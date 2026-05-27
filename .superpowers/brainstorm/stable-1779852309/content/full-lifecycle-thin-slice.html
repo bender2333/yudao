@@ -1,0 +1,68 @@
+<h2>MVP: 全流程薄切片</h2>
+<p class="subtitle">核心不是把某一段做深，而是先打通从需求到运维反馈的可观测闭环。</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">MVP delivery loop</div>
+    <div class="mockup-body">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div style="border:1px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+          <div class="label">Intake</div>
+          <strong>需求进入</strong>
+          <p style="font-size:13px;margin:6px 0 0">PRD / Issue / 告警 / 人工输入</p>
+        </div>
+        <div style="border:1px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+          <div class="label">Plan</div>
+          <strong>分析与编排</strong>
+          <p style="font-size:13px;margin:6px 0 0">澄清, 设计, 分工, gate</p>
+        </div>
+        <div style="border:1px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+          <div class="label">Build</div>
+          <strong>执行与验证</strong>
+          <p style="font-size:13px;margin:6px 0 0">代码, 测试, review, 修复</p>
+        </div>
+        <div style="border:1px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+          <div class="label">Operate</div>
+          <strong>交付与运维</strong>
+          <p style="font-size:13px;margin:6px 0 0">PR, 发布, 监控, 事故反馈</p>
+        </div>
+      </div>
+      <div style="margin-top:16px;border:1px dashed #748094;border-radius:8px;padding:12px;background:#fbfcfe">
+        <strong>闭环信号</strong>
+        <p style="font-size:13px;margin:6px 0 0">运维事件、失败测试、线上指标、用户反馈会自动回流为新任务，保留上下文和决策记录。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>每段 MVP 只保留最小能力</h3>
+<div class="options" data-multiselect>
+  <div class="option" data-choice="intake" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>需求 intake</h3>
+      <p>输入目标、约束、仓库、验收标准；agent 可提出澄清问题并沉淀决策。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="orchestration" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>自主编排</h3>
+      <p>Planner/Reviewer/Implementer/Verifier/Ops agents 协作，系统负责状态、权限、阻塞和人工 gate。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="runtime" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>受控运行时</h3>
+      <p>连接本地或云端 runtime，运行 coding CLI，捕获日志、diff、测试结果和产物。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="delivery" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>交付与运维反馈</h3>
+      <p>生成 PR、发布记录、监控观察项；告警或回归失败能回流成带上下文的新任务。</p>
+    </div>
+  </div>
+</div>

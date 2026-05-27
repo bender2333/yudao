@@ -1,0 +1,111 @@
+<h2>EvoAgentX-style Runtime 执行契约</h2>
+<p class="subtitle">Runtime 只负责一次性 DAG run 的执行、轨迹、工具调用和结果回写；不负责长期 Mission 决策。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Runtime contract</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr auto 1.2fr auto 1fr;gap:10px;align-items:stretch">
+      <div style="border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+        <div class="label">Caller</div>
+        <strong>Process Orchestrator</strong>
+        <p style="font-size:13px;margin:8px 0 0">选择模板、角色、runtime、工具边界和输入 artifact。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#718096">→</div>
+      <div style="border:3px solid #7c5cff;border-radius:12px;padding:14px;background:#f4f0ff">
+        <div class="label">Execution Unit</div>
+        <h3 style="margin:4px 0 8px">DAG Run Engine</h3>
+        <p style="font-size:13px;margin:0">DAG Template → Node Run → Agent Action → Tool Call → Artifact / Result。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#718096">→</div>
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Sink</div>
+        <strong>Mission Core</strong>
+        <p style="font-size:13px;margin:8px 0 0">保存 run result、artifact、event、metrics、recommendation。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Run Request</div>
+        <strong>输入契约</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>mission_id / loop_key</li>
+          <li>run_template_id</li>
+          <li>input_artifact_refs</li>
+          <li>role_bindings</li>
+          <li>runtime_target</li>
+          <li>tool_policy_snapshot</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Execution</div>
+        <strong>运行职责</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>校验 node IO contract</li>
+          <li>调度 agent/action</li>
+          <li>调用 Codex/Claude/Hermes/OpenClaw</li>
+          <li>记录 RunMessage</li>
+          <li>收集 tool call 和 metrics</li>
+          <li>生成结构化结果</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Run Result</div>
+        <strong>输出契约</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>status / verdict</li>
+          <li>output_artifacts</li>
+          <li>node_results</li>
+          <li>risk_signals</li>
+          <li>recommended_next_action</li>
+          <li>evaluation_record</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAGTemplate</div>
+        <strong>可版本化模板</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">定义节点、输入、输出、角色和工具。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAGRun</div>
+        <strong>一次执行实例</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">绑定 mission、loop、template、policy snapshot。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">NodeRun</div>
+        <strong>节点执行</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">保存 node inputs/outputs/status/error。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">ActionRun</div>
+        <strong>agent 动作</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">保存 agent、prompt、model、runtime、messages。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">ToolCall</div>
+        <strong>工具调用</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">保存输入输出摘要、权限、耗时、失败。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">Hard Boundary</div>
+      <strong>Runtime gives recommendations, not lifecycle decisions</strong>
+      <p style="font-size:13px;margin:6px 0 0">Runtime 可以输出 recommended_next_action，但最终是否推进、回退、拆分、gate 或归档，只能由 Process Orchestrator 决定。</p>
+    </div>
+  </div>
+</div>
+
+<h3>正式规则</h3>
+<div class="options">
+  <div class="option" data-choice="formal-runtime-contract" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Runtime = 一次性 DAG 执行器 + 轨迹与证据生产者</h3>
+      <p>借鉴 EvoAgentX 的 WorkflowGraph、Agent/Action、Environment、Evaluator，但补上平台所需的持久化、权限、事件、artifact 和恢复契约。</p>
+    </div>
+  </div>
+</div>

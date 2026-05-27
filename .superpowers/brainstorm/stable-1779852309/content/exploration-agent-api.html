@@ -1,0 +1,81 @@
+<h2>入口 Agent 与需求探索 API</h2>
+<p class="subtitle">入口 agent 可承担部分“需求探索与瓦解”循环，但必须把结论写入平台 Mission 事实源。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Mission-native API inspired by Multica</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Multica pattern to borrow</div>
+        <strong>Chat / Issue / Comment -> AgentTask</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>ChatSession 保存入口会话</li>
+          <li>SendChatMessage 返回 task_id</li>
+          <li>Issue/Comment 可触发 agent task</li>
+          <li>AgentTask 记录状态和来源</li>
+          <li>TaskMessage 形成实时 transcript</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Our mission-native version</div>
+        <strong>Conversation / Signal -> MissionExplorationRun</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>MissionThread 保存入口对话</li>
+          <li>MissionCommand 返回 mission_id / run_id</li>
+          <li>Context/Feedback 可触发探索 run</li>
+          <li>DAGRun 记录状态和来源</li>
+          <li>RunMessage 形成实时 transcript</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Conversation API</div>
+        <strong>入口上下文</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /mission-threads</li>
+          <li>POST /mission-threads/{id}/messages</li>
+          <li>POST /missions/from-thread</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Exploration API</div>
+        <strong>需求探索与瓦解</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /missions</li>
+          <li>POST /missions/{id}/context</li>
+          <li>POST /missions/{id}/explorations</li>
+          <li>POST /missions/{id}/submissions</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Artifact API</div>
+        <strong>结构化探索结果</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /missions/{id}/artifacts</li>
+          <li>POST /missions/{id}/assumptions</li>
+          <li>POST /missions/{id}/questions</li>
+          <li>POST /missions/{id}/decisions</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:1px dashed #8a94a6;border-radius:8px;padding:12px;background:#fbfcfe">
+      <strong>入口 agent 可做什么</strong>
+      <p style="font-size:13px;margin:6px 0 0">它可以把自然语言整理成 mission draft、澄清问题、假设、边界、验收标准、子 mission 建议；但是否进入构建、是否拆分、是否要求人审，由 Process Orchestrator 决定。</p>
+    </div>
+  </div>
+</div>
+
+<h3>建议的最小请求/响应</h3>
+<div class="options">
+  <div class="option" data-choice="mission-exploration-api" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>推荐：Mission Exploration API</h3>
+      <p>参考 Multica 的 chat/issue/task 形态，但对象换成 MissionThread、Mission、ExplorationRun、Artifact、Question、Assumption、Decision。</p>
+    </div>
+  </div>
+</div>

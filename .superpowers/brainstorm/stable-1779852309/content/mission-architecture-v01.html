@@ -1,0 +1,73 @@
+<h2>Mission 系统大架构 v0.1</h2>
+<p class="subtitle">核心定位：Mission 是长期演化容器；流程编排者只管规则；DAG runtime 负责一次性执行；产品壳负责展示、配置、追踪和协作。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Layered architecture</div>
+  <div class="mockup-body">
+    <div style="display:grid;gap:10px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Product Shell - Multica-style</div>
+        <strong>Mission Console / Agents / Runtimes / Approvals / Artifacts / Timeline</strong>
+        <p style="font-size:13px;margin:6px 0 0">负责前端体验、配置入口、实时追踪、协作、任务时间线、agent/runtime 状态。</p>
+      </div>
+
+      <div style="border:3px solid #111827;border-radius:10px;padding:14px;background:#fff">
+        <div class="label">Core Domain</div>
+        <strong>Mission System</strong>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fbfcfe">
+            <strong>需求探索与瓦解</strong>
+            <div style="font-size:12px;color:#667085;margin-top:4px">clarify / decompose / assumptions</div>
+          </div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fbfcfe">
+            <strong>设计与构建</strong>
+            <div style="font-size:12px;color:#667085;margin-top:4px">design / plan / implement</div>
+          </div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fbfcfe">
+            <strong>检查与验证</strong>
+            <div style="font-size:12px;color:#667085;margin-top:4px">test / review / diagnose</div>
+          </div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fbfcfe">
+            <strong>运维与反馈</strong>
+            <div style="font-size:12px;color:#667085;margin-top:4px">release / monitor / feedback</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+        <div class="label">Business-neutral Admin</div>
+        <strong>Process Orchestrator = Policy Engine + State Machine + Run Scheduler + Event Router</strong>
+        <p style="font-size:13px;margin:6px 0 0">只读取 mission 状态、证据、规则和 agent 结构化建议，决定下一步、gate、拆解、回退、升级、结束或沉淀。</p>
+      </div>
+
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Execution Runtime - EvoAgentX-style</div>
+        <strong>DAG Run Engine / Agent-Action / Toolkits / Evaluation</strong>
+        <p style="font-size:13px;margin:6px 0 0">负责一次性 workflow run：节点输入输出、agent/action、工具调用、轨迹、artifact 回写、评估记录。</p>
+      </div>
+
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">Adapters</div>
+        <strong>Codex / Claude Code / Hermes / MCP / GitHub / CI / Sandbox / Observability</strong>
+        <p style="font-size:13px;margin:6px 0 0">连接真实执行环境、代码仓库、测试系统、发布系统、监控告警和外部工具。</p>
+      </div>
+
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">Evolution Loop</div>
+        <strong>Run History -> Evaluator -> Optimizer Candidates -> Sandbox Replay -> Human Gate -> Template Version</strong>
+        <p style="font-size:13px;margin:6px 0 0">先生成候选优化，不自动改线上流程；优化对象是 DAG 模板、agent prompt、策略参数和工具组合。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>一句话架构</h3>
+<div class="options">
+  <div class="option" data-choice="approved-architecture" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Mission Orchestrator + EvoAgentX Runtime + Multica Product Shell</h3>
+      <p>这是当前推荐的大架构：长期 mission 循环由我们设计，一次性执行复用 EvoAgentX 思想，前端配置和追踪参考 Multica。</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,136 @@
+<h2>API Surface v0.1</h2>
+<p class="subtitle">所有入口统一走 MissionCommand；所有状态变化写 MissionEvent；Web Console 和 agent 入口读取同一个事实源。</p>
+
+<div class="mockup">
+  <div class="mockup-header">API groups</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">1 Command API</div>
+        <strong>入口写入</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /mission-commands</li>
+          <li>POST /mission-threads</li>
+          <li>POST /mission-threads/{id}/messages</li>
+          <li>POST /missions/from-thread</li>
+          <li>POST /missions/{id}/feedback</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">2 Mission API</div>
+        <strong>事实查询</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>GET /missions</li>
+          <li>GET /missions/{id}</li>
+          <li>GET /missions/{id}/events</li>
+          <li>GET /missions/{id}/artifacts</li>
+          <li>GET /missions/{id}/decisions</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">3 Runtime API</div>
+        <strong>DAG / Node 执行</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /missions/{id}/runs</li>
+          <li>GET /runs/{id}</li>
+          <li>GET /runs/{id}/nodes</li>
+          <li>GET /nodes/{id}/messages</li>
+          <li>POST /runs/{id}/cancel</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+        <div class="label">4 Orchestrator API</div>
+        <strong>流程决策</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>POST /missions/{id}/next-step</li>
+          <li>GET /missions/{id}/loop-state</li>
+          <li>GET /decisions/{id}</li>
+          <li>POST /decisions/{id}/apply</li>
+          <li>POST /decisions/{id}/override</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">5 Realtime API</div>
+        <strong>事件流</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>WS /events?mission_id=...</li>
+          <li>WS /runs/{id}/messages</li>
+          <li>event: mission.updated</li>
+          <li>event: run.message</li>
+          <li>event: approval.requested</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">6 Config API</div>
+        <strong>Agent / Runtime / Policy</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>GET /agents, /runtimes</li>
+          <li>POST /agents</li>
+          <li>PATCH /agents/{id}</li>
+          <li>GET /dag-templates</li>
+          <li>GET /policies</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+      <div class="label">Unifying primitive</div>
+      <strong>MissionCommand</strong>
+      <p style="font-size:13px;margin:6px 0 0">Hermes、OpenClaw、Web Console、Webhook、Autopilot 都提交 MissionCommand。后端把命令验证、归档为 MissionEvent，并触发 Orchestrator。</p>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Command example</div>
+        <strong>create_mission</strong>
+        <pre style="font-size:12px;white-space:pre-wrap;margin:8px 0 0;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px">{
+  "type": "create_mission",
+  "source": "openclaw",
+  "workspace_id": "ws_1",
+  "payload": {
+    "text": "帮我重构登录模块并发 PR",
+    "repo_ref": "repo_platform",
+    "autonomy_mode": "default_autonomous"
+  }
+}</pre>
+      </div>
+
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Response example</div>
+        <strong>command accepted</strong>
+        <pre style="font-size:12px;white-space:pre-wrap;margin:8px 0 0;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px">{
+  "command_id": "cmd_123",
+  "mission_id": "mis_456",
+  "thread_id": "thr_789",
+  "event_id": "evt_001",
+  "next": {
+    "action": "start_dag_run",
+    "run_template": "ExplorationRun"
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">API rule</div>
+      <strong>Commands mutate; queries project; events explain.</strong>
+      <p style="font-size:13px;margin:6px 0 0">写操作全部通过 Command API；读操作从状态投影读取；为什么发生变化必须能从 MissionEvent、Artifact、Decision 追溯。</p>
+    </div>
+  </div>
+</div>
+
+<h3>API 确认</h3>
+<div class="options">
+  <div class="option" data-choice="formal-api-surface" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>v0.1 API = Command + Query + Runtime + Orchestrator + Realtime + Config</h3>
+      <p>统一入口写入、统一事实流、统一实时追踪，为 agent 入口和 Web Console 提供同一套平台能力。</p>
+    </div>
+  </div>
+</div>
