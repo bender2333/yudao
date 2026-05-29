@@ -1,0 +1,86 @@
+<h2>Agent-first 协作入口</h2>
+<p class="subtitle">Product Shell 不必先等于 Web UI。Hermes / OpenClaw 可以作为第一入口；Web Console 作为控制台和观察面。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Entry model for Mission System</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr auto 1.2fr auto 1fr;gap:10px;align-items:stretch">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Primary Entry</div>
+        <strong>Hermes / OpenClaw Agent</strong>
+        <p style="font-size:13px;margin:8px 0 0">创建 mission、补充上下文、查看进度、处理审批、接收运行摘要。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:24px;color:#718096">→</div>
+      <div style="border:3px solid #111827;border-radius:10px;padding:14px;background:#fff">
+        <div class="label">Source of Truth</div>
+        <strong>Mission Platform Backend</strong>
+        <p style="font-size:13px;margin:8px 0 0">保存 Mission、Policy、Run、Event、Artifact、Decision、Approval，不依赖 agent 会话当状态源。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:24px;color:#718096">→</div>
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Execution</div>
+        <strong>EvoAgentX-style Runtime</strong>
+        <p style="font-size:13px;margin:8px 0 0">启动 DAG run，调度角色 agent、工具、Codex/Claude/Hermes/OpenClaw adapter。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Agent Entry API</div>
+        <strong>MissionCommand</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>create_mission</li>
+          <li>append_context</li>
+          <li>ask_status</li>
+          <li>approve / reject / modify</li>
+          <li>request_run / stop_run</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Feedback Stream</div>
+        <strong>MissionEvent</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>mission.created</li>
+          <li>run.started</li>
+          <li>artifact.created</li>
+          <li>approval.requested</li>
+          <li>mission.needs_input</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Secondary UI</div>
+        <strong>Web Console</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>全局 mission 列表</li>
+          <li>runtime/agent 配置</li>
+          <li>timeline/transcript</li>
+          <li>artifact/approval 管理</li>
+          <li>template/evolution 管理</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:1px dashed #8a94a6;border-radius:8px;padding:12px;background:#fbfcfe">
+      <strong>关键边界</strong>
+      <p style="font-size:13px;margin:6px 0 0">Hermes/OpenClaw 是入口和执行适配器，但不是流程状态源。状态源必须是 Mission Platform Backend，否则无法做审计、恢复、跨入口协作和进化评估。</p>
+    </div>
+  </div>
+</div>
+
+<h3>MVP 入口建议</h3>
+<div class="options">
+  <div class="option" data-choice="agent-first-with-console" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>推荐：Agent-first + 最小 Web Console</h3>
+      <p>Hermes/OpenClaw 作为主要交互入口；Web 先做 mission/runs/artifacts/approvals 的观察和配置面。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="web-first" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Web-first</h3>
+      <p>更传统、更清楚，但会降低 agent 原生工作流体验，MVP 也会更重。</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,72 @@
+<h2>研发协作平台的生命周期范围</h2>
+<p class="subtitle">先选 MVP 应该覆盖到哪里。完整平台可以从需求到持续运维，但第一版需要一个清晰闭环。</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">End-to-end software delivery loop</div>
+    <div class="mockup-body">
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(92px,1fr));gap:8px;align-items:stretch">
+        <div style="border:1px solid #d5d9e2;border-radius:8px;padding:10px;background:#f8fafc">
+          <div class="label">01</div>
+          <strong>需求</strong>
+          <p style="font-size:13px;margin:6px 0 0">PRD, issue, user story, acceptance criteria</p>
+        </div>
+        <div style="border:1px solid #d5d9e2;border-radius:8px;padding:10px;background:#f8fafc">
+          <div class="label">02</div>
+          <strong>设计</strong>
+          <p style="font-size:13px;margin:6px 0 0">方案, 架构, 风险, 评审</p>
+        </div>
+        <div style="border:1px solid #d5d9e2;border-radius:8px;padding:10px;background:#f8fafc">
+          <div class="label">03</div>
+          <strong>计划</strong>
+          <p style="font-size:13px;margin:6px 0 0">任务拆解, agent 分工, gates</p>
+        </div>
+        <div style="border:1px solid #2463eb;border-radius:8px;padding:10px;background:#eef4ff">
+          <div class="label">04</div>
+          <strong>执行</strong>
+          <p style="font-size:13px;margin:6px 0 0">编码, 修改, 调试, 状态流</p>
+        </div>
+        <div style="border:1px solid #2463eb;border-radius:8px;padding:10px;background:#eef4ff">
+          <div class="label">05</div>
+          <strong>验证</strong>
+          <p style="font-size:13px;margin:6px 0 0">测试, lint, review, 修复</p>
+        </div>
+        <div style="border:1px solid #d5d9e2;border-radius:8px;padding:10px;background:#f8fafc">
+          <div class="label">06</div>
+          <strong>交付</strong>
+          <p style="font-size:13px;margin:6px 0 0">PR, merge, release notes</p>
+        </div>
+        <div style="border:1px solid #d5d9e2;border-radius:8px;padding:10px;background:#f8fafc">
+          <div class="label">07</div>
+          <strong>运维</strong>
+          <p style="font-size:13px;margin:6px 0 0">监控, incident, rollback, follow-up</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>第一版 MVP 边界</h3>
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>执行闭环</h3>
+      <p>从现有 issue/需求进入，完成 agent 编码、测试、修复、review、PR。最快做出可用价值。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>需求到 PR 闭环</h3>
+      <p>覆盖需求澄清、方案、任务拆解、agent 执行、验证和 PR。更像完整研发协作平台。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>需求到运维闭环</h3>
+      <p>一开始就覆盖需求、研发、发布、监控、故障响应和持续改进。愿景完整，但 MVP 风险最高。</p>
+    </div>
+  </div>
+</div>

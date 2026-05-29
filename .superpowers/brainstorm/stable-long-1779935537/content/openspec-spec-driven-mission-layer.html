@@ -1,0 +1,71 @@
+<h2>OpenSpec as Spec Artifact Layer</h2>
+<p class="subtitle">Use spec to drive each Mission loop, without replacing Mission Core or Process Orchestrator.</p>
+
+<div class="section">
+  <div class="label">Core Placement</div>
+  <div class="mockup">
+    <div class="mockup-header">Mission owns lifecycle. OpenSpec-style artifacts define behavior and change intent.</div>
+    <div class="mockup-body">
+      <div style="display:grid;gap:10px">
+        <div class="placeholder"><strong>Mission Core</strong><br>long-lived state, event stream, relation, decision, artifact index</div>
+        <div class="placeholder"><strong>OpenSpec-style Spec Artifact Layer</strong><br>proposal, spec deltas, design, tasks, scenarios, archive/sync history</div>
+        <div class="placeholder"><strong>Process Orchestrator</strong><br>routes loops based on facts from specs, nodes, verification, and policy boundary</div>
+        <div class="placeholder"><strong>EvoAgentX-style DAG Runtime</strong><br>executes bounded runs that create, update, validate, or apply spec artifacts</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">OpenSpec Mapping</div>
+  <div class="mockup">
+    <div class="mockup-header">Translate, Do Not Copy Blindly</div>
+    <div class="mockup-body">
+      <pre>openspec/specs/              -> canonical behavior specs
+openspec/changes/&lt;change&gt;/   -> Mission-bound SpecChange
+proposal.md                  -> Mission Brief / Why / What / Impact
+specs/**/*.md                -> behavior requirements + scenarios
+design.md                    -> Design Note / technical approach
+tasks.md                     -> implementation checklist / DAG seed
+verify                       -> Verification DAG input
+archive/sync                 -> accepted behavior promoted to canonical specs</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Loop Integration</div>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Before Build</div>
+      <div class="mockup-body">
+        <ul>
+          <li>Exploration creates proposal and requirement scenarios</li>
+          <li>Design creates design artifact from accepted scope</li>
+          <li>Planning converts tasks into DAG templates or node seeds</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">After Build</div>
+      <div class="mockup-body">
+        <ul>
+          <li>Verification checks code/tests against scenarios</li>
+          <li>Ops feedback opens or updates SpecChange</li>
+          <li>Stable outcomes sync back into canonical specs</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Boundary</div>
+  <div class="mockup">
+    <div class="mockup-header">What OpenSpec Does Not Replace</div>
+    <div class="mockup-body">
+      <p><strong>OpenSpec does not become the platform scheduler, mission database, runtime adapter, or approval system.</strong></p>
+      <p>It supplies the spec-driven artifact grammar. Mission Platform supplies long-term state, orchestration, execution, UI, and evolution.</p>
+    </div>
+  </div>
+</div>

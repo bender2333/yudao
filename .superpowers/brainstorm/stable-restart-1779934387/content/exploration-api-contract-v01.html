@@ -1,0 +1,94 @@
+<h2>需求探索与瓦解 API v0.1</h2>
+<p class="subtitle">入口 agent 承担探索循环的一部分：把自然语言变成 Mission 事实、问题、假设、验收和子 mission 建议。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Minimal closed loop</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:10px;align-items:stretch">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">1 Entry</div>
+        <strong>Hermes / OpenClaw</strong>
+        <p style="font-size:13px;margin:8px 0 0">用户自然语言、附件、仓库上下文、已有对话。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#718096">→</div>
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">2 Thread</div>
+        <strong>MissionThread</strong>
+        <p style="font-size:13px;margin:8px 0 0">保存入口会话和来源，类似 Multica ChatSession。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#718096">→</div>
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">3 Mission</div>
+        <strong>Mission Draft</strong>
+        <p style="font-size:13px;margin:8px 0 0">创建长期目标容器，状态为 exploring。</p>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#718096">→</div>
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">4 Run</div>
+        <strong>ExplorationRun</strong>
+        <p style="font-size:13px;margin:8px 0 0">EvoAgentX-style DAG run，生成结构化探索结果。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Output A</div>
+        <strong>Questions</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">需要人补充的问题，带 priority/blocking。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Output B</div>
+        <strong>Assumptions</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">当前推断、置信度、证据来源。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Output C</div>
+        <strong>Acceptance</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">验收标准草案、验证方式、风险。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Output D</div>
+        <strong>Sub-missions</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">建议拆分的子 mission 和依赖。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">5 Decision</div>
+      <strong>Process Orchestrator consumes exploration_result</strong>
+      <p style="font-size:13px;margin:6px 0 0">根据 policy 决定：继续提问、启动设计构建、拆子 mission、进入 gate、暂停或拒绝。</p>
+    </div>
+  </div>
+</div>
+
+<h3>Core APIs</h3>
+<div class="options" data-multiselect>
+  <div class="option" data-choice="thread" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Thread API</h3>
+      <p>POST /mission-threads, POST /mission-threads/{id}/messages, POST /missions/from-thread</p>
+    </div>
+  </div>
+  <div class="option" data-choice="explore-run" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Exploration Run API</h3>
+      <p>POST /missions/{id}/exploration-runs, GET /runs/{id}, GET /runs/{id}/messages</p>
+    </div>
+  </div>
+  <div class="option" data-choice="fact-write" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Fact Write API</h3>
+      <p>POST /missions/{id}/questions, assumptions, artifacts, decisions, child-mission-proposals</p>
+    </div>
+  </div>
+  <div class="option" data-choice="orchestrate" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Orchestrator API</h3>
+      <p>POST /missions/{id}/next-step，让流程管理员按规则判断下一步，而不是入口 agent 自己决定。</p>
+    </div>
+  </div>
+</div>

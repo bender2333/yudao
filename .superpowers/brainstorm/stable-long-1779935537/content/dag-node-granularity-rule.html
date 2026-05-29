@@ -1,0 +1,104 @@
+<h2>DAG Node 粒度规则</h2>
+<p class="subtitle">四个 Mission 循环是大层级；循环内部的小循环必须落到 DAG Node 粒度，NodeRun 是最小可观察、可调度、可回滚的执行单元。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Granularity hierarchy</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:stretch">
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Level 1</div>
+        <strong>Mission</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">长期目标和演化容器。</p>
+      </div>
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Level 2</div>
+        <strong>Loop</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">探索、设计构建、验证、反馈。</p>
+      </div>
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Level 3</div>
+        <strong>DAG Run</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">一次性 workflow 执行实例。</p>
+      </div>
+      <div style="border:3px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">Level 4</div>
+        <strong>DAG Node / NodeRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#315f43">最小流程控制粒度。</p>
+      </div>
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">Level 5</div>
+        <strong>Action / ToolCall</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#7a5414">agent 执行和工具调用细节。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+      <div class="label">Rule</div>
+      <strong>小循环不是随意 while loop，而是 Node-level retry / branch / route</strong>
+      <p style="font-size:13px;margin:6px 0 0">例如“验证失败回修复”不是整个 Mission 直接重跑，而是 Verification DAG 的 failed node 产出 FailureClassification，Process Orchestrator 再路由到 DesignBuild DAG 的具体 Fix Node 或 Design Node。</p>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Node Contract</div>
+        <strong>每个 Node 必须有明确契约</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>node_key / node_type</li>
+          <li>required_inputs</li>
+          <li>expected_outputs</li>
+          <li>assigned_role</li>
+          <li>tool_policy</li>
+          <li>retry_policy</li>
+          <li>failure_classification</li>
+          <li>artifact_outputs</li>
+        </ul>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Node Control</div>
+        <strong>编排者控制到 NodeRun</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>重试单个 node</li>
+          <li>跳过非必要 node</li>
+          <li>插入补充 node</li>
+          <li>路由到另一个 DAG template 的 node</li>
+          <li>为某个 node 创建 approval gate</li>
+          <li>把 node 输出写为 artifact</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Explore DAG</div>
+        <strong>示例节点</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">intent_extract、question_generate、scope_define、readiness_assess。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Build DAG</div>
+        <strong>示例节点</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">impact_analyze、design_note、implement_patch、local_build。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Verify DAG</div>
+        <strong>示例节点</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">test_select、test_run、review_diff、failure_classify。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Feedback DAG</div>
+        <strong>示例节点</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">release_check、monitor_eval、incident_triage、retro_extract。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>正式规则</h3>
+<div class="options">
+  <div class="option" data-choice="formal-node-granularity" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>循环内控制粒度 = DAG Node</h3>
+      <p>Mission 循环负责方向，DAG Run 负责一次执行，NodeRun 负责最小流程控制；retry、branch、gate、artifact 和 failure classification 都落到 Node 粒度。</p>
+    </div>
+  </div>
+</div>

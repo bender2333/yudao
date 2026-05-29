@@ -1,0 +1,71 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Mission Planner 边界拆分" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 从“重 Planner 黑盒”改成“轻 Planner + 组织编译 + DAG 内部分解”。
+    - generic [ref=e7]:
+      - generic [ref=e8]: 过重职责
+      - generic [ref=e10]: 拆分后职责
+      - generic [ref=e12]: 一次 bounded workflow
+      - generic [ref=e14]: 路由判断
+  - generic [ref=e17]:
+    - generic [ref=e19]:
+      - heading "之前：Planner 太重" [level=2] [ref=e20]
+      - paragraph [ref=e21]: 判断 + 分解 + 组织 + DAG 生成
+    - generic [ref=e23]:
+      - heading "现在：Planner 变轻" [level=2] [ref=e24]
+      - paragraph [ref=e25]: 策略判断在上，任务分解在 DAG 内
+    - generic [ref=e26]:
+      - heading "Mission State" [level=3] [ref=e27]
+      - paragraph [ref=e28]: goal / memory / events / feedback
+    - generic [ref=e29]:
+      - heading "Mission Planner" [level=3] [ref=e30]
+      - paragraph [ref=e31]: 判断下一步、生成组织、拆任务、写 DAG 计划
+    - generic [ref=e32]:
+      - heading "Workflow DAG" [level=3] [ref=e33]
+      - paragraph [ref=e34]: 执行 Planner 已经写好的任务树
+    - generic [ref=e35]:
+      - heading "Runtime Nodes" [level=3] [ref=e36]
+      - paragraph [ref=e37]: 按任务执行，但生命周期权威不清晰
+    - generic [ref=e38]:
+      - heading "Route Decision" [level=3] [ref=e39]
+      - paragraph [ref=e40]: 很多依据被压缩在 Planner 输出里
+    - generic [ref=e45]: 职责集中
+    - generic [ref=e46]: 难审计
+    - generic [ref=e47]:
+      - heading "Mission Context" [level=3] [ref=e48]
+      - paragraph [ref=e49]: state / goal contract / memory / event projection
+    - generic [ref=e51]:
+      - text: Mission Planner
+      - text: 只决定下一轮意图
+    - generic [ref=e52]:
+      - heading "Workflow Intent" [level=3] [ref=e53]
+      - paragraph [ref=e54]: next loop、reason、template candidates、gate hint
+    - generic [ref=e55]:
+      - heading "Organization Compiler" [level=3] [ref=e56]
+      - paragraph [ref=e57]: 选择角色拓扑：Refiner / Worker / Verifier / Critic
+    - generic [ref=e58]:
+      - heading "Workflow Factory" [level=3] [ref=e59]
+      - paragraph [ref=e60]: 模板选择、参数绑定、生成 DAGRunPlan
+    - generic [ref=e62]: Bounded Workflow / 小循环
+    - generic [ref=e63]:
+      - heading "Refiner Node" [level=3] [ref=e64]
+      - paragraph [ref=e65]: 澄清和拆解
+    - generic [ref=e66]:
+      - heading "Worker Node" [level=3] [ref=e67]
+      - paragraph [ref=e68]: 设计 / 实现
+    - generic [ref=e69]:
+      - heading "Verifier Node" [level=3] [ref=e70]
+      - paragraph [ref=e71]: 验证 / 分类
+    - generic [ref=e78]: DAG 内节点再做细分
+    - generic [ref=e79]:
+      - text: 边界变化
+      - text: 不是取消 Planner
+      - text: 而是拆轻
+    - generic [ref=e80]: 风险：Planner 输出会同时包含策略、组织、任务树和执行细节；后续很难判断失败是目标判断错、任务拆错，还是节点执行错。
+    - generic [ref=e81]: 新边界：Planner 只给出下一轮意图和理由；组织编译器选角色；Workflow Factory 生成有界 DAG；具体任务拆解由 DAG 内专业节点完成。
+    - generic [ref=e82]:
+      - generic [ref=e83]: 需求探索与瓦解
+      - generic [ref=e84]: 设计与构建
+      - generic [ref=e85]: 检查与验证
+      - generic [ref=e86]: 运维与反馈

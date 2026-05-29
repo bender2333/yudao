@@ -1,0 +1,86 @@
+<h2>v0.1 路线与验收</h2>
+<p class="subtitle">v0.1 分两段：先打通 Mission 全闭环薄切片，再进入自举，让平台开始开发自己。</p>
+
+<div class="mockup">
+  <div class="mockup-header">v0.1 roadmap</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:stretch">
+      <div style="border:3px solid #1f6feb;border-radius:10px;padding:14px;background:#eef4ff">
+        <div class="label">v0.1A</div>
+        <strong>Mission 全闭环薄切片</strong>
+        <p style="font-size:13px;margin:8px 0 0">证明平台可以从 agent 入口创建 Mission，跑过探索、构建、验证、反馈，并在 Web Console 可追踪。</p>
+        <div style="margin-top:12px;display:grid;gap:8px;font-size:13px">
+          <div style="padding:8px;border-radius:6px;background:#fff">Mission Core + MissionEvent</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">Process Orchestrator MVP</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">EvoAgentX-style DAG / Node runtime</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">Hermes/OpenClaw entry command</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">Multica-style Web Console tracking</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">EvaluationRecord 基础记录</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;font-size:28px;color:#718096">→</div>
+
+      <div style="border:3px solid #7c5cff;border-radius:10px;padding:14px;background:#f4f0ff">
+        <div class="label">v0.1B</div>
+        <strong>Self-bootstrap 自举开发</strong>
+        <p style="font-size:13px;margin:8px 0 0">平台把自身 repo 作为受管项目，用自己的 Mission、DAG、Node、Console 和评价记录来开发自己。</p>
+        <div style="margin-top:12px;display:grid;gap:8px;font-size:13px">
+          <div style="padding:8px;border-radius:6px;background:#fff">Self Project 注册</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">Self Mission 模板</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">代码 agent 修改平台自身代码</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">自身变更验证与三向分流</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">自举 guardrails / hard gates</div>
+          <div style="padding:8px;border-radius:6px;background:#fff">复盘和进化样本沉淀</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">v0.1A Acceptance</div>
+        <strong>闭环薄切片验收</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>入口 agent 能创建 MissionThread / Mission</li>
+          <li>探索 DAG 产出 brief、questions、assumptions、acceptance</li>
+          <li>默认自主能问必要问题或自动推进</li>
+          <li>设计构建 DAG 能产出候选 patch / plan</li>
+          <li>检查验证 DAG 能做需求/设计/实现三向分流</li>
+          <li>Web Console 能看到 Mission、DAGRun、NodeRun、transcript</li>
+          <li>所有 run/node 生成 event、artifact、evaluation record</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">v0.1B Acceptance</div>
+        <strong>自举验收</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>平台自身 repo 被注册为受管项目</li>
+          <li>至少一个平台自身功能通过 Mission 发起</li>
+          <li>能用 DAG/Node 修改平台自身代码</li>
+          <li>能生成自变更 patch / PR draft</li>
+          <li>验证失败能正确回探索、回设计或回修复</li>
+          <li>涉及核心流程/安全/runtime 的修改触发 human gate</li>
+          <li>自举过程产生复盘 artifact 和进化候选</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">Non-goals for v0.1</div>
+      <strong>第一版刻意不做深</strong>
+      <p style="font-size:13px;margin:6px 0 0">不做复杂多租户、不做复杂会签、不做全自动线上流程进化、不做完整云沙箱、不开放任意 agent 拓扑。先证明 Mission 系统、DAG Node 粒度、Web 追踪和自举可成立。</p>
+    </div>
+  </div>
+</div>
+
+<h3>路线确认</h3>
+<div class="options">
+  <div class="option" data-choice="formal-v01-roadmap" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>v0.1 = 闭环薄切片 + 自举开发</h3>
+      <p>先让 Mission 系统跑通，再让平台用自己的 Mission 系统开发自己，作为真实 dogfooding 和进化数据来源。</p>
+    </div>
+  </div>
+</div>

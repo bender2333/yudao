@@ -1,0 +1,81 @@
+<h2>Multica 参考地图</h2>
+<p class="subtitle">Multica 更适合作为产品交互和 runtime/agent/task 追踪参考；EvoAgentX 更适合作为 workflow 与评估进化参考。</p>
+
+<div class="mockup">
+  <div class="mockup-header">What Multica contributes to our Option A architecture</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Frontend Product Shell</div>
+        <strong>可参考前端信息架构</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>Agents 列表和详情页</li>
+          <li>Runtimes 机器/daemon 管理</li>
+          <li>Issues 协作任务视图</li>
+          <li>Chat + task transcript</li>
+          <li>Autopilots 自动触发配置</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Agent Connection</div>
+        <strong>可参考 agent-runtime 绑定</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>RuntimeDevice：provider/status/last_seen</li>
+          <li>Agent：runtime_id/model/instructions/env/args</li>
+          <li>Agent skill 作为可挂载能力</li>
+          <li>Runtime picker 和可用性判断</li>
+          <li>本地 daemon + 云 runtime 入口</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">Task Tracking</div>
+        <strong>可参考实时任务追踪</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>AgentTask：queued/running/done/failed</li>
+          <li>TaskMessage：seq/type/tool/input/output</li>
+          <li>WebSocket 实时事件</li>
+          <li>断线后 reconcile server truth</li>
+          <li>Transcript 时间线和敏感信息脱敏</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Use Directly As Inspiration</div>
+        <strong>我们的前端导航可以参考</strong>
+        <p style="font-size:13px;margin:8px 0 0">Dashboard、Lifecycle Runs、Issues/Requirements、Agents、Runtimes、Autopilots、Approvals、Memory、Settings。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Adapt, Not Copy</div>
+        <strong>我们的任务粒度要更强</strong>
+        <p style="font-size:13px;margin:8px 0 0">Multica 的 AgentTask 是单 agent 任务；我们需要 WorkflowRun / StageRun / DAGNodeRun / AgentActionRun 分层追踪。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>两套参考的职责边界</h3>
+<div class="options">
+  <div class="option" data-choice="multica-shell-evo-kernel" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>推荐：Multica-style shell + EvoAgentX runtime</h3>
+      <p>前端、agent/runtime/task 追踪参考 Multica；workflow DAG、评估和进化参考 EvoAgentX；中间用我们的 lifecycle model 串起来。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="multica-first" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>偏产品：先做 Multica-like task runner</h3>
+      <p>更快做出 UI 和 agent 连接，但容易退化成任务派发工具，弱化全流程 lifecycle 和 workflow 进化。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="evo-first" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>偏框架：先做 EvoAgentX-like workflow lab</h3>
+      <p>内核能力强，但前端协作、任务追踪、runtime 接入体验会弱，不符合平台产品目标。</p>
+    </div>
+  </div>
+</div>

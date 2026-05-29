@@ -1,0 +1,117 @@
+<h2>流程编排者</h2>
+<p class="subtitle">Process Orchestrator 是业务无关管理员：只根据状态、事件、证据、策略和自主模式决定流程下一步。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Business-neutral orchestration brain</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;align-items:center">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Inputs</div>
+        <strong>只读结构化事实</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>Mission State</li>
+          <li>Mission Events</li>
+          <li>Artifacts / Decisions</li>
+          <li>Run Results</li>
+          <li>Readiness / Verdict</li>
+          <li>Autonomy Mode</li>
+          <li>Policies</li>
+        </ul>
+      </div>
+
+      <div style="border:3px solid #111827;border-radius:12px;padding:14px;background:#fff">
+        <div class="label">Core</div>
+        <h3 style="margin:4px 0 8px">Process Orchestrator</h3>
+        <p style="font-size:13px;margin:0">Policy Engine + State Machine + Event Router + Run Scheduler + Gate Manager。</p>
+        <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:8px;background:#fbfcfe;font-size:12px">rules first</div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:8px;background:#fbfcfe;font-size:12px">LLM advisory only</div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:8px;background:#fbfcfe;font-size:12px">append-only events</div>
+          <div style="border:1px solid #d6dbe5;border-radius:8px;padding:8px;background:#fbfcfe;font-size:12px">auditable decisions</div>
+        </div>
+      </div>
+
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">Outputs</div>
+        <strong>流程动作</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>ask_user_input</li>
+          <li>start_dag_run</li>
+          <li>create_child_mission</li>
+          <li>route_to_loop</li>
+          <li>require_approval</li>
+          <li>pause / archive</li>
+          <li>promote_learning</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Policy Engine</div>
+        <strong>规则解释</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">自主模式、风险策略、gate、重试、超时、权限。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">State Machine</div>
+        <strong>状态推进</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">mission 状态、当前循环、阻塞、暂停、归档。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Event Router</div>
+        <strong>事件分流</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">测试失败、review 驳回、告警、反馈、审批。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Run Scheduler</div>
+        <strong>运行调度</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">选择 DAG 模板、角色、runtime、工具和上下文。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Gate Manager</div>
+        <strong>审批控制</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">创建审批、超时、修改、拒绝、恢复执行。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">Decision Contract</div>
+      <strong>OrchestrationDecision</strong>
+      <p style="font-size:13px;margin:6px 0 0">每次编排必须输出结构化决策：action、target_loop、run_template、reason、policy_refs、required_inputs、risk_level、human_gate。</p>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Mode 1</div>
+        <strong>人工主导</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">只整理建议，等待人选择下一步。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Mode 2</div>
+        <strong>半自主推荐</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">输出候选动作，让人选择。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Mode 3</div>
+        <strong>默认自主</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">自动推进，必要阻塞问题和高风险动作才 gate。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Mode 4</div>
+        <strong>全自主</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">按最佳假设推进，只受 hard safety policy 阻断。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>正式规则</h3>
+<div class="options">
+  <div class="option" data-choice="formal-process-orchestrator" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>流程编排者 = 规则管理员 + 运行调度器 + 事件分流器</h3>
+      <p>它不做业务判断，只把 agent/run 产出的结构化事实按 policy 转成下一步流程动作，并保证所有决策可审计、可恢复。</p>
+    </div>
+  </div>
+</div>

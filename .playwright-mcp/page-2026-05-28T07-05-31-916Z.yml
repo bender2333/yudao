@@ -1,0 +1,61 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Mission Event Stream and Projections" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 事件流是长期事实；投影只是读取模型。Planner、Orchestrator、Replay 都围绕事件流工作。
+  - main [ref=e7]:
+    - img
+    - generic [ref=e8]:
+      - generic [ref=e9]: Commands request change
+      - generic [ref=e10]: Events record facts
+      - generic [ref=e11]: Projections support reading
+      - generic [ref=e12]: Replay needs event history
+    - generic [ref=e13]:
+      - heading "MissionCommand" [level=3] [ref=e14]
+      - paragraph [ref=e15]: Hermes、OpenClaw、Web UI、Webhook、Autopilot 提交意图。
+      - generic [ref=e16]:
+        - generic [ref=e17]: create
+        - generic [ref=e18]: update
+        - generic [ref=e19]: feedback
+    - generic [ref=e20]:
+      - heading "Process Orchestrator" [level=3] [ref=e21]
+      - paragraph [ref=e22]: 调度、路由、gate 决策都必须写成事件。
+      - generic [ref=e23]:
+        - generic [ref=e24]: RouteDecided
+        - generic [ref=e25]: GateDecided
+    - generic [ref=e26]:
+      - heading "Append-only MissionEvent Stream" [level=2] [ref=e27]
+      - generic [ref=e28]:
+        - generic [ref=e31]: MissionCreated
+        - generic [ref=e34]: FeedbackSignalReceived
+        - generic [ref=e37]: WorkflowPlanned
+        - generic [ref=e40]: WorkflowTemplateSelected
+        - generic [ref=e43]: SpecChangeCreated / Updated
+        - generic [ref=e46]: DAGRunScheduled
+        - generic [ref=e49]: NodeRunStarted / Completed
+        - generic [ref=e52]: ArtifactRecorded
+        - generic [ref=e55]: RouteDecided
+        - generic [ref=e58]: MissionStateChanged
+        - generic [ref=e61]: EvaluationRecorded
+    - generic [ref=e62]:
+      - heading "Mission Planner" [level=3] [ref=e63]
+      - paragraph [ref=e64]: 读取 projection + event history，生成下一次 workflow plan。
+      - generic [ref=e65]:
+        - generic [ref=e66]: PlannerContext
+        - generic [ref=e67]: WorkflowReason
+    - generic [ref=e68]:
+      - heading "Replay / Evolution" [level=3] [ref=e69]
+      - paragraph [ref=e70]: 没有事件流就没有 replay；没有 replay 就没有可靠演化。
+      - generic [ref=e71]:
+        - generic [ref=e72]: ReplayRun
+        - generic [ref=e73]: EvaluationDataset
+    - region "Mission projections" [ref=e74]:
+      - generic [ref=e75]: MissionSummaryView
+      - generic [ref=e76]: TimelineView
+      - generic [ref=e77]: PlannerContextView
+      - generic [ref=e78]: SpecChangeView
+      - generic [ref=e79]: RunTraceView
+      - generic [ref=e80]: FeedbackInboxView
+      - generic [ref=e81]: ApprovalInboxView
+      - generic [ref=e82]: EvolutionDatasetView
+      - generic [ref=e83]: BacklogView

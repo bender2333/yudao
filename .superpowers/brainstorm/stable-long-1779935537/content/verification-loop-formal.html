@@ -1,0 +1,120 @@
+<h2>检查与验证循环</h2>
+<p class="subtitle">承接“设计与构建”的候选实现，生成可信证据；决定通过、修复、回退、人工 gate 或进入运维与反馈。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Check & Verify loop</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;align-items:center">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Inputs</div>
+        <strong>候选实现与验收目标</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>Patch Set / Branch</li>
+          <li>Design Note</li>
+          <li>Acceptance Criteria</li>
+          <li>Risk Register</li>
+          <li>Build Result</li>
+          <li>Changed Files Summary</li>
+        </ul>
+      </div>
+
+      <div style="border:3px solid #2f855a;border-radius:12px;padding:14px;background:#ecfdf3">
+        <div class="label">Loop</div>
+        <h3 style="margin:4px 0 8px">Check & Verify</h3>
+        <p style="font-size:13px;margin:0">测试、review、安全扫描、验收核验、失败诊断、证据归档。</p>
+        <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="border:1px solid #b7ebca;border-radius:8px;padding:8px;background:#fff;font-size:12px">tests_failed → diagnose</div>
+          <div style="border:1px solid #b7ebca;border-radius:8px;padding:8px;background:#fff;font-size:12px">review_failed → fix</div>
+          <div style="border:1px solid #b7ebca;border-radius:8px;padding:8px;background:#fff;font-size:12px">contradiction → explore</div>
+          <div style="border:1px solid #b7ebca;border-radius:8px;padding:8px;background:#fff;font-size:12px">boundary_gap → design</div>
+        </div>
+      </div>
+
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Outputs</div>
+        <strong>验证证据</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>Test Report</li>
+          <li>Review Findings</li>
+          <li>Risk Assessment</li>
+          <li>Verification Verdict</li>
+          <li>Fix Recommendations</li>
+          <li>PR Readiness / Release Readiness</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAG Run A</div>
+        <strong>TestRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">单测、集成、lint、typecheck、安全扫描。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAG Run B</div>
+        <strong>ReviewRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">代码审查、diff 风险、规范和维护性检查。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAG Run C</div>
+        <strong>DiagnosisRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">失败归因，判断回到构建还是探索。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">DAG Run D</div>
+        <strong>AcceptanceRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">逐条核对验收标准和证据完整性。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">Verdict Gate</div>
+      <strong>Evidence Sufficiency + Autonomy Mode</strong>
+      <p style="font-size:13px;margin:6px 0 0">默认自主下，证据足够且未命中强制 gate 时可自动推进；半自主会给出通过/修复/回退选项；人工主导必须人确认；全自主只在高风险策略命中时停下。</p>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Pass</div>
+        <strong>通过验证</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">进入 PR/Release 或运维反馈。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Fix</div>
+        <strong>回到实现修复</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">目标和设计清楚，只是功能 bug 或实现缺陷。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Design</div>
+        <strong>回到架构/设计</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">边界没考虑清楚、方案缺口、模块职责不清。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Explore</div>
+        <strong>回到需求探索</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">需求未定义清楚，测试和验证结论互相矛盾。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Gate</div>
+        <strong>人工确认</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">风险高、证据冲突无法自动归因、质量边界不明确。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:1px dashed #8a94a6;border-radius:8px;padding:12px;background:#fbfcfe">
+      <strong>失败分流原则</strong>
+      <p style="font-size:13px;margin:6px 0 0">检查与验证必须先做 failure classification：需求定义问题回探索；边界/架构问题回设计；单纯功能 bug 或实现缺陷回修复；无法自动归因才进入人工 gate。</p>
+    </div>
+  </div>
+</div>
+
+<h3>正式规则</h3>
+<div class="options">
+  <div class="option" data-choice="formal-verification-loop" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>检查与验证 = 证据生成 + 失败归因 + 分流 Gate</h3>
+      <p>Process Orchestrator 根据失败类型分流：需求矛盾回探索，边界缺口回架构/设计，功能 bug 回实现修复，无法归因或高风险进入人工 gate。</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,109 @@
+<h2>MVP 薄切片 v0.1</h2>
+<p class="subtitle">第一版不追求每个环节深，而是打通 AI/Agent Native Mission Platform 的完整闭环。</p>
+
+<div class="mockup">
+  <div class="mockup-header">End-to-end MVP flow</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:stretch">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">1 Entry</div>
+        <strong>Hermes / OpenClaw</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#574476">自然语言创建 Mission。</p>
+      </div>
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">2 Explore</div>
+        <strong>探索 DAG</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#38537f">生成 brief、问题、假设、验收。</p>
+      </div>
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">3 Decide</div>
+        <strong>流程编排者</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#374151">按 policy 和自主模式推进。</p>
+      </div>
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">4 Build</div>
+        <strong>设计构建 DAG</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#574476">方案、计划、patch、基础构建。</p>
+      </div>
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">5 Verify</div>
+        <strong>检查验证 DAG</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#315f43">测试、review、失败分流。</p>
+      </div>
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">6 Feedback</div>
+        <strong>反馈与评估</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#7a5414">运行反馈、artifact、evaluation record。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Must work in MVP</div>
+        <strong>端到端闭环能力</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>入口 agent 创建 MissionThread / Mission</li>
+          <li>探索 DAG 跑到 Node 粒度并产出 artifacts</li>
+          <li>Process Orchestrator 根据 mode 和 readiness 决策</li>
+          <li>设计构建 DAG 调用至少一个代码 agent runtime</li>
+          <li>检查验证 DAG 能做三向分流</li>
+          <li>Web Console 能看 Mission、Run、Node、Transcript</li>
+          <li>每次 run 生成 EvaluationRecord</li>
+        </ul>
+      </div>
+
+      <div style="border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+        <div class="label">Can be shallow in MVP</div>
+        <strong>第一版先做薄</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>Autopilot 先支持手动和 webhook，定时可后置</li>
+          <li>运维反馈先手动录入或 webhook 模拟</li>
+          <li>审批先做单人 gate，不做复杂会签</li>
+          <li>进化先做评分和候选建议，不自动晋升</li>
+          <li>Runtime 先本地，云沙箱预留接口</li>
+          <li>固定角色团队，暂不开放任意拓扑</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">P0 API</div>
+        <strong>MissionCommand</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">create_mission、append_context、request_next_step、approve。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">P0 Runtime</div>
+        <strong>DAGRun / NodeRun</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">模板、节点、输入输出、状态、消息、artifact。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">P0 UI</div>
+        <strong>Mission Console</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">Mission detail、run timeline、agent live、approval inbox。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">P0 Data</div>
+        <strong>Event + Artifact</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">append-only event、artifact refs、evaluation record。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">MVP Success</div>
+      <strong>一条 Mission 能从入口 agent 创建，经过探索、构建、验证和反馈，在 Web 上完整追踪，并留下可评估的 run/node 历史。</strong>
+      <p style="font-size:13px;margin:6px 0 0">这就是第一版“流程打通”的验收标准。</p>
+    </div>
+  </div>
+</div>
+
+<h3>MVP 定义</h3>
+<div class="options">
+  <div class="option" data-choice="formal-mvp-thin-slice" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>MVP = Mission 全闭环薄切片</h3>
+      <p>入口 agent、Mission Core、Process Orchestrator、EvoAgentX-style DAG/Node、Multica-style Web Console、EvaluationRecord 必须串通。</p>
+    </div>
+  </div>
+</div>

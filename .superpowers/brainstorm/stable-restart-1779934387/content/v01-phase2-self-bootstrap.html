@@ -1,0 +1,100 @@
+<h2>v0.1 第二阶段：自举</h2>
+<p class="subtitle">平台要能用自己的 Mission 系统开发自己：自举既是 dogfooding，也是最早的进化数据来源。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Self-bootstrap loop</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:stretch">
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">1 Internal Mission</div>
+        <strong>平台自身需求</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#574476">例如：新增 Approval Inbox。</p>
+      </div>
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">2 Mission Loop</div>
+        <strong>探索/构建/验证</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#38537f">用自己的循环推进。</p>
+      </div>
+      <div style="border:2px solid #2f855a;border-radius:8px;padding:12px;background:#ecfdf3">
+        <div class="label">3 Code Change</div>
+        <strong>修改本仓库</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#315f43">DAG run 调用代码 agent。</p>
+      </div>
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">4 PR / Release</div>
+        <strong>提交自身变更</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#7a5414">生成 PR、验证、发布。</p>
+      </div>
+      <div style="border:2px solid #111827;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">5 Learn</div>
+        <strong>沉淀进化样本</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#374151">评估流程、模板、agent 能力。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Phase 1</div>
+        <strong>v0.1A：外部项目闭环</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>能创建 Mission</li>
+          <li>能跑探索/构建/验证 DAG</li>
+          <li>能在 Web Console 追踪</li>
+          <li>能记录 artifact/event/evaluation</li>
+          <li>能接一个代码 agent runtime</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Phase 2</div>
+        <strong>v0.1B：自举开发</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>本平台 repo 作为首个受管项目</li>
+          <li>内部需求用 Mission 创建和拆解</li>
+          <li>DAG run 修改平台自身代码</li>
+          <li>验证失败可分流到探索/设计/修复</li>
+          <li>生成 PR/变更记录/复盘样本</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+      <div class="label">Bootstrap Guardrails</div>
+      <strong>自举必须更严格</strong>
+      <p style="font-size:13px;margin:6px 0 0">平台修改自身流程、策略、runtime、安全边界时默认需要 human gate；普通 UI、文档、小功能可默认自主推进。</p>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Self Project</div>
+        <strong>平台自身项目</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">repo、runtime、CI、release 都纳入 Mission。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Self Templates</div>
+        <strong>自举模板</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">feature、bugfix、refactor、docs、runtime adapter。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Self Review</div>
+        <strong>自我审查</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">强制验证架构边界和流程状态一致性。</p>
+      </div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:10px;background:#fff">
+        <div class="label">Self Evolution</div>
+        <strong>进化样本</strong>
+        <p style="font-size:12px;margin:6px 0 0;color:#667085">用自身开发数据优化模板、prompt、routing。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>正式规则</h3>
+<div class="options">
+  <div class="option" data-choice="formal-self-bootstrap" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>v0.1B = 自举开发能力</h3>
+      <p>平台必须能把自身 repo 当作受管项目，通过自己的 Mission、DAG、Node、Web Console 和 EvaluationRecord 来开发、验证和改进自己。</p>
+    </div>
+  </div>
+</div>

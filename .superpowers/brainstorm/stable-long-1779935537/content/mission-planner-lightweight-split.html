@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mission Planner Boundary Split</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --ink: #17202a;
+      --muted: #647084;
+      --line: #c8d0dc;
+      --panel: #ffffff;
+      --blue: #2f6fed;
+      --green: #1f9d70;
+      --amber: #c57a16;
+      --red: #c84d4d;
+      --violet: #7457c8;
+      --cyan: #248ea3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page {
+      min-height: 100vh;
+      padding: 28px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 18px;
+    }
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .canvas-wrap {
+      overflow: auto;
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(23, 32, 42, .08);
+    }
+    .canvas {
+      position: relative;
+      min-height: 760px;
+      min-width: 1120px;
+      background:
+        linear-gradient(90deg, rgba(23,32,42,.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(23,32,42,.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+      border: 1px solid #d9dee8;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .lane {
+      position: absolute;
+      top: 70px;
+      bottom: 92px;
+      border: 1px solid #d9dee8;
+      background: rgba(255,255,255,.72);
+      border-radius: 14px;
+    }
+    .lane.old { left: 34px; width: 492px; }
+    .lane.new { right: 34px; width: 536px; }
+    .lane-title {
+      position: absolute;
+      top: 22px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 5;
+    }
+    .lane-title h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    .lane-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .box {
+      position: absolute;
+      border: 1.5px solid var(--line);
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 13px 14px;
+      box-shadow: 0 10px 24px rgba(23,32,42,.07);
+      z-index: 4;
+    }
+    .box h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      letter-spacing: 0;
+      line-height: 1.2;
+    }
+    .box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .box.blue { border-color: rgba(47,111,237,.45); }
+    .box.green { border-color: rgba(31,157,112,.48); }
+    .box.amber { border-color: rgba(197,122,22,.48); }
+    .box.red { border-color: rgba(200,77,77,.50); }
+    .box.violet { border-color: rgba(116,87,200,.48); }
+    .box.cyan { border-color: rgba(36,142,163,.48); }
+    .heavy {
+      border-color: rgba(200,77,77,.60);
+      background: #fff7f7;
+    }
+    .split {
+      border-color: rgba(31,157,112,.55);
+      background: #f4fbf7;
+    }
+    .capsule {
+      position: absolute;
+      height: 30px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+      white-space: nowrap;
+      z-index: 4;
+    }
+    .arrow {
+      position: absolute;
+      height: 2px;
+      background: var(--line);
+      transform-origin: left center;
+      z-index: 2;
+    }
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -4px;
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--line);
+    }
+    .arrow.blue { background: rgba(47,111,237,.55); }
+    .arrow.blue::after { border-left-color: rgba(47,111,237,.55); }
+    .arrow.green { background: rgba(31,157,112,.55); }
+    .arrow.green::after { border-left-color: rgba(31,157,112,.55); }
+    .arrow.amber { background: rgba(197,122,22,.55); }
+    .arrow.amber::after { border-left-color: rgba(197,122,22,.55); }
+    .arrow.red { background: rgba(200,77,77,.55); }
+    .arrow.red::after { border-left-color: rgba(200,77,77,.55); }
+    .arrow.down {
+      width: 70px;
+      transform: rotate(90deg);
+    }
+    .arrow.right { width: 72px; }
+    .arrow.short { width: 48px; }
+    .connector-label {
+      position: absolute;
+      padding: 4px 7px;
+      border-radius: 7px;
+      background: rgba(255,255,255,.92);
+      color: var(--muted);
+      border: 1px solid #dbe1ea;
+      font-size: 11px;
+      z-index: 5;
+      white-space: nowrap;
+    }
+    .big-loop {
+      position: absolute;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      width: 760px;
+      z-index: 6;
+    }
+    .loop-step {
+      min-height: 52px;
+      border-radius: 12px;
+      border: 1px solid #d8dee8;
+      background: rgba(255,255,255,.92);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 12px;
+      color: var(--ink);
+      box-shadow: 0 8px 20px rgba(23,32,42,.06);
+    }
+    .center-note {
+      position: absolute;
+      left: 50%;
+      top: 326px;
+      width: 94px;
+      transform: translateX(-50%);
+      border-radius: 12px;
+      background: #17202a;
+      color: #fff;
+      padding: 12px 10px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.25;
+      z-index: 7;
+      box-shadow: 0 16px 30px rgba(23,32,42,.22);
+    }
+    .decision {
+      position: absolute;
+      left: 50%;
+      top: 218px;
+      width: 166px;
+      height: 164px;
+      transform: translateX(-50%);
+      z-index: 4;
+    }
+    .decision::before {
+      content: "";
+      position: absolute;
+      inset: 14px 34px;
+      transform: rotate(45deg);
+      border: 1.5px solid rgba(197,122,22,.55);
+      background: #fffaf1;
+      box-shadow: 0 12px 26px rgba(23,32,42,.08);
+    }
+    .decision span {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 18px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    .panel-note {
+      position: absolute;
+      top: 624px;
+      width: 448px;
+      min-height: 54px;
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.4;
+      z-index: 5;
+    }
+    .panel-note.old-note {
+      left: 58px;
+      background: #fff3f3;
+      border: 1px solid rgba(200,77,77,.28);
+    }
+    .panel-note.new-note {
+      right: 58px;
+      background: #effaf4;
+      border: 1px solid rgba(31,157,112,.28);
+    }
+    .small-loop {
+      position: absolute;
+      border: 2px dashed rgba(47,111,237,.32);
+      border-radius: 18px;
+      z-index: 1;
+    }
+    .small-loop-label {
+      position: absolute;
+      top: -14px;
+      left: 16px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #edf3ff;
+      color: var(--blue);
+      font-size: 11px;
+      z-index: 6;
+    }
+    @media (max-width: 760px) {
+      .page { padding: 16px; }
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      h1 { font-size: 20px; }
+      .legend { justify-content: flex-start; }
+      .canvas {
+        min-width: 1080px;
+        min-height: 760px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <h1>Mission Planner 边界拆分</h1>
+        <p class="subtitle">从“重 Planner 黑盒”改成“轻 Planner + 组织编译 + DAG 内部分解”。</p>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--red)"></i>过重职责</span>
+        <span><i class="dot" style="background:var(--green)"></i>拆分后职责</span>
+        <span><i class="dot" style="background:var(--blue)"></i>一次 bounded workflow</span>
+        <span><i class="dot" style="background:var(--amber)"></i>路由判断</span>
+      </div>
+    </header>
+
+    <section class="canvas-wrap">
+      <div class="canvas">
+        <div class="lane old">
+          <div class="lane-title">
+            <h2>之前：Planner 太重</h2>
+            <p>判断 + 分解 + 组织 + DAG 生成</p>
+          </div>
+        </div>
+        <div class="lane new">
+          <div class="lane-title">
+            <h2>现在：Planner 变轻</h2>
+            <p>策略判断在上，任务分解在 DAG 内</p>
+          </div>
+        </div>
+
+        <div class="box cyan" style="left:82px; top:118px; width:170px;">
+          <h3>Mission State</h3>
+          <p>goal / memory / events / feedback</p>
+        </div>
+        <div class="box heavy" style="left:298px; top:112px; width:182px;">
+          <h3>Mission Planner</h3>
+          <p>判断下一步、生成组织、拆任务、写 DAG 计划</p>
+        </div>
+        <div class="box blue" style="left:82px; top:286px; width:170px;">
+          <h3>Workflow DAG</h3>
+          <p>执行 Planner 已经写好的任务树</p>
+        </div>
+        <div class="box violet" style="left:298px; top:286px; width:182px;">
+          <h3>Runtime Nodes</h3>
+          <p>按任务执行，但生命周期权威不清晰</p>
+        </div>
+        <div class="box amber" style="left:176px; top:458px; width:210px;">
+          <h3>Route Decision</h3>
+          <p>很多依据被压缩在 Planner 输出里</p>
+        </div>
+
+        <div class="arrow right red" style="left:252px; top:153px;"></div>
+        <div class="arrow down red" style="left:385px; top:203px;"></div>
+        <div class="arrow right red" style="left:252px; top:326px;"></div>
+        <div class="arrow down amber" style="left:284px; top:376px;"></div>
+        <div class="connector-label" style="left:276px; top:190px;">职责集中</div>
+        <div class="connector-label" style="left:312px; top:407px;">难审计</div>
+
+        <div class="box cyan" style="left:640px; top:104px; width:182px;">
+          <h3>Mission Context</h3>
+          <p>state / goal contract / memory / event projection</p>
+        </div>
+        <div class="decision"><span>Mission Planner<br>只决定下一轮意图</span></div>
+        <div class="box amber split" style="left:862px; top:104px; width:184px;">
+          <h3>Workflow Intent</h3>
+          <p>next loop、reason、template candidates、gate hint</p>
+        </div>
+
+        <div class="box green" style="left:628px; top:274px; width:174px;">
+          <h3>Organization Compiler</h3>
+          <p>选择角色拓扑：Refiner / Worker / Verifier / Critic</p>
+        </div>
+        <div class="box green" style="left:848px; top:274px; width:184px;">
+          <h3>Workflow Factory</h3>
+          <p>模板选择、参数绑定、生成 DAGRunPlan</p>
+        </div>
+
+        <div class="small-loop" style="left:614px; top:412px; width:430px; height:174px;">
+          <div class="small-loop-label">Bounded Workflow / 小循环</div>
+        </div>
+        <div class="box blue" style="left:638px; top:456px; width:118px;">
+          <h3>Refiner Node</h3>
+          <p>澄清和拆解</p>
+        </div>
+        <div class="box blue" style="left:776px; top:456px; width:118px;">
+          <h3>Worker Node</h3>
+          <p>设计 / 实现</p>
+        </div>
+        <div class="box blue" style="left:914px; top:456px; width:112px;">
+          <h3>Verifier Node</h3>
+          <p>验证 / 分类</p>
+        </div>
+
+        <div class="arrow right green" style="left:822px; top:145px;"></div>
+        <div class="arrow short amber" style="left:744px; top:234px; transform: rotate(128deg);"></div>
+        <div class="arrow right green" style="left:802px; top:314px;"></div>
+        <div class="arrow down blue" style="left:935px; top:362px;"></div>
+        <div class="arrow right blue" style="left:756px; top:498px;"></div>
+        <div class="arrow right blue" style="left:894px; top:498px;"></div>
+        <div class="connector-label" style="left:742px; top:384px;">DAG 内节点再做细分</div>
+
+        <div class="center-note">边界变化<br>不是取消 Planner<br>而是拆轻</div>
+
+        <div class="panel-note old-note">
+          风险：Planner 输出会同时包含策略、组织、任务树和执行细节；后续很难判断失败是目标判断错、任务拆错，还是节点执行错。
+        </div>
+        <div class="panel-note new-note">
+          新边界：Planner 只给出下一轮意图和理由；组织编译器选角色；Workflow Factory 生成有界 DAG；具体任务拆解由 DAG 内专业节点完成。
+        </div>
+
+        <div class="big-loop">
+          <div class="loop-step">需求探索与瓦解</div>
+          <div class="loop-step">设计与构建</div>
+          <div class="loop-step">检查与验证</div>
+          <div class="loop-step">运维与反馈</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

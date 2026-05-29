@@ -1,0 +1,69 @@
+<h2>Dynamic Workflow Generation Boundary</h2>
+<p class="subtitle">OpenSpec describes a bounded change. Mission Planner decides the next workflow.</p>
+
+<div class="section">
+  <div class="label">One-shot Work</div>
+  <div class="mockup">
+    <div class="mockup-header">OpenSpec-style contract is enough when one DAG can finish the job</div>
+    <div class="mockup-body">
+      <pre>User request
+  -> proposal.md
+  -> design.md
+  -> tasks.md
+  -> specs/scenarios
+  -> Workflow DAG
+  -> verify evidence
+  -> archive to canonical spec</pre>
+      <p><strong>Best fit:</strong> bounded feature, bug fix, refactor, API change, testable behavior change.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Mission Work</div>
+  <div class="mockup">
+    <div class="mockup-header">Mission big loop needs a planner above OpenSpec</div>
+    <div class="mockup-body">
+      <pre>MissionState + MissionGoal + MissionMemory
+  + FeedbackSignal + MissionEvents
+  + SpecChange status + artifacts
+  + autonomy mode + policy boundary
+  -> Mission Planner
+  -> WorkflowIntent
+  -> SpecChangeDraft / SpecChangeUpdate
+  -> DAGTemplate selection
+  -> DAGRunPlan</pre>
+      <p><strong>Best fit:</strong> evolving product goal, repeated feedback, incident loops, unclear next step, multi-stage delivery.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Responsibility Split</div>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">OpenSpec-style Artifacts</div>
+      <div class="mockup-body">
+        <ul>
+          <li>Describe one bounded change</li>
+          <li>Give agents a contract</li>
+          <li>Define scenarios and tasks</li>
+          <li>Carry verification evidence</li>
+          <li>Archive accepted behavior</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Mission Planner</div>
+      <div class="mockup-body">
+        <ul>
+          <li>Decide next workflow intent</li>
+          <li>Create or update SpecChange</li>
+          <li>Select DAG template</li>
+          <li>Ask blocking questions</li>
+          <li>Route based on feedback and state</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

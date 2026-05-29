@@ -26,16 +26,19 @@ Turn product/software intent into an autonomous, observable, steerable Mission l
 3. Closed loop, not linear SDLC.
    Requirements, design, build, validation, operations, and feedback can route back into each other.
 
-4. Process Orchestrator is business-neutral.
+4. Spec-driven small loops, Mission-owned big loop.
+   OpenSpec-style artifacts drive bounded SpecChange loops: clarity, behavior contracts, implementation tasks, and verification evidence. Mission Core still owns long-running lifecycle state, routing history, feedback, relations, and learning.
+
+5. Process Orchestrator is business-neutral.
    It behaves like an administrator. It manages rules, state, scheduling, routing, and gates, but does not judge business content.
 
-5. Small loops are DAGs.
+6. Small loops are DAGs.
    Each stage loop is executed by EvoAgentX-style DAG runs. The broader Mission lifecycle can contain cycles, but each concrete run should remain bounded and traceable.
 
-6. Product UI must make agent work observable.
+7. Product UI must make agent work observable.
    The Web Console should show mission progress, DAG runs, node status, transcripts, tool calls, artifacts, decisions, and runtime health.
 
-7. Policy and gate details are reserved interfaces in v0.1.
+8. Policy and gate details are reserved interfaces in v0.1.
    v0.1 should not overbuild enterprise governance, security policy, or complex approval workflows.
 
 ## 3. Top-Level Architecture
@@ -43,6 +46,7 @@ Turn product/software intent into an autonomous, observable, steerable Mission l
 ```text
 AI / Agent Native Interaction Layer
   -> Mission Core
+  -> OpenSpec-style Spec Artifact Layer
   -> Business-neutral Process Orchestrator
   -> EvoAgentX-style Small-loop Runtime
   -> Runtime Adapter Layer
@@ -71,13 +75,59 @@ Mission Core owns the durable product state:
 - `MissionThread`
 - `MissionRelation`
 - `MissionEvent`
+- `MissionState`
+- `MissionGoal`
+- `MissionMemory`
+- `MissionBacklog`
+- `MissionHealth`
+- `FeedbackSignal`
 - `Artifact`
 - `Decision`
 - `ApprovalRequest`
 
 `MissionEvent` is append-only. The platform should be able to reconstruct why a Mission moved from one loop to another by reading events, artifacts, node results, and orchestration decisions.
 
-### 3.3 Business-neutral Process Orchestrator
+### 3.3 OpenSpec-style Spec Artifact Layer
+
+OpenSpec is a strong reference for bounded change work inside a Mission. It should be used as an artifact grammar for proposals, behavior specs, design notes, task lists, verification scenarios, and archival sync.
+
+The platform should not treat OpenSpec as the Mission database, Mission big-loop state machine, or scheduler. Mission Core owns long-running state. Process Orchestrator owns routing. DAG Runtime owns execution. OpenSpec-style artifacts define the behavioral contract and change intent for one bounded SpecChange loop.
+
+Reference mapping:
+
+```text
+openspec/specs/              -> canonical behavior specs
+openspec/changes/<change>/   -> Mission-bound SpecChange
+proposal.md                  -> Mission Brief / Why / What / Impact
+specs/**/*.md                -> behavior requirements and scenarios
+design.md                    -> Design Note / technical approach
+tasks.md                     -> implementation checklist / DAG seed
+verify                       -> Verification DAG input
+archive/sync                 -> accepted behavior promoted to canonical specs
+```
+
+Use OpenSpec ideas for:
+
+- spec-first change proposals
+- behavior requirements and scenario-based acceptance
+- clear separation between proposed change and canonical spec
+- task checklist as implementation seed
+- verification against declared scenarios
+- archiving accepted changes back into stable specs
+
+Do not use OpenSpec to replace:
+
+- Mission lifecycle state
+- Mission big-loop state machine
+- Mission memory and learning
+- Mission relation graph
+- Process Orchestrator routing
+- runtime scheduling
+- runtime adapter protocols
+- Web Console state
+- approval and policy boundaries
+
+### 3.4 Business-neutral Process Orchestrator
 
 The Process Orchestrator is the lifecycle administrator.
 
@@ -105,7 +155,7 @@ It decides:
 
 It must not encode product/business semantics directly. Domain judgment belongs to agents, evaluators, users, and artifacts. The orchestrator only routes based on declared facts and configured rules.
 
-### 3.4 EvoAgentX-style Small-loop Runtime
+### 3.5 EvoAgentX-style Small-loop Runtime
 
 The platform should reuse EvoAgentX as a reference model for bounded DAG execution, not as the whole production platform.
 
@@ -138,7 +188,7 @@ Do not rely on EvoAgentX for:
 - Web Console
 - full backend lifecycle orchestration
 
-### 3.5 Runtime Adapter Layer
+### 3.6 Runtime Adapter Layer
 
 Runtime adapters connect platform NodeRuns to real agent runtimes.
 
@@ -160,7 +210,7 @@ Initial adapter targets:
 
 ACP is a runtime adapter protocol detail. It is not the platform API.
 
-### 3.6 Multica-style Web Console
+### 3.7 Multica-style Web Console
 
 Multica is a reference for product shell, runtime connection, agent status, task transcript, and autopilot-style triggers.
 
@@ -178,6 +228,7 @@ Main v0.1 Console surfaces:
 
 - Mission Console
 - Mission Detail
+- Spec Changes
 - Runs and Timeline
 - NodeRun transcript
 - Artifacts and Decisions
@@ -189,7 +240,7 @@ Main v0.1 Console surfaces:
 
 The UI should show what agents are doing, why the system routed a Mission, which node produced which artifact, and where human input is required.
 
-### 3.7 Evolution Loop
+### 3.8 Evolution Loop
 
 The Evolution Loop turns execution history into platform improvement.
 
@@ -218,6 +269,620 @@ Mission has four recursive loops:
 
 These loops are not a strict linear pipeline. They are a lifecycle graph. A Mission can move forward, route back, create child Missions, or pause for input.
 
+### 4.0 Mission Big Loop and SpecChange Small Loops
+
+Mission is the long-running big loop. OpenSpec-style artifacts are better suited to bounded, one-change small loops inside that Mission.
+
+A Mission can contain many SpecChanges over time:
+
+```text
+Mission
+  -> SpecChange #1
+  -> SpecChange #2
+  -> Incident SpecChange
+  -> Refactor SpecChange
+  -> Feedback SpecChange
+```
+
+Each SpecChange can use OpenSpec-style artifacts to clarify, design, implement, verify, and archive one bounded change. The Mission big loop decides whether to create another SpecChange, route back to exploration, open a child Mission, wait for feedback, or continue operating.
+
+Flow:
+
+```text
+User intent
+  -> MissionCommand
+  -> Mission
+  -> create or update bounded SpecChange
+  -> SpecProposal / scenarios
+  -> Exploration DAG for this SpecChange
+  -> Design artifact + tasks
+  -> Build DAG
+  -> Verification scenarios + evidence
+  -> Accept / archive / sync
+  -> Ops feedback
+  -> Mission decides next big-loop step
+  -> New SpecChange / child Mission / pause / operate
+```
+
+Practical role by loop:
+
+- 需求探索与瓦解: create proposal, define behavior scope, write scenarios
+- 设计与构建: turn accepted spec into design note and task seed
+- 检查与验证: verify implementation against declared scenarios
+- 运维与反馈: capture runtime drift and create follow-up spec changes
+
+Rule:
+
+```text
+OpenSpec-style spec artifacts define what should change in one bounded SpecChange.
+Mission Core defines what happened across the long-running Mission.
+```
+
+Loop mapping:
+
+| Mission loop | OpenSpec artifact role | Mission output | Route back when |
+| --- | --- | --- | --- |
+| 需求探索与瓦解 | `proposal.md`, scenario draft, scope delta | Mission Brief, acceptance, assumptions | request unclear, scope too wide, scenario mismatch |
+| 设计与构建 | `design.md`, `tasks.md` | implementation plan, patch, branch | spec gap, architecture gap, implementation drift |
+| 检查与验证 | delta specs, `verify` evidence | validation verdict, fix request, archive decision | requirement conflict, design gap, bug |
+| 运维与反馈 | archive/sync history, follow-up delta spec | retrospective, new SpecChange, learning record | runtime drift, incident, capacity issue |
+
+Bounded SpecChange lifecycle:
+
+```text
+draft
+  -> clarified
+  -> designed
+  -> planned
+  -> implemented
+  -> verified
+  -> accepted
+  -> archived_to_canonical_spec
+```
+
+Failure or feedback routes:
+
+```text
+draft / clarified        -> exploration loop
+designed / planned       -> design/build loop
+implemented / verified   -> verification loop
+accepted / archived      -> ops/feedback loop
+runtime drift            -> new SpecChange
+```
+
+The Mission event stream records every SpecChange state transition and every big-loop routing decision. The spec files provide human- and agent-readable intent, requirements, design, tasks, and evidence for the bounded change.
+
+Mission big-loop state is separate:
+
+```text
+exploring
+  -> changing
+  -> verifying
+  -> operating
+  -> learning
+  -> exploring / changing / child_mission / archived
+```
+
+The big loop is not a DAG and is not an OpenSpec change. It is a long-running lifecycle graph that composes many bounded DAG runs and SpecChange loops.
+
+### 4.0.1 Dynamic Workflow Generation Boundary
+
+OpenSpec-style Markdown is a strong fit for describing one bounded change:
+
+- why the change is needed
+- what behavior should change
+- which acceptance scenarios apply
+- what the technical design is
+- which tasks should be executed
+- what verification evidence exists
+- whether the change can be archived into canonical specs
+
+If a task can be completed in one pass, and one Workflow DAG can move from proposal/design/tasks/spec scenarios to verification and archive, it is a strong fit for an OpenSpec-style contract.
+
+The Mission system is different at the big-loop level. A Mission may generate the next workflow dynamically because of validation conflicts, operations feedback, new user input, architecture risk, or runtime drift. The question of "what workflow should be generated next" belongs to the Mission layer, not to OpenSpec itself.
+
+Responsibility boundary:
+
+```text
+OpenSpec-style artifacts:
+  describe one bounded SpecChange contract
+
+Mission Planner:
+  decide what workflow should be generated next
+
+Process Orchestrator:
+  schedule and route that workflow based on policy, state, and events
+
+EvoAgentX-style Runtime:
+  execute the generated Workflow DAG
+```
+
+Mission Planner should consume:
+
+- `MissionState`
+- `MissionGoal`
+- `MissionMemory`
+- `MissionEvent`
+- `FeedbackSignal`
+- `SpecChange` state and verification result
+- current artifacts
+- workflow template registry
+- autonomy mode
+- policy/gate boundary
+
+It outputs:
+
+- `WorkflowIntent`
+- `SpecChangeDraft` or `SpecChangeUpdate`
+- selected `DAGTemplate`
+- `DAGRunPlanSeed`
+- `RouteRecommendation`
+- `BlockingQuestion` or `Assumption`
+
+Therefore, OpenSpec can be workflow generation context and one output format, but it should not be the dynamic workflow generator.
+
+### 4.0.2 Mission Planner
+
+Mission Planner is the lightweight next-step selector inside the Mission big loop. It does not execute tasks directly and does not replace the Process Orchestrator. Its responsibility is to decide which bounded workflow should run next, select the appropriate template, and record why that choice was made.
+
+It answers:
+
+```text
+Given the current Mission state, what workflow should be generated next?
+```
+
+It does not answer:
+
+```text
+How should this workflow be executed?
+Which runtime should run this node?
+Should this gate be approved?
+How should the full task tree inside this workflow be decomposed?
+```
+
+Key boundary:
+
+```text
+Mission Planner produces WorkflowIntent and planning rationale.
+WorkflowTemplate / DAGRun define the structure of one bounded workflow.
+NodeRuns inside the DAG perform concrete requirement decomposition, design decomposition, task decomposition, test selection, and failure classification.
+Process Orchestrator schedules DAGRuns based on Planner output and policy/gate state.
+```
+
+The Planner is therefore not a full task decomposer. It may produce a seed for the next workflow, but it must not become a black box that compresses business judgment, engineering design, and execution planning into one component.
+
+Responsibility boundary:
+
+| Component | Owns | Does not own |
+| --- | --- | --- |
+| Mission Planner | next workflow intent, situation classification, template selection, planning rationale, bounded SpecChange action | runtime execution, final routing authority, policy approval, detailed task decomposition |
+| Process Orchestrator | lifecycle routing, scheduling, gate decision, event routing | business judgment, spec authoring |
+| OpenSpec-style artifacts | bounded change contract, scenario, design, tasks, verification evidence | dynamic workflow generation, Mission memory |
+| EvoAgentX-style Runtime | execute generated DAG and NodeRuns | decide Mission strategy or own Mission lifecycle |
+
+Mission Planner inputs:
+
+- `MissionState`
+- `MissionGoal`
+- `MissionMemory`
+- `MissionEvent` history
+- `MissionRelation`
+- `FeedbackSignal`
+- current `SpecChange` state
+- verification verdict
+- operation/incident signals
+- artifact index
+- available `DAGTemplate`
+- autonomy mode
+- policy/gate boundary
+
+Mission Planner outputs:
+
+- `WorkflowIntent`
+- `WorkflowGenerationReason`
+- `SpecChangeDraft`
+- `SpecChangeUpdate`
+- selected `DAGTemplate`
+- `WorkflowTemplateBinding`
+- `DAGRunPlanSeed`
+- `RequiredInputs`
+- `AssumptionSet`
+- `RiskSet`
+- `RouteRecommendation`
+
+Basic flow for generating the next workflow:
+
+```text
+collect_mission_context
+  -> classify_current_situation
+  -> decide_next_loop
+  -> decide_whether_existing_specchange_can_continue
+  -> create_or_update_specchange
+  -> select_workflow_template
+  -> bind_template_inputs
+  -> produce_dag_run_plan_seed
+  -> emit_planning_event
+```
+
+`classify_current_situation` should identify at least:
+
+- requirement unclear
+- spec gap
+- architecture/design gap
+- implementation defect
+- verification contradiction
+- runtime drift
+- incident
+- capacity/performance issue
+- user correction
+- stable progress
+
+This means Mission Planner can generate workflows repeatedly, but each generated workflow should remain bounded:
+
+```text
+Mission big loop owns continuity.
+SpecChange owns one change contract.
+DAGRun owns one bounded execution.
+NodeRun owns the minimum control unit for concrete decomposition, execution, verification, and failure classification.
+```
+
+The Planner only decides what type of workflow should run next. The concrete decomposition of requirements, design, implementation, and verification inside that workflow belongs to the corresponding DAG nodes, and is written back to the Mission through artifacts, RunMessages, and route recommendations.
+
+### 4.0.3 Workflow Template Registry
+
+Mission Planner should not freely generate arbitrary workflows. v0.1 should use a `WorkflowTemplate Registry`: the Planner selects, parameterizes, or performs limited composition over registered templates based on current state.
+
+This gives the system both dynamism and control:
+
+```text
+Dynamism: Mission Planner can generate the next workflow based on feedback.
+Control: workflows mostly come from known templates instead of arbitrary synthesis.
+```
+
+v0.1 template types:
+
+- `ExplorationWorkflow`
+- `SpecChangeDraftWorkflow`
+- `DesignWorkflow`
+- `ImplementationWorkflow`
+- `FixWorkflow`
+- `VerificationWorkflow`
+- `IncidentWorkflow`
+- `RollbackWorkflow`
+- `RetrospectiveWorkflow`
+- `EvolutionCandidateWorkflow`
+
+Template metadata:
+
+```text
+WorkflowTemplate {
+  id
+  name
+  loop_type
+  trigger_conditions
+  required_inputs
+  produced_artifacts
+  node_templates
+  default_agent_roles
+  runtime_requirements
+  risk_level
+  gate_policy_ref
+  version
+}
+```
+
+Planner template selection flow:
+
+```text
+classify_current_situation
+  -> match_trigger_conditions
+  -> rank_candidate_templates
+  -> check_required_inputs
+  -> bind_specchange_or_create_draft
+  -> bind_template_inputs
+  -> produce_DAGRunPlanSeed
+```
+
+Allowed dynamic capabilities:
+
+- select template
+- fill template parameters
+- trim template-level node sets based on SpecChange scope
+- declare runtime/tool availability requirements
+- decide whether to ask blocking questions based on autonomy mode
+- provide decomposition context to DAG nodes
+
+Disallowed in v0.1:
+
+- free-form full workflow generation without templates
+- generating a complete business task tree inside the Planner
+- automatically introducing unregistered runtimes
+- automatically weakening gate/policy
+- automatically promoting optimizer candidates into production templates
+- modifying workflow without Mission event records
+
+When Planner cannot find a suitable template:
+
+```text
+if missing_inputs:
+  ask blocking question
+
+elif no_template_match:
+  create WorkflowTemplateProposal
+  route_to = human_gate / design_loop
+
+elif high_risk:
+  route_to = gate
+
+else:
+  select best effort template with recorded assumptions
+```
+
+This means v0.1 dynamic workflow generation is:
+
+```text
+template selection + parameter binding + bounded node composition
+```
+
+not fully open workflow synthesis.
+
+### 4.0.4 Mission Big-loop State Model
+
+The Mission big loop needs its own long-running state model. It should not be inferred from OpenSpec change state, because OpenSpec focuses on one bounded change while Mission focuses on continuous evolution.
+
+Core objects:
+
+```text
+MissionState
+MissionGoal
+MissionMemory
+MissionBacklog
+FeedbackSignal
+MissionHealth
+MissionRelation
+EvolutionRecord
+```
+
+`MissionState` represents the current lifecycle position:
+
+```text
+exploring
+changing
+verifying
+operating
+learning
+paused
+archived
+```
+
+State is not linear. It can route back to any relevant stage based on feedback and verification results:
+
+```text
+operating -> learning -> exploring
+operating -> changing
+verifying -> exploring
+verifying -> changing
+learning -> child_mission
+paused -> exploring / changing / operating
+```
+
+`MissionMemory` stores long-running context:
+
+- confirmed goals and non-goals
+- long-term constraints
+- user preferences
+- architecture decisions
+- failure patterns
+- historical assumptions
+- important feedback
+- runtime lessons
+- closed and open risks
+
+`MissionBacklog` stores items that should not enter the current SpecChange yet:
+
+- follow-up idea
+- deferred improvement
+- unresolved question
+- tech debt
+- operational issue
+- evolution candidate
+- child mission proposal
+
+`FeedbackSignal` is the standard input from operations and the external world into the Mission big loop:
+
+```text
+FeedbackSignal {
+  source
+  signal_type
+  severity
+  evidence
+  related_artifact
+  related_specchange
+  suggested_classification
+  received_at
+}
+```
+
+Common `signal_type` values:
+
+- user_feedback
+- production_incident
+- metric_regression
+- test_flake
+- performance_degradation
+- security_alert
+- requirement_change
+- usage_observation
+- agent_failure
+
+Mission Planner uses these long-running objects to decide the next workflow instead of looking only at the current OpenSpec change.
+
+Principle:
+
+```text
+SpecChange explains the bounded work.
+MissionState explains where the long-running mission is.
+MissionMemory explains why future workflows should be generated differently.
+FeedbackSignal explains why the big loop should move again.
+```
+
+### 4.0.5 Mission Planner Decision Matrix
+
+Mission Planner should not be a black box. Every generated workflow must produce an auditable `WorkflowGenerationReason`.
+
+`WorkflowGenerationReason` includes at least:
+
+- current situation classification
+- evidence
+- selected workflow template
+- rejected alternatives
+- SpecChange action
+- assumptions
+- missing inputs
+- gate recommendation
+- expected outputs
+
+Baseline decision matrix:
+
+| Situation | Next loop | Workflow template | SpecChange action | Gate behavior |
+| --- | --- | --- | --- | --- |
+| vague request / missing acceptance | exploring | `ExplorationWorkflow` | create draft | ask only blocking questions |
+| clear bounded change | changing | `SpecChangeDraftWorkflow` + `DesignWorkflow` | create or update | no gate unless risk is high |
+| design gap / architecture gap | changing | `DesignWorkflow` | update current SpecChange | gate if architecture/core boundary |
+| implementation defect | changing | `FixWorkflow` | continue current SpecChange | no gate by default |
+| verification contradiction | exploring | `ExplorationWorkflow` | revise SpecChange | ask or gate depending on autonomy |
+| test failure with clear fix | verifying/changing | `FixWorkflow` -> `VerificationWorkflow` | continue current SpecChange | no gate by default |
+| runtime drift | operating/learning | `RetrospectiveWorkflow` -> `SpecChangeDraftWorkflow` | create follow-up SpecChange | gate if production risk |
+| production incident | operating/changing | `IncidentWorkflow` | create Incident SpecChange | gate for rollback/high-risk actions |
+| stable outcome | learning | `RetrospectiveWorkflow` | archive accepted SpecChange | no gate unless promotion changes template |
+| no template match | exploring/changing | `WorkflowTemplateProposal` | create proposal | gate required |
+
+Planner output does not execute directly. It submits a plan:
+
+```text
+MissionPlannerRun
+  -> WorkflowIntent
+  -> WorkflowGenerationReason
+  -> DAGRunPlanSeed
+  -> OrchestrationDecision request
+```
+
+Then the Process Orchestrator decides whether to schedule, ask, gate, pause, or route.
+
+This matrix is the initial v0.1 strategy, not fixed business rules. It can evolve later through EvaluationRecord, ReplayRun, and TemplateVersion.
+
+### 4.0.6 Mission Event Stream and Projections
+
+The Mission big loop must be driven by an append-only event stream. Current database state is a projection, not the only source of truth.
+
+Principle:
+
+```text
+Commands request change.
+Events record facts.
+Projections support reading.
+Planner uses projections plus event history.
+Orchestrator writes routing decisions as events.
+```
+
+Standard event structure:
+
+```text
+MissionEvent {
+  id
+  mission_id
+  event_type
+  actor_type
+  actor_id
+  occurred_at
+  causation_id
+  correlation_id
+  loop
+  specchange_id
+  dag_run_id
+  node_run_id
+  payload
+}
+```
+
+Core event types:
+
+- `MissionCreated`
+- `MissionStateChanged`
+- `MissionGoalUpdated`
+- `MissionMemoryRecorded`
+- `MissionBacklogItemAdded`
+- `FeedbackSignalReceived`
+- `SpecChangeCreated`
+- `SpecChangeUpdated`
+- `SpecChangeStateChanged`
+- `WorkflowPlanned`
+- `WorkflowTemplateSelected`
+- `DAGRunScheduled`
+- `DAGRunStarted`
+- `DAGRunCompleted`
+- `NodeRunStarted`
+- `NodeRunCompleted`
+- `NodeRunFailed`
+- `ArtifactRecorded`
+- `DecisionRecorded`
+- `GateRequested`
+- `GateDecided`
+- `RouteDecided`
+- `EvaluationRecorded`
+
+Typical event chain:
+
+```text
+MissionCommandReceived
+  -> MissionPlannerRunStarted
+  -> WorkflowPlanned
+  -> WorkflowTemplateSelected
+  -> SpecChangeCreated / SpecChangeUpdated
+  -> DAGRunScheduled
+  -> NodeRunStarted
+  -> ArtifactRecorded
+  -> NodeRunCompleted
+  -> DAGRunCompleted
+  -> RouteDecided
+  -> MissionStateChanged
+```
+
+Projection model:
+
+| Projection | Purpose |
+| --- | --- |
+| `MissionSummaryView` | Mission list, status, risk, next action |
+| `MissionTimelineView` | user-readable timeline |
+| `MissionPlannerContextView` | Planner input for next decision |
+| `SpecChangeView` | current proposal/design/tasks/scenario state |
+| `RunTraceView` | DAGRun, NodeRun, ActionRun, ToolCall trace |
+| `FeedbackInboxView` | operations and user feedback entry |
+| `ApprovalInboxView` | gate requests and decisions |
+| `BacklogView` | follow-ups, deferred items, child mission proposals |
+| `EvolutionDatasetView` | replay, evaluation, optimizer samples |
+
+Event stream and projection boundary:
+
+```text
+Event Stream:
+  durable fact history, append-only, replayable
+
+Projection:
+  query optimization, UI state, planner context, rebuildable
+```
+
+v0.1 does not need a complete event sourcing infrastructure, but it must preserve these constraints:
+
+- every workflow generation has `WorkflowPlanned`
+- every route has `RouteDecided`
+- every gate has request/decision events
+- every artifact is linked to mission/specchange/run/node
+- every automatic assumption is recorded
+- projections can be rebuilt and should not be the only source of truth
+
+This is also the foundation for bootstrap and evolution: without events, there is no replay; without replay, there is no reliable Evolution Loop.
+
 ### 4.1 需求探索与瓦解
 
 Goal: turn vague input into actionable Mission structure.
@@ -239,6 +904,8 @@ Outputs:
 - `ScopeBoundary`
 - `AcceptanceCriteria`
 - `ChildMissionProposal`
+- OpenSpec-style `SpecChange` draft
+- requirement scenarios
 
 Self-loop conditions:
 
@@ -256,6 +923,13 @@ readiness + autonomy_mode -> ask / proceed / gate / pause
 ```
 
 In default autonomous mode, the system asks only necessary blocking questions. Non-blocking assumptions are recorded and the Mission can proceed.
+
+OpenSpec role:
+
+- create or update `proposal.md`
+- draft behavior requirement scenarios under the change
+- identify gaps between requested behavior and canonical specs
+- turn accepted clarification into a Mission-bound `SpecChange`
 
 ### 4.2 设计与构建
 
@@ -288,8 +962,17 @@ Outputs:
 - `LocalBuildResult`
 - `PRDraft`
 - `ReleaseNotesDraft`
+- updated `design.md`
+- updated `tasks.md`
 
 If implementation reveals that requirements or scope assumptions are invalid, the orchestrator can route the Mission back to 需求探索与瓦解.
+
+OpenSpec role:
+
+- use `design.md` as the technical approach artifact
+- use `tasks.md` as a seed for DAG nodes or implementation checklist
+- keep implementation aligned with declared scenarios
+- avoid changing canonical specs until verification accepts the change
 
 ### 4.3 检查与验证
 
@@ -329,6 +1012,13 @@ The key design point is three-way classification:
 2. Boundary, architecture, or design gap -> 设计与构建
 3. Functional bug or implementation defect -> implementation fix path
 
+OpenSpec role:
+
+- verify code/tests against requirement scenarios
+- classify whether failure is a spec ambiguity, design gap, or implementation defect
+- record verification evidence against the relevant `SpecChange`
+- promote accepted behavior only after validation passes
+
 ### 4.4 运维与反馈
 
 Goal: make runtime signals part of Mission evolution.
@@ -352,6 +1042,13 @@ Routing examples:
 - high-risk release or rollback -> gate
 - stable outcome -> learning/evaluation record
 
+OpenSpec role:
+
+- use runtime feedback to create or update a `SpecChange`
+- capture production-learned behavior as future scenarios
+- archive accepted changes into canonical specs
+- keep spec history connected to Mission events and retrospectives
+
 ## 5. DAG and Node Granularity
 
 The broader Mission lifecycle can contain cycles, but each loop execution should be a bounded DAG.
@@ -371,6 +1068,9 @@ Mission
 
 A NodeRun can:
 
+- refine requirements within the bounded workflow
+- decompose design or implementation tasks
+- select tests or verification checks
 - retry
 - skip
 - insert supplemental node
@@ -383,11 +1083,16 @@ A NodeRun can:
 Rule:
 
 ```text
+Mission Planner selects the next workflow type.
+DAGRun owns one bounded workflow execution.
+NodeRun owns detailed decomposition inside that bounded workflow.
 NodeRun outputs route_recommendation.
 Process Orchestrator makes the actual routing decision.
 ```
 
 This separation keeps agent/runtime execution from becoming the lifecycle authority.
+
+This also means task decomposition should not be centralized in Mission Planner. Requirement clarification happens inside `ExplorationWorkflow` nodes; design decomposition happens inside `DesignWorkflow` nodes; implementation task decomposition happens inside `ImplementationWorkflow` or `FixWorkflow` nodes; test selection and failure attribution happen inside `VerificationWorkflow` nodes. Planner only selects which workflow should run next and records why.
 
 ## 6. Autonomy Modes
 
@@ -465,10 +1170,25 @@ GateDecision {
 - `Decision`
 - `ApprovalRequest`
 
+### Spec Artifacts
+
+- `SpecChange`
+- `SpecProposal`
+- `BehaviorSpec`
+- `SpecScenario`
+- `SpecDesign`
+- `SpecTask`
+- `SpecVerification`
+- `SpecArchiveRecord`
+
 ### Runtime Execution
 
 - `DAGTemplate`
 - `DAGNodeTemplate`
+- `WorkflowTemplate`
+- `WorkflowTemplateProposal`
+- `WorkflowTemplateVersion`
+- `NodeTemplate`
 - `DAGRun`
 - `NodeRun`
 - `ActionRun`
@@ -484,6 +1204,11 @@ GateDecision {
 - `RouteRule`
 - `GatePolicy`
 - `RetryPolicy`
+- `MissionPlannerRun`
+- `WorkflowIntent`
+- `WorkflowGenerationReason`
+- `DAGRunPlan`
+- `WorkflowTemplateBinding`
 
 ### Agent and Runtime Config
 
@@ -504,6 +1229,8 @@ GateDecision {
 - `SavedView`
 - `TimelineCursor`
 - `UserPreference`
+- `BacklogView`
+- `FeedbackInbox`
 
 ### Evolution
 
@@ -521,6 +1248,7 @@ API groups:
 
 - Command API
 - Mission API
+- Spec API
 - Runtime API
 - Orchestrator API
 - Realtime API
@@ -561,22 +1289,25 @@ Primary screens:
 2. Mission Detail
    Show brief, scope, acceptance, assumptions, decisions, artifacts, and related Missions.
 
-3. Runs and Timeline
+3. Spec Changes
+   Show proposal, delta specs, scenarios, design, tasks, verification evidence, and archive status.
+
+4. Runs and Timeline
    Show DAGRun, NodeRun, ActionRun, messages, tool calls, failures, and route decisions.
 
-4. Approvals
+5. Approvals
    Show pending gate requests and decision history.
 
-5. Agents
+6. Agents
    Configure role agents, skills, plugins, and environment assumptions.
 
-6. Runtime Targets
+7. Runtime Targets
    Configure Hermes, OpenClaw, Codex, Claude, MCP, credentials, and connection health.
 
-7. Autopilots
+8. Autopilots
    Configure webhook/schedule/ops triggers that create or update Missions.
 
-8. Templates
+9. Templates
    Manage DAG templates and template versions.
 
 ## 11. v0.1 Roadmap
@@ -603,11 +1334,130 @@ Acceptance:
 
 - entry agent creates `MissionThread` and `Mission`
 - exploration DAG outputs brief, questions, assumptions, and acceptance criteria
+- exploration DAG creates or updates a Mission-bound SpecChange
 - default autonomy asks necessary questions or auto-progresses
-- design/build DAG outputs plan and patch
+- design/build DAG outputs plan, patch, design artifact, and task artifact
 - verification DAG performs three-way routing
+- verification checks implementation against spec scenarios
 - Web Console shows Mission, DAGRun, NodeRun, and transcript
-- all runs and nodes generate event, artifact, and evaluation records
+- all runs and nodes generate event, artifact, spec evidence, and evaluation records
+
+#### 11.1.1 v0.1A Implementation Slice
+
+v0.1A is not the complete platform. Its goal is to prove one observable, auditable, loop-capable Mission thin slice.
+
+Minimum user path:
+
+```text
+Web Console / Hermes / OpenClaw
+  -> submit MissionCommand
+  -> create Mission
+  -> append MissionCreated event
+  -> Mission Planner generates WorkflowIntent and WorkflowGenerationReason
+  -> create SpecChange draft
+  -> select WorkflowTemplate
+  -> produce DAGRunPlanSeed
+  -> Orchestrator schedules DAGRun
+  -> execute NodeRuns with mocked or simple runtime adapter
+  -> record Artifacts and RunMessages
+  -> verification node emits verdict
+  -> Orchestrator writes RouteDecided
+  -> MissionState changes
+  -> Web Console shows timeline and trace
+  -> FeedbackSignal can trigger next workflow
+```
+
+First core entities:
+
+- `Mission`
+- `MissionState`
+- `MissionEvent`
+- `MissionMemory`
+- `SpecChange`
+- `WorkflowTemplate`
+- `MissionPlannerRun`
+- `DAGRun`
+- `NodeRun`
+- `Artifact`
+- `FeedbackSignal`
+- `EvaluationRecord`
+
+First APIs:
+
+| API | Purpose |
+| --- | --- |
+| `POST /missions` | create Mission from entry command |
+| `POST /missions/{id}/commands` | submit MissionCommand |
+| `POST /missions/{id}/plan-next` | run Mission Planner |
+| `POST /dag-runs` | schedule DAGRun from Orchestrator-materialized DAGRunPlan |
+| `POST /events` | append MissionEvent |
+| `GET /missions` | list MissionSummaryView |
+| `GET /missions/{id}` | read Mission detail projection |
+| `GET /missions/{id}/timeline` | read MissionTimelineView |
+| `GET /dag-runs/{id}` | read run/node trace |
+| `POST /missions/{id}/feedback` | submit FeedbackSignal |
+
+First Web Console screens:
+
+1. `Mission List`
+   Show Mission, state, risk, next action, last event.
+
+2. `Mission Detail + Timeline`
+   Show goal, current state, SpecChange, artifact, decision, event timeline.
+
+3. `Run / Node Trace`
+   Show DAGRun, NodeRun, ActionRun, RunMessage, Artifact, verification verdict.
+
+First WorkflowTemplates:
+
+- `ExplorationWorkflow`
+- `SpecChangeDraftWorkflow`
+- `DesignWorkflow`
+- `ImplementationWorkflow`
+- `VerificationWorkflow`
+- `FixWorkflow`
+- `RetrospectiveWorkflow`
+
+v0.1A can start with a mocked runtime adapter:
+
+```text
+MockRuntimeAdapter:
+  accepts NodeExecutionRequest
+  emits RunMessages
+  writes deterministic Artifact
+  returns RunResult
+```
+
+But the interface must be shaped like a real runtime adapter so it can later be replaced by Hermes/OpenClaw/Codex/Claude.
+
+v0.1A acceptance criteria:
+
+- can create a Mission from an entry point
+- Mission creation writes to the event stream
+- Planner can generate `WorkflowIntent`, `WorkflowGenerationReason`, and `DAGRunPlanSeed`
+- Planner can select WorkflowTemplate
+- Orchestrator can materialize `DAGRunPlanSeed` into a schedulable `DAGRunPlan` or `DAGRun`
+- can create or update SpecChange
+- can execute at least one DAGRun
+- DAGRun includes at least exploration, implementation, and verification NodeRuns
+- NodeRun can write RunMessage and Artifact
+- verification node can emit pass/fail/verdict
+- Orchestrator can write `RouteDecided` from verdict
+- failure can route to exploration/fix/design
+- Web Console can show Mission timeline and run trace
+- FeedbackSignal can trigger the next planning run
+- all automatic assumptions are recorded as event/artifact
+
+v0.1A explicit non-goals:
+
+- multi-tenancy
+- complete permission model
+- real production deployment
+- full agent marketplace
+- autonomous optimizer promotion
+- complex approval workflow
+- full OpenSpec CLI compatibility
+- multi-runtime concurrent scheduling optimization
 
 ### 11.2 v0.1B: Self-bootstrap
 
@@ -629,6 +1479,7 @@ Acceptance:
 - verification failure routes correctly
 - core/security/runtime changes trigger a gate
 - bootstrap produces retrospective artifact and evolution candidates
+- accepted bootstrap changes can be archived back into canonical specs
 
 ## 12. Explicit Non-goals for v0.1
 

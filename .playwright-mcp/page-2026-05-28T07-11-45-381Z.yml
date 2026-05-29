@@ -1,0 +1,71 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - heading "v0.1A Implementation Slice" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 第一版只证明一条闭环：创建 Mission、规划 workflow、执行 DAG、记录事件、展示 timeline、反馈触发下一轮。
+  - main [ref=e7]:
+    - img
+    - generic [ref=e8]:
+      - generic [ref=e9]: MockRuntimeAdapter allowed
+      - generic [ref=e10]: Event stream required
+      - generic [ref=e11]: 3 Web Console screens only
+    - generic [ref=e12]:
+      - heading "Entry" [level=2] [ref=e13]
+      - generic [ref=e14]:
+        - strong [ref=e15]: MissionCommand
+        - text: Web Console / Hermes / OpenClaw 提交意图。
+      - generic [ref=e16]: POST /missions
+      - generic [ref=e17]:
+        - strong [ref=e18]: MissionCreated
+        - text: 创建 Mission 并写入 event stream。
+    - generic [ref=e19]:
+      - heading "Planner" [level=2] [ref=e20]
+      - generic [ref=e21]:
+        - strong [ref=e22]: MissionPlannerRun
+        - text: 读取 state、memory、feedback、events。
+      - generic [ref=e23]:
+        - strong [ref=e24]: WorkflowIntent
+        - text: 决定下一次 workflow。
+      - generic [ref=e25]:
+        - strong [ref=e26]: DAGRunPlan
+        - text: 选择模板并绑定参数。
+    - generic [ref=e27]:
+      - heading "Spec + DAG" [level=2] [ref=e28]
+      - generic [ref=e29]:
+        - strong [ref=e30]: SpecChange draft
+        - text: 一次有边界变更 contract。
+      - generic [ref=e31]:
+        - strong [ref=e32]: WorkflowTemplate
+        - text: Exploration / Design / Implementation / Verification。
+      - generic [ref=e33]:
+        - strong [ref=e34]: DAGRun
+        - text: 调度并执行 NodeRuns。
+    - generic [ref=e35]:
+      - heading "Runtime" [level=2] [ref=e36]
+      - generic [ref=e37]:
+        - strong [ref=e38]: NodeRun
+        - text: 产生 RunMessage 和 Artifact。
+      - generic [ref=e39]:
+        - strong [ref=e40]: Verification verdict
+        - text: pass / fail / conflict。
+      - generic [ref=e41]:
+        - strong [ref=e42]: RouteDecided
+        - text: Orchestrator 写路由事件。
+    - generic [ref=e43]:
+      - heading "Console + Feedback" [level=2] [ref=e44]
+      - generic [ref=e45]:
+        - strong [ref=e46]: Mission Timeline
+        - text: 展示事件、artifact、decision。
+      - generic [ref=e47]:
+        - strong [ref=e48]: Run Trace
+        - text: 展示 DAGRun / NodeRun / messages。
+      - generic [ref=e49]:
+        - strong [ref=e50]: FeedbackSignal
+        - text: 触发下一次 planning。
+    - region "v0.1A acceptance" [ref=e51]:
+      - generic [ref=e52]: Mission created
+      - generic [ref=e53]: Workflow planned
+      - generic [ref=e54]: SpecChange created
+      - generic [ref=e55]: DAGRun executed
+      - generic [ref=e56]: Route decided
+      - generic [ref=e57]: Feedback loops

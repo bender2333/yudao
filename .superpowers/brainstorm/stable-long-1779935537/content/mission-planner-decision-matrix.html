@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mission Planner Decision Matrix</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --ink: #17202a;
+      --muted: #647084;
+      --line: #d7deea;
+      --blue: #2f6fed;
+      --green: #1f9d70;
+      --amber: #c57a16;
+      --red: #c84d4d;
+      --violet: #7457c8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { padding: 28px; min-width: 1060px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; line-height: 1.2; }
+    .subtitle { margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+    .key {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .key span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
+    .mark { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .matrix {
+      display: grid;
+      grid-template-columns: 1.15fr .82fr 1.35fr 1.08fr 1.1fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .head, .cell {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: 0 8px 22px rgba(23,32,42,.06);
+    }
+    .head {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+      background: #eef3f9;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .cell {
+      min-height: 76px;
+      padding: 11px 12px;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .situation {
+      border-left: 5px solid var(--blue);
+      font-weight: 650;
+      color: #1f2a3a;
+    }
+    .loop {
+      justify-content: center;
+      text-align: center;
+      font-weight: 700;
+      color: #263548;
+    }
+    .loop.exploring { border-left: 5px solid var(--blue); }
+    .loop.changing { border-left: 5px solid var(--green); }
+    .loop.verifying { border-left: 5px solid var(--amber); }
+    .loop.operating { border-left: 5px solid var(--violet); }
+    .loop.learning { border-left: 5px solid var(--red); }
+    .template {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      background: #fbfcfe;
+    }
+    .action strong, .gate strong { display: block; margin-bottom: 2px; }
+    .gate {
+      color: #354153;
+      background: linear-gradient(180deg, #fff, #fbfcfe);
+    }
+    .footer {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 10px 26px rgba(23,32,42,.06);
+    }
+    .panel h2 { margin: 0 0 9px; font-size: 15px; }
+    .panel p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      padding: 8px 10px;
+      background: #eef3f9;
+      border: 1px solid #d7deea;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+    }
+    .arrow { color: var(--muted); }
+    @media (max-width: 900px) {
+      .page { padding: 16px; min-width: 760px; }
+      header { flex-direction: column; align-items: flex-start; }
+      .matrix { grid-template-columns: 1.1fr .75fr 1.2fr 1fr 1fr; gap: 8px; }
+      .cell { font-size: 12px; padding: 9px; }
+      .footer { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>Mission Planner Decision Matrix</h1>
+        <p class="subtitle">Planner 不是黑盒：每次生成 workflow 都必须给出可审计理由、模板选择、SpecChange 动作和 gate 建议。</p>
+      </div>
+      <div class="key">
+        <span><i class="mark" style="background: var(--blue)"></i>exploring</span>
+        <span><i class="mark" style="background: var(--green)"></i>changing</span>
+        <span><i class="mark" style="background: var(--amber)"></i>verifying</span>
+        <span><i class="mark" style="background: var(--violet)"></i>operating</span>
+        <span><i class="mark" style="background: var(--red)"></i>learning</span>
+      </div>
+    </header>
+
+    <section class="matrix" aria-label="Mission planner decision matrix">
+      <div class="head">Situation</div>
+      <div class="head">Next Loop</div>
+      <div class="head">Workflow Template</div>
+      <div class="head">SpecChange Action</div>
+      <div class="head">Gate Behavior</div>
+
+      <div class="cell situation">vague request / missing acceptance</div>
+      <div class="cell loop exploring">exploring</div>
+      <div class="cell template">ExplorationWorkflow</div>
+      <div class="cell action"><span><strong>create draft</strong>建立初始 SpecChange</span></div>
+      <div class="cell gate"><span><strong>ask</strong>only blocking questions</span></div>
+
+      <div class="cell situation">clear bounded change</div>
+      <div class="cell loop changing">changing</div>
+      <div class="cell template">SpecChangeDraftWorkflow + DesignWorkflow</div>
+      <div class="cell action"><span><strong>create / update</strong>进入设计构建</span></div>
+      <div class="cell gate"><span><strong>none</strong>unless high risk</span></div>
+
+      <div class="cell situation">design gap / architecture gap</div>
+      <div class="cell loop changing">changing</div>
+      <div class="cell template">DesignWorkflow</div>
+      <div class="cell action"><span><strong>update current</strong>补设计或边界</span></div>
+      <div class="cell gate"><span><strong>gate</strong>if core boundary</span></div>
+
+      <div class="cell situation">implementation defect</div>
+      <div class="cell loop changing">changing</div>
+      <div class="cell template">FixWorkflow</div>
+      <div class="cell action"><span><strong>continue current</strong>不新建变更</span></div>
+      <div class="cell gate"><span><strong>none</strong>by default</span></div>
+
+      <div class="cell situation">verification contradiction</div>
+      <div class="cell loop exploring">exploring</div>
+      <div class="cell template">ExplorationWorkflow</div>
+      <div class="cell action"><span><strong>revise</strong>重写/澄清 SpecChange</span></div>
+      <div class="cell gate"><span><strong>ask / gate</strong>by autonomy mode</span></div>
+
+      <div class="cell situation">test failure with clear fix</div>
+      <div class="cell loop verifying">verifying / changing</div>
+      <div class="cell template">FixWorkflow -> VerificationWorkflow</div>
+      <div class="cell action"><span><strong>continue current</strong>修复后再验</span></div>
+      <div class="cell gate"><span><strong>none</strong>by default</span></div>
+
+      <div class="cell situation">runtime drift</div>
+      <div class="cell loop learning">operating / learning</div>
+      <div class="cell template">RetrospectiveWorkflow -> SpecChangeDraftWorkflow</div>
+      <div class="cell action"><span><strong>create follow-up</strong>形成后续变更</span></div>
+      <div class="cell gate"><span><strong>gate</strong>if production risk</span></div>
+
+      <div class="cell situation">production incident</div>
+      <div class="cell loop operating">operating / changing</div>
+      <div class="cell template">IncidentWorkflow</div>
+      <div class="cell action"><span><strong>create incident</strong>Incident SpecChange</span></div>
+      <div class="cell gate"><span><strong>gate</strong>rollback / high risk</span></div>
+
+      <div class="cell situation">stable outcome</div>
+      <div class="cell loop learning">learning</div>
+      <div class="cell template">RetrospectiveWorkflow</div>
+      <div class="cell action"><span><strong>archive accepted</strong>进入 canonical spec</span></div>
+      <div class="cell gate"><span><strong>none</strong>unless template promotion</span></div>
+
+      <div class="cell situation">no template match</div>
+      <div class="cell loop exploring">exploring / changing</div>
+      <div class="cell template">WorkflowTemplateProposal</div>
+      <div class="cell action"><span><strong>create proposal</strong>请求新模板</span></div>
+      <div class="cell gate"><span><strong>required</strong>human / design gate</span></div>
+    </section>
+
+    <section class="footer">
+      <div class="panel">
+        <h2>Auditable Planner Output</h2>
+        <div class="flow">
+          <span class="pill">MissionPlannerRun</span><span class="arrow">-></span>
+          <span class="pill">WorkflowIntent</span><span class="arrow">-></span>
+          <span class="pill">WorkflowGenerationReason</span><span class="arrow">-></span>
+          <span class="pill">DAGRunPlan</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Boundary</h2>
+        <p>Planner 只提交计划，不直接执行。Process Orchestrator 决定 schedule、ask、gate、pause 或 route。</p>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

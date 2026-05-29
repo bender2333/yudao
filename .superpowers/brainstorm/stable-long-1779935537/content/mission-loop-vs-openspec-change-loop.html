@@ -1,0 +1,77 @@
+<h2>Mission Loop vs OpenSpec Change Loop</h2>
+<p class="subtitle">Mission owns the long-running lifecycle. OpenSpec-style artifacts own bounded change contracts inside it.</p>
+
+<div class="section">
+  <div class="label">Corrected Boundary</div>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Mission 大循环</div>
+      <div class="mockup-body">
+        <p><strong>Long-running evolution system.</strong></p>
+        <ul>
+          <li>Mission state and history</li>
+          <li>Loop routing across months</li>
+          <li>Child missions and relations</li>
+          <li>Operations feedback</li>
+          <li>Strategic progress and learning</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">OpenSpec 小循环</div>
+      <div class="mockup-body">
+        <p><strong>Bounded change contract.</strong></p>
+        <ul>
+          <li>One proposal/change</li>
+          <li>Scenario acceptance</li>
+          <li>Design and tasks</li>
+          <li>Verification evidence</li>
+          <li>Archive to canonical spec</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Composition</div>
+  <div class="mockup">
+    <div class="mockup-header">A Mission contains many bounded SpecChange loops</div>
+    <div class="mockup-body">
+      <pre>Mission
+  MissionLoopState
+  MissionEventStream
+  MissionMemory / Learning
+  MissionRelation
+
+  SpecChange #1  -> OpenSpec proposal/design/tasks/specs/verify/archive
+  SpecChange #2  -> OpenSpec proposal/design/tasks/specs/verify/archive
+  IncidentChange -> OpenSpec proposal/design/tasks/specs/verify/archive
+
+  DAGRun / NodeRun execute each SpecChange loop</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Routing Rule</div>
+  <div class="mockup">
+    <div class="mockup-header">Who decides what?</div>
+    <div class="mockup-body">
+      <p><strong>OpenSpec answers:</strong> Is this bounded change clear, designed, implemented, verified, and accepted?</p>
+      <p><strong>Mission answers:</strong> What should happen next in the long-running product evolution?</p>
+      <p><strong>Process Orchestrator answers:</strong> Given facts from SpecChange, DAG nodes, ops signals, and policy boundary, where do we route now?</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Updated Principle</div>
+  <div class="mockup">
+    <div class="mockup-header">SpecChange is not the Mission</div>
+    <div class="mockup-body">
+      <p><strong>OpenSpec-style artifacts are ideal for a bounded task/change.</strong></p>
+      <p>The Mission 大循环 needs its own durable state model, roadmap/memory, feedback handling, relation graph, and evolution logic.</p>
+    </div>
+  </div>
+</div>

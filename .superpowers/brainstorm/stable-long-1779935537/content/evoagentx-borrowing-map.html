@@ -1,0 +1,95 @@
+<h2>EvoAgentX 借鉴地图</h2>
+<p class="subtitle">结论不是“拿来做底座”，而是“借鉴骨架 + 平台级重写执行、权限、审计和恢复”。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Reuse boundary for the software-dev multi-agent platform</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+      <div style="border:2px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Adopt</div>
+        <strong>可直接借鉴为产品模型</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>WorkflowGraph / Node IO 契约</li>
+          <li>Agent / Action 双层抽象</li>
+          <li>Environment 轨迹留痕</li>
+          <li>Benchmark / Evaluator 评估闭环</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #7c5cff;border-radius:8px;padding:12px;background:#f4f0ff">
+        <div class="label">Adapt</div>
+        <strong>保留思想但要改造</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>固定角色池替代动态 agent 生成</li>
+          <li>确定性生命周期替代 LLM 任意调度</li>
+          <li>MCP / ToolKit 变成受控能力目录</li>
+          <li>HITL 变成异步审批系统</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #b7791f;border-radius:8px;padding:12px;background:#fff7e6">
+        <div class="label">Rebuild</div>
+        <strong>必须平台级重写</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>持久化 run / step / artifact</li>
+          <li>权限、沙箱、凭证、网络边界</li>
+          <li>幂等、恢复、重试、取消</li>
+          <li>审计事件和团队级记忆治理</li>
+        </ul>
+      </div>
+      <div style="border:2px solid #8a94a6;border-radius:8px;padding:12px;background:#f8fafc">
+        <div class="label">Later</div>
+        <strong>MVP 后再启用</strong>
+        <ul style="font-size:13px;margin:8px 0 0;padding-left:18px">
+          <li>TextGrad / MIPRO prompt 优化</li>
+          <li>SEW / AFlow 结构进化</li>
+          <li>自动修改线上流程模板</li>
+          <li>复杂 workflow 自生成</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:center">
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Product Domain</div>
+        <strong>需求 -> 设计 -> 任务 -> 代码 -> PR -> 发布 -> 运维</strong>
+        <p style="font-size:13px;margin:6px 0 0">平台保存事实、状态、权限、证据、决策。</p>
+      </div>
+      <div style="font-size:24px;color:#718096">→</div>
+      <div style="border:1px solid #1f6feb;border-radius:8px;padding:12px;background:#eef4ff">
+        <div class="label">Adapter</div>
+        <strong>EvoAgentX-style graph adapter</strong>
+        <p style="font-size:13px;margin:6px 0 0">把阶段和制品映射为 node inputs / outputs / actions。</p>
+      </div>
+      <div style="font-size:24px;color:#718096">→</div>
+      <div style="border:1px solid #d6dbe5;border-radius:8px;padding:12px;background:#fff">
+        <div class="label">Runtime</div>
+        <strong>Codex / Claude Code / Hermes / CI / Sandbox</strong>
+        <p style="font-size:13px;margin:6px 0 0">执行、测试、审查、提交 PR，全部产生审计事件。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>建议的复用判断</h3>
+<div class="options">
+  <div class="option" data-choice="kernel-adapter" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>推荐：EvoAgentX-style kernel adapter</h3>
+      <p>平台不 fork 成 EvoAgentX 平台版，而是在产品领域模型和执行 runtime 中间放一层兼容其 graph/action/evaluator 思想的 adapter。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="fork-core" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>不推荐：直接 fork 改平台</h3>
+      <p>短期快，但 HITL、app、tool、storage 都偏 demo/SDK，后面会把权限、审计、运行时和框架代码缠在一起。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="rewrite-only" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>保守：只学概念，全重写</h3>
+      <p>长期最干净，但浪费 EvoAgentX 在 workflow、tool、evaluator、optimizer 上已经形成的抽象经验，MVP 验证会慢。</p>
+    </div>
+  </div>
+</div>

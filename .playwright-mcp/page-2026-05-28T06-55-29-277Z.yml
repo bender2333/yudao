@@ -1,0 +1,59 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - heading "AI/Agent Native Mission Platform" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Mission 大循环负责长期演化；SpecChange 小循环负责一次有边界变更；DAG 执行具体 workflow。
+    - generic [ref=e7]:
+      - generic [ref=e8]: Planner
+      - generic [ref=e10]: Templates
+      - generic [ref=e12]: OpenSpec
+      - generic [ref=e14]: DAG Runtime
+      - generic [ref=e16]: Feedback
+  - main [ref=e18]:
+    - img
+    - generic [ref=e19]:
+      - heading "MissionMemory / Backlog" [level=3] [ref=e20]
+      - paragraph [ref=e21]: 长期目标、非目标、约束、架构决策、历史失败、用户偏好、延期事项。
+    - generic [ref=e22]:
+      - heading "Mission Planner" [level=3] [ref=e23]
+      - paragraph [ref=e24]: 根据 MissionState、Memory、Feedback 和 SpecChange 状态决定下一次 workflow。
+      - generic [ref=e25]:
+        - generic [ref=e26]: WorkflowIntent
+        - generic [ref=e27]: DAGRunPlan
+        - generic [ref=e28]: RouteRecommendation
+    - generic [ref=e29]:
+      - heading "Workflow Template Registry" [level=3] [ref=e30]
+      - paragraph [ref=e31]: 限制动态生成边界：选择模板、参数绑定、有限节点组合。
+      - generic [ref=e32]:
+        - generic [ref=e33]: Design
+        - generic [ref=e34]: Fix
+        - generic [ref=e35]: Verify
+        - generic [ref=e36]: Incident
+    - generic [ref=e38]:
+      - heading "Mission 大循环" [level=2] [ref=e39]
+      - paragraph [ref=e40]: 长期生命周期图，编织多个有边界变更与 DAG 执行。
+      - generic [ref=e41]:
+        - generic [ref=e42]: exploring
+        - generic [ref=e43]: changing
+        - generic [ref=e44]: verifying
+        - generic [ref=e45]: operating
+    - generic [ref=e46]:
+      - heading "EvoAgentX-style DAG Runtime" [level=3] [ref=e47]
+      - paragraph [ref=e48]: 执行生成出来的有边界 Workflow DAG，NodeRun 是最小控制单元。
+      - generic [ref=e49]:
+        - generic [ref=e50]: DAGRun
+        - generic [ref=e51]: NodeRun
+        - generic [ref=e52]: ActionRun
+    - generic [ref=e53]:
+      - heading "OpenSpec-style SpecChange" [level=3] [ref=e54]
+      - paragraph [ref=e55]: 一次变更的 contract：proposal、design、tasks、scenarios、verify、archive。
+      - generic [ref=e56]:
+        - generic [ref=e57]: proposal.md
+        - generic [ref=e58]: design.md
+        - generic [ref=e59]: tasks.md
+    - generic [ref=e60]:
+      - heading "FeedbackSignal" [level=3] [ref=e61]
+      - paragraph [ref=e62]: 用户反馈、incident、指标回退、runtime drift 进入大循环，触发下一个 workflow。
+    - generic [ref=e63]:
+      - generic [ref=e64]: OpenSpec 定义一次要改什么；Mission 记录长期发生了什么。
+      - generic [ref=e65]: "v0.1: template selection + parameter binding + bounded node composition"
