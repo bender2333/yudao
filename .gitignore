@@ -1,0 +1,30 @@
+# --- secrets (never commit) ---
+provider.md
+
+# --- run artifacts ---
+runs/
+
+# --- node / build ---
+node_modules/
+dist/
+test-results/
+.vite/
+
+# --- tooling / scratch ---
+.tmp/
+.tmp-codex-test/
+.playwright-mcp/
+.mission-workspaces/
+.remember/
+.yudao/
+
+# --- python ---
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- main-branch legacy artifacts (kept on disk, out of git) ---
+.superpowers/
+.codegraph/
+.cursor/
+ref/
