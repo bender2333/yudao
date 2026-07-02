@@ -230,3 +230,71 @@ def test_empty_field_does_not_terminate_loop(tmp_path):
 def test_parse_understanding_assembles_text():
     text = parse_understanding(_U_ARGS)
     assert "## Summary" in text and "## Done-criteria" in text
+
+
+# ── natural-stop hooks (the milestone-2.1 fix) ────────────
+def _text_stop(text):
+    """A natural stop: model emits text, no tool_calls."""
+    return _cr(text=text, finish="stop")
+
+
+def test_understand_natural_stop_uses_text(tmp_path):
+    """UNDERSTAND stops naturally (no submit_understanding) -> its text becomes
+    the understanding, and the pipeline proceeds instead of escalating."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _text_stop("The task needs a script foo.py that prints hi."),  # UNDERSTAND natural
+        _ready_ok(),                                                   # PLAN terminal
+        _verdict("pass"),                                              # VERIFY terminal
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "done"
+    assert result.understanding.startswith("The task needs")
+    assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
+
+
+def test_plan_natural_stop_proceeds(tmp_path):
+    """PLAN stops naturally (no submit_ready) -> proceeds to VERIFY."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _text_stop("Implemented foo.py and ran it, prints hi."),  # PLAN natural
+        _verdict("pass"),
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "done"
+    assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
+
+
+def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
+    """VERIFY stops naturally -> the on_stop hook makes ONE classification call
+    that recovers a routing verdict (here: pass)."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        _text_stop("All criteria met: ran it, output correct."),  # VERIFY natural
+        _verdict("pass", "router classification"),                # hook's router call
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "done"
+    assert result.verdict["status"] == "pass"
+
+
+def test_verify_natural_stop_router_defaults_to_reject(tmp_path):
+    """If the verify text is empty / router yields nothing usable, default to
+    reject_execution — NEVER a false pass."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        _text_stop(""),  # VERIFY natural stop with no conclusion text -> default reject
+        # (empty text short-circuits to default; router call not consumed)
+        _ready_ok(), _verdict("pass"),  # round 2: plan again then pass
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task", max_rounds=3)
+    # first verify defaulted to reject_execution -> back to PLAN_EXECUTE -> pass
+    assert result.outcome == "done"
+    stages = [s.stage for s in result.stages]
+    assert stages == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY", "PLAN_EXECUTE", "VERIFY"]
+

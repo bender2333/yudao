@@ -63,6 +63,7 @@ def run_agent_loop(
     max_steps: int = 40,
     on_event=None,
     terminal_tools: set | None = None,
+    on_stop=None,
 ) -> LoopResult:
     messages = [
         {"role": "system", "content": system},
@@ -117,6 +118,13 @@ def run_agent_loop(
             final_text = result.text
             stopped_reason = "natural"
             emit({"type": "stop", "reason": "natural", "step": steps})
+            # Stop hook: the stage ended naturally. The hook may inspect the
+            # final text + transcript and return a routing/产出 dict, which we
+            # surface as terminal_call so the orchestrator can consume it.
+            if on_stop is not None:
+                hooked = on_stop(final_text, messages)
+                if hooked is not None:
+                    terminal_call = hooked
             break
 
         # Execute every tool_call; feed each result back.

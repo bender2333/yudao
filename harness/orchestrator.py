@@ -15,6 +15,7 @@ understanding + file listing, never upstream implementation prose.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 from .agent_loop import run_agent_loop
@@ -30,17 +31,18 @@ from .tools import TOOL_DEFS
 UNDERSTAND_SYSTEM = (
     "You are the UNDERSTANDING stage. Investigate the task and the existing workspace "
     "using tools. Your job is NOT to implement — it is to deeply understand WHAT must "
-    "be true when the task is done. When ready, call submit_understanding with a crisp "
-    "summary, the concrete requirements, the constraints, and the observable "
-    "done-criteria. Do not write solution code."
+    "be true when the task is done. Produce a crisp statement of the task summary, the "
+    "concrete requirements, the constraints, and the observable done-criteria. You may "
+    "call submit_understanding to record it in a structured form, but simply writing it "
+    "out and stopping is also fine. Do not write solution code."
 )
 
 PLAN_SYSTEM = (
     "You are the PLAN & EXECUTE stage, given the upstream understanding. Plan and "
     "implement it for real using tools (write/edit files, run commands to check your "
-    "work). Realize every done-criterion as actually-working behavior. When complete "
-    "and you have run it to confirm, call submit_ready with a brief note of what you "
-    "built and how you verified it."
+    "work). Realize every done-criterion as actually-working behavior. Run it to confirm "
+    "it works. When you are done, stop; you may optionally call submit_ready to note what "
+    "you built and how you verified it."
 )
 
 VERIFY_SYSTEM = (
@@ -48,11 +50,11 @@ VERIFY_SYSTEM = (
     'for "done") and the workspace. Independently verify whether the implementation '
     "satisfies the done-criteria: read delivered files and RUN functional checks "
     "(write/execute test scripts, invoke the program, inspect outputs). Judge from real "
-    "execution evidence, not code reading alone. Then call submit_verdict: "
-    'status="pass" if every criterion is met with evidence; "reject_execution" if the '
-    'implementation fails a criterion (cite observed vs expected); '
-    '"reject_understanding" if the understanding itself is wrong/insufficient (cite '
-    "why). Do not modify the implementation; your role is to judge and route."
+    "execution evidence, not code reading alone. State your verdict clearly: whether every "
+    "criterion is met, or which one fails (observed vs expected), or whether the "
+    "understanding itself was wrong. Call submit_verdict with status "
+    "(pass | reject_execution | reject_understanding) and an evidence-based reason. "
+    "Do not modify the implementation; your role is to judge and route."
 )
 
 
@@ -129,9 +131,16 @@ def _accumulate(agg: MultiResult, loop) -> None:
 
 
 def _run_stage(
-    llm, stage, system, user, workspace, max_steps, on_event, round_no, result
+    llm, stage, system, user, workspace, max_steps, on_event, round_no, result,
+    on_stop=None,
 ):
-    """Run one stage loop; emit stage_start/stage_end; record + accumulate."""
+    """Run one stage loop; emit stage_start/stage_end; record + accumulate.
+
+    A stage ends when its loop stops naturally (the model stops calling tools) —
+    that IS the end-of-stage signal. The optional on_stop hook extracts the
+    stage's产出/routing from the final transcript. Terminal tools, if the model
+    happens to call one, are still honored as an early, explicit stop.
+    """
     terminal = {
         "UNDERSTAND": UNDERSTAND_TERMINAL,
         "PLAN_EXECUTE": PLAN_TERMINAL,
@@ -151,6 +160,7 @@ def _run_stage(
         max_steps=max_steps,
         on_event=on_event,
         terminal_tools={terminal},
+        on_stop=on_stop,
     )
     tc = loop.terminal_call
     result.stages.append(StageRun(stage=stage, loop=loop, terminal_call=tc))
@@ -169,6 +179,66 @@ def _run_stage(
     return loop, tc
 
 
+# ── Stop hooks (spec: 自然停止 = 阶段结束) ───────────────────
+# on_stop fires ONLY on natural stop (no tool_calls). The terminal-tool path
+# sets terminal_call itself. So after a stage, terminal_call is None IFF the
+# loop hit max_steps without concluding → that (and only that) escalates.
+
+def _understand_hook(final_text, messages):
+    """Understanding produced as free text (model didn't call the tool)."""
+    text = (final_text or "").strip()
+    if not text:
+        return None  # produced nothing → escalate
+    return {"name": "understanding_natural", "understanding_text": text}
+
+
+def _plan_hook(final_text, messages):
+    """Plan/execute ended naturally — its产出 is the files on disk. Always concludes."""
+    return {"name": "ready_natural", "notes": (final_text or "").strip()}
+
+
+_VERIFY_ROUTER_SYSTEM = (
+    "You are a strict router. You are given a verification stage's own written "
+    "conclusion about whether an implementation meets its done-criteria. Classify "
+    "it into exactly one routing verdict by calling submit_verdict:\n"
+    "- pass: the conclusion clearly states every criterion is met with evidence.\n"
+    "- reject_execution: the conclusion finds the implementation fails a criterion.\n"
+    "- reject_understanding: the conclusion finds the understanding itself was wrong.\n"
+    "Do not invent findings; classify only what the conclusion says. If it is "
+    "ambiguous or gives no clear pass, choose reject_execution (never falsely pass)."
+)
+
+
+def _make_verify_hook(llm):
+    """Verify ended naturally without submit_verdict → recover a routing verdict
+    with ONE cheap classification call. Defaults to reject_execution (never a
+    false pass) if classification can't produce a clean verdict."""
+    def hook(final_text, messages):
+        text = (final_text or "").strip()
+        default = {"name": "submit_verdict",
+                   "args": {"status": "reject_execution",
+                            "reason": "verification produced no explicit verdict; "
+                                      "defaulting to reject_execution (no false pass)."}}
+        if not text:
+            return default
+        try:
+            router_msgs = [
+                {"role": "system", "content": _VERIFY_ROUTER_SYSTEM},
+                {"role": "user", "content": f"Verification conclusion:\n\n{text}"},
+            ]
+            cr = llm.chat(router_msgs, STAGE_TOOL_DEFS["VERIFY"])
+            for tc in cr.tool_calls or []:
+                if tc.function.name == VERIFY_TERMINAL:
+                    args = json.loads(tc.function.arguments or "{}")
+                    if args.get("status") in {"pass", "reject_execution", "reject_understanding"}:
+                        args.setdefault("reason", "(classified from verify conclusion)")
+                        return {"name": "submit_verdict", "args": args}
+        except Exception:
+            pass
+        return default
+    return hook
+
+
 def run_multi(
     llm,
     workspace,
@@ -182,18 +252,19 @@ def run_multi(
     round_no = 0
     understanding: str | None = None
     reject_reason: str | None = None
+    verify_hook = _make_verify_hook(llm)
 
     while round_no < max_rounds:
         if state == "UNDERSTAND":
             user = _understand_user(task, workspace, reject_reason)
             _, tc = _run_stage(
                 llm, "UNDERSTAND", UNDERSTAND_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result,
+                max_steps, on_event, round_no, result, on_stop=_understand_hook,
             )
-            if tc is None:
+            if tc is None:  # max_steps without concluding
                 result.outcome = "escalated"
                 break
-            understanding = parse_understanding(tc["args"])
+            understanding = _understanding_from(tc)
             result.understanding = understanding
             reject_reason = None
             state = "PLAN_EXECUTE"
@@ -202,7 +273,7 @@ def run_multi(
             user = _plan_user(understanding, workspace, reject_reason)
             _, tc = _run_stage(
                 llm, "PLAN_EXECUTE", PLAN_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result,
+                max_steps, on_event, round_no, result, on_stop=_plan_hook,
             )
             if tc is None:
                 result.outcome = "escalated"
@@ -214,7 +285,7 @@ def run_multi(
             user = _verify_user(understanding, workspace)
             _, tc = _run_stage(
                 llm, "VERIFY", VERIFY_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result,
+                max_steps, on_event, round_no, result, on_stop=verify_hook,
             )
             if tc is None:
                 result.outcome = "escalated"
@@ -235,4 +306,12 @@ def run_multi(
         result.outcome = "escalated"
 
     return result
+
+
+def _understanding_from(tc: dict) -> str:
+    """Normalize UNDERSTAND terminal_call into understanding text, whether it
+    came from the submit_understanding tool (structured) or natural stop (text)."""
+    if "understanding_text" in tc:
+        return tc["understanding_text"]
+    return parse_understanding(tc.get("args", {}))
 
