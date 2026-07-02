@@ -43,8 +43,9 @@ def _serialize_tool_calls(tool_calls: list) -> list:
 class LoopResult:
     final_text: str
     steps: int
-    stopped_reason: str  # "natural" | "max_steps"
+    stopped_reason: str  # "natural" | "max_steps" | "terminal"
     tool_invocations: int
+    terminal_call: dict | None = None  # args of the terminal tool that stopped the loop
     events: list = field(default_factory=list)
     calls: int = 0
     prompt_tokens: int = 0
@@ -61,6 +62,7 @@ def run_agent_loop(
     handlers_ctx: str,
     max_steps: int = 40,
     on_event=None,
+    terminal_tools: set | None = None,
 ) -> LoopResult:
     messages = [
         {"role": "system", "content": system},
@@ -77,6 +79,7 @@ def run_agent_loop(
     tool_invocations = 0
     final_text = ""
     stopped_reason = "max_steps"
+    terminal_call = None
 
     while True:
         if steps >= max_steps:
@@ -117,6 +120,7 @@ def run_agent_loop(
             break
 
         # Execute every tool_call; feed each result back.
+        stop_after = False
         for tc in result.tool_calls:
             name = tc.function.name
             raw_args = tc.function.arguments
@@ -144,12 +148,27 @@ def run_agent_loop(
                     "content": output,
                 }
             )
+            # Terminal tool: stop only if the handler accepted it (no Error回执).
+            if (
+                terminal_tools
+                and name in terminal_tools
+                and not output.startswith("Error:")
+            ):
+                terminal_call = {"name": name, "args": args}
+                final_text = result.text or ""
+                stop_after = True
+
+        if stop_after:
+            stopped_reason = "terminal"
+            emit({"type": "stop", "reason": "terminal", "step": steps})
+            break
 
     return LoopResult(
         final_text=final_text,
         steps=steps,
         stopped_reason=stopped_reason,
         tool_invocations=tool_invocations,
+        terminal_call=terminal_call,
         events=events,
         calls=llm.calls_made,
         prompt_tokens=llm.prompt_tokens_total,

@@ -64,6 +64,7 @@ def run_solo(
 
     summary = {
         "task": task,
+        "mode": "solo",
         "model": cfg["model"],
         "stopped_reason": result.stopped_reason,
         "steps": result.steps,
