@@ -22,6 +22,17 @@ def _truncate(s: str, n: int = _TRUNC) -> str:
     return s if len(s) <= n else s[:n] + f"...[truncated {len(s) - n} chars]"
 
 
+def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
+    """Extra handlers (llm/workspace-bound closures, e.g. cross-stage consults)
+    take precedence; otherwise fall back to the standard stateless dispatch."""
+    if extra_handlers and name in extra_handlers:
+        try:
+            return extra_handlers[name](**args)
+        except Exception as e:  # a consult must never crash the caller's loop
+            return f"Error: {type(e).__name__}: {e}"
+    return dispatch(name, args, handlers_ctx)
+
+
 def _serialize_tool_calls(tool_calls: list) -> list:
     """Serialize raw tool_call objects for the assistant message re-feed."""
     out = []
@@ -64,6 +75,7 @@ def run_agent_loop(
     on_event=None,
     terminal_tools: set | None = None,
     on_stop=None,
+    extra_handlers: dict | None = None,
 ) -> LoopResult:
     messages = [
         {"role": "system", "content": system},
@@ -138,7 +150,7 @@ def run_agent_loop(
                     args = {}
             except json.JSONDecodeError:
                 args = {}
-            output = dispatch(name, args, handlers_ctx)
+            output = _dispatch_with_extras(name, args, handlers_ctx, extra_handlers)
             tool_invocations += 1
             emit(
                 {

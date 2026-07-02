@@ -121,6 +121,23 @@ STAGE_TOOL_DEFS: dict[str, list] = {
     "VERIFY": [_VERIFY_DEF],
 }
 
+CONSULT_UNDERSTANDING = "consult_understanding"
+
+_CONSULT_DEF = _fn(
+    CONSULT_UNDERSTANDING,
+    "Ask the UNDERSTANDING stage to clarify or supplement the understanding when "
+    "you hit an ambiguity the current understanding does not resolve (e.g. an "
+    "unspecified edge case). Provide a specific question; you get back a concrete "
+    "answer and may continue. Use this instead of guessing or looping.",
+    {
+        "question": {
+            "type": "string",
+            "description": "The specific ambiguity you need the understanding to resolve.",
+        }
+    },
+    ["question"],
+)
+
 STAGE_TOOL_HANDLERS = {
     UNDERSTAND_TERMINAL: submit_understanding,
     PLAN_TERMINAL: submit_ready,

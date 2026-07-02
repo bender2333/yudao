@@ -20,10 +20,12 @@ from dataclasses import dataclass, field
 
 from .agent_loop import run_agent_loop
 from .stage_tools import (
+    CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
     STAGE_TOOL_DEFS,
     UNDERSTAND_TERMINAL,
     VERIFY_TERMINAL,
+    _CONSULT_DEF,
     parse_understanding,
 )
 from .tools import TOOL_DEFS
@@ -41,8 +43,10 @@ PLAN_SYSTEM = (
     "You are the PLAN & EXECUTE stage, given the upstream understanding. Plan and "
     "implement it for real using tools (write/edit files, run commands to check your "
     "work). Realize every done-criterion as actually-working behavior. Run it to confirm "
-    "it works. When you are done, stop; you may optionally call submit_ready to note what "
-    "you built and how you verified it."
+    "it works. If you hit an ambiguity the understanding does not resolve, call "
+    "consult_understanding with a specific question instead of guessing. When you are "
+    "done, stop; you may optionally call submit_ready to note what you built and how "
+    "you verified it."
 )
 
 VERIFY_SYSTEM = (
@@ -54,6 +58,8 @@ VERIFY_SYSTEM = (
     "criterion is met, or which one fails (observed vs expected), or whether the "
     "understanding itself was wrong. Call submit_verdict with status "
     "(pass | reject_execution | reject_understanding) and an evidence-based reason. "
+    "If a done-criterion is ambiguous and the understanding does not settle it, call "
+    "consult_understanding with a specific question rather than guessing or looping. "
     "Do not modify the implementation; your role is to judge and route."
 )
 
@@ -72,6 +78,7 @@ class MultiResult:
     stages: list = field(default_factory=list)
     understanding: str | None = None
     verdict: dict | None = None
+    consults: int = 0
     # aggregated cost across all stages
     calls: int = 0
     prompt_tokens: int = 0
@@ -132,7 +139,7 @@ def _accumulate(agg: MultiResult, loop) -> None:
 
 def _run_stage(
     llm, stage, system, user, workspace, max_steps, on_event, round_no, result,
-    on_stop=None,
+    on_stop=None, extra_tool_defs=None, extra_handlers=None,
 ):
     """Run one stage loop; emit stage_start/stage_end; record + accumulate.
 
@@ -140,13 +147,14 @@ def _run_stage(
     that IS the end-of-stage signal. The optional on_stop hook extracts the
     stage's产出/routing from the final transcript. Terminal tools, if the model
     happens to call one, are still honored as an early, explicit stop.
+    extra_tool_defs/extra_handlers add cross-stage tools (e.g. consult_understanding).
     """
     terminal = {
         "UNDERSTAND": UNDERSTAND_TERMINAL,
         "PLAN_EXECUTE": PLAN_TERMINAL,
         "VERIFY": VERIFY_TERMINAL,
     }[stage]
-    stage_tools = TOOL_DEFS + STAGE_TOOL_DEFS[stage]
+    stage_tools = TOOL_DEFS + STAGE_TOOL_DEFS[stage] + (extra_tool_defs or [])
 
     if on_event is not None:
         on_event({"type": "stage_start", "stage": stage, "round": round_no})
@@ -161,6 +169,7 @@ def _run_stage(
         on_event=on_event,
         terminal_tools={terminal},
         on_stop=on_stop,
+        extra_handlers=extra_handlers,
     )
     tc = loop.terminal_call
     result.stages.append(StageRun(stage=stage, loop=loop, terminal_call=tc))
@@ -239,6 +248,43 @@ def _make_verify_hook(llm):
     return hook
 
 
+def _make_consult_handler(llm, workspace, task, get_understanding, on_event, counter):
+    """Build a consult_understanding handler: a stage can freely call it to ask the
+    UNDERSTANDING role to clarify an ambiguity. Runs a small understanding sub-loop
+    bound to the task + current understanding; returns a concrete answer string.
+    Fully free-form (per user's directive): any stage may call it any number of times."""
+    def handler(question: str = "") -> str:
+        q = (question or "").strip()
+        if not q:
+            return "Error: question is required"
+        counter["consults"] += 1
+        if on_event is not None:
+            on_event({"type": "consult", "question": _clip(q)})
+        system = (
+            "You are the UNDERSTANDING stage being consulted mid-task. Answer the "
+            "specific question concretely and decisively, grounded in the original "
+            "task and the established understanding. If the task is silent, make the "
+            "most reasonable decision and state it plainly. Investigate with tools if "
+            "needed. Give a direct answer, not a restatement."
+        )
+        user = (
+            f"# Original task\n{task}\n\n"
+            f"# Established understanding\n{get_understanding() or '(none yet)'}\n\n"
+            f"# Question from a downstream stage\n{q}\n"
+        )
+        sub = run_agent_loop(
+            llm=llm, system=system, user=user,
+            tools=TOOL_DEFS, handlers_ctx=workspace.dir,
+            max_steps=8, on_event=on_event,
+        )
+        return sub.final_text or "(no answer)"
+    return handler
+
+
+def _clip(s: str, n: int = 300) -> str:
+    return s if len(s) <= n else s[:n] + "..."
+
+
 def run_multi(
     llm,
     workspace,
@@ -254,9 +300,32 @@ def run_multi(
     reject_reason: str | None = None
     verify_hook = _make_verify_hook(llm)
 
+    # Cross-stage consult (point 1): PLAN_EXECUTE / VERIFY may freely call
+    # consult_understanding any number of times to resolve ambiguity mid-task.
+    counter = {"consults": 0}
+    consult = _make_consult_handler(
+        llm, workspace, task, lambda: understanding, on_event, counter
+    )
+    consult_defs = [_CONSULT_DEF]
+    consult_handlers = {CONSULT_UNDERSTANDING: consult}
+
+    # Soft-convergence (point 2): once we've looped past this many rounds,
+    # inject a nudge to converge rather than hard-cutting.
+    soft_at = max(1, max_rounds - 1)
+
+    def _nudge(reason: str | None) -> str | None:
+        if round_no >= soft_at:
+            note = (
+                f"\n\n# Convergence note\nYou have already iterated {round_no} rounds. "
+                "If you cannot fully resolve remaining issues this round, converge to "
+                "the best working result you can and finish."
+            )
+            return (reason or "") + note
+        return reason
+
     while round_no < max_rounds:
         if state == "UNDERSTAND":
-            user = _understand_user(task, workspace, reject_reason)
+            user = _understand_user(task, workspace, _nudge(reject_reason))
             _, tc = _run_stage(
                 llm, "UNDERSTAND", UNDERSTAND_SYSTEM, user, workspace,
                 max_steps, on_event, round_no, result, on_stop=_understand_hook,
@@ -270,10 +339,11 @@ def run_multi(
             state = "PLAN_EXECUTE"
 
         elif state == "PLAN_EXECUTE":
-            user = _plan_user(understanding, workspace, reject_reason)
+            user = _plan_user(understanding, workspace, _nudge(reject_reason))
             _, tc = _run_stage(
                 llm, "PLAN_EXECUTE", PLAN_SYSTEM, user, workspace,
                 max_steps, on_event, round_no, result, on_stop=_plan_hook,
+                extra_tool_defs=consult_defs, extra_handlers=consult_handlers,
             )
             if tc is None:
                 result.outcome = "escalated"
@@ -286,6 +356,7 @@ def run_multi(
             _, tc = _run_stage(
                 llm, "VERIFY", VERIFY_SYSTEM, user, workspace,
                 max_steps, on_event, round_no, result, on_stop=verify_hook,
+                extra_tool_defs=consult_defs, extra_handlers=consult_handlers,
             )
             if tc is None:
                 result.outcome = "escalated"
@@ -305,6 +376,7 @@ def run_multi(
         # ran out of rounds without a pass verdict
         result.outcome = "escalated"
 
+    result.consults = counter["consults"]
     return result
 
 

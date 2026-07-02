@@ -281,7 +281,27 @@ def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
     assert result.verdict["status"] == "pass"
 
 
-def test_verify_natural_stop_router_defaults_to_reject(tmp_path):
+def test_verify_can_consult_understanding(tmp_path):
+    """VERIFY freely calls consult_understanding mid-stage; the consult runs a
+    sub-loop, VERIFY consumes the answer, then submits its verdict. Counted."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        # VERIFY: first calls consult_understanding (ambiguity)...
+        _cr(tool_calls=[_tc("cq", "consult_understanding",
+                            {"question": "does line count include a file with no trailing newline?"})],
+            finish="tool_calls"),
+        # ...the consult sub-loop answers naturally...
+        _text_stop("Yes: count a final line without trailing newline as one line."),
+        # ...back in VERIFY, now it submits a verdict.
+        _verdict("pass", "resolved via consult"),
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "done"
+    assert result.consults == 1
+    assert result.verdict["status"] == "pass"
+
     """If the verify text is empty / router yields nothing usable, default to
     reject_execution — NEVER a false pass."""
     ws = Workspace(str(tmp_path / "w"))
