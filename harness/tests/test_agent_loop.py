@@ -1,0 +1,136 @@
+"""Tests for harness.agent_loop with a scripted mock LlmClient (spec §5)."""
+
+import json
+import os
+from dataclasses import dataclass
+
+from harness.agent_loop import run_agent_loop
+from harness.llm import CallResult
+from harness.tools import TOOL_DEFS
+
+
+# ── mock tool_call objects (shape mirrors the OpenAI SDK) ──
+@dataclass
+class _Fn:
+    name: str
+    arguments: str
+
+
+@dataclass
+class _ToolCall:
+    id: str
+    function: _Fn
+
+
+def _tc(call_id, name, args: dict):
+    return _ToolCall(id=call_id, function=_Fn(name=name, arguments=json.dumps(args)))
+
+
+class MockLlmClient:
+    """Returns scripted CallResults in order; tracks cumulative totals."""
+
+    def __init__(self, script):
+        self._script = list(script)
+        self._i = 0
+        self.calls_made = 0
+        self.prompt_tokens_total = 0
+        self.completion_tokens_total = 0
+        self.reasoning_tokens_total = 0
+
+    def chat(self, messages, tools, max_completion_tokens=8000):
+        result = self._script[self._i]
+        self._i += 1
+        self.calls_made += 1
+        self.prompt_tokens_total += result.prompt_tokens
+        self.completion_tokens_total += result.completion_tokens
+        self.reasoning_tokens_total += result.reasoning_tokens
+        return result
+
+
+def _cr(text="", tool_calls=None, finish="stop"):
+    return CallResult(
+        text=text,
+        tool_calls=tool_calls or [],
+        finish_reason=finish,
+        prompt_tokens=10,
+        completion_tokens=5,
+        reasoning_tokens=2,
+        duration_ms=1,
+    )
+
+
+def test_loop_executes_tool_then_stops_natural(tmp_path):
+    ws = str(tmp_path)
+    script = [
+        _cr(
+            text="",
+            tool_calls=[_tc("call_1", "write_file", {"path": "out.txt", "content": "done"})],
+            finish="tool_calls",
+        ),
+        _cr(text="All done.", tool_calls=[], finish="stop"),
+    ]
+    llm = MockLlmClient(script)
+    result = run_agent_loop(llm, "sys", "do it", TOOL_DEFS, ws, max_steps=40)
+
+    assert result.stopped_reason == "natural"
+    assert result.final_text == "All done."
+    assert result.tool_invocations == 1
+    assert result.steps == 2
+    # file actually written
+    assert os.path.exists(os.path.join(ws, "out.txt"))
+    with open(os.path.join(ws, "out.txt"), encoding="utf-8") as f:
+        assert f.read() == "done"
+
+    # event sequence: llm_call, tool_call, llm_call, stop
+    types = [e["type"] for e in result.events]
+    assert types == ["llm_call", "tool_call", "llm_call", "stop"]
+    assert result.events[-1]["reason"] == "natural"
+    # totals propagated
+    assert result.calls == 2
+    assert result.prompt_tokens == 20
+
+
+def test_multiple_tool_calls_one_turn(tmp_path):
+    ws = str(tmp_path)
+    script = [
+        _cr(
+            tool_calls=[
+                _tc("c1", "write_file", {"path": "a.txt", "content": "A"}),
+                _tc("c2", "write_file", {"path": "b.txt", "content": "B"}),
+            ],
+            finish="tool_calls",
+        ),
+        _cr(text="two files written", finish="stop"),
+    ]
+    llm = MockLlmClient(script)
+    result = run_agent_loop(llm, "sys", "do it", TOOL_DEFS, ws)
+    assert result.tool_invocations == 2
+    assert os.path.exists(os.path.join(ws, "a.txt"))
+    assert os.path.exists(os.path.join(ws, "b.txt"))
+
+
+def test_max_steps_forces_stop(tmp_path):
+    ws = str(tmp_path)
+    # always returns a tool_call -> never stops naturally
+    script = [
+        _cr(
+            tool_calls=[_tc(f"c{i}", "list_dir", {})],
+            finish="tool_calls",
+        )
+        for i in range(10)
+    ]
+    llm = MockLlmClient(script)
+    result = run_agent_loop(llm, "sys", "loop forever", TOOL_DEFS, ws, max_steps=3)
+    assert result.stopped_reason == "max_steps"
+    assert result.steps == 3
+    assert result.events[-1]["type"] == "stop"
+    assert result.events[-1]["reason"] == "max_steps"
+
+
+def test_events_carry_no_key(tmp_path):
+    ws = str(tmp_path)
+    script = [_cr(text="hi", finish="stop")]
+    llm = MockLlmClient(script)
+    result = run_agent_loop(llm, "sys", "task", TOOL_DEFS, ws)
+    blob = json.dumps(result.events)
+    assert "sk-" not in blob
