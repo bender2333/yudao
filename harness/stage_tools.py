@@ -128,7 +128,8 @@ _CONSULT_DEF = _fn(
     "Ask the UNDERSTANDING stage to clarify or supplement the understanding when "
     "you hit an ambiguity the current understanding does not resolve (e.g. an "
     "unspecified edge case). Provide a specific question; you get back a concrete "
-    "answer and may continue. Use this instead of guessing or looping.",
+    "answer that is also appended to the shared understanding for later stages. "
+    "Use this instead of guessing or looping.",
     {
         "question": {
             "type": "string",

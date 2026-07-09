@@ -7,10 +7,17 @@ UNDERSTAND -> PLAN_EXECUTE -> VERIFY, driven by the verify verdict:
 Exhausting MAX_ROUNDS, or any stage that ends without its terminal_call,
 -> ESCALATED.
 
-Each stage is a fresh run_agent_loop over the SAME workspace + full toolset,
-plus that stage's terminal tool. The orchestrator assembles each stage's
-initial user message (context封装, spec §4): verify only sees the
-understanding + file listing, never upstream implementation prose.
+Each stage is a fresh run_agent_loop over the SAME workspace. Tool access:
+  PLAN_EXECUTE  — full toolset (read/write/edit/bash)
+  UNDERSTAND / VERIFY / consult — no write_file/edit_file (judge/investigate only)
+plus that stage's terminal tool. Context encapsulation (spec §4): verify only
+sees understanding + file listing, never upstream implementation prose.
+
+Gates (post-M2.1 tighten):
+  UNDERSTAND — prefer submit_understanding; natural stop runs one structured extract
+  PLAN       — must leave at least one non-empty deliverable file
+  VERIFY     — submit_verdict preferred; natural stop classifies via router
+  consult    — answers are appended into the shared understanding artifact
 """
 
 from __future__ import annotations
@@ -28,39 +35,46 @@ from .stage_tools import (
     _CONSULT_DEF,
     parse_understanding,
 )
-from .tools import TOOL_DEFS
+from .tools import TOOL_DEFS, tool_defs_without_writes
+
+# Full tools for implement; investigate/judge stages cannot rewrite deliverables.
+_INVESTIGATE_TOOLS = tool_defs_without_writes()
+_IMPLEMENT_TOOLS = TOOL_DEFS
 
 UNDERSTAND_SYSTEM = (
     "You are the UNDERSTANDING stage. Investigate the task and the existing workspace "
-    "using tools. Your job is NOT to implement — it is to deeply understand WHAT must "
-    "be true when the task is done. Produce a crisp statement of the task summary, the "
-    "concrete requirements, the constraints, and the observable done-criteria. You may "
-    "call submit_understanding to record it in a structured form, but simply writing it "
-    "out and stopping is also fine. Do not write solution code."
+    "using read/list/bash tools only — do NOT implement or write solution code.\n"
+    "Your job is to deeply understand WHAT must be true when the task is done.\n"
+    "When ready, you MUST call submit_understanding with all four fields: summary, "
+    "requirements, constraints, and observable done-criteria (concrete checks a verifier "
+    "can run). Prefer the terminal tool over free text; free-text stop is only a fallback "
+    "and will be re-structured automatically."
 )
 
 PLAN_SYSTEM = (
-    "You are the PLAN & EXECUTE stage, given the upstream understanding. Plan and "
-    "implement it for real using tools (write/edit files, run commands to check your "
-    "work). Realize every done-criterion as actually-working behavior. Run it to confirm "
-    "it works. If you hit an ambiguity the understanding does not resolve, call "
-    "consult_understanding with a specific question instead of guessing. When you are "
-    "done, stop; you may optionally call submit_ready to note what you built and how "
-    "you verified it."
+    "You are the PLAN & EXECUTE stage, given the upstream understanding (source of truth).\n"
+    "Plan and implement it for real: write/edit files, then RUN commands to verify behavior. "
+    "Realize every done-criterion as actually-working behavior.\n"
+    "If you hit an ambiguity the understanding does not resolve, call consult_understanding "
+    "with a specific question instead of guessing.\n"
+    "Do not stop until the workspace contains the deliverable files AND you have run them. "
+    "Prefer calling submit_ready with notes of what you built and how you verified; "
+    "natural stop is accepted only when non-empty deliverable files already exist."
 )
 
 VERIFY_SYSTEM = (
     "You are the VERIFICATION stage, given the upstream understanding (source of truth "
-    'for "done") and the workspace. Independently verify whether the implementation '
-    "satisfies the done-criteria: read delivered files and RUN functional checks "
-    "(write/execute test scripts, invoke the program, inspect outputs). Judge from real "
-    "execution evidence, not code reading alone. State your verdict clearly: whether every "
-    "criterion is met, or which one fails (observed vs expected), or whether the "
-    "understanding itself was wrong. Call submit_verdict with status "
-    "(pass | reject_execution | reject_understanding) and an evidence-based reason. "
-    "If a done-criterion is ambiguous and the understanding does not settle it, call "
-    "consult_understanding with a specific question rather than guessing or looping. "
-    "Do not modify the implementation; your role is to judge and route."
+    'for "done") and the workspace file listing.\n'
+    "Independently verify whether the implementation satisfies the done-criteria: read "
+    "delivered files and RUN functional checks via bash (invoke the program, one-liners, "
+    "inline python -c). You cannot write or edit workspace files — judge only.\n"
+    "Judge from real execution evidence, not code reading alone.\n"
+    "You MUST call submit_verdict with status "
+    "(pass | reject_execution | reject_understanding) and an evidence-based reason "
+    "(observed vs expected). Prefer the terminal tool; free-text stop is a fallback that "
+    "will be classified by a router (ambiguous → reject_execution, never a false pass).\n"
+    "If a done-criterion is ambiguous, call consult_understanding with a specific question "
+    "rather than guessing or looping. Do not modify the implementation."
 )
 
 
@@ -95,6 +109,12 @@ def _file_listing(workspace) -> str:
     return "\n".join(f"- {name} ({size} bytes)" for name, size in sorted(files.items()))
 
 
+def _has_deliverables(workspace) -> bool:
+    """True iff workspace has at least one non-empty deliverable file."""
+    files = workspace.snapshot_files()
+    return any(size > 0 for size in files.values())
+
+
 def _understand_user(task: str, workspace, reject_reason: str | None) -> str:
     parts = [
         f"# Original task\n{task}\n",
@@ -103,7 +123,9 @@ def _understand_user(task: str, workspace, reject_reason: str | None) -> str:
     if reject_reason:
         parts.append(
             "# Previous verification rejected the understanding\n"
-            f"{reject_reason}\n"
+            f"{reject_reason}\n\n"
+            "Revise the understanding (especially done-criteria) so it is "
+            "checkable and aligned with the original task.\n"
         )
     return "\n".join(parts)
 
@@ -116,7 +138,8 @@ def _plan_user(understanding: str, workspace, reject_reason: str | None) -> str:
     if reject_reason:
         parts.append(
             "# Previous verification rejected the execution\n"
-            f"{reject_reason}\n"
+            f"{reject_reason}\n\n"
+            "Fix only what failed; keep already-correct behavior intact.\n"
         )
     return "\n".join(parts)
 
@@ -137,6 +160,12 @@ def _accumulate(agg: MultiResult, loop) -> None:
     agg.tool_invocations += loop.tool_invocations
 
 
+def _base_tools_for(stage: str) -> list:
+    if stage == "PLAN_EXECUTE":
+        return _IMPLEMENT_TOOLS
+    return _INVESTIGATE_TOOLS
+
+
 def _run_stage(
     llm, stage, system, user, workspace, max_steps, on_event, round_no, result,
     on_stop=None, extra_tool_defs=None, extra_handlers=None,
@@ -154,7 +183,7 @@ def _run_stage(
         "PLAN_EXECUTE": PLAN_TERMINAL,
         "VERIFY": VERIFY_TERMINAL,
     }[stage]
-    stage_tools = TOOL_DEFS + STAGE_TOOL_DEFS[stage] + (extra_tool_defs or [])
+    stage_tools = _base_tools_for(stage) + STAGE_TOOL_DEFS[stage] + (extra_tool_defs or [])
 
     if on_event is not None:
         on_event({"type": "stage_start", "stage": stage, "round": round_no})
@@ -188,22 +217,60 @@ def _run_stage(
     return loop, tc
 
 
-# ── Stop hooks (spec: 自然停止 = 阶段结束) ───────────────────
+# ── Stop hooks ────────────────────────────────────────────
 # on_stop fires ONLY on natural stop (no tool_calls). The terminal-tool path
-# sets terminal_call itself. So after a stage, terminal_call is None IFF the
-# loop hit max_steps without concluding → that (and only that) escalates.
+# sets terminal_call itself. terminal_call is None after a stage IFF the loop
+# hit max_steps without concluding, OR a gate rejected the natural产出.
 
-def _understand_hook(final_text, messages):
-    """Understanding produced as free text (model didn't call the tool)."""
-    text = (final_text or "").strip()
-    if not text:
-        return None  # produced nothing → escalate
-    return {"name": "understanding_natural", "understanding_text": text}
+_UNDERSTAND_EXTRACT_SYSTEM = (
+    "You extract a structured understanding from a free-text conclusion. "
+    "Call submit_understanding with all four required fields based only on the "
+    "text given. done_criteria must be observable checks a verifier can run. "
+    "Do not invent unrelated requirements. If the text is too vague to fill a "
+    "field, write the best faithful short statement rather than leaving it empty."
+)
+
+_REQUIRED_U_FIELDS = ("summary", "requirements", "constraints", "done_criteria")
 
 
-def _plan_hook(final_text, messages):
-    """Plan/execute ended naturally — its产出 is the files on disk. Always concludes."""
-    return {"name": "ready_natural", "notes": (final_text or "").strip()}
+def _make_understand_hook(llm):
+    """Natural stop → one cheap extract call into submit_understanding fields.
+
+    If extraction fails or text is empty → None (escalate). No free-text
+    understanding is accepted as a durable artifact.
+    """
+    def hook(final_text, messages):
+        text = (final_text or "").strip()
+        if not text:
+            return None
+        try:
+            msgs = [
+                {"role": "system", "content": _UNDERSTAND_EXTRACT_SYSTEM},
+                {"role": "user", "content": f"Free-text understanding:\n\n{text}"},
+            ]
+            cr = llm.chat(msgs, STAGE_TOOL_DEFS["UNDERSTAND"])
+            for tc in cr.tool_calls or []:
+                if tc.function.name != UNDERSTAND_TERMINAL:
+                    continue
+                args = json.loads(tc.function.arguments or "{}")
+                if all((args.get(k) or "").strip() for k in _REQUIRED_U_FIELDS):
+                    return {"name": UNDERSTAND_TERMINAL, "args": args}
+        except Exception:
+            pass
+        return None
+    return hook
+
+
+def _make_plan_hook(workspace):
+    """Natural stop accepted only when non-empty deliverables exist on disk."""
+    def hook(final_text, messages):
+        if not _has_deliverables(workspace):
+            return None  # empty workspace → escalate (do not pretend ready)
+        return {
+            "name": "ready_natural",
+            "notes": (final_text or "").strip() or "(no notes; deliverables present)",
+        }
+    return hook
 
 
 _VERIFY_ROUTER_SYSTEM = (
@@ -224,10 +291,16 @@ def _make_verify_hook(llm):
     false pass) if classification can't produce a clean verdict."""
     def hook(final_text, messages):
         text = (final_text or "").strip()
-        default = {"name": "submit_verdict",
-                   "args": {"status": "reject_execution",
-                            "reason": "verification produced no explicit verdict; "
-                                      "defaulting to reject_execution (no false pass)."}}
+        default = {
+            "name": "submit_verdict",
+            "args": {
+                "status": "reject_execution",
+                "reason": (
+                    "verification produced no explicit verdict; "
+                    "defaulting to reject_execution (no false pass)."
+                ),
+            },
+        }
         if not text:
             return default
         try:
@@ -239,8 +312,14 @@ def _make_verify_hook(llm):
             for tc in cr.tool_calls or []:
                 if tc.function.name == VERIFY_TERMINAL:
                     args = json.loads(tc.function.arguments or "{}")
-                    if args.get("status") in {"pass", "reject_execution", "reject_understanding"}:
-                        args.setdefault("reason", "(classified from verify conclusion)")
+                    if args.get("status") in {
+                        "pass",
+                        "reject_execution",
+                        "reject_understanding",
+                    }:
+                        args.setdefault(
+                            "reason", "(classified from verify conclusion)"
+                        )
                         return {"name": "submit_verdict", "args": args}
         except Exception:
             pass
@@ -248,11 +327,11 @@ def _make_verify_hook(llm):
     return hook
 
 
-def _make_consult_handler(llm, workspace, task, get_understanding, on_event, counter):
-    """Build a consult_understanding handler: a stage can freely call it to ask the
-    UNDERSTANDING role to clarify an ambiguity. Runs a small understanding sub-loop
-    bound to the task + current understanding; returns a concrete answer string.
-    Fully free-form (per user's directive): any stage may call it any number of times."""
+def _make_consult_handler(
+    llm, workspace, task, get_understanding, set_understanding, on_event, counter
+):
+    """consult_understanding: read-only sub-loop; answer is promoted into the
+    shared understanding artifact so later stages (esp. VERIFY) see it."""
     def handler(question: str = "") -> str:
         q = (question or "").strip()
         if not q:
@@ -264,8 +343,9 @@ def _make_consult_handler(llm, workspace, task, get_understanding, on_event, cou
             "You are the UNDERSTANDING stage being consulted mid-task. Answer the "
             "specific question concretely and decisively, grounded in the original "
             "task and the established understanding. If the task is silent, make the "
-            "most reasonable decision and state it plainly. Investigate with tools if "
-            "needed. Give a direct answer, not a restatement."
+            "most reasonable decision and state it plainly. You may inspect the "
+            "workspace with read/list/bash only — do not write or edit files. "
+            "Give a direct answer, not a restatement."
         )
         user = (
             f"# Original task\n{task}\n\n"
@@ -273,11 +353,33 @@ def _make_consult_handler(llm, workspace, task, get_understanding, on_event, cou
             f"# Question from a downstream stage\n{q}\n"
         )
         sub = run_agent_loop(
-            llm=llm, system=system, user=user,
-            tools=TOOL_DEFS, handlers_ctx=workspace.dir,
-            max_steps=8, on_event=on_event,
+            llm=llm,
+            system=system,
+            user=user,
+            tools=_INVESTIGATE_TOOLS,
+            handlers_ctx=workspace.dir,
+            max_steps=8,
+            on_event=on_event,
         )
-        return sub.final_text or "(no answer)"
+        answer = (sub.final_text or "").strip() or "(no answer)"
+        # Promote into shared understanding so VERIFY/PLAN see the clarification.
+        base = get_understanding() or ""
+        promoted = (
+            f"{base.rstrip()}\n\n"
+            f"## Clarification\n"
+            f"**Q:** {q}\n"
+            f"**A:** {answer}\n"
+        )
+        set_understanding(promoted)
+        if on_event is not None:
+            on_event(
+                {
+                    "type": "consult_promoted",
+                    "question": _clip(q),
+                    "answer": _clip(answer),
+                }
+            )
+        return answer
     return handler
 
 
@@ -298,19 +400,33 @@ def run_multi(
     round_no = 0
     understanding: str | None = None
     reject_reason: str | None = None
+    understand_hook = _make_understand_hook(llm)
+    plan_hook = _make_plan_hook(workspace)
     verify_hook = _make_verify_hook(llm)
 
-    # Cross-stage consult (point 1): PLAN_EXECUTE / VERIFY may freely call
-    # consult_understanding any number of times to resolve ambiguity mid-task.
+    def _get_understanding() -> str | None:
+        return understanding
+
+    def _set_understanding(text: str) -> None:
+        nonlocal understanding
+        understanding = text
+        result.understanding = text
+
+    # Cross-stage consult: PLAN_EXECUTE / VERIFY may call freely; answers promote.
     counter = {"consults": 0}
     consult = _make_consult_handler(
-        llm, workspace, task, lambda: understanding, on_event, counter
+        llm,
+        workspace,
+        task,
+        _get_understanding,
+        _set_understanding,
+        on_event,
+        counter,
     )
     consult_defs = [_CONSULT_DEF]
     consult_handlers = {CONSULT_UNDERSTANDING: consult}
 
-    # Soft-convergence (point 2): once we've looped past this many rounds,
-    # inject a nudge to converge rather than hard-cutting.
+    # Soft-convergence: past this many reject rounds, nudge rather than hard-cut only.
     soft_at = max(1, max_rounds - 1)
 
     def _nudge(reason: str | None) -> str | None:
@@ -327,36 +443,63 @@ def run_multi(
         if state == "UNDERSTAND":
             user = _understand_user(task, workspace, _nudge(reject_reason))
             _, tc = _run_stage(
-                llm, "UNDERSTAND", UNDERSTAND_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result, on_stop=_understand_hook,
+                llm,
+                "UNDERSTAND",
+                UNDERSTAND_SYSTEM,
+                user,
+                workspace,
+                max_steps,
+                on_event,
+                round_no,
+                result,
+                on_stop=understand_hook,
             )
-            if tc is None:  # max_steps without concluding
+            if tc is None:  # max_steps / empty / extract failed
                 result.outcome = "escalated"
                 break
-            understanding = _understanding_from(tc)
-            result.understanding = understanding
+            _set_understanding(_understanding_from(tc))
             reject_reason = None
             state = "PLAN_EXECUTE"
 
         elif state == "PLAN_EXECUTE":
             user = _plan_user(understanding, workspace, _nudge(reject_reason))
             _, tc = _run_stage(
-                llm, "PLAN_EXECUTE", PLAN_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result, on_stop=_plan_hook,
-                extra_tool_defs=consult_defs, extra_handlers=consult_handlers,
+                llm,
+                "PLAN_EXECUTE",
+                PLAN_SYSTEM,
+                user,
+                workspace,
+                max_steps,
+                on_event,
+                round_no,
+                result,
+                on_stop=plan_hook,
+                extra_tool_defs=consult_defs,
+                extra_handlers=consult_handlers,
             )
-            if tc is None:
+            # Gate: ready without deliverables is not ready (terminal or natural).
+            if tc is None or not _has_deliverables(workspace):
                 result.outcome = "escalated"
                 break
             reject_reason = None
             state = "VERIFY"
 
         elif state == "VERIFY":
-            user = _verify_user(understanding, workspace)
+            # Always pass the latest understanding (includes any consult promotions).
+            user = _verify_user(understanding or "", workspace)
             _, tc = _run_stage(
-                llm, "VERIFY", VERIFY_SYSTEM, user, workspace,
-                max_steps, on_event, round_no, result, on_stop=verify_hook,
-                extra_tool_defs=consult_defs, extra_handlers=consult_handlers,
+                llm,
+                "VERIFY",
+                VERIFY_SYSTEM,
+                user,
+                workspace,
+                max_steps,
+                on_event,
+                round_no,
+                result,
+                on_stop=verify_hook,
+                extra_tool_defs=consult_defs,
+                extra_handlers=consult_handlers,
             )
             if tc is None:
                 result.outcome = "escalated"
@@ -371,7 +514,11 @@ def run_multi(
                 break
             round_no += 1
             reject_reason = verdict["reason"]
-            state = "UNDERSTAND" if status == "reject_understanding" else "PLAN_EXECUTE"
+            state = (
+                "UNDERSTAND"
+                if status == "reject_understanding"
+                else "PLAN_EXECUTE"
+            )
     else:
         # ran out of rounds without a pass verdict
         result.outcome = "escalated"
@@ -381,9 +528,11 @@ def run_multi(
 
 
 def _understanding_from(tc: dict) -> str:
-    """Normalize UNDERSTAND terminal_call into understanding text, whether it
-    came from the submit_understanding tool (structured) or natural stop (text)."""
+    """Normalize UNDERSTAND terminal_call into understanding text.
+
+    Accepts submit_understanding args (structured) or a rare understanding_text
+    key (legacy); structured is the only path produced by current hooks.
+    """
     if "understanding_text" in tc:
         return tc["understanding_text"]
     return parse_understanding(tc.get("args", {}))
-

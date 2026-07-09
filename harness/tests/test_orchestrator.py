@@ -15,7 +15,7 @@ from harness.stage_tools import (
     submit_understanding,
     submit_verdict,
 )
-from harness.tools import TOOL_DEFS
+from harness.tools import TOOL_DEFS, tool_defs_without_writes
 from harness.workspace import Workspace
 
 
@@ -79,8 +79,23 @@ def _understand_ok():
     return _cr(tool_calls=[_tc("u", "submit_understanding", _U_ARGS)], finish="tool_calls")
 
 
+def _write_ok(path="out.py", content="print(1)\n"):
+    """Create a non-empty deliverable (required by PLAN gate)."""
+    return _cr(
+        tool_calls=[_tc("w", "write_file", {"path": path, "content": content})],
+        finish="tool_calls",
+    )
+
+
 def _ready_ok():
-    return _cr(tool_calls=[_tc("p", "submit_ready", {"notes": "built + ran"})], finish="tool_calls")
+    """PLAN ready in one model turn: write deliverable + submit_ready."""
+    return _cr(
+        tool_calls=[
+            _tc("w", "write_file", {"path": "out.py", "content": "print(1)\n"}),
+            _tc("p", "submit_ready", {"notes": "built + ran"}),
+        ],
+        finish="tool_calls",
+    )
 
 
 def _verdict(status, reason="because"):
@@ -88,6 +103,11 @@ def _verdict(status, reason="because"):
         tool_calls=[_tc("v", "submit_verdict", {"status": status, "reason": reason})],
         finish="tool_calls",
     )
+
+
+def _text_stop(text):
+    """A natural stop: model emits text, no tool_calls."""
+    return _cr(text=text, finish="stop")
 
 
 # ── terminal_tools primitive ──────────────────────────────
@@ -232,38 +252,80 @@ def test_parse_understanding_assembles_text():
     assert "## Summary" in text and "## Done-criteria" in text
 
 
-# ── natural-stop hooks (the milestone-2.1 fix) ────────────
-def _text_stop(text):
-    """A natural stop: model emits text, no tool_calls."""
-    return _cr(text=text, finish="stop")
+def test_tool_defs_without_writes_excludes_mutations():
+    names = {t["function"]["name"] for t in tool_defs_without_writes()}
+    assert "write_file" not in names
+    assert "edit_file" not in names
+    assert "read_file" in names and "bash" in names and "list_dir" in names
 
 
-def test_understand_natural_stop_uses_text(tmp_path):
-    """UNDERSTAND stops naturally (no submit_understanding) -> its text becomes
-    the understanding, and the pipeline proceeds instead of escalating."""
+# ── natural-stop hooks + gates ────────────────────────────
+def test_understand_natural_stop_extracts_structured(tmp_path):
+    """UNDERSTAND natural stop → one extract call into submit_understanding fields."""
     ws = Workspace(str(tmp_path / "w"))
     script = [
-        _text_stop("The task needs a script foo.py that prints hi."),  # UNDERSTAND natural
-        _ready_ok(),                                                   # PLAN terminal
-        _verdict("pass"),                                              # VERIFY terminal
+        _text_stop("Need a script foo.py that prints hi."),  # UNDERSTAND natural
+        _understand_ok(),                                    # extract → structured
+        _ready_ok(),
+        _verdict("pass"),
     ]
     result = run_multi(MockLlmClient(script), ws, "task")
     assert result.outcome == "done"
-    assert result.understanding.startswith("The task needs")
+    assert "## Summary" in (result.understanding or "")
+    assert "## Done-criteria" in (result.understanding or "")
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
 
 
-def test_plan_natural_stop_proceeds(tmp_path):
-    """PLAN stops naturally (no submit_ready) -> proceeds to VERIFY."""
+def test_understand_natural_stop_empty_escalates(tmp_path):
+    """Empty natural stop on UNDERSTAND → escalate (no free-text artifact)."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [_text_stop("")]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "escalated"
+    assert result.stages[0].terminal_call is None
+
+
+def test_plan_natural_stop_proceeds_with_deliverables(tmp_path):
+    """PLAN natural stop is OK only when non-empty files exist."""
     ws = Workspace(str(tmp_path / "w"))
     script = [
         _understand_ok(),
-        _text_stop("Implemented foo.py and ran it, prints hi."),  # PLAN natural
+        _write_ok(),  # create deliverable
+        _text_stop("Implemented out.py and ran it."),  # PLAN natural
         _verdict("pass"),
     ]
     result = run_multi(MockLlmClient(script), ws, "task")
     assert result.outcome == "done"
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
+
+
+def test_plan_natural_stop_without_files_escalates(tmp_path):
+    """PLAN natural stop with empty workspace → escalate (no pretend ready)."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _text_stop("I am done but wrote nothing."),
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "escalated"
+    assert result.stages[-1].stage == "PLAN_EXECUTE"
+    assert result.stages[-1].terminal_call is None
+
+
+def test_plan_ready_without_files_escalates(tmp_path):
+    """submit_ready alone without writing deliverables → escalate at PLAN gate."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        # terminal ready but no write_file → empty workspace
+        _cr(
+            tool_calls=[_tc("p", "submit_ready", {"notes": "pretend ready"})],
+            finish="tool_calls",
+        ),
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task")
+    assert result.outcome == "escalated"
+    assert result.stages[-1].stage == "PLAN_EXECUTE"
 
 
 def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
@@ -281,17 +343,43 @@ def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
     assert result.verdict["status"] == "pass"
 
 
+def test_verify_natural_stop_defaults_reject(tmp_path):
+    """If the verify text is empty, default to reject_execution — NEVER a false pass."""
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        _text_stop(""),  # VERIFY natural stop with no conclusion text -> default reject
+        _ready_ok(),
+        _verdict("pass"),  # round 2: plan again then pass
+    ]
+    result = run_multi(MockLlmClient(script), ws, "task", max_rounds=3)
+    assert result.outcome == "done"
+    stages = [s.stage for s in result.stages]
+    assert stages == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY", "PLAN_EXECUTE", "VERIFY"]
+
+
 def test_verify_can_consult_understanding(tmp_path):
-    """VERIFY freely calls consult_understanding mid-stage; the consult runs a
-    sub-loop, VERIFY consumes the answer, then submits its verdict. Counted."""
+    """VERIFY freely calls consult_understanding; answer is promoted into understanding."""
     ws = Workspace(str(tmp_path / "w"))
     script = [
         _understand_ok(),
         _ready_ok(),
         # VERIFY: first calls consult_understanding (ambiguity)...
-        _cr(tool_calls=[_tc("cq", "consult_understanding",
-                            {"question": "does line count include a file with no trailing newline?"})],
-            finish="tool_calls"),
+        _cr(
+            tool_calls=[
+                _tc(
+                    "cq",
+                    "consult_understanding",
+                    {
+                        "question": (
+                            "does line count include a file with no trailing newline?"
+                        )
+                    },
+                )
+            ],
+            finish="tool_calls",
+        ),
         # ...the consult sub-loop answers naturally...
         _text_stop("Yes: count a final line without trailing newline as one line."),
         # ...back in VERIFY, now it submits a verdict.
@@ -301,20 +389,6 @@ def test_verify_can_consult_understanding(tmp_path):
     assert result.outcome == "done"
     assert result.consults == 1
     assert result.verdict["status"] == "pass"
-
-    """If the verify text is empty / router yields nothing usable, default to
-    reject_execution — NEVER a false pass."""
-    ws = Workspace(str(tmp_path / "w"))
-    script = [
-        _understand_ok(),
-        _ready_ok(),
-        _text_stop(""),  # VERIFY natural stop with no conclusion text -> default reject
-        # (empty text short-circuits to default; router call not consumed)
-        _ready_ok(), _verdict("pass"),  # round 2: plan again then pass
-    ]
-    result = run_multi(MockLlmClient(script), ws, "task", max_rounds=3)
-    # first verify defaulted to reject_execution -> back to PLAN_EXECUTE -> pass
-    assert result.outcome == "done"
-    stages = [s.stage for s in result.stages]
-    assert stages == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY", "PLAN_EXECUTE", "VERIFY"]
-
+    # Promotion: clarification is part of the shared understanding artifact.
+    assert "## Clarification" in (result.understanding or "")
+    assert "trailing newline" in (result.understanding or "")

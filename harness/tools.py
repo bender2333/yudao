@@ -190,6 +190,15 @@ TOOL_DEFS = [
     ),
 ]
 
+# Stages that must not mutate deliverables (UNDERSTAND / VERIFY / consult).
+_WRITE_TOOL_NAMES = frozenset({"write_file", "edit_file"})
+
+
+def tool_defs_without_writes(defs: list | None = None) -> list:
+    """Return tool defs excluding write_file / edit_file (read + bash + list)."""
+    src = defs if defs is not None else TOOL_DEFS
+    return [t for t in src if t["function"]["name"] not in _WRITE_TOOL_NAMES]
+
 
 def dispatch(name: str, args: dict, workspace_dir: str) -> str:
     """Look up and call a tool handler. Unknown tool -> Error string."""
