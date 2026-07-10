@@ -9,6 +9,7 @@
 - 当前历史基线：`docs/native-harness/milestone3-study-protocol.md`
 - 下一正式批次：`docs/native-harness/milestone4-complex-study-protocol.md`（DRAFT / BLOCKED）
 - 会话设计与验收：`docs/native-harness/role-persistent-sessions-design.md`（P0-P3 已实现）
+- **无 Docker 公开题对比（Aider Polyglot）**：`docs/native-harness/aider-polyglot-protocol.md` + `scripts/aider_polyglot_runner.py`（dry-run 已通；live pilot 待额度）
 
 ## Last Action (2026-07-10)
 

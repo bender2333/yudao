@@ -14,6 +14,7 @@ from datetime import datetime
 from .agent_loop import run_agent_loop
 from .llm import LlmClient
 from .provider import load_provider, make_client
+from .seed import seed_workspace
 from .tools import TOOL_DEFS
 from .workspace import Workspace
 
@@ -36,6 +37,7 @@ def run_solo(
     max_tokens: int | None = None,
     max_seconds: float | None = None,
     provider_path: str = "provider.md",
+    seed_dir: str | None = None,
 ) -> dict:
     os.makedirs(run_dir, exist_ok=False)
     cfg = load_provider(provider_path)
@@ -49,6 +51,8 @@ def run_solo(
     )
 
     ws = Workspace(os.path.join(run_dir, "workspace"))
+    if seed_dir:
+        seed_workspace(seed_dir, ws.dir)
 
     events_path = os.path.join(run_dir, "events.jsonl")
     events_file = open(events_path, "w", encoding="utf-8")
@@ -123,6 +127,11 @@ def main() -> None:
     parser.add_argument("--max-calls", type=int, default=None)
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--max-seconds", type=float, default=None)
+    parser.add_argument(
+        "--seed-dir",
+        default=None,
+        help="Copy files from this directory into the new workspace before the loop.",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir or os.path.join(
@@ -135,6 +144,7 @@ def main() -> None:
         max_calls=args.max_calls,
         max_tokens=args.max_tokens,
         max_seconds=args.max_seconds,
+        seed_dir=args.seed_dir,
     )
     _print_summary(summary)
     print(f"\nrun_dir: {run_dir}")

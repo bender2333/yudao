@@ -5,6 +5,9 @@ provider.md
 runs/
 docs/journal/codex/*.log
 
+# --- third-party benchmarks (clone locally) ---
+third_party/
+
 # --- node / build ---
 node_modules/
 dist/

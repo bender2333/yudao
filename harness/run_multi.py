@@ -20,6 +20,7 @@ from datetime import datetime
 from .llm import LlmClient
 from .orchestrator import run_multi
 from .provider import load_provider, make_client
+from .seed import seed_workspace
 from .workspace import Workspace
 
 _SESSION_FILES = {
@@ -47,6 +48,7 @@ def run_multi_cli(
     max_seconds: float | None = None,
     provider_path: str = "provider.md",
     session_model: str = "persistent",
+    seed_dir: str | None = None,
 ) -> dict:
     os.makedirs(run_dir, exist_ok=False)
     cfg = load_provider(provider_path)
@@ -60,6 +62,8 @@ def run_multi_cli(
     )
 
     ws = Workspace(os.path.join(run_dir, "workspace"))
+    if seed_dir:
+        seed_workspace(seed_dir, ws.dir)
 
     events_path = os.path.join(run_dir, "events.jsonl")
     events_file = open(events_path, "w", encoding="utf-8")
@@ -185,6 +189,11 @@ def main() -> None:
         choices=("cold", "persistent"),
         default="persistent",
     )
+    parser.add_argument(
+        "--seed-dir",
+        default=None,
+        help="Copy files from this directory into the new workspace before multi.",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir or os.path.join(
@@ -199,6 +208,7 @@ def main() -> None:
         max_tokens=args.max_tokens,
         max_seconds=args.max_seconds,
         session_model=args.session_model,
+        seed_dir=args.seed_dir,
     )
     _print_summary(summary)
     print(f"\nrun_dir: {run_dir}")
