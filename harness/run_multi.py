@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import time
+from datetime import datetime
 
 from .llm import LlmClient
 from .orchestrator import run_multi
@@ -29,7 +29,7 @@ def run_multi_cli(
     max_calls: int | None = None,
     provider_path: str = "provider.md",
 ) -> dict:
-    os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(run_dir, exist_ok=False)
     cfg = load_provider(provider_path)
     client = make_client(cfg)
     llm = LlmClient(client, cfg["model"], max_calls=max_calls)
@@ -133,7 +133,9 @@ def main() -> None:
     parser.add_argument("--max-calls", type=int, default=None)
     args = parser.parse_args()
 
-    run_dir = args.run_dir or os.path.join("runs", time.strftime("%Y%m%d-%H%M%S") + "-multi")
+    run_dir = args.run_dir or os.path.join(
+        "runs", datetime.now().strftime("%Y%m%d-%H%M%S-%f") + "-multi"
+    )
     summary = run_multi_cli(
         task=args.task,
         run_dir=run_dir,
