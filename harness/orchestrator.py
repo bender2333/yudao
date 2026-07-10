@@ -7,7 +7,7 @@ UNDERSTAND -> PLAN_EXECUTE -> VERIFY, driven by the verify verdict:
 Exhausting MAX_ROUNDS, or any stage that ends without its terminal_call,
 -> ESCALATED.
 
-Each stage is a fresh run_agent_loop over the SAME workspace. Tool access:
+Each role has one private AgentSession for the run over the SAME workspace. Tool access:
   PLAN_EXECUTE  — full toolset (read/write/edit/bash)
   UNDERSTAND / VERIFY / consult — no write_file/edit_file (judge/investigate only)
 plus that stage's terminal tool. Context encapsulation (spec §4): verify only
@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from .agent_loop import run_agent_loop
+from .agent_loop import AgentSession, activate, run_agent_loop
 from .stage_tools import (
     CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
@@ -42,7 +42,9 @@ _INVESTIGATE_TOOLS = tool_defs_without_writes()
 _IMPLEMENT_TOOLS = TOOL_DEFS
 
 UNDERSTAND_SYSTEM = (
-    "You are the UNDERSTANDING stage. Investigate the task and the existing workspace "
+    "You are the persistent UNDERSTANDING role for this run. You retain only your own "
+    "transcript and receive other roles' information only through explicit handoffs. "
+    "Investigate the task and the existing workspace "
     "using read/list/bash tools only — do NOT implement or write solution code.\n"
     "Your job is to deeply understand WHAT must be true when the task is done.\n"
     "When ready, you MUST call submit_understanding with all four fields: summary, "
@@ -52,7 +54,9 @@ UNDERSTAND_SYSTEM = (
 )
 
 PLAN_SYSTEM = (
-    "You are the PLAN & EXECUTE stage, given the upstream understanding (source of truth).\n"
+    "You are the persistent PLAN & EXECUTE role for this run. You retain only your own "
+    "transcript and receive other roles' information only through explicit handoffs.\n"
+    "The upstream understanding is the source of truth.\n"
     "Plan and implement it for real: write/edit files, then RUN commands to verify behavior. "
     "Realize every done-criterion as actually-working behavior.\n"
     "If you hit an ambiguity the understanding does not resolve, call consult_understanding "
@@ -63,7 +67,9 @@ PLAN_SYSTEM = (
 )
 
 VERIFY_SYSTEM = (
-    "You are the VERIFICATION stage, given the upstream understanding (source of truth "
+    "You are the persistent VERIFICATION role for this run. You retain only your own "
+    "transcript and receive other roles' information only through explicit handoffs.\n"
+    "You are given the upstream understanding (source of truth "
     'for "done") and the workspace file listing.\n'
     "Independently verify whether the implementation satisfies the done-criteria: read "
     "delivered files and RUN functional checks via bash (invoke the program, one-liners, "
@@ -93,6 +99,8 @@ class MultiResult:
     understanding: str | None = None
     verdict: dict | None = None
     consults: int = 0
+    session_model: str = "persistent_roles_v1"
+    sessions: dict[str, AgentSession] = field(default_factory=dict)
     # aggregated cost across all stages
     calls: int = 0
     prompt_tokens: int = 0
@@ -124,13 +132,20 @@ def _has_changed_deliverable(workspace, before: dict[str, str]) -> bool:
     )
 
 
-def _understand_user(task: str, workspace, reject_reason: str | None) -> str:
+def _understand_user(
+    task: str,
+    workspace,
+    reject_reason: str | None,
+    canonical_understanding: str | None,
+) -> str:
     parts = [
         f"# Original task\n{task}\n",
         f"# Workspace files\n{_file_listing(workspace)}\n",
     ]
     if reject_reason:
         parts.append(
+            "# Your previous understanding (canonical)\n"
+            f"{canonical_understanding or '(none yet)'}\n\n"
             "# Previous verification rejected the understanding\n"
             f"{reject_reason}\n\n"
             "Revise the understanding (especially done-criteria) so it is "
@@ -176,8 +191,8 @@ def _base_tools_for(stage: str) -> list:
 
 
 def _run_stage(
-    llm, stage, system, user, workspace, max_steps, on_event, round_no, result,
-    on_stop=None, extra_tool_defs=None, extra_handlers=None,
+    llm, session, user, workspace, max_steps, on_event, round_no, result,
+    on_stop=None, extra_handlers=None,
 ):
     """Run one stage loop; emit stage_start/stage_end; record + accumulate.
 
@@ -185,23 +200,21 @@ def _run_stage(
     that IS the end-of-stage signal. The optional on_stop hook extracts the
     stage's产出/routing from the final transcript. Terminal tools, if the model
     happens to call one, are still honored as an early, explicit stop.
-    extra_tool_defs/extra_handlers add cross-stage tools (e.g. consult_understanding).
+    extra_handlers provide run-bound tools (e.g. consult_understanding).
     """
+    stage = session.role
     terminal = {
         "UNDERSTAND": UNDERSTAND_TERMINAL,
         "PLAN_EXECUTE": PLAN_TERMINAL,
         "VERIFY": VERIFY_TERMINAL,
     }[stage]
-    stage_tools = _base_tools_for(stage) + STAGE_TOOL_DEFS[stage] + (extra_tool_defs or [])
-
     if on_event is not None:
         on_event({"type": "stage_start", "stage": stage, "round": round_no})
 
-    loop = run_agent_loop(
+    loop = activate(
+        session,
+        user,
         llm=llm,
-        system=system,
-        user=user,
-        tools=stage_tools,
         handlers_ctx=workspace.dir,
         max_steps=max_steps,
         on_event=on_event,
@@ -439,6 +452,26 @@ def run_multi(
     )
     consult_defs = [_CONSULT_DEF]
     consult_handlers = {CONSULT_UNDERSTANDING: consult}
+    sessions = {
+        "UNDERSTAND": AgentSession(
+            "UNDERSTAND",
+            UNDERSTAND_SYSTEM,
+            _base_tools_for("UNDERSTAND") + STAGE_TOOL_DEFS["UNDERSTAND"],
+        ),
+        "PLAN_EXECUTE": AgentSession(
+            "PLAN_EXECUTE",
+            PLAN_SYSTEM,
+            _base_tools_for("PLAN_EXECUTE")
+            + STAGE_TOOL_DEFS["PLAN_EXECUTE"]
+            + consult_defs,
+        ),
+        "VERIFY": AgentSession(
+            "VERIFY",
+            VERIFY_SYSTEM,
+            _base_tools_for("VERIFY") + STAGE_TOOL_DEFS["VERIFY"] + consult_defs,
+        ),
+    }
+    result.sessions = sessions
 
     # Soft-convergence: past this many reject rounds, nudge rather than hard-cut only.
     soft_at = max(1, max_rounds - 1)
@@ -455,11 +488,15 @@ def run_multi(
 
     while round_no < max_rounds:
         if state == "UNDERSTAND":
-            user = _understand_user(task, workspace, _nudge(reject_reason))
+            user = _understand_user(
+                task,
+                workspace,
+                _nudge(reject_reason),
+                understanding,
+            )
             _, tc = _run_stage(
                 llm,
-                "UNDERSTAND",
-                UNDERSTAND_SYSTEM,
+                sessions["UNDERSTAND"],
                 user,
                 workspace,
                 max_steps,
@@ -480,8 +517,7 @@ def run_multi(
             before = workspace.snapshot_fingerprints()
             _, tc = _run_stage(
                 llm,
-                "PLAN_EXECUTE",
-                PLAN_SYSTEM,
+                sessions["PLAN_EXECUTE"],
                 user,
                 workspace,
                 max_steps,
@@ -489,7 +525,6 @@ def run_multi(
                 round_no,
                 result,
                 on_stop=plan_hook,
-                extra_tool_defs=consult_defs,
                 extra_handlers=consult_handlers,
             )
             # PLAN 本轮必须创建或修改至少一个非空交付文件。
@@ -504,8 +539,7 @@ def run_multi(
             user = _verify_user(understanding or "", workspace)
             _, tc = _run_stage(
                 llm,
-                "VERIFY",
-                VERIFY_SYSTEM,
+                sessions["VERIFY"],
                 user,
                 workspace,
                 max_steps,
@@ -513,7 +547,6 @@ def run_multi(
                 round_no,
                 result,
                 on_stop=verify_hook,
-                extra_tool_defs=consult_defs,
                 extra_handlers=consult_handlers,
             )
             if tc is None:

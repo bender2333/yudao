@@ -66,6 +66,50 @@ class LoopResult:
     duration_ms: int = 0
 
 
+@dataclass
+class AgentSession:
+    """One role's private, run-scoped transcript."""
+
+    role: str
+    system: str
+    tools: list
+    messages: list[dict] = field(default_factory=list)
+    activates: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.messages:
+            self.messages.append({"role": "system", "content": self.system})
+
+
+def activate(
+    session: AgentSession,
+    user_turn: str,
+    *,
+    llm: LlmClient,
+    handlers_ctx: str,
+    max_steps: int = 40,
+    on_event=None,
+    terminal_tools: set | None = None,
+    on_stop=None,
+    extra_handlers: dict | None = None,
+) -> LoopResult:
+    """Append one handoff and continue the same role transcript."""
+    session.activates += 1
+    return run_agent_loop(
+        llm=llm,
+        system=session.system,
+        user=user_turn,
+        tools=session.tools,
+        handlers_ctx=handlers_ctx,
+        max_steps=max_steps,
+        on_event=on_event,
+        terminal_tools=terminal_tools,
+        on_stop=on_stop,
+        extra_handlers=extra_handlers,
+        messages=session.messages,
+    )
+
+
 def run_agent_loop(
     llm: LlmClient,
     system: str,
@@ -77,6 +121,8 @@ def run_agent_loop(
     terminal_tools: set | None = None,
     on_stop=None,
     extra_handlers: dict | None = None,
+    *,
+    messages: list[dict] | None = None,
 ) -> LoopResult:
     allowed_tools = {tool["function"]["name"] for tool in tools}
     started = time.monotonic()
@@ -84,10 +130,9 @@ def run_agent_loop(
     prompt_tokens_before = llm.prompt_tokens_total
     completion_tokens_before = llm.completion_tokens_total
     reasoning_tokens_before = llm.reasoning_tokens_total
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]
+    if messages is None:
+        messages = [{"role": "system", "content": system}]
+    messages.append({"role": "user", "content": user})
     events: list = []
 
     def emit(event: dict) -> None:

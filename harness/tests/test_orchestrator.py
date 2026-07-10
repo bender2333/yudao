@@ -3,12 +3,18 @@
 All offline: a scripted MockLlmClient drives the state machine.
 """
 
+import copy
 import json
 from dataclasses import dataclass
 
 from harness.agent_loop import run_agent_loop
 from harness.llm import CallResult
-from harness.orchestrator import run_multi
+from harness.orchestrator import (
+    PLAN_SYSTEM,
+    UNDERSTAND_SYSTEM,
+    VERIFY_SYSTEM,
+    run_multi,
+)
 from harness.stage_tools import (
     STAGE_TOOL_DEFS,
     parse_understanding,
@@ -51,12 +57,14 @@ class MockLlmClient:
     def __init__(self, script):
         self._script = list(script)
         self._i = 0
+        self.message_snapshots = []
         self.calls_made = 0
         self.prompt_tokens_total = 0
         self.completion_tokens_total = 0
         self.reasoning_tokens_total = 0
 
     def chat(self, messages, tools, max_completion_tokens=8000):
+        self.message_snapshots.append(copy.deepcopy(messages))
         result = self._script[self._i]
         self._i += 1
         self.calls_made += 1
@@ -64,6 +72,14 @@ class MockLlmClient:
         self.completion_tokens_total += result.completion_tokens
         self.reasoning_tokens_total += result.reasoning_tokens
         return result
+
+
+def _role_calls(llm, system):
+    return [
+        messages
+        for messages in llm.message_snapshots
+        if messages and messages[0].get("content") == system
+    ]
 
 
 # ── scripted stage terminals ──────────────────────────────
@@ -138,6 +154,16 @@ def test_solo_path_unchanged_without_terminal_tools(tmp_path):
     assert result.terminal_call is None
     types = [e["type"] for e in result.events]
     assert types == ["llm_call", "tool_call", "llm_call", "stop"]
+    assert llm.message_snapshots[0] == [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "task"},
+    ]
+    assert [message["role"] for message in llm.message_snapshots[1]] == [
+        "system",
+        "user",
+        "assistant",
+        "tool",
+    ]
 
 
 # ── three routing edges ───────────────────────────────────
@@ -160,12 +186,18 @@ def test_reject_execution_reruns_plan(tmp_path):
         _understand_ok(), _ready_ok(), _verdict("reject_execution", "bug"),
         _ready_ok("print(2)\n"), _verdict("pass"),
     ]
-    result = run_multi(MockLlmClient(script), ws, "task")
+    llm = MockLlmClient(script)
+    result = run_multi(llm, ws, "task")
     assert result.outcome == "done"
     assert result.rounds == 2
     # after reject_execution we go back to PLAN_EXECUTE, not UNDERSTAND
     stages = [s.stage for s in result.stages]
     assert stages == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY", "PLAN_EXECUTE", "VERIFY"]
+    plan_calls = _role_calls(llm, PLAN_SYSTEM)
+    assert len(plan_calls) == 2
+    assert len(plan_calls[1]) > len(plan_calls[0])
+    assert "submit_ready" in json.dumps(plan_calls[1])
+    assert sum(message["role"] == "system" for message in plan_calls[1]) == 1
 
 
 def test_reject_understanding_reruns_understand(tmp_path):
@@ -174,7 +206,8 @@ def test_reject_understanding_reruns_understand(tmp_path):
         _understand_ok(), _ready_ok(), _verdict("reject_understanding", "wrong"),
         _understand_ok(), _ready_ok("print(2)\n"), _verdict("pass"),
     ]
-    result = run_multi(MockLlmClient(script), ws, "task")
+    llm = MockLlmClient(script)
+    result = run_multi(llm, ws, "task")
     assert result.outcome == "done"
     assert result.rounds == 2
     stages = [s.stage for s in result.stages]
@@ -182,6 +215,62 @@ def test_reject_understanding_reruns_understand(tmp_path):
         "UNDERSTAND", "PLAN_EXECUTE", "VERIFY",
         "UNDERSTAND", "PLAN_EXECUTE", "VERIFY",
     ]
+    understand_calls = _role_calls(llm, UNDERSTAND_SYSTEM)
+    assert len(understand_calls) == 2
+    assert len(understand_calls[1]) > len(understand_calls[0])
+    assert "submit_understanding" in json.dumps(understand_calls[1])
+    assert sum(message["role"] == "system" for message in understand_calls[1]) == 1
+
+
+def test_role_handoffs_do_not_share_private_transcripts(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _cr(
+            text="UNDERSTAND_PRIVATE_TRACE",
+            tool_calls=[_tc("u", "submit_understanding", _U_ARGS)],
+            finish="tool_calls",
+        ),
+        _cr(
+            text="PLAN_PRIVATE_TRACE",
+            tool_calls=[
+                _tc("w1", "write_file", {"path": "out.py", "content": "print(1)\n"}),
+                _tc("p1", "submit_ready", {"notes": "PLAN_NOTES_PRIVATE_TRACE"}),
+            ],
+            finish="tool_calls",
+        ),
+        _cr(
+            text="VERIFY_PRIVATE_TRACE",
+            tool_calls=[
+                _tc(
+                    "v1",
+                    "submit_verdict",
+                    {"status": "reject_execution", "reason": "fix bug"},
+                )
+            ],
+            finish="tool_calls",
+        ),
+        _ready_ok("print(2)\n"),
+        _verdict("pass"),
+    ]
+    llm = MockLlmClient(script)
+
+    result = run_multi(llm, ws, "ORIGINAL_TASK_L0")
+
+    plan_calls = _role_calls(llm, PLAN_SYSTEM)
+    verify_calls = _role_calls(llm, VERIFY_SYSTEM)
+    first_plan = json.dumps(plan_calls[0])
+    first_verify = json.dumps(verify_calls[0])
+    second_plan = json.dumps(plan_calls[1])
+    assert result.outcome == "done"
+    assert "## Summary" in first_plan
+    assert "ORIGINAL_TASK_L0" not in first_plan
+    assert "UNDERSTAND_PRIVATE_TRACE" not in first_plan
+    assert "## Summary" in first_verify
+    assert "ORIGINAL_TASK_L0" not in first_verify
+    assert "PLAN_PRIVATE_TRACE" not in first_verify
+    assert "PLAN_NOTES_PRIVATE_TRACE" not in first_verify
+    assert "fix bug" in second_plan
+    assert "VERIFY_PRIVATE_TRACE" not in second_plan
 
 
 def test_max_rounds_escalates(tmp_path):
