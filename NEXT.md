@@ -16,7 +16,7 @@
 - P0 三角色私有 AgentSession + activate：`5a49438`。
 - P1 常驻 consult、per-role 计量与预算耗尽收口：`1646903`。
 - P2 sessions/handoffs 审计落盘与 reason/context 边界：`87ccd6d`。
-- P3 cold/persistent 消融、共享 calls/token/协作式墙钟预算与三臂协议：当前提交。
+- P3 cold/persistent 消融、共享 calls/token/协作式墙钟预算与三臂协议：`b15794e`。
 - harness 全量：80 passed，0 skipped。
 
 ## Next Action
