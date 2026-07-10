@@ -15,6 +15,7 @@
 - 修复执行 allowlist、成本增量、破坏性写入、bash 退出码与解码：`331b593`。
 - 收紧 PLAN、VERIFY fallback、consult 和 stage 参数门禁：`dfcf7ab`。
 - 禁止复用 run 目录并提高默认目录唯一性：`35828e9`。
+- 起草复杂任务成对实验协议并勘误旧成本结论：`d327121`。
 - harness 全量：54 passed。
 
 ## Next Action
