@@ -1,5 +1,7 @@
 # 门闩收紧后 — G1 live 对照（solo vs multi）
 
+> **成本勘误（2026-07-10）**：本文保留历史质量结果，但 multi calls/token 存在重复累计，`duration_ms` 也不是真实墙钟。原成本倍数不得继续作为证据；纠正值与原因见 `milestone4-complex-study-protocol.md#12-历史成本勘误`。
+
 > 日期：2026-07-09  
 > commit：`8834d92` fix(harness): tighten stage gates…  
 > 数据：`runs/gates/`（G1 normalize_date，solo/multi 各 2 run）  

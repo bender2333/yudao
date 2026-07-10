@@ -1,5 +1,7 @@
 # 里程碑 3 — solo vs multi 第一批对比结果（诚实版）
 
+> **成本勘误（2026-07-10）**：本文保留历史质量结果，但 multi calls/token 存在重复累计，`duration_ms` 也不是真实墙钟。原成本倍数不得继续作为证据；纠正值与原因见 `milestone4-complex-study-protocol.md#12-历史成本勘误`。
+
 > 数据：runs/m3b/（16 run，4题×2模式×2重复），gpt 网关 = gemini-2.5-flash。
 > 裁判 = 主线 agent，隐藏 oracle = runs/m3/_oracle/（agent 全程不可见）。
 > **本报告刻意区分「干净信号」与「被出题质量污染的信号」，不夸大。**

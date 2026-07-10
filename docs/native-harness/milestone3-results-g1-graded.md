@@ -1,5 +1,7 @@
 # 里程碑 3 — G1 分级评分结果（第一个干净的质量信号）
 
+> **成本勘误（2026-07-10）**：本文保留历史质量结果，但 multi calls/token 存在重复累计，`duration_ms` 也不是真实墙钟。原成本倍数不得继续作为证据；纠正值与原因见 `milestone4-complex-study-protocol.md#12-历史成本勘误`。
+
 > 数据 runs/m3g/（G1 normalize_date，solo/multi 各 3 run）。gemini-2.5-flash。
 > oracle = grade_g1.py（0-100 加权分，agent 不可见）。裁判 = 主线。
 
