@@ -621,6 +621,24 @@ def test_verify_can_consult_understanding(tmp_path):
         assert getattr(result, metric) == sum(
             role[metric] for role in result.per_role.values()
         )
+    assert [handoff["kind"] for handoff in result.handoffs] == [
+        "NewMission",
+        "ExecuteAgainstUnderstanding",
+        "VerifyAgainstUnderstanding",
+        "ConsultRequest",
+        "ConsultAnswer",
+    ]
+    request, answer = result.handoffs[-2:]
+    assert request["source"] == "VERIFY" and request["target"] == "UNDERSTAND"
+    assert answer["source"] == "UNDERSTAND" and answer["target"] == "VERIFY"
+    assert any(
+        message.get("content") == request["content"]
+        for message in result.sessions["UNDERSTAND"].messages
+    )
+    assert any(
+        message.get("content") == answer["content"]
+        for message in result.sessions["VERIFY"].messages
+    )
     # Promotion: clarification is part of the shared understanding artifact.
     assert "## Clarification" in (result.understanding or "")
     assert "trailing newline" in (result.understanding or "")
@@ -647,6 +665,8 @@ def test_failed_consult_does_not_pollute_understanding(tmp_path):
     assert result.consult_errors == 1
     assert result.sessions["UNDERSTAND"].activates == 2
     assert "## Clarification" not in (result.understanding or "")
+    assert [handoff["kind"] for handoff in result.handoffs].count("ConsultRequest") == 1
+    assert all(handoff["kind"] != "ConsultAnswer" for handoff in result.handoffs)
 
 
 def test_consult_provider_error_is_counted(tmp_path):
@@ -730,3 +750,38 @@ def test_verify_router_budget_exhaustion_is_not_default_reject(tmp_path):
     assert result.stopped_reason == "budget_exhausted"
     assert result.verdict is None
     assert result.calls == 3
+
+
+def test_verdict_reason_is_truncated_before_handoff(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    tail = "VERIFY_ONLY_TAIL"
+    reason = "x" * 2000 + tail
+    events = []
+    llm = MockLlmClient(
+        [
+            _understand_ok(),
+            _ready_ok(),
+            _verdict("reject_execution", reason),
+            _ready_ok("print(2)\n"),
+            _verdict("pass"),
+        ]
+    )
+
+    result = run_multi(llm, ws, "task", on_event=events.append)
+
+    reject = next(
+        handoff for handoff in result.handoffs
+        if handoff["kind"] == "RejectToPlan"
+    )
+    assert "x" * 2000 in reject["content"]
+    assert tail not in reject["content"]
+    assert reject["reason_truncated"] is True
+    assert reject["reason_original_chars"] == len(reason)
+    assert tail not in json.dumps(result.sessions["PLAN_EXECUTE"].messages)
+    assert tail in json.dumps(result.sessions["VERIFY"].messages)
+    event = next(e for e in events if e["type"] == "verdict_reason_truncated")
+    assert event == {
+        "type": "verdict_reason_truncated",
+        "original_chars": len(reason),
+        "kept_chars": 2000,
+    }

@@ -41,6 +41,7 @@ from .tools import TOOL_DEFS, tool_defs_without_writes
 # Full tools for implement; investigate/judge stages cannot rewrite deliverables.
 _INVESTIGATE_TOOLS = tool_defs_without_writes()
 _IMPLEMENT_TOOLS = TOOL_DEFS
+_MAX_REASON_CHARS = 2000
 
 UNDERSTAND_SYSTEM = (
     "You are the persistent UNDERSTANDING role for this run. You retain only your own "
@@ -106,6 +107,7 @@ class MultiResult:
     stopped_reason: str | None = None
     session_model: str = "persistent_roles_v1"
     sessions: dict[str, AgentSession] = field(default_factory=dict)
+    handoffs: list[dict] = field(default_factory=list)
     per_role: dict = field(default_factory=dict)
     activates: int = 0
     # aggregated cost across all stages
@@ -378,6 +380,9 @@ def _make_consult_handler(
     set_understanding,
     on_event,
     counter,
+    record_handoff,
+    get_caller_role,
+    get_round,
 ):
     """激活常驻 UNDERSTAND，并将成功答复晋升到 canonical understanding。"""
     def fail(reason: str) -> str:
@@ -390,6 +395,8 @@ def _make_consult_handler(
         q = (question or "").strip()
         if not q:
             return fail("question is required")
+        caller_role = get_caller_role()
+        current_round = get_round()
         if on_event is not None:
             on_event({"type": "consult", "question": _clip(q)})
         user = (
@@ -400,6 +407,13 @@ def _make_consult_handler(
             f"# Question from a downstream role\n{q}\n\n"
             "Answer this clarification directly in final text. Do not call "
             "submit_understanding in this activation."
+        )
+        record_handoff(
+            "ConsultRequest",
+            caller_role,
+            "UNDERSTAND",
+            current_round,
+            user,
         )
         try:
             sub = activate(
@@ -433,6 +447,13 @@ def _make_consult_handler(
         )
         set_understanding(promoted)
         counter["consults"] += 1
+        record_handoff(
+            "ConsultAnswer",
+            "UNDERSTAND",
+            caller_role,
+            current_round,
+            answer,
+        )
         if on_event is not None:
             on_event(
                 {
@@ -463,6 +484,7 @@ def run_multi(
     round_no = 0
     understanding: str | None = None
     reject_reason: str | None = None
+    reject_reason_meta: dict = {}
     understand_hook = _make_understand_hook(llm)
     plan_hook = _make_plan_hook(workspace)
     verify_hook = _make_verify_hook(llm)
@@ -496,6 +518,39 @@ def run_multi(
         ),
     }
     result.sessions = sessions
+    handoff_seq = 0
+
+    def _record_handoff(
+        kind: str,
+        source: str,
+        target: str,
+        handoff_round: int,
+        content: str,
+        **metadata,
+    ) -> None:
+        nonlocal handoff_seq
+        handoff_seq += 1
+        record = {
+            "seq": handoff_seq,
+            "kind": kind,
+            "source": source,
+            "target": target,
+            "round": handoff_round,
+            "content": content,
+            **metadata,
+        }
+        result.handoffs.append(record)
+        if on_event is not None:
+            on_event(
+                {
+                    "type": "handoff",
+                    "seq": handoff_seq,
+                    "kind": kind,
+                    "source": source,
+                    "target": target,
+                    "round": handoff_round,
+                }
+            )
     usage_fields = (
         "calls",
         "prompt_tokens",
@@ -522,6 +577,9 @@ def run_multi(
         _set_understanding,
         on_event,
         counter,
+        _record_handoff,
+        lambda: state,
+        lambda: round_no,
     )
     consult_handlers = {CONSULT_UNDERSTANDING: consult}
 
@@ -546,6 +604,14 @@ def run_multi(
                 _nudge(reject_reason),
                 understanding,
             )
+            _record_handoff(
+                "RejectToUnderstanding" if reject_reason else "NewMission",
+                "VERIFY" if reject_reason else "USER",
+                "UNDERSTAND",
+                round_no,
+                user,
+                **reject_reason_meta,
+            )
             loop, tc = _run_stage(
                 llm,
                 sessions["UNDERSTAND"],
@@ -567,10 +633,19 @@ def run_multi(
                 break
             _set_understanding(_understanding_from(tc))
             reject_reason = None
+            reject_reason_meta = {}
             state = "PLAN_EXECUTE"
 
         elif state == "PLAN_EXECUTE":
             user = _plan_user(understanding, workspace, _nudge(reject_reason))
+            _record_handoff(
+                "RejectToPlan" if reject_reason else "ExecuteAgainstUnderstanding",
+                "VERIFY" if reject_reason else "UNDERSTAND",
+                "PLAN_EXECUTE",
+                round_no,
+                user,
+                **reject_reason_meta,
+            )
             before = workspace.snapshot_fingerprints()
             loop, tc = _run_stage(
                 llm,
@@ -595,11 +670,19 @@ def run_multi(
                     result.stopped_reason = "plan_no_changed_deliverable"
                 break
             reject_reason = None
+            reject_reason_meta = {}
             state = "VERIFY"
 
         elif state == "VERIFY":
             # Always pass the latest understanding (includes any consult promotions).
             user = _verify_user(understanding or "", workspace)
+            _record_handoff(
+                "VerifyAgainstUnderstanding",
+                "UNDERSTAND",
+                "VERIFY",
+                round_no,
+                user,
+            )
             loop, tc = _run_stage(
                 llm,
                 sessions["VERIFY"],
@@ -621,7 +704,27 @@ def run_multi(
                 )
                 break
             status = tc["args"]["status"]
-            verdict = {"status": status, "reason": tc["args"].get("reason", "")}
+            raw_reason = tc["args"].get("reason", "")
+            reason = raw_reason[:_MAX_REASON_CHARS]
+            reject_reason_meta = {}
+            if len(raw_reason) > _MAX_REASON_CHARS:
+                reject_reason_meta = {
+                    "reason_truncated": True,
+                    "reason_original_chars": len(raw_reason),
+                }
+                if on_event is not None:
+                    on_event(
+                        {
+                            "type": "verdict_reason_truncated",
+                            "original_chars": len(raw_reason),
+                            "kept_chars": _MAX_REASON_CHARS,
+                        }
+                    )
+            verdict = {
+                "status": status,
+                "reason": reason,
+                **reject_reason_meta,
+            }
             result.verdict = verdict
             result.rounds += 1  # a verify verdict completes a round
 
@@ -630,7 +733,7 @@ def run_multi(
                 result.stopped_reason = "completed"
                 break
             round_no += 1
-            reject_reason = verdict["reason"]
+            reject_reason = reason
             state = (
                 "UNDERSTAND"
                 if status == "reject_understanding"
@@ -653,7 +756,11 @@ def run_multi(
                 field: current.get(field, 0) - usage_before[role][field]
                 for field in usage_fields
             },
-            "messages": len(session.messages),
+            "message_count": len(session.messages),
+            "message_chars": sum(
+                len(json.dumps(message, ensure_ascii=False, separators=(",", ":")))
+                for message in session.messages
+            ),
         }
     return result
 

@@ -20,6 +20,20 @@ from .orchestrator import run_multi
 from .provider import load_provider, make_client
 from .workspace import Workspace
 
+_SESSION_FILES = {
+    "UNDERSTAND": "understand.jsonl",
+    "PLAN_EXECUTE": "plan_execute.jsonl",
+    "VERIFY": "verify.jsonl",
+}
+
+
+def _write_jsonl(path: str, rows) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(
+                json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            )
+
 
 def run_multi_cli(
     task: str,
@@ -55,6 +69,15 @@ def run_multi_cli(
     finally:
         events_file.close()
 
+    sessions_dir = os.path.join(run_dir, "sessions")
+    os.makedirs(sessions_dir, exist_ok=False)
+    for role, filename in _SESSION_FILES.items():
+        _write_jsonl(
+            os.path.join(sessions_dir, filename),
+            result.sessions[role].messages,
+        )
+    _write_jsonl(os.path.join(run_dir, "handoffs.jsonl"), result.handoffs)
+
     per_stage = [
         {
             "stage": s.stage,
@@ -81,6 +104,7 @@ def run_multi_cli(
         "activates": result.activates,
         "consults": result.consults,
         "consult_errors": result.consult_errors,
+        "handoff_count": len(result.handoffs),
         "verdict": result.verdict,
         "understanding": result.understanding,
         "stopped_reason": result.stopped_reason,
