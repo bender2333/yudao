@@ -6,17 +6,17 @@
 ---
 
 ## Current Focus
-NS-1：v0.1A 骨架与流程闭环。长任务控制文件已搭好，准备进入实现循环。
+当前 checkout 为 `exp/native-harness`。本 session 已完成该分支的代码审查；它是 Python agent harness 实验分支，不是 NORTH_STAR 所述 Mission 平台主实现。
 
-## Last Action（2026-05-29）
-搭建完长任务自动闭环的控制文件：NORTH_STAR.md / LOOP.md / 重写 AGENTS.md / docs/decision.md / docs/journal/2026-05-29.md。
+## Last Action（2026-07-10）
+- `python -m pytest harness/tests -q`：43 passed。
+- 确认高风险问题：工具白名单未在执行层生效、bash 可越 workspace、multi 成本重复累计、非法 `write_file` 会先清空旧文件。
+- 标准 pnpm 验收命令均失败；对应 Mission 平台实现和配置已存在于本地 `work/v01a`，不在当前分支。
 
 ## Next Action
-启动实现循环（按 LOOP.md）：
-1. 自动模式首步：切到工作分支 `work/v01a`（不存在则建），`git push -u origin work/v01a`。
-2. 开始 **Task 1**（脚手架 + 共享契约），见 `docs/superpowers/plans/2026-05-29-v01a-tasks-detailed.md`。
-   - 该 Task 的"验收门槛"即它的 done；通过即 commit + push，再进 Task 2。
-3. 沿 Task 1 → 12 顺序推进，直到 NS-1 三项验收门全绿。
+1. 先确认目标分支：审查/推进 Mission 平台应切到 `work/v01a`；继续 native harness 才留在当前分支。
+2. 若继续 harness，依次修复：执行层工具 allowlist 与 workspace 隔离 → 成本统计 → 写入参数/原子性 → bash 退出码；每项补最小回归测试。
+3. 修正统计后重算 `docs/native-harness/` 中的 calls/token/墙钟结论。
 
 ## 当前进度（Task 维度）
 - [ ] Task 1  脚手架 + 共享契约
@@ -32,9 +32,9 @@ NS-1：v0.1A 骨架与流程闭环。长任务控制文件已搭好，准备进�
 - [ ] Task 12  集成测试两层（第 1 层 wiring + 第 2 层黑盒验收门）
 
 ## Open BLOCKs
-_（无）_
+- 目标分支不一致：`NORTH_STAR.md` 指向 Mission 平台，当前 checkout 是 `exp/native-harness`；实现前需明确选择。
 
 ## 备注
-- 设计稿与 4 份计划文档已成体系且自洽（设计-zh / plan-revised / tasks-detailed / 集成测试）。
-- v0.1A 只实装 `full_autonomous` 一种自主模式。
-- 仓库根有大量未跟踪的 .superpowers/ 与 node_modules/ 等——提交前用具体路径 add，别 `git add .`。
+- Review 详情见 `docs/journal/2026-07-10.md` 与本 session 最终报告。
+- `work/v01a` 相对当前分支有完整 API、Vitest 配置和两层 E2E 验收文件。
+- 工作区已有 `.serena/project.yml` 与 `docs/journal/codex/` 改动；提交时继续使用具体路径，别 `git add .`。
