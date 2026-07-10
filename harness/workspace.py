@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 
 
@@ -36,4 +37,17 @@ class Workspace:
                     result[rel] = os.path.getsize(full)
                 except OSError:
                     result[rel] = -1
+        return result
+
+    def snapshot_fingerprints(self) -> dict[str, str]:
+        """返回交付文件的内容指纹，用于识别本轮真实改动。"""
+        result: dict[str, str] = {}
+        # ponytail: 当前 workspace 很小，规模变大后改用工具变更日志避免全量哈希。
+        for rel in self.snapshot_files():
+            full = os.path.join(self.dir, *rel.split("/"))
+            try:
+                with open(full, "rb") as f:
+                    result[rel] = hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                result[rel] = ""
         return result

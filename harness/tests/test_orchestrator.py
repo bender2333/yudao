@@ -87,11 +87,11 @@ def _write_ok(path="out.py", content="print(1)\n"):
     )
 
 
-def _ready_ok():
+def _ready_ok(content="print(1)\n"):
     """PLAN ready in one model turn: write deliverable + submit_ready."""
     return _cr(
         tool_calls=[
-            _tc("w", "write_file", {"path": "out.py", "content": "print(1)\n"}),
+            _tc("w", "write_file", {"path": "out.py", "content": content}),
             _tc("p", "submit_ready", {"notes": "built + ran"}),
         ],
         finish="tool_calls",
@@ -158,7 +158,7 @@ def test_reject_execution_reruns_plan(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     script = [
         _understand_ok(), _ready_ok(), _verdict("reject_execution", "bug"),
-        _ready_ok(), _verdict("pass"),
+        _ready_ok("print(2)\n"), _verdict("pass"),
     ]
     result = run_multi(MockLlmClient(script), ws, "task")
     assert result.outcome == "done"
@@ -172,7 +172,7 @@ def test_reject_understanding_reruns_understand(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     script = [
         _understand_ok(), _ready_ok(), _verdict("reject_understanding", "wrong"),
-        _understand_ok(), _ready_ok(), _verdict("pass"),
+        _understand_ok(), _ready_ok("print(2)\n"), _verdict("pass"),
     ]
     result = run_multi(MockLlmClient(script), ws, "task")
     assert result.outcome == "done"
@@ -187,11 +187,12 @@ def test_reject_understanding_reruns_understand(tmp_path):
 def test_max_rounds_escalates(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     # every round rejects execution -> never converges
-    script = []
-    for _ in range(4):
-        script += [_understand_ok(), _ready_ok(), _verdict("reject_execution", "still bad")]
-    # extra padding in case
-    script += [_understand_ok(), _ready_ok(), _verdict("reject_execution", "x")]
+    script = [_understand_ok()]
+    for attempt in range(4):
+        script += [
+            _ready_ok(f"print({attempt})\n"),
+            _verdict("reject_execution", "still bad"),
+        ]
     result = run_multi(MockLlmClient(script), ws, "task", max_rounds=4)
     assert result.outcome == "escalated"
     assert result.rounds == 4
@@ -218,6 +219,13 @@ def test_submit_understanding_empty_field_errors():
 def test_submit_understanding_ok():
     out = submit_understanding("ws", summary="s", requirements="r", constraints="c", done_criteria="d")
     assert out == "understanding recorded"
+
+
+def test_submit_understanding_wrong_type_errors():
+    out = submit_understanding(
+        "ws", summary=1, requirements="r", constraints="c", done_criteria="d"
+    )
+    assert out.startswith("Error:")
 
 
 def test_submit_verdict_invalid_status():
@@ -333,6 +341,24 @@ def test_plan_ready_without_files_escalates(tmp_path):
     assert result.stages[-1].stage == "PLAN_EXECUTE"
 
 
+def test_plan_ready_with_only_stale_file_escalates(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    (tmp_path / "w" / "old.txt").write_text("old", encoding="utf-8")
+    script = [
+        _understand_ok(),
+        _cr(
+            tool_calls=[_tc("p", "submit_ready", {"notes": "reused old output"})],
+            finish="tool_calls",
+        ),
+        _verdict("pass"),
+    ]
+
+    result = run_multi(MockLlmClient(script), ws, "task")
+
+    assert result.outcome == "escalated"
+    assert result.stages[-1].stage == "PLAN_EXECUTE"
+
+
 def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
     """VERIFY stops naturally -> the on_stop hook makes ONE classification call
     that recovers a routing verdict (here: pass)."""
@@ -348,6 +374,21 @@ def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
     assert result.verdict["status"] == "pass"
 
 
+def test_verify_router_rejects_pass_without_reason(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        _text_stop("Everything passed."),
+        _verdict("pass", ""),
+    ]
+
+    result = run_multi(MockLlmClient(script), ws, "task", max_rounds=1)
+
+    assert result.outcome == "escalated"
+    assert result.verdict["status"] == "reject_execution"
+
+
 def test_verify_natural_stop_defaults_reject(tmp_path):
     """If the verify text is empty, default to reject_execution — NEVER a false pass."""
     ws = Workspace(str(tmp_path / "w"))
@@ -355,7 +396,7 @@ def test_verify_natural_stop_defaults_reject(tmp_path):
         _understand_ok(),
         _ready_ok(),
         _text_stop(""),  # VERIFY natural stop with no conclusion text -> default reject
-        _ready_ok(),
+        _ready_ok("print(2)\n"),
         _verdict("pass"),  # round 2: plan again then pass
     ]
     result = run_multi(MockLlmClient(script), ws, "task", max_rounds=3)
@@ -399,3 +440,24 @@ def test_verify_can_consult_understanding(tmp_path):
     # Promotion: clarification is part of the shared understanding artifact.
     assert "## Clarification" in (result.understanding or "")
     assert "trailing newline" in (result.understanding or "")
+
+
+def test_failed_consult_does_not_pollute_understanding(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    consult = _cr(
+        tool_calls=[
+            _tc("cq", "consult_understanding", {"question": "what is ambiguous?"})
+        ],
+        finish="tool_calls",
+    )
+    stuck = [
+        _cr(tool_calls=[_tc(f"l{i}", "list_dir", {})], finish="tool_calls")
+        for i in range(8)
+    ]
+    script = [_understand_ok(), _ready_ok(), consult, *stuck, _verdict("pass")]
+
+    result = run_multi(MockLlmClient(script), ws, "task")
+
+    assert result.outcome == "done"
+    assert result.consults == 1
+    assert "## Clarification" not in (result.understanding or "")

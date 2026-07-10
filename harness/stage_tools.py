@@ -20,6 +20,10 @@ VERIFY_TERMINAL = "submit_verdict"
 _VALID_STATUS = {"pass", "reject_understanding", "reject_execution"}
 
 
+def _has_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 # ── handlers (workspace_dir, **kwargs) -> str ──────────────
 def submit_understanding(
     workspace_dir: str,
@@ -34,21 +38,21 @@ def submit_understanding(
         ("constraints", constraints),
         ("done_criteria", done_criteria),
     ):
-        if not (value or "").strip():
+        if not _has_text(value):
             return f"Error: {field_name} is required"
     return "understanding recorded"
 
 
 def submit_ready(workspace_dir: str, notes: str = "") -> str:
-    if not (notes or "").strip():
+    if not _has_text(notes):
         return "Error: notes is required"
     return "ready recorded"
 
 
 def submit_verdict(workspace_dir: str, status: str = "", reason: str = "") -> str:
-    if status not in _VALID_STATUS:
+    if not isinstance(status, str) or status not in _VALID_STATUS:
         return "Error: invalid status"
-    if not (reason or "").strip():
+    if not _has_text(reason):
         return "Error: reason is required"
     return f"verdict recorded: {status}"
 

@@ -115,6 +115,15 @@ def _has_deliverables(workspace) -> bool:
     return any(size > 0 for size in files.values())
 
 
+def _has_changed_deliverable(workspace, before: dict[str, str]) -> bool:
+    sizes = workspace.snapshot_files()
+    after = workspace.snapshot_fingerprints()
+    return any(
+        size > 0 and after.get(name) != before.get(name)
+        for name, size in sizes.items()
+    )
+
+
 def _understand_user(task: str, workspace, reject_reason: str | None) -> str:
     parts = [
         f"# Original task\n{task}\n",
@@ -312,14 +321,15 @@ def _make_verify_hook(llm):
             for tc in cr.tool_calls or []:
                 if tc.function.name == VERIFY_TERMINAL:
                     args = json.loads(tc.function.arguments or "{}")
-                    if args.get("status") in {
-                        "pass",
-                        "reject_execution",
-                        "reject_understanding",
-                    }:
-                        args.setdefault(
-                            "reason", "(classified from verify conclusion)"
-                        )
+                    if (
+                        args.get("status") in {
+                            "pass",
+                            "reject_execution",
+                            "reject_understanding",
+                        }
+                        and isinstance(args.get("reason"), str)
+                        and args["reason"].strip()
+                    ):
                         return {"name": "submit_verdict", "args": args}
         except Exception:
             pass
@@ -361,7 +371,11 @@ def _make_consult_handler(
             max_steps=8,
             on_event=on_event,
         )
-        answer = (sub.final_text or "").strip() or "(no answer)"
+        if sub.stopped_reason != "natural":
+            return f"Error: consult did not complete ({sub.stopped_reason})"
+        answer = (sub.final_text or "").strip()
+        if not answer:
+            return "Error: consult returned no answer"
         # Promote into shared understanding so VERIFY/PLAN see the clarification.
         base = get_understanding() or ""
         promoted = (
@@ -463,6 +477,7 @@ def run_multi(
 
         elif state == "PLAN_EXECUTE":
             user = _plan_user(understanding, workspace, _nudge(reject_reason))
+            before = workspace.snapshot_fingerprints()
             _, tc = _run_stage(
                 llm,
                 "PLAN_EXECUTE",
@@ -477,8 +492,8 @@ def run_multi(
                 extra_tool_defs=consult_defs,
                 extra_handlers=consult_handlers,
             )
-            # Gate: ready without deliverables is not ready (terminal or natural).
-            if tc is None or not _has_deliverables(workspace):
+            # PLAN 本轮必须创建或修改至少一个非空交付文件。
+            if tc is None or not _has_changed_deliverable(workspace, before):
                 result.outcome = "escalated"
                 break
             reject_reason = None
