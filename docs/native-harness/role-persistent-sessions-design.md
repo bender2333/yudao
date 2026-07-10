@@ -1,9 +1,9 @@
 # 设计方案：三角色常驻会话（彼此不共享上下文）
 
-> 状态：**提案 / 待实现**  
+> 状态：**P0-P3 已实现**
 > 日期：2026-07-10  
 > 分支语境：`exp/native-harness`  
-> 关联：当前实现为「每阶段冷启动 `run_agent_loop` + 仅传 understanding 文本」；本方案将其替换为「三角色常驻线程」。
+> 关联：默认实现为「三角色常驻线程」；保留 `cold` 作为同拓扑消融臂。
 
 ---
 
@@ -395,7 +395,7 @@ runs/<id>/
 ```json
 {
   "mode": "multi",
-  "session_model": "persistent_roles_v1",
+  "session_model": "persistent",
   "outcome": "done|escalated",
   "rounds": 1,
   "consults": 0,
@@ -512,7 +512,7 @@ solo 仍走旧 `run_agent_loop`。
 | **P0** | `AgentSession` + `run_agent_loop` 支持续跑；orchestrator 三 session；handoff 拼装；sessions 落盘 | 单测 13.1.1–13.1.6 |
 | **P1** | consult 改走常驻 UNDERSTAND；summary.per_role；run 级 max_calls→escalated | live smoke 1 题 |
 | **P2** | handoffs.jsonl 审计；reason 截断；context 指标 | 文档 + 单测 |
-| **P3** | （可选）角色内压缩；`--session-model` 双臂实验协议 | 实验协议另文 |
+| **P3** | `--session-model cold\|persistent`；统一 calls/token/协作式墙钟预算；实验协议 | 默认 persistent；cold 快照测试；不实现自动压缩 |
 
 ---
 
@@ -549,15 +549,18 @@ solo 仍走旧 `run_agent_loop`。
 | Q1 | VERIFY handoff 是否带 ReadyArtifact.notes？ | **否**（MVP） |
 | Q2 | PLAN 是否可见 Original task？ | **否**（保持 L1 合同） |
 | Q3 | UNDERSTAND extract「勿 invent」是否保留？ | 保留实现能力；文案是否鼓励扩边由题库策略另定 |
-| Q4 | 默认 `--session-model`？ | 实现稳定后 **persistent**；过渡期显式 flag |
+| Q4 | 默认 `--session-model`？ | **persistent**；cold 仅作显式消融 |
 | Q5 | VERIFY 自然停默认 reject 是否占 round？ | **是**，防空转 |
 
 （若无异议，实现按默认建议执行。）
 
 ---
 
-## 18. 文档状态
+## 18. 实现状态
 
-- 本文仅定义方案，**不修改 harness 代码**。  
-- 实现时以本文 §13 为验收门；若实现偏离，先改本文再改代码。  
-- 废止/并存关系：冷启动 multi 可作为实验对照臂保留，不再作为「角色」叙事的默认解释。
+- P0：三个 run 级 `AgentSession`、私有 messages、activate 续跑与原状态机回归已完成。
+- P1：consult 复用常驻 UNDERSTAND；per-role 计量与预算耗尽收口已完成。
+- P2：`sessions/*.jsonl`、`handoffs.jsonl`、reason 2k 截断与上下文指标已完成。
+- P3：`cold|persistent` 开关已完成，默认 persistent；cold 只清空角色历史，其他变量不变。
+- 自动上下文压缩未实现；当前只测量 `message_count/message_chars`，达到真实溢出后再立项。
+- `max_seconds` 是进程内协作式门闩，无法强杀在途 API/shell；正式实验仍需外层 300 秒硬超时。

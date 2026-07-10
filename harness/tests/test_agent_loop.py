@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 
 from harness.agent_loop import AgentSession, activate, run_agent_loop
-from harness.llm import CallResult
+from harness.llm import BudgetExhausted, CallResult
 from harness.tools import TOOL_DEFS, tool_defs_without_writes
 
 
@@ -244,6 +244,33 @@ def test_max_steps_forces_stop(tmp_path):
     assert result.steps == 3
     assert result.events[-1]["type"] == "stop"
     assert result.events[-1]["reason"] == "max_steps"
+
+
+def test_expired_budget_prevents_tool_dispatch(tmp_path):
+    llm = MockLlmClient(
+        [
+            _cr(
+                tool_calls=[
+                    _tc(
+                        "w",
+                        "write_file",
+                        {"path": "forbidden.txt", "content": "x"},
+                    )
+                ],
+                finish="tool_calls",
+            )
+        ]
+    )
+
+    def expired():
+        raise BudgetExhausted("expired")
+
+    llm.check_budget = expired
+
+    result = run_agent_loop(llm, "sys", "task", TOOL_DEFS, str(tmp_path))
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert not (tmp_path / "forbidden.txt").exists()
 
 
 def test_events_carry_no_key(tmp_path):

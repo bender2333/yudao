@@ -6,6 +6,7 @@ accounting and backoff retries on transient errors.
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 
@@ -14,6 +15,10 @@ from openai import APIConnectionError, APITimeoutError, InternalServerError, Rat
 
 class BudgetExhausted(Exception):
     """Raised when the configured max_calls budget is exceeded."""
+
+
+class BudgetAccountingError(Exception):
+    """配置了 token 预算，但 provider 未返回可计量的 usage。"""
 
 
 # Transient errors worth retrying with backoff.
@@ -29,6 +34,8 @@ class CallResult:
     completion_tokens: int
     reasoning_tokens: int
     duration_ms: int
+    stopped_reason: str | None = None
+    stop_detail: str | None = None
 
 
 @dataclass
@@ -36,12 +43,48 @@ class LlmClient:
     client: object
     model: str
     max_calls: int | None = None
+    max_tokens: int | None = None
+    max_seconds: float | None = None
     # cumulative accounting
     calls_made: int = field(default=0, init=False)
     prompt_tokens_total: int = field(default=0, init=False)
     completion_tokens_total: int = field(default=0, init=False)
     reasoning_tokens_total: int = field(default=0, init=False)
     usage_by_role: dict = field(default_factory=dict, init=False)
+    _started_at: float = field(default_factory=time.monotonic, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.max_calls is not None and self.max_calls <= 0:
+            raise ValueError("max_calls must be positive")
+        if self.max_tokens is not None and self.max_tokens <= 0:
+            raise ValueError("max_tokens must be positive")
+        if self.max_seconds is not None:
+            if not math.isfinite(self.max_seconds) or self.max_seconds <= 0:
+                raise ValueError("max_seconds must be positive and finite")
+
+    def check_budget(self, *, before_call: bool = False) -> None:
+        if before_call and self.max_calls is not None:
+            if self.calls_made >= self.max_calls:
+                raise BudgetExhausted(f"max_calls={self.max_calls} exceeded")
+
+        total_tokens = self.prompt_tokens_total + self.completion_tokens_total
+        if self.max_tokens is not None:
+            exhausted = (
+                total_tokens >= self.max_tokens
+                if before_call
+                else total_tokens > self.max_tokens
+            )
+            if exhausted:
+                raise BudgetExhausted(
+                    f"max_tokens={self.max_tokens} exceeded (used={total_tokens})"
+                )
+
+        if self.max_seconds is not None:
+            elapsed = time.monotonic() - self._started_at
+            if elapsed >= self.max_seconds:
+                raise BudgetExhausted(
+                    f"max_seconds={self.max_seconds} exceeded (elapsed={elapsed:.3f})"
+                )
 
     def chat(
         self,
@@ -50,8 +93,7 @@ class LlmClient:
         max_completion_tokens: int = 8000,
         accounting_role: str | None = None,
     ) -> CallResult:
-        if self.max_calls is not None and self.calls_made >= self.max_calls:
-            raise BudgetExhausted(f"max_calls={self.max_calls} exceeded")
+        self.check_budget(before_call=True)
 
         started = time.monotonic()
         resp = self._create_with_retry(messages, tools, max_completion_tokens)
@@ -69,6 +111,11 @@ class LlmClient:
         completion_tokens = 0
         reasoning_tokens = 0
         usage = getattr(resp, "usage", None)
+        usage_available = (
+            usage is not None
+            and getattr(usage, "prompt_tokens", None) is not None
+            and getattr(usage, "completion_tokens", None) is not None
+        )
         if usage is not None:
             prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
             completion_tokens = getattr(usage, "completion_tokens", 0) or 0
@@ -96,6 +143,19 @@ class LlmClient:
             usage["reasoning_tokens"] += reasoning_tokens
             usage["llm_duration_ms"] += duration_ms
 
+        stopped_reason = None
+        stop_detail = None
+        if self.max_tokens is not None and not usage_available:
+            stopped_reason = "budget_accounting_error"
+            stop_detail = "provider response did not include prompt/completion token usage"
+        else:
+            # 在途请求无法预先中断；响应记账后由 caller 记录本次响应再停止。
+            try:
+                self.check_budget()
+            except BudgetExhausted as exc:
+                stopped_reason = "budget_exhausted"
+                stop_detail = str(exc)
+
         return CallResult(
             text=text,
             tool_calls=tool_calls,
@@ -104,11 +164,14 @@ class LlmClient:
             completion_tokens=completion_tokens,
             reasoning_tokens=reasoning_tokens,
             duration_ms=duration_ms,
+            stopped_reason=stopped_reason,
+            stop_detail=stop_detail,
         )
 
     def _create_with_retry(self, messages, tools, max_completion_tokens):
         last_exc = None
         for attempt in range(4):  # 1 try + up to 3 retries
+            self.check_budget()
             try:
                 return self.client.chat.completions.create(
                     model=self.model,
@@ -121,5 +184,12 @@ class LlmClient:
                 last_exc = exc
                 if attempt == 3:
                     break
-                time.sleep(min(2 ** attempt, 8))
+                delay = min(2 ** attempt, 8)
+                if self.max_seconds is not None:
+                    remaining = self.max_seconds - (time.monotonic() - self._started_at)
+                    if remaining <= 0:
+                        self.check_budget()
+                    delay = min(delay, remaining)
+                time.sleep(delay)
+        self.check_budget()
         raise last_exc

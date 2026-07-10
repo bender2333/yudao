@@ -7,13 +7,13 @@
 
 ## 1. 研究问题
 
-在固定总预算和相同运行条件下，完整 multi 方案：
+在固定总预算和相同运行条件下，默认的常驻会话 multi 方案：
 
 ```text
 UNDERSTAND -> PLAN_EXECUTE -> VERIFY
 ```
 
-是否比 solo 在复杂软件任务上取得可重复、可归因到“完整 treatment bundle”的质量收益？
+是否比 solo 在复杂软件任务上取得可重复、可归因到“完整 treatment bundle”的质量收益？同拓扑 cold multi 作为次要消融臂，用于判断收益是否来自角色内历史持久化。
 
 本实验不声称当前 multi 是真实并行部门，也不把潜在收益归因到某一个阶段。只有完整方案胜出后，才在新 holdout 上增加 `solo + explicit review`，区分角色结构与单纯增加推理计算。
 
@@ -21,11 +21,11 @@ UNDERSTAND -> PLAN_EXECUTE -> VERIFY
 
 正式批次只允许得出以下之一：
 
-- **支持**：multi 达到第 9 节全部质量与工程门槛。
-- **不支持**：multi 平均质量差 `<= 0`，或只赢 `<= 4/8` 个任务。
+- **支持**：P 相对 S 达到第 9 节全部质量与工程门槛。
+- **不支持**：P 相对 S 的平均质量差 `<= 0`，或只赢 `<= 4/8` 个任务。
 - **证据不足**：介于上述区间；只能按预注册规则补样，不能改 prompt 或题目。
 
-multi 获胜不是项目完成条件。
+P 获胜不是项目完成条件；C 只回答持久记忆是否贡献增益。
 
 ## 3. 正式运行前置门
 
@@ -38,7 +38,8 @@ multi 获胜不是项目完成条件。
 - [x] 空 reason 与失败 consult 不得形成成功证据。
 - [x] 已存在的 run 目录会 fail-fast，不复用 workspace。
 - [ ] agent 进程不能读取 workspace 外路径、provider key 或 hidden oracle。
-- [ ] 统一硬预算已实现并测试：成功 calls、总 tokens、进程墙钟。
+- [x] run 级共享 `max_calls`、总 token 与协作式 `max_seconds` 已实现并测试。
+- [ ] 外层 300 秒进程硬超时已实现并测试，可终止在途 API/shell。
 - [ ] 8 个 fixture、oracle、评分权重与 SHA-256 已提交。
 - [ ] provider 记录可获得的模型版本、temperature、seed/system fingerprint。
 - [ ] live batch 的模型额度由 `NEXT.md` 明确授权。
@@ -51,15 +52,23 @@ multi 获胜不是项目完成条件。
 
 - 入口：`python -m harness.run_solo`
 - 单一 agent loop，自主调查、实现、验证。
-- 与 M 使用相同任务文本、fixture、工具能力和总硬预算。
+- 与 C/P 使用相同任务文本、fixture、工具能力和总预算。
 
-### M - multi
+### C - multi-cold
 
 - 入口：`python -m harness.run_multi`
-- 固定三个串行角色与当前 routing。
-- 正式批次中不得更改 system prompt、terminal gate、consult 或 convergence 逻辑。
+- 参数：`--session-model cold`。
+- 固定三个串行角色与当前 routing；每次 activate 前仅清空目标角色历史。
 
-本轮比较完整 S 与完整 M，不引入第三臂。
+### P - multi-persistent
+
+- 入口：`python -m harness.run_multi`
+- 参数：`--session-model persistent`（默认）。
+- 每个 run 内 U/P/V 各一个常驻私有 transcript；consult 复用同一个 UNDERSTAND。
+
+C/P 的 system prompt、handoff、workspace、terminal gate、consult、convergence 与预算必须完全相同，唯一处理变量是角色历史是否跨 activate 保留。
+
+主比较为 P vs S；C 用作预注册的次要机制消融，不替代主结论。
 
 ## 5. 控制变量与预算
 
@@ -70,12 +79,13 @@ multi 获胜不是项目完成条件。
 | provider / model | 冻结时填写 |
 | 成功模型调用上限 | 60 |
 | prompt + completion token 上限 | 200,000 |
-| 进程墙钟上限 | 300 秒 |
+| 协作式墙钟上限 | 300 秒（`--max-seconds 300`） |
+| 外层进程硬超时 | 300 秒（待实现） |
 | fixture | 每次从只读源复制到全新 workspace |
 | 网络 | agent 工具禁用 |
-| 顺序 | 每个 `(task, repetition)` block 内随机 S/M，记录 seed |
+| 顺序 | 每个 `(task, repetition)` block 内随机 S/C/P，记录 seed |
 
-`max_steps` 不是总预算。S/M 必须共享同一个 run 级 `max_calls`、token 和墙钟上限；multi 不得按阶段重置。
+`max_steps` 不是总预算。S/C/P 必须共享同一个 run 级 `max_calls`、token 和墙钟上限；multi 不得按阶段重置。token 或在途调用超限时允许保留一次已记账 overshoot，但不得执行该响应的 tool calls。
 
 ## 6. 复杂任务集
 
@@ -99,11 +109,11 @@ multi 获胜不是项目完成条件。
 ## 7. 样本与运行顺序
 
 ```text
-8 tasks x 3 repetitions x 2 modes = 48 runs
+8 tasks x 3 repetitions x 3 modes = 72 runs
 ```
 
 - task 是统计单位；每题先取 3 次中位数。
-- 同一 block 的 S/M 紧邻运行，顺序由冻结 seed 随机决定。
+- 同一 block 的 S/C/P 紧邻运行，顺序由冻结 seed 随机决定。
 - 运行目录已存在即失败，禁止复用 workspace。
 - 超时、异常、缺 summary 全部按 intention-to-treat 纳入，记 0 分并保留原始失败原因。
 - pilot 不计入正式样本；pilot 题不得进入正式题库。
@@ -129,16 +139,16 @@ reasoning tokens 若已包含在 completion tokens 中，不重复计入硬预�
 
 ## 9. 预注册门槛
 
-判定“支持”必须同时满足：
+主比较 P vs S 判定“支持”必须同时满足：
 
-- 8 题中 multi 至少赢 7 题。
+- 8 题中 P 至少赢 S 7 题。
 - task-level 平均质量提升至少 `+5` 分。
-- multi completion 不得比 solo 少超过 `1/24` run。
-- multi critical failure 不增加。
-- median token ratio `<= 2.0x`。
-- median wall-clock ratio `<= 2.0x`。
+- P completion 不得比 S 少超过 `1/24` run。
+- P critical failure 不增加。
+- P/S median token ratio `<= 2.0x`。
+- P/S median wall-clock ratio `<= 2.0x`。
 
-8 题赢 7 题的单侧精确 sign test 为 `p = 9/256 ~= 0.035`。若质量达标但成本门不达标，只能结论为“有效但不经济”。
+8 题赢 7 题的单侧精确 sign test 为 `p = 9/256 ~= 0.035`。若质量达标但成本门不达标，只能结论为“有效但不经济”。P vs C 只报告效应量、胜题数和成本，不改变主比较门槛；若 P 与 C 无差异，不得把收益归因于持久记忆。
 
 `5-6/8` 或平均提升 `0-5` 为证据不足。仅允许把每题重复从 3 次补到 5 次；不得边看结果边修改 treatment。
 
@@ -146,8 +156,8 @@ reasoning tokens 若已包含在 completion tokens 中，不重复计入硬预�
 
 1. 提交 fixture、oracle、评分权重、预算实现和本协议。
 2. 记录所有输入文件 SHA-256，状态改为 FROZEN。
-3. 用独立 pilot 题验证 wiring、隔离、预算中止和评分。
-4. pilot 通过后再次 commit，随后一次性运行 48 个正式样本。
+3. 用独立 pilot 题验证三臂 wiring、隔离、预算中止和评分。
+4. pilot 通过后再次 commit，随后一次性运行 72 个正式样本。
 5. 循环外运行 oracle，生成逐 run 明细和 task-level 聚合。
 6. 原样报告全部失败、超时和缺失数据。
 7. 输出“支持 / 不支持 / 证据不足”，不追加事后门槛。

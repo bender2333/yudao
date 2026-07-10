@@ -1,11 +1,13 @@
-"""run_multi — assemble provider + client + workspace + multi-stage orchestrator.
+"""组装 provider、共享预算 client、workspace 与多角色编排器。
 
 CLI:
     python -m harness.run_multi "<task>" [--run-dir runs/<ts>] \
-        [--max-rounds N] [--max-steps N] [--max-calls N]
+        [--max-rounds N] [--max-steps N] [--max-calls N] \
+        [--max-tokens N] [--max-seconds N] \
+        [--session-model cold|persistent]
 
-Summary is同构 with run_solo plus mode="multi", outcome, rounds, per-stage
-cost, and the final verdict.
+summary 与 solo 共享预算口径，并增加 outcome、rounds、per-role、per-stage、
+session_model 与最终 verdict。
 """
 
 from __future__ import annotations
@@ -41,12 +43,21 @@ def run_multi_cli(
     max_rounds: int = 4,
     max_steps: int = 40,
     max_calls: int | None = None,
+    max_tokens: int | None = None,
+    max_seconds: float | None = None,
     provider_path: str = "provider.md",
+    session_model: str = "persistent",
 ) -> dict:
     os.makedirs(run_dir, exist_ok=False)
     cfg = load_provider(provider_path)
     client = make_client(cfg)
-    llm = LlmClient(client, cfg["model"], max_calls=max_calls)
+    llm = LlmClient(
+        client,
+        cfg["model"],
+        max_calls=max_calls,
+        max_tokens=max_tokens,
+        max_seconds=max_seconds,
+    )
 
     ws = Workspace(os.path.join(run_dir, "workspace"))
 
@@ -65,6 +76,7 @@ def run_multi_cli(
             max_rounds=max_rounds,
             max_steps=max_steps,
             on_event=on_event,
+            session_model=session_model,
         )
     finally:
         events_file.close()
@@ -105,6 +117,11 @@ def run_multi_cli(
         "consults": result.consults,
         "consult_errors": result.consult_errors,
         "handoff_count": len(result.handoffs),
+        "budget": {
+            "max_calls": max_calls,
+            "max_tokens": max_tokens,
+            "max_seconds": max_seconds,
+        },
         "verdict": result.verdict,
         "understanding": result.understanding,
         "stopped_reason": result.stopped_reason,
@@ -129,6 +146,7 @@ def _print_summary(summary: dict) -> None:
     print("=" * 60)
     print(f"model:            {summary['model']}")
     print(f"mode:             {summary['mode']}")
+    print(f"session_model:    {summary['session_model']}")
     print(f"outcome:          {summary['outcome']}")
     print(f"rounds:           {summary['rounds']}")
     print(f"verdict:          {summary['verdict']}")
@@ -160,6 +178,13 @@ def main() -> None:
     parser.add_argument("--max-rounds", type=int, default=4)
     parser.add_argument("--max-steps", type=int, default=40)
     parser.add_argument("--max-calls", type=int, default=None)
+    parser.add_argument("--max-tokens", type=int, default=None)
+    parser.add_argument("--max-seconds", type=float, default=None)
+    parser.add_argument(
+        "--session-model",
+        choices=("cold", "persistent"),
+        default="persistent",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir or os.path.join(
@@ -171,6 +196,9 @@ def main() -> None:
         max_rounds=args.max_rounds,
         max_steps=args.max_steps,
         max_calls=args.max_calls,
+        max_tokens=args.max_tokens,
+        max_seconds=args.max_seconds,
+        session_model=args.session_model,
     )
     _print_summary(summary)
     print(f"\nrun_dir: {run_dir}")

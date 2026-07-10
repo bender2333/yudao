@@ -7,6 +7,8 @@ import copy
 import json
 from dataclasses import dataclass
 
+import pytest
+
 from harness.agent_loop import run_agent_loop
 from harness.llm import BudgetExhausted, CallResult
 from harness.orchestrator import (
@@ -195,6 +197,12 @@ def _text_stop(text):
     return _cr(text=text, finish="stop")
 
 
+def _stopped(result, reason):
+    result.stopped_reason = reason
+    result.stop_detail = reason
+    return result
+
+
 # ── terminal_tools primitive ──────────────────────────────
 def test_terminal_tool_stops_loop(tmp_path):
     ws = str(tmp_path)
@@ -243,6 +251,7 @@ def test_pass_on_first_round(tmp_path):
     assert result.outcome == "done"
     assert result.rounds == 1
     assert result.verdict["status"] == "pass"
+    assert result.session_model == "persistent"
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
     assert result.calls == 3
     assert result.prompt_tokens == 30
@@ -268,6 +277,47 @@ def test_reject_execution_reruns_plan(tmp_path):
     assert "submit_ready" in json.dumps(plan_calls[1])
     assert sum(message["role"] == "system" for message in plan_calls[1]) == 1
     assert result.sessions["PLAN_EXECUTE"].activates == 2
+
+
+def test_cold_session_model_resets_plan_history(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    script = [
+        _understand_ok(),
+        _ready_ok(),
+        _verdict("reject_execution", "bug"),
+        _ready_ok("print(2)\n"),
+        _verdict("pass"),
+    ]
+    llm = MockLlmClient(script)
+
+    result = run_multi(llm, ws, "task", session_model="cold")
+
+    plan_calls = _role_calls(llm, PLAN_SYSTEM)
+    assert result.outcome == "done"
+    assert result.session_model == "cold"
+    assert result.sessions["PLAN_EXECUTE"].activates == 2
+    assert [message["role"] for message in plan_calls[1]] == ["system", "user"]
+    assert [handoff["kind"] for handoff in result.handoffs] == [
+        "NewMission",
+        "ExecuteAgainstUnderstanding",
+        "VerifyAgainstUnderstanding",
+        "RejectToPlan",
+        "VerifyAgainstUnderstanding",
+    ]
+
+
+def test_invalid_session_model_fails_before_llm_call(tmp_path):
+    llm = MockLlmClient([])
+
+    with pytest.raises(ValueError, match="session_model"):
+        run_multi(
+            llm,
+            Workspace(str(tmp_path / "w")),
+            "task",
+            session_model="unknown",
+        )
+
+    assert llm.calls_made == 0
 
 
 def test_reject_understanding_reruns_understand(tmp_path):
@@ -441,13 +491,16 @@ def test_understand_natural_stop_extracts_structured(tmp_path):
         _ready_ok(),
         _verdict("pass"),
     ]
-    result = run_multi(MockLlmClient(script), ws, "task")
+    events = []
+    result = run_multi(MockLlmClient(script), ws, "task", on_event=events.append)
     assert result.outcome == "done"
     assert "## Summary" in (result.understanding or "")
     assert "## Done-criteria" in (result.understanding or "")
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
     assert result.calls == 4
     assert [s.loop.calls for s in result.stages] == [2, 1, 1]
+    assert sum(event["type"] == "llm_call" for event in events) == result.calls
+    assert any(event.get("kind") == "extract" for event in events)
 
 
 def test_understand_natural_stop_empty_escalates(tmp_path):
@@ -530,9 +583,12 @@ def test_verify_natural_stop_recovers_verdict_via_router(tmp_path):
         _text_stop("All criteria met: ran it, output correct."),  # VERIFY natural
         _verdict("pass", "router classification"),                # hook's router call
     ]
-    result = run_multi(MockLlmClient(script), ws, "task")
+    events = []
+    result = run_multi(MockLlmClient(script), ws, "task", on_event=events.append)
     assert result.outcome == "done"
     assert result.verdict["status"] == "pass"
+    assert sum(event["type"] == "llm_call" for event in events) == result.calls
+    assert any(event.get("kind") == "router" for event in events)
 
 
 def test_verify_router_rejects_pass_without_reason(tmp_path):
@@ -644,6 +700,38 @@ def test_verify_can_consult_understanding(tmp_path):
     assert "trailing newline" in (result.understanding or "")
 
 
+def test_cold_consult_resets_understand_history(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    llm = MockLlmClient(
+        [
+            _understand_ok(),
+            _ready_ok(),
+            _cr(
+                tool_calls=[
+                    _tc(
+                        "cq",
+                        "consult_understanding",
+                        {"question": "clarify the line rule"},
+                    )
+                ],
+                finish="tool_calls",
+            ),
+            _text_stop("Count the final line."),
+            _verdict("pass"),
+        ]
+    )
+
+    result = run_multi(llm, ws, "task", session_model="cold")
+
+    understand_calls = _role_calls(llm, UNDERSTAND_SYSTEM)
+    assert result.outcome == "done"
+    assert result.consults == 1
+    assert [message["role"] for message in understand_calls[1]] == [
+        "system",
+        "user",
+    ]
+
+
 def test_failed_consult_does_not_pollute_understanding(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     consult = _cr(
@@ -733,6 +821,24 @@ def test_understand_extract_budget_exhaustion_is_not_swallowed(tmp_path):
     assert result.calls == 1
 
 
+def test_understand_extract_post_response_budget_exhaustion_stops(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    events = []
+    llm = MockLlmClient(
+        [
+            _text_stop("a concrete understanding"),
+            _stopped(_understand_ok(), "budget_exhausted"),
+        ]
+    )
+
+    result = run_multi(llm, ws, "task", on_event=events.append)
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == 2
+    assert sum(event["type"] == "llm_call" for event in events) == 2
+
+
 def test_verify_router_budget_exhaustion_is_not_default_reject(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     llm = BudgetMockLlmClient(
@@ -750,6 +856,27 @@ def test_verify_router_budget_exhaustion_is_not_default_reject(tmp_path):
     assert result.stopped_reason == "budget_exhausted"
     assert result.verdict is None
     assert result.calls == 3
+
+
+def test_verify_router_post_response_budget_exhaustion_stops(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    events = []
+    llm = MockLlmClient(
+        [
+            _understand_ok(),
+            _ready_ok(),
+            _text_stop("All criteria passed with evidence."),
+            _stopped(_verdict("pass"), "budget_exhausted"),
+        ]
+    )
+
+    result = run_multi(llm, ws, "task", on_event=events.append)
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.verdict is None
+    assert result.calls == 4
+    assert sum(event["type"] == "llm_call" for event in events) == 4
 
 
 def test_verdict_reason_is_truncated_before_handoff(tmp_path):

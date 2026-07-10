@@ -33,12 +33,20 @@ def run_solo(
     run_dir: str,
     max_steps: int = 40,
     max_calls: int | None = None,
+    max_tokens: int | None = None,
+    max_seconds: float | None = None,
     provider_path: str = "provider.md",
 ) -> dict:
     os.makedirs(run_dir, exist_ok=False)
     cfg = load_provider(provider_path)
     client = make_client(cfg)
-    llm = LlmClient(client, cfg["model"], max_calls=max_calls)
+    llm = LlmClient(
+        client,
+        cfg["model"],
+        max_calls=max_calls,
+        max_tokens=max_tokens,
+        max_seconds=max_seconds,
+    )
 
     ws = Workspace(os.path.join(run_dir, "workspace"))
 
@@ -66,6 +74,11 @@ def run_solo(
         "task": task,
         "mode": "solo",
         "model": cfg["model"],
+        "budget": {
+            "max_calls": max_calls,
+            "max_tokens": max_tokens,
+            "max_seconds": max_seconds,
+        },
         "stopped_reason": result.stopped_reason,
         "steps": result.steps,
         "tool_invocations": result.tool_invocations,
@@ -108,6 +121,8 @@ def main() -> None:
     parser.add_argument("--run-dir", default=None)
     parser.add_argument("--max-steps", type=int, default=40)
     parser.add_argument("--max-calls", type=int, default=None)
+    parser.add_argument("--max-tokens", type=int, default=None)
+    parser.add_argument("--max-seconds", type=float, default=None)
     args = parser.parse_args()
 
     run_dir = args.run_dir or os.path.join(
@@ -118,6 +133,8 @@ def main() -> None:
         run_dir=run_dir,
         max_steps=args.max_steps,
         max_calls=args.max_calls,
+        max_tokens=args.max_tokens,
+        max_seconds=args.max_seconds,
     )
     _print_summary(summary)
     print(f"\nrun_dir: {run_dir}")

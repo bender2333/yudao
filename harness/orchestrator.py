@@ -26,7 +26,7 @@ import json
 from dataclasses import dataclass, field
 
 from .agent_loop import AgentSession, activate
-from .llm import BudgetExhausted
+from .llm import BudgetAccountingError, BudgetExhausted
 from .stage_tools import (
     CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
@@ -44,8 +44,8 @@ _IMPLEMENT_TOOLS = TOOL_DEFS
 _MAX_REASON_CHARS = 2000
 
 UNDERSTAND_SYSTEM = (
-    "You are the persistent UNDERSTANDING role for this run. You retain only your own "
-    "transcript and receive other roles' information only through explicit handoffs. "
+    "You are the UNDERSTANDING role for this run. You see only your own transcript "
+    "and receive other roles' information only through explicit handoffs. "
     "Investigate the task and the existing workspace "
     "using read/list/bash tools only — do NOT implement or write solution code.\n"
     "Your job is to deeply understand WHAT must be true when the task is done.\n"
@@ -58,8 +58,8 @@ UNDERSTAND_SYSTEM = (
 )
 
 PLAN_SYSTEM = (
-    "You are the persistent PLAN & EXECUTE role for this run. You retain only your own "
-    "transcript and receive other roles' information only through explicit handoffs.\n"
+    "You are the PLAN & EXECUTE role for this run. You see only your own transcript "
+    "and receive other roles' information only through explicit handoffs.\n"
     "The upstream understanding is the source of truth.\n"
     "Plan and implement it for real: write/edit files, then RUN commands to verify behavior. "
     "Realize every done-criterion as actually-working behavior.\n"
@@ -71,8 +71,8 @@ PLAN_SYSTEM = (
 )
 
 VERIFY_SYSTEM = (
-    "You are the persistent VERIFICATION role for this run. You retain only your own "
-    "transcript and receive other roles' information only through explicit handoffs.\n"
+    "You are the VERIFICATION role for this run. You see only your own transcript "
+    "and receive other roles' information only through explicit handoffs.\n"
     "You are given the upstream understanding (source of truth "
     'for "done") and the workspace file listing.\n'
     "Independently verify whether the implementation satisfies the done-criteria: read "
@@ -105,7 +105,7 @@ class MultiResult:
     consults: int = 0
     consult_errors: int = 0
     stopped_reason: str | None = None
-    session_model: str = "persistent_roles_v1"
+    session_model: str = "persistent"
     sessions: dict[str, AgentSession] = field(default_factory=dict)
     handoffs: list[dict] = field(default_factory=list)
     per_role: dict = field(default_factory=dict)
@@ -201,7 +201,7 @@ def _base_tools_for(stage: str) -> list:
 
 def _run_stage(
     llm, session, user, workspace, max_steps, on_event, round_no, result,
-    on_stop=None, extra_handlers=None,
+    on_stop=None, extra_handlers=None, keep_history=True,
 ):
     """Run one stage loop; emit stage_start/stage_end; record + accumulate.
 
@@ -230,6 +230,7 @@ def _run_stage(
         terminal_tools={terminal},
         on_stop=on_stop,
         extra_handlers=extra_handlers,
+        keep_history=keep_history,
     )
     tc = loop.terminal_call
     result.stages.append(StageRun(stage=stage, loop=loop, terminal_call=tc))
@@ -264,7 +265,34 @@ _UNDERSTAND_EXTRACT_SYSTEM = (
 _REQUIRED_U_FIELDS = ("summary", "requirements", "constraints", "done_criteria")
 
 
-def _make_understand_hook(llm):
+def _emit_hook_call(on_event, stage: str, kind: str, result) -> None:
+    if on_event is None:
+        return
+    on_event(
+        {
+            "type": "llm_call",
+            "stage": stage,
+            "kind": kind,
+            "finish_reason": result.finish_reason,
+            "has_tool_calls": bool(result.tool_calls),
+            "text": _clip(result.text),
+            "prompt_tokens": result.prompt_tokens,
+            "completion_tokens": result.completion_tokens,
+            "reasoning_tokens": result.reasoning_tokens,
+            "duration_ms": result.duration_ms,
+            "stopped_reason": result.stopped_reason,
+        }
+    )
+
+
+def _raise_if_call_stopped(result) -> None:
+    if result.stopped_reason == "budget_exhausted":
+        raise BudgetExhausted(result.stop_detail or "run budget exhausted")
+    if result.stopped_reason == "budget_accounting_error":
+        raise BudgetAccountingError(result.stop_detail or "token usage unavailable")
+
+
+def _make_understand_hook(llm, on_event):
     """Natural stop → one cheap extract call into submit_understanding fields.
 
     If extraction fails or text is empty → None (escalate). No free-text
@@ -284,13 +312,15 @@ def _make_understand_hook(llm):
                 STAGE_TOOL_DEFS["UNDERSTAND"],
                 accounting_role="UNDERSTAND",
             )
+            _emit_hook_call(on_event, "UNDERSTAND", "extract", cr)
+            _raise_if_call_stopped(cr)
             for tc in cr.tool_calls or []:
                 if tc.function.name != UNDERSTAND_TERMINAL:
                     continue
                 args = json.loads(tc.function.arguments or "{}")
                 if all((args.get(k) or "").strip() for k in _REQUIRED_U_FIELDS):
                     return {"name": UNDERSTAND_TERMINAL, "args": args}
-        except BudgetExhausted:
+        except (BudgetAccountingError, BudgetExhausted):
             raise
         except Exception:
             pass
@@ -322,7 +352,7 @@ _VERIFY_ROUTER_SYSTEM = (
 )
 
 
-def _make_verify_hook(llm):
+def _make_verify_hook(llm, on_event):
     """Verify ended naturally without submit_verdict → recover a routing verdict
     with ONE cheap classification call. Defaults to reject_execution (never a
     false pass) if classification can't produce a clean verdict."""
@@ -350,6 +380,8 @@ def _make_verify_hook(llm):
                 STAGE_TOOL_DEFS["VERIFY"],
                 accounting_role="VERIFY",
             )
+            _emit_hook_call(on_event, "VERIFY", "router", cr)
+            _raise_if_call_stopped(cr)
             for tc in cr.tool_calls or []:
                 if tc.function.name == VERIFY_TERMINAL:
                     args = json.loads(tc.function.arguments or "{}")
@@ -363,7 +395,7 @@ def _make_verify_hook(llm):
                         and args["reason"].strip()
                     ):
                         return {"name": "submit_verdict", "args": args}
-        except BudgetExhausted:
+        except (BudgetAccountingError, BudgetExhausted):
             raise
         except Exception:
             pass
@@ -383,6 +415,7 @@ def _make_consult_handler(
     record_handoff,
     get_caller_role,
     get_round,
+    keep_history,
 ):
     """激活常驻 UNDERSTAND，并将成功答复晋升到 canonical understanding。"""
     def fail(reason: str) -> str:
@@ -423,7 +456,11 @@ def _make_consult_handler(
                 handlers_ctx=workspace.dir,
                 max_steps=8,
                 on_event=on_event,
+                keep_history=keep_history,
             )
+        except BudgetAccountingError:
+            fail("consult could not measure token usage")
+            raise
         except BudgetExhausted:
             fail("consult exhausted the run budget")
             raise
@@ -432,6 +469,9 @@ def _make_consult_handler(
         if sub.stopped_reason == "budget_exhausted":
             fail("consult exhausted the run budget")
             raise BudgetExhausted("consult exhausted the run budget")
+        if sub.stopped_reason == "budget_accounting_error":
+            fail("consult could not measure token usage")
+            raise BudgetAccountingError("consult could not measure token usage")
         if sub.stopped_reason != "natural":
             return fail(f"consult did not complete ({sub.stopped_reason})")
         answer = (sub.final_text or "").strip()
@@ -477,17 +517,25 @@ def run_multi(
     max_rounds: int = 4,
     max_steps: int = 40,
     on_event=None,
+    session_model: str = "persistent",
 ) -> MultiResult:
     """运行一次 multi；llm 是本 run 三角色共享且独占的预算 client。"""
-    result = MultiResult(outcome="escalated", rounds=0)
+    if session_model not in {"cold", "persistent"}:
+        raise ValueError("session_model must be 'cold' or 'persistent'")
+    keep_history = session_model == "persistent"
+    result = MultiResult(
+        outcome="escalated",
+        rounds=0,
+        session_model=session_model,
+    )
     state = "UNDERSTAND"
     round_no = 0
     understanding: str | None = None
     reject_reason: str | None = None
     reject_reason_meta: dict = {}
-    understand_hook = _make_understand_hook(llm)
+    understand_hook = _make_understand_hook(llm, on_event)
     plan_hook = _make_plan_hook(workspace)
-    verify_hook = _make_verify_hook(llm)
+    verify_hook = _make_verify_hook(llm, on_event)
 
     def _get_understanding() -> str | None:
         return understanding
@@ -580,6 +628,7 @@ def run_multi(
         _record_handoff,
         lambda: state,
         lambda: round_no,
+        keep_history,
     )
     consult_handlers = {CONSULT_UNDERSTANDING: consult}
 
@@ -622,13 +671,14 @@ def run_multi(
                 round_no,
                 result,
                 on_stop=understand_hook,
+                keep_history=keep_history,
             )
             if tc is None:  # max_steps / empty / extract failed
                 result.outcome = "escalated"
                 result.stopped_reason = (
-                    loop.stopped_reason
-                    if loop.stopped_reason in {"max_steps", "budget_exhausted"}
-                    else "understand_incomplete"
+                    "understand_incomplete"
+                    if loop.stopped_reason in {"natural", "terminal"}
+                    else loop.stopped_reason
                 )
                 break
             _set_understanding(_understanding_from(tc))
@@ -658,11 +708,12 @@ def run_multi(
                 result,
                 on_stop=plan_hook,
                 extra_handlers=consult_handlers,
+                keep_history=keep_history,
             )
             # PLAN 本轮必须创建或修改至少一个非空交付文件。
             if tc is None or not _has_changed_deliverable(workspace, before):
                 result.outcome = "escalated"
-                if loop.stopped_reason in {"max_steps", "budget_exhausted"}:
+                if loop.stopped_reason not in {"natural", "terminal"}:
                     result.stopped_reason = loop.stopped_reason
                 elif tc is None:
                     result.stopped_reason = "plan_incomplete"
@@ -694,13 +745,14 @@ def run_multi(
                 result,
                 on_stop=verify_hook,
                 extra_handlers=consult_handlers,
+                keep_history=keep_history,
             )
             if tc is None:
                 result.outcome = "escalated"
                 result.stopped_reason = (
-                    loop.stopped_reason
-                    if loop.stopped_reason in {"max_steps", "budget_exhausted"}
-                    else "verify_incomplete"
+                    "verify_incomplete"
+                    if loop.stopped_reason in {"natural", "terminal"}
+                    else loop.stopped_reason
                 )
                 break
             status = tc["args"]["status"]

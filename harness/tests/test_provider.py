@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from harness.llm import LlmClient
 from harness.provider import load_provider
 from harness.run_multi import run_multi_cli
 from harness.run_solo import run_solo
@@ -28,7 +29,7 @@ def _response(tool_calls, text=""):
         choices=[
             SimpleNamespace(
                 message=SimpleNamespace(content=text, tool_calls=tool_calls),
-                finish_reason="tool_calls",
+                finish_reason="tool_calls" if tool_calls else "stop",
             )
         ],
         usage=SimpleNamespace(
@@ -37,6 +38,12 @@ def _response(tool_calls, text=""):
             completion_tokens_details=SimpleNamespace(reasoning_tokens=2),
         ),
     )
+
+
+def _response_without_usage(tool_calls):
+    response = _response(tool_calls)
+    response.usage = None
+    return response
 
 
 class _ScriptedCompletions:
@@ -56,6 +63,17 @@ def _patch_multi_provider(monkeypatch, responses):
         lambda _: {"model": "test-model"},
     )
     monkeypatch.setattr("harness.run_multi.make_client", lambda _: client)
+
+
+def _patch_solo_provider(monkeypatch, responses):
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=_ScriptedCompletions(responses))
+    )
+    monkeypatch.setattr(
+        "harness.run_solo.load_provider",
+        lambda _: {"model": "test-model"},
+    )
+    monkeypatch.setattr("harness.run_solo.make_client", lambda _: client)
 
 
 def _read_jsonl(path):
@@ -220,6 +238,7 @@ def test_run_multi_cli_writes_isolated_sessions_and_handoffs(tmp_path, monkeypat
         provider_path="ignored.md",
     )
 
+    assert summary["session_model"] == "persistent"
     files = {
         "UNDERSTAND": "understand.jsonl",
         "PLAN_EXECUTE": "plan_execute.jsonl",
@@ -261,3 +280,137 @@ def test_run_multi_cli_writes_isolated_sessions_and_handoffs(tmp_path, monkeypat
     assert "PLAN_PRIVATE_TRACE" not in handoff_blob
     assert "PLAN_NOTES_PRIVATE_TRACE" not in handoff_blob
     assert "VERIFY_PRIVATE_TRACE" not in handoff_blob
+
+
+def test_token_budget_is_shared_across_multi_roles(tmp_path, monkeypatch):
+    understanding = {
+        "summary": "s",
+        "requirements": "r",
+        "constraints": "c",
+        "done_criteria": "d",
+    }
+    _patch_multi_provider(
+        monkeypatch,
+        [
+            _response(
+                [_tool_call("u", "submit_understanding", understanding)]
+            ),
+            _response(
+                [
+                    _tool_call(
+                        "w",
+                        "write_file",
+                        {"path": "out.py", "content": "print(1)\n"},
+                    )
+                ]
+            ),
+        ],
+    )
+
+    run_dir = tmp_path / "token-budget"
+    summary = run_multi_cli(
+        "task",
+        str(run_dir),
+        max_tokens=25,
+        provider_path="ignored.md",
+    )
+
+    assert summary["outcome"] == "escalated"
+    assert summary["stopped_reason"] == "budget_exhausted"
+    assert summary["calls"] == 2
+    assert summary["prompt_tokens"] + summary["completion_tokens"] == 30
+    assert summary["per_role"]["UNDERSTAND"]["calls"] == 1
+    assert summary["per_role"]["PLAN_EXECUTE"]["calls"] == 1
+    assert summary["budget"]["max_tokens"] == 25
+    events = _read_jsonl(run_dir / "events.jsonl")
+    assert sum(event["type"] == "llm_call" for event in events) == summary["calls"]
+    plan_messages = _read_jsonl(run_dir / "sessions" / "plan_execute.jsonl")
+    assert [message["role"] for message in plan_messages] == [
+        "system",
+        "user",
+        "assistant",
+    ]
+
+
+def test_wall_budget_stops_before_first_multi_call(tmp_path, monkeypatch):
+    _patch_multi_provider(monkeypatch, [])
+
+    summary = run_multi_cli(
+        "task",
+        str(tmp_path / "wall-budget"),
+        max_seconds=1e-12,
+        provider_path="ignored.md",
+    )
+
+    assert summary["outcome"] == "escalated"
+    assert summary["stopped_reason"] == "budget_exhausted"
+    assert summary["calls"] == 0
+    assert summary["budget"]["max_seconds"] == 1e-12
+
+
+def test_solo_uses_the_same_token_budget(tmp_path, monkeypatch):
+    _patch_solo_provider(monkeypatch, [_response([], text="done")])
+
+    summary = run_solo(
+        "task",
+        str(tmp_path / "solo-token-budget"),
+        max_tokens=5,
+        provider_path="ignored.md",
+    )
+
+    assert summary["mode"] == "solo"
+    assert summary["stopped_reason"] == "budget_exhausted"
+    assert summary["calls"] == 1
+    assert summary["prompt_tokens"] + summary["completion_tokens"] == 15
+    assert summary["budget"]["max_tokens"] == 5
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_calls": 0},
+        {"max_tokens": 0},
+        {"max_seconds": 0},
+        {"max_seconds": float("nan")},
+        {"max_seconds": float("inf")},
+    ],
+)
+def test_llm_rejects_invalid_budget(kwargs):
+    with pytest.raises(ValueError):
+        LlmClient(object(), "test-model", **kwargs)
+
+
+def test_missing_provider_usage_fails_token_budget_loudly(tmp_path, monkeypatch):
+    _patch_multi_provider(
+        monkeypatch,
+        [
+            _response_without_usage(
+                [
+                    _tool_call(
+                        "u",
+                        "submit_understanding",
+                        {
+                            "summary": "s",
+                            "requirements": "r",
+                            "constraints": "c",
+                            "done_criteria": "d",
+                        },
+                    )
+                ]
+            )
+        ],
+    )
+    run_dir = tmp_path / "missing-usage"
+
+    summary = run_multi_cli(
+        "task",
+        str(run_dir),
+        max_tokens=100,
+        provider_path="ignored.md",
+    )
+
+    assert summary["outcome"] == "escalated"
+    assert summary["stopped_reason"] == "budget_accounting_error"
+    assert summary["calls"] == 1
+    events = _read_jsonl(run_dir / "events.jsonl")
+    assert sum(event["type"] == "llm_call" for event in events) == 1

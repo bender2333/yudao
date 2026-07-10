@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from .llm import BudgetExhausted, LlmClient
+from .llm import BudgetAccountingError, BudgetExhausted, LlmClient
 from .tools import dispatch
 
 _TRUNC = 2000
@@ -29,7 +29,7 @@ def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
     if extra_handlers and name in extra_handlers:
         try:
             return extra_handlers[name](**args)
-        except BudgetExhausted:
+        except (BudgetAccountingError, BudgetExhausted):
             raise
         except Exception as e:  # a consult must never crash the caller's loop
             return f"Error: {type(e).__name__}: {e}"
@@ -57,7 +57,7 @@ def _serialize_tool_calls(tool_calls: list) -> list:
 class LoopResult:
     final_text: str
     steps: int
-    stopped_reason: str  # "natural" | "max_steps" | "terminal"
+    stopped_reason: str
     tool_invocations: int
     terminal_call: dict | None = None  # args of the terminal tool that stopped the loop
     events: list = field(default_factory=list)
@@ -94,8 +94,11 @@ def activate(
     terminal_tools: set | None = None,
     on_stop=None,
     extra_handlers: dict | None = None,
+    keep_history: bool = True,
 ) -> LoopResult:
     """追加本轮交接，并在同一角色历史上续跑。"""
+    if not keep_history:
+        session.messages[:] = [{"role": "system", "content": session.system}]
     session.activates += 1
     return run_agent_loop(
         llm=llm,
@@ -158,8 +161,12 @@ def run_agent_loop(
 
         try:
             result = llm.chat(messages, tools, accounting_role=accounting_role)
-        except BudgetExhausted:
-            stopped_reason = "budget_exhausted"
+        except (BudgetAccountingError, BudgetExhausted) as exc:
+            stopped_reason = (
+                "budget_accounting_error"
+                if isinstance(exc, BudgetAccountingError)
+                else "budget_exhausted"
+            )
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
         steps += 1
@@ -174,6 +181,7 @@ def run_agent_loop(
                 "completion_tokens": result.completion_tokens,
                 "reasoning_tokens": result.reasoning_tokens,
                 "duration_ms": result.duration_ms,
+                "stopped_reason": result.stopped_reason,
             }
         )
 
@@ -185,6 +193,19 @@ def run_agent_loop(
         if result.tool_calls:
             assistant_msg["tool_calls"] = _serialize_tool_calls(result.tool_calls)
         messages.append(assistant_msg)
+
+        if result.stopped_reason is not None:
+            final_text = result.text
+            stopped_reason = result.stopped_reason
+            emit(
+                {
+                    "type": "stop",
+                    "reason": stopped_reason,
+                    "detail": result.stop_detail,
+                    "step": steps,
+                }
+            )
+            break
 
         # Stop condition: no tool_calls (only signal we trust for thinking models).
         if not result.tool_calls:
@@ -198,14 +219,18 @@ def run_agent_loop(
                     hooked = on_stop(final_text, messages)
                     if hooked is not None:
                         terminal_call = hooked
-                except BudgetExhausted:
-                    stopped_reason = "budget_exhausted"
+                except (BudgetAccountingError, BudgetExhausted) as exc:
+                    stopped_reason = (
+                        "budget_accounting_error"
+                        if isinstance(exc, BudgetAccountingError)
+                        else "budget_exhausted"
+                    )
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
 
         # Execute every tool_call; feed each result back.
         stop_after = False
-        budget_exhausted = False
+        forced_stop_reason = None
         for tc in result.tool_calls:
             name = tc.function.name
             raw_args = tc.function.arguments
@@ -218,13 +243,31 @@ def run_agent_loop(
             if name not in allowed_tools:
                 output = f"Error: tool not available in this stage: {name}"
             else:
-                try:
-                    output = _dispatch_with_extras(
-                        name, args, handlers_ctx, extra_handlers
-                    )
-                except BudgetExhausted:
-                    output = "Error: run budget exhausted"
-                    budget_exhausted = True
+                check_budget = getattr(llm, "check_budget", None)
+                if check_budget is not None:
+                    try:
+                        check_budget()
+                    except BudgetExhausted:
+                        output = "Error: run budget exhausted"
+                        forced_stop_reason = "budget_exhausted"
+                if forced_stop_reason is None:
+                    try:
+                        output = _dispatch_with_extras(
+                            name, args, handlers_ctx, extra_handlers
+                        )
+                    except BudgetExhausted:
+                        output = "Error: run budget exhausted"
+                        forced_stop_reason = "budget_exhausted"
+                    except BudgetAccountingError:
+                        output = "Error: token usage unavailable"
+                        forced_stop_reason = "budget_accounting_error"
+            if forced_stop_reason is None:
+                check_budget = getattr(llm, "check_budget", None)
+                if check_budget is not None:
+                    try:
+                        check_budget()
+                    except BudgetExhausted:
+                        forced_stop_reason = "budget_exhausted"
             tool_invocations += 1
             emit(
                 {
@@ -242,7 +285,7 @@ def run_agent_loop(
                     "content": output,
                 }
             )
-            if budget_exhausted:
+            if forced_stop_reason is not None:
                 break
             # Terminal tool: stop only if the handler accepted it (no Error回执).
             if (
@@ -254,8 +297,8 @@ def run_agent_loop(
                 final_text = result.text or ""
                 stop_after = True
 
-        if budget_exhausted:
-            stopped_reason = "budget_exhausted"
+        if forced_stop_reason is not None:
+            stopped_reason = forced_stop_reason
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
         if stop_after:
