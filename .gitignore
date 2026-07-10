@@ -3,6 +3,7 @@ provider.md
 
 # --- run artifacts ---
 runs/
+docs/journal/codex/*.log
 
 # --- node / build ---
 node_modules/
