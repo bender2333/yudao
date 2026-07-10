@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from harness.agent_loop import run_agent_loop
 from harness.llm import CallResult
-from harness.tools import TOOL_DEFS
+from harness.tools import TOOL_DEFS, tool_defs_without_writes
 
 
 # ── mock tool_call objects (shape mirrors the OpenAI SDK) ──
@@ -107,6 +107,38 @@ def test_multiple_tool_calls_one_turn(tmp_path):
     assert result.tool_invocations == 2
     assert os.path.exists(os.path.join(ws, "a.txt"))
     assert os.path.exists(os.path.join(ws, "b.txt"))
+
+
+def test_loop_rejects_tool_not_advertised_for_stage(tmp_path):
+    ws = str(tmp_path)
+    script = [
+        _cr(
+            tool_calls=[_tc("c1", "write_file", {"path": "forbidden.txt", "content": "x"})],
+            finish="tool_calls",
+        ),
+        _cr(text="stopped", finish="stop"),
+    ]
+
+    result = run_agent_loop(
+        MockLlmClient(script),
+        "sys",
+        "inspect only",
+        tool_defs_without_writes(),
+        ws,
+    )
+
+    assert not os.path.exists(os.path.join(ws, "forbidden.txt"))
+    assert result.events[1]["output"].startswith("Error: tool not available")
+
+
+def test_loop_costs_are_deltas_for_shared_client(tmp_path):
+    llm = MockLlmClient([_cr(text="first"), _cr(text="second")])
+
+    first = run_agent_loop(llm, "sys", "one", TOOL_DEFS, str(tmp_path))
+    second = run_agent_loop(llm, "sys", "two", TOOL_DEFS, str(tmp_path))
+
+    assert first.calls == second.calls == 1
+    assert first.prompt_tokens == second.prompt_tokens == 10
 
 
 def test_max_steps_forces_stop(tmp_path):

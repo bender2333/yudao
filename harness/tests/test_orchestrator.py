@@ -149,6 +149,9 @@ def test_pass_on_first_round(tmp_path):
     assert result.rounds == 1
     assert result.verdict["status"] == "pass"
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
+    assert result.calls == 3
+    assert result.prompt_tokens == 30
+    assert [s.loop.calls for s in result.stages] == [1, 1, 1]
 
 
 def test_reject_execution_reruns_plan(tmp_path):
@@ -274,6 +277,8 @@ def test_understand_natural_stop_extracts_structured(tmp_path):
     assert "## Summary" in (result.understanding or "")
     assert "## Done-criteria" in (result.understanding or "")
     assert [s.stage for s in result.stages] == ["UNDERSTAND", "PLAN_EXECUTE", "VERIFY"]
+    assert result.calls == 4
+    assert [s.loop.calls for s in result.stages] == [2, 1, 1]
 
 
 def test_understand_natural_stop_empty_escalates(tmp_path):
@@ -389,6 +394,8 @@ def test_verify_can_consult_understanding(tmp_path):
     assert result.outcome == "done"
     assert result.consults == 1
     assert result.verdict["status"] == "pass"
+    assert result.calls == 5
+    assert [s.loop.calls for s in result.stages] == [1, 1, 3]
     # Promotion: clarification is part of the shared understanding artifact.
     assert "## Clarification" in (result.understanding or "")
     assert "trailing newline" in (result.understanding or "")

@@ -33,6 +33,16 @@ def test_write_creates_nested_dirs(tmp_path):
     assert dispatch("read_file", {"path": "d1/d2/x.txt"}, ws) == "nested"
 
 
+def test_write_rejects_invalid_content_without_truncating(tmp_path):
+    ws = str(tmp_path)
+    dispatch("write_file", {"path": "keep.txt", "content": "KEEP"}, ws)
+
+    out = dispatch("write_file", {"path": "keep.txt", "content": None}, ws)
+
+    assert out.startswith("Error:")
+    assert dispatch("read_file", {"path": "keep.txt"}, ws) == "KEEP"
+
+
 def test_edit_hit(tmp_path):
     ws = str(tmp_path)
     dispatch("write_file", {"path": "b.txt", "content": "foo bar foo"}, ws)
@@ -65,6 +75,17 @@ def test_bash_runs_in_workspace(tmp_path):
     dispatch("write_file", {"path": "marker.txt", "content": "hi"}, ws)
     out = dispatch("bash", {"command": "python -c \"import os;print(os.path.exists('marker.txt'))\""}, ws)
     assert "True" in out
+
+
+def test_bash_reports_nonzero_exit_code(tmp_path):
+    out = dispatch("bash", {"command": "python -c \"raise SystemExit(7)\""}, str(tmp_path))
+    assert "Exit code: 7" in out
+
+
+def test_bash_replaces_undecodable_output(tmp_path):
+    command = "python -c \"import sys;sys.stdout.buffer.write(bytes([255]))\""
+    out = dispatch("bash", {"command": command}, str(tmp_path))
+    assert "Exit code: 0" in out
 
 
 def test_list_dir(tmp_path):

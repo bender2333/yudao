@@ -8,6 +8,7 @@ Emits an event per step. Events never contain the API key.
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 
 from .llm import LlmClient
@@ -77,6 +78,12 @@ def run_agent_loop(
     on_stop=None,
     extra_handlers: dict | None = None,
 ) -> LoopResult:
+    allowed_tools = {tool["function"]["name"] for tool in tools}
+    started = time.monotonic()
+    calls_before = llm.calls_made
+    prompt_tokens_before = llm.prompt_tokens_total
+    completion_tokens_before = llm.completion_tokens_total
+    reasoning_tokens_before = llm.reasoning_tokens_total
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -150,7 +157,10 @@ def run_agent_loop(
                     args = {}
             except json.JSONDecodeError:
                 args = {}
-            output = _dispatch_with_extras(name, args, handlers_ctx, extra_handlers)
+            if name not in allowed_tools:
+                output = f"Error: tool not available in this stage: {name}"
+            else:
+                output = _dispatch_with_extras(name, args, handlers_ctx, extra_handlers)
             tool_invocations += 1
             emit(
                 {
@@ -190,11 +200,9 @@ def run_agent_loop(
         tool_invocations=tool_invocations,
         terminal_call=terminal_call,
         events=events,
-        calls=llm.calls_made,
-        prompt_tokens=llm.prompt_tokens_total,
-        completion_tokens=llm.completion_tokens_total,
-        reasoning_tokens=llm.reasoning_tokens_total,
-        duration_ms=sum(
-            e.get("duration_ms", 0) for e in events if e.get("type") == "llm_call"
-        ),
+        calls=llm.calls_made - calls_before,
+        prompt_tokens=llm.prompt_tokens_total - prompt_tokens_before,
+        completion_tokens=llm.completion_tokens_total - completion_tokens_before,
+        reasoning_tokens=llm.reasoning_tokens_total - reasoning_tokens_before,
+        duration_ms=int((time.monotonic() - started) * 1000),
     )

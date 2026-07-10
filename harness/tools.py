@@ -49,6 +49,8 @@ def read_file(workspace_dir: str, path: str, limit: int | None = None) -> str:
 
 
 def write_file(workspace_dir: str, path: str, content: str) -> str:
+    if not isinstance(content, str):
+        return "Error: content must be a string"
     try:
         p = safe_path(workspace_dir, path)
         os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
@@ -91,12 +93,13 @@ def bash(workspace_dir: str, command: str) -> str:
             cwd=workspace_dir,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=_BASH_TIMEOUT,
         )
         out = (r.stdout + r.stderr).strip()
         if not out:
-            return "(no output)"
-        return out[:_MAX_OUTPUT]
+            out = "(no output)"
+        return f"Exit code: {r.returncode}\n{out}"[:_MAX_OUTPUT]
     except subprocess.TimeoutExpired:
         return f"Error: Timeout ({_BASH_TIMEOUT}s)"
     except (FileNotFoundError, OSError) as e:
