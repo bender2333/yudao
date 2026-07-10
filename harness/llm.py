@@ -41,8 +41,15 @@ class LlmClient:
     prompt_tokens_total: int = field(default=0, init=False)
     completion_tokens_total: int = field(default=0, init=False)
     reasoning_tokens_total: int = field(default=0, init=False)
+    usage_by_role: dict = field(default_factory=dict, init=False)
 
-    def chat(self, messages: list, tools: list, max_completion_tokens: int = 8000) -> CallResult:
+    def chat(
+        self,
+        messages: list,
+        tools: list,
+        max_completion_tokens: int = 8000,
+        accounting_role: str | None = None,
+    ) -> CallResult:
         if self.max_calls is not None and self.calls_made >= self.max_calls:
             raise BudgetExhausted(f"max_calls={self.max_calls} exceeded")
 
@@ -72,6 +79,22 @@ class LlmClient:
         self.prompt_tokens_total += prompt_tokens
         self.completion_tokens_total += completion_tokens
         self.reasoning_tokens_total += reasoning_tokens
+        if accounting_role is not None:
+            usage = self.usage_by_role.setdefault(
+                accounting_role,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "llm_duration_ms": 0,
+                },
+            )
+            usage["calls"] += 1
+            usage["prompt_tokens"] += prompt_tokens
+            usage["completion_tokens"] += completion_tokens
+            usage["reasoning_tokens"] += reasoning_tokens
+            usage["llm_duration_ms"] += duration_ms
 
         return CallResult(
             text=text,

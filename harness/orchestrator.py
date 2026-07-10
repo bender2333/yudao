@@ -25,7 +25,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from .agent_loop import AgentSession, activate, run_agent_loop
+from .agent_loop import AgentSession, activate
+from .llm import BudgetExhausted
 from .stage_tools import (
     CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
@@ -51,6 +52,8 @@ UNDERSTAND_SYSTEM = (
     "requirements, constraints, and observable done-criteria (concrete checks a verifier "
     "can run). Prefer the terminal tool over free text; free-text stop is only a fallback "
     "and will be re-structured automatically."
+    " When activated by a ConsultRequest, answer the question directly in final text "
+    "without calling submit_understanding."
 )
 
 PLAN_SYSTEM = (
@@ -99,8 +102,12 @@ class MultiResult:
     understanding: str | None = None
     verdict: dict | None = None
     consults: int = 0
+    consult_errors: int = 0
+    stopped_reason: str | None = None
     session_model: str = "persistent_roles_v1"
     sessions: dict[str, AgentSession] = field(default_factory=dict)
+    per_role: dict = field(default_factory=dict)
+    activates: int = 0
     # aggregated cost across all stages
     calls: int = 0
     prompt_tokens: int = 0
@@ -270,13 +277,19 @@ def _make_understand_hook(llm):
                 {"role": "system", "content": _UNDERSTAND_EXTRACT_SYSTEM},
                 {"role": "user", "content": f"Free-text understanding:\n\n{text}"},
             ]
-            cr = llm.chat(msgs, STAGE_TOOL_DEFS["UNDERSTAND"])
+            cr = llm.chat(
+                msgs,
+                STAGE_TOOL_DEFS["UNDERSTAND"],
+                accounting_role="UNDERSTAND",
+            )
             for tc in cr.tool_calls or []:
                 if tc.function.name != UNDERSTAND_TERMINAL:
                     continue
                 args = json.loads(tc.function.arguments or "{}")
                 if all((args.get(k) or "").strip() for k in _REQUIRED_U_FIELDS):
                     return {"name": UNDERSTAND_TERMINAL, "args": args}
+        except BudgetExhausted:
+            raise
         except Exception:
             pass
         return None
@@ -330,7 +343,11 @@ def _make_verify_hook(llm):
                 {"role": "system", "content": _VERIFY_ROUTER_SYSTEM},
                 {"role": "user", "content": f"Verification conclusion:\n\n{text}"},
             ]
-            cr = llm.chat(router_msgs, STAGE_TOOL_DEFS["VERIFY"])
+            cr = llm.chat(
+                router_msgs,
+                STAGE_TOOL_DEFS["VERIFY"],
+                accounting_role="VERIFY",
+            )
             for tc in cr.tool_calls or []:
                 if tc.function.name == VERIFY_TERMINAL:
                     args = json.loads(tc.function.arguments or "{}")
@@ -344,6 +361,8 @@ def _make_verify_hook(llm):
                         and args["reason"].strip()
                     ):
                         return {"name": "submit_verdict", "args": args}
+        except BudgetExhausted:
+            raise
         except Exception:
             pass
         return default
@@ -351,44 +370,59 @@ def _make_verify_hook(llm):
 
 
 def _make_consult_handler(
-    llm, workspace, task, get_understanding, set_understanding, on_event, counter
+    llm,
+    session,
+    workspace,
+    task,
+    get_understanding,
+    set_understanding,
+    on_event,
+    counter,
 ):
-    """consult_understanding: read-only sub-loop; answer is promoted into the
-    shared understanding artifact so later stages (esp. VERIFY) see it."""
+    """激活常驻 UNDERSTAND，并将成功答复晋升到 canonical understanding。"""
+    def fail(reason: str) -> str:
+        counter["consult_errors"] += 1
+        if on_event is not None:
+            on_event({"type": "consult_error", "reason": _clip(reason)})
+        return f"Error: {reason}"
+
     def handler(question: str = "") -> str:
         q = (question or "").strip()
         if not q:
-            return "Error: question is required"
-        counter["consults"] += 1
+            return fail("question is required")
         if on_event is not None:
             on_event({"type": "consult", "question": _clip(q)})
-        system = (
-            "You are the UNDERSTANDING stage being consulted mid-task. Answer the "
-            "specific question concretely and decisively, grounded in the original "
-            "task and the established understanding. If the task is silent, make the "
-            "most reasonable decision and state it plainly. You may inspect the "
-            "workspace with read/list/bash only — do not write or edit files. "
-            "Give a direct answer, not a restatement."
-        )
         user = (
+            "# Handoff: ConsultRequest\n"
             f"# Original task\n{task}\n\n"
-            f"# Established understanding\n{get_understanding() or '(none yet)'}\n\n"
-            f"# Question from a downstream stage\n{q}\n"
+            "# Understanding (canonical)\n"
+            f"{get_understanding() or '(none yet)'}\n\n"
+            f"# Question from a downstream role\n{q}\n\n"
+            "Answer this clarification directly in final text. Do not call "
+            "submit_understanding in this activation."
         )
-        sub = run_agent_loop(
-            llm=llm,
-            system=system,
-            user=user,
-            tools=_INVESTIGATE_TOOLS,
-            handlers_ctx=workspace.dir,
-            max_steps=8,
-            on_event=on_event,
-        )
+        try:
+            sub = activate(
+                session,
+                user,
+                llm=llm,
+                handlers_ctx=workspace.dir,
+                max_steps=8,
+                on_event=on_event,
+            )
+        except BudgetExhausted:
+            fail("consult exhausted the run budget")
+            raise
+        except Exception as exc:
+            return fail(f"consult failed ({type(exc).__name__}: {exc})")
+        if sub.stopped_reason == "budget_exhausted":
+            fail("consult exhausted the run budget")
+            raise BudgetExhausted("consult exhausted the run budget")
         if sub.stopped_reason != "natural":
-            return f"Error: consult did not complete ({sub.stopped_reason})"
+            return fail(f"consult did not complete ({sub.stopped_reason})")
         answer = (sub.final_text or "").strip()
         if not answer:
-            return "Error: consult returned no answer"
+            return fail("consult returned no answer")
         # Promote into shared understanding so VERIFY/PLAN see the clarification.
         base = get_understanding() or ""
         promoted = (
@@ -398,6 +432,7 @@ def _make_consult_handler(
             f"**A:** {answer}\n"
         )
         set_understanding(promoted)
+        counter["consults"] += 1
         if on_event is not None:
             on_event(
                 {
@@ -422,6 +457,7 @@ def run_multi(
     max_steps: int = 40,
     on_event=None,
 ) -> MultiResult:
+    """运行一次 multi；llm 是本 run 三角色共享且独占的预算 client。"""
     result = MultiResult(outcome="escalated", rounds=0)
     state = "UNDERSTAND"
     round_no = 0
@@ -439,19 +475,7 @@ def run_multi(
         understanding = text
         result.understanding = text
 
-    # Cross-stage consult: PLAN_EXECUTE / VERIFY may call freely; answers promote.
-    counter = {"consults": 0}
-    consult = _make_consult_handler(
-        llm,
-        workspace,
-        task,
-        _get_understanding,
-        _set_understanding,
-        on_event,
-        counter,
-    )
     consult_defs = [_CONSULT_DEF]
-    consult_handlers = {CONSULT_UNDERSTANDING: consult}
     sessions = {
         "UNDERSTAND": AgentSession(
             "UNDERSTAND",
@@ -472,6 +496,34 @@ def run_multi(
         ),
     }
     result.sessions = sessions
+    usage_fields = (
+        "calls",
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+        "llm_duration_ms",
+    )
+    usage_before = {
+        role: {
+            field: llm.usage_by_role.get(role, {}).get(field, 0)
+            for field in usage_fields
+        }
+        for role in sessions
+    }
+
+    # PLAN_EXECUTE / VERIFY 的 consult 始终激活同一个 UNDERSTAND 会话。
+    counter = {"consults": 0, "consult_errors": 0}
+    consult = _make_consult_handler(
+        llm,
+        sessions["UNDERSTAND"],
+        workspace,
+        task,
+        _get_understanding,
+        _set_understanding,
+        on_event,
+        counter,
+    )
+    consult_handlers = {CONSULT_UNDERSTANDING: consult}
 
     # Soft-convergence: past this many reject rounds, nudge rather than hard-cut only.
     soft_at = max(1, max_rounds - 1)
@@ -494,7 +546,7 @@ def run_multi(
                 _nudge(reject_reason),
                 understanding,
             )
-            _, tc = _run_stage(
+            loop, tc = _run_stage(
                 llm,
                 sessions["UNDERSTAND"],
                 user,
@@ -507,6 +559,11 @@ def run_multi(
             )
             if tc is None:  # max_steps / empty / extract failed
                 result.outcome = "escalated"
+                result.stopped_reason = (
+                    loop.stopped_reason
+                    if loop.stopped_reason in {"max_steps", "budget_exhausted"}
+                    else "understand_incomplete"
+                )
                 break
             _set_understanding(_understanding_from(tc))
             reject_reason = None
@@ -515,7 +572,7 @@ def run_multi(
         elif state == "PLAN_EXECUTE":
             user = _plan_user(understanding, workspace, _nudge(reject_reason))
             before = workspace.snapshot_fingerprints()
-            _, tc = _run_stage(
+            loop, tc = _run_stage(
                 llm,
                 sessions["PLAN_EXECUTE"],
                 user,
@@ -530,6 +587,12 @@ def run_multi(
             # PLAN 本轮必须创建或修改至少一个非空交付文件。
             if tc is None or not _has_changed_deliverable(workspace, before):
                 result.outcome = "escalated"
+                if loop.stopped_reason in {"max_steps", "budget_exhausted"}:
+                    result.stopped_reason = loop.stopped_reason
+                elif tc is None:
+                    result.stopped_reason = "plan_incomplete"
+                else:
+                    result.stopped_reason = "plan_no_changed_deliverable"
                 break
             reject_reason = None
             state = "VERIFY"
@@ -537,7 +600,7 @@ def run_multi(
         elif state == "VERIFY":
             # Always pass the latest understanding (includes any consult promotions).
             user = _verify_user(understanding or "", workspace)
-            _, tc = _run_stage(
+            loop, tc = _run_stage(
                 llm,
                 sessions["VERIFY"],
                 user,
@@ -551,6 +614,11 @@ def run_multi(
             )
             if tc is None:
                 result.outcome = "escalated"
+                result.stopped_reason = (
+                    loop.stopped_reason
+                    if loop.stopped_reason in {"max_steps", "budget_exhausted"}
+                    else "verify_incomplete"
+                )
                 break
             status = tc["args"]["status"]
             verdict = {"status": status, "reason": tc["args"].get("reason", "")}
@@ -559,6 +627,7 @@ def run_multi(
 
             if status == "pass":
                 result.outcome = "done"
+                result.stopped_reason = "completed"
                 break
             round_no += 1
             reject_reason = verdict["reason"]
@@ -570,8 +639,22 @@ def run_multi(
     else:
         # ran out of rounds without a pass verdict
         result.outcome = "escalated"
+        result.stopped_reason = "max_rounds"
 
     result.consults = counter["consults"]
+    result.consult_errors = counter["consult_errors"]
+    result.activates = sum(session.activates for session in sessions.values())
+    result.per_role = {}
+    for role, session in sessions.items():
+        current = llm.usage_by_role.get(role, {})
+        result.per_role[role] = {
+            "activates": session.activates,
+            **{
+                field: current.get(field, 0) - usage_before[role][field]
+                for field in usage_fields
+            },
+            "messages": len(session.messages),
+        }
     return result
 
 

@@ -8,7 +8,7 @@ import json
 from dataclasses import dataclass
 
 from harness.agent_loop import run_agent_loop
-from harness.llm import CallResult
+from harness.llm import BudgetExhausted, CallResult
 from harness.orchestrator import (
     PLAN_SYSTEM,
     UNDERSTAND_SYSTEM,
@@ -62,8 +62,15 @@ class MockLlmClient:
         self.prompt_tokens_total = 0
         self.completion_tokens_total = 0
         self.reasoning_tokens_total = 0
+        self.usage_by_role = {}
 
-    def chat(self, messages, tools, max_completion_tokens=8000):
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
         self.message_snapshots.append(copy.deepcopy(messages))
         result = self._script[self._i]
         self._i += 1
@@ -71,7 +78,69 @@ class MockLlmClient:
         self.prompt_tokens_total += result.prompt_tokens
         self.completion_tokens_total += result.completion_tokens
         self.reasoning_tokens_total += result.reasoning_tokens
+        if accounting_role is not None:
+            usage = self.usage_by_role.setdefault(
+                accounting_role,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "llm_duration_ms": 0,
+                },
+            )
+            usage["calls"] += 1
+            usage["prompt_tokens"] += result.prompt_tokens
+            usage["completion_tokens"] += result.completion_tokens
+            usage["reasoning_tokens"] += result.reasoning_tokens
+            usage["llm_duration_ms"] += result.duration_ms
         return result
+
+
+class BudgetMockLlmClient(MockLlmClient):
+    def __init__(self, script, max_calls):
+        super().__init__(script)
+        self.max_calls = max_calls
+
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
+        if self.calls_made >= self.max_calls:
+            raise BudgetExhausted(f"max_calls={self.max_calls} exceeded")
+        return super().chat(
+            messages,
+            tools,
+            max_completion_tokens,
+            accounting_role,
+        )
+
+
+class ErrorOnCallMockLlmClient(MockLlmClient):
+    def __init__(self, script, error_on_attempt):
+        super().__init__(script)
+        self.error_on_attempt = error_on_attempt
+        self.attempts = 0
+
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
+        self.attempts += 1
+        if self.attempts == self.error_on_attempt:
+            raise RuntimeError("provider unavailable")
+        return super().chat(
+            messages,
+            tools,
+            max_completion_tokens,
+            accounting_role,
+        )
 
 
 def _role_calls(llm, system):
@@ -198,6 +267,7 @@ def test_reject_execution_reruns_plan(tmp_path):
     assert len(plan_calls[1]) > len(plan_calls[0])
     assert "submit_ready" in json.dumps(plan_calls[1])
     assert sum(message["role"] == "system" for message in plan_calls[1]) == 1
+    assert result.sessions["PLAN_EXECUTE"].activates == 2
 
 
 def test_reject_understanding_reruns_understand(tmp_path):
@@ -220,6 +290,7 @@ def test_reject_understanding_reruns_understand(tmp_path):
     assert len(understand_calls[1]) > len(understand_calls[0])
     assert "submit_understanding" in json.dumps(understand_calls[1])
     assert sum(message["role"] == "system" for message in understand_calls[1]) == 1
+    assert result.sessions["UNDERSTAND"].activates == 2
 
 
 def test_role_handoffs_do_not_share_private_transcripts(tmp_path):
@@ -271,6 +342,7 @@ def test_role_handoffs_do_not_share_private_transcripts(tmp_path):
     assert "PLAN_NOTES_PRIVATE_TRACE" not in first_verify
     assert "fix bug" in second_plan
     assert "VERIFY_PRIVATE_TRACE" not in second_plan
+    assert len({id(session.messages) for session in result.sessions.values()}) == 3
 
 
 def test_max_rounds_escalates(tmp_path):
@@ -520,12 +592,35 @@ def test_verify_can_consult_understanding(tmp_path):
         # ...back in VERIFY, now it submits a verdict.
         _verdict("pass", "resolved via consult"),
     ]
-    result = run_multi(MockLlmClient(script), ws, "task")
+    llm = MockLlmClient(script)
+    result = run_multi(llm, ws, "task")
     assert result.outcome == "done"
     assert result.consults == 1
+    assert result.consult_errors == 0
     assert result.verdict["status"] == "pass"
     assert result.calls == 5
     assert [s.loop.calls for s in result.stages] == [1, 1, 3]
+    understand_calls = _role_calls(llm, UNDERSTAND_SYSTEM)
+    assert len(understand_calls) == 2
+    assert len(understand_calls[1]) > len(understand_calls[0])
+    assert "submit_understanding" in json.dumps(understand_calls[1])
+    assert "does line count include" in json.dumps(understand_calls[1])
+    assert result.sessions["UNDERSTAND"].activates == 2
+    assert result.sessions["PLAN_EXECUTE"].activates == 1
+    assert result.sessions["VERIFY"].activates == 1
+    assert sum(session.activates for session in result.sessions.values()) == 4
+    assert result.per_role["UNDERSTAND"]["calls"] == 2
+    assert result.per_role["PLAN_EXECUTE"]["calls"] == 1
+    assert result.per_role["VERIFY"]["calls"] == 2
+    for metric in (
+        "calls",
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+    ):
+        assert getattr(result, metric) == sum(
+            role[metric] for role in result.per_role.values()
+        )
     # Promotion: clarification is part of the shared understanding artifact.
     assert "## Clarification" in (result.understanding or "")
     assert "trailing newline" in (result.understanding or "")
@@ -548,5 +643,90 @@ def test_failed_consult_does_not_pollute_understanding(tmp_path):
     result = run_multi(MockLlmClient(script), ws, "task")
 
     assert result.outcome == "done"
-    assert result.consults == 1
+    assert result.consults == 0
+    assert result.consult_errors == 1
+    assert result.sessions["UNDERSTAND"].activates == 2
     assert "## Clarification" not in (result.understanding or "")
+
+
+def test_consult_provider_error_is_counted(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    consult = _cr(
+        tool_calls=[_tc("cq", "consult_understanding", {"question": "clarify"})],
+        finish="tool_calls",
+    )
+    llm = ErrorOnCallMockLlmClient(
+        [_understand_ok(), _ready_ok(), consult, _verdict("pass")],
+        error_on_attempt=4,
+    )
+
+    result = run_multi(llm, ws, "task")
+
+    assert result.outcome == "done"
+    assert result.consults == 0
+    assert result.consult_errors == 1
+    assert "## Clarification" not in (result.understanding or "")
+
+
+def test_main_stage_budget_exhaustion_escalates(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    llm = BudgetMockLlmClient([_understand_ok(), _write_ok()], max_calls=2)
+
+    result = run_multi(llm, ws, "task")
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == 2
+    assert sum(role["calls"] for role in result.per_role.values()) == 2
+
+
+def test_consult_budget_exhaustion_escalates(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    consult = _cr(
+        tool_calls=[_tc("cq", "consult_understanding", {"question": "clarify"})],
+        finish="tool_calls",
+    )
+    llm = BudgetMockLlmClient(
+        [_understand_ok(), _ready_ok(), consult],
+        max_calls=3,
+    )
+
+    result = run_multi(llm, ws, "task")
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.consults == 0
+    assert result.consult_errors == 1
+    assert result.sessions["UNDERSTAND"].activates == 2
+    assert result.calls == 3
+    assert sum(role["calls"] for role in result.per_role.values()) == 3
+
+
+def test_understand_extract_budget_exhaustion_is_not_swallowed(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    llm = BudgetMockLlmClient([_text_stop("a concrete understanding")], max_calls=1)
+
+    result = run_multi(llm, ws, "task")
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == 1
+
+
+def test_verify_router_budget_exhaustion_is_not_default_reject(tmp_path):
+    ws = Workspace(str(tmp_path / "w"))
+    llm = BudgetMockLlmClient(
+        [
+            _understand_ok(),
+            _ready_ok(),
+            _text_stop("All criteria passed with evidence."),
+        ],
+        max_calls=3,
+    )
+
+    result = run_multi(llm, ws, "task", max_rounds=1)
+
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.verdict is None
+    assert result.calls == 3

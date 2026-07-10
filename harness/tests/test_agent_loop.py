@@ -38,8 +38,15 @@ class MockLlmClient:
         self.prompt_tokens_total = 0
         self.completion_tokens_total = 0
         self.reasoning_tokens_total = 0
+        self.usage_by_role = {}
 
-    def chat(self, messages, tools, max_completion_tokens=8000):
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
         self.message_snapshots.append(copy.deepcopy(messages))
         result = self._script[self._i]
         self._i += 1
@@ -47,6 +54,22 @@ class MockLlmClient:
         self.prompt_tokens_total += result.prompt_tokens
         self.completion_tokens_total += result.completion_tokens
         self.reasoning_tokens_total += result.reasoning_tokens
+        if accounting_role is not None:
+            usage = self.usage_by_role.setdefault(
+                accounting_role,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "llm_duration_ms": 0,
+                },
+            )
+            usage["calls"] += 1
+            usage["prompt_tokens"] += result.prompt_tokens
+            usage["completion_tokens"] += result.completion_tokens
+            usage["reasoning_tokens"] += result.reasoning_tokens
+            usage["llm_duration_ms"] += result.duration_ms
         return result
 
 
@@ -164,7 +187,7 @@ def test_activate_continues_messages_in_place(tmp_path):
     session = AgentSession("PLAN_EXECUTE", "sys", TOOL_DEFS)
     history = session.messages
 
-    activate(session, "turn-1", llm=llm, handlers_ctx=str(tmp_path))
+    first = activate(session, "turn-1", llm=llm, handlers_ctx=str(tmp_path))
     second = activate(session, "turn-2", llm=llm, handlers_ctx=str(tmp_path))
 
     assert session.messages is history
@@ -181,6 +204,8 @@ def test_activate_continues_messages_in_place(tmp_path):
     assert llm.message_snapshots[2][-1] == {"role": "user", "content": "turn-2"}
     assert sum(message["role"] == "system" for message in history) == 1
     assert second.final_text == "second done"
+    assert first.calls == 2 and second.calls == 1
+    assert first.prompt_tokens == 20 and second.prompt_tokens == 10
 
 
 def test_agent_sessions_keep_transcripts_isolated(tmp_path):
@@ -200,6 +225,7 @@ def test_agent_sessions_keep_transcripts_isolated(tmp_path):
     assert "PLAN_PRIVATE" not in verify_blob and "plan-turn" not in verify_blob
     assert plan.messages[0] == {"role": "system", "content": "plan-sys"}
     assert verify.messages[0] == {"role": "system", "content": "verify-sys"}
+    assert AgentSession.__dataclass_fields__["messages"].init is False
 
 
 def test_max_steps_forces_stop(tmp_path):

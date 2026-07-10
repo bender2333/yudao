@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from .llm import LlmClient
+from .llm import BudgetExhausted, LlmClient
 from .tools import dispatch
 
 _TRUNC = 2000
@@ -29,6 +29,8 @@ def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
     if extra_handlers and name in extra_handlers:
         try:
             return extra_handlers[name](**args)
+        except BudgetExhausted:
+            raise
         except Exception as e:  # a consult must never crash the caller's loop
             return f"Error: {type(e).__name__}: {e}"
     return dispatch(name, args, handlers_ctx)
@@ -68,12 +70,12 @@ class LoopResult:
 
 @dataclass
 class AgentSession:
-    """One role's private, run-scoped transcript."""
+    """单个角色在一次 run 内独占的会话历史。"""
 
     role: str
     system: str
     tools: list
-    messages: list[dict] = field(default_factory=list)
+    messages: list[dict] = field(default_factory=list, init=False)
     activates: int = 0
 
     def __post_init__(self) -> None:
@@ -93,7 +95,7 @@ def activate(
     on_stop=None,
     extra_handlers: dict | None = None,
 ) -> LoopResult:
-    """Append one handoff and continue the same role transcript."""
+    """追加本轮交接，并在同一角色历史上续跑。"""
     session.activates += 1
     return run_agent_loop(
         llm=llm,
@@ -106,6 +108,7 @@ def activate(
         terminal_tools=terminal_tools,
         on_stop=on_stop,
         extra_handlers=extra_handlers,
+        accounting_role=session.role,
         messages=session.messages,
     )
 
@@ -122,6 +125,7 @@ def run_agent_loop(
     on_stop=None,
     extra_handlers: dict | None = None,
     *,
+    accounting_role: str | None = None,
     messages: list[dict] | None = None,
 ) -> LoopResult:
     allowed_tools = {tool["function"]["name"] for tool in tools}
@@ -152,7 +156,12 @@ def run_agent_loop(
             emit({"type": "stop", "reason": "max_steps", "step": steps})
             break
 
-        result = llm.chat(messages, tools)
+        try:
+            result = llm.chat(messages, tools, accounting_role=accounting_role)
+        except BudgetExhausted:
+            stopped_reason = "budget_exhausted"
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            break
         steps += 1
         emit(
             {
@@ -181,18 +190,22 @@ def run_agent_loop(
         if not result.tool_calls:
             final_text = result.text
             stopped_reason = "natural"
-            emit({"type": "stop", "reason": "natural", "step": steps})
             # Stop hook: the stage ended naturally. The hook may inspect the
             # final text + transcript and return a routing/产出 dict, which we
             # surface as terminal_call so the orchestrator can consume it.
             if on_stop is not None:
-                hooked = on_stop(final_text, messages)
-                if hooked is not None:
-                    terminal_call = hooked
+                try:
+                    hooked = on_stop(final_text, messages)
+                    if hooked is not None:
+                        terminal_call = hooked
+                except BudgetExhausted:
+                    stopped_reason = "budget_exhausted"
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
 
         # Execute every tool_call; feed each result back.
         stop_after = False
+        budget_exhausted = False
         for tc in result.tool_calls:
             name = tc.function.name
             raw_args = tc.function.arguments
@@ -205,7 +218,13 @@ def run_agent_loop(
             if name not in allowed_tools:
                 output = f"Error: tool not available in this stage: {name}"
             else:
-                output = _dispatch_with_extras(name, args, handlers_ctx, extra_handlers)
+                try:
+                    output = _dispatch_with_extras(
+                        name, args, handlers_ctx, extra_handlers
+                    )
+                except BudgetExhausted:
+                    output = "Error: run budget exhausted"
+                    budget_exhausted = True
             tool_invocations += 1
             emit(
                 {
@@ -223,6 +242,8 @@ def run_agent_loop(
                     "content": output,
                 }
             )
+            if budget_exhausted:
+                break
             # Terminal tool: stop only if the handler accepted it (no Error回执).
             if (
                 terminal_tools
@@ -233,6 +254,10 @@ def run_agent_loop(
                 final_text = result.text or ""
                 stop_after = True
 
+        if budget_exhausted:
+            stopped_reason = "budget_exhausted"
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            break
         if stop_after:
             stopped_reason = "terminal"
             emit({"type": "stop", "reason": "terminal", "step": steps})
