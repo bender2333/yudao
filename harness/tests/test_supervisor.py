@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 
 import pytest
+import harness.supervisor as supervisor_module
+
 
 from harness.supervisor import SupervisorResult, main, supervise_command
 
@@ -94,26 +96,147 @@ def test_oversize_summary_is_invalid(tmp_path: Path) -> None:
     assert result.stop_reason == "summary_invalid"
 
 
-def test_timeout_kills_descendants_and_records_failure(tmp_path: Path) -> None:
+def test_infrastructure_failure_is_sanitized_and_preserves_logs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     run_dir = tmp_path / "run"
-    sentinel = tmp_path / "child-survived.txt"
-    child = (
-        "import time,pathlib,sys;time.sleep(1);"
-        "pathlib.Path(sys.argv[1]).write_text('bad',encoding='utf-8')"
-    )
-    parent = (
-        "import pathlib,subprocess,sys,time;pathlib.Path(sys.argv[1]).mkdir();"
-        "subprocess.Popen([sys.executable,'-c',sys.argv[3],sys.argv[2]]);time.sleep(60)"
+
+    def fail(*_args: object, **kwargs: object) -> object:
+        Path(kwargs["stdout_path"]).write_text("stdout evidence", encoding="utf-8")  # type: ignore[arg-type]
+        Path(kwargs["stderr_path"]).write_text("SECRET stderr", encoding="utf-8")  # type: ignore[arg-type]
+        raise FileNotFoundError("SECRET")
+
+    monkeypatch.setattr(supervisor_module, "run_process_tree", fail)
+    result = supervise_command(
+        [sys.executable, "-c", "pass"],
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env={},
     )
 
+    assert result == SupervisorResult(
+        None,
+        False,
+        "supervisor_error",
+        result.duration_ms,
+        {"error_type": "FileNotFoundError"},
+    )
+    record_text = (run_dir / "supervisor.json").read_text(encoding="utf-8")
+    assert "SECRET" not in record_text
+    assert json.loads(record_text) == {"schema_version": 1, **result.__dict__}
+    assert (run_dir / "supervisor.stdout.log").read_text(encoding="utf-8") == "stdout evidence"
+    assert (run_dir / "supervisor.stderr.log").read_text(encoding="utf-8") == "SECRET stderr"
+
+
+@pytest.mark.parametrize("leaf_kind", ["file", "symlink", "junction"])
+def test_invalid_child_run_leaf_is_quarantined_and_recorded(
+    tmp_path: Path, leaf_kind: str
+) -> None:
+    run_dir = tmp_path / "run"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if leaf_kind == "file":
+        child = "import pathlib,sys;pathlib.Path(sys.argv[1]).write_text('evidence',encoding='utf-8')"
+    elif leaf_kind == "symlink":
+        child = "import os,sys;os.symlink(sys.argv[2],sys.argv[1],target_is_directory=True)"
+    else:
+        child = (
+            "import subprocess,sys;subprocess.run(['cmd','/c','mklink','/J',sys.argv[1],sys.argv[2]],"
+            "check=True,stdout=subprocess.DEVNULL)"
+        )
+
     result = supervise_command(
-        [sys.executable, "-c", parent, str(run_dir), str(sentinel), child],
+        [sys.executable, "-c", child, str(run_dir), str(outside)],
         run_dir=run_dir,
-        timeout_seconds=0.2,
+        timeout_seconds=5,
         env=os.environ.copy(),
     )
 
-    time.sleep(1.2)
+    assert result.stop_reason == "supervisor_error"
+    assert result.summary == {"error_type": "InvalidRunDirectory"}
+    assert _read_record(run_dir)["stop_reason"] == "supervisor_error"
+    quarantine = list(tmp_path.glob(".run.invalid-*"))
+    assert len(quarantine) == 1
+    if leaf_kind == "file":
+        assert quarantine[0].read_text(encoding="utf-8") == "evidence"
+    else:
+        assert os.path.islink(quarantine[0]) or getattr(os.path, "isjunction")(quarantine[0])
+    assert not (outside / "supervisor.json").exists()
+
+
+def test_rejects_linked_run_dir_ancestor_before_launch(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    sentinel = tmp_path / "executed"
+    script = "import pathlib,sys;pathlib.Path(sys.argv[1]).write_text('bad',encoding='utf-8')"
+
+    with pytest.raises(ValueError, match="link"):
+        supervise_command(
+            [sys.executable, "-c", script, str(sentinel)],
+            run_dir=linked / "run",
+            timeout_seconds=5,
+            env=os.environ.copy(),
+        )
+
+    assert not sentinel.exists()
+    assert not (outside / "run").exists()
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        '{"nested":{"value":NaN}}',
+        '{"nested":[Infinity]}',
+        '{"nested":' + "[" * 2000 + "0" + "]" * 2000 + "}",
+    ],
+    ids=["nested-nan", "nested-infinity", "deep-list"],
+)
+def test_non_strict_or_deep_summary_is_invalid(tmp_path: Path, summary: str) -> None:
+    run_dir = tmp_path / "run"
+    result = supervise_command(
+        _command(run_dir, summary=summary),
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env=os.environ.copy(),
+    )
+
+    assert result.stop_reason == "summary_invalid"
+    json.loads(
+        (run_dir / "supervisor.json").read_text(encoding="utf-8"),
+        parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+    )
+
+
+def test_timeout_kills_ready_descendant_and_records_failure(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    ready = tmp_path / "child-ready.txt"
+    sentinel = tmp_path / "child-survived.txt"
+    child = (
+        "import os,pathlib,sys,time;"
+        "p=pathlib.Path(sys.argv[1]);t=p.with_suffix('.tmp');"
+        "t.write_text('ready',encoding='utf-8');os.replace(t,p);"
+        "time.sleep(3);pathlib.Path(sys.argv[2]).write_text('bad',encoding='utf-8')"
+    )
+    parent = (
+        "import pathlib,subprocess,sys,time;pathlib.Path(sys.argv[1]).mkdir();"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[4],sys.argv[2],sys.argv[3]]);"
+        "limit=time.monotonic()+5;"
+        "exec(\"while not pathlib.Path(sys.argv[2]).exists():\\n"
+        " if time.monotonic()>limit: raise SystemExit(9)\\n time.sleep(.01)\");"
+        "time.sleep(60)"
+    )
+
+    result = supervise_command(
+        [sys.executable, "-c", parent, str(run_dir), str(ready), str(sentinel), child],
+        run_dir=run_dir,
+        timeout_seconds=2,
+        env=os.environ.copy(),
+    )
+
+    assert ready.exists()
+    time.sleep(3.2)
     assert result.timed_out is True
     assert result.stop_reason == "hard_timeout"
     assert result.summary is None

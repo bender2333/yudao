@@ -14,9 +14,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .artifacts import write_json_atomic
+from .contracts import canonical_json
 from .local_tools import _safe_env
-from .process_control import ProcessResult, run_process_tree
-from .workspace import _is_link_or_junction
+from .process_control import run_process_tree
+from .workspace import _is_link_or_junction, _require_link_free_components
 
 _MAX_SUMMARY_BYTES = 16 * 1024 * 1024
 
@@ -46,6 +47,7 @@ def _validate(
         for key, value in env.items()
     ):
         raise ValueError("env must be an exact dict of strings without NUL")
+    _require_link_free_components(os.fspath(run_dir.parent), "run_dir parent")
     if os.path.lexists(run_dir):
         raise FileExistsError(run_dir)
     parent = run_dir.parent
@@ -54,30 +56,62 @@ def _validate(
     return list(argv), run_dir, float(timeout_seconds), dict(env)
 
 
+def _reject_constant(value: str) -> None:
+    raise ValueError(value)
+
+
 def _read_summary(path: Path) -> dict | None:
     try:
         if _is_link_or_junction(path) or not stat.S_ISREG(path.lstat().st_mode):
             return None
         if path.stat().st_size > _MAX_SUMMARY_BYTES:
             return None
-        value = json.loads(path.read_text(encoding="utf-8", errors="strict"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        value = json.loads(
+            path.read_text(encoding="utf-8", errors="strict"),
+            parse_constant=_reject_constant,
+        )
+        if type(value) is not dict:
+            return None
+        canonical_json(value)
+        return value
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError):
         return None
-    return value if type(value) is dict else None
 
 
-def _safe_run_dir(run_dir: Path) -> None:
+def _ensure_record_dir(run_dir: Path) -> bool:
     if not os.path.lexists(run_dir):
         run_dir.mkdir()
-    if _is_link_or_junction(run_dir) or not stat.S_ISDIR(run_dir.lstat().st_mode):
-        raise ValueError("child run_dir must be a real directory")
+        return True
+    if not _is_link_or_junction(run_dir) and stat.S_ISDIR(run_dir.lstat().st_mode):
+        return True
+    os.replace(run_dir, run_dir.with_name(f".{run_dir.name}.invalid-{uuid.uuid4().hex}"))
+    run_dir.mkdir()
+    return False
+
+
+def _move_log(source: Path, target: Path) -> None:
+    if not os.path.lexists(source):
+        return
+    try:
+        os.link(source, target)
+    finally:
+        try:
+            source.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _write_result(run_dir: Path, result: SupervisorResult) -> None:
-    write_json_atomic(
-        run_dir / "supervisor.json",
-        {"schema_version": 1, **asdict(result)},
-    )
+    value = {
+        "schema_version": 1,
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "stop_reason": result.stop_reason,
+        "duration_ms": result.duration_ms,
+        "summary": result.summary,
+    }
+    canonical_json(value)
+    write_json_atomic(run_dir / "supervisor.json", value)
 
 
 def supervise_command(
@@ -92,6 +126,7 @@ def supervise_command(
     stdout = target.parent / f".{target.name}-{token}.supervisor.stdout.log"
     stderr = target.parent / f".{target.name}-{token}.supervisor.stderr.log"
     started = time.monotonic()
+    preserve_logs = False
     try:
         try:
             process = run_process_tree(
@@ -102,23 +137,44 @@ def supervise_command(
                 stdout_path=stdout,
                 stderr_path=stderr,
             )
-        except Exception:
-            process = ProcessResult(None, False, max(0, int((time.monotonic() - started) * 1000)))
-        _safe_run_dir(target)
-        summary: dict | None = None
-        if process.timed_out:
-            reason = "hard_timeout"
-        elif process.returncode != 0:
-            reason = "process_failed"
-        elif not os.path.lexists(target / "summary.json"):
-            reason = "summary_missing"
+        except Exception as error:
+            preserve_logs = True
+            _ensure_record_dir(target)
+            result = SupervisorResult(
+                None,
+                False,
+                "supervisor_error",
+                max(0, int((time.monotonic() - started) * 1000)),
+                {"error_type": type(error).__name__},
+            )
         else:
-            summary = _read_summary(target / "summary.json")
-            reason = "completed" if summary is not None else "summary_invalid"
-        result = SupervisorResult(
-            process.returncode, process.timed_out, reason, process.duration_ms, summary
-        )
+            if not _ensure_record_dir(target):
+                preserve_logs = True
+                result = SupervisorResult(
+                    process.returncode,
+                    process.timed_out,
+                    "supervisor_error",
+                    process.duration_ms,
+                    {"error_type": "InvalidRunDirectory"},
+                )
+            else:
+                summary: dict | None = None
+                if process.timed_out:
+                    reason = "hard_timeout"
+                elif process.returncode != 0:
+                    reason = "process_failed"
+                elif not os.path.lexists(target / "summary.json"):
+                    reason = "summary_missing"
+                else:
+                    summary = _read_summary(target / "summary.json")
+                    reason = "completed" if summary is not None else "summary_invalid"
+                result = SupervisorResult(
+                    process.returncode, process.timed_out, reason, process.duration_ms, summary
+                )
         _write_result(target, result)
+        if preserve_logs:
+            _move_log(stdout, target / "supervisor.stdout.log")
+            _move_log(stderr, target / "supervisor.stderr.log")
         return result
     finally:
         for path in (stdout, stderr):
