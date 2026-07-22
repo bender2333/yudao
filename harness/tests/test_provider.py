@@ -3,9 +3,17 @@
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
+from openai import BadRequestError
 
-from harness.llm import LlmClient
+import harness.llm as llm_module
+from harness.llm import (
+    ContextOverflow,
+    LlmClient,
+    ProviderProtocolError,
+    ProviderUnavailable,
+)
 from harness.provider import load_provider
 from harness.run_multi import run_multi_cli
 from harness.run_solo import run_solo
@@ -49,9 +57,14 @@ def _response_without_usage(tool_calls):
 class _ScriptedCompletions:
     def __init__(self, responses):
         self.responses = list(responses)
+        self.calls = 0
 
     def create(self, **kwargs):
-        return self.responses.pop(0)
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 def _patch_multi_provider(monkeypatch, responses):
@@ -78,6 +91,14 @@ def _patch_solo_provider(monkeypatch, responses):
 
 def _read_jsonl(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def _bad_request(body):
+    response = httpx.Response(
+        400,
+        request=httpx.Request("POST", "https://provider.invalid/v1/chat/completions"),
+    )
+    return BadRequestError("bad request", response=response, body=body)
 
 
 def test_parses_bare_model_line(tmp_path):
@@ -414,3 +435,44 @@ def test_missing_provider_usage_fails_token_budget_loudly(tmp_path, monkeypatch)
     assert summary["calls"] == 1
     events = _read_jsonl(run_dir / "events.jsonl")
     assert sum(event["type"] == "llm_call" for event in events) == 1
+
+
+def test_transient_failures_are_wrapped_after_three_actual_retries(monkeypatch):
+    completions = _ScriptedCompletions([RuntimeError("offline")] * 4)
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    monkeypatch.setattr(llm_module, "_RETRYABLE", (RuntimeError,))
+    monkeypatch.setattr(llm_module.time, "sleep", lambda _: None)
+
+    with pytest.raises(ProviderUnavailable):
+        llm.chat([], [])
+
+    assert completions.calls == 4
+    assert llm.retry_attempts == 3
+
+
+def test_exact_context_length_code_maps_to_context_overflow():
+    completions = _ScriptedCompletions(
+        [_bad_request({"code": "context_length_exceeded", "message": "too long"})]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    with pytest.raises(ContextOverflow):
+        LlmClient(client, "test-model").chat([], [])
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"message": "thinking signature is invalid"},
+        {"message": "ordinary bad request"},
+        {"code": "unknown", "message": "context_length_exceeded"},
+    ],
+    ids=["thinking-signature", "ordinary-400", "unknown-code"],
+)
+def test_other_bad_requests_map_to_provider_protocol_error(body):
+    completions = _ScriptedCompletions([_bad_request(body)])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    with pytest.raises(ProviderProtocolError):
+        LlmClient(client, "test-model").chat([], [])

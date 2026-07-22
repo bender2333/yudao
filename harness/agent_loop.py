@@ -1,7 +1,7 @@
 """agent_loop — the core primitive.
 
-while: llm.chat -> record assistant turn -> if no tool_calls: stop(natural)
-       else: for each tool_call: dispatch -> append role:tool message
+while: llm.chat -> classify provider stop -> record assistant turn
+       -> dispatch tool calls or classify the terminal finish reason
 Emits an event per step. Events never contain the API key.
 """
 
@@ -11,7 +11,14 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from .llm import BudgetAccountingError, BudgetExhausted, LlmClient
+from .llm import (
+    BudgetAccountingError,
+    BudgetExhausted,
+    ContextOverflow,
+    LlmClient,
+    ProviderProtocolError,
+    ProviderUnavailable,
+)
 from .tools import dispatch
 
 _TRUNC = 2000
@@ -66,6 +73,7 @@ class LoopResult:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     duration_ms: int = 0
+    content_filter_retries: int = 0
 
 
 @dataclass
@@ -152,6 +160,8 @@ def run_agent_loop(
     final_text = ""
     stopped_reason = "max_steps"
     terminal_call = None
+    content_filter_retries = 0
+    content_filter_retry_available = True
 
     while True:
         if steps >= max_steps:
@@ -166,6 +176,23 @@ def run_agent_loop(
                 "budget_accounting_error"
                 if isinstance(exc, BudgetAccountingError)
                 else "budget_exhausted"
+            )
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            break
+        except (ProviderUnavailable, ProviderProtocolError, ContextOverflow) as exc:
+            if isinstance(exc, ProviderUnavailable):
+                stopped_reason = "provider_unavailable"
+            elif isinstance(exc, ContextOverflow):
+                stopped_reason = "context_overflow"
+            else:
+                stopped_reason = "provider_protocol_error"
+            emit(
+                {
+                    "type": "provider_error",
+                    "reason": stopped_reason,
+                    "error_type": type(exc).__name__,
+                    "step": steps,
+                }
             )
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
@@ -184,6 +211,38 @@ def run_agent_loop(
                 "stopped_reason": result.stopped_reason,
             }
         )
+
+        if (
+            result.stopped_reason is not None
+            and result.finish_reason == "content_filter"
+        ):
+            final_text = result.text
+            stopped_reason = result.stopped_reason
+            emit(
+                {
+                    "type": "stop",
+                    "reason": stopped_reason,
+                    "detail": result.stop_detail,
+                    "step": steps,
+                }
+            )
+            break
+
+        if result.finish_reason == "content_filter":
+            if content_filter_retry_available:
+                content_filter_retry_available = False
+                content_filter_retries += 1
+                emit(
+                    {
+                        "type": "provider_retry",
+                        "reason": "content_filter",
+                        "step": steps,
+                    }
+                )
+                continue
+            stopped_reason = "provider_blocked"
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            break
 
         # Record assistant turn (spec §2 re-feed protocol).
         assistant_msg = {
@@ -207,24 +266,26 @@ def run_agent_loop(
             )
             break
 
-        # Stop condition: no tool_calls (only signal we trust for thinking models).
         if not result.tool_calls:
             final_text = result.text
-            stopped_reason = "natural"
-            # Stop hook: the stage ended naturally. The hook may inspect the
-            # final text + transcript and return a routing/产出 dict, which we
-            # surface as terminal_call so the orchestrator can consume it.
-            if on_stop is not None:
-                try:
-                    hooked = on_stop(final_text, messages)
-                    if hooked is not None:
-                        terminal_call = hooked
-                except (BudgetAccountingError, BudgetExhausted) as exc:
-                    stopped_reason = (
-                        "budget_accounting_error"
-                        if isinstance(exc, BudgetAccountingError)
-                        else "budget_exhausted"
-                    )
+            if result.finish_reason in {"stop", ""}:
+                stopped_reason = "natural"
+                # The hook may turn a natural conclusion into a routed terminal call.
+                if on_stop is not None:
+                    try:
+                        hooked = on_stop(final_text, messages)
+                        if hooked is not None:
+                            terminal_call = hooked
+                    except (BudgetAccountingError, BudgetExhausted) as exc:
+                        stopped_reason = (
+                            "budget_accounting_error"
+                            if isinstance(exc, BudgetAccountingError)
+                            else "budget_exhausted"
+                        )
+            elif result.finish_reason == "length":
+                stopped_reason = "output_truncated"
+            else:
+                stopped_reason = "provider_protocol_error"
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
 
@@ -306,6 +367,8 @@ def run_agent_loop(
             emit({"type": "stop", "reason": "terminal", "step": steps})
             break
 
+        content_filter_retry_available = True
+
     return LoopResult(
         final_text=final_text,
         steps=steps,
@@ -313,6 +376,7 @@ def run_agent_loop(
         tool_invocations=tool_invocations,
         terminal_call=terminal_call,
         events=events,
+        content_filter_retries=content_filter_retries,
         calls=llm.calls_made - calls_before,
         prompt_tokens=llm.prompt_tokens_total - prompt_tokens_before,
         completion_tokens=llm.completion_tokens_total - completion_tokens_before,

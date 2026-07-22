@@ -5,8 +5,16 @@ import json
 import os
 from dataclasses import dataclass
 
+import pytest
+
 from harness.agent_loop import AgentSession, activate, run_agent_loop
-from harness.llm import BudgetExhausted, CallResult
+from harness.llm import (
+    BudgetExhausted,
+    CallResult,
+    ContextOverflow,
+    ProviderProtocolError,
+    ProviderUnavailable,
+)
 from harness.tools import TOOL_DEFS, tool_defs_without_writes
 
 
@@ -280,3 +288,144 @@ def test_events_carry_no_key(tmp_path):
     result = run_agent_loop(llm, "sys", "task", TOOL_DEFS, ws)
     blob = json.dumps(result.events)
     assert "sk-" not in blob
+
+
+def test_content_filter_retries_same_context_without_recording_empty_assistant(tmp_path):
+    llm = MockLlmClient(
+        [_cr(text="", finish="content_filter"), _cr(text="done", finish="stop")]
+    )
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm=llm,
+        system="system",
+        user="task",
+        tools=[],
+        handlers_ctx=str(tmp_path),
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "natural"
+    assert result.calls == 2
+    assert result.content_filter_retries == 1
+    assert llm.message_snapshots[0] == llm.message_snapshots[1]
+    assert [message["role"] for message in messages] == ["system", "user", "assistant"]
+    assert sum(event["type"] == "llm_call" for event in result.events) == 2
+    assert any(event["type"] == "provider_retry" for event in result.events)
+
+
+def test_repeated_content_filter_stops_before_tool_dispatch(tmp_path):
+    filtered_tool_call = [_tc("blocked", "write_file", {"path": "blocked", "content": "x"})]
+    llm = MockLlmClient(
+        [
+            _cr(tool_calls=filtered_tool_call, finish="content_filter"),
+            _cr(tool_calls=filtered_tool_call, finish="content_filter"),
+            _cr(text="unexpected third call", finish="stop"),
+        ]
+    )
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm=llm,
+        system="system",
+        user="task",
+        tools=TOOL_DEFS,
+        handlers_ctx=str(tmp_path),
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "provider_blocked"
+    assert result.calls == 2
+    assert result.content_filter_retries == 1
+    assert llm.message_snapshots[0] == llm.message_snapshots[1]
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert not any(event["type"] == "tool_call" for event in result.events)
+    assert all(event.get("reason") != "natural" for event in result.events)
+    assert not (tmp_path / "blocked").exists()
+
+
+def test_content_filter_retry_allowance_resets_for_new_context(tmp_path):
+    llm = MockLlmClient(
+        [
+            _cr(finish="content_filter"),
+            _cr(tool_calls=[_tc("list", "list_dir", {})], finish="tool_calls"),
+            _cr(finish="content_filter"),
+            _cr(text="done", finish="stop"),
+        ]
+    )
+
+    result = run_agent_loop(llm, "system", "task", TOOL_DEFS, str(tmp_path))
+
+    assert result.stopped_reason == "natural"
+    assert result.calls == 4
+    assert result.content_filter_retries == 2
+    assert llm.message_snapshots[0] == llm.message_snapshots[1]
+    assert llm.message_snapshots[2] == llm.message_snapshots[3]
+
+
+def test_budget_stop_precedes_content_filter_retry(tmp_path):
+    response = _cr(finish="content_filter")
+    response.stopped_reason = "budget_exhausted"
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        MockLlmClient([response]),
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.content_filter_retries == 0
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert not any(event["type"] == "provider_retry" for event in result.events)
+
+
+def test_length_finish_is_not_natural(tmp_path):
+    result = run_agent_loop(
+        MockLlmClient([_cr(text="partial", finish="length")]),
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+    )
+
+    assert result.stopped_reason == "output_truncated"
+
+
+def test_unknown_finish_without_tools_is_provider_protocol_error(tmp_path):
+    result = run_agent_loop(
+        MockLlmClient([_cr(text="partial", finish="unexpected")]),
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_typed_provider_failure_stops_loop(
+    tmp_path, exception_type, stopped_reason
+):
+    llm = MockLlmClient([])
+
+    def fail(*args, **kwargs):
+        raise exception_type("provider failed")
+
+    llm.chat = fail
+
+    result = run_agent_loop(llm, "system", "task", [], str(tmp_path))
+
+    assert result.stopped_reason == stopped_reason
+    assert [event["type"] for event in result.events] == ["provider_error", "stop"]

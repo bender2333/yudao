@@ -10,7 +10,13 @@ import math
 import time
 from dataclasses import dataclass, field
 
-from openai import APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    BadRequestError,
+    InternalServerError,
+    RateLimitError,
+)
 
 
 class BudgetExhausted(Exception):
@@ -19,6 +25,18 @@ class BudgetExhausted(Exception):
 
 class BudgetAccountingError(Exception):
     """配置了 token 预算，但 provider 未返回可计量的 usage。"""
+
+
+class ProviderUnavailable(Exception):
+    """Transient provider retries were exhausted."""
+
+
+class ProviderProtocolError(Exception):
+    """The provider rejected or malformed the request protocol."""
+
+
+class ContextOverflow(Exception):
+    """The provider explicitly reported context_length_exceeded."""
 
 
 # Transient errors worth retrying with backoff.
@@ -51,6 +69,7 @@ class LlmClient:
     completion_tokens_total: int = field(default=0, init=False)
     reasoning_tokens_total: int = field(default=0, init=False)
     usage_by_role: dict = field(default_factory=dict, init=False)
+    retry_attempts: int = field(default=0, init=False)
     _started_at: float = field(default_factory=time.monotonic, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -172,6 +191,8 @@ class LlmClient:
         last_exc = None
         for attempt in range(4):  # 1 try + up to 3 retries
             self.check_budget()
+            if attempt:
+                self.retry_attempts += 1
             try:
                 return self.client.chat.completions.create(
                     model=self.model,
@@ -180,6 +201,13 @@ class LlmClient:
                     tool_choice="auto",
                     max_completion_tokens=max_completion_tokens,
                 )
+            except BadRequestError as exc:
+                error_type = (
+                    ContextOverflow
+                    if exc.code == "context_length_exceeded"
+                    else ProviderProtocolError
+                )
+                raise error_type(f"{type(exc).__name__}: {exc}") from exc
             except _RETRYABLE as exc:
                 last_exc = exc
                 if attempt == 3:
@@ -191,5 +219,8 @@ class LlmClient:
                         self.check_budget()
                     delay = min(delay, remaining)
                 time.sleep(delay)
+
         self.check_budget()
-        raise last_exc
+        raise ProviderUnavailable(
+            f"{type(last_exc).__name__}: {last_exc}"
+        ) from last_exc
