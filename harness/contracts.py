@@ -29,6 +29,15 @@ class TicketValidationError(ValueError):
     pass
 
 
+def _ticket_boundary(operation, *args):
+    try:
+        return operation(*args)
+    except TicketValidationError:
+        raise
+    except (RecursionError, TypeError, ValueError) as exc:
+        raise TicketValidationError("ticket is not canonical JSON") from exc
+
+
 def _validate_json_value(value: object) -> None:
     if value is None or type(value) in (str, int, bool):
         return
@@ -83,7 +92,7 @@ def validate_payload(kind: str, payload: object) -> dict:
         for name, expected_type in fields.items():
             if not isinstance(payload.get(name), expected_type):
                 raise TicketValidationError(f"acceptance payload field {name} has invalid type")
-    return copy.deepcopy(payload)
+    return _ticket_boundary(copy.deepcopy, payload)
 
 
 def verify_ticket(ticket: object) -> None:
@@ -123,14 +132,11 @@ def verify_ticket(ticket: object) -> None:
         raise TicketValidationError("invalid parent_hash")
     if not isinstance(ticket["bindings"], dict):
         raise TicketValidationError("bindings must be a dict")
-    validate_payload(kind, ticket["payload"])
+    _ticket_boundary(validate_payload, kind, ticket["payload"])
     if not isinstance(ticket["content_hash"], str):
         raise TicketValidationError("invalid content_hash type")
     body = {key: value for key, value in ticket.items() if key != "content_hash"}
-    try:
-        expected_hash = content_hash(body)
-    except (TypeError, ValueError, RecursionError) as exc:
-        raise TicketValidationError("ticket is not canonical JSON") from exc
+    expected_hash = _ticket_boundary(content_hash, body)
     if ticket["content_hash"] != expected_hash:
         raise TicketValidationError("content_hash mismatch")
 
@@ -154,7 +160,7 @@ class TicketLedger:
         return copy.deepcopy(self._revisions)
 
     def issue(self, kind, issuer, payload, parent_hash, bindings=None) -> dict:
-        validated = validate_payload(kind, payload)
+        validated = _ticket_boundary(validate_payload, kind, payload)
         if ROLE_BY_KIND[kind] != issuer:
             raise TicketValidationError("issuer does not own ticket kind")
         if bindings is None:
@@ -178,13 +184,10 @@ class TicketLedger:
             "issuer": issuer,
             "revision": revision,
             "parent_hash": parent_hash,
-            "bindings": copy.deepcopy(bindings),
+            "bindings": _ticket_boundary(copy.deepcopy, bindings),
             "payload": validated,
         }
-        try:
-            ticket = {**body, "content_hash": content_hash(body)}
-        except (TypeError, ValueError, RecursionError) as exc:
-            raise TicketValidationError("ticket is not canonical JSON") from exc
+        ticket = {**body, "content_hash": _ticket_boundary(content_hash, body)}
         verify_ticket(ticket)
         self._revisions[kind] = revision
         self._tickets.append(copy.deepcopy(ticket))

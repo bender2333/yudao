@@ -298,3 +298,27 @@ def test_cyclic_values_are_normalized_to_ticket_validation_error(field):
     valid[field]["cyclic"] = cyclic
     with pytest.raises(TicketValidationError, match="canonical JSON"):
         verify_ticket(valid)
+
+
+@pytest.mark.parametrize("field", ["payload", "bindings"])
+def test_deep_acyclic_values_are_normalized_without_mutating_ledger(field):
+    deep = []
+    for _ in range(2000):
+        deep = [deep]
+    ledger = TicketLedger("task-1")
+    payload = _valid_acceptance()
+    bindings = {}
+    (payload if field == "payload" else bindings)["deep"] = deep
+
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        ledger.issue("acceptance", "requirements", payload, None, bindings)
+
+    assert ledger.tickets == []
+    assert ledger.revisions == {}
+
+    ticket = TicketLedger("task-1").issue(
+        "acceptance", "requirements", _valid_acceptance(), None
+    )
+    ticket[field]["deep"] = deep
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        verify_ticket(ticket)
