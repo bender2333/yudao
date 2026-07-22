@@ -217,6 +217,48 @@ def test_summary_with_more_than_100000_nodes_is_invalid(tmp_path: Path) -> None:
     assert result.stop_reason == "summary_invalid"
 
 
+def test_move_log_link_failure_keeps_source_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.log"
+    target = tmp_path / "target.log"
+    source.write_text("diagnostic evidence", encoding="utf-8")
+    monkeypatch.setattr(supervisor_module.os, "link", lambda *_args: (_ for _ in ()).throw(OSError("link failed")))
+
+    with pytest.raises(OSError, match="link failed"):
+        supervisor_module._move_log(source, target)
+
+    assert source.read_text(encoding="utf-8") == "diagnostic evidence"
+    assert not target.exists()
+
+
+def test_keyboard_interrupt_propagates_and_keeps_raw_logs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+
+    def interrupt(*_args: object, **kwargs: object) -> object:
+        Path(kwargs["stdout_path"]).write_text("stdout interrupt evidence", encoding="utf-8")  # type: ignore[arg-type]
+        Path(kwargs["stderr_path"]).write_text("stderr interrupt evidence", encoding="utf-8")  # type: ignore[arg-type]
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(supervisor_module, "run_process_tree", interrupt)
+
+    with pytest.raises(KeyboardInterrupt):
+        supervise_command(
+            [sys.executable, "-c", "pass"],
+            run_dir=run_dir,
+            timeout_seconds=5,
+            env={},
+        )
+
+    assert not run_dir.exists()
+    raw_stdout = list(tmp_path.glob(".run-*.supervisor.stdout.log"))
+    raw_stderr = list(tmp_path.glob(".run-*.supervisor.stderr.log"))
+    assert [path.read_text(encoding="utf-8") for path in raw_stdout] == ["stdout interrupt evidence"]
+    assert [path.read_text(encoding="utf-8") for path in raw_stderr] == ["stderr interrupt evidence"]
+
+
 def test_infrastructure_failure_is_sanitized_and_preserves_logs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -254,7 +296,14 @@ def test_log_move_failure_keeps_raw_evidence_and_records_error(
 ) -> None:
     run_dir = tmp_path / "run"
 
-    monkeypatch.setattr(supervisor_module, "_move_log", lambda *_args: (_ for _ in ()).throw(OSError("link failed")))
+    link = os.link
+
+    def fail_log_link(source: os.PathLike[str], target: os.PathLike[str]) -> None:
+        if ".supervisor." in os.fspath(source):
+            raise OSError("link failed")
+        link(source, target)
+
+    monkeypatch.setattr(supervisor_module.os, "link", fail_log_link)
     result = supervise_command(
         _command(run_dir, returncode=7),
         run_dir=run_dir,
@@ -265,9 +314,10 @@ def test_log_move_failure_keeps_raw_evidence_and_records_error(
     assert result.stop_reason == "supervisor_error"
     assert result.summary == {"error_type": "LogPreservationError"}
     assert _read_record(run_dir) == {"schema_version": 1, **result.__dict__}
-    raw_logs = list(tmp_path.glob(".run-*.supervisor.*.log"))
-    assert raw_logs
-    assert any("evidence" in path.read_text(encoding="utf-8") for path in raw_logs)
+    raw_stdout = list(tmp_path.glob(".run-*.supervisor.stdout.log"))
+    raw_stderr = list(tmp_path.glob(".run-*.supervisor.stderr.log"))
+    assert [path.read_text(encoding="utf-8") for path in raw_stdout] == ["stdout evidence"]
+    assert [path.read_text(encoding="utf-8") for path in raw_stderr] == ["stderr evidence"]
 
 
 @pytest.mark.parametrize("leaf_kind", ["file", "symlink", "junction"])

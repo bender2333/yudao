@@ -133,13 +133,11 @@ def _move_log(source: Path, target: Path) -> None:
     if not os.path.lexists(source):
         return
     _quarantine_leaf(target)
+    os.link(source, target)
     try:
-        os.link(source, target)
-    finally:
-        try:
-            source.unlink()
-        except FileNotFoundError:
-            pass
+        source.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def _write_result(run_dir: Path, result: SupervisorResult) -> None:
@@ -230,6 +228,9 @@ def supervise_command(
                 )
         _write_result(target, result)
         return result
+    except BaseException:
+        preserve_logs = True
+        raise
     finally:
         if not preserve_logs:
             for path in (stdout, stderr):
