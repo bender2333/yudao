@@ -645,3 +645,162 @@ def test_unknown_extra_handler_error_stops_as_sanitized_system_error(tmp_path):
     assert result.stopped_reason == "system_error"
     assert result.calls == 1
     assert secret_detail not in json.dumps([result.events, messages])
+
+
+def _terminal_tool_def():
+    return {
+        "type": "function",
+        "function": {
+            "name": "submit_done",
+            "description": "record completion",
+            "parameters": {"type": "object"},
+        },
+    }
+
+
+def test_terminal_acceptance_skips_later_calls_and_completes_protocol(tmp_path):
+    calls = [
+        _tc("before", "write_file", {"path": "before.txt", "content": "ok"}),
+        _tc("terminal", "submit_done", {"marker": "accepted"}),
+        _tc(
+            "after",
+            "write_file",
+            {"path": "after.txt", "content": "secret-after"},
+        ),
+    ]
+    accepted = []
+    messages = [{"role": "system", "content": "system"}]
+
+    def terminal(marker):
+        accepted.append(marker)
+        return "done recorded"
+
+    result = run_agent_loop(
+        llm=MockLlmClient([_cr(tool_calls=calls, finish="tool_calls")]),
+        system="system",
+        user="task",
+        tools=TOOL_DEFS + [_terminal_tool_def()],
+        handlers_ctx=str(tmp_path),
+        terminal_tools={"submit_done"},
+        extra_handlers={"submit_done": terminal},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "terminal"
+    assert result.calls == 1
+    assert result.tool_invocations == 2
+    assert result.terminal_call == {
+        "name": "submit_done",
+        "args": {"marker": "accepted"},
+    }
+    assert accepted == ["accepted"]
+    assert (tmp_path / "before.txt").read_text(encoding="utf-8") == "ok"
+    assert not (tmp_path / "after.txt").exists()
+
+    tool_messages = [message for message in messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        call.id for call in calls
+    ]
+    assert tool_messages[-1]["content"] == "Skipped: terminal tool already accepted"
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "tool_call",
+        "tool_call",
+        "tool_call_skipped",
+        "stop",
+    ]
+    skipped = [event for event in result.events if event["type"] == "tool_call_skipped"]
+    assert skipped == [{"type": "tool_call_skipped", "step": 1, "name": "write_file"}]
+    assert "secret-after" not in json.dumps(result.events)
+
+
+def test_first_terminal_skips_ordinary_and_second_terminal_call(tmp_path):
+    calls = [
+        _tc("first", "submit_done", {"marker": "first"}),
+        _tc(
+            "ordinary",
+            "write_file",
+            {"path": "after.txt", "content": "must-not-run"},
+        ),
+        _tc("second", "submit_done", {"marker": "secret-second"}),
+    ]
+    accepted = []
+    messages = [{"role": "system", "content": "system"}]
+
+    def terminal(marker):
+        accepted.append(marker)
+        return "done recorded"
+
+    result = run_agent_loop(
+        llm=MockLlmClient([_cr(tool_calls=calls, finish="tool_calls")]),
+        system="system",
+        user="task",
+        tools=TOOL_DEFS + [_terminal_tool_def()],
+        handlers_ctx=str(tmp_path),
+        terminal_tools={"submit_done"},
+        extra_handlers={"submit_done": terminal},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "terminal"
+    assert result.calls == 1
+    assert result.tool_invocations == 1
+    assert result.terminal_call == {
+        "name": "submit_done",
+        "args": {"marker": "first"},
+    }
+    assert accepted == ["first"]
+    assert not (tmp_path / "after.txt").exists()
+
+    tool_messages = [message for message in messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        call.id for call in calls
+    ]
+    assert [message["content"] for message in tool_messages[1:]] == [
+        "Skipped: terminal tool already accepted",
+        "Skipped: terminal tool already accepted",
+    ]
+    skipped = [event for event in result.events if event["type"] == "tool_call_skipped"]
+    assert skipped == [
+        {"type": "tool_call_skipped", "step": 1, "name": "write_file"},
+        {"type": "tool_call_skipped", "step": 1, "name": "submit_done"},
+    ]
+    tool_events = [event for event in result.events if event["type"] == "tool_call"]
+    assert [event["name"] for event in tool_events] == ["submit_done"]
+    assert "secret-second" not in json.dumps(result.events)
+
+
+def test_rejected_terminal_continues_with_later_tools(tmp_path):
+    calls = [
+        _tc("terminal", "submit_done", {"marker": "rejected"}),
+        _tc("after", "write_file", {"path": "after.txt", "content": "ok"}),
+    ]
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm=MockLlmClient(
+            [
+                _cr(tool_calls=calls, finish="tool_calls"),
+                _cr(text="continued", finish="stop"),
+            ]
+        ),
+        system="system",
+        user="task",
+        tools=TOOL_DEFS + [_terminal_tool_def()],
+        handlers_ctx=str(tmp_path),
+        terminal_tools={"submit_done"},
+        extra_handlers={"submit_done": lambda **_: "Error: rejected"},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "natural"
+    assert result.calls == 2
+    assert result.tool_invocations == 2
+    assert result.terminal_call is None
+    assert (tmp_path / "after.txt").read_text(encoding="utf-8") == "ok"
+    assert not any(event["type"] == "tool_call_skipped" for event in result.events)
+    tool_messages = [message for message in messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        call.id for call in calls
+    ]
+    assert tool_messages[0]["content"] == "Error: rejected"

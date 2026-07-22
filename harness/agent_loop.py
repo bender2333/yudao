@@ -403,6 +403,16 @@ def run_agent_loop(
         forced_stop_reason = None
         for tc in result.tool_calls:
             name = tc.function.name
+            if stop_after:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": "Skipped: terminal tool already accepted",
+                    }
+                )
+                emit({"type": "tool_call_skipped", "step": steps, "name": name})
+                continue
             raw_args = tc.function.arguments
             try:
                 args = json.loads(raw_args) if raw_args else {}
