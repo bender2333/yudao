@@ -500,6 +500,22 @@ def test_other_api_status_error_is_sanitized_protocol_error():
     assert secret_detail not in str(raised.value)
 
 
+@pytest.mark.parametrize("finish_reason", ["stop", "content_filter"])
+def test_optional_sdk_response_fields_normalize_to_empty_values(finish_reason):
+    response = _response([], text="done")
+    response.choices[0].finish_reason = finish_reason
+    response.choices[0].message.tool_calls = None
+    response.usage.completion_tokens_details.reasoning_tokens = None
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    result = LlmClient(client, "test-model").chat([], [])
+
+    assert result.finish_reason == finish_reason
+    assert result.tool_calls == []
+    assert result.reasoning_tokens == 0
+
+
 @pytest.mark.parametrize(
     "malformed_field",
     [
@@ -508,7 +524,6 @@ def test_other_api_status_error_is_sanitized_protocol_error():
         "missing_message",
         "finish_reason",
         "content",
-        "tool_calls",
         "tool_id",
         "tool_name",
         "tool_arguments",
@@ -538,8 +553,6 @@ def test_malformed_provider_response_stops_loop_without_leaking(
         choice.finish_reason = True
     elif malformed_field == "content":
         message.content = {"secret": secret_detail}
-    elif malformed_field == "tool_calls":
-        message.tool_calls = None
     elif malformed_field == "tool_id":
         tool_call.id = None
         message.tool_calls = [tool_call]
@@ -569,16 +582,23 @@ def test_malformed_provider_response_stops_loop_without_leaking(
         "task",
         [],
         str(tmp_path),
+        accounting_role="ROLE",
         messages=messages,
     )
 
     assert result.stopped_reason == "provider_protocol_error"
     assert result.calls == 1
     assert llm.calls_made == 1
+    assert llm.usage_by_role["ROLE"]["calls"] == 1
+    assert llm.usage_by_role["ROLE"]["llm_duration_ms"] >= 0
     assert (
         llm.prompt_tokens_total,
         llm.completion_tokens_total,
         llm.reasoning_tokens_total,
     ) == (0, 0, 0)
-    assert [event["type"] for event in result.events] == ["provider_error", "stop"]
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "provider_error",
+        "stop",
+    ]
     assert secret_detail not in json.dumps([result.events, messages])

@@ -269,13 +269,23 @@ _UNDERSTAND_EXTRACT_SYSTEM = (
 )
 
 
-def _run_hook_loop(llm, stage, kind, system, user, on_event):
+def _run_hook_loop(
+    llm, stage, kind, system, user, on_event, caller_stage, round_no
+):
     def emit(event):
-        if on_event is None:
+        if on_event is None or event.get("type") == "stop":
             return
         forwarded = dict(event)
-        if forwarded.get("type") == "llm_call":
-            forwarded.update({"stage": stage, "kind": kind})
+        forwarded.update(
+            {
+                "stage": stage,
+                "role": stage,
+                "kind": kind,
+                "nested": True,
+                "caller_stage": caller_stage,
+                "round": round_no,
+            }
+        )
         on_event(forwarded)
 
     terminal = {
@@ -303,7 +313,7 @@ def _run_hook_loop(llm, stage, kind, system, user, on_event):
 
 
 
-def _make_understand_hook(llm, on_event):
+def _make_understand_hook(llm, on_event, get_caller_stage, get_round):
     """Natural stop → one structured extraction loop."""
     def hook(final_text, messages):
         text = (final_text or "").strip()
@@ -316,6 +326,8 @@ def _make_understand_hook(llm, on_event):
             _UNDERSTAND_EXTRACT_SYSTEM,
             f"Free-text understanding:\n\n{text}",
             on_event,
+            get_caller_stage(),
+            get_round(),
         )
         return loop.terminal_call
     return hook
@@ -345,7 +357,7 @@ _VERIFY_ROUTER_SYSTEM = (
 )
 
 
-def _make_verify_hook(llm, on_event):
+def _make_verify_hook(llm, on_event, get_caller_stage, get_round):
     """Recover a routed verdict without treating provider stops as rejection."""
     default = {
         "name": "submit_verdict",
@@ -369,6 +381,8 @@ def _make_verify_hook(llm, on_event):
             _VERIFY_ROUTER_SYSTEM,
             f"Verification conclusion:\n\n{text}",
             on_event,
+            get_caller_stage(),
+            get_round(),
         )
         return loop.terminal_call or default
     return hook
@@ -419,6 +433,22 @@ def _make_consult_handler(
             current_round,
             user,
         )
+        def emit_nested(event):
+            if on_event is None or event.get("type") == "stop":
+                return
+            forwarded = dict(event)
+            forwarded.update(
+                {
+                    "stage": "UNDERSTAND",
+                    "role": "UNDERSTAND",
+                    "kind": "consult",
+                    "nested": True,
+                    "caller_stage": caller_role,
+                    "round": current_round,
+                }
+            )
+            on_event(forwarded)
+
         try:
             sub = activate(
                 session,
@@ -426,7 +456,7 @@ def _make_consult_handler(
                 llm=llm,
                 handlers_ctx=workspace.dir,
                 max_steps=8,
-                on_event=on_event,
+                on_event=emit_nested,
                 keep_history=keep_history,
             )
         except BudgetAccountingError:
@@ -511,9 +541,13 @@ def run_multi(
     understanding: str | None = None
     reject_reason: str | None = None
     reject_reason_meta: dict = {}
-    understand_hook = _make_understand_hook(llm, on_event)
+    understand_hook = _make_understand_hook(
+        llm, on_event, lambda: state, lambda: round_no
+    )
     plan_hook = _make_plan_hook(workspace)
-    verify_hook = _make_verify_hook(llm, on_event)
+    verify_hook = _make_verify_hook(
+        llm, on_event, lambda: state, lambda: round_no
+    )
 
     def _get_understanding() -> str | None:
         return understanding

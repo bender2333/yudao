@@ -216,7 +216,12 @@ def run_agent_loop(
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
         except (ProviderUnavailable, ProviderProtocolError, ContextOverflow) as exc:
-            attempt_step = steps + 1 if pending_content_filter_retry else steps
+            call_recorded = bool(getattr(exc, "call_recorded", False))
+            attempt_step = (
+                steps + 1
+                if pending_content_filter_retry or call_recorded
+                else steps
+            )
             if pending_content_filter_retry:
                 content_filter_retries += 1
                 pending_content_filter_retry = False
@@ -228,6 +233,23 @@ def run_agent_loop(
                     }
                 )
             stopped_reason = _provider_stop_reason(exc)
+            if call_recorded:
+                steps = attempt_step
+                emit(
+                    {
+                        "type": "llm_call",
+                        "step": attempt_step,
+                        "finish_reason": "",
+                        "has_tool_calls": False,
+                        "text": "",
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "reasoning_tokens": 0,
+                        "duration_ms": getattr(exc, "duration_ms", 0),
+                        "stopped_reason": stopped_reason,
+                        "failed": True,
+                    }
+                )
             emit(
                 {
                     "type": "provider_error",

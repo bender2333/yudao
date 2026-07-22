@@ -176,6 +176,46 @@ class TypedErrorOnCallMockLlmClient(MockLlmClient):
         )
 
 
+class RecordedProtocolErrorOnCallMockLlmClient(MockLlmClient):
+    def __init__(self, script, error_on_attempt):
+        super().__init__(script)
+        self.error_on_attempt = error_on_attempt
+        self.attempts = 0
+
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
+        self.attempts += 1
+        if self.attempts == self.error_on_attempt:
+            self.calls_made += 1
+            usage = self.usage_by_role.setdefault(
+                accounting_role,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "llm_duration_ms": 0,
+                },
+            )
+            usage["calls"] += 1
+            usage["llm_duration_ms"] += 1
+            error = ProviderProtocolError("provider-private-detail")
+            error.call_recorded = True
+            error.duration_ms = 1
+            raise error
+        return super().chat(
+            messages,
+            tools,
+            max_completion_tokens,
+            accounting_role,
+        )
+
+
 def _role_calls(llm, system):
     return [
         messages
@@ -1149,3 +1189,103 @@ def test_nested_consult_propagates_repeated_content_filter(tmp_path):
     assert [
         event for event in events if event["type"] == "consult_error"
     ] == [{"type": "consult_error", "reason": "provider_blocked"}]
+
+
+@pytest.mark.parametrize("stage", ["UNDERSTAND", "VERIFY"])
+def test_malformed_hook_response_preserves_accounting_and_event_attribution(
+    tmp_path, stage
+):
+    if stage == "UNDERSTAND":
+        script = [_text_stop("structured understanding")]
+        error_on_attempt = 2
+    else:
+        script = [
+            _understand_ok(),
+            _ready_ok(),
+            _text_stop("verification conclusion"),
+        ]
+        error_on_attempt = 4
+    llm = RecordedProtocolErrorOnCallMockLlmClient(script, error_on_attempt)
+    events = []
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        max_rounds=1,
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+    assert result.calls == sum(role["calls"] for role in result.per_role.values())
+    assert result.calls == sum(event["type"] == "llm_call" for event in events)
+    provider_errors = [event for event in events if event["type"] == "provider_error"]
+    assert provider_errors == [
+        {
+            "type": "provider_error",
+            "reason": "provider_protocol_error",
+            "error_type": "ProviderProtocolError",
+            "step": 1,
+            "stage": stage,
+            "role": stage,
+            "kind": "extract" if stage == "UNDERSTAND" else "router",
+            "nested": True,
+            "caller_stage": stage,
+            "round": 0,
+        }
+    ]
+    assert sum(
+        event["type"] == "stop"
+        and event.get("reason") == "provider_protocol_error"
+        for event in events
+    ) == 1
+    assert "provider-private-detail" not in json.dumps(events)
+
+
+def test_malformed_consult_response_preserves_accounting_and_event_attribution(
+    tmp_path,
+):
+    consult_call = _cr(
+        tool_calls=[
+            _tc("consult", "consult_understanding", {"question": "clarify"})
+        ],
+        finish="tool_calls",
+    )
+    llm = RecordedProtocolErrorOnCallMockLlmClient(
+        [_understand_ok(), _ready_ok(), consult_call],
+        error_on_attempt=4,
+    )
+    events = []
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+    assert result.consult_errors == 1
+    assert result.calls == sum(role["calls"] for role in result.per_role.values())
+    assert result.calls == sum(event["type"] == "llm_call" for event in events)
+    provider_errors = [event for event in events if event["type"] == "provider_error"]
+    assert provider_errors == [
+        {
+            "type": "provider_error",
+            "reason": "provider_protocol_error",
+            "error_type": "ProviderProtocolError",
+            "step": 1,
+            "stage": "UNDERSTAND",
+            "role": "UNDERSTAND",
+            "kind": "consult",
+            "nested": True,
+            "caller_stage": "VERIFY",
+            "round": 0,
+        }
+    ]
+    assert sum(
+        event["type"] == "stop"
+        and event.get("reason") == "provider_protocol_error"
+        for event in events
+    ) == 1
+    assert "provider-private-detail" not in json.dumps(events)

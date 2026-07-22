@@ -35,6 +35,17 @@ class ProviderUnavailable(Exception):
 class ProviderProtocolError(Exception):
     """The provider rejected or malformed the request protocol."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        call_recorded: bool = False,
+        duration_ms: int = 0,
+    ):
+        super().__init__(message)
+        self.call_recorded = call_recorded
+        self.duration_ms = duration_ms
+
 
 class ContextOverflow(Exception):
     """The provider explicitly reported context_length_exceeded."""
@@ -127,14 +138,35 @@ class LlmClient:
         duration_ms = int((time.monotonic() - started) * 1000)
 
         self.calls_made += 1
-
+        role_usage = None
+        if accounting_role is not None:
+            role_usage = self.usage_by_role.setdefault(
+                accounting_role,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "llm_duration_ms": 0,
+                },
+            )
+            role_usage["calls"] += 1
+            role_usage["llm_duration_ms"] += duration_ms
         choices = getattr(resp, "choices", _MISSING)
         if not isinstance(choices, (list, tuple)) or not choices:
-            raise ProviderProtocolError("malformed provider response")
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            )
         choice = choices[0]
         msg = getattr(choice, "message", _MISSING)
         if msg is _MISSING or msg is None:
-            raise ProviderProtocolError("malformed provider response")
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            )
 
         finish_reason = getattr(choice, "finish_reason", _MISSING)
         content = getattr(msg, "content", _MISSING)
@@ -142,13 +174,27 @@ class LlmClient:
         if finish_reason is _MISSING or not (
             finish_reason is None or isinstance(finish_reason, str)
         ):
-            raise ProviderProtocolError("malformed provider response")
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            )
         if content is _MISSING or not (
             content is None or isinstance(content, str)
         ):
-            raise ProviderProtocolError("malformed provider response")
-        if not isinstance(tool_calls, (list, tuple)):
-            raise ProviderProtocolError("malformed provider response")
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            )
+        if tool_calls is None:
+            tool_calls = []
+        elif not isinstance(tool_calls, (list, tuple)):
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            )
         for tool_call in tool_calls:
             function = getattr(tool_call, "function", _MISSING)
             if (
@@ -157,7 +203,11 @@ class LlmClient:
                 or not isinstance(getattr(function, "name", None), str)
                 or not isinstance(getattr(function, "arguments", None), str)
             ):
-                raise ProviderProtocolError("malformed provider response")
+                raise ProviderProtocolError(
+                    "malformed provider response",
+                    call_recorded=True,
+                    duration_ms=duration_ms,
+                )
 
         finish_reason = finish_reason or ""
         text = content or ""
@@ -173,32 +223,30 @@ class LlmClient:
             if not _is_nonnegative_int(prompt_tokens) or not _is_nonnegative_int(
                 completion_tokens
             ):
-                raise ProviderProtocolError("malformed provider response")
+                raise ProviderProtocolError(
+                    "malformed provider response",
+                    call_recorded=True,
+                    duration_ms=duration_ms,
+                )
             details = getattr(usage, "completion_tokens_details", None)
             if details is not None:
                 reasoning_tokens = getattr(details, "reasoning_tokens", _MISSING)
-                if not _is_nonnegative_int(reasoning_tokens):
-                    raise ProviderProtocolError("malformed provider response")
+                if reasoning_tokens is None:
+                    reasoning_tokens = 0
+                elif not _is_nonnegative_int(reasoning_tokens):
+                    raise ProviderProtocolError(
+                        "malformed provider response",
+                        call_recorded=True,
+                        duration_ms=duration_ms,
+                    )
 
         self.prompt_tokens_total += prompt_tokens
         self.completion_tokens_total += completion_tokens
         self.reasoning_tokens_total += reasoning_tokens
-        if accounting_role is not None:
-            usage = self.usage_by_role.setdefault(
-                accounting_role,
-                {
-                    "calls": 0,
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "reasoning_tokens": 0,
-                    "llm_duration_ms": 0,
-                },
-            )
-            usage["calls"] += 1
-            usage["prompt_tokens"] += prompt_tokens
-            usage["completion_tokens"] += completion_tokens
-            usage["reasoning_tokens"] += reasoning_tokens
-            usage["llm_duration_ms"] += duration_ms
+        if role_usage is not None:
+            role_usage["prompt_tokens"] += prompt_tokens
+            role_usage["completion_tokens"] += completion_tokens
+            role_usage["reasoning_tokens"] += reasoning_tokens
 
         stopped_reason = None
         stop_detail = None
