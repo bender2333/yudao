@@ -93,6 +93,7 @@ def test_team_happy_path_binds_tickets_to_real_tree_and_receipts(tmp_path):
     assert result.tool_invocations == 6
     assert result.transient_retry_attempts == 0
     assert result.content_filter_retries == 0
+    assert runtime.check_sequence == 2
     assert set(result.per_role) == {"requirements", "engineering", "quality"}
     assert [result.per_role[role]["calls"] for role in result.per_role] == [1, 1, 1]
 
@@ -148,3 +149,266 @@ def test_invalid_terminal_can_be_corrected_in_same_activation(tmp_path):
     assert "Error: payload field acceptance.summary is missing" in str(
         result.sessions["requirements"].messages
     )
+
+
+
+def _clarification_payload():
+    return {
+        "blocked_requirement_ids": ["R-001"],
+        "question": "Which value is required?",
+        "interpretations": [
+            {"choice": "forty-two", "observable_result": "write VALUE=42"},
+            {"choice": "other", "observable_result": "write another value"},
+        ],
+        "why_blocking": "The implementation depends on the value.",
+    }
+
+
+def _defect_payload():
+    return {
+        "route": "engineering",
+        "defects": [
+            {
+                "requirement_ids": ["R-001"],
+                "severity": "major",
+                "reproduction": ["run public_tests"],
+                "expected": "pass",
+                "actual": "fails quality review",
+                "evidence_check_names": ["public_tests"],
+            }
+        ],
+    }
+
+
+def test_engineering_cannot_reuse_requirements_check_receipt(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            multi_tool_result(
+                [
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_acceptance", valid_acceptance_payload()),
+                ]
+            ),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("submit_delivery", valid_delivery_payload()),
+                ]
+            ),
+            text_stop("cannot provide fresh engineering evidence"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "natural"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
+    assert "missing current activation receipt" in str(result.sessions["engineering"].messages)
+
+
+def test_quality_cannot_reuse_engineering_check_receipt(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_delivery", valid_delivery_payload()),
+                ]
+            ),
+            tool_result("submit_release", valid_release_payload()),
+            text_stop("cannot provide fresh quality evidence"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "natural"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance", "delivery"]
+    assert "missing current activation receipt" in str(result.sessions["quality"].messages)
+
+
+def test_clarification_is_bound_issued_and_stops_without_quality_transition(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            tool_result("submit_clarification", _clarification_payload()),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "unsupported_clarification"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance", "clarification"]
+    clarification = result.tickets[-1]
+    assert clarification["parent_hash"] == result.tickets[0]["content_hash"]
+    assert clarification["bindings"] == {
+        "code_tree_hash": workspace.tree_hash(),
+        "files": [],
+    }
+    assert result.transitions == ["requirements->engineering"]
+
+
+def test_defect_is_bound_to_fresh_quality_evidence_and_stops(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_delivery", valid_delivery_payload()),
+                ]
+            ),
+            multi_tool_result(
+                [
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_defect", _defect_payload()),
+                ]
+            ),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "unsupported_defect"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance", "delivery", "defect"]
+    defect = result.tickets[-1]
+    assert defect["parent_hash"] == result.tickets[1]["content_hash"]
+    assert [check["name"] for check in defect["bindings"]["checks"]] == ["public_tests"]
+
+
+def test_defect_without_fresh_quality_check_is_rejected_for_correction(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_delivery", valid_delivery_payload()),
+                ]
+            ),
+            tool_result("submit_defect", _defect_payload()),
+            text_stop("quality cannot substantiate defect"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.stopped_reason == "natural"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance", "delivery"]
+    assert "missing current activation receipt" in str(result.sessions["quality"].messages)
+
+
+def test_transition_callback_failure_preserves_issued_ticket_and_transition(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm([tool_result("submit_acceptance", valid_acceptance_payload())])
+
+    def fail_transition(event):
+        if event["type"] == "team_transition":
+            raise RuntimeError("callback failed")
+
+    result = run_team(
+        llm, workspace, runtime, "task-1", "implement VALUE", on_event=fail_transition
+    )
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "system_error"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
+    assert result.transitions == ["requirements->engineering"]
+
+
+def test_failed_activation_uses_client_accounting_and_event_tool_count(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+
+    class AccountingThenErrorLlm(ScriptedLlm):
+        def chat(self, messages, tools, max_completion_tokens=8000, accounting_role=None):
+            if self._index == 1:
+                self.calls_made += 1
+                self.prompt_tokens_total += 7
+                self.completion_tokens_total += 3
+                self.reasoning_tokens_total += 1
+                usage = self.usage_by_role.setdefault(
+                    accounting_role,
+                    {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0,
+                     "reasoning_tokens": 0, "llm_duration_ms": 0},
+                )
+                usage.update(
+                    calls=usage["calls"] + 1,
+                    prompt_tokens=usage["prompt_tokens"] + 7,
+                    completion_tokens=usage["completion_tokens"] + 3,
+                    reasoning_tokens=usage["reasoning_tokens"] + 1,
+                    llm_duration_ms=usage["llm_duration_ms"] + 4,
+                )
+                self._index += 1
+                raise RuntimeError("chat boundary failed")
+            return super().chat(
+                messages,
+                tools,
+                max_completion_tokens=max_completion_tokens,
+                accounting_role=accounting_role,
+            )
+
+    llm = AccountingThenErrorLlm(
+        [
+            multi_tool_result(
+                [
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_acceptance", valid_acceptance_payload()),
+                ]
+            ),
+            RuntimeError("unused"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.stopped_reason == "system_error"
+    assert result.calls == 2
+    assert result.prompt_tokens == 17
+    assert result.completion_tokens == 8
+    assert result.reasoning_tokens == 3
+    assert result.duration_ms == 5
+    assert result.tool_invocations == 2
+    assert result.per_role["requirements"]["calls"] == 1
+    assert result.per_role["engineering"]["calls"] == 1
+
+
+def test_quality_can_correct_missing_evidence_with_new_receipt_same_activation(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_delivery", valid_delivery_payload()),
+                ]
+            ),
+            tool_result("submit_release", valid_release_payload()),
+            multi_tool_result(
+                [
+                    call("run_check", {"name": "public_tests"}),
+                    call("submit_release", valid_release_payload()),
+                ]
+            ),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "done"
+    assert result.stopped_reason == "done"
+    assert runtime.check_sequence == 2

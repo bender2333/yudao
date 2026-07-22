@@ -95,6 +95,7 @@ class TicketCollector:
         open_defects: set[str] | None = None,
         on_ticket=None,
         on_event=None,
+        receipt_baseline: dict | None = None,
     ):
         self.role = role
         self.ledger = ledger
@@ -106,6 +107,7 @@ class TicketCollector:
         self.open_defects = set(open_defects or ())
         self.on_ticket = on_ticket
         self.on_event = on_event
+        self.receipt_baseline = dict(receipt_baseline or {})
         self.ticket = None
 
     def handler(self, name: str):
@@ -176,6 +178,11 @@ class TicketCollector:
                 "changed_files": changed_files,
                 "checks": checks,
             }, self.acceptance["content_hash"]
+        if kind == "clarification":
+            return {
+                "code_tree_hash": tree_hash,
+                "files": files,
+            }, self.acceptance["content_hash"]
         if kind == "release":
             if set(payload["verified_requirements"]) != _acceptance_ids(self.acceptance):
                 raise ValueError("verified_requirements must exactly cover acceptance ids")
@@ -187,14 +194,29 @@ class TicketCollector:
                 "files": files,
                 "checks": checks,
             }, self.trigger["content_hash"]
+        if kind == "defect":
+            names = list(
+                dict.fromkeys(
+                    name
+                    for defect in payload["defects"]
+                    for name in defect["evidence_check_names"]
+                )
+            )
+            checks = self._checks(names, tree_hash)
+            return {
+                "code_tree_hash": tree_hash,
+                "files": files,
+                "checks": checks,
+            }, self.trigger["content_hash"]
         raise ValueError(f"unsupported ticket kind: {kind}")
 
     def _checks(self, names: list[str], tree_hash: str) -> list[dict]:
         checks = []
         for name in names:
+            key = (name, tree_hash)
             receipt = self.runtime.receipt(name, tree_hash)
-            if receipt is None:
-                raise ValueError(f"check_names missing current receipt: {name}")
+            if receipt is None or receipt is self.receipt_baseline.get(key):
+                raise ValueError(f"check_names missing current activation receipt: {name}")
             if receipt.exit_code != 0 or receipt.timed_out:
                 raise ValueError(f"check_names check did not pass: {name}")
             checks.append(asdict(receipt))
@@ -269,30 +291,44 @@ def run_team(
     }
     ledger = TicketLedger(task_id)
     transitions = []
-    loops = []
     state = TeamState.REQUIREMENTS
     acceptance = None
     trigger = None
-    retry_before = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
+    roles = tuple(sessions)
     usage_fields = ("calls", "prompt_tokens", "completion_tokens", "reasoning_tokens", "llm_duration_ms")
     usage_before = {
-        role: {field: copy.deepcopy(getattr(llm, "usage_by_role", {}).get(role, {}).get(field, 0)) for field in usage_fields}
-        for role in sessions
+        role: {
+            field: copy.deepcopy(
+                getattr(llm, "usage_by_role", {}).get(role, {}).get(field, 0)
+            )
+            for field in usage_fields
+        }
+        for role in roles
     }
+    retry_before = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
+    filter_before = getattr(llm, "content_filter_retries", 0)
     outcome = "failed"
     stopped_reason = "system_error"
+    tool_invocations = 0
+
+    def emit(event: dict) -> None:
+        nonlocal tool_invocations
+        if event.get("type") == "tool_call":
+            tool_invocations += 1
+        if on_event is not None and event.get("type", "").startswith("team_"):
+            on_event(event)
 
     def transition(target: TeamState):
         nonlocal state
         label = f"{state.value}->{target.value}"
         transitions.append(label)
-        if on_event is not None:
-            on_event({"type": "team_transition", "transition": label})
         state = target
+        emit({"type": "team_transition", "transition": label})
 
     while state is not TeamState.DONE:
         role = state.value
         before_manifest = workspace.tree_manifest() if state is TeamState.ENGINEERING else None
+        receipt_baseline = dict(runtime.receipts)
         collector = TicketCollector(
             role,
             ledger,
@@ -301,8 +337,9 @@ def run_team(
             acceptance=acceptance,
             trigger=trigger,
             before_manifest=before_manifest,
+            receipt_baseline=receipt_baseline,
             on_ticket=on_ticket,
-            on_event=on_event,
+            on_event=emit,
         )
         terminals = _ALLOWED_TERMINALS[role]
         handlers = runtime.handlers()
@@ -315,32 +352,36 @@ def run_team(
                 max_steps=max_steps,
                 terminal_tools=set(terminals),
                 extra_handlers=handlers,
+                on_event=emit,
             )
         except Exception:
             stopped_reason = "system_error"
             break
-        loops.append(loop)
         if loop.stopped_reason != "terminal" or collector.ticket is None:
             stopped_reason = loop.stopped_reason
             break
         trigger = collector.ticket
-        if state is TeamState.REQUIREMENTS and trigger["kind"] == "acceptance":
-            acceptance = trigger
-            transition(TeamState.ENGINEERING)
-        elif state is TeamState.ENGINEERING and trigger["kind"] == "delivery":
-            transition(TeamState.QUALITY)
-        elif state is TeamState.ENGINEERING and trigger["kind"] == "clarification":
-            stopped_reason = "unsupported_clarification"
-            break
-        elif state is TeamState.QUALITY and trigger["kind"] == "release":
-            transition(TeamState.DONE)
-            outcome = "done"
-            stopped_reason = "done"
-        elif state is TeamState.QUALITY and trigger["kind"] == "defect":
-            stopped_reason = "unsupported_defect"
-            break
-        else:
-            stopped_reason = "unexpected_terminal"
+        try:
+            if state is TeamState.REQUIREMENTS and trigger["kind"] == "acceptance":
+                acceptance = trigger
+                transition(TeamState.ENGINEERING)
+            elif state is TeamState.ENGINEERING and trigger["kind"] == "delivery":
+                transition(TeamState.QUALITY)
+            elif state is TeamState.ENGINEERING and trigger["kind"] == "clarification":
+                stopped_reason = "unsupported_clarification"
+                break
+            elif state is TeamState.QUALITY and trigger["kind"] == "release":
+                transition(TeamState.DONE)
+                outcome = "done"
+                stopped_reason = "done"
+            elif state is TeamState.QUALITY and trigger["kind"] == "defect":
+                stopped_reason = "unsupported_defect"
+                break
+            else:
+                stopped_reason = "unexpected_terminal"
+                break
+        except Exception:
+            stopped_reason = "system_error"
             break
 
     usage_after = getattr(llm, "usage_by_role", {})
@@ -352,6 +393,10 @@ def run_team(
         for role in sessions
     }
     retry_after = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
+    totals = {
+        field: sum(per_role[role][field] for role in roles)
+        for field in usage_fields
+    }
     return TeamResult(
         outcome=outcome,
         stopped_reason=stopped_reason,
@@ -359,13 +404,13 @@ def run_team(
         tickets=ledger.tickets,
         transitions=transitions,
         reworks=0,
-        calls=sum(loop.calls for loop in loops),
-        prompt_tokens=sum(loop.prompt_tokens for loop in loops),
-        completion_tokens=sum(loop.completion_tokens for loop in loops),
-        reasoning_tokens=sum(loop.reasoning_tokens for loop in loops),
-        duration_ms=sum(loop.duration_ms for loop in loops),
-        tool_invocations=sum(loop.tool_invocations for loop in loops),
+        calls=totals["calls"],
+        prompt_tokens=totals["prompt_tokens"],
+        completion_tokens=totals["completion_tokens"],
+        reasoning_tokens=totals["reasoning_tokens"],
+        duration_ms=totals["llm_duration_ms"],
+        tool_invocations=tool_invocations,
         transient_retry_attempts=retry_after - retry_before,
-        content_filter_retries=sum(loop.content_filter_retries for loop in loops),
+        content_filter_retries=getattr(llm, "content_filter_retries", 0) - filter_before,
         per_role=per_role,
     )
