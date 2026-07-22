@@ -2,48 +2,48 @@
 
 ## Current Focus
 
-三角色常驻会话重构已完成。当前研究对象是同一 U -> P -> V 拓扑下的三臂比较：solo（S）、cold multi（C）与 persistent multi（P）；主问题仍是 P 是否优于 S，C 只用于识别角色内记忆的贡献。
+用户已批准放弃旧 `UNDERSTAND -> PLAN_EXECUTE -> VERIFY` 三臂主方案。下一研究对象改为两臂：单 Agent（S）与需求/开发/质检工单闭环（T），回答“各自跑到完成时，T 是否更容易交付正确结果”。
+
+三个部门各自保留 run 级完整私有会话，跨部门只传带版本与内容哈希的正式工单；隐藏评分始终在循环外。
 
 ## Active Protocol
 
-- 当前历史基线：`docs/native-harness/milestone3-study-protocol.md`
-- 下一正式批次：`docs/native-harness/milestone4-complex-study-protocol.md`（DRAFT / BLOCKED）
-- 会话设计与验收：`docs/native-harness/role-persistent-sessions-design.md`（P0-P3 已实现）
-- **无 Docker 公开题对比（Aider Polyglot）**：`docs/native-harness/aider-polyglot-protocol.md` + `scripts/aider_polyglot_runner.py`（dry-run 已通；live pilot 待额度）
+- 当前已批准设计：`docs/native-harness/three-department-work-order-validation-design.md`（APPROVED / 待实施）
+- 历史协议：`milestone3-study-protocol.md`、`milestone4-complex-study-protocol.md`、`role-persistent-sessions-design.md` 与 `aider-polyglot-protocol.md` 仅供追溯，不再定义下一轮主方案。
+- 已知历史缺陷：`docs/native-harness/ISSUES-content-filter.md`；旧 Aider pilot 因异常停止误判而无效，不进入新方案证据。
 
-## Last Action (2026-07-10)
+## Last Action (2026-07-22)
 
-- 设计三角色常驻会话：`59db10d`。
-- P0 三角色私有 AgentSession + activate：`5a49438`。
-- P1 常驻 consult、per-role 计量与预算耗尽收口：`1646903`。
-- P2 sessions/handoffs 审计落盘与 reason/context 边界：`87ccd6d`。
-- P3 cold/persistent 消融、共享 calls/token/协作式墙钟预算与三臂协议：`b15794e`。
-- harness 全量：80 passed，0 skipped。
+- 完成并批准三部门工单闭环重设计。
+- 决策：S/T 各自跑到完成；同模型、同工具和相同宽松保险丝，但不强制等 calls/token/墙钟。
+- 决策：五类工单、确定性路由、三个私有会话、质检唯一放行、循环外隐藏评分。
+- 决策：移除任意 shell，改为相对路径文件工具与预登记 `run_check`；暂不引入容器，因此结果只称本机软隔离工程证据。
+- 预注册规模：12 道自建复杂题 × S/T × 3 次 = 72 个正式 run；支持门槛为 T 赢至少 10/12、平均有效分至少 +5、fatal 与 false-complete 均不增加。
+- 本次只写设计，未改代码、未调用 live 模型、未运行实验。
 
 ## Next Action
 
-1. 为 S/C/P 三臂补 pilot runner wiring 与外层 300 秒进程硬超时；先用 development fixture 验证，不计正式样本。
-2. 创建并审查 8 个复杂 fixture + hidden oracle；提交 SHA-256 后冻结协议。
-3. 评估 persistent 的 `message_count/message_chars` 与 token 成本，再决定是否另立角色内压缩任务；当前不自动压缩。
-4. Docker/Podman 暂不推进；正式 hidden-oracle 批次前再完成机械隔离并取得 live 额度授权。
+1. 用户复核已写入的设计文档；确认后编写逐任务实施计划。
+2. 先实施 P0：五类工单 schema、规范化哈希、版本校验、确定性状态机和错误分类，全部使用假模型。
+3. 再实施 P1：三个长期私有部门会话、Solo 显式完成、权限和 transcript 隔离。
+4. P2 才替换任意 shell、加入一次性检查镜像和 Windows 外层进程树硬超时。
+5. 代码底座通过全量 harness 回归后，制作两道 development 校准题；任何 live 调用仍需 `NEXT.md` 单独授权。
 
 ## Progress
 
-- [x] Milestone 1：solo loop
-- [x] Milestone 2：UNDERSTAND -> PLAN_EXECUTE -> VERIFY
-- [x] Milestone 3：小任务/鲁棒性初步实验，结论不足
-- [x] R0：确定性实验可信度修复（不含 OS 级隔离）
-- [x] P0：三角色常驻 session + 私有 transcript
-- [x] P1：常驻 consult + per-role + run budget 收口
-- [x] P2：session/handoff 审计与 context 指标
-- [x] P3：cold/persistent 消融开关与三臂协议
-- [ ] R1：复杂任务协议与题库冻结
-- [ ] R2：pilot wiring
-- [ ] R3：正式成对批次
-- [ ] R4：循环外评分与结论
+- [x] 历史：solo loop、旧 U/P/V 三阶段、常驻会话与三臂消融
+- [x] W0：新工单闭环与 S/T 验证设计获批
+- [ ] W1：工单合同与确定性状态机
+- [ ] W2：私有会话、角色权限与 Solo 对照
+- [ ] W3：受限本机工具与外层 supervisor
+- [ ] W4：两道 development 校准题
+- [ ] W5：12 道 formal 题与冻结
+- [ ] W6：72 次正式运行、循环外评分与结论
 
 ## Open BLOCKs
 
-- `bash` 尚无机械 workspace 隔离；修复前不能宣称 hidden oracle 对 agent 不可见。
-- `max_seconds` 是协作式门闩；外层进程硬超时未实现，不能保证强杀在途 API/shell。
-- live batch 的模型额度、题数、重复数和最大 calls 尚未授权。
+- 当前 `bash` 与 Agent 生成代码都没有 OS 级沙箱；新工具边界完成前不得运行新协议样本。即使完成，本机结果也只能称软隔离工程证据。
+- `content_filter` 仍会被旧 agent loop 误判；新底座必须将它与 natural stop 分开并留下回归测试。
+- 外层 Windows 进程树硬超时尚未实现。
+- 两道 development 题、12 道 formal 题、隐藏评分与冻结哈希均未创建。
+- live batch 的模型、费用上限和计划 run 数尚未授权。
