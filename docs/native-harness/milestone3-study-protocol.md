@@ -1,5 +1,9 @@
 # 里程碑 3 — solo vs multi 循环外对比研究（研究者协议）
 
+> 状态：**SUPERSEDED / HISTORICAL**
+> 新方案：`three-department-work-order-validation-design.md`
+> 旧命令仅用于解释历史结果，当前运行时已移除。
+
 > 这是**循环外裁判**的工作，不进 harness。harness 只跑题、吐产物+指标；
 > 出题、隐藏 oracle、评分、量化对比都在这里，harness 与被试 agent **绝不可见本文件与 oracle**。
 

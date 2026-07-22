@@ -423,8 +423,12 @@ def run_team(
                 on_event=emit,
             )
             terminals = _ALLOWED_TERMINALS[role]
-            handlers = runtime.handlers()
-            handlers.update({name: collector.handler(name) for name in terminals})
+            terminal_handlers = {name: collector.handler(name) for name in terminals}
+
+            def dispatch_tool(name, args):
+                if name in terminal_handlers:
+                    return terminal_handlers[name](**args)
+                return runtime.dispatch(name, args)
             phase = "handoff"
             handoff = _handoff(task, current_acceptance, trigger_ticket, workspace)
 
@@ -447,10 +451,9 @@ def run_team(
                 loop = sessions[role].activate(
                     handoff,
                     llm=llm,
-                    handlers_ctx=workspace.dir,
+                    dispatch_tool=dispatch_tool,
                     max_steps=max_steps,
                     terminal_tools=set(terminals),
-                    extra_handlers=handlers,
                     on_event=emit,
                 )
                 if loop.stopped_reason == "terminal" and collector.ticket is not None:

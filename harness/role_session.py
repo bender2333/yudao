@@ -1,6 +1,7 @@
 """Private, persistent conversation history for one work-order role."""
 
 from __future__ import annotations
+from collections.abc import Callable
 
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -36,18 +37,17 @@ class RoleSession:
         user_turn: str,
         *,
         llm: LlmClient,
-        handlers_ctx: str,
+        dispatch_tool: Callable[[str, dict], str],
         max_steps: int = 40,
         on_event=None,
         terminal_tools: set[str] | None = None,
-        extra_handlers: dict | None = None,
     ) -> LoopResult:
         if type(user_turn) is not str:
             raise TypeError("user_turn must be a non-empty string")
         if not user_turn.strip():
             raise ValueError("user_turn must be a non-empty string")
-        if type(handlers_ctx) is not str:
-            raise TypeError("handlers_ctx must be a string")
+        if not callable(dispatch_tool):
+            raise TypeError("dispatch_tool must be callable")
         if type(max_steps) is not int:
             raise TypeError("max_steps must be a positive integer")
         if max_steps <= 0:
@@ -59,11 +59,10 @@ class RoleSession:
             system=self.system,
             user=user_turn,
             tools=self.tools,
-            handlers_ctx=handlers_ctx,
+            dispatch_tool=dispatch_tool,
             max_steps=max_steps,
             on_event=on_event,
             terminal_tools=terminal_tools,
-            extra_handlers=extra_handlers,
             accounting_role=self.role,
             messages=self.messages,
         )

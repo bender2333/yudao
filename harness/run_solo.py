@@ -214,15 +214,16 @@ def run_solo_loop(
                     "tree_hash": workspace.tree_hash(),
                 }
             )
-            handlers = runtime.handlers()
-            handlers[SUBMIT_DONE] = submit_done
+            def dispatch_tool(name, args):
+                if name == SUBMIT_DONE:
+                    return submit_done(**args)
+                return runtime.dispatch(name, args)
             loop = session.activate(
                 handoff,
                 llm=llm,
-                handlers_ctx=workspace.dir,
+                dispatch_tool=dispatch_tool,
                 max_steps=max_steps,
                 terminal_tools={SUBMIT_DONE},
-                extra_handlers=handlers,
                 on_event=emit,
             )
             if loop.stopped_reason == "terminal" and completion is not None:

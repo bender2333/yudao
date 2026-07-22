@@ -16,7 +16,6 @@ from harness.llm import (
     ProviderUnavailable,
 )
 from harness.provider import load_provider
-from harness.run_multi import run_multi_cli
 from harness.run_solo import run_solo
 
 
@@ -67,16 +66,6 @@ class _ScriptedCompletions:
             raise response
         return response
 
-
-def _patch_multi_provider(monkeypatch, responses):
-    client = SimpleNamespace(
-        chat=SimpleNamespace(completions=_ScriptedCompletions(responses))
-    )
-    monkeypatch.setattr(
-        "harness.run_multi.load_provider",
-        lambda _: {"model": "test-model"},
-    )
-    monkeypatch.setattr("harness.run_multi.make_client", lambda _: client)
 
 
 def _patch_solo_provider(monkeypatch, responses):
@@ -171,223 +160,6 @@ def test_runner_rejects_existing_run_directory(tmp_path):
             provider_path=str(tmp_path / "missing-provider.md"),
         )
 
-    other = tmp_path / "multi"
-    other.mkdir()
-    with pytest.raises(FileExistsError):
-        run_multi_cli("task", str(other), provider_path=str(tmp_path / "missing-provider.md"))
-
-
-def test_run_multi_cli_writes_summary_when_budget_exhausted(tmp_path, monkeypatch):
-    understanding = {
-        "summary": "s",
-        "requirements": "r",
-        "constraints": "c",
-        "done_criteria": "d",
-    }
-    _patch_multi_provider(
-        monkeypatch,
-        [
-            _response(
-                [_tool_call("u", "submit_understanding", understanding)]
-            ),
-            _response(
-                [
-                    _tool_call(
-                        "w",
-                        "write_file",
-                        {"path": "out.py", "content": "print(1)\n"},
-                    )
-                ]
-            ),
-        ]
-    )
-    run_dir = tmp_path / "budget-run"
-
-    summary = run_multi_cli(
-        "task",
-        str(run_dir),
-        max_calls=2,
-        provider_path="ignored.md",
-    )
-
-    saved = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
-    assert saved == summary
-    assert summary["outcome"] == "escalated"
-    assert summary["stopped_reason"] == "budget_exhausted"
-    assert summary["calls"] == 2
-    for metric in (
-        "calls",
-        "prompt_tokens",
-        "completion_tokens",
-        "reasoning_tokens",
-    ):
-        assert summary[metric] == sum(
-            role[metric] for role in summary["per_role"].values()
-        )
-    assert sorted(path.name for path in (run_dir / "sessions").iterdir()) == [
-        "plan_execute.jsonl",
-        "understand.jsonl",
-        "verify.jsonl",
-    ]
-    assert summary["handoff_count"] == len(
-        _read_jsonl(run_dir / "handoffs.jsonl")
-    )
-
-
-def test_run_multi_cli_writes_isolated_sessions_and_handoffs(tmp_path, monkeypatch):
-    understanding = {
-        "summary": "s",
-        "requirements": "r",
-        "constraints": "c",
-        "done_criteria": "d",
-    }
-    _patch_multi_provider(
-        monkeypatch,
-        [
-            _response(
-                [_tool_call("u", "submit_understanding", understanding)],
-                text="U_PRIVATE_TRACE",
-            ),
-            _response(
-                [
-                    _tool_call(
-                        "w",
-                        "write_file",
-                        {"path": "out.py", "content": "print(1)\n"},
-                    ),
-                    _tool_call(
-                        "p",
-                        "submit_ready",
-                        {"notes": "PLAN_NOTES_PRIVATE_TRACE"},
-                    ),
-                ],
-                text="PLAN_PRIVATE_TRACE",
-            ),
-            _response(
-                [
-                    _tool_call(
-                        "v",
-                        "submit_verdict",
-                        {"status": "pass", "reason": "verified"},
-                    )
-                ],
-                text="VERIFY_PRIVATE_TRACE",
-            ),
-        ],
-    )
-    run_dir = tmp_path / "success-run"
-
-    summary = run_multi_cli(
-        "L0_ONLY_TRACE",
-        str(run_dir),
-        provider_path="ignored.md",
-    )
-
-    assert summary["session_model"] == "persistent"
-    files = {
-        "UNDERSTAND": "understand.jsonl",
-        "PLAN_EXECUTE": "plan_execute.jsonl",
-        "VERIFY": "verify.jsonl",
-    }
-    sessions = {
-        role: _read_jsonl(run_dir / "sessions" / filename)
-        for role, filename in files.items()
-    }
-    for role, messages in sessions.items():
-        assert len(messages) == summary["per_role"][role]["message_count"]
-        assert sum(
-            len(json.dumps(message, ensure_ascii=False, separators=(",", ":")))
-            for message in messages
-        ) == summary["per_role"][role]["message_chars"]
-
-    handoffs = _read_jsonl(run_dir / "handoffs.jsonl")
-    assert [handoff["seq"] for handoff in handoffs] == [1, 2, 3]
-    assert [handoff["kind"] for handoff in handoffs] == [
-        "NewMission",
-        "ExecuteAgainstUnderstanding",
-        "VerifyAgainstUnderstanding",
-    ]
-    assert summary["handoff_count"] == len(handoffs)
-    for handoff in handoffs:
-        assert any(
-            message.get("content") == handoff["content"]
-            for message in sessions[handoff["target"]]
-        )
-
-    plan_blob = json.dumps(sessions["PLAN_EXECUTE"])
-    verify_blob = json.dumps(sessions["VERIFY"])
-    handoff_blob = json.dumps(handoffs)
-    assert "L0_ONLY_TRACE" not in plan_blob and "L0_ONLY_TRACE" not in verify_blob
-    assert "U_PRIVATE_TRACE" not in plan_blob and "U_PRIVATE_TRACE" not in verify_blob
-    assert "PLAN_PRIVATE_TRACE" not in verify_blob
-    assert "PLAN_NOTES_PRIVATE_TRACE" not in verify_blob
-    assert "U_PRIVATE_TRACE" not in handoff_blob
-    assert "PLAN_PRIVATE_TRACE" not in handoff_blob
-    assert "PLAN_NOTES_PRIVATE_TRACE" not in handoff_blob
-    assert "VERIFY_PRIVATE_TRACE" not in handoff_blob
-
-
-def test_token_budget_is_shared_across_multi_roles(tmp_path, monkeypatch):
-    understanding = {
-        "summary": "s",
-        "requirements": "r",
-        "constraints": "c",
-        "done_criteria": "d",
-    }
-    _patch_multi_provider(
-        monkeypatch,
-        [
-            _response(
-                [_tool_call("u", "submit_understanding", understanding)]
-            ),
-            _response(
-                [
-                    _tool_call(
-                        "w",
-                        "write_file",
-                        {"path": "out.py", "content": "print(1)\n"},
-                    )
-                ]
-            ),
-        ],
-    )
-
-    run_dir = tmp_path / "token-budget"
-    summary = run_multi_cli(
-        "task",
-        str(run_dir),
-        max_tokens=25,
-        provider_path="ignored.md",
-    )
-
-    assert summary["outcome"] == "escalated"
-    assert summary["stopped_reason"] == "budget_exhausted"
-    assert summary["calls"] == 2
-    assert summary["prompt_tokens"] + summary["completion_tokens"] == 30
-    assert summary["per_role"]["UNDERSTAND"]["calls"] == 1
-    assert summary["per_role"]["PLAN_EXECUTE"]["calls"] == 1
-    assert summary["budget"]["max_tokens"] == 25
-    events = _read_jsonl(run_dir / "events.jsonl")
-    assert sum(event["type"] == "llm_call" for event in events) == summary["calls"]
-    plan_messages = _read_jsonl(run_dir / "sessions" / "plan_execute.jsonl")
-    assert [message["role"] for message in plan_messages] == ["system", "user"]
-
-
-def test_wall_budget_stops_before_first_multi_call(tmp_path, monkeypatch):
-    _patch_multi_provider(monkeypatch, [])
-
-    summary = run_multi_cli(
-        "task",
-        str(tmp_path / "wall-budget"),
-        max_seconds=1e-12,
-        provider_path="ignored.md",
-    )
-
-    assert summary["outcome"] == "escalated"
-    assert summary["stopped_reason"] == "budget_exhausted"
-    assert summary["calls"] == 0
-    assert summary["budget"]["max_seconds"] == 1e-12
-
 
 def test_solo_uses_the_same_token_budget(tmp_path, monkeypatch):
     _patch_solo_provider(monkeypatch, [_response([], text="done")])
@@ -429,41 +201,6 @@ def test_llm_rejects_invalid_budget(kwargs):
     with pytest.raises(ValueError):
         LlmClient(object(), "test-model", **kwargs)
 
-
-def test_missing_provider_usage_fails_token_budget_loudly(tmp_path, monkeypatch):
-    _patch_multi_provider(
-        monkeypatch,
-        [
-            _response_without_usage(
-                [
-                    _tool_call(
-                        "u",
-                        "submit_understanding",
-                        {
-                            "summary": "s",
-                            "requirements": "r",
-                            "constraints": "c",
-                            "done_criteria": "d",
-                        },
-                    )
-                ]
-            )
-        ],
-    )
-    run_dir = tmp_path / "missing-usage"
-
-    summary = run_multi_cli(
-        "task",
-        str(run_dir),
-        max_tokens=100,
-        provider_path="ignored.md",
-    )
-
-    assert summary["outcome"] == "escalated"
-    assert summary["stopped_reason"] == "budget_accounting_error"
-    assert summary["calls"] == 1
-    events = _read_jsonl(run_dir / "events.jsonl")
-    assert sum(event["type"] == "llm_call" for event in events) == 1
 
 
 def test_transient_failures_are_wrapped_after_three_actual_retries(monkeypatch):
@@ -598,7 +335,7 @@ def test_malformed_provider_response_stops_loop_without_leaking(
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -664,7 +401,7 @@ def test_unavailable_usage_stops_as_accounting_error_by_default(
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -691,7 +428,7 @@ def test_sdk_response_validation_error_is_accounted_protocol_stop(tmp_path):
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -722,7 +459,7 @@ def test_post_response_budget_precedes_malformed_message(tmp_path):
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -768,7 +505,7 @@ def test_invalid_json_response_is_accounted_protocol_stop(tmp_path):
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -807,7 +544,7 @@ def test_invalid_json_response_yields_to_expired_wall_budget(tmp_path):
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -839,7 +576,7 @@ def test_tool_finish_contradiction_is_sanitized_protocol_failure(
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )
@@ -890,7 +627,7 @@ def test_unknown_usage_yields_to_expired_wall_budget(tmp_path, usage_error):
         "system",
         "task",
         [],
-        str(tmp_path),
+        lambda _name, _args: "unused",
         accounting_role="ROLE",
         messages=messages,
     )

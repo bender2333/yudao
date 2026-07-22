@@ -1,8 +1,0 @@
-{
-  "files": {
-    "solution": ["mini.py"],
-    "test": ["mini_suite.py"],
-    "example": [".meta/example.py"]
-  },
-  "blurb": "Add two numbers."
-}

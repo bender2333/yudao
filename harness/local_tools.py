@@ -289,8 +289,6 @@ class LocalToolRuntime:
             return handler(**args)
         except (TypeError, ValueError, OSError, UnicodeError) as error:
             return f"Error: {error}"
-        except Exception as error:  # Model-facing dispatch is a hard exception boundary.
-            return f"Error: {error}"
 
     def _path(self, value: object) -> tuple[Path, str]:
         parts = _relative_parts(value)

@@ -2,9 +2,9 @@
 
 当前分支 `exp/native-harness` 用 Python harness 做受控实验，研究：
 
-> 串行角色分工（UNDERSTAND -> PLAN_EXECUTE -> VERIFY）相对 solo，能否在复杂软件任务上带来可重复的质量收益，以及收益是否值得额外成本。
+> 单 Agent（S）与需求/开发/质检工单闭环（T）各自跑到完成时，T 是否更容易交付正确的复杂软件任务，以及质量收益是否值得额外成本。
 
-multi 获胜不是完成条件。得到“支持 / 不支持 / 证据不足”中的任一可复查结论，都比为了证明假设而调结果更重要。
+T 获胜不是完成条件。得到“支持 / 不支持 / 证据不足”中的任一可复查结论，都比为了证明假设而调结果更重要。
 
 ## 控制文件
 
@@ -76,8 +76,8 @@ multi 获胜不是完成条件。得到“支持 / 不支持 / 证据不足”�
 
 ```bash
 python -m pytest harness/tests -q
-python -m harness.run_solo "<task>" --run-dir runs/<id>
-python -m harness.run_multi "<task>" --run-dir runs/<id>
+python -m harness.run_solo "<task>" --task-id <id> --run-dir runs/<id> --seed-dir <seed> --checks-file <checks.json>
+python -m harness.run_team "<task>" --task-id <id> --run-dir runs/<id> --seed-dir <seed> --checks-file <checks.json>
 ```
 
 live smoke 或批量实验会消耗外部模型额度，只能在活动协议已冻结且 `NEXT.md` 明确授权该批次时运行。

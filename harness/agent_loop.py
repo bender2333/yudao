@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from collections.abc import Callable
 
 from .llm import (
     BudgetAccountingError,
@@ -19,7 +20,6 @@ from .llm import (
     ProviderProtocolError,
     ProviderUnavailable,
 )
-from .tools import dispatch
 
 _TRUNC = 2000
 
@@ -58,24 +58,6 @@ class LoopStopped(Exception):
         super().__init__(reason)
 
 
-def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
-    """Extra handlers (llm/workspace-bound closures, e.g. cross-stage consults)
-    take precedence; otherwise fall back to the standard stateless dispatch."""
-    if extra_handlers and name in extra_handlers:
-        try:
-            return extra_handlers[name](**args)
-        except (
-            BudgetAccountingError,
-            BudgetExhausted,
-            ContextOverflow,
-            LoopStopped,
-            ProviderProtocolError,
-            ProviderUnavailable,
-        ):
-            raise
-        except Exception:
-            raise LoopStopped("system_error") from None
-    return dispatch(name, args, handlers_ctx)
 
 
 def _serialize_tool_calls(tool_calls: list) -> list:
@@ -111,52 +93,6 @@ class LoopResult:
     content_filter_retries: int = 0
 
 
-@dataclass
-class AgentSession:
-    """单个角色在一次 run 内独占的会话历史。"""
-
-    role: str
-    system: str
-    tools: list
-    messages: list[dict] = field(default_factory=list, init=False)
-    activates: int = 0
-
-    def __post_init__(self) -> None:
-        if not self.messages:
-            self.messages.append({"role": "system", "content": self.system})
-
-
-def activate(
-    session: AgentSession,
-    user_turn: str,
-    *,
-    llm: LlmClient,
-    handlers_ctx: str,
-    max_steps: int = 40,
-    on_event=None,
-    terminal_tools: set | None = None,
-    on_stop=None,
-    extra_handlers: dict | None = None,
-    keep_history: bool = True,
-) -> LoopResult:
-    """追加本轮交接，并在同一角色历史上续跑。"""
-    if not keep_history:
-        session.messages[:] = [{"role": "system", "content": session.system}]
-    session.activates += 1
-    return run_agent_loop(
-        llm=llm,
-        system=session.system,
-        user=user_turn,
-        tools=session.tools,
-        handlers_ctx=handlers_ctx,
-        max_steps=max_steps,
-        on_event=on_event,
-        terminal_tools=terminal_tools,
-        on_stop=on_stop,
-        extra_handlers=extra_handlers,
-        accounting_role=session.role,
-        messages=session.messages,
-    )
 
 
 def run_agent_loop(
@@ -164,17 +100,17 @@ def run_agent_loop(
     system: str,
     user: str,
     tools: list,
-    handlers_ctx: str,
+    dispatch_tool: Callable[[str, dict], str],
     max_steps: int = 40,
     on_event=None,
     terminal_tools: set | None = None,
-    on_stop=None,
-    extra_handlers: dict | None = None,
     *,
     accounting_role: str | None = None,
     messages: list[dict] | None = None,
 ) -> LoopResult:
     allowed_tools = {tool["function"]["name"] for tool in tools}
+    if not callable(dispatch_tool):
+        raise TypeError("dispatch_tool must be callable")
     started = time.monotonic()
     calls_before = llm.calls_made
     prompt_tokens_before = llm.prompt_tokens_total
@@ -363,34 +299,6 @@ def run_agent_loop(
             final_text = result.text
             if result.finish_reason == "stop":
                 stopped_reason = "natural"
-                # The hook may turn a natural conclusion into a routed terminal call.
-                if on_stop is not None:
-                    try:
-                        hooked = on_stop(final_text, messages)
-                        if hooked is not None:
-                            terminal_call = hooked
-                    except (BudgetAccountingError, BudgetExhausted) as exc:
-                        stopped_reason = (
-                            "budget_accounting_error"
-                            if isinstance(exc, BudgetAccountingError)
-                            else "budget_exhausted"
-                        )
-                    except LoopStopped as exc:
-                        stopped_reason = exc.reason
-                    except (
-                        ProviderUnavailable,
-                        ProviderProtocolError,
-                        ContextOverflow,
-                    ) as exc:
-                        stopped_reason = _provider_stop_reason(exc)
-                        emit(
-                            {
-                                "type": "provider_error",
-                                "reason": stopped_reason,
-                                "error_type": type(exc).__name__,
-                                "step": steps,
-                            }
-                        )
             elif result.finish_reason == "length":
                 stopped_reason = "output_truncated"
             else:
@@ -432,9 +340,7 @@ def run_agent_loop(
                         forced_stop_reason = "budget_exhausted"
                 if forced_stop_reason is None:
                     try:
-                        output = _dispatch_with_extras(
-                            name, args, handlers_ctx, extra_handlers
-                        )
+                        output = dispatch_tool(name, args)
                     except BudgetExhausted:
                         output = "Error: run budget exhausted"
                         forced_stop_reason = "budget_exhausted"
@@ -459,6 +365,9 @@ def run_agent_loop(
                                 "step": steps,
                             }
                         )
+                    except Exception:
+                        forced_stop_reason = "system_error"
+                        output = "Error: system error"
             accepted_terminal = (
                 forced_stop_reason is None
                 and terminal_tools

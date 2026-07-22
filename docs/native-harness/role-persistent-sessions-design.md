@@ -1,5 +1,9 @@
 # 设计方案：三角色常驻会话（彼此不共享上下文）
 
+> 状态：**SUPERSEDED / HISTORICAL**
+> 新方案：`three-department-work-order-validation-design.md`
+> 旧命令仅用于解释历史结果，当前运行时已移除。
+
 > 状态：**P0-P3 已实现**
 > 日期：2026-07-10  
 > 分支语境：`exp/native-harness`  

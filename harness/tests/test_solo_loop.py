@@ -343,6 +343,31 @@ def test_metrics_and_events_are_solo_only_and_sanitized(tmp_path):
     assert not hasattr(result, "tickets")
 
 
+def test_unexpected_tool_failure_stops_solo_without_leaking_or_accepting_terminal(tmp_path, monkeypatch):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    events = []
+    llm = ScriptedLlm([
+        tool_result("read_file", {"path": "answer.py"}),
+        tool_result("submit_done", valid_done_payload()),
+    ])
+
+    def fail(path):
+        raise RuntimeError(f"SECRET:{path}")
+
+    monkeypatch.setattr(runtime, "read_file", fail)
+    result = run_solo_loop(
+        llm, workspace, runtime, "task-1", "implement VALUE", on_event=events.append
+    )
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "system_error"
+    assert result.calls == 1
+    assert llm._index == 1
+    assert "SECRET" not in json.dumps(result.session.messages)
+    assert "SECRET" not in json.dumps(events)
+    assert not any(event["type"] == "completion_accepted" for event in events)
+
+
 def test_completion_is_not_published_when_acceptance_callback_fails(tmp_path):
     workspace, runtime = make_runtime_with_public_check(tmp_path)
     events = []

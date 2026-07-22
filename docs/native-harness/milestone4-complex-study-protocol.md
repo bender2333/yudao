@@ -1,5 +1,9 @@
 # Milestone 4 - 复杂任务成对实验协议（DRAFT）
 
+> 状态：**SUPERSEDED / HISTORICAL**
+> 新方案：`three-department-work-order-validation-design.md`
+> 旧命令仅用于解释历史结果，当前运行时已移除。
+
 > 状态：**DRAFT / BLOCKED，不得运行正式样本**
 > 日期：2026-07-10
 > 研究代码基线：`35828e9` 或更新 commit

@@ -276,6 +276,18 @@ def test_tool_capabilities_schemas_handlers_and_dispatch_are_closed(tmp_path: Pa
     assert runtime.dispatch("run_check", {"name": "x", "argv": []}).startswith("Error:")
 
 
+def test_dispatch_propagates_unexpected_handler_exceptions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime = make_runtime(tmp_path)
+
+    def fail(path: str) -> str:
+        raise RuntimeError(f"SECRET:{path}")
+
+    monkeypatch.setattr(runtime, "read_file", fail)
+    with pytest.raises(RuntimeError, match="SECRET"):
+        runtime.dispatch("read_file", {"path": "answer.py"})
+
+
+
 def test_load_check_manifest_accepts_exact_schema(tmp_path: Path) -> None:
     manifest = tmp_path / "checks.json"
     manifest.write_text(

@@ -1,5 +1,9 @@
 # Aider Polyglot 题清单（Pilot）
 
+> 状态：**SUPERSEDED / HISTORICAL**
+> 新方案：`three-department-work-order-validation-design.md`
+> 旧命令仅用于解释历史结果，当前运行时已移除。
+
 > 状态：**pilot**（不得直接作为正式科学结论题库）  
 > 语言：Python only  
 > 来源：`third_party/polyglot-benchmark`（Aider polyglot）  

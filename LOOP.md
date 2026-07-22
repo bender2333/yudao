@@ -49,8 +49,8 @@ loop:
 python -m pytest harness/tests -q
 
 # live smoke / batch
-python -m harness.run_solo "<task>" --run-dir runs/<cell>
-python -m harness.run_multi "<task>" --run-dir runs/<cell>
+python -m harness.run_solo "<task>" --task-id <id> --run-dir runs/<cell> --seed-dir <seed> --checks-file <checks.json>
+python -m harness.run_team "<task>" --task-id <id> --run-dir runs/<cell> --seed-dir <seed> --checks-file <checks.json>
 ```
 
 PASS 必须写清：命令、通过数、skip 数、run 数、oracle 结果和产物路径。缺任一项就标 FAIL 或 INCOMPLETE。
