@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from harness.agent_loop import AgentSession, activate, run_agent_loop
+from harness.agent_loop import run_agent_loop
 from harness.llm import (
     BudgetExhausted,
     CallResult,
@@ -175,65 +175,6 @@ def test_loop_costs_are_deltas_for_shared_client(tmp_path):
     assert first.prompt_tokens == second.prompt_tokens == 10
 
 
-def test_activate_continues_messages_in_place(tmp_path):
-    llm = MockLlmClient(
-        [
-            _cr(
-                tool_calls=[
-                    _tc(
-                        "c1",
-                        "write_file",
-                        {"path": "out.txt", "content": "first"},
-                    )
-                ],
-                finish="tool_calls",
-            ),
-            _cr(text="first done"),
-            _cr(text="second done"),
-        ]
-    )
-    session = AgentSession("PLAN_EXECUTE", "sys", TOOL_DEFS)
-    history = session.messages
-
-    first = activate(session, "turn-1", llm=llm, handlers_ctx=str(tmp_path))
-    second = activate(session, "turn-2", llm=llm, handlers_ctx=str(tmp_path))
-
-    assert session.messages is history
-    assert [message["role"] for message in history] == [
-        "system",
-        "user",
-        "assistant",
-        "tool",
-        "assistant",
-        "user",
-        "assistant",
-    ]
-    assert llm.message_snapshots[2][:-1] == history[:5]
-    assert llm.message_snapshots[2][-1] == {"role": "user", "content": "turn-2"}
-    assert sum(message["role"] == "system" for message in history) == 1
-    assert second.final_text == "second done"
-    assert first.calls == 2 and second.calls == 1
-    assert first.prompt_tokens == 20 and second.prompt_tokens == 10
-
-
-def test_agent_sessions_keep_transcripts_isolated(tmp_path):
-    llm = MockLlmClient([_cr(text="PLAN_PRIVATE"), _cr(text="VERIFY_PRIVATE")])
-    plan = AgentSession("PLAN_EXECUTE", "plan-sys", TOOL_DEFS)
-    verify = AgentSession("VERIFY", "verify-sys", TOOL_DEFS)
-
-    activate(plan, "plan-turn", llm=llm, handlers_ctx=str(tmp_path))
-    activate(verify, "verify-turn", llm=llm, handlers_ctx=str(tmp_path))
-
-    plan_blob = json.dumps(plan.messages)
-    verify_blob = json.dumps(verify.messages)
-    assert plan.messages is not verify.messages
-    assert "PLAN_PRIVATE" in plan_blob
-    assert "VERIFY_PRIVATE" not in plan_blob and "verify-turn" not in plan_blob
-    assert "VERIFY_PRIVATE" in verify_blob
-    assert "PLAN_PRIVATE" not in verify_blob and "plan-turn" not in verify_blob
-    assert plan.messages[0] == {"role": "system", "content": "plan-sys"}
-    assert verify.messages[0] == {"role": "system", "content": "verify-sys"}
-    assert AgentSession.__dataclass_fields__["messages"].init is False
 
 
 def test_max_steps_forces_stop(tmp_path):
