@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     BadRequestError,
     InternalServerError,
@@ -120,11 +121,20 @@ class LlmClient:
 
         self.calls_made += 1
 
-        choice = resp.choices[0]
-        msg = choice.message
-        finish_reason = choice.finish_reason or ""
-        text = msg.content or ""
-        tool_calls = list(msg.tool_calls or [])
+        choices = getattr(resp, "choices", None)
+        if not isinstance(choices, (list, tuple)) or not choices:
+            raise ProviderProtocolError("malformed provider response")
+        choice = choices[0]
+        msg = getattr(choice, "message", None)
+        if msg is None:
+            raise ProviderProtocolError("malformed provider response")
+        finish_reason = getattr(choice, "finish_reason", None) or ""
+        text = getattr(msg, "content", None) or ""
+        raw_tool_calls = getattr(msg, "tool_calls", None)
+        try:
+            tool_calls = list(raw_tool_calls or [])
+        except TypeError as exc:
+            raise ProviderProtocolError("malformed provider response") from exc
 
         prompt_tokens = 0
         completion_tokens = 0
@@ -202,12 +212,9 @@ class LlmClient:
                     max_completion_tokens=max_completion_tokens,
                 )
             except BadRequestError as exc:
-                error_type = (
-                    ContextOverflow
-                    if exc.code == "context_length_exceeded"
-                    else ProviderProtocolError
-                )
-                raise error_type(f"{type(exc).__name__}: {exc}") from exc
+                if exc.code == "context_length_exceeded":
+                    raise ContextOverflow("provider context length exceeded") from exc
+                raise ProviderProtocolError("provider rejected request protocol") from exc
             except _RETRYABLE as exc:
                 last_exc = exc
                 if attempt == 3:
@@ -219,8 +226,8 @@ class LlmClient:
                         self.check_budget()
                     delay = min(delay, remaining)
                 time.sleep(delay)
+            except APIStatusError as exc:
+                raise ProviderProtocolError("provider request failed") from exc
 
         self.check_budget()
-        raise ProviderUnavailable(
-            f"{type(last_exc).__name__}: {last_exc}"
-        ) from last_exc
+        raise ProviderUnavailable("transient provider retries exhausted") from last_exc

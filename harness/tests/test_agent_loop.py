@@ -614,3 +614,31 @@ def test_pending_retry_provider_error_events_share_attempt_step(
         "stop",
     ]
     assert retry["step"] == provider_error["step"] == stop["step"] == 2
+
+
+def test_unknown_extra_handler_error_stops_as_sanitized_system_error(tmp_path):
+    secret_detail = "handler-private-detail"
+    messages = [{"role": "system", "content": "system"}]
+    llm = MockLlmClient(
+        [
+            _cr(tool_calls=[_tc("extra", "list_dir", {})], finish="tool_calls"),
+            _cr(text="must not finish", finish="stop"),
+        ]
+    )
+
+    def fail():
+        raise RuntimeError(secret_detail)
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        TOOL_DEFS,
+        str(tmp_path),
+        extra_handlers={"list_dir": fail},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "system_error"
+    assert result.calls == 1
+    assert secret_detail not in json.dumps([result.events, messages])

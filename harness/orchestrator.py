@@ -26,7 +26,7 @@ import json
 from dataclasses import dataclass, field
 
 from .agent_loop import (
-    PROVIDER_STOP_REASONS,
+    NONRECOVERABLE_STOP_REASONS,
     AgentSession,
     LoopStopped,
     activate,
@@ -297,7 +297,7 @@ def _run_hook_loop(llm, stage, kind, system, user, on_event):
         raise BudgetExhausted("hook exhausted the run budget")
     if loop.stopped_reason == "budget_accounting_error":
         raise BudgetAccountingError("hook could not measure token usage")
-    if loop.stopped_reason in PROVIDER_STOP_REASONS:
+    if loop.stopped_reason in NONRECOVERABLE_STOP_REASONS:
         raise LoopStopped(loop.stopped_reason)
     return loop
 
@@ -435,15 +435,18 @@ def _make_consult_handler(
         except BudgetExhausted:
             fail("consult exhausted the run budget")
             raise
-        except Exception as exc:
-            return fail(f"consult failed ({type(exc).__name__}: {exc})")
+        except LoopStopped:
+            raise
+        except Exception:
+            fail("consult failed")
+            raise LoopStopped("system_error") from None
         if sub.stopped_reason == "budget_exhausted":
             fail("consult exhausted the run budget")
             raise BudgetExhausted("consult exhausted the run budget")
         if sub.stopped_reason == "budget_accounting_error":
             fail("consult could not measure token usage")
             raise BudgetAccountingError("consult could not measure token usage")
-        if sub.stopped_reason in PROVIDER_STOP_REASONS:
+        if sub.stopped_reason in NONRECOVERABLE_STOP_REASONS:
             raise LoopStopped(sub.stopped_reason)
         if sub.stopped_reason != "natural":
             return fail(f"consult did not complete ({sub.stopped_reason})")

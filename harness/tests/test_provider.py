@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from openai import BadRequestError
+from openai import APIStatusError, BadRequestError
 
 import harness.llm as llm_module
 from harness.llm import (
@@ -99,6 +99,14 @@ def _bad_request(body):
         request=httpx.Request("POST", "https://provider.invalid/v1/chat/completions"),
     )
     return BadRequestError("bad request", response=response, body=body)
+
+
+def _api_status_error(body):
+    response = httpx.Response(
+        502,
+        request=httpx.Request("POST", "https://provider.invalid/v1/chat/completions"),
+    )
+    return APIStatusError("provider-private-detail", response=response, body=body)
 
 
 def test_parses_bare_model_line(tmp_path):
@@ -476,3 +484,38 @@ def test_other_bad_requests_map_to_provider_protocol_error(body):
 
     with pytest.raises(ProviderProtocolError):
         LlmClient(client, "test-model").chat([], [])
+
+
+def test_other_api_status_error_is_sanitized_protocol_error():
+    secret_detail = "provider-private-detail"
+    completions = _ScriptedCompletions(
+        [_api_status_error({"message": secret_detail})]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    with pytest.raises(ProviderProtocolError) as raised:
+        LlmClient(client, "test-model").chat([], [])
+
+    assert secret_detail not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        SimpleNamespace(provider_private_detail="provider-private-detail"),
+        SimpleNamespace(choices=[], provider_private_detail="provider-private-detail"),
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=None, finish_reason="stop")],
+            provider_private_detail="provider-private-detail",
+        ),
+    ],
+    ids=["missing-choices", "empty-choices", "missing-message"],
+)
+def test_malformed_provider_response_is_sanitized_protocol_error(response):
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    with pytest.raises(ProviderProtocolError) as raised:
+        LlmClient(client, "test-model").chat([], [])
+
+    assert "provider-private-detail" not in str(raised.value)

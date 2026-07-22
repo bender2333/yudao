@@ -47,6 +47,7 @@ PROVIDER_STOP_REASONS = frozenset(
         "output_truncated",
     }
 )
+NONRECOVERABLE_STOP_REASONS = PROVIDER_STOP_REASONS | {"system_error"}
 
 
 class LoopStopped(Exception):
@@ -72,8 +73,8 @@ def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
             ProviderUnavailable,
         ):
             raise
-        except Exception as e:  # a consult must never crash the caller's loop
-            return f"Error: {type(e).__name__}: {e}"
+        except Exception:
+            raise LoopStopped("system_error") from None
     return dispatch(name, args, handlers_ctx)
 
 

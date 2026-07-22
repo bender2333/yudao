@@ -142,7 +142,7 @@ class ErrorOnCallMockLlmClient(MockLlmClient):
     ):
         self.attempts += 1
         if self.attempts == self.error_on_attempt:
-            raise RuntimeError("provider unavailable")
+            raise RuntimeError("provider-private-detail")
         return super().chat(
             messages,
             tools,
@@ -788,23 +788,28 @@ def test_failed_consult_does_not_pollute_understanding(tmp_path):
     assert all(handoff["kind"] != "ConsultAnswer" for handoff in result.handoffs)
 
 
-def test_consult_provider_error_is_counted(tmp_path):
+def test_consult_unknown_error_fails_closed_without_leaking(tmp_path):
     ws = Workspace(str(tmp_path / "w"))
     consult = _cr(
         tool_calls=[_tc("cq", "consult_understanding", {"question": "clarify"})],
         finish="tool_calls",
     )
+    secret_detail = "provider-private-detail"
     llm = ErrorOnCallMockLlmClient(
         [_understand_ok(), _ready_ok(), consult, _verdict("pass")],
         error_on_attempt=4,
     )
+    events = []
 
-    result = run_multi(llm, ws, "task")
+    result = run_multi(llm, ws, "task", on_event=events.append)
 
-    assert result.outcome == "done"
+    assert result.outcome == "escalated"
+    assert result.stopped_reason == "system_error"
+    assert result.verdict is None
     assert result.consults == 0
     assert result.consult_errors == 1
-    assert "## Clarification" not in (result.understanding or "")
+    transcript = {role: session.messages for role, session in result.sessions.items()}
+    assert secret_detail not in json.dumps([events, transcript])
 
 
 def test_main_stage_budget_exhaustion_escalates(tmp_path):
