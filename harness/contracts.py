@@ -1,6 +1,8 @@
 import copy
 import hashlib
 import json
+import math
+
 from dataclasses import dataclass, field
 
 
@@ -27,7 +29,28 @@ class TicketValidationError(ValueError):
     pass
 
 
+def _validate_json_value(value: object) -> None:
+    if value is None or type(value) in (str, int, bool):
+        return
+    if type(value) is float:
+        if math.isfinite(value):
+            return
+        raise TicketValidationError("ticket is not canonical JSON")
+    if type(value) is list:
+        for item in value:
+            _validate_json_value(item)
+        return
+    if type(value) is dict:
+        if not all(type(key) is str for key in value):
+            raise TicketValidationError("ticket is not canonical JSON")
+        for item in value.values():
+            _validate_json_value(item)
+        return
+    raise TicketValidationError("ticket is not canonical JSON")
+
+
 def canonical_json(value: object) -> bytes:
+    _validate_json_value(value)
     return json.dumps(
         value,
         ensure_ascii=False,
@@ -106,17 +129,21 @@ def verify_ticket(ticket: object) -> None:
     body = {key: value for key, value in ticket.items() if key != "content_hash"}
     try:
         expected_hash = content_hash(body)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError) as exc:
         raise TicketValidationError("ticket is not canonical JSON") from exc
     if ticket["content_hash"] != expected_hash:
         raise TicketValidationError("content_hash mismatch")
 
 
-@dataclass
+@dataclass(frozen=True)
 class TicketLedger:
     task_id: str
     _tickets: list[dict] = field(default_factory=list, init=False, repr=False)
     _revisions: dict[str, int] = field(default_factory=dict, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.task_id, str) or not self.task_id:
+            raise TicketValidationError("invalid task_id")
 
     @property
     def tickets(self) -> list[dict]:
@@ -156,9 +183,9 @@ class TicketLedger:
         }
         try:
             ticket = {**body, "content_hash": content_hash(body)}
-            verify_ticket(ticket)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise TicketValidationError("ticket is not canonical JSON") from exc
+        verify_ticket(ticket)
         self._revisions[kind] = revision
         self._tickets.append(copy.deepcopy(ticket))
         return copy.deepcopy(ticket)

@@ -1,5 +1,6 @@
 import copy
 import json
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -215,3 +216,85 @@ def test_validate_payload_acceptance_requires_basic_structure_and_other_kinds_ac
     validate_payload("delivery", {"anything": "allowed for now"})
     with pytest.raises(TicketValidationError):
         validate_payload("delivery", [])
+
+
+@pytest.mark.parametrize("task_id", ["", None, 1])
+def test_ledger_rejects_invalid_task_id(task_id):
+    with pytest.raises(TicketValidationError, match="invalid task_id"):
+        TicketLedger(task_id)
+
+
+def test_ledger_task_id_is_frozen_after_issue():
+    ledger = TicketLedger("task-1")
+    issued = ledger.issue("acceptance", "requirements", _valid_acceptance(), None)
+
+    with pytest.raises(FrozenInstanceError):
+        ledger.task_id = "task-2"
+
+    assert ledger.tickets == [issued]
+    ledger.verify_chain()
+
+
+@pytest.mark.parametrize("field", ["payload", "bindings"])
+@pytest.mark.parametrize("invalid", [("x",), {"x"}, b"x", object(), {1: "x"}])
+def test_issue_rejects_non_json_values_without_mutating_ledger(field, invalid):
+    ledger = TicketLedger("task-1")
+    payload = _valid_acceptance()
+    bindings = {}
+    (payload if field == "payload" else bindings)["invalid"] = invalid
+
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        ledger.issue("acceptance", "requirements", payload, None, bindings)
+
+    assert ledger.tickets == []
+    assert ledger.revisions == {}
+
+
+def test_non_string_key_and_tuple_cannot_collide_with_json_equivalents():
+    ledger = TicketLedger("task-1")
+    for bindings in ({1: "x"}, {"value": ("x",)}):
+        with pytest.raises(TicketValidationError, match="canonical JSON"):
+            ledger.issue("acceptance", "requirements", _valid_acceptance(), None, bindings)
+
+    ledger.issue(
+        "acceptance", "requirements", _valid_acceptance(), None, {"1": "x", "value": ["x"]}
+    )
+
+
+@pytest.mark.parametrize("invalid", [("x",), {"x"}, b"x", object(), {1: "x"}])
+def test_verify_ticket_rejects_forged_non_json_values(invalid):
+    ticket = TicketLedger("task-1").issue(
+        "acceptance", "requirements", _valid_acceptance(), None
+    )
+    ticket["bindings"]["invalid"] = invalid
+
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        verify_ticket(ticket)
+
+
+def test_issue_preserves_specific_ticket_validation_error():
+    ledger = TicketLedger("task-1")
+    object.__setattr__(ledger, "task_id", "")
+
+    with pytest.raises(TicketValidationError, match="^invalid task_id$"):
+        ledger.issue("acceptance", "requirements", _valid_acceptance(), None)
+
+
+@pytest.mark.parametrize("field", ["payload", "bindings"])
+def test_cyclic_values_are_normalized_to_ticket_validation_error(field):
+    cyclic = []
+    cyclic.append(cyclic)
+    ledger = TicketLedger("task-1")
+    payload = _valid_acceptance()
+    bindings = {}
+    (payload if field == "payload" else bindings)["cyclic"] = cyclic
+
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        ledger.issue("acceptance", "requirements", payload, None, bindings)
+
+    valid = TicketLedger("task-1").issue(
+        "acceptance", "requirements", _valid_acceptance(), None
+    )
+    valid[field]["cyclic"] = cyclic
+    with pytest.raises(TicketValidationError, match="canonical JSON"):
+        verify_ticket(valid)
