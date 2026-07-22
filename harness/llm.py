@@ -44,6 +44,13 @@ class ContextOverflow(Exception):
 _RETRYABLE = (RateLimitError, InternalServerError, APITimeoutError, APIConnectionError)
 
 
+_MISSING = object()
+
+
+def _is_nonnegative_int(value) -> bool:
+    return type(value) is int and value >= 0
+
+
 @dataclass
 class CallResult:
     text: str
@@ -121,36 +128,57 @@ class LlmClient:
 
         self.calls_made += 1
 
-        choices = getattr(resp, "choices", None)
+        choices = getattr(resp, "choices", _MISSING)
         if not isinstance(choices, (list, tuple)) or not choices:
             raise ProviderProtocolError("malformed provider response")
         choice = choices[0]
-        msg = getattr(choice, "message", None)
-        if msg is None:
+        msg = getattr(choice, "message", _MISSING)
+        if msg is _MISSING or msg is None:
             raise ProviderProtocolError("malformed provider response")
-        finish_reason = getattr(choice, "finish_reason", None) or ""
-        text = getattr(msg, "content", None) or ""
-        raw_tool_calls = getattr(msg, "tool_calls", None)
-        try:
-            tool_calls = list(raw_tool_calls or [])
-        except TypeError as exc:
-            raise ProviderProtocolError("malformed provider response") from exc
 
+        finish_reason = getattr(choice, "finish_reason", _MISSING)
+        content = getattr(msg, "content", _MISSING)
+        tool_calls = getattr(msg, "tool_calls", _MISSING)
+        if finish_reason is _MISSING or not (
+            finish_reason is None or isinstance(finish_reason, str)
+        ):
+            raise ProviderProtocolError("malformed provider response")
+        if content is _MISSING or not (
+            content is None or isinstance(content, str)
+        ):
+            raise ProviderProtocolError("malformed provider response")
+        if not isinstance(tool_calls, (list, tuple)):
+            raise ProviderProtocolError("malformed provider response")
+        for tool_call in tool_calls:
+            function = getattr(tool_call, "function", _MISSING)
+            if (
+                not isinstance(getattr(tool_call, "id", None), str)
+                or function is _MISSING
+                or not isinstance(getattr(function, "name", None), str)
+                or not isinstance(getattr(function, "arguments", None), str)
+            ):
+                raise ProviderProtocolError("malformed provider response")
+
+        finish_reason = finish_reason or ""
+        text = content or ""
+        tool_calls = list(tool_calls)
         prompt_tokens = 0
         completion_tokens = 0
         reasoning_tokens = 0
         usage = getattr(resp, "usage", None)
-        usage_available = (
-            usage is not None
-            and getattr(usage, "prompt_tokens", None) is not None
-            and getattr(usage, "completion_tokens", None) is not None
-        )
+        usage_available = usage is not None
         if usage is not None:
-            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+            prompt_tokens = getattr(usage, "prompt_tokens", _MISSING)
+            completion_tokens = getattr(usage, "completion_tokens", _MISSING)
+            if not _is_nonnegative_int(prompt_tokens) or not _is_nonnegative_int(
+                completion_tokens
+            ):
+                raise ProviderProtocolError("malformed provider response")
             details = getattr(usage, "completion_tokens_details", None)
             if details is not None:
-                reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+                reasoning_tokens = getattr(details, "reasoning_tokens", _MISSING)
+                if not _is_nonnegative_int(reasoning_tokens):
+                    raise ProviderProtocolError("malformed provider response")
 
         self.prompt_tokens_total += prompt_tokens
         self.completion_tokens_total += completion_tokens

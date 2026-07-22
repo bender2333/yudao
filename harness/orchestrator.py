@@ -435,10 +435,11 @@ def _make_consult_handler(
         except BudgetExhausted:
             fail("consult exhausted the run budget")
             raise
-        except LoopStopped:
+        except LoopStopped as exc:
+            fail(exc.reason)
             raise
         except Exception:
-            fail("consult failed")
+            fail("system_error")
             raise LoopStopped("system_error") from None
         if sub.stopped_reason == "budget_exhausted":
             fail("consult exhausted the run budget")
@@ -447,6 +448,7 @@ def _make_consult_handler(
             fail("consult could not measure token usage")
             raise BudgetAccountingError("consult could not measure token usage")
         if sub.stopped_reason in NONRECOVERABLE_STOP_REASONS:
+            fail(sub.stopped_reason)
             raise LoopStopped(sub.stopped_reason)
         if sub.stopped_reason != "natural":
             return fail(f"consult did not complete ({sub.stopped_reason})")

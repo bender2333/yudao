@@ -808,6 +808,9 @@ def test_consult_unknown_error_fails_closed_without_leaking(tmp_path):
     assert result.verdict is None
     assert result.consults == 0
     assert result.consult_errors == 1
+    assert [
+        event for event in events if event["type"] == "consult_error"
+    ] == [{"type": "consult_error", "reason": "system_error"}]
     transcript = {role: session.messages for role, session in result.sessions.items()}
     assert secret_detail not in json.dumps([events, transcript])
 
@@ -1105,6 +1108,10 @@ def test_nested_consult_propagates_typed_provider_stop(
 
     assert result.stopped_reason == stopped_reason
     assert result.verdict is None
+    assert result.consult_errors == 1
+    assert [
+        event for event in events if event["type"] == "consult_error"
+    ] == [{"type": "consult_error", "reason": stopped_reason}]
     transcript = {role: session.messages for role, session in result.sessions.items()}
     assert secret_detail not in json.dumps([events, transcript])
 
@@ -1116,6 +1123,7 @@ def test_nested_consult_propagates_repeated_content_filter(tmp_path):
         ],
         finish="tool_calls",
     )
+    events = []
     llm = MockLlmClient(
         [
             _understand_ok(),
@@ -1127,8 +1135,17 @@ def test_nested_consult_propagates_repeated_content_filter(tmp_path):
         ]
     )
 
-    result = run_multi(llm, Workspace(str(tmp_path / "w")), "task")
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        on_event=events.append,
+    )
 
     assert result.stopped_reason == "provider_blocked"
     assert result.verdict is None
     assert result.calls == 5
+    assert result.consult_errors == 1
+    assert [
+        event for event in events if event["type"] == "consult_error"
+    ] == [{"type": "consult_error", "reason": "provider_blocked"}]

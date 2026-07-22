@@ -8,6 +8,7 @@ import pytest
 from openai import APIStatusError, BadRequestError
 
 import harness.llm as llm_module
+from harness.agent_loop import run_agent_loop
 from harness.llm import (
     ContextOverflow,
     LlmClient,
@@ -500,22 +501,84 @@ def test_other_api_status_error_is_sanitized_protocol_error():
 
 
 @pytest.mark.parametrize(
-    "response",
+    "malformed_field",
     [
-        SimpleNamespace(provider_private_detail="provider-private-detail"),
-        SimpleNamespace(choices=[], provider_private_detail="provider-private-detail"),
-        SimpleNamespace(
-            choices=[SimpleNamespace(message=None, finish_reason="stop")],
-            provider_private_detail="provider-private-detail",
-        ),
+        "missing_choices",
+        "empty_choices",
+        "missing_message",
+        "finish_reason",
+        "content",
+        "tool_calls",
+        "tool_id",
+        "tool_name",
+        "tool_arguments",
+        "prompt_tokens",
+        "prompt_tokens_none",
+        "completion_tokens",
+        "reasoning_tokens",
     ],
-    ids=["missing-choices", "empty-choices", "missing-message"],
 )
-def test_malformed_provider_response_is_sanitized_protocol_error(response):
+def test_malformed_provider_response_stops_loop_without_leaking(
+    tmp_path, malformed_field
+):
+    secret_detail = "provider-private-detail"
+    response = _response([])
+    response.provider_private_detail = secret_detail
+    choice = response.choices[0]
+    message = choice.message
+    tool_call = _tool_call("call", "list_dir", {})
+
+    if malformed_field == "missing_choices":
+        del response.choices
+    elif malformed_field == "empty_choices":
+        response.choices = []
+    elif malformed_field == "missing_message":
+        choice.message = None
+    elif malformed_field == "finish_reason":
+        choice.finish_reason = True
+    elif malformed_field == "content":
+        message.content = {"secret": secret_detail}
+    elif malformed_field == "tool_calls":
+        message.tool_calls = None
+    elif malformed_field == "tool_id":
+        tool_call.id = None
+        message.tool_calls = [tool_call]
+    elif malformed_field == "tool_name":
+        tool_call.function.name = 7
+        message.tool_calls = [tool_call]
+    elif malformed_field == "tool_arguments":
+        tool_call.function.arguments = {"secret": secret_detail}
+        message.tool_calls = [tool_call]
+    elif malformed_field == "prompt_tokens":
+        response.usage.prompt_tokens = -1
+    elif malformed_field == "prompt_tokens_none":
+        response.usage.prompt_tokens = None
+    elif malformed_field == "completion_tokens":
+        response.usage.completion_tokens = True
+    else:
+        response.usage.completion_tokens_details.reasoning_tokens = "2"
+
     completions = _ScriptedCompletions([response])
     client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    messages = [{"role": "system", "content": "system"}]
 
-    with pytest.raises(ProviderProtocolError) as raised:
-        LlmClient(client, "test-model").chat([], [])
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        messages=messages,
+    )
 
-    assert "provider-private-detail" not in str(raised.value)
+    assert result.stopped_reason == "provider_protocol_error"
+    assert result.calls == 1
+    assert llm.calls_made == 1
+    assert (
+        llm.prompt_tokens_total,
+        llm.completion_tokens_total,
+        llm.reasoning_tokens_total,
+    ) == (0, 0, 0)
+    assert [event["type"] for event in result.events] == ["provider_error", "stop"]
+    assert secret_detail not in json.dumps([result.events, messages])
