@@ -280,18 +280,18 @@ def test_event_writer_commits_sequence_only_after_serialized_flushed_write(tmp_p
     writer.append({"type": "ok"})
     writer.close()
     assert _jsonl(events) == [{"type": "ok", "seq": 1}]
-    with pytest.raises(ValueError, match="closed"):
+    with pytest.raises(RuntimeError, match="^event writer is closed$"):
         writer.append({"type": "late"})
 
 
-def test_event_writer_flush_failure_does_not_commit_sequence(tmp_path):
+def test_event_writer_flush_failure_permanently_poisons_stream(tmp_path):
     class FailingFlush:
         def __init__(self, wrapped):
             self.wrapped = wrapped
             self.fail = True
 
-        def write(self, value):
-            return self.wrapped.write(value)
+        def write(self, line):
+            return self.wrapped.write(line)
 
         def flush(self):
             if self.fail:
@@ -307,13 +307,19 @@ def test_event_writer_flush_failure_does_not_commit_sequence(tmp_path):
 
     events = tmp_path / "events.jsonl"
     writer = EventWriter(events)
-    wrapper = FailingFlush(writer._file)
-    writer._file = wrapper
+    writer._file = FailingFlush(writer._file)
     with pytest.raises(OSError, match="flush failed"):
         writer.append({"type": "failed"})
-    writer.append({"type": "ok"})
+    assert writer.failed
+    with pytest.raises(RuntimeError, match="^event writer failed$"):
+        writer.append({"type": "second"})
     writer.close()
-    assert _jsonl(events)[-1]["seq"] == 1
+    writer.close()
+
+    rows = _jsonl(events)
+    assert len(rows) <= 1
+    assert [row["seq"] for row in rows] == list(range(1, len(rows) + 1))
+    assert all(row["type"] != "second" for row in rows)
 
 
 def test_event_writer_close_fsyncs_closes_and_preserves_fsync_error(tmp_path, monkeypatch):
@@ -328,6 +334,59 @@ def test_event_writer_close_fsyncs_closes_and_preserves_fsync_error(tmp_path, mo
         writer.close()
     assert closed == [True]
     writer.close()
+
+
+@pytest.mark.parametrize("runner_name", ["solo", "team"])
+def test_event_flush_failure_escapes_runner_without_summary(tmp_path, monkeypatch, runner_name):
+    import harness.run_solo as solo_module
+    import harness.run_team as team_module
+
+    class FailingFlush:
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+            self.fail = True
+
+        def write(self, line):
+            return self.wrapped.write(line)
+
+        def flush(self):
+            if self.fail:
+                self.fail = False
+                raise OSError("flush failed")
+            return self.wrapped.flush()
+
+        def fileno(self):
+            return self.wrapped.fileno()
+
+        def close(self):
+            return self.wrapped.close()
+
+    original_init = EventWriter.__init__
+
+    def failing_init(self, path):
+        original_init(self, path)
+        self._file = FailingFlush(self._file)
+
+    monkeypatch.setattr(EventWriter, "__init__", failing_init)
+    seed, checks = _inputs(tmp_path)
+    run_dir = tmp_path / runner_name
+    module = solo_module if runner_name == "solo" else team_module
+    _patch_provider(monkeypatch, module, [])
+    runner = run_solo if runner_name == "solo" else run_team_cli
+
+    with pytest.raises(RuntimeError, match="^event log write failed$"):
+        runner(
+            "task", "task-1", str(run_dir), str(seed), str(checks),
+            provider_path=str(_provider(tmp_path)),
+        )
+
+    rows = _jsonl(run_dir / "events.jsonl")
+    assert len(rows) <= 1
+    assert [row["seq"] for row in rows] == list(range(1, len(rows) + 1))
+    assert not (run_dir / "summary.json").exists()
+    assert not (run_dir / "summary.json.tmp").exists()
+
+
 
 
 def test_atomic_writer_rejects_target_links_and_cleans_racing_temp(tmp_path, monkeypatch):

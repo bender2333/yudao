@@ -75,16 +75,30 @@ class EventWriter:
         self._file = path.open("x", encoding="utf-8", newline="\n")
         self._seq = 0
         self._closed = False
+        self._failed = False
+
+    @property
+    def failed(self) -> bool:
+        return self._failed
 
     def append(self, event: dict) -> None:
-        if self._closed:
-            raise ValueError("event writer is closed")
+        if self._closed or self._failed:
+            raise RuntimeError("event writer failed" if self._failed else "event writer is closed")
         if type(event) is not dict:
             raise TypeError("event must be a dict")
         candidate = self._seq + 1
         line = json.dumps({**event, "seq": candidate}, ensure_ascii=False, separators=(",", ":")) + "\n"
-        self._file.write(line)
-        self._file.flush()
+        try:
+            self._file.write(line)
+            self._file.flush()
+        except BaseException:
+            self._failed = True
+            self._closed = True
+            try:
+                self._file.close()
+            except BaseException:
+                pass
+            raise
         self._seq = candidate
 
     def close(self) -> None:
@@ -94,5 +108,8 @@ class EventWriter:
         try:
             self._file.flush()
             os.fsync(self._file.fileno())
+        except BaseException:
+            self._failed = True
+            raise
         finally:
             self._file.close()

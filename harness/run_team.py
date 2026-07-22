@@ -27,8 +27,15 @@ def run_team_cli(task: str, task_id: str, run_dir: str, seed_dir: str, checks_fi
             max_reworks=max_reworks, max_steps=max_steps,
             on_event=setup.events.append,
         )
-    finally:
-        setup.events.close()
+    except BaseException:
+        try:
+            setup.events.close()
+        except BaseException:
+            pass
+        raise
+    setup.events.close()
+    if setup.events.failed:
+        raise RuntimeError("event log write failed")
     validate_accounting(result, setup.root / "events.jsonl")
     return finalize_artifacts(
         setup, result, task_id=task_id, treatment="T",
