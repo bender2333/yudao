@@ -19,7 +19,10 @@ from .local_tools import _safe_env
 from .process_control import run_process_tree
 from .workspace import _is_link_or_junction, _require_link_free_components
 
-_MAX_SUMMARY_BYTES = 16 * 1024 * 1024
+_MAX_SUMMARY_BYTES = 1024 * 1024
+_MAX_SUMMARY_NODES = 100_000
+_MAX_SUMMARY_DEPTH = 100
+_MAX_SUMMARY_STRING_BYTES = 256 * 1024
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,22 @@ def _reject_constant(value: str) -> None:
     raise ValueError(value)
 
 
+def _validate_summary_shape(value: object) -> None:
+    nodes = 0
+    pending = [(value, 0)]
+    while pending:
+        item, depth = pending.pop()
+        nodes += 1
+        if nodes > _MAX_SUMMARY_NODES or depth > _MAX_SUMMARY_DEPTH:
+            raise ValueError("summary is too complex")
+        if type(item) is str and len(item.encode("utf-8")) > _MAX_SUMMARY_STRING_BYTES:
+            raise ValueError("summary string is too large")
+        if type(item) is list:
+            pending.extend((child, depth + 1) for child in item)
+        elif type(item) is dict:
+            pending.extend((child, depth + 1) for child in item.values())
+
+
 def _read_summary(path: Path) -> dict | None:
     try:
         if _is_link_or_junction(path) or not stat.S_ISREG(path.lstat().st_mode):
@@ -72,10 +91,16 @@ def _read_summary(path: Path) -> dict | None:
         )
         if type(value) is not dict:
             return None
+        _validate_summary_shape(value)
         canonical_json(value)
         return value
     except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError):
         return None
+
+
+def _summary_completed(summary: dict) -> bool:
+    expected_reason = {"S": "completed", "T": "done"}.get(summary.get("treatment"))
+    return summary.get("outcome") == "done" and summary.get("stopped_reason") == expected_reason
 
 
 def _ensure_record_dir(run_dir: Path) -> bool:
@@ -89,9 +114,22 @@ def _ensure_record_dir(run_dir: Path) -> bool:
     return False
 
 
+def _quarantine_leaf(path: Path) -> None:
+    if os.path.lexists(path):
+        quarantine = path.with_name(f".{path.name}.child-{uuid.uuid4().hex}")
+        os.replace(path, quarantine)
+
+
+def _prepare_result_paths(run_dir: Path) -> None:
+    target = run_dir / "supervisor.json"
+    _quarantine_leaf(target)
+    _quarantine_leaf(target.with_name(target.name + ".tmp"))
+
+
 def _move_log(source: Path, target: Path) -> None:
     if not os.path.lexists(source):
         return
+    _quarantine_leaf(target)
     try:
         os.link(source, target)
     finally:
@@ -102,16 +140,16 @@ def _move_log(source: Path, target: Path) -> None:
 
 
 def _write_result(run_dir: Path, result: SupervisorResult) -> None:
-    value = {
-        "schema_version": 1,
-        "returncode": result.returncode,
-        "timed_out": result.timed_out,
-        "stop_reason": result.stop_reason,
-        "duration_ms": result.duration_ms,
-        "summary": result.summary,
-    }
+    value = {"schema_version": 1, **asdict(result)}
     canonical_json(value)
-    write_json_atomic(run_dir / "supervisor.json", value)
+    for attempt in range(2):
+        _prepare_result_paths(run_dir)
+        try:
+            write_json_atomic(run_dir / "supervisor.json", value)
+            return
+        except FileExistsError:
+            if attempt:
+                raise
 
 
 def supervise_command(
@@ -167,14 +205,26 @@ def supervise_command(
                     reason = "summary_missing"
                 else:
                     summary = _read_summary(target / "summary.json")
-                    reason = "completed" if summary is not None else "summary_invalid"
+                    if summary is None:
+                        reason = "summary_invalid"
+                    else:
+                        reason = "completed" if _summary_completed(summary) else "process_failed"
                 result = SupervisorResult(
                     process.returncode, process.timed_out, reason, process.duration_ms, summary
                 )
+        if result.stop_reason != "completed":
+            try:
+                _move_log(stdout, target / "supervisor.stdout.log")
+                _move_log(stderr, target / "supervisor.stderr.log")
+            except OSError:
+                result = SupervisorResult(
+                    result.returncode,
+                    result.timed_out,
+                    "supervisor_error",
+                    result.duration_ms,
+                    {"error_type": "LogPreservationError"},
+                )
         _write_result(target, result)
-        if preserve_logs:
-            _move_log(stdout, target / "supervisor.stdout.log")
-            _move_log(stderr, target / "supervisor.stderr.log")
         return result
     finally:
         for path in (stdout, stderr):

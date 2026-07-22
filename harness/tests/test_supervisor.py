@@ -14,10 +14,19 @@ import harness.supervisor as supervisor_module
 from harness.supervisor import SupervisorResult, main, supervise_command
 
 
+def _valid_summary(treatment: str = "S") -> dict:
+    return {
+        "treatment": treatment,
+        "outcome": "done",
+        "stopped_reason": "completed" if treatment == "S" else "done",
+    }
+
+
 def _command(run_dir: Path, *, summary: str | None = None, returncode: int = 0) -> list[str]:
     script = "import pathlib,sys; p=pathlib.Path(sys.argv[1]); p.mkdir();"
     if summary is not None:
         script += "(p/'summary.json').write_text(sys.argv[2],encoding='utf-8');"
+    script += "sys.stdout.write('stdout evidence');sys.stderr.write('stderr evidence');"
     script += f"raise SystemExit({returncode})"
     argv = [sys.executable, "-c", script, str(run_dir)]
     if summary is not None:
@@ -29,9 +38,12 @@ def _read_record(run_dir: Path) -> dict:
     return json.loads((run_dir / "supervisor.json").read_text(encoding="utf-8"))
 
 
-def test_completed_reads_object_summary_and_writes_atomic_record(tmp_path: Path) -> None:
+@pytest.mark.parametrize("treatment", ["S", "T"])
+def test_completed_requires_treatment_specific_runner_summary(
+    tmp_path: Path, treatment: str
+) -> None:
     run_dir = tmp_path / "run"
-    summary = {"outcome": "done", "value": [1, "two"]}
+    summary = _valid_summary(treatment)
 
     result = supervise_command(
         _command(run_dir, summary=json.dumps(summary)),
@@ -41,16 +53,94 @@ def test_completed_reads_object_summary_and_writes_atomic_record(tmp_path: Path)
     )
 
     assert result == SupervisorResult(0, False, "completed", result.duration_ms, summary)
-    assert _read_record(run_dir) == {
-        "schema_version": 1,
-        "returncode": 0,
-        "timed_out": False,
-        "stop_reason": "completed",
-        "duration_ms": result.duration_ms,
-        "summary": summary,
-    }
+    assert _read_record(run_dir) == {"schema_version": 1, **result.__dict__}
     assert not (run_dir / "supervisor.json.tmp").exists()
+    assert not (run_dir / "supervisor.stdout.log").exists()
+    assert not (run_dir / "supervisor.stderr.log").exists()
     assert sorted(path.name for path in tmp_path.iterdir()) == ["run"]
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        {"ok": True},
+        {"treatment": "X", "outcome": "done", "stopped_reason": "completed"},
+        {"treatment": "S", "outcome": "failed", "stopped_reason": "completed"},
+        {"treatment": "S", "outcome": "done", "stopped_reason": "done"},
+        {"treatment": "T", "outcome": "done", "stopped_reason": "completed"},
+    ],
+)
+def test_false_completion_is_process_failed_and_preserves_summary(
+    tmp_path: Path, summary: dict
+) -> None:
+    run_dir = tmp_path / "run"
+
+    result = supervise_command(
+        _command(run_dir, summary=json.dumps(summary)),
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env=os.environ.copy(),
+    )
+
+    assert result.stop_reason == "process_failed"
+    assert result.returncode == 0
+    assert result.summary == summary
+    assert _read_record(run_dir)["summary"] == summary
+    assert (run_dir / "supervisor.stderr.log").read_text(encoding="utf-8") == "stderr evidence"
+
+
+@pytest.mark.parametrize("leaf_kind", ["file", "symlink"])
+def test_child_supervisor_leaves_are_quarantined_before_authoritative_write(
+    tmp_path: Path, leaf_kind: str
+) -> None:
+    run_dir = tmp_path / "run"
+    outside = tmp_path / "outside"
+    outside.write_text("victim", encoding="utf-8")
+    summary = json.dumps(_valid_summary())
+    child = (
+        "import os,pathlib,sys;p=pathlib.Path(sys.argv[1]);p.mkdir();"
+        "(p/'summary.json').write_text(sys.argv[2],encoding='utf-8');"
+        "[(os.symlink(sys.argv[3],p/n) if sys.argv[4]=='symlink' else (p/n).write_text('{}',encoding='utf-8')) "
+        "for n in ('supervisor.json','supervisor.json.tmp')]"
+    )
+
+    result = supervise_command(
+        [sys.executable, "-c", child, str(run_dir), summary, str(outside), leaf_kind],
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env=os.environ.copy(),
+    )
+
+    assert result.stop_reason == "completed"
+    assert _read_record(run_dir) == {"schema_version": 1, **result.__dict__}
+    quarantines = list(run_dir.glob(".supervisor.json*.child-*"))
+    assert len(quarantines) == 2
+    assert outside.read_text(encoding="utf-8") == "victim"
+
+
+def test_child_log_targets_are_quarantined_before_failure_logs(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    outside = tmp_path / "outside"
+    outside.write_text("victim", encoding="utf-8")
+    child = (
+        "import os,pathlib,sys;p=pathlib.Path(sys.argv[1]);p.mkdir();"
+        "os.symlink(sys.argv[2],p/'supervisor.stdout.log');"
+        "(p/'supervisor.stderr.log').write_text('child',encoding='utf-8');"
+        "sys.stdout.write('stdout evidence');sys.stderr.write('stderr evidence');raise SystemExit(7)"
+    )
+
+    result = supervise_command(
+        [sys.executable, "-c", child, str(run_dir), str(outside)],
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env=os.environ.copy(),
+    )
+
+    assert result.stop_reason == "process_failed"
+    assert (run_dir / "supervisor.stdout.log").read_text(encoding="utf-8") == "stdout evidence"
+    assert (run_dir / "supervisor.stderr.log").read_text(encoding="utf-8") == "stderr evidence"
+    assert len(list(run_dir.glob(".supervisor.*.log.child-*"))) == 2
+    assert outside.read_text(encoding="utf-8") == "victim"
 
 
 @pytest.mark.parametrize(
@@ -79,13 +169,42 @@ def test_failure_classification_is_recorded(
     assert result.summary is None
     assert _read_record(run_dir)["stop_reason"] == reason
     assert _read_record(run_dir)["summary"] is None
+    assert (run_dir / "supervisor.stdout.log").read_text(encoding="utf-8") == "stdout evidence"
+    assert (run_dir / "supervisor.stderr.log").read_text(encoding="utf-8") == "stderr evidence"
 
 
-def test_oversize_summary_is_invalid(tmp_path: Path) -> None:
+def test_oversize_summary_is_invalid_without_parsing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     run_dir = tmp_path / "run"
     script = (
         "import pathlib,sys;p=pathlib.Path(sys.argv[1]);p.mkdir();"
-        "(p/'summary.json').write_bytes(b'x'*(16*1024*1024+1))"
+        "(p/'summary.json').write_text('{\\\"padding\\\":\\\"'+'x'*(2*1024*1024)+'\\\"}',encoding='utf-8')"
+    )
+    loads = supervisor_module.json.loads
+    calls = 0
+
+    def spy(*args: object, **kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        return loads(*args, **kwargs)
+
+    monkeypatch.setattr(supervisor_module.json, "loads", spy)
+    result = supervise_command(
+        [sys.executable, "-c", script, str(run_dir)],
+        run_dir=run_dir,
+        timeout_seconds=20,
+        env=os.environ.copy(),
+    )
+    assert result.stop_reason == "summary_invalid"
+    assert calls == 0
+
+
+def test_summary_with_more_than_100000_nodes_is_invalid(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    script = (
+        "import pathlib,sys;p=pathlib.Path(sys.argv[1]);p.mkdir();"
+        "(p/'summary.json').write_text('{\\\"items\\\":['+'[],'*100000+'[]]}',encoding='utf-8')"
     )
     result = supervise_command(
         [sys.executable, "-c", script, str(run_dir)],
@@ -242,6 +361,8 @@ def test_timeout_kills_ready_descendant_and_records_failure(tmp_path: Path) -> N
     assert result.summary is None
     assert not sentinel.exists()
     assert _read_record(run_dir)["stop_reason"] == "hard_timeout"
+    assert (run_dir / "supervisor.stdout.log").exists()
+    assert (run_dir / "supervisor.stderr.log").exists()
 
 
 @pytest.mark.parametrize(
@@ -301,6 +422,18 @@ def test_main_builds_only_selected_runner_command(monkeypatch: pytest.MonkeyPatc
     assert calls[0][1:3] == (run_dir, 70.0)
     assert "PYTHONUTF8" in calls[0][3]
     assert json.loads(capsys.readouterr().out)["stop_reason"] == "completed"
+
+
+def test_main_false_completion_exits_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake(*_args: object, **_kwargs: object) -> SupervisorResult:
+        return SupervisorResult(0, False, "process_failed", 1, {"outcome": "failed"})
+
+    monkeypatch.setattr("harness.supervisor.supervise_command", fake)
+    exit_code = main([
+        "solo", "task", "--task-id", "S1", "--run-dir", str(tmp_path / "run"),
+        "--seed-dir", "seed", "--checks-file", "checks.json",
+    ])
+    assert exit_code == 1
 
 
 def test_main_solo_failure_exits_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
