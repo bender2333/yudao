@@ -66,33 +66,6 @@ def test_solo_prompts_keep_legacy_and_explicit_completion_separate():
     assert all(word not in loop for word in ("department", "engineering", "quality", "requirements"))
 
 
-def test_legacy_run_solo_still_accepts_natural_stop(tmp_path, monkeypatch):
-    captured = {}
-
-    def fake_loop(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(
-            stopped_reason="natural",
-            steps=1,
-            tool_invocations=0,
-            calls=1,
-            prompt_tokens=1,
-            completion_tokens=1,
-            reasoning_tokens=0,
-            duration_ms=1,
-            final_text="done naturally",
-        )
-
-    monkeypatch.setattr("harness.run_solo.load_provider", lambda _: {"model": "test"})
-    monkeypatch.setattr("harness.run_solo.make_client", lambda _: object())
-    monkeypatch.setattr("harness.run_solo.LlmClient", lambda *args, **kwargs: object())
-    monkeypatch.setattr("harness.run_solo.run_agent_loop", fake_loop)
-
-    summary = run_solo("task", str(tmp_path / "legacy"), provider_path="ignored")
-
-    assert captured["system"] == SOLO_SYSTEM
-    assert summary["stopped_reason"] == "natural"
-    assert summary["final_text"] == "done naturally"
 
 
 def test_solo_requires_explicit_done_with_current_check(tmp_path):

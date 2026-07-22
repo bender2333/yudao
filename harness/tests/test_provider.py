@@ -164,14 +164,17 @@ def test_missing_url_raises(tmp_path):
         load_provider(path)
 
 
-@pytest.mark.parametrize("runner", [run_solo, run_multi_cli])
-def test_runner_rejects_existing_run_directory(tmp_path, runner):
+def test_runner_rejects_existing_run_directory(tmp_path):
     with pytest.raises(FileExistsError):
-        runner(
-            "task",
-            str(tmp_path),
+        run_solo(
+            "task", "task-1", str(tmp_path), "missing-seed", "missing-checks",
             provider_path=str(tmp_path / "missing-provider.md"),
         )
+
+    other = tmp_path / "multi"
+    other.mkdir()
+    with pytest.raises(FileExistsError):
+        run_multi_cli("task", str(other), provider_path=str(tmp_path / "missing-provider.md"))
 
 
 def test_run_multi_cli_writes_summary_when_budget_exhausted(tmp_path, monkeypatch):
@@ -388,19 +391,26 @@ def test_wall_budget_stops_before_first_multi_call(tmp_path, monkeypatch):
 
 def test_solo_uses_the_same_token_budget(tmp_path, monkeypatch):
     _patch_solo_provider(monkeypatch, [_response([], text="done")])
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    checks = tmp_path / "checks.json"
+    checks.write_text('{"protected_paths":[],"checks":{}}', encoding="utf-8")
 
     summary = run_solo(
         "task",
+        "task-1",
         str(tmp_path / "solo-token-budget"),
+        str(seed),
+        str(checks),
         max_tokens=5,
         provider_path="ignored.md",
     )
 
-    assert summary["mode"] == "solo"
+    assert summary["treatment"] == "S"
     assert summary["stopped_reason"] == "budget_exhausted"
     assert summary["calls"] == 1
     assert summary["prompt_tokens"] + summary["completion_tokens"] == 15
-    assert summary["budget"]["max_tokens"] == 5
+    assert summary["limits"]["max_tokens"] == 5
 
 
 @pytest.mark.parametrize(

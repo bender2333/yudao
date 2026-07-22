@@ -9,18 +9,17 @@ from __future__ import annotations
 import argparse
 import copy
 import json
-import os
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from pathlib import Path
 
-from .agent_loop import LoopStopped, run_agent_loop
+from .agent_loop import LoopStopped
+from .artifacts import EventWriter, _write_jsonl_atomic, write_json_atomic
 from .contracts import SUBMIT_DONE, TERMINAL_TOOL_DEFS, TicketValidationError, validate_payload
 from .llm import LlmClient
-from .local_tools import LocalToolRuntime
+from .local_tools import LocalToolRuntime, load_check_manifest
 from .provider import load_provider, make_client
 from .role_session import RoleSession
 from .seed import seed_workspace
-from .tools import TOOL_DEFS
 from .workspace import Workspace, diff_manifests
 
 SOLO_SYSTEM = (
@@ -298,125 +297,82 @@ def run_solo_loop(
     )
 
 
-def run_solo(
-    task: str,
-    run_dir: str,
-    max_steps: int = 40,
-    max_calls: int | None = None,
-    max_tokens: int | None = None,
-    max_seconds: float | None = None,
-    provider_path: str = "provider.md",
-    seed_dir: str | None = None,
-) -> dict:
-    os.makedirs(run_dir, exist_ok=False)
+def run_solo(task: str, task_id: str, run_dir: str, seed_dir: str, checks_file: str, max_steps: int = 200, max_calls: int = 200, max_tokens: int | None = None, max_seconds: float = 5400, provider_path: str = "provider.md") -> dict:
+    root = Path(run_dir)
+    root.mkdir(parents=True, exist_ok=False)
+    if type(max_steps) is not int or max_steps <= 0:
+        raise ValueError("max_steps must be a positive integer")
+
     cfg = load_provider(provider_path)
     client = make_client(cfg)
-    llm = LlmClient(
-        client,
-        cfg["model"],
-        max_calls=max_calls,
-        max_tokens=max_tokens,
-        max_seconds=max_seconds,
-    )
-
-    ws = Workspace(os.path.join(run_dir, "workspace"))
-    if seed_dir:
-        seed_workspace(seed_dir, ws.dir)
-
-    events_path = os.path.join(run_dir, "events.jsonl")
-    events_file = open(events_path, "w", encoding="utf-8")
-
-    def on_event(event: dict) -> None:
-        events_file.write(json.dumps(event, ensure_ascii=False) + "\n")
-        events_file.flush()
-
+    llm = LlmClient(client, cfg["model"], max_calls=max_calls, max_tokens=max_tokens, max_seconds=max_seconds)
+    workspace = Workspace(str(root / "workspace"))
+    (root / "sessions").mkdir()
+    (root / "tickets").mkdir()
+    checks, protected = load_check_manifest(checks_file)
+    runtime = LocalToolRuntime(workspace, checks, protected, root / "checks")
+    seed_workspace(seed_dir, workspace.dir)
+    events = EventWriter(root / "events.jsonl")
     try:
-        result = run_agent_loop(
-            llm=llm,
-            system=SOLO_SYSTEM,
-            user=task,
-            tools=TOOL_DEFS,
-            handlers_ctx=ws.dir,
-            max_steps=max_steps,
-            on_event=on_event,
-        )
+        result = run_solo_loop(llm, workspace, runtime, task_id, task, max_steps=max_steps, on_event=events.append)
     finally:
-        events_file.close()
+        events.close()
 
+    if result.calls != sum(metric["calls"] for metric in result.per_role.values()):
+        raise RuntimeError("accounting mismatch: per-role calls")
+    event_calls = sum(line.count('\"type\":\"llm_call\"') for line in (root / "events.jsonl").read_text(encoding="utf-8").splitlines())
+    if result.calls != event_calls:
+        raise RuntimeError("accounting mismatch: event calls")
+
+    _write_jsonl_atomic(root / "sessions" / "solo.jsonl", result.session.messages)
+    manifest = workspace.tree_manifest()
+    final_hash = workspace.tree_hash()
+    write_json_atomic(root / "final_tree.json", manifest)
+    llm_duration_ms = sum(metric["llm_duration_ms"] for metric in result.per_role.values())
     summary = {
-        "task": task,
-        "mode": "solo",
+        "schema_version": 1,
+        "task_id": task_id,
+        "treatment": "S",
         "model": cfg["model"],
-        "budget": {
-            "max_calls": max_calls,
-            "max_tokens": max_tokens,
-            "max_seconds": max_seconds,
-        },
+        "outcome": result.outcome,
         "stopped_reason": result.stopped_reason,
-        "steps": result.steps,
-        "tool_invocations": result.tool_invocations,
+        "limits": {"max_steps": max_steps, "max_calls": max_calls, "max_tokens": max_tokens, "max_seconds": max_seconds},
         "calls": result.calls,
         "prompt_tokens": result.prompt_tokens,
         "completion_tokens": result.completion_tokens,
         "reasoning_tokens": result.reasoning_tokens,
+        "transient_retry_attempts": result.transient_retry_attempts,
+        "content_filter_retries": result.content_filter_retries,
+        "tool_invocations": result.tool_invocations,
         "duration_ms": result.duration_ms,
-        "files": ws.snapshot_files(),
-        "final_text": result.final_text,
+        "llm_duration_ms": llm_duration_ms,
+        "final_tree_hash": final_hash,
+        "final_tree": manifest,
+        "per_role": result.per_role,
+        "completion": result.completion,
     }
-    with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as f:
-        json.dump(summary, f, ensure_ascii=False, indent=2)
+    write_json_atomic(root / "summary.json", summary)
     return summary
 
 
 def _print_summary(summary: dict) -> None:
-    print("=" * 60)
-    print(f"model:            {summary['model']}")
-    print(f"stopped_reason:   {summary['stopped_reason']}")
-    print(f"steps:            {summary['steps']}")
-    print(f"tool_invocations: {summary['tool_invocations']}")
-    print(f"calls:            {summary['calls']}")
-    print(
-        f"tokens:           prompt={summary['prompt_tokens']} "
-        f"completion={summary['completion_tokens']} "
-        f"reasoning={summary['reasoning_tokens']}"
-    )
-    print(f"duration_ms:      {summary['duration_ms']}")
-    print(f"files:            {summary['files']}")
-    print("-" * 60)
-    print("final_text:")
-    print(summary["final_text"])
-    print("=" * 60)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="harness.run_solo")
-    parser.add_argument("task", help="Task description for the agent.")
-    parser.add_argument("--run-dir", default=None)
-    parser.add_argument("--max-steps", type=int, default=40)
-    parser.add_argument("--max-calls", type=int, default=None)
-    parser.add_argument("--max-tokens", type=int, default=None)
-    parser.add_argument("--max-seconds", type=float, default=None)
-    parser.add_argument(
-        "--seed-dir",
-        default=None,
-        help="Copy files from this directory into the new workspace before the loop.",
-    )
+    parser.add_argument("task")
+    parser.add_argument("--task-id", required=True)
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--seed-dir", required=True)
+    parser.add_argument("--checks-file", required=True)
+    parser.add_argument("--max-steps", type=int, default=200)
+    parser.add_argument("--max-calls", type=int, default=200)
+    parser.add_argument("--max-tokens", type=int)
+    parser.add_argument("--max-seconds", type=float, default=5400)
+    parser.add_argument("--provider-path", default="provider.md")
     args = parser.parse_args()
-
-    run_dir = args.run_dir or os.path.join(
-        "runs", datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    )
-    summary = run_solo(
-        task=args.task,
-        run_dir=run_dir,
-        max_steps=args.max_steps,
-        max_calls=args.max_calls,
-        max_tokens=args.max_tokens,
-        max_seconds=args.max_seconds,
-        seed_dir=args.seed_dir,
-    )
-    _print_summary(summary)
-    print(f"\nrun_dir: {run_dir}")
+    _print_summary(run_solo(**vars(args)))
 
 
 if __name__ == "__main__":
