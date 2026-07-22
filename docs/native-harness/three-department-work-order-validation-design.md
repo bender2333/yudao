@@ -163,31 +163,32 @@ S 使用一个 run 级长期会话。它拥有与开发部相同的文件能力�
 
 ### 6.1 公共头部
 
-所有工单包含：
+模型只提交各工单的语义 payload。控制层校验 payload 后，机械生成并持久化公共头部：
 
 ```json
 {
   "schema_version": 1,
-  "ticket_id": "...",
-  "task_id": "...",
+  "kind": "acceptance|clarification|delivery|defect|release",
+  "ticket_id": "A-0001",
+  "task_id": "task-001",
   "issuer": "requirements|engineering|quality",
   "revision": 1,
   "parent_hash": null,
-  "content_hash": "sha256:..."
+  "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 }
 ```
 
-控制层将除 `content_hash` 外的工单内容按 UTF-8、键排序、紧凑 JSON 规范化后计算 SHA-256。时间戳和本地文件路径属于事件元数据，不进入工单内容哈希。
+`schema_version`、`kind`、`ticket_id`、`task_id`、`issuer`、`revision`、`parent_hash`、`content_hash`、当前验收单哈希、当前代码树哈希、检查退出码和检查摘要都由控制层生成，绝不要求模型计算或抄写。控制层将除 `content_hash` 外的完整工单按 UTF-8、键排序、紧凑 JSON 规范化后计算 SHA-256。时间戳和本地文件路径属于事件元数据，不进入工单内容哈希。
 
 校验规则：
 
-- schema 不合法：留在当前部门并返回字段级错误；
-- `task_id` 不符：拒绝；
-- revision 不连续：拒绝；
-- `parent_hash` 不是当前有效上游工单：拒绝；
-- `content_hash` 不匹配：拒绝；
-- 引用旧验收单或旧代码哈希：拒绝；
-- 工单校验通过后才允许状态跳转。
+- payload schema 不合法：留在当前部门并返回字段级错误；
+- issuer 与当前激活部门不符：拒绝；
+- revision、parent 与 ticket ID 只由控制层按当前状态生成；
+- 交付、返工和放行自动绑定当前验收单与当前代码树；
+- 模型引用的检查名必须存在当前代码树对应的真实 `run_check` 回执，否则拒绝；
+- 持久工单重新读取时，公共头部、父链和 `content_hash` 任一不匹配都大声失败；
+- 工单完整封装并持久化后才允许状态跳转。
 
 ### 6.2 验收单（AcceptanceSpec）
 
@@ -236,68 +237,57 @@ S 使用一个 run 级长期会话。它拥有与开发部相同的文件能力�
 
 ### 6.4 交付单（DeliveryReport）
 
-开发部提交：
+开发部提交语义 payload：
 
 ```json
 {
-  "acceptance_hash": "sha256:...",
-  "code_tree_hash": "sha256:...",
   "changed_files": ["relative/path.py"],
   "requirement_mapping": [
     {"requirement_id": "R-001", "files": ["relative/path.py"]}
   ],
-  "checks": [
-    {"name": "public_tests", "exit_code": 0, "result_digest": "sha256:..."}
-  ],
+  "check_names": ["public_tests"],
   "known_risks": []
 }
 ```
 
-控制层验证文件确实存在、代码树哈希匹配、检查确实由本 run 的 `run_check` 产生。模型不能伪造退出码或检查摘要。
+控制层验证文件确实存在，绑定当前验收单与代码树哈希，并把当前代码树对应的真实检查退出码和结果摘要写入持久交付单。模型不能提交或覆盖这些控制字段。
 
 ### 6.5 返工单（DefectTicket）
 
-质检部提交：
+质检部提交语义 payload：
 
 ```json
 {
-  "acceptance_hash": "sha256:...",
-  "code_tree_hash": "sha256:...",
   "route": "requirements|engineering",
   "defects": [
     {
-      "defect_id": "D-001",
       "requirement_ids": ["R-001"],
       "severity": "fatal|major|minor",
       "reproduction": ["机械复现步骤"],
       "expected": "期望结果",
       "actual": "实际结果",
-      "evidence": [{"check": "public_tests", "result_digest": "sha256:..."}]
+      "evidence_check_names": ["public_tests"]
     }
   ]
 }
 ```
 
-`route=requirements` 表示验收合同错误、矛盾或缺失；`route=engineering` 表示合同足够清楚而实现不满足。返工单可包含多个缺陷，但整张单只允许一个 route，避免一次跳向两个状态。
+控制层为缺陷分配 `defect_id`，绑定当前验收单、代码树和真实检查回执。`route=requirements` 表示验收合同错误、矛盾或缺失；`route=engineering` 表示合同足够清楚而实现不满足。返工单可包含多个缺陷，但整张单只允许一个 route，避免一次跳向两个状态。
 
 ### 6.6 放行单（ReleaseDecision）
 
-质检部提交：
+质检部提交语义 payload：
 
 ```json
 {
-  "acceptance_hash": "sha256:...",
-  "code_tree_hash": "sha256:...",
   "verified_requirements": ["R-001", "E-001", "G-001", "F-001"],
-  "checks": [
-    {"name": "public_tests", "exit_code": 0, "result_digest": "sha256:..."}
-  ],
+  "check_names": ["public_tests"],
   "closed_defects": ["D-001"],
   "decision": "release"
 }
 ```
 
-只有质检部可以提交，且必须覆盖验收单全部可验证项。控制层只把它解释为“Team 自报完成”；真正正确性仍由循环外隐藏评分决定。
+控制层绑定当前验收单、代码树和真实检查回执。只有质检部可以提交；全部检查必须针对当前代码树且退出码为 0，并且必须覆盖验收单全部可验证项。控制层只把它解释为“Team 自报完成”；真正正确性仍由循环外隐藏评分决定。
 
 ## 7. 确定性状态机
 
@@ -370,9 +360,16 @@ Team 权限：
 
 ```json
 {
+  "protected_paths": ["TASK.md", "tests/public"],
   "checks": {
-    "public_tests": ["python", "-m", "pytest", "tests/public", "-q"],
-    "build": ["python", "-m", "compileall", "src"]
+    "public_tests": {
+      "argv": ["python", "-m", "pytest", "tests/public", "-q"],
+      "timeout_seconds": 120
+    },
+    "build": {
+      "argv": ["python", "-m", "compileall", "src"],
+      "timeout_seconds": 120
+    }
   }
 }
 ```
@@ -382,11 +379,12 @@ Team 权限：
 - Agent 只能传检查名，不能传命令或额外参数；
 - 每次检查先计算当前代码树哈希，再把工作区复制到一次性检查镜像；
 - 控制层在镜像中使用参数数组直接启动，不经过 shell；检查结束后删除镜像，任何角色的检查都不能改写真实工作区；
+- 每个检查运行在独立进程组；检查超时时必须终止完整进程树，而不是只杀直接子进程；
 - 检查结果绑定调用前的代码树哈希，代码变化后旧证据自动失效；
 - cwd 固定为一次性检查镜像；
 - 环境变量使用最小允许列表，不继承 provider key；
 - 每个检查有 manifest 固定超时；
-- stdout/stderr 截断落盘并返回摘要；
+- stdout/stderr 直接流入 workspace 外审计文件，控制层只读有界摘要，不能在内存无限累积；
 - 退出码和结果摘要由控制层生成，模型不能覆盖；
 - manifest、任务种子和检查配置在正式运行前冻结。
 
@@ -668,9 +666,11 @@ runs/work-order/<batch-id>/
 | `harness/role_session.py` | 单个长期私有会话及 transcript 落盘 |
 | `harness/work_order_loop.py` | T 确定性状态机、路由、卡死检测和汇总 |
 | `harness/local_tools.py` | 相对路径文件工具、权限过滤和命名检查 |
+| `harness/process_control.py` | 参数数组子进程、真实墙钟与跨平台进程树终止，供检查和 supervisor 共用 |
 | `harness/run_team.py` | 单次 T CLI 装配，不包含批次逻辑 |
 | `harness/run_solo.py` | S 单会话入口，改为同工具边界与显式 `submit_done` |
 | `harness/supervisor.py` | 子进程、90 分钟硬超时、进程树终止和 summary 完整性 |
+| `harness/artifacts.py` | 原子 JSON/JSONL、流式事件、工单、会话和 final tree 落盘 |
 | `scripts/work_order_experiment.py` | 配对顺序、workspace 复制、循环外评分和批次汇总 |
 | `harness/tests/test_contracts.py` | 工单、版本、哈希和 stale 引用 |
 | `harness/tests/test_work_order_loop.py` | 全状态路径、返工、权限、私有记忆和卡死 |
