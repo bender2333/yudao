@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from openai import APIStatusError, BadRequestError
+from openai import APIResponseValidationError, APIStatusError, BadRequestError
 
 import harness.llm as llm_module
 from harness.agent_loop import run_agent_loop
@@ -108,6 +108,18 @@ def _api_status_error(body):
         request=httpx.Request("POST", "https://provider.invalid/v1/chat/completions"),
     )
     return APIStatusError("provider-private-detail", response=response, body=body)
+
+
+def _api_response_validation_error(body):
+    response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://provider.invalid/v1/chat/completions"),
+    )
+    return APIResponseValidationError(
+        response=response,
+        body=body,
+        message="provider-private-detail",
+    )
 
 
 def test_parses_bare_model_line(tmp_path):
@@ -355,11 +367,7 @@ def test_token_budget_is_shared_across_multi_roles(tmp_path, monkeypatch):
     events = _read_jsonl(run_dir / "events.jsonl")
     assert sum(event["type"] == "llm_call" for event in events) == summary["calls"]
     plan_messages = _read_jsonl(run_dir / "sessions" / "plan_execute.jsonl")
-    assert [message["role"] for message in plan_messages] == [
-        "system",
-        "user",
-        "assistant",
-    ]
+    assert [message["role"] for message in plan_messages] == ["system", "user"]
 
 
 def test_wall_budget_stops_before_first_multi_call(tmp_path, monkeypatch):
@@ -655,3 +663,59 @@ def test_unavailable_usage_stops_as_accounting_error_by_default(
     assert [event["type"] for event in result.events] == ["llm_call", "stop"]
     assert result.events[0]["stopped_reason"] == "budget_accounting_error"
     assert [message["role"] for message in messages] == ["system", "user"]
+
+
+def test_sdk_response_validation_error_is_sanitized_protocol_stop(tmp_path):
+    secret_detail = "provider-private-detail"
+    completions = _ScriptedCompletions(
+        [_api_response_validation_error({"message": secret_detail})]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+    assert result.calls == 0
+    assert [event["type"] for event in result.events] == ["provider_error", "stop"]
+    assert secret_detail not in json.dumps([result.events, messages])
+
+
+def test_post_response_budget_precedes_malformed_message(tmp_path):
+    secret_detail = "provider-private-detail"
+    response = _response([], text=secret_detail)
+    response.choices[0].message = None
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model", max_tokens=1)
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert (result.prompt_tokens, result.completion_tokens, result.reasoning_tokens) == (
+        10,
+        5,
+        2,
+    )
+    assert [event["type"] for event in result.events] == ["llm_call", "stop"]
+    assert result.events[0]["stopped_reason"] == "budget_exhausted"
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert secret_detail not in json.dumps([result.events, messages])

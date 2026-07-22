@@ -286,7 +286,7 @@ def run_agent_loop(
             }
         )
 
-        if result.stopped_reason == "budget_accounting_error":
+        if result.stopped_reason in {"budget_accounting_error", "budget_exhausted"}:
             stopped_reason = result.stopped_reason
             emit(
                 {

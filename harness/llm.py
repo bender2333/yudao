@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from openai import (
     APIConnectionError,
+    APIResponseValidationError,
     APIStatusError,
     APITimeoutError,
     BadRequestError,
@@ -198,6 +199,21 @@ class LlmClient:
             role_usage["completion_tokens"] += completion_tokens
             role_usage["reasoning_tokens"] += reasoning_tokens
 
+        try:
+            self.check_budget()
+        except BudgetExhausted as exc:
+            return CallResult(
+                text="",
+                tool_calls=[],
+                finish_reason="stop",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                reasoning_tokens=reasoning_tokens,
+                duration_ms=duration_ms,
+                stopped_reason="budget_exhausted",
+                stop_detail=str(exc),
+            )
+
         def malformed_response():
             return ProviderProtocolError(
                 "malformed provider response",
@@ -241,11 +257,6 @@ class LlmClient:
 
         stopped_reason = None
         stop_detail = None
-        try:
-            self.check_budget()
-        except BudgetExhausted as exc:
-            stopped_reason = "budget_exhausted"
-            stop_detail = str(exc)
 
         return CallResult(
             text=content or "",
@@ -288,6 +299,8 @@ class LlmClient:
                         self.check_budget()
                     delay = min(delay, remaining)
                 time.sleep(delay)
+            except APIResponseValidationError as exc:
+                raise ProviderProtocolError("malformed provider response") from exc
             except APIStatusError as exc:
                 raise ProviderProtocolError("provider request failed") from exc
 
