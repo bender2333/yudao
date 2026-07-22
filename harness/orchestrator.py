@@ -26,7 +26,13 @@ import json
 from dataclasses import dataclass, field
 
 from .agent_loop import AgentSession, activate
-from .llm import BudgetAccountingError, BudgetExhausted
+from .llm import (
+    BudgetAccountingError,
+    BudgetExhausted,
+    ContextOverflow,
+    ProviderProtocolError,
+    ProviderUnavailable,
+)
 from .stage_tools import (
     CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
@@ -320,7 +326,13 @@ def _make_understand_hook(llm, on_event):
                 args = json.loads(tc.function.arguments or "{}")
                 if all((args.get(k) or "").strip() for k in _REQUIRED_U_FIELDS):
                     return {"name": UNDERSTAND_TERMINAL, "args": args}
-        except (BudgetAccountingError, BudgetExhausted):
+        except (
+            BudgetAccountingError,
+            BudgetExhausted,
+            ContextOverflow,
+            ProviderProtocolError,
+            ProviderUnavailable,
+        ):
             raise
         except Exception:
             pass
@@ -395,7 +407,13 @@ def _make_verify_hook(llm, on_event):
                         and args["reason"].strip()
                     ):
                         return {"name": "submit_verdict", "args": args}
-        except (BudgetAccountingError, BudgetExhausted):
+        except (
+            BudgetAccountingError,
+            BudgetExhausted,
+            ContextOverflow,
+            ProviderProtocolError,
+            ProviderUnavailable,
+        ):
             raise
         except Exception:
             pass

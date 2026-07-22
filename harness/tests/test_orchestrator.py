@@ -10,7 +10,13 @@ from dataclasses import dataclass
 import pytest
 
 from harness.agent_loop import run_agent_loop
-from harness.llm import BudgetExhausted, CallResult
+from harness.llm import (
+    BudgetExhausted,
+    CallResult,
+    ContextOverflow,
+    ProviderProtocolError,
+    ProviderUnavailable,
+)
 from harness.orchestrator import (
     PLAN_SYSTEM,
     UNDERSTAND_SYSTEM,
@@ -137,6 +143,31 @@ class ErrorOnCallMockLlmClient(MockLlmClient):
         self.attempts += 1
         if self.attempts == self.error_on_attempt:
             raise RuntimeError("provider unavailable")
+        return super().chat(
+            messages,
+            tools,
+            max_completion_tokens,
+            accounting_role,
+        )
+
+
+class TypedErrorOnCallMockLlmClient(MockLlmClient):
+    def __init__(self, script, error_on_attempt, error):
+        super().__init__(script)
+        self.error_on_attempt = error_on_attempt
+        self.error = error
+        self.attempts = 0
+
+    def chat(
+        self,
+        messages,
+        tools,
+        max_completion_tokens=8000,
+        accounting_role=None,
+    ):
+        self.attempts += 1
+        if self.attempts == self.error_on_attempt:
+            raise self.error
         return super().chat(
             messages,
             tools,
@@ -912,3 +943,81 @@ def test_verdict_reason_is_truncated_before_handoff(tmp_path):
         "original_chars": len(reason),
         "kept_chars": 2000,
     }
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_understand_extract_propagates_provider_failure(
+    tmp_path, exception_type, stopped_reason
+):
+    secret_detail = "provider-private-detail"
+    events = []
+    llm = TypedErrorOnCallMockLlmClient(
+        [_text_stop("structured understanding")],
+        error_on_attempt=2,
+        error=exception_type(secret_detail),
+    )
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.stopped_reason != "understand_incomplete"
+    assert result.understanding is None
+    provider_stops = [
+        event["type"]
+        for event in events
+        if event["type"] in {"provider_error", "stop"}
+    ]
+    assert provider_stops[-2:] == ["provider_error", "stop"]
+    transcript = {role: session.messages for role, session in result.sessions.items()}
+    assert secret_detail not in json.dumps([events, transcript])
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_verify_router_propagates_provider_failure_without_default_verdict(
+    tmp_path, exception_type, stopped_reason
+):
+    secret_detail = "provider-private-detail"
+    events = []
+    llm = TypedErrorOnCallMockLlmClient(
+        [_understand_ok(), _ready_ok(), _text_stop("verification conclusion")],
+        error_on_attempt=4,
+        error=exception_type(secret_detail),
+    )
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        max_rounds=1,
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.verdict is None
+    provider_stops = [
+        event["type"]
+        for event in events
+        if event["type"] in {"provider_error", "stop"}
+    ]
+    assert provider_stops[-2:] == ["provider_error", "stop"]
+    transcript = {role: session.messages for role, session in result.sessions.items()}
+    assert secret_detail not in json.dumps([events, transcript])
