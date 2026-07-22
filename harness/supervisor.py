@@ -99,8 +99,11 @@ def _read_summary(path: Path) -> dict | None:
 
 
 def _summary_completed(summary: dict) -> bool:
-    expected_reason = {"S": "completed", "T": "done"}.get(summary.get("treatment"))
-    return summary.get("outcome") == "done" and summary.get("stopped_reason") == expected_reason
+    treatment = summary.get("treatment")
+    return summary.get("outcome") == "done" and (
+        (treatment == "S" and summary.get("stopped_reason") == "completed")
+        or (treatment == "T" and summary.get("stopped_reason") == "done")
+    )
 
 
 def _ensure_record_dir(run_dir: Path) -> bool:

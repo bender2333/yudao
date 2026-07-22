@@ -64,6 +64,8 @@ def test_completed_requires_treatment_specific_runner_summary(
     "summary",
     [
         {"ok": True},
+        {"outcome": "done"},
+        {"treatment": {}, "outcome": "done", "stopped_reason": "completed"},
         {"treatment": "X", "outcome": "done", "stopped_reason": "completed"},
         {"treatment": "S", "outcome": "failed", "stopped_reason": "completed"},
         {"treatment": "S", "outcome": "done", "stopped_reason": "done"},
