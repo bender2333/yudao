@@ -84,6 +84,27 @@ def test_issue_snapshots_payload_and_bindings():
     assert ticket["bindings"] == {"source": ["one"]}
 
 
+def test_issue_and_public_views_cannot_mutate_ledger_snapshot():
+    ledger = TicketLedger("task-1")
+    issued = ledger.issue(
+        "acceptance", "requirements", _valid_acceptance(), None, {"source": ["one"]}
+    )
+    snapshot = copy.deepcopy(issued)
+
+    issued["task_id"] = "other"
+    issued["payload"]["summary"] = "changed"
+    issued["bindings"]["source"].append("two")
+    public_tickets = ledger.tickets
+    public_tickets[0]["payload"]["summary"] = "changed again"
+    public_tickets.append({"fake": "ticket"})
+    public_revisions = ledger.revisions
+    public_revisions["acceptance"] = 99
+
+    assert ledger.tickets == [snapshot]
+    assert ledger.revisions == {"acceptance": 1}
+    ledger.verify_chain()
+
+
 @pytest.mark.parametrize("field,value", [
     ("schema_version", "1"), ("kind", 1), ("ticket_id", 1), ("task_id", 1),
     ("issuer", 1), ("revision", "1"), ("parent_hash", 1), ("bindings", []),
@@ -128,22 +149,60 @@ def test_verify_chain_detects_revision_parent_and_hash_tampering():
 
     ledger = ledger_with_two_tickets()
     ledger.verify_chain()
-    ledger.tickets[1]["revision"] = 3
+    ledger._tickets[1]["revision"] = 3
     with pytest.raises(TicketValidationError):
         ledger.verify_chain()
 
     ledger = ledger_with_two_tickets()
-    ledger.tickets[1]["parent_hash"] = "sha256:missing"
-    ledger.tickets[1]["content_hash"] = content_hash({
-        key: value for key, value in ledger.tickets[1].items() if key != "content_hash"
+    ledger._tickets[1]["parent_hash"] = "sha256:missing"
+    ledger._tickets[1]["content_hash"] = content_hash({
+        key: value for key, value in ledger._tickets[1].items() if key != "content_hash"
     })
     with pytest.raises(TicketValidationError, match="parent"):
         ledger.verify_chain()
 
     ledger = ledger_with_two_tickets()
-    ledger.tickets[1]["payload"]["summary"] = "tampered"
+    ledger._tickets[1]["payload"]["summary"] = "tampered"
     with pytest.raises(TicketValidationError, match="content_hash"):
         ledger.verify_chain()
+
+
+def test_verify_chain_rejects_rehashed_ticket_for_another_task():
+    ledger = TicketLedger("task-1")
+    ledger.issue("acceptance", "requirements", _valid_acceptance(), None)
+    ledger._tickets[0]["task_id"] = "task-2"
+    ledger._tickets[0]["content_hash"] = content_hash({
+        key: value for key, value in ledger._tickets[0].items() if key != "content_hash"
+    })
+
+    with pytest.raises(TicketValidationError, match="task_id"):
+        ledger.verify_chain()
+
+
+@pytest.mark.parametrize("nonfinite", [float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize("field", ["payload", "bindings"])
+def test_issue_rejects_nonfinite_json_without_mutating_ledger(field, nonfinite):
+    ledger = TicketLedger("task-1")
+    payload = _valid_acceptance()
+    bindings = {}
+    (payload if field == "payload" else bindings)["nonfinite"] = nonfinite
+
+    with pytest.raises(TicketValidationError):
+        ledger.issue("acceptance", "requirements", payload, None, bindings)
+
+    assert ledger.tickets == []
+    assert ledger.revisions == {}
+
+
+@pytest.mark.parametrize("nonfinite", [float("nan"), float("inf"), float("-inf")])
+def test_verify_ticket_wraps_nonfinite_json_errors(nonfinite):
+    ticket = TicketLedger("task-1").issue(
+        "acceptance", "requirements", _valid_acceptance(), None
+    )
+    ticket["payload"]["nonfinite"] = nonfinite
+
+    with pytest.raises(TicketValidationError):
+        verify_ticket(ticket)
 
 
 def test_validate_payload_acceptance_requires_basic_structure_and_other_kinds_accept_dict():

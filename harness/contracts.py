@@ -32,6 +32,7 @@ def canonical_json(value: object) -> bytes:
         value,
         ensure_ascii=False,
         sort_keys=True,
+        allow_nan=False,
         separators=(",", ":"),
     ).encode("utf-8")
 
@@ -103,15 +104,27 @@ def verify_ticket(ticket: object) -> None:
     if not isinstance(ticket["content_hash"], str):
         raise TicketValidationError("invalid content_hash type")
     body = {key: value for key, value in ticket.items() if key != "content_hash"}
-    if ticket["content_hash"] != content_hash(body):
+    try:
+        expected_hash = content_hash(body)
+    except (TypeError, ValueError) as exc:
+        raise TicketValidationError("ticket is not canonical JSON") from exc
+    if ticket["content_hash"] != expected_hash:
         raise TicketValidationError("content_hash mismatch")
 
 
 @dataclass
 class TicketLedger:
     task_id: str
-    tickets: list[dict] = field(default_factory=list)
-    revisions: dict[str, int] = field(default_factory=dict)
+    _tickets: list[dict] = field(default_factory=list, init=False, repr=False)
+    _revisions: dict[str, int] = field(default_factory=dict, init=False, repr=False)
+
+    @property
+    def tickets(self) -> list[dict]:
+        return copy.deepcopy(self._tickets)
+
+    @property
+    def revisions(self) -> dict[str, int]:
+        return copy.deepcopy(self._revisions)
 
     def issue(self, kind, issuer, payload, parent_hash, bindings=None) -> dict:
         validated = validate_payload(kind, payload)
@@ -122,14 +135,14 @@ class TicketLedger:
         if not isinstance(bindings, dict):
             raise TicketValidationError("bindings must be a dict")
         if parent_hash is None:
-            if self.tickets or kind != "acceptance":
+            if self._tickets or kind != "acceptance":
                 raise TicketValidationError("parent_hash may be None only for initial acceptance")
         elif not isinstance(parent_hash, str) or not any(
-            ticket["content_hash"] == parent_hash for ticket in self.tickets
+            ticket["content_hash"] == parent_hash for ticket in self._tickets
         ):
             raise TicketValidationError("parent_hash must reference an existing ticket")
 
-        revision = self.revisions.get(kind, 0) + 1
+        revision = self._revisions.get(kind, 0) + 1
         body = {
             "schema_version": SCHEMA_VERSION,
             "kind": kind,
@@ -141,17 +154,22 @@ class TicketLedger:
             "bindings": copy.deepcopy(bindings),
             "payload": validated,
         }
-        ticket = {**body, "content_hash": content_hash(body)}
-        verify_ticket(ticket)
-        self.revisions[kind] = revision
-        self.tickets.append(ticket)
-        return ticket
+        try:
+            ticket = {**body, "content_hash": content_hash(body)}
+            verify_ticket(ticket)
+        except (TypeError, ValueError) as exc:
+            raise TicketValidationError("ticket is not canonical JSON") from exc
+        self._revisions[kind] = revision
+        self._tickets.append(copy.deepcopy(ticket))
+        return copy.deepcopy(ticket)
 
     def verify_chain(self) -> None:
         seen_hashes = set()
         revisions = {}
-        for index, ticket in enumerate(self.tickets):
+        for index, ticket in enumerate(self._tickets):
             verify_ticket(ticket)
+            if ticket["task_id"] != self.task_id:
+                raise TicketValidationError("ticket task_id does not match ledger task_id")
             kind = ticket["kind"]
             expected_revision = revisions.get(kind, 0) + 1
             if ticket["revision"] != expected_revision:
