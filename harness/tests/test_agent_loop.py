@@ -586,3 +586,31 @@ def test_on_stop_provider_failure_is_sanitized(
         "stop",
     ]
     assert secret_detail not in json.dumps(result.events)
+
+
+@pytest.mark.parametrize(
+    "exception_type",
+    [ProviderUnavailable, ProviderProtocolError, ContextOverflow],
+)
+def test_pending_retry_provider_error_events_share_attempt_step(
+    tmp_path, exception_type
+):
+    llm = MockLlmClient([_cr(finish="content_filter")])
+    scripted_chat = llm.chat
+
+    def filter_then_fail(*args, **kwargs):
+        if llm.calls_made:
+            raise exception_type("provider-private-detail")
+        return scripted_chat(*args, **kwargs)
+
+    llm.chat = filter_then_fail
+
+    result = run_agent_loop(llm, "system", "task", [], str(tmp_path))
+
+    retry, provider_error, stop = result.events[-3:]
+    assert [retry["type"], provider_error["type"], stop["type"]] == [
+        "provider_retry",
+        "provider_error",
+        "stop",
+    ]
+    assert retry["step"] == provider_error["step"] == stop["step"] == 2

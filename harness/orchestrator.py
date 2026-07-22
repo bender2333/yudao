@@ -25,14 +25,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from .agent_loop import AgentSession, activate
-from .llm import (
-    BudgetAccountingError,
-    BudgetExhausted,
-    ContextOverflow,
-    ProviderProtocolError,
-    ProviderUnavailable,
+from .agent_loop import (
+    PROVIDER_STOP_REASONS,
+    AgentSession,
+    LoopStopped,
+    activate,
+    run_agent_loop,
 )
+from .llm import BudgetAccountingError, BudgetExhausted
 from .stage_tools import (
     CONSULT_UNDERSTANDING,
     PLAN_TERMINAL,
@@ -268,75 +268,56 @@ _UNDERSTAND_EXTRACT_SYSTEM = (
     "field, write the best faithful short statement rather than leaving it empty."
 )
 
-_REQUIRED_U_FIELDS = ("summary", "requirements", "constraints", "done_criteria")
 
+def _run_hook_loop(llm, stage, kind, system, user, on_event):
+    def emit(event):
+        if on_event is None:
+            return
+        forwarded = dict(event)
+        if forwarded.get("type") == "llm_call":
+            forwarded.update({"stage": stage, "kind": kind})
+        on_event(forwarded)
 
-def _emit_hook_call(on_event, stage: str, kind: str, result) -> None:
-    if on_event is None:
-        return
-    on_event(
-        {
-            "type": "llm_call",
-            "stage": stage,
-            "kind": kind,
-            "finish_reason": result.finish_reason,
-            "has_tool_calls": bool(result.tool_calls),
-            "text": _clip(result.text),
-            "prompt_tokens": result.prompt_tokens,
-            "completion_tokens": result.completion_tokens,
-            "reasoning_tokens": result.reasoning_tokens,
-            "duration_ms": result.duration_ms,
-            "stopped_reason": result.stopped_reason,
-        }
+    terminal = {
+        "UNDERSTAND": UNDERSTAND_TERMINAL,
+        "VERIFY": VERIFY_TERMINAL,
+    }[stage]
+    loop = run_agent_loop(
+        llm,
+        system,
+        user,
+        STAGE_TOOL_DEFS[stage],
+        "",
+        max_steps=1,
+        on_event=emit,
+        terminal_tools={terminal},
+        accounting_role=stage,
     )
+    if loop.stopped_reason == "budget_exhausted":
+        raise BudgetExhausted("hook exhausted the run budget")
+    if loop.stopped_reason == "budget_accounting_error":
+        raise BudgetAccountingError("hook could not measure token usage")
+    if loop.stopped_reason in PROVIDER_STOP_REASONS:
+        raise LoopStopped(loop.stopped_reason)
+    return loop
 
-
-def _raise_if_call_stopped(result) -> None:
-    if result.stopped_reason == "budget_exhausted":
-        raise BudgetExhausted(result.stop_detail or "run budget exhausted")
-    if result.stopped_reason == "budget_accounting_error":
-        raise BudgetAccountingError(result.stop_detail or "token usage unavailable")
 
 
 def _make_understand_hook(llm, on_event):
-    """Natural stop → one cheap extract call into submit_understanding fields.
-
-    If extraction fails or text is empty → None (escalate). No free-text
-    understanding is accepted as a durable artifact.
-    """
+    """Natural stop → one structured extraction loop."""
     def hook(final_text, messages):
         text = (final_text or "").strip()
         if not text:
             return None
-        try:
-            msgs = [
-                {"role": "system", "content": _UNDERSTAND_EXTRACT_SYSTEM},
-                {"role": "user", "content": f"Free-text understanding:\n\n{text}"},
-            ]
-            cr = llm.chat(
-                msgs,
-                STAGE_TOOL_DEFS["UNDERSTAND"],
-                accounting_role="UNDERSTAND",
-            )
-            _emit_hook_call(on_event, "UNDERSTAND", "extract", cr)
-            _raise_if_call_stopped(cr)
-            for tc in cr.tool_calls or []:
-                if tc.function.name != UNDERSTAND_TERMINAL:
-                    continue
-                args = json.loads(tc.function.arguments or "{}")
-                if all((args.get(k) or "").strip() for k in _REQUIRED_U_FIELDS):
-                    return {"name": UNDERSTAND_TERMINAL, "args": args}
-        except (
-            BudgetAccountingError,
-            BudgetExhausted,
-            ContextOverflow,
-            ProviderProtocolError,
-            ProviderUnavailable,
-        ):
-            raise
-        except Exception:
-            pass
-        return None
+        loop = _run_hook_loop(
+            llm,
+            "UNDERSTAND",
+            "extract",
+            _UNDERSTAND_EXTRACT_SYSTEM,
+            f"Free-text understanding:\n\n{text}",
+            on_event,
+        )
+        return loop.terminal_call
     return hook
 
 
@@ -365,59 +346,31 @@ _VERIFY_ROUTER_SYSTEM = (
 
 
 def _make_verify_hook(llm, on_event):
-    """Verify ended naturally without submit_verdict → recover a routing verdict
-    with ONE cheap classification call. Defaults to reject_execution (never a
-    false pass) if classification can't produce a clean verdict."""
+    """Recover a routed verdict without treating provider stops as rejection."""
+    default = {
+        "name": "submit_verdict",
+        "args": {
+            "status": "reject_execution",
+            "reason": (
+                "verification produced no explicit verdict; "
+                "defaulting to reject_execution (no false pass)."
+            ),
+        },
+    }
+
     def hook(final_text, messages):
         text = (final_text or "").strip()
-        default = {
-            "name": "submit_verdict",
-            "args": {
-                "status": "reject_execution",
-                "reason": (
-                    "verification produced no explicit verdict; "
-                    "defaulting to reject_execution (no false pass)."
-                ),
-            },
-        }
         if not text:
             return default
-        try:
-            router_msgs = [
-                {"role": "system", "content": _VERIFY_ROUTER_SYSTEM},
-                {"role": "user", "content": f"Verification conclusion:\n\n{text}"},
-            ]
-            cr = llm.chat(
-                router_msgs,
-                STAGE_TOOL_DEFS["VERIFY"],
-                accounting_role="VERIFY",
-            )
-            _emit_hook_call(on_event, "VERIFY", "router", cr)
-            _raise_if_call_stopped(cr)
-            for tc in cr.tool_calls or []:
-                if tc.function.name == VERIFY_TERMINAL:
-                    args = json.loads(tc.function.arguments or "{}")
-                    if (
-                        args.get("status") in {
-                            "pass",
-                            "reject_execution",
-                            "reject_understanding",
-                        }
-                        and isinstance(args.get("reason"), str)
-                        and args["reason"].strip()
-                    ):
-                        return {"name": "submit_verdict", "args": args}
-        except (
-            BudgetAccountingError,
-            BudgetExhausted,
-            ContextOverflow,
-            ProviderProtocolError,
-            ProviderUnavailable,
-        ):
-            raise
-        except Exception:
-            pass
-        return default
+        loop = _run_hook_loop(
+            llm,
+            "VERIFY",
+            "router",
+            _VERIFY_ROUTER_SYSTEM,
+            f"Verification conclusion:\n\n{text}",
+            on_event,
+        )
+        return loop.terminal_call or default
     return hook
 
 
@@ -490,6 +443,8 @@ def _make_consult_handler(
         if sub.stopped_reason == "budget_accounting_error":
             fail("consult could not measure token usage")
             raise BudgetAccountingError("consult could not measure token usage")
+        if sub.stopped_reason in PROVIDER_STOP_REASONS:
+            raise LoopStopped(sub.stopped_reason)
         if sub.stopped_reason != "natural":
             return fail(f"consult did not complete ({sub.stopped_reason})")
         answer = (sub.final_text or "").strip()

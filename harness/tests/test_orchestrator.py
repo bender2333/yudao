@@ -974,12 +974,14 @@ def test_understand_extract_propagates_provider_failure(
     assert result.stopped_reason == stopped_reason
     assert result.stopped_reason != "understand_incomplete"
     assert result.understanding is None
-    provider_stops = [
-        event["type"]
-        for event in events
-        if event["type"] in {"provider_error", "stop"}
+    provider_events = [
+        event for event in events if event["type"] in {"provider_error", "stop"}
     ]
-    assert provider_stops[-2:] == ["provider_error", "stop"]
+    assert any(
+        event["type"] == "provider_error" and event["reason"] == stopped_reason
+        for event in provider_events
+    )
+    assert provider_events[-1]["type"] == "stop"
     transcript = {role: session.messages for role, session in result.sessions.items()}
     assert secret_detail not in json.dumps([events, transcript])
 
@@ -1013,11 +1015,115 @@ def test_verify_router_propagates_provider_failure_without_default_verdict(
 
     assert result.stopped_reason == stopped_reason
     assert result.verdict is None
-    provider_stops = [
-        event["type"]
-        for event in events
-        if event["type"] in {"provider_error", "stop"}
+    provider_events = [
+        event for event in events if event["type"] in {"provider_error", "stop"}
     ]
-    assert provider_stops[-2:] == ["provider_error", "stop"]
+    assert any(
+        event["type"] == "provider_error" and event["reason"] == stopped_reason
+        for event in provider_events
+    )
+    assert provider_events[-1]["type"] == "stop"
     transcript = {role: session.messages for role, session in result.sessions.items()}
     assert secret_detail not in json.dumps([events, transcript])
+
+
+@pytest.mark.parametrize("stage", ["UNDERSTAND", "VERIFY"])
+@pytest.mark.parametrize(
+    ("hook_responses", "stopped_reason"),
+    [
+        ([_cr(finish="content_filter"), _cr(finish="content_filter")], "provider_blocked"),
+        ([_cr(text="partial", finish="length")], "output_truncated"),
+        ([_cr(text="partial", finish="unexpected")], "provider_protocol_error"),
+    ],
+)
+def test_natural_stop_hooks_use_provider_finish_state_machine(
+    tmp_path, stage, hook_responses, stopped_reason
+):
+    if stage == "UNDERSTAND":
+        script = [_text_stop("structured understanding"), *hook_responses]
+    else:
+        script = [
+            _understand_ok(),
+            _ready_ok(),
+            _text_stop("verification conclusion"),
+            *hook_responses,
+        ]
+    llm = MockLlmClient(script)
+    events = []
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        max_rounds=1,
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.verdict is None
+    if stage == "UNDERSTAND":
+        assert result.understanding is None
+        assert result.stopped_reason != "understand_incomplete"
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_nested_consult_propagates_typed_provider_stop(
+    tmp_path, exception_type, stopped_reason
+):
+    secret_detail = "provider-private-detail"
+    events = []
+    consult_call = _cr(
+        tool_calls=[
+            _tc("consult", "consult_understanding", {"question": "clarify"})
+        ],
+        finish="tool_calls",
+    )
+    llm = TypedErrorOnCallMockLlmClient(
+        [_understand_ok(), _ready_ok(), consult_call, _verdict("pass", "must not run")],
+        error_on_attempt=4,
+        error=exception_type(secret_detail),
+    )
+
+    result = run_multi(
+        llm,
+        Workspace(str(tmp_path / "w")),
+        "task",
+        on_event=events.append,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.verdict is None
+    transcript = {role: session.messages for role, session in result.sessions.items()}
+    assert secret_detail not in json.dumps([events, transcript])
+
+
+def test_nested_consult_propagates_repeated_content_filter(tmp_path):
+    consult_call = _cr(
+        tool_calls=[
+            _tc("consult", "consult_understanding", {"question": "clarify"})
+        ],
+        finish="tool_calls",
+    )
+    llm = MockLlmClient(
+        [
+            _understand_ok(),
+            _ready_ok(),
+            consult_call,
+            _cr(finish="content_filter"),
+            _cr(finish="content_filter"),
+            _verdict("pass", "must not run"),
+        ]
+    )
+
+    result = run_multi(llm, Workspace(str(tmp_path / "w")), "task")
+
+    assert result.stopped_reason == "provider_blocked"
+    assert result.verdict is None
+    assert result.calls == 5

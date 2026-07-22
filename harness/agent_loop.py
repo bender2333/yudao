@@ -38,6 +38,25 @@ def _provider_stop_reason(exc: Exception) -> str:
     return "provider_protocol_error"
 
 
+PROVIDER_STOP_REASONS = frozenset(
+    {
+        "provider_unavailable",
+        "provider_protocol_error",
+        "context_overflow",
+        "provider_blocked",
+        "output_truncated",
+    }
+)
+
+
+class LoopStopped(Exception):
+    """Carries only a sanitized nested-loop stop reason."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
 def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
     """Extra handlers (llm/workspace-bound closures, e.g. cross-stage consults)
     take precedence; otherwise fall back to the standard stateless dispatch."""
@@ -48,6 +67,7 @@ def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
             BudgetAccountingError,
             BudgetExhausted,
             ContextOverflow,
+            LoopStopped,
             ProviderProtocolError,
             ProviderUnavailable,
         ):
@@ -195,6 +215,7 @@ def run_agent_loop(
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
         except (ProviderUnavailable, ProviderProtocolError, ContextOverflow) as exc:
+            attempt_step = steps + 1 if pending_content_filter_retry else steps
             if pending_content_filter_retry:
                 content_filter_retries += 1
                 pending_content_filter_retry = False
@@ -202,7 +223,7 @@ def run_agent_loop(
                     {
                         "type": "provider_retry",
                         "reason": "content_filter",
-                        "step": steps + 1,
+                        "step": attempt_step,
                     }
                 )
             stopped_reason = _provider_stop_reason(exc)
@@ -211,10 +232,10 @@ def run_agent_loop(
                     "type": "provider_error",
                     "reason": stopped_reason,
                     "error_type": type(exc).__name__,
-                    "step": steps,
+                    "step": attempt_step,
                 }
             )
-            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            emit({"type": "stop", "reason": stopped_reason, "step": attempt_step})
             break
         if pending_content_filter_retry:
             content_filter_retries += 1
@@ -319,6 +340,8 @@ def run_agent_loop(
                             if isinstance(exc, BudgetAccountingError)
                             else "budget_exhausted"
                         )
+                    except LoopStopped as exc:
+                        stopped_reason = exc.reason
                     except (
                         ProviderUnavailable,
                         ProviderProtocolError,
@@ -373,6 +396,9 @@ def run_agent_loop(
                     except BudgetAccountingError:
                         output = "Error: token usage unavailable"
                         forced_stop_reason = "budget_accounting_error"
+                    except LoopStopped as exc:
+                        forced_stop_reason = exc.reason
+                        output = f"Error: {forced_stop_reason.replace('_', ' ')}"
                     except (
                         ProviderUnavailable,
                         ProviderProtocolError,
