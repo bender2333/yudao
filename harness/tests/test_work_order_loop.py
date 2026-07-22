@@ -15,6 +15,60 @@ from harness.tests.fakes import (
     valid_release_payload,
 )
 from harness.work_order_loop import TeamState, run_team
+from harness.llm import ProviderUnavailable
+
+
+def _content_filter_result():
+    result = text_stop("")
+    result.finish_reason = "content_filter"
+    return result
+
+
+def test_content_filter_retry_is_counted_before_later_natural_stop(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            _content_filter_result(),
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            text_stop("cannot implement"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.stopped_reason == "natural"
+    assert result.content_filter_retries == 1
+
+
+def test_content_filter_retry_is_counted_before_provider_failure(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            _content_filter_result(),
+            ProviderUnavailable("SECRET_PROVIDER_MESSAGE"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.stopped_reason == "provider_unavailable"
+    assert result.content_filter_retries == 1
+
+
+def test_unexpected_activation_failure_has_sanitized_phase_and_type(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    secret = "SECRET_ACTIVATION_MESSAGE"
+    llm = ScriptedLlm([ValueError(secret)])
+    events = []
+
+    result = run_team(
+        llm, workspace, runtime, "task-1", "implement VALUE", on_event=events.append
+    )
+
+    assert result.stopped_reason == "system_error:requirements_activation:ValueError"
+    assert secret not in json.dumps([result, events], default=str)
+
+
 
 
 def test_team_happy_path_binds_tickets_to_real_tree_and_receipts(tmp_path):
@@ -111,9 +165,12 @@ def test_on_ticket_exception_fails_closed_after_legal_issue(tmp_path):
         [tool_result("submit_acceptance", valid_acceptance_payload())]
     )
 
-    def fail_callback(_ticket):
-        raise ValueError("callback secret")
+    secret = "SECRET_TICKET_CALLBACK"
 
+    def fail_callback(_ticket):
+        raise RuntimeError(secret)
+
+    events = []
     result = run_team(
         llm,
         workspace,
@@ -121,10 +178,13 @@ def test_on_ticket_exception_fails_closed_after_legal_issue(tmp_path):
         "task-1",
         "implement VALUE",
         on_ticket=fail_callback,
+        on_event=events.append,
     )
 
     assert result.outcome == "failed"
-    assert result.stopped_reason == "system_error"
+    assert result.stopped_reason == "system_error:ticket_callback:RuntimeError"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
+    assert secret not in json.dumps([result, events], default=str)
     assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
 
 
@@ -315,18 +375,23 @@ def test_transition_callback_failure_preserves_issued_ticket_and_transition(tmp_
     workspace, runtime = make_runtime_with_public_check(tmp_path)
     llm = ScriptedLlm([tool_result("submit_acceptance", valid_acceptance_payload())])
 
+    secret = "SECRET_TRANSITION_CALLBACK"
+
     def fail_transition(event):
         if event["type"] == "team_transition":
-            raise RuntimeError("callback failed")
+            raise RuntimeError(secret)
 
+    events = []
     result = run_team(
         llm, workspace, runtime, "task-1", "implement VALUE", on_event=fail_transition
     )
 
     assert result.outcome == "failed"
-    assert result.stopped_reason == "system_error"
+    assert result.stopped_reason == "system_error:transition_callback:RuntimeError"
     assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
     assert result.transitions == ["requirements->engineering"]
+    assert secret not in json.dumps([result, events], default=str)
+
 
 
 def test_failed_activation_uses_client_accounting_and_event_tool_count(tmp_path):
@@ -374,7 +439,7 @@ def test_failed_activation_uses_client_accounting_and_event_tool_count(tmp_path)
 
     result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
 
-    assert result.stopped_reason == "system_error"
+    assert result.stopped_reason == "system_error:engineering_activation:RuntimeError"
     assert result.calls == 2
     assert result.prompt_tokens == 17
     assert result.completion_tokens == 8

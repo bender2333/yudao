@@ -15,6 +15,7 @@ from .contracts import (
     TicketValidationError,
     validate_payload,
 )
+from .agent_loop import LoopStopped
 from .local_tools import LocalToolRuntime
 from .role_session import RoleSession
 from .workspace import Workspace, diff_manifests
@@ -63,6 +64,25 @@ class TeamResult:
     transient_retry_attempts: int
     content_filter_retries: int
     per_role: dict
+
+
+_SYSTEM_ERROR_PHASES = frozenset(
+    {
+        "requirements_activation",
+        "engineering_activation",
+        "quality_activation",
+        "ticket_callback",
+        "transition_callback",
+        "handoff",
+        "unknown",
+    }
+)
+
+
+def _system_error(phase: str, exc: BaseException) -> str:
+    if phase not in _SYSTEM_ERROR_PHASES:
+        phase = "unknown"
+    return f"system_error:{phase}:{type(exc).__name__}"
 
 
 _ALLOWED_TERMINALS = {
@@ -128,18 +148,24 @@ class TicketCollector:
                 return f"Error: {error}"
             self.ticket = ticket
             if self.on_ticket is not None:
-                self.on_ticket(copy.deepcopy(ticket))
+                try:
+                    self.on_ticket(copy.deepcopy(ticket))
+                except Exception as exc:
+                    raise LoopStopped(_system_error("ticket_callback", exc)) from None
             if self.on_event is not None:
-                self.on_event(
-                    {
-                        "type": "team_ticket",
-                        "kind": kind,
-                        "ticket_id": ticket["ticket_id"],
-                        "issuer": self.role,
-                        "content_hash": ticket["content_hash"],
-                        "parent_hash": ticket["parent_hash"],
-                    }
-                )
+                try:
+                    self.on_event(
+                        {
+                            "type": "team_ticket",
+                            "kind": kind,
+                            "ticket_id": ticket["ticket_id"],
+                            "issuer": self.role,
+                            "content_hash": ticket["content_hash"],
+                            "parent_hash": ticket["parent_hash"],
+                        }
+                    )
+                except Exception as exc:
+                    raise LoopStopped(_system_error("ticket_callback", exc)) from None
             return f"Accepted {ticket['ticket_id']}"
 
         return collect
@@ -306,15 +332,20 @@ def run_team(
         for role in roles
     }
     retry_before = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
-    filter_before = getattr(llm, "content_filter_retries", 0)
     outcome = "failed"
     stopped_reason = "system_error"
     tool_invocations = 0
+    content_filter_retries = 0
 
     def emit(event: dict) -> None:
-        nonlocal tool_invocations
+        nonlocal tool_invocations, content_filter_retries
         if event.get("type") == "tool_call":
             tool_invocations += 1
+        elif (
+            event.get("type") == "provider_retry"
+            and event.get("reason") == "content_filter"
+        ):
+            content_filter_retries += 1
         if on_event is not None and event.get("type", "").startswith("team_"):
             on_event(event)
 
@@ -344,9 +375,12 @@ def run_team(
         terminals = _ALLOWED_TERMINALS[role]
         handlers = runtime.handlers()
         handlers.update({name: collector.handler(name) for name in terminals})
+        phase = "handoff"
         try:
+            handoff = _handoff(task, acceptance, trigger, workspace)
+            phase = f"{role}_activation"
             loop = sessions[role].activate(
-                _handoff(task, acceptance, trigger, workspace),
+                handoff,
                 llm=llm,
                 handlers_ctx=workspace.dir,
                 max_steps=max_steps,
@@ -354,8 +388,8 @@ def run_team(
                 extra_handlers=handlers,
                 on_event=emit,
             )
-        except Exception:
-            stopped_reason = "system_error"
+        except Exception as exc:
+            stopped_reason = _system_error(phase, exc)
             break
         if loop.stopped_reason != "terminal" or collector.ticket is None:
             stopped_reason = loop.stopped_reason
@@ -380,8 +414,8 @@ def run_team(
             else:
                 stopped_reason = "unexpected_terminal"
                 break
-        except Exception:
-            stopped_reason = "system_error"
+        except Exception as exc:
+            stopped_reason = _system_error("transition_callback", exc)
             break
 
     usage_after = getattr(llm, "usage_by_role", {})
@@ -411,6 +445,6 @@ def run_team(
         duration_ms=totals["llm_duration_ms"],
         tool_invocations=tool_invocations,
         transient_retry_attempts=retry_after - retry_before,
-        content_filter_retries=getattr(llm, "content_filter_retries", 0) - filter_before,
+        content_filter_retries=content_filter_retries,
         per_role=per_role,
     )
