@@ -41,10 +41,16 @@ class ProviderProtocolError(Exception):
         *,
         call_recorded: bool = False,
         duration_ms: int = 0,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        reasoning_tokens: int = 0,
     ):
         super().__init__(message)
         self.call_recorded = call_recorded
         self.duration_ms = duration_ms
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+        self.reasoning_tokens = reasoning_tokens
 
 
 class ContextOverflow(Exception):
@@ -73,6 +79,9 @@ class CallResult:
     duration_ms: int
     stopped_reason: str | None = None
     stop_detail: str | None = None
+
+
+_FINISH_REASONS = frozenset({"stop", "length", "tool_calls", "content_filter"})
 
 
 @dataclass
@@ -152,93 +161,34 @@ class LlmClient:
             )
             role_usage["calls"] += 1
             role_usage["llm_duration_ms"] += duration_ms
-        choices = getattr(resp, "choices", _MISSING)
-        if not isinstance(choices, (list, tuple)) or not choices:
-            raise ProviderProtocolError(
-                "malformed provider response",
-                call_recorded=True,
-                duration_ms=duration_ms,
-            )
-        choice = choices[0]
-        msg = getattr(choice, "message", _MISSING)
-        if msg is _MISSING or msg is None:
-            raise ProviderProtocolError(
-                "malformed provider response",
-                call_recorded=True,
-                duration_ms=duration_ms,
-            )
 
-        finish_reason = getattr(choice, "finish_reason", _MISSING)
-        content = getattr(msg, "content", _MISSING)
-        tool_calls = getattr(msg, "tool_calls", _MISSING)
-        if finish_reason is _MISSING or not (
-            finish_reason is None or isinstance(finish_reason, str)
+        usage = getattr(resp, "usage", _MISSING)
+        prompt_tokens = getattr(usage, "prompt_tokens", _MISSING)
+        completion_tokens = getattr(usage, "completion_tokens", _MISSING)
+        details = getattr(usage, "completion_tokens_details", None)
+        reasoning_tokens = (
+            0
+            if details is None
+            else getattr(details, "reasoning_tokens", _MISSING)
+        )
+        if reasoning_tokens is None:
+            reasoning_tokens = 0
+        if not (
+            _is_nonnegative_int(prompt_tokens)
+            and _is_nonnegative_int(completion_tokens)
+            and _is_nonnegative_int(reasoning_tokens)
         ):
-            raise ProviderProtocolError(
-                "malformed provider response",
-                call_recorded=True,
+            return CallResult(
+                text="",
+                tool_calls=[],
+                finish_reason="",
+                prompt_tokens=0,
+                completion_tokens=0,
+                reasoning_tokens=0,
                 duration_ms=duration_ms,
+                stopped_reason="budget_accounting_error",
+                stop_detail="provider response did not include valid token usage",
             )
-        if content is _MISSING or not (
-            content is None or isinstance(content, str)
-        ):
-            raise ProviderProtocolError(
-                "malformed provider response",
-                call_recorded=True,
-                duration_ms=duration_ms,
-            )
-        if tool_calls is None:
-            tool_calls = []
-        elif not isinstance(tool_calls, (list, tuple)):
-            raise ProviderProtocolError(
-                "malformed provider response",
-                call_recorded=True,
-                duration_ms=duration_ms,
-            )
-        for tool_call in tool_calls:
-            function = getattr(tool_call, "function", _MISSING)
-            if (
-                not isinstance(getattr(tool_call, "id", None), str)
-                or function is _MISSING
-                or not isinstance(getattr(function, "name", None), str)
-                or not isinstance(getattr(function, "arguments", None), str)
-            ):
-                raise ProviderProtocolError(
-                    "malformed provider response",
-                    call_recorded=True,
-                    duration_ms=duration_ms,
-                )
-
-        finish_reason = finish_reason or ""
-        text = content or ""
-        tool_calls = list(tool_calls)
-        prompt_tokens = 0
-        completion_tokens = 0
-        reasoning_tokens = 0
-        usage = getattr(resp, "usage", None)
-        usage_available = usage is not None
-        if usage is not None:
-            prompt_tokens = getattr(usage, "prompt_tokens", _MISSING)
-            completion_tokens = getattr(usage, "completion_tokens", _MISSING)
-            if not _is_nonnegative_int(prompt_tokens) or not _is_nonnegative_int(
-                completion_tokens
-            ):
-                raise ProviderProtocolError(
-                    "malformed provider response",
-                    call_recorded=True,
-                    duration_ms=duration_ms,
-                )
-            details = getattr(usage, "completion_tokens_details", None)
-            if details is not None:
-                reasoning_tokens = getattr(details, "reasoning_tokens", _MISSING)
-                if reasoning_tokens is None:
-                    reasoning_tokens = 0
-                elif not _is_nonnegative_int(reasoning_tokens):
-                    raise ProviderProtocolError(
-                        "malformed provider response",
-                        call_recorded=True,
-                        duration_ms=duration_ms,
-                    )
 
         self.prompt_tokens_total += prompt_tokens
         self.completion_tokens_total += completion_tokens
@@ -248,22 +198,58 @@ class LlmClient:
             role_usage["completion_tokens"] += completion_tokens
             role_usage["reasoning_tokens"] += reasoning_tokens
 
+        def malformed_response():
+            return ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                reasoning_tokens=reasoning_tokens,
+            )
+
+        choices = getattr(resp, "choices", _MISSING)
+        if not isinstance(choices, (list, tuple)) or not choices:
+            raise malformed_response()
+        choice = choices[0]
+        msg = getattr(choice, "message", _MISSING)
+        if msg is _MISSING or msg is None:
+            raise malformed_response()
+
+        finish_reason = getattr(choice, "finish_reason", _MISSING)
+        content = getattr(msg, "content", _MISSING)
+        tool_calls = getattr(msg, "tool_calls", _MISSING)
+        if finish_reason not in _FINISH_REASONS:
+            raise malformed_response()
+        if content is _MISSING or not (
+            content is None or isinstance(content, str)
+        ):
+            raise malformed_response()
+        if tool_calls is None:
+            tool_calls = []
+        elif not isinstance(tool_calls, (list, tuple)):
+            raise malformed_response()
+        for tool_call in tool_calls:
+            function = getattr(tool_call, "function", _MISSING)
+            if (
+                not isinstance(getattr(tool_call, "id", None), str)
+                or function is _MISSING
+                or not isinstance(getattr(function, "name", None), str)
+                or not isinstance(getattr(function, "arguments", None), str)
+            ):
+                raise malformed_response()
+
         stopped_reason = None
         stop_detail = None
-        if self.max_tokens is not None and not usage_available:
-            stopped_reason = "budget_accounting_error"
-            stop_detail = "provider response did not include prompt/completion token usage"
-        else:
-            # 在途请求无法预先中断；响应记账后由 caller 记录本次响应再停止。
-            try:
-                self.check_budget()
-            except BudgetExhausted as exc:
-                stopped_reason = "budget_exhausted"
-                stop_detail = str(exc)
+        try:
+            self.check_budget()
+        except BudgetExhausted as exc:
+            stopped_reason = "budget_exhausted"
+            stop_detail = str(exc)
 
         return CallResult(
-            text=text,
-            tool_calls=tool_calls,
+            text=content or "",
+            tool_calls=list(tool_calls),
             finish_reason=finish_reason,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,

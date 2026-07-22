@@ -522,15 +522,14 @@ def test_optional_sdk_response_fields_normalize_to_empty_values(finish_reason):
         "missing_choices",
         "empty_choices",
         "missing_message",
-        "finish_reason",
+        "finish_reason_type",
+        "finish_reason_none",
+        "finish_reason_empty",
+        "finish_reason_unknown",
         "content",
         "tool_id",
         "tool_name",
         "tool_arguments",
-        "prompt_tokens",
-        "prompt_tokens_none",
-        "completion_tokens",
-        "reasoning_tokens",
     ],
 )
 def test_malformed_provider_response_stops_loop_without_leaking(
@@ -549,8 +548,14 @@ def test_malformed_provider_response_stops_loop_without_leaking(
         response.choices = []
     elif malformed_field == "missing_message":
         choice.message = None
-    elif malformed_field == "finish_reason":
+    elif malformed_field == "finish_reason_type":
         choice.finish_reason = True
+    elif malformed_field == "finish_reason_none":
+        choice.finish_reason = None
+    elif malformed_field == "finish_reason_empty":
+        choice.finish_reason = ""
+    elif malformed_field == "finish_reason_unknown":
+        choice.finish_reason = "unexpected"
     elif malformed_field == "content":
         message.content = {"secret": secret_detail}
     elif malformed_field == "tool_id":
@@ -559,17 +564,9 @@ def test_malformed_provider_response_stops_loop_without_leaking(
     elif malformed_field == "tool_name":
         tool_call.function.name = 7
         message.tool_calls = [tool_call]
-    elif malformed_field == "tool_arguments":
+    else:
         tool_call.function.arguments = {"secret": secret_detail}
         message.tool_calls = [tool_call]
-    elif malformed_field == "prompt_tokens":
-        response.usage.prompt_tokens = -1
-    elif malformed_field == "prompt_tokens_none":
-        response.usage.prompt_tokens = None
-    elif malformed_field == "completion_tokens":
-        response.usage.completion_tokens = True
-    else:
-        response.usage.completion_tokens_details.reasoning_tokens = "2"
 
     completions = _ScriptedCompletions([response])
     client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
@@ -590,15 +587,71 @@ def test_malformed_provider_response_stops_loop_without_leaking(
     assert result.calls == 1
     assert llm.calls_made == 1
     assert llm.usage_by_role["ROLE"]["calls"] == 1
-    assert llm.usage_by_role["ROLE"]["llm_duration_ms"] >= 0
     assert (
         llm.prompt_tokens_total,
         llm.completion_tokens_total,
         llm.reasoning_tokens_total,
-    ) == (0, 0, 0)
+    ) == (10, 5, 2)
+    failed_call = result.events[0]
+    assert failed_call["type"] == "llm_call"
+    assert (
+        failed_call["prompt_tokens"],
+        failed_call["completion_tokens"],
+        failed_call["reasoning_tokens"],
+    ) == (10, 5, 2)
     assert [event["type"] for event in result.events] == [
         "llm_call",
         "provider_error",
         "stop",
     ]
     assert secret_detail not in json.dumps([result.events, messages])
+
+
+@pytest.mark.parametrize(
+    "usage_error",
+    [
+        "missing",
+        "none",
+        "prompt_negative",
+        "prompt_none",
+        "completion_bool",
+        "reasoning_string",
+    ],
+)
+def test_unavailable_usage_stops_as_accounting_error_by_default(
+    tmp_path, usage_error
+):
+    response = _response([], text="must not be recorded")
+    if usage_error == "missing":
+        del response.usage
+    elif usage_error == "none":
+        response.usage = None
+    elif usage_error == "prompt_negative":
+        response.usage.prompt_tokens = -1
+    elif usage_error == "prompt_none":
+        response.usage.prompt_tokens = None
+    elif usage_error == "completion_bool":
+        response.usage.completion_tokens = True
+    else:
+        response.usage.completion_tokens_details.reasoning_tokens = "2"
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "budget_accounting_error"
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert result.prompt_tokens == result.completion_tokens == 0
+    assert [event["type"] for event in result.events] == ["llm_call", "stop"]
+    assert result.events[0]["stopped_reason"] == "budget_accounting_error"
+    assert [message["role"] for message in messages] == ["system", "user"]

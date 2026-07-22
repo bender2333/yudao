@@ -242,9 +242,9 @@ def run_agent_loop(
                         "finish_reason": "",
                         "has_tool_calls": False,
                         "text": "",
-                        "prompt_tokens": 0,
-                        "completion_tokens": 0,
-                        "reasoning_tokens": 0,
+                        "prompt_tokens": getattr(exc, "prompt_tokens", 0),
+                        "completion_tokens": getattr(exc, "completion_tokens", 0),
+                        "reasoning_tokens": getattr(exc, "reasoning_tokens", 0),
                         "duration_ms": getattr(exc, "duration_ms", 0),
                         "stopped_reason": stopped_reason,
                         "failed": True,
@@ -285,6 +285,18 @@ def run_agent_loop(
                 "stopped_reason": result.stopped_reason,
             }
         )
+
+        if result.stopped_reason == "budget_accounting_error":
+            stopped_reason = result.stopped_reason
+            emit(
+                {
+                    "type": "stop",
+                    "reason": stopped_reason,
+                    "detail": result.stop_detail,
+                    "step": steps,
+                }
+            )
+            break
 
         if (
             result.stopped_reason is not None
@@ -349,7 +361,7 @@ def run_agent_loop(
 
         if not result.tool_calls:
             final_text = result.text
-            if result.finish_reason in {"stop", ""}:
+            if result.finish_reason == "stop":
                 stopped_reason = "natural"
                 # The hook may turn a natural conclusion into a routed terminal call.
                 if on_stop is not None:

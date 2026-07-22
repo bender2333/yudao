@@ -192,6 +192,9 @@ class RecordedProtocolErrorOnCallMockLlmClient(MockLlmClient):
         self.attempts += 1
         if self.attempts == self.error_on_attempt:
             self.calls_made += 1
+            self.prompt_tokens_total += 10
+            self.completion_tokens_total += 5
+            self.reasoning_tokens_total += 2
             usage = self.usage_by_role.setdefault(
                 accounting_role,
                 {
@@ -204,10 +207,17 @@ class RecordedProtocolErrorOnCallMockLlmClient(MockLlmClient):
             )
             usage["calls"] += 1
             usage["llm_duration_ms"] += 1
-            error = ProviderProtocolError("provider-private-detail")
-            error.call_recorded = True
-            error.duration_ms = 1
-            raise error
+            usage["prompt_tokens"] += 10
+            usage["completion_tokens"] += 5
+            usage["reasoning_tokens"] += 2
+            raise ProviderProtocolError(
+                "provider-private-detail",
+                call_recorded=True,
+                duration_ms=1,
+                prompt_tokens=10,
+                completion_tokens=5,
+                reasoning_tokens=2,
+            )
         return super().chat(
             messages,
             tools,
@@ -1219,6 +1229,12 @@ def test_malformed_hook_response_preserves_accounting_and_event_attribution(
     assert result.stopped_reason == "provider_protocol_error"
     assert result.calls == sum(role["calls"] for role in result.per_role.values())
     assert result.calls == sum(event["type"] == "llm_call" for event in events)
+    for metric in ("prompt_tokens", "completion_tokens", "reasoning_tokens"):
+        assert getattr(result, metric) == sum(
+            role[metric] for role in result.per_role.values()
+        ) == sum(
+            event.get(metric, 0) for event in events if event["type"] == "llm_call"
+        )
     provider_errors = [event for event in events if event["type"] == "provider_error"]
     assert provider_errors == [
         {
@@ -1268,6 +1284,12 @@ def test_malformed_consult_response_preserves_accounting_and_event_attribution(
     assert result.consult_errors == 1
     assert result.calls == sum(role["calls"] for role in result.per_role.values())
     assert result.calls == sum(event["type"] == "llm_call" for event in events)
+    for metric in ("prompt_tokens", "completion_tokens", "reasoning_tokens"):
+        assert getattr(result, metric) == sum(
+            role[metric] for role in result.per_role.values()
+        ) == sum(
+            event.get(metric, 0) for event in events if event["type"] == "llm_call"
+        )
     provider_errors = [event for event in events if event["type"] == "provider_error"]
     assert provider_errors == [
         {

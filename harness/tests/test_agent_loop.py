@@ -395,9 +395,12 @@ def test_length_finish_is_not_natural(tmp_path):
     assert result.stopped_reason == "output_truncated"
 
 
-def test_unknown_finish_without_tools_is_provider_protocol_error(tmp_path):
+@pytest.mark.parametrize("finish_reason", ["unexpected", "", None])
+def test_unknown_finish_without_tools_is_provider_protocol_error(
+    tmp_path, finish_reason
+):
     result = run_agent_loop(
-        MockLlmClient([_cr(text="partial", finish="unexpected")]),
+        MockLlmClient([_cr(text="partial", finish=finish_reason)]),
         "system",
         "task",
         [],
