@@ -2,7 +2,7 @@
 
 import inspect
 import json
-from dataclasses import fields
+from dataclasses import FrozenInstanceError, fields
 
 import pytest
 
@@ -38,6 +38,25 @@ def test_role_session_has_fixed_fields_and_initial_system_message():
     assert "keep_history" not in inspect.signature(session.activate).parameters
     assert "messages" not in inspect.signature(RoleSession).parameters
 
+
+def test_role_session_constructor_and_field_bindings_are_frozen():
+    first = RoleSession("requirements", "requirements system", [])
+    second = RoleSession("engineering", "engineering system", [])
+
+    assert list(inspect.signature(RoleSession).parameters) == ["role", "system", "tools"]
+    for name, value in [
+        ("role", "engineering"),
+        ("system", "replacement"),
+        ("tools", []),
+        ("messages", second.messages),
+        ("activates", 1),
+    ]:
+        with pytest.raises((FrozenInstanceError, AttributeError)):
+            setattr(first, name, value)
+
+    first.messages.append({"role": "assistant", "content": "PRIVATE_R"})
+    assert first.messages is not second.messages
+    assert "PRIVATE_R" not in json.dumps(second.messages)
 
 @pytest.mark.parametrize(
     ("args", "message"),

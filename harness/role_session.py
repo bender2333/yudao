@@ -9,13 +9,13 @@ from .agent_loop import LoopResult, run_agent_loop
 from .llm import LlmClient
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleSession:
     role: str
     system: str
     tools: list[dict]
-    messages: list[dict] = field(default_factory=list, init=False)
-    activates: int = 0
+    messages: list[dict] = field(default_factory=list, init=False, compare=False)
+    activates: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         if type(self.role) is not str:
@@ -28,7 +28,7 @@ class RoleSession:
             raise ValueError("system must be a non-empty string")
         if type(self.tools) is not list:
             raise TypeError("tools must be a list")
-        self.tools = deepcopy(self.tools)
+        object.__setattr__(self, "tools", deepcopy(self.tools))
         self.messages.append({"role": "system", "content": self.system})
 
     def activate(
@@ -53,7 +53,7 @@ class RoleSession:
         if max_steps <= 0:
             raise ValueError("max_steps must be a positive integer")
 
-        self.activates += 1
+        object.__setattr__(self, "activates", self.activates + 1)
         return run_agent_loop(
             llm=llm,
             system=self.system,
