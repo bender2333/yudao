@@ -13,6 +13,7 @@ from .contracts import (
     TERMINAL_TOOL_DEFS,
     TicketLedger,
     TicketValidationError,
+    content_hash,
     validate_payload,
 )
 from .agent_loop import LoopStopped
@@ -145,6 +146,18 @@ class TicketCollector:
                 )
                 self.ledger.verify_chain()
             except (TicketValidationError, ValueError) as error:
+                if self.on_event is not None:
+                    reason = str(error)
+                    field = reason.split("payload field ", 1)[-1].split(" ", 1)[0] if "payload field " in reason else None
+                    self.on_event(
+                        {
+                            "type": "ticket_rejected",
+                            "role": self.role,
+                            "kind": TERMINAL_TO_KIND.get(name),
+                            "error_field": field,
+                            "reason": type(error).__name__,
+                        }
+                    )
                 return f"Error: {error}"
             self.ticket = ticket
             if self.on_ticket is not None:
@@ -175,9 +188,8 @@ class TicketCollector:
         tree_hash = self.workspace.tree_hash()
         files = [item["path"] for item in manifest]
         if kind == "acceptance":
-            if self.ledger.tickets:
-                raise ValueError("acceptance must be the first ticket")
-            return {"code_tree_hash": tree_hash, "files": files}, None
+            parent_hash = None if not self.ledger.tickets else self.trigger["content_hash"]
+            return {"code_tree_hash": tree_hash, "files": files}, parent_hash
         if self.acceptance is None or self.trigger is None:
             raise ValueError("current acceptance and trigger are required")
         if kind == "delivery":
@@ -203,7 +215,7 @@ class TicketCollector:
                 "files": files,
                 "changed_files": changed_files,
                 "checks": checks,
-            }, self.acceptance["content_hash"]
+            }, self.trigger["content_hash"]
         if kind == "clarification":
             return {
                 "code_tree_hash": tree_hash,
@@ -257,6 +269,17 @@ def _acceptance_ids(ticket: dict) -> set[str]:
         for item in payload[group]
     }
 
+def _defect_fingerprint(ticket: dict) -> str:
+    return content_hash(
+        {
+            "route": ticket["payload"]["route"],
+            "defects": [
+                {key: value for key, value in defect.items() if key != "defect_id"}
+                for defect in ticket["payload"]["defects"]
+            ],
+        }
+    )
+
 
 def _handoff(task: str, acceptance: dict | None, trigger: dict | None, workspace: Workspace) -> str:
     return json.dumps(
@@ -299,36 +322,33 @@ def run_team(
     terminal_defs = lambda names: [copy.deepcopy(_TERMINAL_DEFS[name]) for name in names]
     sessions = {
         "requirements": RoleSession(
-            "requirements",
-            REQUIREMENTS_SYSTEM,
+            "requirements", REQUIREMENTS_SYSTEM,
             runtime.tool_defs(False) + terminal_defs(["submit_acceptance"]),
         ),
         "engineering": RoleSession(
-            "engineering",
-            ENGINEERING_SYSTEM,
-            runtime.tool_defs(True)
-            + terminal_defs(["submit_clarification", "submit_delivery"]),
+            "engineering", ENGINEERING_SYSTEM,
+            runtime.tool_defs(True) + terminal_defs(["submit_clarification", "submit_delivery"]),
         ),
         "quality": RoleSession(
-            "quality",
-            QUALITY_SYSTEM,
+            "quality", QUALITY_SYSTEM,
             runtime.tool_defs(False) + terminal_defs(["submit_defect", "submit_release"]),
         ),
     }
     ledger = TicketLedger(task_id)
     transitions = []
     state = TeamState.REQUIREMENTS
-    acceptance = None
-    trigger = None
+    current_acceptance = None
+    current_delivery = None
+    trigger_ticket = None
+    open_defects = {}
+    last_defect_fingerprint = None
+    consecutive_no_change_deliveries = 0
+    reworks = 0
     roles = tuple(sessions)
     usage_fields = ("calls", "prompt_tokens", "completion_tokens", "reasoning_tokens", "llm_duration_ms")
     usage_before = {
-        role: {
-            field: copy.deepcopy(
-                getattr(llm, "usage_by_role", {}).get(role, {}).get(field, 0)
-            )
-            for field in usage_fields
-        }
+        role: {field: copy.deepcopy(getattr(llm, "usage_by_role", {}).get(role, {}).get(field, 0))
+               for field in usage_fields}
         for role in roles
     }
     retry_before = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
@@ -337,107 +357,186 @@ def run_team(
     tool_invocations = 0
     content_filter_retries = 0
 
+    def external(event: dict) -> None:
+        if on_event is None:
+            return
+        try:
+            on_event(event)
+        except Exception as exc:
+            raise LoopStopped(_system_error("transition_callback", exc)) from None
+
     def emit(event: dict) -> None:
         nonlocal tool_invocations, content_filter_retries
-        if event.get("type") == "tool_call":
+        event_type = event.get("type")
+        if event_type == "tool_call":
             tool_invocations += 1
-        elif (
-            event.get("type") == "provider_retry"
-            and event.get("reason") == "content_filter"
-        ):
+        elif event_type == "provider_retry" and event.get("reason") == "content_filter":
             content_filter_retries += 1
-        if on_event is not None and event.get("type", "").startswith("team_"):
-            on_event(event)
+        if event_type == "llm_call":
+            external(
+                {
+                    "type": "llm_call",
+                    "role": state.value,
+                    "step": event.get("step"),
+                    "failed": bool(event.get("failed")),
+                    "finish_reason": event.get("finish_reason", ""),
+                }
+            )
+        elif event_type in {"team_ticket", "team_transition", "ticket_rejected"}:
+            external(event)
 
-    def transition(target: TeamState):
+    def transition(target: TeamState) -> None:
         nonlocal state
         label = f"{state.value}->{target.value}"
         transitions.append(label)
         state = target
         emit({"type": "team_transition", "transition": label})
 
-    while state is not TeamState.DONE:
-        role = state.value
-        before_manifest = workspace.tree_manifest() if state is TeamState.ENGINEERING else None
-        receipt_baseline = dict(runtime.receipts)
-        collector = TicketCollector(
-            role,
-            ledger,
-            runtime,
-            workspace,
-            acceptance=acceptance,
-            trigger=trigger,
-            before_manifest=before_manifest,
-            receipt_baseline=receipt_baseline,
-            on_ticket=on_ticket,
-            on_event=emit,
-        )
-        terminals = _ALLOWED_TERMINALS[role]
-        handlers = runtime.handlers()
-        handlers.update({name: collector.handler(name) for name in terminals})
-        phase = "handoff"
-        try:
-            handoff = _handoff(task, acceptance, trigger, workspace)
-            phase = f"{role}_activation"
-            loop = sessions[role].activate(
-                handoff,
-                llm=llm,
-                handlers_ctx=workspace.dir,
-                max_steps=max_steps,
-                terminal_tools=set(terminals),
-                extra_handlers=handlers,
+    try:
+        while state is not TeamState.DONE:
+            role = state.value
+            engineering_before_manifest = workspace.tree_manifest() if state is TeamState.ENGINEERING else None
+            receipt_baseline = dict(runtime.receipts)
+            collector = TicketCollector(
+                role, ledger, runtime, workspace,
+                acceptance=current_acceptance,
+                trigger=trigger_ticket,
+                before_manifest=engineering_before_manifest,
+                open_defects=set(open_defects),
+                receipt_baseline=receipt_baseline,
+                on_ticket=on_ticket,
                 on_event=emit,
             )
-        except Exception as exc:
-            stopped_reason = _system_error(phase, exc)
-            break
-        if loop.stopped_reason != "terminal" or collector.ticket is None:
-            stopped_reason = loop.stopped_reason
-            break
-        trigger = collector.ticket
-        try:
-            if state is TeamState.REQUIREMENTS and trigger["kind"] == "acceptance":
-                acceptance = trigger
-                transition(TeamState.ENGINEERING)
-            elif state is TeamState.ENGINEERING and trigger["kind"] == "delivery":
-                transition(TeamState.QUALITY)
-            elif state is TeamState.ENGINEERING and trigger["kind"] == "clarification":
-                stopped_reason = "unsupported_clarification"
+            terminals = _ALLOWED_TERMINALS[role]
+            handlers = runtime.handlers()
+            handlers.update({name: collector.handler(name) for name in terminals})
+            phase = "handoff"
+            handoff = _handoff(task, current_acceptance, trigger_ticket, workspace)
+
+            loop = None
+            for activate_number in (1, 2):
+                external(
+                    {
+                        "type": "role_activation",
+                        "role": role,
+                        "activate": sessions[role].activates + 1,
+                        "tree_hash": workspace.tree_hash(),
+                    }
+                )
+                phase = f"{role}_activation"
+                loop = sessions[role].activate(
+                    handoff,
+                    llm=llm,
+                    handlers_ctx=workspace.dir,
+                    max_steps=max_steps,
+                    terminal_tools=set(terminals),
+                    extra_handlers=handlers,
+                    on_event=emit,
+                )
+                if loop.stopped_reason == "terminal" and collector.ticket is not None:
+                    break
+                if loop.stopped_reason not in {"natural", "terminal"}:
+                    stopped_reason = loop.stopped_reason
+                    break
+                if activate_number == 2:
+                    stopped_reason = "role_incomplete"
+                    break
+                handoff = json.dumps(
+                    {
+                        "correction": "A legal terminal ticket is required.",
+                        "role": role,
+                        "expected_allowed_terminal": sorted(terminals),
+                        "last_stop": loop.stopped_reason,
+                        "immutable_task": task,
+                        "current_acceptance": current_acceptance,
+                        "trigger": trigger_ticket,
+                        "code_tree_hash": workspace.tree_hash(),
+                        "files": [item["path"] for item in workspace.tree_manifest()],
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            if loop is None or loop.stopped_reason != "terminal" or collector.ticket is None:
                 break
-            elif state is TeamState.QUALITY and trigger["kind"] == "release":
+
+            ticket = collector.ticket
+            trigger_ticket = ticket
+            if state is TeamState.REQUIREMENTS and ticket["kind"] == "acceptance":
+                current_acceptance = ticket
+                consecutive_no_change_deliveries = 0
+                transition(TeamState.ENGINEERING)
+            elif state is TeamState.ENGINEERING and ticket["kind"] == "clarification":
+                transition(TeamState.REQUIREMENTS)
+            elif state is TeamState.ENGINEERING and ticket["kind"] == "delivery":
+                current_delivery = ticket
+                if ticket["bindings"]["changed_files"]:
+                    consecutive_no_change_deliveries = 0
+                else:
+                    consecutive_no_change_deliveries += 1
+                    if consecutive_no_change_deliveries >= 2:
+                        stopped_reason = "stalled"
+                        break
+                transition(TeamState.QUALITY)
+            elif state is TeamState.QUALITY and ticket["kind"] == "release":
+                open_defects.clear()
                 transition(TeamState.DONE)
                 outcome = "done"
                 stopped_reason = "done"
-            elif state is TeamState.QUALITY and trigger["kind"] == "defect":
-                stopped_reason = "unsupported_defect"
-                break
+            elif state is TeamState.QUALITY and ticket["kind"] == "defect":
+                reworks += 1
+                open_defects[ticket["ticket_id"]] = ticket
+                fingerprint = content_hash(
+                    {
+                        "acceptance": current_acceptance["content_hash"],
+                        "tree": workspace.tree_hash(),
+                        "defect": _defect_fingerprint(ticket),
+                    }
+                )
+                if fingerprint == last_defect_fingerprint:
+                    stopped_reason = "stalled"
+                    break
+                last_defect_fingerprint = fingerprint
+                if reworks > max_reworks:
+                    stopped_reason = "max_reworks"
+                    break
+                route = ticket["payload"]["route"]
+                transition(TeamState.REQUIREMENTS if route == "requirements" else TeamState.ENGINEERING)
             else:
                 stopped_reason = "unexpected_terminal"
                 break
-        except Exception as exc:
-            stopped_reason = _system_error("transition_callback", exc)
-            break
+    except LoopStopped as exc:
+        stopped_reason = exc.reason
+    except Exception as exc:
+        stopped_reason = _system_error(phase, exc)
 
     usage_after = getattr(llm, "usage_by_role", {})
-    per_role = {
-        role: {
+    per_role = {}
+    for role, session in sessions.items():
+        metric = {
             field: usage_after.get(role, {}).get(field, 0) - usage_before[role][field]
             for field in usage_fields
         }
-        for role in sessions
-    }
+        metric.update(
+            activates=session.activates,
+            message_count=len(session.messages),
+            message_chars=sum(len(str(message.get("content") or "")) for message in session.messages),
+            duration_ms=metric["llm_duration_ms"],
+        )
+        per_role[role] = metric
     retry_after = getattr(llm, "transient_retry_attempts", getattr(llm, "retry_attempts", 0))
-    totals = {
-        field: sum(per_role[role][field] for role in roles)
-        for field in usage_fields
-    }
+    totals = {field: sum(per_role[role][field] for role in roles) for field in usage_fields}
+    try:
+        external({"type": "team_stop", "reason": stopped_reason, "outcome": outcome})
+    except LoopStopped as exc:
+        stopped_reason = exc.reason
+        outcome = "failed"
     return TeamResult(
         outcome=outcome,
         stopped_reason=stopped_reason,
         sessions=sessions,
         tickets=ledger.tickets,
         transitions=transitions,
-        reworks=0,
+        reworks=reworks,
         calls=totals["calls"],
         prompt_tokens=totals["prompt_tokens"],
         completion_tokens=totals["completion_tokens"],
