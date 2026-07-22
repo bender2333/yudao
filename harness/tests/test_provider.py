@@ -395,6 +395,8 @@ def test_solo_uses_the_same_token_budget(tmp_path, monkeypatch):
     seed.mkdir()
     checks = tmp_path / "checks.json"
     checks.write_text('{"protected_paths":[],"checks":{}}', encoding="utf-8")
+    provider = tmp_path / "provider.md"
+    provider.write_text("key: fake\nurl: https://provider.invalid\nmodel: test-model\n", encoding="utf-8")
 
     summary = run_solo(
         "task",
@@ -403,7 +405,7 @@ def test_solo_uses_the_same_token_budget(tmp_path, monkeypatch):
         str(seed),
         str(checks),
         max_tokens=5,
-        provider_path="ignored.md",
+        provider_path=str(provider),
     )
 
     assert summary["treatment"] == "S"

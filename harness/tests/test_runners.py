@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import inspect
 import json
+import math
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +15,7 @@ from harness.contracts import verify_ticket
 from harness.run_solo import run_solo
 from harness.run_team import run_team_cli
 
+from harness.runner_common import RunnerSetup, finalize_artifacts
 
 FAKE_KEY = "sk-runner-secret"
 
@@ -122,6 +125,12 @@ def _inputs(tmp_path):
     return seed, checks
 
 
+def _provider(tmp_path):
+    path = tmp_path / "provider.md"
+    path.write_text("key: fake\nurl: https://provider.invalid\nmodel: test-model\n", encoding="utf-8")
+    return path
+
+
 def _patch_provider(monkeypatch, module, responses):
     monkeypatch.setattr(module, "load_provider", lambda _path: {
         "key": FAKE_KEY,
@@ -197,7 +206,7 @@ def test_solo_offline_done_writes_complete_artifacts(tmp_path, monkeypatch):
     )
     run_dir = tmp_path / "solo"
 
-    summary = run_solo("implement VALUE", "task-1", str(run_dir), str(seed), str(checks), provider_path="ignored")
+    summary = run_solo("implement VALUE", "task-1", str(run_dir), str(seed), str(checks), provider_path=str(_provider(tmp_path)))
 
     assert summary["outcome"] == "done"
     assert summary["completion"]["kind"] == "solo_done"
@@ -232,7 +241,7 @@ def test_team_offline_done_writes_complete_artifacts(tmp_path, monkeypatch):
     )
     run_dir = tmp_path / "team"
 
-    summary = run_team_cli("implement VALUE", "task-1", str(run_dir), str(seed), str(checks), provider_path="ignored")
+    summary = run_team_cli("implement VALUE", "task-1", str(run_dir), str(seed), str(checks), provider_path=str(_provider(tmp_path)))
 
     assert summary["outcome"] == "done"
     assert summary["tickets"] == ["A-0001", "L-0001", "R-0001"]
@@ -263,21 +272,160 @@ def test_atomic_writers_reject_stale_files_and_control_sequence(tmp_path):
     assert _jsonl(events) == [{"type": "x", "seq": 1}]
 
 
+def test_event_writer_commits_sequence_only_after_serialized_flushed_write(tmp_path):
+    events = tmp_path / "events.jsonl"
+    writer = EventWriter(events)
+    with pytest.raises(TypeError):
+        writer.append({"type": "bad", "value": object()})
+    writer.append({"type": "ok"})
+    writer.close()
+    assert _jsonl(events) == [{"type": "ok", "seq": 1}]
+    with pytest.raises(ValueError, match="closed"):
+        writer.append({"type": "late"})
+
+
+def test_event_writer_flush_failure_does_not_commit_sequence(tmp_path):
+    class FailingFlush:
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+            self.fail = True
+
+        def write(self, value):
+            return self.wrapped.write(value)
+
+        def flush(self):
+            if self.fail:
+                self.fail = False
+                raise OSError("flush failed")
+            return self.wrapped.flush()
+
+        def fileno(self):
+            return self.wrapped.fileno()
+
+        def close(self):
+            return self.wrapped.close()
+
+    events = tmp_path / "events.jsonl"
+    writer = EventWriter(events)
+    wrapper = FailingFlush(writer._file)
+    writer._file = wrapper
+    with pytest.raises(OSError, match="flush failed"):
+        writer.append({"type": "failed"})
+    writer.append({"type": "ok"})
+    writer.close()
+    assert _jsonl(events)[-1]["seq"] == 1
+
+
+def test_event_writer_close_fsyncs_closes_and_preserves_fsync_error(tmp_path, monkeypatch):
+    events = tmp_path / "events.jsonl"
+    writer = EventWriter(events)
+    writer.append({"type": "ok"})
+    closed = []
+    original_close = writer._file.close
+    monkeypatch.setattr(os, "fsync", lambda _fd: (_ for _ in ()).throw(OSError("fsync failed")))
+    writer._file.close = lambda: (closed.append(True), original_close())[1]
+    with pytest.raises(OSError, match="fsync failed"):
+        writer.close()
+    assert closed == [True]
+    writer.close()
+
+
+def test_atomic_writer_rejects_target_links_and_cleans_racing_temp(tmp_path, monkeypatch):
+    victim = tmp_path / "victim.json"
+    victim.write_text("victim", encoding="utf-8")
+    target = tmp_path / "linked.json"
+    try:
+        target.symlink_to(victim)
+    except OSError:
+        monkeypatch.setattr("harness.artifacts._is_link_or_junction", lambda path: path == target)
+        target.write_text("old", encoding="utf-8")
+    with pytest.raises((FileExistsError, ValueError)):
+        write_json_atomic(target, {"new": True})
+    assert victim.read_text(encoding="utf-8") == "victim"
+
+    race = tmp_path / "race.json"
+    original_link = os.link
+    def create_racer(source, destination):
+        Path(destination).write_text("racer", encoding="utf-8")
+        return original_link(source, destination)
+    monkeypatch.setattr(os, "link", create_racer)
+    with pytest.raises(FileExistsError):
+        write_json_atomic(race, {"new": True})
+    assert race.read_text(encoding="utf-8") == "racer"
+    assert not (tmp_path / "race.json.tmp").exists()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_steps": 0}, {"max_steps": True}, {"max_calls": math.inf},
+        {"max_seconds": math.nan}, {"max_tokens": 1.5}, {"task": ""},
+    ],
+)
+def test_invalid_runner_prerequisites_leave_no_run_dir(tmp_path, monkeypatch, kwargs):
+    import harness.run_solo as module
+    seed, checks = _inputs(tmp_path)
+    _patch_provider(monkeypatch, module, [])
+    arguments = dict(task="task", task_id="task-1", run_dir=str(tmp_path / "run"), seed_dir=str(seed), checks_file=str(checks), provider_path=str(_provider(tmp_path)))
+    arguments.update(kwargs)
+    with pytest.raises((TypeError, ValueError)):
+        run_solo(**arguments)
+    assert not (tmp_path / "run").exists()
+
+
+def test_missing_setup_inputs_leave_no_run_dir(tmp_path):
+    seed, checks = _inputs(tmp_path)
+    cases = [
+        {"seed_dir": str(tmp_path / "missing-seed"), "checks_file": str(checks), "provider_path": "missing-provider"},
+        {"seed_dir": str(seed), "checks_file": str(tmp_path / "missing-checks"), "provider_path": "missing-provider"},
+    ]
+    for index, case in enumerate(cases):
+        run_dir = tmp_path / f"run-{index}"
+        with pytest.raises((FileNotFoundError, ValueError)):
+            run_solo("task", "task-1", str(run_dir), **case)
+        assert not run_dir.exists()
+
+
+def test_finalize_conflict_preserves_existing_artifact_and_writes_no_summary(tmp_path):
+    from harness.workspace import Workspace
+
+    root = tmp_path / "run"
+    workspace = Workspace(str(root / "workspace"))
+    (root / "sessions").mkdir()
+    (root / "tickets").mkdir()
+    (root / "sessions" / "solo.jsonl").write_text("old", encoding="utf-8")
+    setup = RunnerSetup(root, {"model": "test"}, object(), workspace, object(), object())
+    result = SimpleNamespace(
+        outcome="done", stopped_reason="done", calls=0, prompt_tokens=0,
+        completion_tokens=0, reasoning_tokens=0, transient_retry_attempts=0,
+        content_filter_retries=0, tool_invocations=0, duration_ms=0,
+        per_role={"solo": {"calls": 0, "llm_duration_ms": 0}},
+    )
+    with pytest.raises(FileExistsError):
+        finalize_artifacts(
+            setup, result, task_id="task-1", treatment="S", limits={},
+            sessions={"solo": []}, tickets=[], extras={"completion": None},
+        )
+    assert (root / "sessions" / "solo.jsonl").read_text(encoding="utf-8") == "old"
+    assert not (root / "summary.json").exists()
+
+
 def test_summary_is_last_atomic_json_artifact(tmp_path, monkeypatch):
     import harness.run_solo as module
 
     seed, checks = _inputs(tmp_path)
     _patch_provider(monkeypatch, module, [_response([], usage=True), _response([], usage=True)])
-    original = module.write_json_atomic
+    import harness.runner_common as common
+    original = common.write_json_atomic
     paths = []
 
     def record(path, value):
         paths.append(path.name)
         original(path, value)
 
-    monkeypatch.setattr(module, "write_json_atomic", record)
+    monkeypatch.setattr(common, "write_json_atomic", record)
     run_dir = tmp_path / "ordered"
-    summary = run_solo("task", "task-1", str(run_dir), str(seed), str(checks), provider_path="ignored")
+    summary = run_solo("task", "task-1", str(run_dir), str(seed), str(checks), provider_path=str(_provider(tmp_path)))
 
     assert summary["outcome"] == "failed"
     assert paths[-1] == "summary.json"
@@ -296,7 +444,7 @@ def test_missing_usage_is_controlled_and_unexpected_crash_has_no_summary(tmp_pat
     controlled = tmp_path / "controlled"
     summary = run_solo(
         "task", "task-1", str(controlled), str(seed), str(checks),
-        max_tokens=100, provider_path="ignored",
+        max_tokens=100, provider_path=str(_provider(tmp_path)),
     )
     assert summary["outcome"] == "failed"
     assert summary["stopped_reason"] == "budget_accounting_error"
@@ -306,7 +454,7 @@ def test_missing_usage_is_controlled_and_unexpected_crash_has_no_summary(tmp_pat
     monkeypatch.setattr(module, "run_solo_loop", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
     crashed = tmp_path / "crashed"
     with pytest.raises(RuntimeError, match="boom"):
-        run_solo("task", "task-1", str(crashed), str(seed), str(checks), provider_path="ignored")
+        run_solo("task", "task-1", str(crashed), str(seed), str(checks), provider_path=str(_provider(tmp_path)))
     assert (crashed / "events.jsonl").exists()
     assert not (crashed / "summary.json").exists()
     assert not (crashed / "summary.json.tmp").exists()
