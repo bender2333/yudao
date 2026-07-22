@@ -30,6 +30,14 @@ def _truncate(s: str, n: int = _TRUNC) -> str:
     return s if len(s) <= n else s[:n] + f"...[truncated {len(s) - n} chars]"
 
 
+def _provider_stop_reason(exc: Exception) -> str:
+    if isinstance(exc, ProviderUnavailable):
+        return "provider_unavailable"
+    if isinstance(exc, ContextOverflow):
+        return "context_overflow"
+    return "provider_protocol_error"
+
+
 def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
     """Extra handlers (llm/workspace-bound closures, e.g. cross-stage consults)
     take precedence; otherwise fall back to the standard stateless dispatch."""
@@ -171,7 +179,7 @@ def run_agent_loop(
     pending_content_filter_retry = False
 
     while True:
-        if steps >= max_steps:
+        if steps >= max_steps and not pending_content_filter_retry:
             stopped_reason = "max_steps"
             emit({"type": "stop", "reason": "max_steps", "step": steps})
             break
@@ -197,12 +205,7 @@ def run_agent_loop(
                         "step": steps + 1,
                     }
                 )
-            if isinstance(exc, ProviderUnavailable):
-                stopped_reason = "provider_unavailable"
-            elif isinstance(exc, ContextOverflow):
-                stopped_reason = "context_overflow"
-            else:
-                stopped_reason = "provider_protocol_error"
+            stopped_reason = _provider_stop_reason(exc)
             emit(
                 {
                     "type": "provider_error",
@@ -316,6 +319,20 @@ def run_agent_loop(
                             if isinstance(exc, BudgetAccountingError)
                             else "budget_exhausted"
                         )
+                    except (
+                        ProviderUnavailable,
+                        ProviderProtocolError,
+                        ContextOverflow,
+                    ) as exc:
+                        stopped_reason = _provider_stop_reason(exc)
+                        emit(
+                            {
+                                "type": "provider_error",
+                                "reason": stopped_reason,
+                                "error_type": type(exc).__name__,
+                                "step": steps,
+                            }
+                        )
             elif result.finish_reason == "length":
                 stopped_reason = "output_truncated"
             else:
@@ -361,12 +378,7 @@ def run_agent_loop(
                         ProviderProtocolError,
                         ContextOverflow,
                     ) as exc:
-                        if isinstance(exc, ProviderUnavailable):
-                            forced_stop_reason = "provider_unavailable"
-                        elif isinstance(exc, ContextOverflow):
-                            forced_stop_reason = "context_overflow"
-                        else:
-                            forced_stop_reason = "provider_protocol_error"
+                        forced_stop_reason = _provider_stop_reason(exc)
                         output = f"Error: {forced_stop_reason.replace('_', ' ')}"
                         emit(
                             {

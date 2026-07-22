@@ -526,3 +526,63 @@ def test_content_filter_retry_not_counted_when_next_call_hits_budget(tmp_path):
     assert result.calls == 1
     assert result.content_filter_retries == 0
     assert not any(event["type"] == "provider_retry" for event in result.events)
+
+
+@pytest.mark.parametrize(
+    ("second_response", "stopped_reason"),
+    [
+        (_cr(text="done", finish="stop"), "natural"),
+        (_cr(finish="content_filter"), "provider_blocked"),
+    ],
+)
+def test_pending_content_filter_retry_bypasses_max_steps_once(
+    tmp_path, second_response, stopped_reason
+):
+    llm = MockLlmClient([_cr(finish="content_filter"), second_response])
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        max_steps=1,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.calls == 2
+    assert result.content_filter_retries == 1
+    assert sum(event["type"] == "llm_call" for event in result.events) == 2
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_on_stop_provider_failure_is_sanitized(
+    tmp_path, exception_type, stopped_reason
+):
+    secret_detail = "provider-private-detail"
+
+    def fail_on_stop(final_text, messages):
+        raise exception_type(secret_detail)
+
+    result = run_agent_loop(
+        MockLlmClient([_cr(text="done", finish="stop")]),
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        on_stop=fail_on_stop,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert [event["type"] for event in result.events[-2:]] == [
+        "provider_error",
+        "stop",
+    ]
+    assert secret_detail not in json.dumps(result.events)
