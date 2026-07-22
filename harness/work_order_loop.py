@@ -39,6 +39,8 @@ QUALITY_SYSTEM = (
     "without running registered checks. End with submit_defect or submit_release. "
     "The immutable user request and newest validated tickets override older memories."
 )
+MAX_TEAM_ACTIVATIONS = 64
+
 
 
 class TeamState(str, Enum):
@@ -73,6 +75,7 @@ _SYSTEM_ERROR_PHASES = frozenset(
         "engineering_activation",
         "quality_activation",
         "ticket_callback",
+        "event_callback",
         "transition_callback",
         "handoff",
         "unknown",
@@ -163,6 +166,8 @@ class TicketCollector:
             if self.on_ticket is not None:
                 try:
                     self.on_ticket(copy.deepcopy(ticket))
+                except LoopStopped:
+                    raise
                 except Exception as exc:
                     raise LoopStopped(_system_error("ticket_callback", exc)) from None
             if self.on_event is not None:
@@ -177,8 +182,10 @@ class TicketCollector:
                             "parent_hash": ticket["parent_hash"],
                         }
                     )
+                except LoopStopped:
+                    raise
                 except Exception as exc:
-                    raise LoopStopped(_system_error("ticket_callback", exc)) from None
+                    raise LoopStopped(_system_error("event_callback", exc)) from None
             return f"Accepted {ticket['ticket_id']}"
 
         return collect
@@ -220,7 +227,7 @@ class TicketCollector:
             return {
                 "code_tree_hash": tree_hash,
                 "files": files,
-            }, self.acceptance["content_hash"]
+            }, self.trigger["content_hash"]
         if kind == "release":
             if set(payload["verified_requirements"]) != _acceptance_ids(self.acceptance):
                 raise ValueError("verified_requirements must exactly cover acceptance ids")
@@ -356,14 +363,22 @@ def run_team(
     stopped_reason = "system_error"
     tool_invocations = 0
     content_filter_retries = 0
+    activations = 0
 
     def external(event: dict) -> None:
         if on_event is None:
             return
+        phase_name = (
+            "transition_callback"
+            if event.get("type") == "team_transition"
+            else "event_callback"
+        )
         try:
             on_event(event)
+        except LoopStopped:
+            raise
         except Exception as exc:
-            raise LoopStopped(_system_error("transition_callback", exc)) from None
+            raise LoopStopped(_system_error(phase_name, exc)) from None
 
     def emit(event: dict) -> None:
         nonlocal tool_invocations, content_filter_retries
@@ -415,6 +430,11 @@ def run_team(
 
             loop = None
             for activate_number in (1, 2):
+                if activations >= MAX_TEAM_ACTIVATIONS:
+                    stopped_reason = "stalled"
+                    break
+                collector.receipt_baseline = dict(runtime.receipts)
+                activations += 1
                 external(
                     {
                         "type": "role_activation",

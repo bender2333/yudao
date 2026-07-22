@@ -15,6 +15,8 @@ from harness.tests.fakes import (
     valid_release_payload,
 )
 from harness.work_order_loop import TeamState, run_team
+import harness.work_order_loop as work_order_loop
+
 from harness.llm import ProviderUnavailable
 
 
@@ -381,6 +383,70 @@ def test_defect_without_fresh_quality_check_is_rejected_for_correction(tmp_path)
     assert "missing current activation receipt" in str(result.sessions["quality"].messages)
 
 
+def test_quality_correction_requires_receipt_from_second_activation(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            _delivery_calls("VALUE = 42\n"),
+            tool_result("run_check", {"name": "public_tests"}),
+            text_stop("forgot the ticket"),
+            tool_result("submit_release", valid_release_payload()),
+            text_stop("cannot release without fresh evidence"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "role_incomplete"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance", "delivery"]
+    assert "missing current activation receipt" in str(result.sessions["quality"].messages)
+
+
+def test_engineering_correction_requires_receipt_from_second_activation(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            multi_tool_result(
+                [
+                    call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                    call("run_check", {"name": "public_tests"}),
+                ]
+            ),
+            text_stop("forgot the ticket"),
+            tool_result("submit_delivery", valid_delivery_payload()),
+            text_stop("cannot deliver without fresh evidence"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "role_incomplete"
+    assert [ticket["kind"] for ticket in result.tickets] == ["acceptance"]
+    assert "missing current activation receipt" in str(result.sessions["engineering"].messages)
+
+
+def test_team_ticket_callback_failure_is_sanitized_once_as_event_callback(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    llm = ScriptedLlm([tool_result("submit_acceptance", valid_acceptance_payload())])
+
+    def fail_ticket(event):
+        if event["type"] == "team_ticket":
+            raise RuntimeError("SECRET_EVENT_CALLBACK")
+
+    result = run_team(
+        llm, workspace, runtime, "task-1", "implement VALUE", on_event=fail_ticket
+    )
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "system_error:event_callback:RuntimeError"
+    assert "SECRET_EVENT_CALLBACK" not in str(result)
+    assert "LoopStopped" not in result.stopped_reason
+
+
 def test_transition_callback_failure_preserves_issued_ticket_and_transition(tmp_path):
     workspace, runtime = make_runtime_with_public_check(tmp_path)
     llm = ScriptedLlm([tool_result("submit_acceptance", valid_acceptance_payload())])
@@ -500,6 +566,60 @@ def _release_with_defects(*ticket_ids):
     payload = valid_release_payload()
     payload["closed_defects"] = list(ticket_ids)
     return payload
+
+
+def test_clarification_after_engineering_defect_has_defect_as_direct_parent(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    revised = valid_acceptance_payload()
+    revised["clarification_responses"] = ["Apply the defect guidance."]
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            _delivery_calls("VALUE = 42\n"),
+            _quality_defect(),
+            tool_result("submit_clarification", _clarification_payload()),
+            tool_result("submit_acceptance", revised),
+            text_stop("cannot continue"),
+            text_stop("still cannot continue"),
+        ]
+    )
+
+    result = run_team(llm, workspace, runtime, "task-1", "implement VALUE")
+
+    defect, clarification, acceptance = result.tickets[2:5]
+    assert clarification["parent_hash"] == defect["content_hash"]
+    assert acceptance["parent_hash"] == clarification["content_hash"]
+
+
+def test_activation_cap_stalls_clarification_cycle_without_extra_provider_call(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(work_order_loop, "MAX_TEAM_ACTIVATIONS", 4)
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    revised = valid_acceptance_payload()
+    revised["clarification_responses"] = ["First answer."]
+    events = []
+    llm = ScriptedLlm(
+        [
+            tool_result("submit_acceptance", valid_acceptance_payload()),
+            tool_result("submit_clarification", _clarification_payload()),
+            tool_result("submit_acceptance", revised),
+            tool_result("submit_clarification", _clarification_payload()),
+            RuntimeError("CAP_MUST_NOT_CONSUME_THIS"),
+        ]
+    )
+
+    result = run_team(
+        llm, workspace, runtime, "task-1", "implement VALUE", on_event=events.append
+    )
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "stalled"
+    assert result.calls == 4
+    assert result.reworks == 0
+    assert sum(event["type"] == "role_activation" for event in events) == 4
+    assert events[-1] == {"type": "team_stop", "reason": "stalled", "outcome": "failed"}
+    assert llm._index == 4
 
 
 def _delivery_calls(content, payload=None):
