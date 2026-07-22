@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from openai import APIResponseValidationError, APIStatusError, BadRequestError
+from openai import APIResponseValidationError, APIStatusError, BadRequestError, OpenAI
 
 import harness.llm as llm_module
 from harness.agent_loop import run_agent_loop
@@ -665,7 +665,7 @@ def test_unavailable_usage_stops_as_accounting_error_by_default(
     assert [message["role"] for message in messages] == ["system", "user"]
 
 
-def test_sdk_response_validation_error_is_sanitized_protocol_stop(tmp_path):
+def test_sdk_response_validation_error_is_accounted_protocol_stop(tmp_path):
     secret_detail = "provider-private-detail"
     completions = _ScriptedCompletions(
         [_api_response_validation_error({"message": secret_detail})]
@@ -680,13 +680,20 @@ def test_sdk_response_validation_error_is_sanitized_protocol_stop(tmp_path):
         "task",
         [],
         str(tmp_path),
+        accounting_role="ROLE",
         messages=messages,
     )
 
     assert result.stopped_reason == "provider_protocol_error"
-    assert result.calls == 0
-    assert [event["type"] for event in result.events] == ["provider_error", "stop"]
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "provider_error",
+        "stop",
+    ]
+    assert result.events[0]["failed"] is True
     assert secret_detail not in json.dumps([result.events, messages])
+
 
 
 def test_post_response_budget_precedes_malformed_message(tmp_path):
@@ -718,4 +725,82 @@ def test_post_response_budget_precedes_malformed_message(tmp_path):
     assert [event["type"] for event in result.events] == ["llm_call", "stop"]
     assert result.events[0]["stopped_reason"] == "budget_exhausted"
     assert [message["role"] for message in messages] == ["system", "user"]
+    assert secret_detail not in json.dumps([result.events, messages])
+
+
+def _invalid_json_openai_client(secret_detail):
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=f"{{invalid-{secret_detail}".encode(),
+            request=request,
+        )
+    )
+    sdk = OpenAI(
+        api_key="test-key",
+        base_url="https://provider.invalid/v1",
+        http_client=httpx.Client(transport=transport),
+        max_retries=0,
+    )
+    return LlmClient(sdk, "test-model")
+
+
+def test_invalid_json_response_is_accounted_protocol_stop(tmp_path):
+    secret_detail = "provider-private-detail"
+    llm = _invalid_json_openai_client(secret_detail)
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "provider_error",
+        "stop",
+    ]
+    assert llm.usage_by_role["ROLE"]["llm_duration_ms"] >= 0
+    assert secret_detail not in json.dumps([result.events, messages])
+
+
+def test_invalid_json_response_yields_to_expired_wall_budget(tmp_path):
+    secret_detail = "provider-private-detail"
+    llm = _invalid_json_openai_client(secret_detail)
+    llm.max_seconds = 1
+    llm._started_at -= 2
+    original_check_budget = llm.check_budget
+    checks = 0
+
+    def allow_request_then_check(*, before_call=False):
+        nonlocal checks
+        checks += 1
+        if checks <= 2:
+            return None
+        return original_check_budget(before_call=before_call)
+
+    llm.check_budget = allow_request_then_check
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert [event["type"] for event in result.events] == ["llm_call", "stop"]
     assert secret_detail not in json.dumps([result.events, messages])

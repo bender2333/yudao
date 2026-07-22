@@ -6,6 +6,7 @@ accounting and backoff retries on transient errors.
 
 from __future__ import annotations
 
+import json
 import math
 import time
 from dataclasses import dataclass, field
@@ -67,6 +68,10 @@ _MISSING = object()
 
 def _is_nonnegative_int(value) -> bool:
     return type(value) is int and value >= 0
+
+
+class _PostResponseProtocolFailure(Exception):
+    """SDK parsed an HTTP response but could not construct a completion."""
 
 
 @dataclass
@@ -144,8 +149,59 @@ class LlmClient:
         self.check_budget(before_call=True)
 
         started = time.monotonic()
-        resp = self._create_with_retry(messages, tools, max_completion_tokens)
-        duration_ms = int((time.monotonic() - started) * 1000)
+        try:
+            resp = self._create_with_retry(messages, tools, max_completion_tokens)
+        except _PostResponseProtocolFailure as failure:
+            duration_ms = int((time.monotonic() - started) * 1000)
+            self.calls_made += 1
+            role_usage = None
+            if accounting_role is not None:
+                role_usage = self.usage_by_role.setdefault(
+                    accounting_role,
+                    {
+                        "calls": 0,
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "reasoning_tokens": 0,
+                        "llm_duration_ms": 0,
+                    },
+                )
+                role_usage["calls"] += 1
+                role_usage["llm_duration_ms"] += duration_ms
+            try:
+                self.check_budget()
+            except BudgetExhausted as exc:
+                return CallResult(
+                    text="",
+                    tool_calls=[],
+                    finish_reason="stop",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    reasoning_tokens=0,
+                    duration_ms=duration_ms,
+                    stopped_reason="budget_exhausted",
+                    stop_detail=str(exc),
+                )
+            if self.max_tokens is not None:
+                return CallResult(
+                    text="",
+                    tool_calls=[],
+                    finish_reason="",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    reasoning_tokens=0,
+                    duration_ms=duration_ms,
+                    stopped_reason="budget_accounting_error",
+                    stop_detail="provider response did not include valid token usage",
+                )
+            raise ProviderProtocolError(
+                "malformed provider response",
+                call_recorded=True,
+                duration_ms=duration_ms,
+            ) from failure
+        else:
+            duration_ms = int((time.monotonic() - started) * 1000)
+
 
         self.calls_made += 1
         role_usage = None
@@ -300,7 +356,9 @@ class LlmClient:
                     delay = min(delay, remaining)
                 time.sleep(delay)
             except APIResponseValidationError as exc:
-                raise ProviderProtocolError("malformed provider response") from exc
+                raise _PostResponseProtocolFailure from exc
+            except json.JSONDecodeError as exc:
+                raise _PostResponseProtocolFailure from exc
             except APIStatusError as exc:
                 raise ProviderProtocolError("provider request failed") from exc
 
