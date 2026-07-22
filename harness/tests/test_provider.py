@@ -804,3 +804,87 @@ def test_invalid_json_response_yields_to_expired_wall_budget(tmp_path):
     assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
     assert [event["type"] for event in result.events] == ["llm_call", "stop"]
     assert secret_detail not in json.dumps([result.events, messages])
+
+
+@pytest.mark.parametrize("contradiction", ["missing_calls", "unexpected_calls"])
+def test_tool_finish_contradiction_is_sanitized_protocol_failure(
+    tmp_path, contradiction
+):
+    secret_detail = "provider-private-detail"
+    if contradiction == "missing_calls":
+        response = _response([], text=secret_detail)
+        response.choices[0].finish_reason = "tool_calls"
+    else:
+        response = _response([_tool_call("call", "list_dir", {})], text=secret_detail)
+        response.choices[0].finish_reason = "stop"
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "provider_protocol_error"
+    assert (result.prompt_tokens, result.completion_tokens, result.reasoning_tokens) == (
+        10,
+        5,
+        2,
+    )
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "provider_error",
+        "stop",
+    ]
+    assert result.events[0]["failed"] is True
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert secret_detail not in json.dumps([result.events, messages])
+
+
+@pytest.mark.parametrize("usage_error", ["missing", "invalid"])
+def test_unknown_usage_yields_to_expired_wall_budget(tmp_path, usage_error):
+    response = _response([], text="provider-private-detail")
+    if usage_error == "missing":
+        response.usage = None
+    else:
+        response.usage.prompt_tokens = "10"
+    completions = _ScriptedCompletions([response])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    llm = LlmClient(client, "test-model")
+    llm.max_seconds = 1
+    llm._started_at -= 2
+    original_check_budget = llm.check_budget
+    checks = 0
+
+    def allow_request_then_check(*, before_call=False):
+        nonlocal checks
+        checks += 1
+        if checks <= 2:
+            return None
+        return original_check_budget(before_call=before_call)
+
+    llm.check_budget = allow_request_then_check
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        [],
+        str(tmp_path),
+        accounting_role="ROLE",
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == llm.usage_by_role["ROLE"]["calls"] == 1
+    assert [event["type"] for event in result.events] == ["llm_call", "stop"]
+    assert result.events[0]["stopped_reason"] == "budget_exhausted"
+    assert [message["role"] for message in messages] == ["system", "user"]

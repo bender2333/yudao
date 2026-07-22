@@ -235,6 +235,20 @@ class LlmClient:
             and _is_nonnegative_int(completion_tokens)
             and _is_nonnegative_int(reasoning_tokens)
         ):
+            try:
+                self.check_budget()
+            except BudgetExhausted as exc:
+                return CallResult(
+                    text="",
+                    tool_calls=[],
+                    finish_reason="stop",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    reasoning_tokens=0,
+                    duration_ms=duration_ms,
+                    stopped_reason="budget_exhausted",
+                    stop_detail=str(exc),
+                )
             return CallResult(
                 text="",
                 tool_calls=[],
@@ -301,6 +315,9 @@ class LlmClient:
             tool_calls = []
         elif not isinstance(tool_calls, (list, tuple)):
             raise malformed_response()
+        if (finish_reason == "tool_calls") != bool(tool_calls):
+            if finish_reason not in {"content_filter", "length"}:
+                raise malformed_response()
         for tool_call in tool_calls:
             function = getattr(tool_call, "function", _MISSING)
             if (
