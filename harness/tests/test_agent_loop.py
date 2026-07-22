@@ -658,6 +658,104 @@ def _terminal_tool_def():
     }
 
 
+@pytest.mark.parametrize("raw_args", ['{"marker":', "[]", '"scalar"', "1"])
+def test_invalid_terminal_arguments_do_not_dispatch_or_stop(tmp_path, raw_args):
+    calls = [
+        _ToolCall(id="invalid", function=_Fn(name="submit_done", arguments=raw_args)),
+        _tc("after", "write_file", {"path": "after.txt", "content": "ok"}),
+    ]
+    dispatched = []
+    messages = [{"role": "system", "content": "system"}]
+
+    result = run_agent_loop(
+        llm=MockLlmClient(
+            [
+                _cr(tool_calls=calls, finish="tool_calls"),
+                _cr(text="continued", finish="stop"),
+            ]
+        ),
+        system="system",
+        user="task",
+        tools=TOOL_DEFS + [_terminal_tool_def()],
+        handlers_ctx=str(tmp_path),
+        terminal_tools={"submit_done"},
+        extra_handlers={"submit_done": lambda **args: dispatched.append(args) or "done"},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "natural"
+    assert result.tool_invocations == 1
+    assert result.terminal_call is None
+    assert dispatched == []
+    assert (tmp_path / "after.txt").read_text(encoding="utf-8") == "ok"
+    tool_messages = [message for message in messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        call.id for call in calls
+    ]
+    assert tool_messages[0]["content"] == "Error: invalid tool arguments"
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "tool_call",
+        "tool_call",
+        "llm_call",
+        "stop",
+    ]
+
+
+def test_terminal_acceptance_wins_over_post_dispatch_budget(tmp_path):
+    calls = [
+        _tc("terminal", "submit_done", {"marker": "accepted"}),
+        _tc(
+            "after",
+            "write_file",
+            {"path": "after.txt", "content": "secret-after"},
+        ),
+    ]
+    messages = [{"role": "system", "content": "system"}]
+    llm = MockLlmClient([_cr(tool_calls=calls, finish="tool_calls")])
+    budget_checks = 0
+
+    def check_budget():
+        nonlocal budget_checks
+        budget_checks += 1
+        if budget_checks >= 2:
+            raise BudgetExhausted("expired during terminal handler")
+
+    llm.check_budget = check_budget
+
+    result = run_agent_loop(
+        llm=llm,
+        system="system",
+        user="task",
+        tools=TOOL_DEFS + [_terminal_tool_def()],
+        handlers_ctx=str(tmp_path),
+        terminal_tools={"submit_done"},
+        extra_handlers={"submit_done": lambda marker: "done recorded"},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == "terminal"
+    assert result.terminal_call == {
+        "name": "submit_done",
+        "args": {"marker": "accepted"},
+    }
+    assert result.tool_invocations == 1
+    assert not (tmp_path / "after.txt").exists()
+    tool_messages = [message for message in messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        call.id for call in calls
+    ]
+    assert tool_messages[0]["content"] == "done recorded"
+    assert tool_messages[1]["content"] == "Skipped: terminal tool already accepted"
+    assert [event["type"] for event in result.events] == [
+        "llm_call",
+        "tool_call",
+        "tool_call_skipped",
+        "stop",
+    ]
+    assert result.events[-1]["reason"] == "terminal"
+    assert "secret-after" not in json.dumps(result.events)
+
 def test_terminal_acceptance_skips_later_calls_and_completes_protocol(tmp_path):
     calls = [
         _tc("before", "write_file", {"path": "before.txt", "content": "ok"}),

@@ -416,11 +416,11 @@ def run_agent_loop(
             raw_args = tc.function.arguments
             try:
                 args = json.loads(raw_args) if raw_args else {}
-                if not isinstance(args, dict):
-                    args = {}
-            except json.JSONDecodeError:
-                args = {}
-            if name not in allowed_tools:
+            except (json.JSONDecodeError, TypeError):
+                args = None
+            if not isinstance(args, dict):
+                output = "Error: invalid tool arguments"
+            elif name not in allowed_tools:
                 output = f"Error: tool not available in this stage: {name}"
             else:
                 check_budget = getattr(llm, "check_budget", None)
@@ -459,14 +459,25 @@ def run_agent_loop(
                                 "step": steps,
                             }
                         )
-            if forced_stop_reason is None:
+            accepted_terminal = (
+                forced_stop_reason is None
+                and terminal_tools
+                and name in terminal_tools
+                and not output.startswith("Error:")
+            )
+            if accepted_terminal:
+                terminal_call = {"name": name, "args": args}
+                final_text = result.text or ""
+                stop_after = True
+            elif forced_stop_reason is None:
                 check_budget = getattr(llm, "check_budget", None)
                 if check_budget is not None:
                     try:
                         check_budget()
                     except BudgetExhausted:
                         forced_stop_reason = "budget_exhausted"
-            tool_invocations += 1
+            if isinstance(args, dict):
+                tool_invocations += 1
             emit(
                 {
                     "type": "tool_call",
@@ -485,15 +496,6 @@ def run_agent_loop(
             )
             if forced_stop_reason is not None:
                 break
-            # Terminal tool: stop only if the handler accepted it (no Error回执).
-            if (
-                terminal_tools
-                and name in terminal_tools
-                and not output.startswith("Error:")
-            ):
-                terminal_call = {"name": name, "args": args}
-                final_text = result.text or ""
-                stop_after = True
 
         if forced_stop_reason is not None:
             stopped_reason = forced_stop_reason
