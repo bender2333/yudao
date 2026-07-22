@@ -220,6 +220,7 @@ def supervise_command(
                 _move_log(stdout, target / "supervisor.stdout.log")
                 _move_log(stderr, target / "supervisor.stderr.log")
             except OSError:
+                preserve_logs = True
                 result = SupervisorResult(
                     result.returncode,
                     result.timed_out,
@@ -230,11 +231,12 @@ def supervise_command(
         _write_result(target, result)
         return result
     finally:
-        for path in (stdout, stderr):
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
+        if not preserve_logs:
+            for path in (stdout, stderr):
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
 
 
 def _parser() -> argparse.ArgumentParser:

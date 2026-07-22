@@ -249,6 +249,27 @@ def test_infrastructure_failure_is_sanitized_and_preserves_logs(
     assert (run_dir / "supervisor.stderr.log").read_text(encoding="utf-8") == "SECRET stderr"
 
 
+def test_log_move_failure_keeps_raw_evidence_and_records_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+
+    monkeypatch.setattr(supervisor_module, "_move_log", lambda *_args: (_ for _ in ()).throw(OSError("link failed")))
+    result = supervise_command(
+        _command(run_dir, returncode=7),
+        run_dir=run_dir,
+        timeout_seconds=5,
+        env=os.environ.copy(),
+    )
+
+    assert result.stop_reason == "supervisor_error"
+    assert result.summary == {"error_type": "LogPreservationError"}
+    assert _read_record(run_dir) == {"schema_version": 1, **result.__dict__}
+    raw_logs = list(tmp_path.glob(".run-*.supervisor.*.log"))
+    assert raw_logs
+    assert any("evidence" in path.read_text(encoding="utf-8") for path in raw_logs)
+
+
 @pytest.mark.parametrize("leaf_kind", ["file", "symlink", "junction"])
 def test_invalid_child_run_leaf_is_quarantined_and_recorded(
     tmp_path: Path, leaf_kind: str

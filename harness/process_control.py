@@ -41,6 +41,18 @@ if os.name == "nt":
         )]
 
 
+    class _THREADENTRY32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_uint32),
+            ("cntUsage", ctypes.c_uint32),
+            ("th32ThreadID", ctypes.c_uint32),
+            ("th32OwnerProcessID", ctypes.c_uint32),
+            ("tpBasePri", ctypes.c_long),
+            ("tpDeltaPri", ctypes.c_long),
+            ("dwFlags", ctypes.c_uint32),
+        ]
+
+
     class _JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
         _fields_ = [
             ("BasicLimitInformation", _JOBOBJECT_BASIC_LIMIT_INFORMATION),
@@ -63,6 +75,16 @@ if os.name == "nt":
     _kernel32.TerminateJobObject.restype = ctypes.c_int
     _kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
     _kernel32.CloseHandle.restype = ctypes.c_int
+    _kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    _kernel32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    _kernel32.Thread32First.argtypes = [ctypes.c_void_p, ctypes.POINTER(_THREADENTRY32)]
+    _kernel32.Thread32First.restype = ctypes.c_int
+    _kernel32.Thread32Next.argtypes = [ctypes.c_void_p, ctypes.POINTER(_THREADENTRY32)]
+    _kernel32.Thread32Next.restype = ctypes.c_int
+    _kernel32.OpenThread.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    _kernel32.OpenThread.restype = ctypes.c_void_p
+    _kernel32.ResumeThread.argtypes = [ctypes.c_void_p]
+    _kernel32.ResumeThread.restype = ctypes.c_uint32
 
 
 def _validate(argv: object, cwd: object, env: object, timeout_seconds: object, stdout_path: object, stderr_path: object) -> tuple[list[str], str, dict[str, str], float, Path, Path]:
@@ -94,6 +116,43 @@ def _validate(argv: object, cwd: object, env: object, timeout_seconds: object, s
         if not path.parent.is_dir():
             raise ValueError(f"{label} parent must be an existing directory")
     return list(argv), cwd_path, dict(env), float(timeout_seconds), stdout, stderr
+
+
+def _assign_windows_job(job: int, process: subprocess.Popen[bytes]) -> None:
+    if not _kernel32.AssignProcessToJobObject(job, int(process._handle)):
+        raise _win_error("AssignProcessToJobObject")
+
+
+def _resume_process_threads(pid: int) -> None:
+    snapshot = _kernel32.CreateToolhelp32Snapshot(0x4, 0)
+    if snapshot == ctypes.c_void_p(-1).value:
+        raise _win_error("CreateToolhelp32Snapshot")
+    found = 0
+    try:
+        entry = _THREADENTRY32()
+        entry.dwSize = ctypes.sizeof(entry)
+        more = _kernel32.Thread32First(snapshot, ctypes.byref(entry))
+        if not more:
+            raise _win_error("Thread32First")
+        while more:
+            if entry.th32OwnerProcessID == pid:
+                thread = _kernel32.OpenThread(0x0002, False, entry.th32ThreadID)
+                if not thread:
+                    raise _win_error("OpenThread")
+                try:
+                    previous = _kernel32.ResumeThread(thread)
+                    if previous == 0xFFFFFFFF:
+                        raise _win_error("ResumeThread")
+                    if previous == 0:
+                        raise RuntimeError("target process thread was not suspended")
+                    found += 1
+                finally:
+                    _kernel32.CloseHandle(thread)
+            more = _kernel32.Thread32Next(snapshot, ctypes.byref(entry))
+        if not found:
+            raise RuntimeError("target process has no resumable threads")
+    finally:
+        _kernel32.CloseHandle(snapshot)
 
 
 def _win_error(operation: str) -> RuntimeError:
@@ -179,6 +238,7 @@ def run_process_tree(
     start = time.monotonic()
     timed_out = False
     job: int | None = None
+    assigned = False
     process: subprocess.Popen[bytes] | None = None
     stdout_file = None
     stderr_file = None
@@ -196,15 +256,19 @@ def run_process_tree(
             raise
         if os.name == "nt":
             job = _create_job()
-        popen_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+        popen_options = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | 0x4}
+            if os.name == "nt"
+            else {"start_new_session": True}
+        )
         process = subprocess.Popen(
             command, cwd=working_dir, env=child_env, stdin=subprocess.DEVNULL,
             stdout=stdout_file, stderr=stderr_file, shell=False, **popen_options,
         )
-        if os.name == "nt" and not _kernel32.AssignProcessToJobObject(job, int(process._handle)):
-            error = _win_error("AssignProcessToJobObject")
-            _best_effort_kill(process)
-            raise error
+        if os.name == "nt":
+            _assign_windows_job(job, process)
+            assigned = True
+            _resume_process_threads(process.pid)
         try:
             process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -214,7 +278,11 @@ def run_process_tree(
     except BaseException:
         if process is not None:
             try:
-                _terminate_tree(process, job)
+                if os.name == "nt" and not assigned:
+                    process.kill()
+                    process.wait()
+                else:
+                    _terminate_tree(process, job)
             except BaseException:
                 _best_effort_kill(process)
         raise

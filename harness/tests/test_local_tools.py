@@ -391,6 +391,47 @@ def test_run_process_tree_timeout_kills_orphaned_grandchild(tmp_path: Path) -> N
     assert not sentinel.exists()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows Job Object regression")
+def test_windows_job_assignment_precedes_child_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_assign = process_control._assign_windows_job
+
+    def delayed_assign(job: int, process: subprocess.Popen[bytes]) -> None:
+        time.sleep(0.2)
+        real_assign(job, process)
+
+    monkeypatch.setattr(process_control, "_assign_windows_job", delayed_assign)
+    child = (
+        "import os,pathlib,sys,time;"
+        "p=pathlib.Path(sys.argv[1]);t=p.with_suffix('.tmp');"
+        "t.write_text('ready',encoding='utf-8');os.replace(t,p);"
+        "time.sleep(.5);pathlib.Path(sys.argv[2]).write_text('escaped',encoding='utf-8')"
+    )
+    parent = (
+        "import subprocess,sys,time;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]],"
+        "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);"
+        "time.sleep(5)"
+    )
+
+    for attempt in range(10):
+        ready = tmp_path / f"ready-{attempt}"
+        sentinel = tmp_path / f"sentinel-{attempt}"
+        result = run_process_tree(
+            [sys.executable, "-c", parent, child, str(ready), str(sentinel)],
+            cwd=tmp_path,
+            env=dict(os.environ),
+            timeout_seconds=0.2,
+            stdout_path=tmp_path / f"race-{attempt}.out.log",
+            stderr_path=tmp_path / f"race-{attempt}.err.log",
+        )
+        assert result.timed_out
+        assert ready.exists()
+        time.sleep(0.6)
+        assert not sentinel.exists()
+
+
 def test_run_process_tree_reaps_after_wait_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     sentinel = tmp_path / "wait-error-sentinel"
     child = "import pathlib,sys,time;time.sleep(.8);pathlib.Path(sys.argv[1]).write_text('escaped')"
