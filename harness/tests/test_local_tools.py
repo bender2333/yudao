@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -13,9 +17,11 @@ from harness.local_tools import (
     CheckSpec,
     LocalToolRuntime,
     _path_is_within,
+    load_check_manifest,
 )
-from harness.workspace import Workspace
+from harness.process_control import run_process_tree
 
+from harness.workspace import Workspace
 
 def make_runtime(tmp_path: Path, *, protected: tuple[str, ...] = ()) -> LocalToolRuntime:
     return LocalToolRuntime(
@@ -263,4 +269,170 @@ def test_tool_capabilities_schemas_handlers_and_dispatch_are_closed(tmp_path: Pa
     assert runtime.dispatch("list_files", DictSubclass()).startswith("Error:")
     assert runtime.dispatch("read_file", {}).startswith("Error:")
     assert runtime.dispatch("list_files", {"path": "."}).startswith("Error:")
-    assert runtime.dispatch("run_check", {"name": "x"}).startswith("Error: not implemented")
+    assert runtime.dispatch("run_check", {"name": "x"}).startswith("Error: unknown check")
+    assert runtime.dispatch("run_check", {"name": "x", "argv": []}).startswith("Error:")
+
+
+def test_load_check_manifest_accepts_exact_schema(tmp_path: Path) -> None:
+    manifest = tmp_path / "checks.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "protected_paths": ["TASK.md", "tests/public"],
+                "checks": {"public_tests": {"argv": ["python", "-V"], "timeout_seconds": 2}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    checks, protected = load_check_manifest(manifest)
+
+    assert checks == {"public_tests": CheckSpec(("python", "-V"), 2.0)}
+    assert protected == ("task.md", "tests/public")
+
+
+@pytest.mark.parametrize(
+    ("payload", "field"),
+    [
+        ([], "top-level"),
+        ({"protected_paths": [], "checks": {}, "extra": 1}, "top-level"),
+        ({"protected_paths": [], "checks": []}, "checks"),
+        ({"protected_paths": [], "checks": {"bad/name": {"argv": ["x"], "timeout_seconds": 1}}}, "name"),
+        ({"protected_paths": [], "checks": {"x": {"argv": [], "timeout_seconds": 1}}}, "argv"),
+        ({"protected_paths": [], "checks": {"x": {"argv": ["x", 1], "timeout_seconds": 1}}}, "argv"),
+        ({"protected_paths": [], "checks": {"x": {"argv": ["x\0"], "timeout_seconds": 1}}}, "argv"),
+        ({"protected_paths": [], "checks": {"x": {"argv": ["x"], "timeout_seconds": True}}}, "timeout"),
+        ({"protected_paths": [], "checks": {"x": {"argv": ["x"], "timeout_seconds": float("inf")}}}, "timeout"),
+        ({"protected_paths": [], "checks": {"x": {"argv": ["x"], "timeout_seconds": 1, "extra": 1}}}, "check x"),
+        ({"protected_paths": ["../escape"], "checks": {}}, "protected"),
+    ],
+)
+def test_load_check_manifest_rejects_invalid_fields(tmp_path: Path, payload: object, field: str) -> None:
+    manifest = tmp_path / "checks.json"
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match=field):
+        load_check_manifest(manifest)
+
+
+@pytest.mark.parametrize("content", [b"\xff", b"{"])
+def test_load_check_manifest_reports_utf8_and_json_errors(tmp_path: Path, content: bytes) -> None:
+    manifest = tmp_path / "checks.json"
+    manifest.write_bytes(content)
+    with pytest.raises(ValueError, match="manifest"):
+        load_check_manifest(manifest)
+
+
+def test_runtime_revalidates_programmatic_check_specs(tmp_path: Path) -> None:
+    workspace = Workspace(str(tmp_path / "workspace"))
+    for checks in (
+        {"bad/name": CheckSpec(("python",), 1)},
+        {"ok": CheckSpec(("python\0",), 1)},
+        {"ok": CheckSpec(("python",), float("nan"))},
+        {"ok": CheckSpec(("python",), True)},
+    ):
+        with pytest.raises((TypeError, ValueError), match="check"):
+            LocalToolRuntime(workspace, checks, (), tmp_path / "audit")
+
+
+def test_run_process_tree_validates_inputs_and_streams_bytes(tmp_path: Path) -> None:
+    stdout = tmp_path / "stdout.log"
+    stderr = tmp_path / "stderr.log"
+    result = run_process_tree(
+        [sys.executable, "-c", "import os;os.write(1,b'out\\xff');os.write(2,b'err\\xfe')"],
+        cwd=tmp_path,
+        env={"PYTHONIOENCODING": "utf-8"},
+        timeout_seconds=5,
+        stdout_path=stdout,
+        stderr_path=stderr,
+    )
+    assert (result.returncode, result.timed_out) == (0, False)
+    assert result.duration_ms >= 0
+    assert stdout.read_bytes() == b"out\xff"
+    assert stderr.read_bytes() == b"err\xfe"
+    with pytest.raises(ValueError, match="different"):
+        run_process_tree([sys.executable], cwd=tmp_path, env={}, timeout_seconds=1, stdout_path=stdout, stderr_path=stdout)
+
+
+def test_run_process_tree_timeout_kills_descendants(tmp_path: Path) -> None:
+    sentinel = tmp_path / "sentinel"
+    child = "import pathlib,sys,time;time.sleep(.8);pathlib.Path(sys.argv[1]).write_text('escaped');time.sleep(5)"
+    parent = "import subprocess,sys,time;subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(5)"
+    result = run_process_tree(
+        [sys.executable, "-c", parent, child, str(sentinel)],
+        cwd=tmp_path,
+        env=dict(os.environ),
+        timeout_seconds=0.2,
+        stdout_path=tmp_path / "out.log",
+        stderr_path=tmp_path / "err.log",
+    )
+    time.sleep(1.0)
+    assert result.timed_out
+    assert not sentinel.exists()
+
+
+def test_run_check_uses_disposable_mirror_sanitized_env_and_receipts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PROVIDER_KEY", "must-not-leak")
+    workspace = Workspace(str(tmp_path / "workspace"))
+    root = Path(workspace.dir)
+    (root / "value.txt").write_text("before", encoding="utf-8")
+    script = (
+        "import os,pathlib;assert 'PROVIDER_KEY' not in os.environ;"
+        "assert pathlib.Path.cwd()!=pathlib.Path(sys.argv[1]);"
+        "pathlib.Path('value.txt').write_text('mirror');pathlib.Path('created').write_text('x');"
+        "os.write(1,b'out\\xff');os.write(2,b'err\\xfe')"
+    )
+    runtime = LocalToolRuntime(
+        workspace,
+        {"public_tests": CheckSpec((sys.executable, "-c", "import sys;" + script, workspace.dir), 5)},
+        (),
+        tmp_path / "audit",
+    )
+    before_hash = workspace.tree_hash()
+
+    output = runtime.dispatch("run_check", {"name": "public_tests"})
+    receipt = runtime.receipt("public_tests", before_hash)
+
+    assert receipt is not None and receipt.exit_code == 0 and not receipt.timed_out
+    assert output == (
+        f"name=public_tests exit=0 timed_out=false duration_ms={receipt.duration_ms} tree_hash={before_hash} "
+        f"stdout_digest={receipt.stdout_digest} stderr_digest={receipt.stderr_digest}"
+    )
+    assert (root / "value.txt").read_text(encoding="utf-8") == "before"
+    assert not (root / "created").exists()
+    assert receipt.stdout_digest == "sha256:" + hashlib.sha256(b"out\xff").hexdigest()
+    assert receipt.stderr_digest == "sha256:" + hashlib.sha256(b"err\xfe").hexdigest()
+    assert (tmp_path / "audit" / "0001-public_tests.stdout.log").read_bytes() == b"out\xff"
+    assert runtime.receipt("public_tests", "sha256:wrong") is None
+    (root / "value.txt").write_text("changed", encoding="utf-8")
+    assert runtime.receipt("public_tests", workspace.tree_hash()) is None
+    assert runtime.receipt("public_tests", before_hash) is receipt
+
+
+@pytest.mark.parametrize(
+    ("name", "script", "timeout", "exit_code", "timed_out"),
+    [
+        ("nonzero", "import sys;sys.exit(7)", 5, 7, False),
+        ("timeout", "import time;time.sleep(5)", 0.1, None, True),
+    ],
+)
+def test_run_check_receipts_cover_nonzero_and_timeout(
+    tmp_path: Path, name: str, script: str, timeout: float, exit_code: int | None, timed_out: bool
+) -> None:
+    workspace = Workspace(str(tmp_path / "workspace"))
+    runtime = LocalToolRuntime(workspace, {name: CheckSpec((sys.executable, "-c", script), timeout)}, (), tmp_path / "audit")
+    tree_hash = workspace.tree_hash()
+    runtime.run_check(name)
+    receipt = runtime.receipt(name, tree_hash)
+    assert receipt is not None and receipt.timed_out is timed_out
+    if exit_code is not None:
+        assert receipt.exit_code == exit_code
+    assert (tmp_path / "audit" / f"0001-{name}.stdout.log").is_file()
+    assert (tmp_path / "audit" / f"0001-{name}.stderr.log").is_file()
+
+
+def test_run_check_rejects_reserved_workspace_before_copy(tmp_path: Path) -> None:
+    runtime = make_runtime(tmp_path)
+    reserved = Path(runtime.workspace.dir) / ".harness"
+    reserved.mkdir()
+    (reserved / "secret").write_text("x", encoding="utf-8")
+    assert runtime.dispatch("run_check", {"name": "missing"}) == "Error: reserved path"

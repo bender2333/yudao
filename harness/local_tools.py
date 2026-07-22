@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
+import json
+import math
 import ntpath
 import os
+import re
 import stat
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from .process_control import run_process_tree
+from .seed import seed_workspace
 from .workspace import Workspace, _require_link_free_components
 
 READ_TOOL_NAMES = frozenset({"read_file", "list_files", "search_text", "run_check"})
@@ -20,6 +27,7 @@ _MAX_LIST_PATHS = 1000
 _MAX_SEARCH_MATCHES = 200
 SEARCH_OUTPUT_BYTES = 64 * 1024
 _SEARCH_TRUNCATION_MARKER = "[truncated at 200 matches or 65536 bytes]"
+_CHECK_NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
 
 
 @dataclass(frozen=True)
@@ -74,6 +82,75 @@ def _relative_parts(value: object, label: str = "path") -> tuple[str, ...]:
     if any(part.endswith((".", " ")) for part in parts):
         raise ValueError(f"{label} contains a Windows-aliased component")
     return parts
+
+
+def _check_name(value: object) -> str:
+    if type(value) is not str or not value or _CHECK_NAME.fullmatch(value) is None:
+        raise ValueError("check name must be a non-empty safe identifier")
+    return value
+
+
+def _check_spec(name: str, value: object) -> CheckSpec:
+    if type(value) is not dict or set(value) != {"argv", "timeout_seconds"}:
+        raise ValueError(f"check {name} must have exact fields argv and timeout_seconds")
+    argv = value["argv"]
+    if type(argv) is not list or not argv or any(type(arg) is not str or not arg or "\0" in arg for arg in argv):
+        raise ValueError(f"check {name} argv must be a non-empty list of exact non-empty strings without NUL")
+    timeout = value["timeout_seconds"]
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError(f"check {name} timeout_seconds must be a finite positive number")
+    return CheckSpec(tuple(argv), float(timeout))
+
+
+def load_check_manifest(path: str | os.PathLike[str]) -> tuple[dict[str, CheckSpec], tuple[str, ...]]:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8", errors="strict"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"manifest: {error}") from error
+    if type(payload) is not dict or set(payload) != {"protected_paths", "checks"}:
+        raise ValueError("top-level manifest must be an object with exact fields protected_paths and checks")
+    protected = payload["protected_paths"]
+    if type(protected) is not list:
+        raise ValueError("protected_paths must be a list")
+    try:
+        normalized_parts = tuple(_relative_parts(item, "protected path") for item in protected)
+    except (TypeError, ValueError) as error:
+        raise ValueError(str(error)) from error
+    canonical = tuple(_canonical_parts(parts) for parts in normalized_parts)
+    if len(set(canonical)) != len(canonical):
+        raise ValueError("duplicate protected path")
+    raw_checks = payload["checks"]
+    if type(raw_checks) is not dict:
+        raise ValueError("checks must be an object")
+    checks: dict[str, CheckSpec] = {}
+    for raw_name, raw_spec in raw_checks.items():
+        name = _check_name(raw_name)
+        checks[name] = _check_spec(name, raw_spec)
+    return checks, tuple("/".join(parts) for parts in canonical)
+
+
+def _safe_env() -> dict[str, str]:
+    allowed = {
+        "PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR",
+        "HOME", "USERPROFILE", "LANG", "LC_ALL",
+    }
+    blocked = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key in allowed and type(value) is str and not any(marker in key.upper() for marker in blocked)
+    }
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
+def _digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
 
 
 def _fn(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -151,12 +228,15 @@ class LocalToolRuntime:
         if not isinstance(self.checks, dict):
             raise TypeError("checks must be a dict")
         for name, spec in self.checks.items():
-            if not isinstance(name, str) or not name or not isinstance(spec, CheckSpec):
-                raise TypeError("check names must be non-empty strings and values must be CheckSpec")
-            if not spec.argv or not all(isinstance(arg, str) and arg for arg in spec.argv):
-                raise ValueError(f"check {name!r} argv must contain non-empty strings")
-            if not isinstance(spec.timeout_seconds, (int, float)) or spec.timeout_seconds <= 0:
-                raise ValueError(f"check {name!r} timeout must be positive")
+            _check_name(name)
+            if type(spec) is not CheckSpec:
+                raise TypeError("check values must be CheckSpec")
+            if type(spec.argv) is not tuple or not spec.argv or any(
+                type(arg) is not str or not arg or "\0" in arg for arg in spec.argv
+            ):
+                raise ValueError(f"check {name!r} argv must be a non-empty tuple of exact strings without NUL")
+            if type(spec.timeout_seconds) not in (int, float) or not math.isfinite(spec.timeout_seconds) or spec.timeout_seconds <= 0:
+                raise ValueError(f"check {name!r} timeout must be finite and positive")
         if not isinstance(self.protected_paths, tuple):
             raise TypeError("protected_paths must be a tuple")
         normalized_parts = tuple(_relative_parts(path, "protected path") for path in self.protected_paths)
@@ -369,5 +449,46 @@ class LocalToolRuntime:
             matches.append(_SEARCH_TRUNCATION_MARKER)
         return "\n".join(matches) or "(no matches)"
 
+    def receipt(self, name: str, tree_hash: str) -> CheckReceipt | None:
+        if type(name) is not str or type(tree_hash) is not str:
+            return None
+        return self.receipts.get((name, tree_hash))
+
     def run_check(self, name: str) -> str:
-        raise ValueError("not implemented until Task 7")
+        _check_name(name)
+        self._files()
+        spec = self.checks.get(name)
+        if spec is None:
+            raise ValueError(f"unknown check: {name}")
+        self.workspace.tree_manifest()
+        before_hash = self.workspace.tree_hash()
+        with tempfile.TemporaryDirectory(prefix="check-mirror-") as mirror:
+            seed_workspace(self.workspace.dir, mirror)
+            self.check_sequence += 1
+            sequence = self.check_sequence
+            stdout_path = self.audit_dir / f"{sequence:04d}-{name}.stdout.log"
+            stderr_path = self.audit_dir / f"{sequence:04d}-{name}.stderr.log"
+            result = run_process_tree(
+                list(spec.argv),
+                cwd=mirror,
+                env=_safe_env(),
+                timeout_seconds=spec.timeout_seconds,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+            )
+        receipt = CheckReceipt(
+            name=name,
+            tree_hash=before_hash,
+            exit_code=result.returncode,
+            timed_out=result.timed_out,
+            stdout_digest=_digest(stdout_path),
+            stderr_digest=_digest(stderr_path),
+            duration_ms=result.duration_ms,
+        )
+        self.receipts[(name, before_hash)] = receipt
+        exit_value = "none" if receipt.exit_code is None else str(receipt.exit_code)
+        return (
+            f"name={name} exit={exit_value} timed_out={str(receipt.timed_out).lower()} "
+            f"duration_ms={receipt.duration_ms} tree_hash={before_hash} "
+            f"stdout_digest={receipt.stdout_digest} stderr_digest={receipt.stderr_digest}"
+        )
