@@ -36,7 +36,13 @@ def _dispatch_with_extras(name, args, handlers_ctx, extra_handlers):
     if extra_handlers and name in extra_handlers:
         try:
             return extra_handlers[name](**args)
-        except (BudgetAccountingError, BudgetExhausted):
+        except (
+            BudgetAccountingError,
+            BudgetExhausted,
+            ContextOverflow,
+            ProviderProtocolError,
+            ProviderUnavailable,
+        ):
             raise
         except Exception as e:  # a consult must never crash the caller's loop
             return f"Error: {type(e).__name__}: {e}"
@@ -162,6 +168,7 @@ def run_agent_loop(
     terminal_call = None
     content_filter_retries = 0
     content_filter_retry_available = True
+    pending_content_filter_retry = False
 
     while True:
         if steps >= max_steps:
@@ -180,6 +187,16 @@ def run_agent_loop(
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
         except (ProviderUnavailable, ProviderProtocolError, ContextOverflow) as exc:
+            if pending_content_filter_retry:
+                content_filter_retries += 1
+                pending_content_filter_retry = False
+                emit(
+                    {
+                        "type": "provider_retry",
+                        "reason": "content_filter",
+                        "step": steps + 1,
+                    }
+                )
             if isinstance(exc, ProviderUnavailable):
                 stopped_reason = "provider_unavailable"
             elif isinstance(exc, ContextOverflow):
@@ -196,6 +213,16 @@ def run_agent_loop(
             )
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
+        if pending_content_filter_retry:
+            content_filter_retries += 1
+            pending_content_filter_retry = False
+            emit(
+                {
+                    "type": "provider_retry",
+                    "reason": "content_filter",
+                    "step": steps + 1,
+                }
+            )
         steps += 1
         emit(
             {
@@ -231,16 +258,23 @@ def run_agent_loop(
         if result.finish_reason == "content_filter":
             if content_filter_retry_available:
                 content_filter_retry_available = False
-                content_filter_retries += 1
-                emit(
-                    {
-                        "type": "provider_retry",
-                        "reason": "content_filter",
-                        "step": steps,
-                    }
-                )
+                pending_content_filter_retry = True
                 continue
             stopped_reason = "provider_blocked"
+            emit({"type": "stop", "reason": stopped_reason, "step": steps})
+            break
+
+        if (
+            result.stopped_reason is None
+            and result.tool_calls
+            and result.finish_reason != "tool_calls"
+        ):
+            final_text = result.text
+            stopped_reason = (
+                "output_truncated"
+                if result.finish_reason == "length"
+                else "provider_protocol_error"
+            )
             emit({"type": "stop", "reason": stopped_reason, "step": steps})
             break
 
@@ -322,6 +356,26 @@ def run_agent_loop(
                     except BudgetAccountingError:
                         output = "Error: token usage unavailable"
                         forced_stop_reason = "budget_accounting_error"
+                    except (
+                        ProviderUnavailable,
+                        ProviderProtocolError,
+                        ContextOverflow,
+                    ) as exc:
+                        if isinstance(exc, ProviderUnavailable):
+                            forced_stop_reason = "provider_unavailable"
+                        elif isinstance(exc, ContextOverflow):
+                            forced_stop_reason = "context_overflow"
+                        else:
+                            forced_stop_reason = "provider_protocol_error"
+                        output = f"Error: {forced_stop_reason.replace('_', ' ')}"
+                        emit(
+                            {
+                                "type": "provider_error",
+                                "reason": forced_stop_reason,
+                                "error_type": type(exc).__name__,
+                                "step": steps,
+                            }
+                        )
             if forced_stop_reason is None:
                 check_budget = getattr(llm, "check_budget", None)
                 if check_budget is not None:

@@ -429,3 +429,100 @@ def test_typed_provider_failure_stops_loop(
 
     assert result.stopped_reason == stopped_reason
     assert [event["type"] for event in result.events] == ["provider_error", "stop"]
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "stopped_reason"),
+    [
+        (ProviderUnavailable, "provider_unavailable"),
+        (ProviderProtocolError, "provider_protocol_error"),
+        (ContextOverflow, "context_overflow"),
+    ],
+)
+def test_extra_handler_provider_failure_stops_without_leaking_detail(
+    tmp_path, exception_type, stopped_reason
+):
+    secret_detail = "provider-private-detail"
+    llm = MockLlmClient(
+        [
+            _cr(tool_calls=[_tc("extra", "list_dir", {})], finish="tool_calls"),
+            _cr(text="unexpected natural stop", finish="stop"),
+        ]
+    )
+    messages = [{"role": "system", "content": "system"}]
+
+    def fail():
+        raise exception_type(secret_detail)
+
+    result = run_agent_loop(
+        llm,
+        "system",
+        "task",
+        TOOL_DEFS,
+        str(tmp_path),
+        extra_handlers={"list_dir": fail},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.calls == 1
+    assert all(event.get("reason") != "natural" for event in result.events)
+    assert secret_detail not in json.dumps([result.events, messages])
+
+
+@pytest.mark.parametrize(
+    ("finish_reason", "stopped_reason"),
+    [
+        ("length", "output_truncated"),
+        ("unexpected", "provider_protocol_error"),
+    ],
+)
+def test_non_tool_finish_with_tool_calls_stops_before_dispatch(
+    tmp_path, finish_reason, stopped_reason
+):
+    messages = [{"role": "system", "content": "system"}]
+    result = run_agent_loop(
+        MockLlmClient(
+            [
+                _cr(
+                    text="partial",
+                    tool_calls=[
+                        _tc("write", "write_file", {"path": "blocked", "content": "x"})
+                    ],
+                    finish=finish_reason,
+                )
+            ]
+        ),
+        "system",
+        "task",
+        TOOL_DEFS,
+        str(tmp_path),
+        terminal_tools={"write_file"},
+        messages=messages,
+    )
+
+    assert result.stopped_reason == stopped_reason
+    assert result.calls == 1
+    assert result.tool_invocations == 0
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert not any(event["type"] == "tool_call" for event in result.events)
+    assert not (tmp_path / "blocked").exists()
+
+
+def test_content_filter_retry_not_counted_when_next_call_hits_budget(tmp_path):
+    llm = MockLlmClient([_cr(finish="content_filter")])
+    unbudgeted_chat = llm.chat
+
+    def max_one_call(*args, **kwargs):
+        if llm.calls_made >= 1:
+            raise BudgetExhausted("max_calls=1 exceeded")
+        return unbudgeted_chat(*args, **kwargs)
+
+    llm.chat = max_one_call
+
+    result = run_agent_loop(llm, "system", "task", [], str(tmp_path))
+
+    assert result.stopped_reason == "budget_exhausted"
+    assert result.calls == 1
+    assert result.content_filter_retries == 0
+    assert not any(event["type"] == "provider_retry" for event in result.events)
