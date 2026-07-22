@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import fields
+from types import SimpleNamespace
 
 import pytest
 
-from harness.run_solo import SOLO_SYSTEM, SoloResult, run_solo_loop
+from harness.run_solo import SOLO_LOOP_SYSTEM, SOLO_SYSTEM, SoloResult, run_solo, run_solo_loop
 from harness.tests.fakes import (
     ScriptedLlm,
     call,
@@ -52,13 +54,45 @@ def test_solo_result_fields_are_exact():
     ]
 
 
-def test_solo_system_describes_only_the_solo_boundary():
-    lowered = SOLO_SYSTEM.lower()
-    assert "private" in lowered and "persistent" in lowered and "history" in lowered
-    assert "immutable" in lowered and "original task" in lowered
-    assert "current workspace" in lowered and "registered checks" in lowered
-    assert "local tools" in lowered and "submit_done" in lowered
-    assert all(word not in lowered for word in ("department", "engineering", "quality", "requirements"))
+def test_solo_prompts_keep_legacy_and_explicit_completion_separate():
+    legacy = SOLO_SYSTEM.lower()
+    loop = SOLO_LOOP_SYSTEM.lower()
+    assert "submit_done" not in legacy
+    assert "brief final summary" in legacy
+    assert "private" in loop and "persistent" in loop and "history" in loop
+    assert "immutable" in loop and "original task" in loop
+    assert "current workspace" in loop and "registered checks" in loop
+    assert "local tools" in loop and "submit_done" in loop
+    assert all(word not in loop for word in ("department", "engineering", "quality", "requirements"))
+
+
+def test_legacy_run_solo_still_accepts_natural_stop(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_loop(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            stopped_reason="natural",
+            steps=1,
+            tool_invocations=0,
+            calls=1,
+            prompt_tokens=1,
+            completion_tokens=1,
+            reasoning_tokens=0,
+            duration_ms=1,
+            final_text="done naturally",
+        )
+
+    monkeypatch.setattr("harness.run_solo.load_provider", lambda _: {"model": "test"})
+    monkeypatch.setattr("harness.run_solo.make_client", lambda _: object())
+    monkeypatch.setattr("harness.run_solo.LlmClient", lambda *args, **kwargs: object())
+    monkeypatch.setattr("harness.run_solo.run_agent_loop", fake_loop)
+
+    summary = run_solo("task", str(tmp_path / "legacy"), provider_path="ignored")
+
+    assert captured["system"] == SOLO_SYSTEM
+    assert summary["stopped_reason"] == "natural"
+    assert summary["final_text"] == "done naturally"
 
 
 def test_solo_requires_explicit_done_with_current_check(tmp_path):
@@ -187,6 +221,54 @@ def test_receipt_rejections_can_be_corrected_in_same_activation(tmp_path, mode):
     assert "Error:" in str(result.session.messages)
 
 
+@pytest.mark.parametrize(
+    ("calls", "reason"),
+    [
+        ([call("submit_done", {"changed_files": []})], "payload_invalid"),
+        (
+            [
+                call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                call("submit_done", {**valid_done_payload(), "changed_files": ["wrong.py"]}),
+            ],
+            "changed_files_mismatch",
+        ),
+        (
+            [
+                call("write_file", {"path": "answer.py", "content": "VALUE = 42\n"}),
+                call("submit_done", {**valid_done_payload(), "check_names": ["unknown"]}),
+            ],
+            "receipt_missing_current_activation",
+        ),
+        (
+            [
+                call("write_file", {"path": "answer.py", "content": "VALUE = 0\n"}),
+                call("run_check", {"name": "public_tests"}),
+                call("submit_done", valid_done_payload()),
+            ],
+            "check_failed",
+        ),
+    ],
+)
+def test_completion_rejections_use_stable_sanitized_codes(tmp_path, calls, reason):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    events = []
+
+    result = run_solo_loop(
+        ScriptedLlm([multi_tool_result(calls), text_stop("not complete")]),
+        workspace,
+        runtime,
+        "task-1",
+        "implement VALUE",
+        on_event=events.append,
+    )
+
+    rejected = [event for event in events if event["type"] == "completion_rejected"]
+    assert rejected == [{"type": "completion_rejected", "kind": "solo_done", "reason": reason}]
+    serialized = json.dumps(events)
+    assert all(not ({"payload", "args", "output", "message"} & set(event)) for event in events)
+    assert "VALUE" not in serialized
+
+
 def test_correction_activation_requires_a_new_receipt(tmp_path):
     workspace, runtime = make_runtime_with_public_check(tmp_path)
     llm = ScriptedLlm(
@@ -286,6 +368,33 @@ def test_metrics_and_events_are_solo_only_and_sanitized(tmp_path):
     assert all(not ({"text", "args", "output", "messages", "payload"} & set(event)) for event in events)
     assert not hasattr(result, "sessions")
     assert not hasattr(result, "tickets")
+
+
+def test_completion_is_not_published_when_acceptance_callback_fails(tmp_path):
+    workspace, runtime = make_runtime_with_public_check(tmp_path)
+    events = []
+
+    def explode_on_acceptance(event):
+        events.append(event)
+        if event["type"] == "completion_accepted":
+            raise RuntimeError("SECRET")
+
+    result = run_solo_loop(
+        ScriptedLlm([successful_calls()]),
+        workspace,
+        runtime,
+        "task-1",
+        "implement VALUE",
+        on_event=explode_on_acceptance,
+    )
+
+    assert result.outcome == "failed"
+    assert result.stopped_reason == "system_error:event_callback:RuntimeError"
+    assert result.completion is None
+    serialized = json.dumps(
+        {"result": {"outcome": result.outcome, "reason": result.stopped_reason}, "events": events, "session": result.session.messages}
+    )
+    assert "SECRET" not in serialized
 
 
 def test_event_callback_exception_fails_closed_without_message(tmp_path):

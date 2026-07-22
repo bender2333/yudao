@@ -24,11 +24,27 @@ from .tools import TOOL_DEFS
 from .workspace import Workspace, diff_manifests
 
 SOLO_SYSTEM = (
+    "You are a software engineering agent working in an isolated workspace directory.\n"
+    "You solve the user's task by using the provided tools to read, write, edit files "
+    "and run commands.\n"
+    "Work autonomously: investigate, implement, and verify your own work by running it.\n"
+    "When the task is fully complete and you have verified it works, stop calling tools "
+    "and give a brief final summary.\n"
+    "Do not ask questions — make reasonable decisions and proceed."
+)
+
+SOLO_LOOP_SYSTEM = (
     "Keep a private persistent history for this solo run. The immutable original task, "
     "current workspace, and registered checks are the only sources of truth. Use only "
     "the provided local tools. Implement and verify the task, then end with submit_done; "
     "a natural-language claim of completion is not completion."
 )
+
+
+class SoloCompletionError(Exception):
+    def __init__(self, code: str, message: str | None = None):
+        super().__init__(message or code.replace("_", " "))
+        self.code = code
 
 
 @dataclass
@@ -74,7 +90,7 @@ def run_solo_loop(
         for definition in TERMINAL_TOOL_DEFS
         if definition["function"]["name"] == SUBMIT_DONE
     )
-    session = RoleSession("solo", SOLO_SYSTEM, runtime.tool_defs(True) + [submit_def])
+    session = RoleSession("solo", SOLO_LOOP_SYSTEM, runtime.tool_defs(True) + [submit_def])
     initial_manifest = workspace.tree_manifest()
     usage_fields = (
         "calls",
@@ -131,24 +147,33 @@ def run_solo_loop(
     def submit_done(**payload):
         nonlocal completion
         try:
-            validated = validate_payload("solo_done", payload)
+            try:
+                validated = validate_payload("solo_done", payload)
+            except TicketValidationError as error:
+                raise SoloCompletionError("payload_invalid", str(error)) from error
             manifest = workspace.tree_manifest()
             tree_hash = workspace.tree_hash()
             changed_files = diff_manifests(initial_manifest, manifest)
             if validated["changed_files"] != changed_files:
-                raise ValueError("changed_files must exactly match the workspace diff")
+                raise SoloCompletionError(
+                    "changed_files_mismatch",
+                    "changed_files must exactly match the workspace diff",
+                )
             checks = []
             for name in validated["check_names"]:
                 key = (name, tree_hash)
                 receipt = runtime.receipt(name, tree_hash)
                 if receipt is None or receipt is receipt_baseline.get(key):
-                    raise ValueError(
-                        f"check_names missing current activation receipt: {name}"
+                    raise SoloCompletionError(
+                        "receipt_missing_current_activation",
+                        f"check_names missing current activation receipt: {name}",
                     )
                 if receipt.exit_code != 0 or receipt.timed_out:
-                    raise ValueError(f"check_names check did not pass: {name}")
+                    raise SoloCompletionError(
+                        "check_failed", f"check_names check did not pass: {name}"
+                    )
                 checks.append(asdict(receipt))
-            completion = {
+            candidate = {
                 "kind": "solo_done",
                 "payload": validated,
                 "bindings": {
@@ -158,16 +183,17 @@ def run_solo_loop(
                     "checks": checks,
                 },
             }
-        except (TicketValidationError, ValueError) as error:
+        except SoloCompletionError as error:
             external(
                 {
                     "type": "completion_rejected",
                     "kind": "solo_done",
-                    "reason": type(error).__name__,
+                    "reason": error.code,
                 }
             )
             return f"Error: {error}"
         external({"type": "completion_accepted", "kind": "solo_done"})
+        completion = candidate
         return "Accepted solo_done"
 
     try:
@@ -252,6 +278,8 @@ def run_solo_loop(
     except LoopStopped as exc:
         stopped_reason = exc.reason
         outcome = "failed"
+        completion = None
+    if outcome != "done":
         completion = None
     return SoloResult(
         outcome=outcome,
