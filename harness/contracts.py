@@ -300,10 +300,15 @@ def _validate_delivery(payload):
     mappings = payload["requirement_mapping"]
     if type(mappings) is not list or not mappings:
         _fail("requirement_mapping", "must be a non-empty list")
+    seen_requirement_ids = set()
     for item in mappings:
         if type(item) is not dict or set(item) != {"requirement_id", "files"}:
             _fail("requirement_mapping", "items must have exactly requirement_id and files")
         _required_text(item["requirement_id"], "requirement_mapping")
+        requirement_id = item["requirement_id"]
+        if requirement_id in seen_requirement_ids:
+            _fail("requirement_mapping.requirement_id", "must be unique")
+        seen_requirement_ids.add(requirement_id)
         _relative_paths(item["files"], "requirement_mapping", unique=True)
     _unique_ids(payload["check_names"], "check_names")
     _string_list(payload["known_risks"], "known_risks")

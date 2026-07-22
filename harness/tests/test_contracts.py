@@ -430,6 +430,14 @@ def test_delivery_mapping_files_reject_duplicates():
         validate_payload("delivery", payload)
 
 
+@pytest.mark.parametrize("second_files", [["answer.py"], ["other.py"]])
+def test_delivery_mapping_rejects_duplicate_requirement_ids(second_files):
+    payload = _valid_delivery()
+    payload["requirement_mapping"].append({"requirement_id": "R-001", "files": second_files})
+    with pytest.raises(TicketValidationError, match="requirement_mapping|requirement_id"):
+        validate_payload("delivery", payload)
+
+
 def test_delivery_mapping_validates_each_declared_field_without_cross_ticket_lookup():
     validate_payload("delivery", {**_valid_delivery(), "requirement_mapping": [{"requirement_id": "UNKNOWN", "files": []}]})
     bad_items = [
