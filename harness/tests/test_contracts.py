@@ -1,5 +1,6 @@
 import copy
 import json
+import re
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -402,6 +403,33 @@ def test_changed_files_reject_ambiguous_or_nonrelative_paths(kind, path):
         validate_payload(kind, payload)
 
 
+@pytest.mark.parametrize("path", ["bad\0name.py", "bad\nname.py", "bad\tname.py", "bad\x7fname.py", "dir/file:stream", "foo:bar"])
+@pytest.mark.parametrize("kind,field", [("delivery", "changed_files"), ("delivery", "requirement_mapping"), ("solo_done", "changed_files")])
+def test_all_payload_path_fields_reject_controls_del_and_colons(kind, field, path):
+    payload = _valid_delivery() if kind == "delivery" else _valid_done()
+    if field == "requirement_mapping":
+        payload[field][0]["files"] = [path]
+    else:
+        payload[field] = [path]
+    with pytest.raises(TicketValidationError, match=field):
+        validate_payload(kind, payload)
+
+
+def test_all_payload_path_fields_accept_plain_unicode_relative_paths():
+    path = "目录/雪人.py"
+    delivery = _valid_delivery([path])
+    delivery["requirement_mapping"][0]["files"] = [path]
+    validate_payload("delivery", delivery)
+    validate_payload("solo_done", {**_valid_done(), "changed_files": [path]})
+
+
+def test_delivery_mapping_files_reject_duplicates():
+    payload = _valid_delivery()
+    payload["requirement_mapping"][0]["files"] = ["answer.py", "answer.py"]
+    with pytest.raises(TicketValidationError, match="requirement_mapping"):
+        validate_payload("delivery", payload)
+
+
 def test_delivery_mapping_validates_each_declared_field_without_cross_ticket_lookup():
     validate_payload("delivery", {**_valid_delivery(), "requirement_mapping": [{"requirement_id": "UNKNOWN", "files": []}]})
     bad_items = [
@@ -471,6 +499,24 @@ def test_terminal_tool_defs_match_mapping_and_expose_only_payload_arguments():
         assert parameters["additionalProperties"] is False
         assert set(parameters["properties"]) == set(parameters["required"])
         assert not forbidden.intersection(keys(parameters))
+
+
+def test_path_schemas_expose_string_unique_items_and_basic_lexical_guards():
+    by_kind = {tool["function"]["name"]: tool["function"]["parameters"] for tool in TERMINAL_TOOL_DEFS}
+    delivery = by_kind[SUBMIT_DELIVERY]
+    done = by_kind[SUBMIT_DONE]
+    schemas = [
+        delivery["properties"]["changed_files"],
+        delivery["properties"]["requirement_mapping"]["items"]["properties"]["files"],
+        done["properties"]["changed_files"],
+    ]
+    for schema in schemas:
+        assert schema["uniqueItems"] is True
+        assert schema["items"]["type"] == "string"
+        pattern = re.compile(schema["items"]["pattern"])
+        assert pattern.fullmatch("目录/雪人.py")
+        for path in ("/x.py", "a/../x.py", r"a\x.py", "foo:bar", "bad\nname.py"):
+            assert pattern.fullmatch(path) is None
 
 
 @pytest.mark.parametrize("task_id", ["", None, 1])

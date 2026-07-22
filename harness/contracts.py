@@ -62,7 +62,8 @@ def _object(properties, required):
 _TEXT = {"type": "string", "minLength": 1}
 _STRING = {"type": "string"}
 _NONEMPTY_UNIQUE_STRINGS = _array(_TEXT, 1, True)
-_PATHS = _array(_TEXT, unique=True)
+_PATH = {"type": "string", "pattern": r"^(?!/)(?!.*//)(?!.*(?:^|/)\.{1,2}(?:/|$))[^\\:\u0000-\u001f\u007f]+$"}
+_PATHS = _array(_PATH, unique=True)
 _ACCEPTANCE_ITEM = _object(
     {"id": _TEXT, "behavior": _TEXT, "evidence": _TEXT},
     ["id", "behavior", "evidence"],
@@ -133,7 +134,7 @@ _PARAMETERS_BY_KIND = {
         ["verified_requirements", "check_names", "closed_defects", "decision"],
     ),
     "solo_done": _object(
-        {"changed_files": _array(_TEXT, 1, True), "check_names": _NONEMPTY_UNIQUE_STRINGS, "known_risks": _array(_STRING)},
+        {"changed_files": _array(_PATH, 1, True), "check_names": _NONEMPTY_UNIQUE_STRINGS, "known_risks": _array(_STRING)},
         ["changed_files", "check_names", "known_risks"],
     ),
 }
@@ -243,7 +244,8 @@ def _relative_paths(value, field, *, nonempty=False, unique=False):
             not path
             or path.startswith("/")
             or "\\" in path
-            or (len(path) >= 2 and path[1] == ":")
+            or ":" in path
+            or any(ord(character) < 32 or ord(character) == 127 for character in path)
             or any(part in ("", ".", "..") for part in parts)
         ):
             _fail(field, "must contain unambiguous relative paths")
@@ -302,7 +304,7 @@ def _validate_delivery(payload):
         if type(item) is not dict or set(item) != {"requirement_id", "files"}:
             _fail("requirement_mapping", "items must have exactly requirement_id and files")
         _required_text(item["requirement_id"], "requirement_mapping")
-        _relative_paths(item["files"], "requirement_mapping")
+        _relative_paths(item["files"], "requirement_mapping", unique=True)
     _unique_ids(payload["check_names"], "check_names")
     _string_list(payload["known_risks"], "known_risks")
 
