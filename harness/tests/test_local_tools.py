@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 import pytest
 
+from harness import local_tools, process_control
 from harness.local_tools import (
     READ_TOOL_NAMES,
     SEARCH_OUTPUT_BYTES,
@@ -17,6 +19,7 @@ from harness.local_tools import (
     CheckSpec,
     LocalToolRuntime,
     _path_is_within,
+    _safe_env,
     load_check_manifest,
 )
 from harness.process_control import run_process_tree
@@ -370,6 +373,61 @@ def test_run_process_tree_timeout_kills_descendants(tmp_path: Path) -> None:
     assert not sentinel.exists()
 
 
+def test_run_process_tree_timeout_kills_orphaned_grandchild(tmp_path: Path) -> None:
+    sentinel = tmp_path / "orphan-sentinel"
+    grandchild = "import pathlib,sys,time;time.sleep(.8);pathlib.Path(sys.argv[1]).write_text('escaped')"
+    child = "import subprocess,sys;subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)"
+    parent = "import subprocess,sys,time;subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(5)"
+    result = run_process_tree(
+        [sys.executable, "-c", parent, child, grandchild, str(sentinel)],
+        cwd=tmp_path,
+        env=dict(os.environ),
+        timeout_seconds=0.2,
+        stdout_path=tmp_path / "orphan-out.log",
+        stderr_path=tmp_path / "orphan-err.log",
+    )
+    time.sleep(1.0)
+    assert result.timed_out
+    assert not sentinel.exists()
+
+
+def test_run_process_tree_reaps_after_wait_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    sentinel = tmp_path / "wait-error-sentinel"
+    child = "import pathlib,sys,time;time.sleep(.8);pathlib.Path(sys.argv[1]).write_text('escaped')"
+    parent = "import subprocess,sys,time;subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(5)"
+    real_popen = subprocess.Popen
+    spawned: list[subprocess.Popen[bytes]] = []
+
+    class FailingWaitPopen:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.process = real_popen(*args, **kwargs)
+            self.first_wait = True
+            spawned.append(self.process)
+
+        def wait(self, *args: object, **kwargs: object) -> int:
+            if self.first_wait:
+                self.first_wait = False
+                raise OSError("wait probe")
+            return self.process.wait(*args, **kwargs)
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self.process, name)
+
+    monkeypatch.setattr(process_control.subprocess, "Popen", FailingWaitPopen)
+    with pytest.raises(OSError, match="wait probe"):
+        run_process_tree(
+            [sys.executable, "-c", parent, child, str(sentinel)],
+            cwd=tmp_path,
+            env=dict(os.environ),
+            timeout_seconds=5,
+            stdout_path=tmp_path / "wait-out.log",
+            stderr_path=tmp_path / "wait-err.log",
+        )
+    time.sleep(1.0)
+    assert spawned[0].poll() is not None
+    assert not sentinel.exists()
+
+
 def test_run_check_uses_disposable_mirror_sanitized_env_and_receipts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PROVIDER_KEY", "must-not-leak")
     workspace = Workspace(str(tmp_path / "workspace"))
@@ -406,6 +464,41 @@ def test_run_check_uses_disposable_mirror_sanitized_env_and_receipts(tmp_path: P
     (root / "value.txt").write_text("changed", encoding="utf-8")
     assert runtime.receipt("public_tests", workspace.tree_hash()) is None
     assert runtime.receipt("public_tests", before_hash) is receipt
+
+
+def test_safe_env_canonicalizes_case_variants_without_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        local_tools.os,
+        "environ",
+        {"Path": "mixed-path", "provider_token": "secret", "HOME": "home"},
+    )
+    env = _safe_env()
+    assert env["PATH"] == "mixed-path"
+    assert "Path" not in env
+    assert all("TOKEN" not in key.upper() and value != "secret" for key, value in env.items())
+
+
+def test_run_check_never_overwrites_or_follows_existing_audit_paths(tmp_path: Path) -> None:
+    workspace = Workspace(str(tmp_path / "workspace"))
+    audit = tmp_path / "audit"
+    audit.mkdir()
+    old_stdout = audit / "0001-public.stdout.log"
+    old_stderr = audit / "0001-public.stderr.log"
+    old_stdout.write_bytes(b"old evidence")
+    target = tmp_path / "symlink-target"
+    target.write_bytes(b"target evidence")
+    os.symlink(target, old_stderr)
+    runtime = LocalToolRuntime(
+        workspace,
+        {"public": CheckSpec((sys.executable, "-c", "import os;os.write(1,b'new')"), 5)},
+        (),
+        audit,
+    )
+    runtime.run_check("public")
+    assert old_stdout.read_bytes() == b"old evidence"
+    assert target.read_bytes() == b"target evidence"
+    assert (audit / "0002-public.stdout.log").read_bytes() == b"new"
+    assert (audit / "0002-public.stderr.log").read_bytes() == b""
 
 
 @pytest.mark.parametrize(

@@ -130,16 +130,24 @@ def load_check_manifest(path: str | os.PathLike[str]) -> tuple[dict[str, CheckSp
 
 
 def _safe_env() -> dict[str, str]:
-    allowed = {
-        "PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR",
-        "HOME", "USERPROFILE", "LANG", "LC_ALL",
+    canonical = {
+        key.upper(): key
+        for key in (
+            "PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR",
+            "HOME", "USERPROFILE", "LANG", "LC_ALL",
+        )
     }
     blocked = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
-    env = {
-        key: value
-        for key, value in os.environ.items()
-        if key in allowed and type(value) is str and not any(marker in key.upper() for marker in blocked)
-    }
+    variants: dict[str, list[tuple[str, str]]] = {}
+    for key, value in os.environ.items():
+        upper = key.upper()
+        if upper in canonical and type(value) is str and not any(marker in upper for marker in blocked):
+            variants.setdefault(upper, []).append((key, value))
+    env: dict[str, str] = {}
+    for upper, choices in variants.items():
+        name = canonical[upper]
+        exact = next((value for key, value in choices if key == name), None)
+        env[name] = exact if exact is not None else sorted(choices)[0][1]
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     return env
@@ -464,10 +472,13 @@ class LocalToolRuntime:
         before_hash = self.workspace.tree_hash()
         with tempfile.TemporaryDirectory(prefix="check-mirror-") as mirror:
             seed_workspace(self.workspace.dir, mirror)
-            self.check_sequence += 1
-            sequence = self.check_sequence
-            stdout_path = self.audit_dir / f"{sequence:04d}-{name}.stdout.log"
-            stderr_path = self.audit_dir / f"{sequence:04d}-{name}.stderr.log"
+            while True:
+                self.check_sequence += 1
+                sequence = self.check_sequence
+                stdout_path = self.audit_dir / f"{sequence:04d}-{name}.stdout.log"
+                stderr_path = self.audit_dir / f"{sequence:04d}-{name}.stderr.log"
+                if not os.path.lexists(stdout_path) and not os.path.lexists(stderr_path):
+                    break
             result = run_process_tree(
                 list(spec.argv),
                 cwd=mirror,
