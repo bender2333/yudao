@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 import ntpath
 import os
@@ -10,13 +11,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .workspace import Workspace
+from .workspace import Workspace, _require_link_free_components
 
 READ_TOOL_NAMES = frozenset({"read_file", "list_files", "search_text", "run_check"})
 WRITE_TOOL_NAMES = frozenset({"write_file", "edit_file"})
 _MAX_FILE_BYTES = 1024 * 1024
 _MAX_LIST_PATHS = 1000
 _MAX_SEARCH_MATCHES = 200
+SEARCH_OUTPUT_BYTES = 64 * 1024
+_SEARCH_TRUNCATION_MARKER = "[truncated at 200 matches or 65536 bytes]"
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,18 @@ class CheckReceipt:
 def _is_link_or_junction(path: os.PathLike[str] | str) -> bool:
     return os.path.islink(path) or getattr(os.path, "isjunction", lambda _path: False)(path)
 
+def _canonical_parts(parts: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(part.casefold() for part in parts)
+
+
+def _path_is_within(root: str, candidate: str) -> bool:
+    root_drive = (ntpath.splitdrive(root)[0] or os.path.splitdrive(root)[0]).casefold()
+    candidate_drive = (ntpath.splitdrive(candidate)[0] or os.path.splitdrive(candidate)[0]).casefold()
+    if root_drive != candidate_drive:
+        return False
+    return os.path.commonpath((root, candidate)) == root
+
+
 
 def _relative_parts(value: object, label: str = "path") -> tuple[str, ...]:
     if not isinstance(value, str):
@@ -56,6 +71,8 @@ def _relative_parts(value: object, label: str = "path") -> tuple[str, ...]:
     parts = tuple(value.split("/"))
     if any(part in {"", ".", ".."} for part in parts):
         raise ValueError(f"{label} contains an invalid component")
+    if any(part.endswith((".", " ")) for part in parts):
+        raise ValueError(f"{label} contains a Windows-aliased component")
     return parts
 
 
@@ -142,23 +159,26 @@ class LocalToolRuntime:
                 raise ValueError(f"check {name!r} timeout must be positive")
         if not isinstance(self.protected_paths, tuple):
             raise TypeError("protected_paths must be a tuple")
-        normalized = tuple("/".join(_relative_parts(path, "protected path")) for path in self.protected_paths)
-        if len(set(normalized)) != len(normalized):
+        normalized_parts = tuple(_relative_parts(path, "protected path") for path in self.protected_paths)
+        canonical = tuple(_canonical_parts(parts) for parts in normalized_parts)
+        if len(set(canonical)) != len(canonical):
             raise ValueError("duplicate protected path")
-        self.protected_paths = normalized
+        self.protected_paths = tuple("/".join(parts) for parts in canonical)
         if not isinstance(self.audit_dir, Path):
             raise TypeError("audit_dir must be a Path")
         root = os.path.realpath(self.workspace.dir)
         audit = os.path.realpath(self.audit_dir)
-        if os.path.commonpath((root, audit)) == root:
+        if _path_is_within(root, audit):
             raise ValueError("audit_dir must be outside workspace")
+        _require_link_free_components(self.audit_dir, "audit_dir")
         self.audit_dir.mkdir(parents=True, exist_ok=True)
-        if _is_link_or_junction(self.audit_dir) or not self.audit_dir.is_dir():
+        _require_link_free_components(self.audit_dir, "audit_dir")
+        if not self.audit_dir.is_dir():
             raise ValueError("audit_dir must be a real directory")
 
     def tool_defs(self, writable: bool) -> list[dict]:
         names = READ_TOOL_NAMES | (WRITE_TOOL_NAMES if writable else frozenset())
-        return [_TOOL_DEFS[name] for name in sorted(names)]
+        return copy.deepcopy([_TOOL_DEFS[name] for name in sorted(names)])
 
     def handlers(self) -> dict[str, Callable]:
         return {
@@ -187,11 +207,13 @@ class LocalToolRuntime:
     def _path(self, value: object) -> tuple[Path, str]:
         parts = _relative_parts(value)
         relative = "/".join(parts)
+        if parts[0].casefold() == ".harness":
+            raise ValueError("reserved path")
         root = Path(self.workspace.dir)
         target = root.joinpath(*parts)
         root_real = os.path.realpath(root)
         target_real = os.path.realpath(target)
-        if os.path.commonpath((root_real, target_real)) != root_real:
+        if not _path_is_within(root_real, target_real):
             raise ValueError("path escapes workspace")
         current = root
         for part in parts:
@@ -222,7 +244,8 @@ class LocalToolRuntime:
         return data, relative
 
     def _require_writable(self, relative: str) -> None:
-        if any(relative == protected or relative.startswith(protected + "/") for protected in self.protected_paths):
+        canonical = "/".join(_canonical_parts(tuple(relative.split("/"))))
+        if any(canonical == protected or canonical.startswith(protected + "/") for protected in self.protected_paths):
             raise ValueError(f"protected path: {relative}")
 
     def _create_parents(self, path: Path, relative: str) -> None:
@@ -295,11 +318,16 @@ class LocalToolRuntime:
             directory = Path(dirpath)
             for dirname in dirnames:
                 child = directory / dirname
+                relative = child.relative_to(root).as_posix()
+                if relative.split("/", 1)[0].casefold() == ".harness":
+                    raise ValueError("reserved path")
                 if _is_link_or_junction(child) or not stat.S_ISDIR(child.lstat().st_mode):
-                    raise ValueError(f"unsafe workspace entry: {child.relative_to(root).as_posix()}")
+                    raise ValueError(f"unsafe workspace entry: {relative}")
             for filename in filenames:
                 child = directory / filename
                 relative = child.relative_to(root).as_posix()
+                if relative.split("/", 1)[0].casefold() == ".harness":
+                    raise ValueError("reserved path")
                 if _is_link_or_junction(child) or not stat.S_ISREG(child.lstat().st_mode):
                     raise ValueError(f"unsafe workspace entry: {relative}")
                 files.append((relative, child))
@@ -315,6 +343,8 @@ class LocalToolRuntime:
         if not isinstance(query, str) or not query:
             raise ValueError("query must be a non-empty string")
         matches: list[str] = []
+        used_bytes = 0
+        marker_bytes = len(_SEARCH_TRUNCATION_MARKER.encode("utf-8")) + 1
         truncated = False
         for relative, path in self._files():
             if path.stat().st_size > _MAX_FILE_BYTES:
@@ -324,14 +354,20 @@ class LocalToolRuntime:
                 raise ValueError(f"file exceeds {_MAX_FILE_BYTES} bytes: {relative}")
             text = data.decode("utf-8", errors="strict")
             for line_number, line in enumerate(text.splitlines(), 1):
-                if query in line:
-                    if len(matches) < _MAX_SEARCH_MATCHES:
-                        matches.append(f"{relative}:{line_number}:{line}")
-                    else:
-                        truncated = True
+                if query not in line:
+                    continue
+                candidate = f"{relative}:{line_number}:{line}"
+                candidate_bytes = len(candidate.encode("utf-8")) + (1 if matches else 0)
+                if len(matches) >= _MAX_SEARCH_MATCHES or used_bytes + candidate_bytes + marker_bytes > SEARCH_OUTPUT_BYTES:
+                    truncated = True
+                    break
+                matches.append(candidate)
+                used_bytes += candidate_bytes
+            if truncated:
+                break
         if truncated:
-            matches.append(f"[truncated at {_MAX_SEARCH_MATCHES} matches]")
-        return "\n".join(matches) or "(empty)"
+            matches.append(_SEARCH_TRUNCATION_MARKER)
+        return "\n".join(matches) or "(no matches)"
 
     def run_check(self, name: str) -> str:
         raise ValueError("not implemented until Task 7")

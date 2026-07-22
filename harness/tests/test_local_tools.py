@@ -7,10 +7,12 @@ import pytest
 
 from harness.local_tools import (
     READ_TOOL_NAMES,
+    SEARCH_OUTPUT_BYTES,
     WRITE_TOOL_NAMES,
     CheckReceipt,
     CheckSpec,
     LocalToolRuntime,
+    _path_is_within,
 )
 from harness.workspace import Workspace
 
@@ -54,6 +56,20 @@ def test_file_tools_reject_lexically_unsafe_paths(tmp_path: Path, path: str) -> 
     ):
         assert runtime.dispatch(name, {"path": path, **extra}).startswith("Error:")
 
+@pytest.mark.parametrize(
+    "path",
+    ["TASK.md.", "TASK.md ", "tests/public./x", "tests/public /x"],
+)
+def test_file_tools_reject_windows_trailing_alias_components(tmp_path: Path, path: str) -> None:
+    runtime = make_runtime(tmp_path)
+    for name, extra in (
+        ("read_file", {}),
+        ("write_file", {"content": "x"}),
+        ("edit_file", {"old": "x", "new": "y"}),
+    ):
+        assert runtime.dispatch(name, {"path": path, **extra}).startswith("Error:")
+
+
 
 def test_runtime_validates_configuration_and_normalizes_protected_paths(tmp_path: Path) -> None:
     workspace = Workspace(str(tmp_path / "workspace"))
@@ -69,6 +85,8 @@ def test_runtime_validates_configuration_and_normalizes_protected_paths(tmp_path
         LocalToolRuntime(workspace, {}, ("../secret",), tmp_path / "audit")
     with pytest.raises(ValueError, match="duplicate"):
         LocalToolRuntime(workspace, {}, ("safe", "safe"), tmp_path / "audit")
+    with pytest.raises(ValueError, match="duplicate"):
+        LocalToolRuntime(workspace, {}, ("TASK.md", "task.MD"), tmp_path / "audit")
     with pytest.raises((TypeError, ValueError), match="check"):
         LocalToolRuntime(workspace, {1: CheckSpec(("python",), 1)}, (), tmp_path / "audit")  # type: ignore[dict-item]
     assert not (tmp_path / "audit").exists()
@@ -99,6 +117,8 @@ def test_read_write_edit_roundtrip_and_protected_boundaries(tmp_path: Path) -> N
     for path in ("TASK.md", "tests/public", "tests/public/x.py"):
         assert runtime.dispatch("write_file", {"path": path, "content": "x"}).startswith("Error:")
     assert runtime.dispatch("write_file", {"path": "tests/publicity/x.py", "content": "ok"}).startswith("Wrote")
+    for path in ("task.md", "tests/PUBLIC/x.py"):
+        assert runtime.dispatch("write_file", {"path": path, "content": "x"}).startswith("Error:")
 
 
 def test_content_and_file_size_and_utf8_fail_closed(tmp_path: Path) -> None:
@@ -143,15 +163,29 @@ def test_list_files_is_recursive_sorted_and_loud_on_limits(tmp_path: Path) -> No
     runtime = make_runtime(tmp_path)
     assert runtime.dispatch("list_files", {}) == "(empty)"
     root = Path(runtime.workspace.dir)
-    (root / ".harness").mkdir()
-    (root / ".harness" / "z").write_text("z", encoding="utf-8")
     (root / "a").mkdir()
     (root / "a" / "é.txt").write_text("e", encoding="utf-8")
     (root / "b.txt").write_text("b", encoding="utf-8")
-    assert runtime.dispatch("list_files", {}) == ".harness/z\na/é.txt\nb.txt"
+    assert runtime.dispatch("list_files", {}) == "a/é.txt\nb.txt"
     for index in range(999):
         (root / f"f{index:03d}").write_text("", encoding="utf-8")
     assert runtime.dispatch("list_files", {}).startswith("Error:")
+
+def test_reserved_harness_namespace_is_never_accessible_or_exposed(tmp_path: Path) -> None:
+    runtime = make_runtime(tmp_path)
+    root = Path(runtime.workspace.dir)
+    for alias in (".harness", ".HARNESS"):
+        for name, args in (
+            ("read_file", {"path": f"{alias}/x"}),
+            ("write_file", {"path": f"{alias}/x", "content": "secret"}),
+            ("edit_file", {"path": f"{alias}/x", "old": "x", "new": "y"}),
+        ):
+            assert runtime.dispatch(name, args) == "Error: reserved path"
+    (root / ".HARNESS").mkdir()
+    (root / ".HARNESS" / "secret").write_text("needle", encoding="utf-8")
+    assert runtime.dispatch("list_files", {}) == "Error: reserved path"
+    assert runtime.dispatch("search_text", {"query": "needle"}) == "Error: reserved path"
+
 
 
 def test_search_text_is_literal_sorted_strict_and_truncated(tmp_path: Path) -> None:
@@ -165,9 +199,48 @@ def test_search_text_is_literal_sorted_strict_and_truncated(tmp_path: Path) -> N
     (root / "many.txt").write_text("\n".join(["hit"] * 201), encoding="utf-8")
     result = runtime.dispatch("search_text", {"query": "hit"})
     assert len(result.splitlines()) == 201
-    assert result.endswith("[truncated at 200 matches]")
+    assert result.endswith("[truncated at 200 matches or 65536 bytes]")
     (root / "bad.bin").write_bytes(b"\xff")
     assert runtime.dispatch("search_text", {"query": "hit"}).startswith("Error:")
+
+
+def test_search_text_caps_utf8_bytes_without_partial_lines(tmp_path: Path) -> None:
+    runtime = make_runtime(tmp_path)
+    root = Path(runtime.workspace.dir)
+    complete_line = "needle" + "雪" * 1000
+    (root / "many.txt").write_text("\n".join([complete_line] * 30), encoding="utf-8")
+    result = runtime.dispatch("search_text", {"query": "needle"})
+    assert len(result.encode("utf-8")) <= SEARCH_OUTPUT_BYTES
+    assert result.endswith("[truncated at 200 matches or 65536 bytes]")
+    assert all(line == f"many.txt:{index}:{complete_line}" for index, line in enumerate(result.splitlines()[:-1], 1))
+    assert runtime.dispatch("search_text", {"query": "absent"}) == "(no matches)"
+
+
+def test_tool_defs_are_isolated_deep_copies(tmp_path: Path) -> None:
+    runtime = make_runtime(tmp_path)
+    definitions = runtime.tool_defs(True)
+    definitions[0]["function"]["parameters"]["properties"]["injected"] = {"type": "string"}
+    assert "injected" not in repr(runtime.tool_defs(True))
+    assert "injected" not in repr(make_runtime(tmp_path / "other").tool_defs(True))
+
+
+def test_windows_cross_drive_paths_are_outside_without_commonpath(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os.path, "commonpath", lambda _paths: pytest.fail("commonpath must not compare drives"))
+    assert not _path_is_within(r"C:\workspace", r"D:\audit")
+
+
+def test_audit_dir_rejects_linked_ancestors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace = Workspace(str(tmp_path / "workspace"))
+    audit = tmp_path / "audit-parent" / "audit"
+
+    def reject_audit(path: object, label: str, link_check: object = None) -> str:
+        if Path(path) == audit:
+            raise ValueError(f"{label} link is not allowed")
+        return os.path.abspath(path)
+
+    monkeypatch.setattr("harness.local_tools._require_link_free_components", reject_audit)
+    with pytest.raises(ValueError, match="audit_dir link"):
+        LocalToolRuntime(workspace, {}, (), audit)
 
 
 def test_tool_capabilities_schemas_handlers_and_dispatch_are_closed(tmp_path: Path) -> None:
