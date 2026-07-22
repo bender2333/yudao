@@ -112,6 +112,44 @@ def test_tree_manifest_rejects_link_root(tmp_path: Path) -> None:
         Workspace(str(link)).tree_manifest()
 
 
+@pytest.mark.parametrize("ancestor_kind", ["file", "directory"])
+def test_workspace_init_rejects_symlink_ancestor(tmp_path: Path, ancestor_kind: str) -> None:
+    target = tmp_path / "target"
+    if ancestor_kind == "directory":
+        target.mkdir()
+    else:
+        target.write_text("target", encoding="utf-8")
+    linked_ancestor = tmp_path / "linked-ancestor"
+    _make_symlink(linked_ancestor, target, directory=ancestor_kind == "directory")
+    root = linked_ancestor / "workspace"
+
+    with pytest.raises(ValueError, match="link"):
+        Workspace(str(root))
+
+    if ancestor_kind == "directory":
+        assert not (target / "workspace").exists()
+
+
+def test_workspace_init_rejects_junction_ancestor_via_helper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ancestor = tmp_path / "junction-ancestor"
+    ancestor.mkdir()
+    root = ancestor / "workspace"
+    real_check = workspace_module._is_link_or_junction
+    monkeypatch.setattr(
+        workspace_module,
+        "_is_link_or_junction",
+        lambda path: os.path.normcase(os.fspath(path)) == os.path.normcase(os.fspath(ancestor))
+        or real_check(path),
+    )
+
+    with pytest.raises(ValueError, match="link"):
+        Workspace(str(root))
+
+    assert not root.exists()
+
+
 def test_is_link_or_junction_uses_platform_junction_check(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(os.path, "islink", lambda _path: False)
     monkeypatch.setattr(os.path, "isjunction", lambda path: path == "junction", raising=False)

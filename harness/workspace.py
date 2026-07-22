@@ -20,6 +20,30 @@ def _is_link_or_junction(path: str) -> bool:
     return os.path.islink(path) or getattr(os.path, "isjunction", lambda _path: False)(path)
 
 
+def _require_link_free_components(path: str, label: str, link_check=None) -> str:
+    absolute = os.path.abspath(path)
+    current = absolute
+    components = []
+    while True:
+        components.append(current)
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    check = link_check or _is_link_or_junction
+    for component in reversed(components):
+        if os.path.lexists(component) and check(component):
+            raise ValueError(f"{label} link is not allowed: {component}")
+    return absolute
+
+
+def _require_real_directory(path: str, label: str, link_check=None) -> str:
+    absolute = _require_link_free_components(path, label, link_check)
+    if not os.path.isdir(absolute):
+        raise FileNotFoundError(f"{label} not found: {path}")
+    return os.path.realpath(absolute)
+
+
 def _manifest_by_path(manifest: list[dict]) -> dict[str, tuple[int, str]]:
     result: dict[str, tuple[int, str]] = {}
     for item in manifest:
@@ -48,12 +72,9 @@ def diff_manifests(before: list[dict], after: list[dict]) -> list[str]:
 
 class Workspace:
     def __init__(self, root: str):
-        root_path = os.path.abspath(root)
-        if os.path.lexists(root_path) and _is_link_or_junction(root_path):
-            self.dir = root_path
-            return
+        root_path = _require_link_free_components(root, "workspace root")
         os.makedirs(root_path, exist_ok=True)
-        self.dir = os.path.realpath(root_path)
+        self.dir = _require_real_directory(root_path, "workspace root")
 
     def tree_manifest(self) -> list[dict]:
         if not os.path.isdir(self.dir):

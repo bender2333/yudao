@@ -6,22 +6,21 @@ import os
 import shutil
 import stat
 
-from harness.workspace import _is_link_or_junction
-
-
-def _require_real_directory(path: str, label: str) -> str:
-    absolute = os.path.abspath(path)
-    if not os.path.isdir(absolute):
-        raise FileNotFoundError(f"{label} not found: {path}")
-    if _is_link_or_junction(absolute):
-        raise ValueError(f"{label} link is not allowed: {path}")
-    return os.path.realpath(absolute)
+from harness.workspace import _is_link_or_junction, _require_real_directory
 
 
 def seed_workspace(seed_dir: str, dest_dir: str) -> list[str]:
     """Copy regular seed files into an existing, empty real directory."""
-    source_root = _require_real_directory(seed_dir, "seed source")
-    destination_root = _require_real_directory(dest_dir, "seed destination")
+    source_root = _require_real_directory(seed_dir, "seed source", _is_link_or_junction)
+    destination_root = _require_real_directory(dest_dir, "seed destination", _is_link_or_junction)
+    if os.path.samefile(source_root, destination_root):
+        raise ValueError("seed root overlap: source and destination are the same")
+    try:
+        common_root = os.path.commonpath((source_root, destination_root))
+    except ValueError:
+        common_root = None
+    if common_root in (source_root, destination_root):
+        raise ValueError("seed root overlap: source and destination must not contain one another")
     with os.scandir(destination_root) as entries:
         if next(entries, None) is not None:
             raise ValueError(f"seed destination must be empty: {dest_dir}")
