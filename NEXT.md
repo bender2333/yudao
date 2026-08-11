@@ -13,6 +13,15 @@
 - 历史协议：`milestone3-study-protocol.md`、`milestone4-complex-study-protocol.md`、`role-persistent-sessions-design.md` 与 `aider-polyglot-protocol.md` 仅供追溯，不再定义下一轮主方案。
 - 已知历史缺陷：`docs/native-harness/ISSUES-content-filter.md`；旧 Aider pilot 因异常停止误判而无效，不进入新方案证据。
 
+## Parallel Architecture Design Track (2026-08-11)
+
+- 动态 Harness 理论架构基线：`docs/native-harness/dynamic-harness-architecture.md`。
+- Open-endedness 一手来源核验：`docs/native-harness/2026-08-11-open-endedness-research.md`。
+- 统一领域语言：`CONTEXT.md`。
+- 本轨只研究治理面、元控制、分层学习、Open-ended Artifact 发展环、Skill Fold/Unfold、候选晋升和渐进 RSI；不修改当前 S/T 实验协议，不授权代码实施或 live 调用。
+- 当前三部门 Harness 在目标架构中只是一种 `TeamNode` adapter 和可复查实验形态，不定义动态 Harness 的全部拓扑。
+- 下一份设计应联合回答 D1 + O0/O1 Observer 基础：如何事前提交 Prediction Commitment、定义 Artifact 身份与谱系，并在冻结 Observer/Loss/前缀/后缀下构造可校准的 Surprise 与 finite Open-endedness Profile；仍为只观察模式，不允许改变执行策略。
+
 ## Last Action (2026-07-22)
 
 - P0–P2 核心底座完成：工单合同与哈希、确定性 Team 状态机、三个长期私有会话、Solo 对照、受限文件工具、预登记检查、原子产物和外层进程树 supervisor。
