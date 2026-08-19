@@ -1,0 +1,1 @@
+Yudao native-harness research repository. Python harness compares solo vs explicit three-department work-order Team loops. Current work is under harness/, with pytest tests under harness/tests/. State machine is cross-department cyclic with private RoleSession histories and canonical ticket handoffs.

@@ -1,0 +1,1 @@
+Python uses snake_case, type hints where useful, dataclasses for result/value types, explicit validation at public boundaries, deterministic state transitions, sanitized external events, and pytest behavior tests. Reuse existing helpers and avoid speculative abstractions.

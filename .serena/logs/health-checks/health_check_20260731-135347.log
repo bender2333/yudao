@@ -1,0 +1,93 @@
+INFO  2026-07-31 13:53:47,988 serena.cli:health_check:928 - Starting health check for project: C:\project\yudao
+INFO  2026-07-31 13:53:47,989 serena.cli:health_check:932 - Creating SerenaAgent with disabled dashboard...
+INFO  2026-07-31 13:53:48,018 serena.util.file_system:_load_gitignore_files:152 - Processing .gitignore file: C:\project\yudao\.serena\.gitignore
+INFO  2026-07-31 13:53:48,049 serena.util.file_system:stop:336 - Loading of .gitignore files completed in 0.068 seconds
+INFO  2026-07-31 13:53:48,050 serena.project:stop:336 - Gathering ignore spec for project yudao completed in 0.069 seconds
+INFO  2026-07-31 13:53:48,228 serena.agent:__init__:627 - Will record tool usage statistics with token count estimator: CHAR_COUNT.
+INFO  2026-07-31 13:53:48,296 serena.agent:__init__:631 - Starting Serena server (version=1.6.1, process id=4108, parent process id=20116; language backend=LSP); Python version=3.13.13, platform=Windows-11-10.0.26200-SP0
+INFO  2026-07-31 13:53:48,296 serena.agent:__init__:635 - Configuration file: C:\Users\BA_H3C_Pad\.serena\serena_config.yml
+INFO  2026-07-31 13:53:48,296 serena.agent:__init__:636 - Available projects: EHand, cargo_project, yudao, yudao
+INFO  2026-07-31 13:53:48,296 serena.agent:__init__:637 - Loaded tools (52): create_text_file, replace_content, replace_in_files, delete_lines, replace_lines, insert_at_line, replace_symbol_body, insert_after_symbol, insert_before_symbol, read_file, list_dir, find_file, search_for_pattern, restart_language_server, get_symbols_overview, find_symbol, find_referencing_symbols, find_implementations, find_declaration, get_diagnostics_for_file, get_diagnostics_for_symbol, rename_symbol, safe_delete_symbol, write_memory, read_memory, list_memories, delete_memory, rename_memory, edit_memory, execute_shell_command, open_dashboard, activate_project, remove_project, get_current_config, onboarding, initial_instructions, serena_info, jet_brains_find_symbol, jet_brains_move, jet_brains_safe_delete, jet_brains_inline_symbol, jet_brains_find_referencing_symbols, jet_brains_get_symbols_overview, jet_brains_type_hierarchy, jet_brains_find_declaration, jet_brains_find_implementations, jet_brains_rename, jet_brains_debug, jet_brains_run_inspections, jet_brains_list_inspections, list_queryable_projects, query_project
+INFO  2026-07-31 13:53:48,296 serena.config.serena_config:determine_language_backend:1432 - Using language backend from global configuration: LSP
+INFO  2026-07-31 13:53:48,331 serena.config.serena_config:start:329 - Loading project instance for RegisteredProject[project_root=C:\project\yudao, project_config=ProjectConfig[project_name=yudao]] starting ...
+INFO  2026-07-31 13:53:48,332 serena.project:__init__:45 - Serena project data folder: C:\project\yudao\.serena
+INFO  2026-07-31 13:53:48,334 serena.project:start:329 - Gathering ignore spec for project yudao starting ...
+INFO  2026-07-31 13:53:48,334 serena.config.serena_config:stop:336 - Loading project instance for RegisteredProject[project_root=C:\project\yudao, project_config=ProjectConfig[project_name=yudao]] completed in 0.003 seconds
+INFO  2026-07-31 13:53:48,334 serena.util.file_system:start:329 - Loading of .gitignore files starting ...
+INFO  2026-07-31 13:53:48,335 serena.agent:activate_project_from_path_or_name:1301 - Found registered project 'yudao' at path C:\project\yudao
+INFO  2026-07-31 13:53:48,335 serena.agent:_activate_project:1171 - Activating yudao at C:\project\yudao
+INFO  2026-07-31 13:53:48,335 serena.task_executor:issue_task:205 - Scheduling Task-1:init_project_services
+INFO  2026-07-31 13:53:48,335 serena.agent:_update_active_modes:1079 - Active modes (2): editing, interactive
+INFO  2026-07-31 13:53:48,335 serena.util.file_system:_load_gitignore_files:152 - Processing .gitignore file: C:\project\yudao\.gitignore
+INFO  2026-07-31 13:53:48,341 serena.util.file_system:_load_gitignore_files:152 - Processing .gitignore file: C:\project\yudao\.serena\.gitignore
+INFO  2026-07-31 13:53:48,344 serena.agent:_create_base_toolset:808 - Number of exposed tools: 29
+INFO  2026-07-31 13:53:48,443 serena.agent:__init__:676 - Number of exposed tools: 29. Exposed tools: ['activate_project', 'create_text_file', 'delete_memory', 'edit_memory', 'execute_shell_command', 'find_declaration', 'find_file', 'find_implementations', 'find_referencing_symbols', 'find_symbol', 'get_current_config', 'get_diagnostics_for_file', 'get_symbols_overview', 'initial_instructions', 'insert_after_symbol', 'insert_before_symbol', 'list_dir', 'list_memories', 'onboarding', 'read_file', 'read_memory', 'rename_memory', 'rename_symbol', 'replace_content', 'replace_in_files', 'replace_symbol_body', 'safe_delete_symbol', 'search_for_pattern', 'write_memory']
+INFO  2026-07-31 13:53:48,443 serena.task_executor:_process_task_queue:129 - Starting execution of Task-1:init_project_services
+INFO  2026-07-31 13:53:48,444 serena.agent:_update_active_tools:1097 - Active tools (29): activate_project, create_text_file, delete_memory, edit_memory, execute_shell_command, find_declaration, find_file, find_implementations, find_referencing_symbols, find_symbol, get_current_config, get_diagnostics_for_file, get_symbols_overview, initial_instructions, insert_after_symbol, insert_before_symbol, list_dir, list_memories, onboarding, read_file, read_memory, rename_memory, rename_symbol, replace_content, replace_in_files, replace_symbol_body, safe_delete_symbol, search_for_pattern, write_memory
+INFO  2026-07-31 13:53:48,446 serena.task_executor:start:329 - Task-1:init_project_services starting ...
+INFO  2026-07-31 13:53:48,446 serena.agent:start:329 - Language server initialization starting ...
+INFO  2026-07-31 13:53:48,447 serena.project:create_language_server_manager:475 - Creating language server manager for C:\project\yudao
+INFO  2026-07-31 13:53:48,447 serena.project:_ignored_patterns:202 - Waiting for ignored patterns to become available ...
+INFO  2026-07-31 13:53:48,458 serena.util.file_system:stop:336 - Loading of .gitignore files completed in 0.123 seconds
+INFO  2026-07-31 13:53:48,458 serena.project:stop:336 - Gathering ignore spec for project yudao completed in 0.125 seconds
+INFO  2026-07-31 13:53:48,459 serena.project:_ignored_patterns:205 - Ignored patterns are now available for project; proceeding
+INFO  2026-07-31 13:53:48,459 sensai.util.logging:start:329 - Language server startup (language=typescript) starting ...
+INFO  2026-07-31 13:53:48,460 serena.ls_manager:create_language_server:58 - Creating language server instance for C:\project\yudao, language=typescript.
+INFO  2026-07-31 13:53:48,526 solidlsp.ls:_load_raw_document_symbols_cache:3003 - Loading document symbols cache from C:\project\yudao\.serena\cache\typescript\raw_document_symbols.pkl
+INFO  2026-07-31 13:53:48,564 solidlsp.ls:_load_raw_document_symbols_cache:3008 - Loaded 18 entries from raw document symbols cache.
+INFO  2026-07-31 13:53:48,564 solidlsp.ls:_load_document_symbols_cache:3038 - Loading document symbols cache from C:\project\yudao\.serena\cache\typescript\document_symbols.pkl
+INFO  2026-07-31 13:53:48,626 solidlsp.ls:_load_document_symbols_cache:3043 - Loaded 18 entries from document symbols cache.
+INFO  2026-07-31 13:53:48,642 solidlsp.ls:start:3134 - Starting language server with language typescript for C:\project\yudao
+INFO  2026-07-31 13:53:48,643 solidlsp.language_servers.typescript_language_server:_start_server:436 - Starting TypeScript server process
+INFO  2026-07-31 13:53:48,643 solidlsp.ls_process:_start:519 - Starting language server process via command: ['C:\\Users\\BA_H3C_Pad\\.serena\\language_servers\\static\\TypeScriptLanguageServer\\ts-lsp\\node_modules\\.bin\\typescript-language-server', '--stdio']
+INFO  2026-07-31 13:53:48,676 solidlsp.initialize_params:_apply_updates:61 - Workspace folders: ['C:\\project\\yudao']
+INFO  2026-07-31 13:53:48,677 solidlsp.language_servers.typescript_language_server:_start_server:440 - Sending initialize request from LSP client to LSP server and awaiting response
+INFO  2026-07-31 13:53:48,939 solidlsp.language_servers.typescript_language_server:window_log_message:373 - LSP: window/logMessage: {'type': 3, 'message': 'Using Typescript version (workspace) 5.9.3 from path "c:\\project\\yudao\\node_modules\\typescript\\lib\\tsserver.js"'}
+INFO  2026-07-31 13:53:48,941 solidlsp.language_servers.typescript_language_server:handle_typescript_version:381 - TypeScript server version notification received: {'version': '5.9.3', 'source': 'workspace'}
+INFO  2026-07-31 13:53:48,941 solidlsp.language_servers.typescript_language_server:_start_server:456 - TypeScript server is ready
+INFO  2026-07-31 13:53:48,941 solidlsp.language_servers.typescript_language_server:_start_server:465 - Waiting for TypeScript project indexing to complete (if async)...
+INFO  2026-07-31 13:53:48,941 solidlsp.language_servers.typescript_language_server:_start_server:467 - TypeScript project indexing complete
+INFO  2026-07-31 13:53:48,942 sensai.util.logging:stop:336 - Language server startup (language=typescript) completed in 0.482 seconds
+INFO  2026-07-31 13:53:48,942 sensai.util.logging:start:329 - Initialising file change notifier (polling for baseline) starting ...
+INFO  2026-07-31 13:53:49,028 sensai.util.logging:stop:336 - Initialising file change notifier (polling for baseline) completed in 0.086 seconds
+INFO  2026-07-31 13:53:49,028 serena.agent:stop:336 - Language server initialization completed in 0.582 seconds
+INFO  2026-07-31 13:53:49,028 serena.task_executor:stop:336 - Task-1:init_project_services completed in 0.583 seconds
+INFO  2026-07-31 13:53:49,777 serena.cli:health_check:935 - SerenaAgent created successfully
+INFO  2026-07-31 13:53:49,777 serena.cli:health_check:938 - Searching for analyzable files...
+INFO  2026-07-31 13:53:49,847 serena.cli:health_check:947 - Found analyzable file: vite.config.ts
+INFO  2026-07-31 13:53:49,848 serena.cli:health_check:965 - Testing GetSymbolsOverviewTool on file: vite.config.ts
+INFO  2026-07-31 13:53:49,848 serena.task_executor:issue_task:205 - Scheduling Task-2:<lambda>
+INFO  2026-07-31 13:53:49,937 serena.task_executor:_process_task_queue:129 - Starting execution of Task-2:<lambda>
+INFO  2026-07-31 13:53:49,938 serena.task_executor:start:329 - Task-2:<lambda> starting ...
+INFO  2026-07-31 13:53:50,009 solidlsp.language_servers.typescript_language_server:progress_handler:410 - TypeScript LSP progress [f6eb268b-a0d7-405e-af92-86e0cc294b70]: started - Initializing JS/TS language features…
+INFO  2026-07-31 13:53:51,234 serena.task_executor:stop:336 - Task-2:<lambda> completed in 1.296 seconds
+INFO  2026-07-31 13:53:51,234 serena.cli:health_check:967 - GetSymbolsOverviewTool returned: [{'name': 'default', 'kind': 'Constant'}]
+INFO  2026-07-31 13:53:51,235 serena.cli:health_check:986 - No class or function found, using first available symbol
+INFO  2026-07-31 13:53:51,235 serena.cli:health_check:990 - Using symbol for testing: default (kind: Constant)
+INFO  2026-07-31 13:53:51,235 serena.cli:health_check:993 - Testing FindSymbolTool for symbol: default
+INFO  2026-07-31 13:53:51,235 serena.task_executor:issue_task:205 - Scheduling Task-3:<lambda>
+INFO  2026-07-31 13:53:51,350 serena.task_executor:_process_task_queue:129 - Starting execution of Task-3:<lambda>
+INFO  2026-07-31 13:53:51,384 serena.task_executor:start:329 - Task-3:<lambda> starting ...
+INFO  2026-07-31 13:53:51,415 serena.task_executor:stop:336 - Task-3:<lambda> completed in 0.031 seconds
+INFO  2026-07-31 13:53:51,415 serena.cli:health_check:998 - FindSymbolTool found 1 matches for symbol default
+INFO  2026-07-31 13:53:51,419 serena.cli:health_check:1001 - Testing FindReferencingSymbolsTool for symbol: default
+INFO  2026-07-31 13:53:51,420 serena.task_executor:issue_task:205 - Scheduling Task-4:<lambda>
+INFO  2026-07-31 13:53:51,532 serena.task_executor:_process_task_queue:129 - Starting execution of Task-4:<lambda>
+INFO  2026-07-31 13:53:51,580 serena.task_executor:start:329 - Task-4:<lambda> starting ...
+INFO  2026-07-31 13:53:51,581 serena.ls_manager:sync_file_system_changes:272 - Polling file system for changes to source files ...
+INFO  2026-07-31 13:53:51,870 serena.ls_manager:sync_file_system_changes:274 - File system polling complete; 0 change events sent to language servers.
+INFO  2026-07-31 13:53:57,006 solidlsp.language_servers.typescript_language_server:progress_handler:421 - TypeScript LSP progress [f6eb268b-a0d7-405e-af92-86e0cc294b70]: ended - 
+INFO  2026-07-31 13:53:57,006 solidlsp.language_servers.typescript_language_server:_wait_for_cross_file_references_if_needed:545 - TypeScript cross-file indexing complete
+INFO  2026-07-31 13:53:57,082 solidlsp.language_servers.typescript_language_server:progress_handler:410 - TypeScript LSP progress [6d3f0927-fefd-4366-a8bd-828c64dbd75f]: started - Initializing JS/TS language features…
+INFO  2026-07-31 13:53:57,108 solidlsp.language_servers.typescript_language_server:progress_handler:421 - TypeScript LSP progress [6d3f0927-fefd-4366-a8bd-828c64dbd75f]: ended - 
+INFO  2026-07-31 13:53:57,263 serena.task_executor:stop:336 - Task-4:<lambda> completed in 5.683 seconds
+INFO  2026-07-31 13:53:57,263 serena.cli:health_check:1005 - FindReferencingSymbolsTool found 0 references for symbol default
+INFO  2026-07-31 13:53:57,264 serena.cli:health_check:1011 - Testing SearchForPatternTool for pattern: default
+INFO  2026-07-31 13:53:57,264 serena.task_executor:issue_task:205 - Scheduling Task-5:<lambda>
+INFO  2026-07-31 13:53:57,364 serena.task_executor:_process_task_queue:129 - Starting execution of Task-5:<lambda>
+INFO  2026-07-31 13:53:57,365 serena.task_executor:start:329 - Task-5:<lambda> starting ...
+INFO  2026-07-31 13:53:57,392 serena.util.text_utils:search_files:327 - Processing 4 files.
+INFO  2026-07-31 13:53:57,436 serena.util.text_utils:search_files:368 - Found 1 total matches across 4 files
+INFO  2026-07-31 13:53:57,436 serena.task_executor:stop:336 - Task-5:<lambda> completed in 0.072 seconds
+INFO  2026-07-31 13:53:57,436 serena.cli:health_check:1018 - SearchForPatternTool found 1 pattern matches for default
+INFO  2026-07-31 13:53:57,437 serena.cli:health_check:1032 - Health check completed successfully
