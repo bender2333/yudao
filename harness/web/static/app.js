@@ -570,6 +570,39 @@ function listen(runId, afterSeq, gen) {
   };
 }
 
+function isMobileLayout() {
+  try {
+    return Boolean(globalThis.matchMedia && globalThis.matchMedia("(max-width: 960px)").matches);
+  } catch {
+    return false;
+  }
+}
+
+function blurTask() {
+  const task = document.getElementById("task");
+  if (task && typeof task.blur === "function") task.blur();
+}
+
+function openCompose() {
+  if (document.body && document.body.classList) document.body.classList.add("compose");
+  const form = document.getElementById("task-form");
+  const task = document.getElementById("task");
+  if (form && typeof form.scrollIntoView === "function") form.scrollIntoView({ block: "start" });
+  if (task && typeof task.focus === "function") task.focus();
+}
+
+function closeCompose() {
+  if (document.body && document.body.classList) document.body.classList.remove("compose");
+}
+
+function scrollBoardIntoView() {
+  if (!isMobileLayout()) return;
+  blurTask();
+  if (typeof globalThis.scrollTo === "function") globalThis.scrollTo(0, 0);
+  const board = document.getElementById("board");
+  if (board && typeof board.scrollIntoView === "function") board.scrollIntoView({ block: "start" });
+}
+
 function readBudget() {
   const options = {};
   for (const key of ["max_cycles", "token_budget", "context_window"]) {
@@ -592,6 +625,7 @@ async function startRun(event) {
     options = readBudget();
   } catch (error) {
     setStatus("error", error.message);
+    openCompose();
     return;
   }
   state.submittingStart = true;
@@ -606,10 +640,14 @@ async function startRun(event) {
     state.activeRunId = created.run_id;
     syncButtons();
     syncWorkerWatch();
+    blurTask();
+    closeCompose();
     await selectRun(created.run_id);
+    scrollBoardIntoView();
   } catch (error) {
     if (error.status === 409) setStatus("conflict", error.message);
     else setStatus("error", error.message);
+    openCompose();
     await loadHealth(state.gen);
   } finally {
     state.submittingStart = false;
@@ -641,6 +679,8 @@ async function cancelRun() {
 function boot() {
   document.getElementById("task-form").addEventListener("submit", startRun);
   document.getElementById("btn-cancel").addEventListener("click", cancelRun);
+  const newer = document.getElementById("btn-new");
+  if (newer) newer.addEventListener("click", openCompose);
   syncButtons();
   loadHealth()
     .then(() => loadRuns())
@@ -665,9 +705,15 @@ globalThis.harnessWeb = {
   applyProviderAlert,
   renderBoard,
   renderCycle,
+  openCompose,
+  closeCompose,
+  startRun,
+  isMobileLayout,
+  scrollBoardIntoView,
+  blurTask,
   HEALTH_POLL_MS,
 };
 
-if (typeof document !== "undefined" && document.getElementById && document.getElementById("task-form")) {
+if (!globalThis.__HARNESS_SKIP_BOOT__ && typeof document !== "undefined" && document.getElementById && document.getElementById("task-form")) {
   boot();
 }

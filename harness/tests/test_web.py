@@ -144,6 +144,10 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
         assert 'id="exec-alert"' in html
         assert 'aria-label="开始"' in html
         assert 'aria-label="取消"' in html
+        assert 'aria-label="新任务"' in html
+        assert 'title="新任务"' in html
+        assert 'd="M5 12h14"' in html
+        assert 'd="M12 5v14"' in html
         assert "python -m" not in html
         assert "Event Store" not in html
         assert 'class="panel"' not in html
@@ -543,3 +547,8 @@ def test_web_ui_node_behaviors():
     assert "late worker_error for selected run appears from health without new events" in output
     assert "worker_error of another run does not fill exec-alert" in output
     assert "cycle band shows" in output
+    assert "new-task entry focuses existing input" in output
+    assert "successful start leaves compose" in output
+    assert "failed start stays on compose" in output
+    assert "scrollBoardIntoView only moves the board on mobile" in output
+    assert "desktop successful start does not force-scroll" in output

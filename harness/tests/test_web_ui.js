@@ -6,9 +6,30 @@ const vm = require("node:vm");
 
 const APP_JS = fs.readFileSync(path.join(__dirname, "..", "web", "static", "app.js"), "utf8");
 
+function makeClassList() {
+  const names = new Set();
+  return {
+    add(name) {
+      names.add(name);
+    },
+    remove(name) {
+      names.delete(name);
+    },
+    toggle(name, force) {
+      if (force === true) names.add(name);
+      else if (force === false) names.delete(name);
+      else if (names.has(name)) names.delete(name);
+      else names.add(name);
+    },
+    contains(name) {
+      return names.has(name);
+    },
+  };
+}
+
 function makeEl(id) {
   const listeners = {};
-  return {
+  const el = {
     id,
     tagName: "DIV",
     hidden: true,
@@ -20,13 +41,7 @@ function makeEl(id) {
     className: "",
     dataset: {},
     style: {},
-    classList: {
-      add() {},
-      toggle() {},
-      contains() {
-        return false;
-      },
-    },
+    classList: makeClassList(),
     children: [],
     addEventListener(type, fn) {
       (listeners[type] ||= []).push(fn);
@@ -46,7 +61,21 @@ function makeEl(id) {
       return [];
     },
     showModal() {},
+    focus() {
+      el._focused = true;
+      if (el.ownerDocument) el.ownerDocument.activeElement = el;
+    },
+    blur() {
+      el._focused = false;
+      if (el.ownerDocument && el.ownerDocument.activeElement === el) {
+        el.ownerDocument.activeElement = el.ownerDocument.body;
+      }
+    },
+    scrollIntoView() {
+      el._scrolled = true;
+    },
   };
+  return el;
 }
 
 function makeDocument() {
@@ -59,17 +88,27 @@ function makeDocument() {
     "btn-cancel",
     "runs",
     "run-empty",
+    "board",
     "board-body",
     "timeline-body",
     "evidence-body",
     "context-body",
     "event-json",
     "event-dialog",
+    "task-form",
+    "task",
+    "btn-new",
+    "max_cycles",
+    "token_budget",
+    "context_window",
   ]) {
     nodes.set(id, makeEl(id));
   }
-  return {
+  const body = makeEl("body");
+  const doc = {
     nodes,
+    body,
+    activeElement: null,
     getElementById(id) {
       return nodes.get(id) || null;
     },
@@ -80,6 +119,12 @@ function makeDocument() {
       return makeEl(tag);
     },
   };
+  for (const node of nodes.values()) node.ownerDocument = doc;
+  body.ownerDocument = doc;
+  nodes.get("max_cycles").value = "8";
+  nodes.get("token_budget").value = "100000";
+  nodes.get("context_window").value = "32000";
+  return doc;
 }
 
 function jsonResponse(payload, status = 200) {
@@ -138,6 +183,16 @@ function loadApp(fetchImpl) {
       close() {}
       addEventListener() {}
     },
+    matchMedia(query) {
+      return {
+        matches: Boolean(sandbox.__mobile) && String(query).includes("960"),
+        media: query,
+        addListener() {},
+        removeListener() {},
+        addEventListener() {},
+        removeEventListener() {},
+      };
+    },
     encodeURIComponent,
     URL,
     Promise,
@@ -156,6 +211,7 @@ function loadApp(fetchImpl) {
     Number: globalThis.Number,
   };
   sandbox.globalThis = sandbox;
+  sandbox.__HARNESS_SKIP_BOOT__ = true;
   vm.createContext(sandbox);
   vm.runInContext(APP_JS, sandbox);
   return { web: sandbox.harnessWeb, document, sandbox };
@@ -397,4 +453,117 @@ test("ask phase is visible on the product node and fact line", () => {
   assert.match(html, /cycle-node active/);
   assert.match(html, /处理 Ask/);
   assert.match(html, /Ask \/ React/);
+});
+
+test("new-task entry focuses existing input and keeps typed text", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  const task = document.getElementById("task");
+  const form = document.getElementById("task-form");
+  task.value = "keep this draft";
+  web.openCompose();
+  assert.equal(document.body.classList.contains("compose"), true);
+  assert.equal(document.activeElement, task);
+  assert.equal(task.value, "keep this draft");
+  assert.equal(form._scrolled, true);
+});
+
+test("successful start leaves compose and selects the new run", async () => {
+  const { web, document, sandbox } = loadApp(async (url, options) => {
+    const path = new URL(url, "http://local.test").pathname;
+    if (path === "/api/runs" && options && options.method === "POST") {
+      return jsonResponse({ run_id: "run-new", phase: "PRODUCT_SPEC" }, 201);
+    }
+    if (path === "/api/runs/run-new") return jsonResponse(runPayload("run-new"));
+    if (path === "/api/runs") return jsonResponse({ runs: [] });
+    if (path === "/api/health") {
+      return jsonResponse({
+        ok: true,
+        busy: true,
+        active_run_id: "run-new",
+        provider_available: true,
+        provider_message: "",
+        worker_error: null,
+      });
+    }
+    return jsonResponse({ error: path }, 404);
+  });
+  sandbox.__mobile = true;
+  const task = document.getElementById("task");
+  const board = document.getElementById("board");
+  task.value = "ship it";
+  web.openCompose();
+  await web.startRun({ preventDefault() {} });
+  assert.equal(document.body.classList.contains("compose"), false);
+  assert.equal(web.state.runId, "run-new");
+  assert.equal(task.value, "ship it");
+  assert.notEqual(document.activeElement, task);
+  assert.equal(board._scrolled, true);
+});
+
+test("failed start stays on compose with the same input", async () => {
+  const { web, document } = loadApp(async (url, options) => {
+    const path = new URL(url, "http://local.test").pathname;
+    if (path === "/api/runs" && options && options.method === "POST") {
+      return jsonResponse({ error: "已有任务正在运行", reason: "busy" }, 409);
+    }
+    if (path === "/api/health") {
+      return jsonResponse({
+        ok: true,
+        busy: true,
+        active_run_id: "run-a",
+        provider_available: true,
+        provider_message: "",
+        worker_error: null,
+      });
+    }
+    return jsonResponse({ error: path }, 404);
+  });
+  const task = document.getElementById("task");
+  task.value = "retry me";
+  web.openCompose();
+  await web.startRun({ preventDefault() {} });
+  assert.equal(document.body.classList.contains("compose"), true);
+  assert.equal(task.value, "retry me");
+  assert.equal(document.activeElement, task);
+});
+
+test("scrollBoardIntoView only moves the board on mobile", () => {
+  const { web, document, sandbox } = loadApp(async () => jsonResponse({ ok: true }));
+  const board = document.getElementById("board");
+  sandbox.__mobile = false;
+  web.scrollBoardIntoView();
+  assert.equal(board._scrolled, undefined);
+  sandbox.__mobile = true;
+  web.scrollBoardIntoView();
+  assert.equal(board._scrolled, true);
+});
+
+test("desktop successful start does not force-scroll the board", async () => {
+  const { web, document, sandbox } = loadApp(async (url, options) => {
+    const path = new URL(url, "http://local.test").pathname;
+    if (path === "/api/runs" && options && options.method === "POST") {
+      return jsonResponse({ run_id: "run-new", phase: "PRODUCT_SPEC" }, 201);
+    }
+    if (path === "/api/runs/run-new") return jsonResponse(runPayload("run-new"));
+    if (path === "/api/runs") return jsonResponse({ runs: [] });
+    if (path === "/api/health") {
+      return jsonResponse({
+        ok: true,
+        busy: true,
+        active_run_id: "run-new",
+        provider_available: true,
+        provider_message: "",
+        worker_error: null,
+      });
+    }
+    return jsonResponse({ error: path }, 404);
+  });
+  sandbox.__mobile = false;
+  const task = document.getElementById("task");
+  task.value = "desktop";
+  web.openCompose();
+  await web.startRun({ preventDefault() {} });
+  assert.equal(document.body.classList.contains("compose"), false);
+  assert.equal(web.state.runId, "run-new");
+  assert.equal(document.getElementById("board")._scrolled, undefined);
 });

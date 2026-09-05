@@ -1,4 +1,4 @@
-Lucide icons used here: play and square, inlined in index.html
+Lucide icons used here: play, square, and plus, inlined in index.html
 Official source: https://github.com/lucide-icons/lucide
 
 ISC License
