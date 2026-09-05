@@ -21,7 +21,7 @@ from .models import (
 from .projection import RunProjection, project_run
 from .sessions import SessionFactory
 from .tools import tools_for
-from .validation import evaluate_proposal
+from .validation import FieldError, ProposalDecision, evaluate_proposal
 from .workspace import Workspace
 
 
@@ -195,6 +195,11 @@ class Orchestrator:
             return self.project(run_id)
 
         workspace = self.workspace(run_id)
+        workspace.bind_check(
+            activation_id=activation_id,
+            product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+            delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+        )
         abort_flag = self._abort.setdefault(run_id, Event())
         try:
             result = self.adapter.invoke(
@@ -304,13 +309,19 @@ class Orchestrator:
         model: str | None,
     ) -> None:
         snapshot = self.workspace(run_id).snapshot()
-        decision = evaluate_proposal(
-            phase=projection.phase,
-            department=department,
-            proposal=proposal,
-            projection=projection,
-            snapshot=snapshot,
-        )
+        try:
+            decision = evaluate_proposal(
+                phase=projection.phase,
+                department=department,
+                proposal=proposal,
+                projection=projection,
+                snapshot=snapshot,
+            )
+        except Exception as exc:
+            decision = ProposalDecision(
+                False,
+                [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
+            )
         if proposal is not None:
             self.store.append(
                 run_id,

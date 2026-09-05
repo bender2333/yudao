@@ -1,6 +1,6 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review_turn
+from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 
@@ -215,6 +215,58 @@ def test_context_overflow_is_explicit_failure(data_dir):
     _, projection = run_scripted(data_dir, happy_script(), context_window=8)
     assert projection.phase == "FAILED"
     assert projection.stop_reason == "context_overflow"
+
+
+def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
+    script = [
+        product_spec(acceptance=["old behavior"]),
+        delivery_turn(),
+        review_turn(
+            "rework_product",
+            "contract is wrong",
+            defects=[{"severity": "major", "summary": "contract issue"}],
+        ),
+        product_spec(acceptance=["new behavior"]),
+        delivery_turn(summary="same code under new spec"),
+        FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),
+        review_turn("release", "checked current contract"),
+    ]
+    system, projection = run_scripted(data_dir, script, max_cycles=12)
+    assert projection.product_spec.revision == 2
+    assert any(
+        "prior receipts are not reused" in error["message"] or "must run" in error["message"]
+        for item in projection.rejections
+        for error in item["errors"]
+    )
+    assert projection.phase == "DONE"
+    assert projection.last_review.product_spec_hash == projection.product_spec.content_hash
+    assert projection.last_review.delivery_spec_hash == projection.delivery_spec.content_hash
+
+
+def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
+    script = [
+        product_spec(),
+        delivery_turn(),
+        FakeTurn(
+            proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": [123], "defects": []},
+            checks={"smoke": 0},
+        ),
+        FakeTurn(
+            proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": ["smoke"], "defects": None},
+            checks={"smoke": 0},
+        ),
+        review_turn("release", "ok"),
+    ]
+    system, projection = run_scripted(data_dir, script, max_cycles=12)
+    fields = [error["field"] for item in projection.rejections for error in item["errors"]]
+    messages = [error["message"] for item in projection.rejections for error in item["errors"]]
+    assert any(field.startswith("checks") for field in fields)
+    assert "defects" in fields
+    assert not any("AttributeError" in message or "TypeError" in message for message in messages)
+    events = system.store.list_events(projection.run_id)
+    assert any(event.type == "proposal_rejected" for event in events)
+    assert projection.phase == "DONE"
+    assert events[-1].type == "run_done"
 
 
 def test_release_without_quality_evidence_is_rejected(data_dir):

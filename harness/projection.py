@@ -75,6 +75,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         if session:
             session.activations += 1
             session.status = "active"
+        activation_id = payload.get("activation_id")
+        if event.role and activation_id:
+            state.last_activations[event.role] = str(activation_id)
         return
 
     if etype == EventType.CONTEXT_ASSEMBLED:

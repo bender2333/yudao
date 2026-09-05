@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ from typing import Any, Callable
 
 from .models import json_dumps
 from .redact import redact_text, sanitized_env
-from .workspace import Workspace, is_private_path
+from .workspace import Workspace, is_private_path, tree_digest
 
 CHECK_TIMEOUT_SEC = 30
 CHECK_OUTPUT_LIMIT = 4000
@@ -120,41 +121,59 @@ class ToolRuntime:
         if not name:
             raise ValueError("check name is required")
         argv = _argv_from_args(args)
-        resolved = _resolve_argv(self.workspace, argv)
-        frozen = self.workspace.capture_tree()
+        original_digest = self.workspace.digest()
+        copy_root = self.workspace.make_check_copy()
+        resolved = _resolve_argv(self.workspace, argv, cwd=copy_root)
         try:
-            completed = subprocess.run(
-                resolved,
-                cwd=str(self.workspace.root),
-                env=sanitized_env(),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=CHECK_TIMEOUT_SEC,
+            try:
+                completed = subprocess.run(
+                    resolved,
+                    cwd=str(copy_root),
+                    env=sanitized_env(),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=CHECK_TIMEOUT_SEC,
+                )
+                exit_code = int(completed.returncode)
+                output = _summarize_output(completed.stdout, completed.stderr)
+            except subprocess.TimeoutExpired as exc:
+                exit_code = 124
+                output = f"check timed out after {CHECK_TIMEOUT_SEC}s"
+                if exc.stdout:
+                    output += "\n" + _decode(exc.stdout)
+                if exc.stderr:
+                    output += "\n" + _decode(exc.stderr)
+            observed_digest = tree_digest(copy_root)
+            tree_changed = observed_digest != original_digest
+            snapshot_hash = original_digest if not tree_changed else observed_digest
+            if tree_changed:
+                output = (output + "\n" if output else "") + "tested tree changed; pass is not bound to the original snapshot"
+            summary = redact_text(
+                f"host-executed argv={_display_argv(resolved)} exit={exit_code}\n{output}".strip()
             )
-            exit_code = int(completed.returncode)
-            output = _summarize_output(completed.stdout, completed.stderr)
-        except subprocess.TimeoutExpired as exc:
-            exit_code = 124
-            output = f"check timed out after {CHECK_TIMEOUT_SEC}s"
-            if exc.stdout:
-                output += "\n" + _decode(exc.stdout)
-            if exc.stderr:
-                output += "\n" + _decode(exc.stderr)
+            receipt = self.workspace.record_check(
+                department,
+                name,
+                exit_code,
+                summary,
+                snapshot_hash=snapshot_hash,
+                tree_changed=tree_changed,
+            )
+            return {
+                "name": receipt.name,
+                "exit_code": receipt.exit_code,
+                "summary": receipt.summary,
+                "snapshot_hash": receipt.snapshot_hash,
+                "executor": "host",
+                "tree_changed": receipt.tree_changed,
+                "product_spec_hash": receipt.product_spec_hash,
+                "delivery_spec_hash": receipt.delivery_spec_hash,
+                "activation_id": receipt.activation_id,
+            }
         finally:
-            self.workspace.restore_tree(frozen)
-        summary = redact_text(
-            f"host-executed argv={_display_argv(resolved)} exit={exit_code}\n{output}".strip()
-        )
-        receipt = self.workspace.record_check(department, name, exit_code, summary)
-        return {
-            "name": receipt.name,
-            "exit_code": receipt.exit_code,
-            "summary": receipt.summary,
-            "snapshot_hash": receipt.snapshot_hash,
-            "executor": "host",
-        }
+            shutil.rmtree(copy_root, ignore_errors=True)
 
 
 def _argv_from_args(args: dict[str, Any]) -> list[str]:
@@ -176,7 +195,7 @@ def _argv_from_args(args: dict[str, Any]) -> list[str]:
     raise ValueError("run_check/collect_evidence require host-executed argv or command; exit_code is not evidence")
 
 
-def _resolve_argv(workspace: Workspace, argv: list[str]) -> list[str]:
+def _resolve_argv(workspace: Workspace, argv: list[str], *, cwd: Path | None = None) -> list[str]:
     for item in argv:
         if ".." in Path(item).parts or is_private_path(item):
             raise PermissionError("check argv cannot reference private or parent paths")
@@ -189,7 +208,8 @@ def _resolve_argv(workspace: Workspace, argv: list[str]) -> list[str]:
         if resolved != Path(sys.executable).resolve():
             raise PermissionError("absolute executables other than the host python are not allowed")
         return [str(resolved), *argv[1:]]
-    path = workspace.resolve(prog)
+    base = cwd if cwd is not None else workspace.root
+    path = (base / prog)
     if not path.exists():
         raise FileNotFoundError(f"check program not in workspace: {prog}")
     return [str(path), *argv[1:]]

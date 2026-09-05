@@ -62,6 +62,29 @@ def evaluate_proposal(
     projection: RunProjection,
     snapshot: WorkspaceSnapshot,
 ) -> ProposalDecision:
+    try:
+        return _evaluate_proposal(
+            phase=phase,
+            department=department,
+            proposal=proposal,
+            projection=projection,
+            snapshot=snapshot,
+        )
+    except Exception as exc:
+        return ProposalDecision(
+            False,
+            [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
+        )
+
+
+def _evaluate_proposal(
+    *,
+    phase: str,
+    department: str,
+    proposal: dict[str, Any] | None,
+    projection: RunProjection,
+    snapshot: WorkspaceSnapshot,
+) -> ProposalDecision:
     if not proposal or not isinstance(proposal, dict):
         return ProposalDecision(False, [FieldError("proposal", "structured proposal is required; natural language cannot change state")])
     kind = proposal.get("kind")
@@ -138,24 +161,12 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
         verdict = proposal.get("verdict")
         if verdict not in QA_VERDICTS:
             errors.append(FieldError("verdict", "verdict must be rework_product, rework_engineering, or release"))
-        defects = proposal.get("defects", [])
-        if defects is None:
-            defects = []
-        if not isinstance(defects, list):
-            errors.append(FieldError("defects", "defects must be a list"))
-            defects = []
-        for index, defect in enumerate(defects):
-            if not isinstance(defect, dict) or not str(defect.get("summary", "")).strip():
-                errors.append(FieldError(f"defects[{index}].summary", "defect summary is required"))
-            severity = defect.get("severity") if isinstance(defect, dict) else None
-            if severity not in {"blocker", "major", "minor"}:
-                errors.append(FieldError(f"defects[{index}].severity", "severity must be blocker, major, or minor"))
-        checks = proposal.get("checks", proposal.get("check_names", []))
-        if not isinstance(checks, list) or not checks:
-            errors.append(FieldError("checks", "at least one check name is required"))
-        if verdict == "release" and defects:
+        errors.extend(_qa_defects_errors(proposal))
+        errors.extend(_qa_check_name_errors(proposal))
+        defects = [] if "defects" not in proposal else proposal.get("defects")
+        if verdict == "release" and isinstance(defects, list) and defects:
             errors.append(FieldError("defects", "release requires an empty defect list"))
-        if verdict in {"rework_product", "rework_engineering"} and not defects:
+        if verdict in {"rework_product", "rework_engineering"} and isinstance(defects, list) and not defects:
             errors.append(FieldError("defects", "rework requires at least one defect"))
         return errors
     return [FieldError("kind", "unknown kind")]
@@ -262,18 +273,21 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
             errors.append(FieldError("files", f"missing workspace file: {rel}"))
     checks = []
     for name in proposal["check_names"]:
-        receipt = snapshot.latest_check("engineering", name)
-        if receipt is None:
-            errors.append(FieldError("check_names", f"no engineering check receipt for {name} on the current snapshot"))
-            continue
-        checks.append(
-            {
-                "name": receipt.name,
-                "exit_code": receipt.exit_code,
-                "summary": receipt.summary,
-                "snapshot_hash": receipt.snapshot_hash,
-            }
+        receipt = snapshot.latest_check(
+            "engineering",
+            name,
+            product_spec_hash=projection.product_spec.content_hash,
+            activation_id=projection.last_activations.get("engineering"),
         )
+        if receipt is None:
+            errors.append(
+                FieldError(
+                    "check_names",
+                    f"no engineering check receipt for {name} bound to the current snapshot, ProductSpec, and activation",
+                )
+            )
+            continue
+        checks.append(_receipt_evidence(receipt))
     if errors:
         return ProposalDecision(False, errors)
     parent = projection.delivery_spec.content_hash if projection.delivery_spec else None
@@ -315,37 +329,36 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
         errors.append(FieldError("product_spec_hash", "delivery is not bound to the current ProductSpec"))
     if projection.delivery_spec.code_tree_digest != snapshot.digest:
         errors.append(FieldError("code_snapshot_hash", "workspace snapshot no longer matches the current delivery"))
-    check_names = []
-    for item in proposal.get("checks", proposal.get("check_names", [])):
-        name = item if isinstance(item, str) else item.get("name")
-        if name:
-            check_names.append(name)
+    check_names, name_errors = _qa_check_names(proposal)
+    errors.extend(name_errors)
     bound_checks = []
     for name in check_names:
-        receipt = snapshot.latest_check("quality", name)
-        if receipt is None:
-            errors.append(FieldError("checks", f"quality must run {name} against the current snapshot; engineering receipts are not accepted"))
-            continue
-        bound_checks.append(
-            {
-                "name": receipt.name,
-                "exit_code": receipt.exit_code,
-                "summary": receipt.summary,
-                "snapshot_hash": receipt.snapshot_hash,
-            }
+        receipt = snapshot.latest_check(
+            "quality",
+            name,
+            product_spec_hash=projection.product_spec.content_hash,
+            delivery_spec_hash=projection.delivery_spec.content_hash,
+            activation_id=projection.last_activations.get("quality"),
         )
+        if receipt is None:
+            errors.append(
+                FieldError(
+                    "checks",
+                    f"quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused",
+                )
+            )
+            continue
+        bound_checks.append(_receipt_evidence(receipt))
     verdict = proposal["verdict"]
     if verdict == "release":
         if any(item["exit_code"] != 0 for item in bound_checks):
             errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
         if not bound_checks:
             errors.append(FieldError("checks", "release requires quality-run evidence bound to the current snapshot"))
+    defects, defect_errors = _qa_defects(proposal)
+    errors.extend(defect_errors)
     if errors:
         return ProposalDecision(False, errors)
-    defects = [
-        {"severity": item["severity"], "summary": item["summary"].strip()}
-        for item in proposal.get("defects", [])
-    ]
     parent = projection.last_review.content_hash if projection.last_review else None
     revision = (projection.last_review.revision + 1) if projection.last_review else 1
     payload = {
@@ -386,6 +399,65 @@ def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:
         "fatal_conditions": [item.strip() for item in proposal.get("fatal_conditions", [])],
         "non_goals": [item.strip() for item in proposal.get("non_goals", [])],
     }
+
+
+def _receipt_evidence(receipt: Any) -> dict[str, Any]:
+    return {
+        "activation_id": receipt.activation_id,
+        "delivery_spec_hash": receipt.delivery_spec_hash,
+        "exit_code": receipt.exit_code,
+        "name": receipt.name,
+        "product_spec_hash": receipt.product_spec_hash,
+        "snapshot_hash": receipt.snapshot_hash,
+        "summary": receipt.summary,
+    }
+
+
+def _qa_check_name_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _qa_check_names(proposal)[1]
+
+
+def _qa_check_names(proposal: dict[str, Any]) -> tuple[list[str], list[FieldError]]:
+    raw = proposal["checks"] if "checks" in proposal else proposal.get("check_names", [])
+    if raw is None or not isinstance(raw, list):
+        return [], [FieldError("checks", "checks must be a list of names")]
+    if not raw:
+        return [], [FieldError("checks", "at least one check name is required")]
+    names: list[str] = []
+    errors: list[FieldError] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, str) or not item.strip():
+            errors.append(FieldError(f"checks[{index}]", "check name must be a non-empty string"))
+            continue
+        names.append(item.strip())
+    return names, errors
+
+
+def _qa_defects_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _qa_defects(proposal)[1]
+
+
+def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[FieldError]]:
+    if "defects" not in proposal:
+        return [], []
+    raw = proposal.get("defects")
+    if raw is None or not isinstance(raw, list):
+        return [], [FieldError("defects", "defects must be a list")]
+    defects: list[dict[str, str]] = []
+    errors: list[FieldError] = []
+    for index, defect in enumerate(raw):
+        if not isinstance(defect, dict):
+            errors.append(FieldError(f"defects[{index}]", "defect must be an object"))
+            continue
+        summary = defect.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            errors.append(FieldError(f"defects[{index}].summary", "defect summary is required"))
+        severity = defect.get("severity")
+        if severity not in {"blocker", "major", "minor"}:
+            errors.append(FieldError(f"defects[{index}].severity", "severity must be blocker, major, or minor"))
+        if isinstance(summary, str) and summary.strip() and severity in {"blocker", "major", "minor"}:
+            defects.append({"severity": severity, "summary": summary.strip()})
+    return defects, errors
 
 
 def _require_text(payload: dict[str, Any], field: str) -> list[FieldError]:

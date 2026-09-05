@@ -127,6 +127,10 @@ class CheckReceipt:
     exit_code: int
     summary: str
     snapshot_hash: str
+    product_spec_hash: str | None = None
+    delivery_spec_hash: str | None = None
+    activation_id: str | None = None
+    tree_changed: bool = False
 
 
 @dataclass(frozen=True)
@@ -353,6 +357,7 @@ class RunProjection:
     transitions: list[str] = field(default_factory=list)
     rejections: list[dict[str, Any]] = field(default_factory=list)
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    last_activations: dict[str, str] = field(default_factory=dict)
     last_event_id: str | None = None
     last_seq: int = 0
 
