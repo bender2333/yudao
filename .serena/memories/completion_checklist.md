@@ -1,1 +1,0 @@
-For deterministic harness changes: use strict red-green TDD; run the exact targeted pytest command; only stage explicitly requested files; preserve unrelated user changes; commit with requested Conventional Commit and Verified-By trailer.

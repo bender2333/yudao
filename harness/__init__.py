@@ -1,1 +1,1 @@
-"""Native harness — milestone 1 (solo agent loop)."""
+"""从确定性三部门状态机开始演化的基础 harness。"""
