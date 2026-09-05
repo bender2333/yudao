@@ -290,8 +290,9 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
         checks.append(_receipt_evidence(receipt))
     if errors:
         return ProposalDecision(False, errors)
-    parent = projection.delivery_spec.content_hash if projection.delivery_spec else None
-    revision = (projection.delivery_spec.revision + 1) if projection.delivery_spec else 1
+    previous = projection.delivery_specs[-1] if projection.delivery_specs else None
+    parent = previous.content_hash if previous else None
+    revision = (previous.revision + 1) if previous else 1
     payload = {
         "summary": proposal["summary"].strip(),
         "files": files,

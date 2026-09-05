@@ -190,6 +190,21 @@ class ProductReaction:
 
 
 @dataclass(frozen=True)
+class ProductDecision:
+    ask_id: str
+    ask_hash: str
+    reaction_id: str
+    reaction_hash: str
+    product_spec_hash: str
+    question: str
+    options: list[str]
+    recommendation: str
+    decide_fields: list[str]
+    decision: str
+    rationale: str
+
+
+@dataclass(frozen=True)
 class DeliverySpec:
     id: str
     run_id: str
@@ -207,6 +222,7 @@ class DeliverySpec:
     known_risks: list[str]
     code_tree_digest: str
     file_refs: list[ArtifactRef]
+    invalidation_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -353,9 +369,11 @@ class RunProjection:
     asks: list[AskRequest] = field(default_factory=list)
     reactions: list[ProductReaction] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)
     transitions: list[str] = field(default_factory=list)
     rejections: list[dict[str, Any]] = field(default_factory=list)
+    pending_feedback: dict[str, dict[str, Any]] = field(default_factory=dict)
     evidence: list[dict[str, Any]] = field(default_factory=list)
     last_activations: dict[str, str] = field(default_factory=dict)
     last_event_id: str | None = None

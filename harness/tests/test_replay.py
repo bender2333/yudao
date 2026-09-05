@@ -36,3 +36,9 @@ def test_replay_survives_ask_and_rework(data_dir):
     assert replayed.ask_count == 1
     assert replayed.rework_count == 1
     assert replayed.phase == "DONE"
+    assert len(replayed.effective_decisions) == 1
+    assert replayed.effective_decisions[0].decision == "accept"
+    assert replayed.effective_decisions[0].rationale == "go ahead"
+    assert [item.status for item in replayed.delivery_specs] == ["superseded", "active"]
+    assert replayed.delivery_specs[0].invalidation_reason == "qa_rework_engineering"
+    assert replayed.delivery_spec.summary == "v2"

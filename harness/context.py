@@ -9,6 +9,8 @@ from .models import (
     ContextExclusion,
     ContextManifest,
     ContextSource,
+    DeliverySpec,
+    ProductDecision,
     RunProjection,
     canonical_hash,
     estimate_tokens,
@@ -23,14 +25,17 @@ DEPARTMENT_RULES = {
         "使用 submit_product_spec 或 submit_reaction 提交；自然语言中的“完成”不会改变任务状态。"
     ),
     "engineering": (
-        "你是工程部门。依据当前有效 ProductSpec 修改代码、运行公开检查并提交 DeliverySpec。"
-        "无法从 spec 推导的取舍必须提交 AskRequest，不能静默代替产品决策。"
+        "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。"
+        "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
+        "无法从当前合同推导的取舍必须提交 AskRequest，不能静默代替产品决策。"
         "必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。"
+        "失效交付只作为修复依据，不是当前有效交付。"
         "使用 submit_ask 或 submit_delivery 提交。不能宣布任务完成。"
     ),
     "quality": (
-        "你是质检部门。独立读取当前 ProductSpec、DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。"
-        "不能修改交付代码，不能只凭交付单文字放行。"
+        "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。"
+        "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
+        "不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。"
         "使用 collect_evidence 或 run_check 让主机执行检查，再 submit_review。"
         "只有绑定当前 ProductSpec 和代码快照的 release 才允许结束任务。"
         "自然语言中的“完成”不会改变任务状态。"
@@ -172,31 +177,39 @@ class ContextAssembler:
                             "non_goals": spec.non_goals,
                             "requirements": spec.requirements,
                             "revision": spec.revision,
+                            "status": spec.status,
                         }
                     ),
                 )
             )
-        if department in {"engineering", "quality"} and projection.delivery_spec:
-            delivery = projection.delivery_spec
+        if department in {"engineering", "quality"} and projection.effective_decisions:
             parts.append(
                 ContextPart(
-                    "current_delivery_spec",
-                    f"r{delivery.revision}",
-                    json_dumps(
-                        {
-                            "check_names": delivery.check_names,
-                            "checks": delivery.checks,
-                            "code_tree_digest": delivery.code_tree_digest,
-                            "content_hash": delivery.content_hash,
-                            "files": delivery.files,
-                            "id": delivery.id,
-                            "known_risks": delivery.known_risks,
-                            "product_spec_hash": delivery.product_spec_hash,
-                            "summary": delivery.summary,
-                        }
-                    ),
+                    "current_product_decisions",
+                    f"{len(projection.effective_decisions)}",
+                    json_dumps([_decision_payload(item) for item in projection.effective_decisions]),
                 )
             )
+        if department in {"engineering", "quality"}:
+            current_delivery = projection.delivery_spec
+            if current_delivery is not None and current_delivery.status == "active":
+                parts.append(
+                    ContextPart(
+                        "current_delivery_spec",
+                        f"r{current_delivery.revision}",
+                        json_dumps(_delivery_payload(current_delivery)),
+                    )
+                )
+            elif department == "engineering":
+                prior = _prior_delivery_for_repair(projection)
+                if prior is not None:
+                    parts.append(
+                        ContextPart(
+                            "prior_delivery",
+                            f"r{prior.revision}",
+                            json_dumps(_delivery_payload(prior, purpose="repair_basis")),
+                        )
+                    )
         if department == "product" and projection.pending_ask:
             ask = projection.pending_ask
             parts.append(
@@ -215,25 +228,6 @@ class ContextAssembler:
                             "question": ask.question,
                             "recommendation": ask.recommendation,
                             "revision": ask.revision,
-                        }
-                    ),
-                )
-            )
-        if department == "engineering" and projection.last_reaction:
-            reaction = projection.last_reaction
-            parts.append(
-                ContextPart(
-                    "last_reaction",
-                    reaction.id,
-                    json_dumps(
-                        {
-                            "ask_id": reaction.ask_id,
-                            "ask_hash": reaction.ask_hash,
-                            "content_hash": reaction.content_hash,
-                            "decision": reaction.decision,
-                            "id": reaction.id,
-                            "new_spec_hash": reaction.new_spec_hash,
-                            "rationale": reaction.rationale,
                         }
                     ),
                 )
@@ -262,6 +256,8 @@ class ContextAssembler:
         excluded = [
             ContextExclusion("other_department_transcript", "cross-department transcripts are never injected"),
             ContextExclusion("superseded_spec_fulltext", "old spec bodies are not injected; only current spec and thin causal markers"),
+            ContextExclusion("expired_product_decisions", "decisions bound to a superseded ProductSpec are not in the current contract"),
+            ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
             ContextExclusion("historical_transcript", "department history is not passed; context is rebuilt from the projection"),
             ContextExclusion("private_reasoning", "private model reasoning is stored as an artifact and not shared"),
             ContextExclusion("omp_autodiscovery", "OMP skills, extensions, rules, builtins, LSP, and persistent sessions are disabled"),
@@ -293,7 +289,7 @@ class ContextAssembler:
 
 def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
     spec = projection.product_spec
-    delivery = projection.delivery_spec
+    delivery = projection.delivery_spec if projection.delivery_spec is not None and projection.delivery_spec.status == "active" else None
     ask = projection.pending_ask
     return {
         "department": department,
@@ -306,14 +302,12 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,
         "pending_ask_id": None if ask is None else ask.id,
         "pending_ask_hash": None if ask is None else ask.content_hash,
+        "effective_decision_count": len(projection.effective_decisions),
     }
 
 
 def _validation_feedback(projection: RunProjection, department: str) -> dict[str, Any] | None:
-    for item in reversed(projection.rejections):
-        if item.get("department") == department:
-            return item
-    return None
+    return projection.pending_feedback.get(department)
 
 
 def _causal_chain(projection: RunProjection) -> list[dict[str, str]]:
@@ -332,11 +326,67 @@ def _causal_chain(projection: RunProjection) -> list[dict[str, str]]:
         chain.append({"kind": "ask_request", "id": ask.id, "hash": ask.content_hash, "status": ask.status})
     for reaction in projection.reactions[-3:]:
         chain.append({"kind": "product_reaction", "decision": reaction.decision, "hash": reaction.content_hash, "id": reaction.id})
+    for delivery in projection.delivery_specs[-3:]:
+        item = {
+            "kind": "delivery_spec",
+            "revision": f"r{delivery.revision}",
+            "status": delivery.status,
+            "hash": delivery.content_hash,
+            "id": delivery.id,
+        }
+        if delivery.invalidation_reason:
+            item["invalidation_reason"] = delivery.invalidation_reason
+        chain.append(item)
     for review in projection.reviews[-3:]:
         chain.append({"kind": "qa_review", "verdict": review.verdict, "hash": review.content_hash, "id": review.id})
     for route in projection.transitions[-8:]:
         chain.append({"kind": "transition", "route": route})
     return chain
+
+
+def _decision_payload(item: ProductDecision) -> dict[str, Any]:
+    return {
+        "ask_hash": item.ask_hash,
+        "ask_id": item.ask_id,
+        "decide_fields": list(item.decide_fields),
+        "decision": item.decision,
+        "options": list(item.options),
+        "product_spec_hash": item.product_spec_hash,
+        "question": item.question,
+        "rationale": item.rationale,
+        "reaction_hash": item.reaction_hash,
+        "reaction_id": item.reaction_id,
+        "recommendation": item.recommendation,
+    }
+
+
+def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> dict[str, Any]:
+    payload = {
+        "check_names": delivery.check_names,
+        "checks": delivery.checks,
+        "code_tree_digest": delivery.code_tree_digest,
+        "content_hash": delivery.content_hash,
+        "files": delivery.files,
+        "id": delivery.id,
+        "invalidation_reason": delivery.invalidation_reason,
+        "known_risks": delivery.known_risks,
+        "product_spec_hash": delivery.product_spec_hash,
+        "revision": delivery.revision,
+        "status": delivery.status,
+        "summary": delivery.summary,
+    }
+    if purpose is not None:
+        payload["purpose"] = purpose
+    return payload
+
+
+def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None:
+    if projection.delivery_spec is not None and projection.delivery_spec.status == "active":
+        return None
+    for item in reversed(projection.delivery_specs):
+        if item.status != "active":
+            return item
+    return None
 
 
 def _tools_for(department: str) -> list[str]:

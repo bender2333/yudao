@@ -15,6 +15,7 @@ from .models import (
     Defect,
     Event,
     EventType,
+    ProductDecision,
     ProductReaction,
     ProductSpec,
     QAReview,
@@ -105,23 +106,27 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.PROPOSAL_REJECTED:
-        state.rejections.append(
-            {
-                "department": event.role,
-                "errors": payload.get("errors", []),
-                "event_id": event.event_id,
-                "phase": event.state_after,
-            }
-        )
+        item = {
+            "department": event.role,
+            "errors": payload.get("errors", []),
+            "event_id": event.event_id,
+            "phase": event.state_after,
+        }
+        state.rejections.append(item)
+        if event.role:
+            state.pending_feedback[event.role] = item
         return
 
     if etype == EventType.SPEC_ACCEPTED:
+        _clear_feedback(state, event.role)
         spec = _product_spec_from_payload(payload, event)
         for existing in state.product_specs:
             if existing.status == "active":
                 state.product_specs[state.product_specs.index(existing)] = replace(existing, status="superseded")
         state.product_specs.append(spec)
         state.product_spec = spec
+        _supersede_active_deliveries(state, "product_spec_changed")
+        _refresh_effective_decisions(state)
         return
 
     if etype == EventType.SPEC_SUPERSEDED:
@@ -134,6 +139,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.ASK_SUBMITTED:
+        _clear_feedback(state, event.role)
         ask = _ask_from_payload(payload, event)
         state.asks.append(ask)
         state.pending_ask = ask
@@ -141,6 +147,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.REACT_SUBMITTED:
+        _clear_feedback(state, event.role)
         reaction = _reaction_from_payload(payload, event)
         state.reactions.append(reaction)
         state.last_reaction = reaction
@@ -149,9 +156,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
         for index, ask in enumerate(state.asks):
             if ask.id == reaction.ask_id:
                 state.asks[index] = replace(ask, status="answered")
+        _refresh_effective_decisions(state)
         return
 
     if etype == EventType.DELIVERY_ACCEPTED:
+        _clear_feedback(state, event.role)
+        _supersede_active_deliveries(state, "replaced")
         delivery = _delivery_from_payload(payload, event)
         state.delivery_specs.append(delivery)
         state.delivery_spec = delivery
@@ -167,11 +177,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.QA_SUBMITTED:
+        _clear_feedback(state, event.role)
         review = _review_from_payload(payload, event)
         state.reviews.append(review)
         state.last_review = review
         if review.verdict in {"rework_product", "rework_engineering"}:
             state.rework_count += 1
+            reason = "qa_rework_product" if review.verdict == "rework_product" else "qa_rework_engineering"
+            _supersede_active_deliveries(state, reason)
         state.evidence.append(
             {
                 "kind": "qa_review",
@@ -320,7 +333,52 @@ def _delivery_from_payload(payload: dict[str, Any], event: Event) -> DeliverySpe
         known_risks=list(payload.get("known_risks", [])),
         code_tree_digest=payload["code_tree_digest"],
         file_refs=[ArtifactRef(**item) if not isinstance(item, ArtifactRef) else item for item in payload.get("file_refs", [])],
+        invalidation_reason=payload.get("invalidation_reason"),
     )
+
+
+def _clear_feedback(state: RunProjection, role: str | None) -> None:
+    if role:
+        state.pending_feedback.pop(role, None)
+
+
+def _supersede_active_deliveries(state: RunProjection, reason: str) -> None:
+    for index, existing in enumerate(state.delivery_specs):
+        if existing.status == "active":
+            state.delivery_specs[index] = replace(existing, status="superseded", invalidation_reason=reason)
+    if state.delivery_spec is not None:
+        state.delivery_spec = None
+
+
+def _refresh_effective_decisions(state: RunProjection) -> None:
+    spec = state.product_spec
+    if spec is None or spec.status != "active":
+        state.effective_decisions = []
+        return
+    asks = {ask.id: ask for ask in state.asks}
+    decisions: list[ProductDecision] = []
+    for reaction in state.reactions:
+        if reaction.produces_new_spec:
+            continue
+        ask = asks.get(reaction.ask_id)
+        if ask is None or ask.product_spec_hash != spec.content_hash:
+            continue
+        decisions.append(
+            ProductDecision(
+                ask_id=ask.id,
+                ask_hash=ask.content_hash,
+                reaction_id=reaction.id,
+                reaction_hash=reaction.content_hash,
+                product_spec_hash=ask.product_spec_hash,
+                question=ask.question,
+                options=list(ask.options),
+                recommendation=ask.recommendation,
+                decide_fields=list(ask.decide_fields),
+                decision=reaction.decision,
+                rationale=reaction.rationale,
+            )
+        )
+    state.effective_decisions = decisions
 
 
 def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:

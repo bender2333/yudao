@@ -102,6 +102,20 @@
 - 真实循环待补齐的关键是主机执行检查并产生可信回执，不能把模型自报退出码作为独立验收证据。Grok 负责工具桥接、进程控制、提案合同与真实循环验证。
 - 修正设计文档的入口歧义：Web 允许提交任务与取消请求，由控制层生成事件；禁止界面直接修改 spec、投影或完成状态。首版仅执行一个活动任务，不引入分布式队列。
 
+## 2026-09-06 - 真实 provider 三部门验收
+
+- 本地没有可安装的 `python/omp-rpc`。adapter 改为独立 stdout/stderr 读队列：超时、中止、进程早退和 stderr 诊断可在静默 stdout 上生效；早退不再记为 completed。诊断会去掉凭据。
+- 部门工具改为 OMP `set_host_tools` / `host_tool_call` / `host_tool_result`，名称与 Yudao 一致。启动带 `--no-tools` 等隔离旗标，禁用 bash/write 内建工具。Product/Quality 没有写工具。
+- `run_check` / `collect_evidence` 由主机在工作区执行 argv，写入 `.checks` 回执；模型自报 `exit_code` 无效。检查子进程不继承 provider 凭据，检查对工作区的改动会回滚，agent 不能读写 `.checks`。
+- 上下文注入各部门 proposal 合同、binding id/hash/版本和校验反馈。跨部门 transcript 与 OMP 自动发现/持久历史被排除。
+- Fake 的检查也走主机进程（隔离的 `SystemExit` 脚本），不直接伪造回执。
+- 真实主 provider 结果（blackrouter / gpt-5.6-terra，未用 fake）：
+  - happy：`run_67e9e1eb3178445d`，`PRODUCT_SPEC -> ENGINEERING -> QUALITY -> DONE`，工程与质量主机检查 exit=0，replay 一致，上下文隔离。
+  - ask：`run_5f7f3e29439f4a93`，工程提交 AskRequest，产品 reply，再实现并质检放行；`-dash` 按产品决定原样回显。
+- 过程中的真实失败已保留：180s 超时、`server_error: overloaded`、空 `spec_update: {}` 被当成完整 spec 拒绝。空对象现视为不改合同。Smoke 部门超时默认 600s。
+- 入口：`python -m harness smoke`。报告：`.yudao/provider-validation/smoke-report.md`。`python -m pytest harness/tests -q` 通过。
+- 局限：happy 路径模型把验收收成了仅 `hello` 的实现；检查允许主机 python，含 `-c`，但仍受工作区回滚和凭据剥离约束。未加入长期记忆、知识图谱或新部门。
+
 ## 2026-09-06 - 第一阶段状态核对与后续路线建议
 
 - 本条来自独立状态核对，时间点为北京时间 03:23；原构建任务仍在继续，结论是当时快照。本轮不修改业务代码或干预真实运行。
@@ -133,8 +147,17 @@
 - 修正路线稿的因果表述：第二阶段可还原事实、发现差异和建立评价基线，不能保证知道失败原因。原因与经验只作为可推翻的候选解释，不自动进入后续部门上下文。
 - 事前预测缺失时保留缺失，不将验收目标或事后解释冒充预测；新增预测提示可能改变运行行为，应视为明确的新执行版本。
 - 衔接重点是保存每轮可重新取回的完整交付；代码哈希或文件列表不足以支持独立复核。实际检查证据、上下文来源和执行版本需清楚标明完整性。
-- 上轮提出的长任务恢复保留为单独设计议题，本次最小观察场景不依赖恢复执行。原 Phase 5 的未完成项继续显式核对，不因设计新阶段而消失。
+- 上轮提出的长任务恢复保留为单独设计议题，本次最小观察场景不依赖恢复执行。设计期间第一阶段 Phase 5 已校正为停止审计与可审计候选；本草案同步此范围，独立评价由第二阶段承担，不把额外蒸馏、Scorer 或恢复执行继续记为第一阶段欠项。
 - 设计草案位于 `docs/stage-2-evidence-and-evaluation-design.md`。首个具体任务族、独立检查和采样口径仍待下一步围绕真实任务确定，未预设固定阈值或新增数据库。
+- 草案审读补充：首个场景使用可确定复现的行为检查；非确定性检查的一次通过不能证明修复，缺乏稳定性证据时仅记录观测序列，不计为已确认回归。
+
+## 2026-09-06 - 真实三部门循环已跑通
+
+- 主 provider blackrouter / gpt-5.6-terra，未用 fake。报告：`.yudao/provider-validation/smoke-report.md`。
+- happy `run_67e9e1eb3178445d`：产品提交 spec，工程写 `src/echo.py` 并由主机执行检查，质检独立再跑检查后 release，进入 DONE。replay 一致，上下文隔离。
+- ask `run_5f7f3e29439f4a93`：工程提交 AskRequest，产品 reply（空 spec_update 视为不改写），工程按产品决定把以 `-` 开头的参数当文本回显，质检独立检查后 DONE。
+- 此前超时、过载和空 spec_update 失败仍留在同一事件库，没有改成成功事件。
+- `python -m pytest harness/tests -q` 在实现后通过。未提交 git，未改 oh-my-pi 源码。
 
 ## 2026-09-06 - 扩大阶段范围的总体重规划
 
@@ -148,3 +171,22 @@
 - 开放性研究可在第二阶段形成可靠证据后并行只读测量和隔离实验，进入执行仍须独立评价；无限 RSI 和模型权重更新均不作为主线阶段完成条件。
 - 本轮检查既有规划和运行材料，没有重跑测试或真实 provider。03:27 是历史快照；构建材料后续仍在更新，不能用单次成功或旧测试数量替代完整 MVP 验收。
 - 执行继续由 Grok Build 承担，Codex 负责架构和验收；按大阶段定义完整结果，按内部工作包小步提交与推送。旧路线中的阶段编号以本轮总体路线图的映射为准。
+
+## 2026-09-06 - 检查证据与输入校验返修
+
+- 检查改为可丢弃工作副本执行，已删除 capture_tree/restore_tree。副本不含 .checks，不以链接形式带入文件。检查改动受测代码时，通过结果绑定观察树哈希，不签发原始快照通过回执。硬链接外部文件不会被检查副本覆写。
+- 回执绑定 product_spec_hash、delivery_spec_hash 与 activation_id。新产品合同或新交付上，旧 QA 回执不能直接 release；当前激活对当前合同真正跑检查后才可放行。
+- 非法 QA payload（checks 中的数字、defects=null）返回字段错误和 proposal_rejected，不抛异常，run 留在 QUALITY，修正后可继续完成。
+- 本批未改 OMP 自动上下文、usage 统计、取消串行化、Ask/React 有效决策内容或 lesson 候选；未改 harness/web 与 __main__.py。未调用真实 provider。
+- python -m pytest harness/tests -q 通过。
+
+## 2026-09-06 - 当前有效产品合同
+
+- 产品合同由控制层投影，不由模型改写。当前有效合同 = 当前 ProductSpec + 绑定在该 spec 上、且未改写 spec 的已回答 Ask/React。
+- 连续两次 accept 且不改 spec 时，工程和质检上下文注入 `current_product_decisions`，包含问题、选项正文、建议、decision 和 rationale；不再只给最后一次 `last_reaction`。
+- 新 ProductSpec 使旧决定离开当前合同。因果链仍只有 id/hash，不注入完整 transcript，也不无条件追加全部 Ask 历史。
+- 交付有效性同样由投影决定：QA 返工、产品改版、新交付替换都会把旧交付标为 superseded，并记下失效原因。`delivery_spec` 只指向当前有效交付。
+- 工程在没有当前有效交付时，只把最近失效交付作为 `prior_delivery` 修复依据，带 status、invalidation_reason 和 purpose=repair_basis。质检只看到当前有效交付。
+- 校验失败反馈只在该部门下一次修正前保留；提案被接受后不再作为当前指令。
+- 未改 OMP adapter、smoke、Web、CLI、lesson 候选、取消或 usage。未调用真实 provider。
+- 测试：`python -m pytest harness/tests/test_context.py harness/tests/test_replay.py harness/tests/test_orchestrator.py -q --cache-clear` 通过（31 passed）。
