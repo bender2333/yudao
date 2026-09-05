@@ -197,7 +197,9 @@ class ProductDecision:
     reaction_hash: str
     product_spec_hash: str
     question: str
+    background: str
     options: list[str]
+    impact: str
     recommendation: str
     decide_fields: list[str]
     decision: str

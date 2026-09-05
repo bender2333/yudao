@@ -39,6 +39,8 @@ def test_replay_survives_ask_and_rework(data_dir):
     assert len(replayed.effective_decisions) == 1
     assert replayed.effective_decisions[0].decision == "accept"
     assert replayed.effective_decisions[0].rationale == "go ahead"
+    assert replayed.effective_decisions[0].background == "The current spec does not mention flags."
+    assert replayed.effective_decisions[0].impact == "Error handling changes the public contract."
     assert [item.status for item in replayed.delivery_specs] == ["superseded", "active"]
     assert replayed.delivery_specs[0].invalidation_reason == "qa_rework_engineering"
     assert replayed.delivery_spec.summary == "v2"

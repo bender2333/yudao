@@ -348,8 +348,10 @@ def _decision_payload(item: ProductDecision) -> dict[str, Any]:
     return {
         "ask_hash": item.ask_hash,
         "ask_id": item.ask_id,
+        "background": item.background,
         "decide_fields": list(item.decide_fields),
         "decision": item.decision,
+        "impact": item.impact,
         "options": list(item.options),
         "product_spec_hash": item.product_spec_hash,
         "question": item.question,

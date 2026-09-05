@@ -177,6 +177,46 @@ def test_two_answered_asks_keep_decision_semantics_for_engineering_and_quality(d
         assert "ASK_CHOICE_CANARY_C" in request.context.prompt_text
 
 
+def test_effective_decision_keeps_ask_background_and_impact(data_dir):
+    adapter = FakeAdapter(
+        [
+            product_spec(),
+            ask_request(
+                question="采用背景中描述的方案吗？",
+                background="Actual required output token is BACKGROUND_CANARY",
+                options=["A: use the described approach", "B: defer"],
+                impact="The required public contract token is IMPACT_CANARY",
+                recommendation="A: use the described approach",
+                decide_fields=["described approach"],
+            ),
+            reaction("accept", "Use option A."),
+            delivery_turn(),
+            review_turn("release", "accepted the described approach"),
+        ]
+    )
+    system = LoopSystem(data_dir, adapter)
+    run_id = system.create_run("build echo", max_cycles=12)
+    projection = system.run_until_stop(run_id)
+    assert projection.phase == "DONE"
+    assert len(projection.effective_decisions) == 1
+    decision = projection.effective_decisions[0]
+    assert decision.background == "Actual required output token is BACKGROUND_CANARY"
+    assert decision.impact == "The required public contract token is IMPACT_CANARY"
+    assert "BACKGROUND_CANARY" not in decision.rationale
+    assert "IMPACT_CANARY" not in decision.rationale
+    engineering = [item for item in adapter.invocations if item.department == "engineering"][-1]
+    quality = [item for item in adapter.invocations if item.department == "quality"][-1]
+    for request in (engineering, quality):
+        decisions = _part(request, "current_product_decisions")
+        assert decisions is not None
+        assert len(decisions) == 1
+        assert decisions[0]["background"] == "Actual required output token is BACKGROUND_CANARY"
+        assert decisions[0]["impact"] == "The required public contract token is IMPACT_CANARY"
+        assert "BACKGROUND_CANARY" in request.context.prompt_text
+        assert "IMPACT_CANARY" in request.context.prompt_text
+        assert "采用背景中描述的方案吗？" in request.context.prompt_text
+
+
 def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
     stale = "ASK_CHOICE_STALE_SHOULD_NOT_LEAK"
     adapter = FakeAdapter(
