@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -157,6 +158,60 @@ def test_timed_out_check_records_timeout_exit_code(tmp_path, monkeypatch):
     assert receipt is not None
     assert receipt.exit_code == 124
     assert "timed out" in receipt.summary
+
+
+@pytest.fixture
+def check_copy_base(tmp_path, monkeypatch):
+    base = tmp_path / "check-copies"
+    base.mkdir()
+    monkeypatch.setattr("harness.workspace.tempfile.tempdir", str(base))
+    return base
+
+
+def test_missing_check_command_does_not_leave_a_copy(tmp_path, check_copy_base):
+    workspace = Workspace(tmp_path / "workspace")
+    runtime = ToolRuntime(workspace)
+    workspace.write_file("ok.py", "print('ok')\n")
+    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["missing.py"]})
+    assert result.ok is False
+    assert "missing.py" in (result.error or "")
+    assert list(check_copy_base.iterdir()) == []
+
+
+def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_copy_base):
+    workspace = Workspace(tmp_path / "workspace")
+    runtime = ToolRuntime(workspace)
+    workspace.write_file("ok.py", "print('ok')\n")
+    original = Path.write_bytes
+
+    def fail_copy(self: Path, data: bytes) -> int:
+        if check_copy_base in self.parents:
+            raise OSError("copy failed")
+        return original(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", fail_copy)
+    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
+    assert result.ok is False
+    assert "copy failed" in (result.error or "")
+    assert list(check_copy_base.iterdir()) == []
+
+
+def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_base):
+    workspace = Workspace(tmp_path / "workspace")
+    runtime = ToolRuntime(workspace)
+    workspace.write_file("ok.py", "print('ok')\n")
+    workspace.write_file("fail.py", "raise SystemExit(7)\n")
+    with workspace.check_copy() as copy_root:
+        assert copy_root.parent == check_copy_base
+        assert not copy_root.is_relative_to(workspace.root)
+    ok = runtime.execute("engineering", "run_check", {"name": "ok", "argv": ["python", "ok.py"]})
+    failed = runtime.execute("engineering", "run_check", {"name": "fail", "argv": ["python", "fail.py"]})
+    assert ok.ok is True
+    assert ok.output["exit_code"] == 0
+    assert failed.ok is True
+    assert failed.output["exit_code"] == 7
+    assert workspace.read_file("ok.py") == "print('ok')\n"
+    assert list(check_copy_base.iterdir()) == []
 
 
 def test_product_cannot_write(tmp_path):

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from .models import CheckReceipt, canonical_hash, json_dumps
 
@@ -127,9 +128,15 @@ class Workspace:
     def digest(self) -> str:
         return tree_digest(self.root)
 
-    def make_check_copy(self) -> Path:
-        """Materialize a disposable regular-file copy. Links are not copied as links."""
-        tmp = Path(tempfile.mkdtemp(prefix="yudao-check-"))
+    @contextmanager
+    def check_copy(self) -> Iterator[Path]:
+        """Yield a disposable regular-file copy. Links are not copied as links."""
+        with tempfile.TemporaryDirectory(prefix="yudao-check-") as tmp:
+            dest = Path(tmp)
+            self._populate_check_copy(dest)
+            yield dest
+
+    def _populate_check_copy(self, dest: Path) -> None:
         root = self.root.resolve()
         for rel in self.list_files():
             src = self.root / rel
@@ -138,10 +145,9 @@ class Workspace:
             resolved = src.resolve()
             if resolved != root and root not in resolved.parents:
                 continue
-            dest = tmp / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(src.read_bytes())
-        return tmp
+            target = dest / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(src.read_bytes())
 
     def record_check(
         self,

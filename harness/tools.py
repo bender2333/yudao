@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shlex
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -122,9 +121,8 @@ class ToolRuntime:
             raise ValueError("check name is required")
         argv = _argv_from_args(args)
         original_digest = self.workspace.digest()
-        copy_root = self.workspace.make_check_copy()
-        resolved = _resolve_argv(self.workspace, argv, cwd=copy_root)
-        try:
+        with self.workspace.check_copy() as copy_root:
+            resolved = _resolve_argv(self.workspace, argv, cwd=copy_root)
             try:
                 completed = subprocess.run(
                     resolved,
@@ -172,8 +170,6 @@ class ToolRuntime:
                 "delivery_spec_hash": receipt.delivery_spec_hash,
                 "activation_id": receipt.activation_id,
             }
-        finally:
-            shutil.rmtree(copy_root, ignore_errors=True)
 
 
 def _argv_from_args(args: dict[str, Any]) -> list[str]:
