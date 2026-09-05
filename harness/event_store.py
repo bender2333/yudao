@@ -1,0 +1,176 @@
+"""SQLite append-only Event Store。唯一事实来源。"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+from pathlib import Path
+from typing import Any, Iterator
+
+from .models import Event, json_dumps, new_id, utc_now
+
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS events (
+    event_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    role TEXT,
+    parent_event_id TEXT,
+    state_before TEXT NOT NULL,
+    state_after TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    artifact_hashes_json TEXT NOT NULL,
+    session_id TEXT,
+    provider TEXT,
+    model TEXT,
+    context_digest TEXT,
+    stop_reason TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(run_id, seq)
+);
+CREATE INDEX IF NOT EXISTS idx_events_run_seq ON events(run_id, seq);
+"""
+
+
+class EventStore:
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+        self._conn = sqlite3.connect(self.path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        with self._lock:
+            self._conn.executescript(SCHEMA)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.commit()
+
+    def append(
+        self,
+        run_id: str,
+        type: str,
+        *,
+        role: str | None = None,
+        parent_event_id: str | None = None,
+        state_before: str,
+        state_after: str,
+        payload: dict[str, Any] | None = None,
+        artifact_hashes: list[str] | None = None,
+        session_id: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        context_digest: str | None = None,
+        stop_reason: str | None = None,
+        error: str | None = None,
+    ) -> Event:
+        event = Event(
+            event_id=new_id("evt"),
+            run_id=run_id,
+            seq=0,
+            type=type,
+            role=role,
+            parent_event_id=parent_event_id,
+            state_before=state_before,
+            state_after=state_after,
+            payload=payload or {},
+            artifact_hashes=list(artifact_hashes or []),
+            session_id=session_id,
+            provider=provider,
+            model=model,
+            context_digest=context_digest,
+            stop_reason=stop_reason,
+            error=error,
+            created_at=utc_now(),
+        )
+        with self._lock:
+            seq = self._next_seq(run_id)
+            event.seq = seq
+            self._conn.execute(
+                """
+                INSERT INTO events (
+                    event_id, run_id, seq, type, role, parent_event_id,
+                    state_before, state_after, payload_json, artifact_hashes_json,
+                    session_id, provider, model, context_digest, stop_reason, error, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.event_id,
+                    event.run_id,
+                    event.seq,
+                    event.type,
+                    event.role,
+                    event.parent_event_id,
+                    event.state_before,
+                    event.state_after,
+                    json_dumps(event.payload),
+                    json_dumps(event.artifact_hashes),
+                    event.session_id,
+                    event.provider,
+                    event.model,
+                    event.context_digest,
+                    event.stop_reason,
+                    event.error,
+                    event.created_at,
+                ),
+            )
+            self._conn.commit()
+        return event
+
+    def list_events(self, run_id: str, *, after_seq: int = 0) -> list[Event]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM events WHERE run_id = ? AND seq > ? ORDER BY seq ASC",
+                (run_id, after_seq),
+            ).fetchall()
+        return [self._from_row(row) for row in rows]
+
+    def get_event(self, event_id: str) -> Event | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
+        return self._from_row(row) if row else None
+
+    def list_run_ids(self) -> list[str]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT run_id, MAX(seq) AS last_seq FROM events GROUP BY run_id ORDER BY MAX(created_at) DESC"
+            ).fetchall()
+        return [row["run_id"] for row in rows]
+
+    def iter_all(self) -> Iterator[Event]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM events ORDER BY run_id, seq").fetchall()
+        for row in rows:
+            yield self._from_row(row)
+
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
+
+    def _next_seq(self, run_id: str) -> int:
+        row = self._conn.execute("SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE run_id = ?", (run_id,)).fetchone()
+        return int(row["seq"]) + 1
+
+    @staticmethod
+    def _from_row(row: sqlite3.Row) -> Event:
+        return Event(
+            event_id=row["event_id"],
+            run_id=row["run_id"],
+            seq=row["seq"],
+            type=row["type"],
+            role=row["role"],
+            parent_event_id=row["parent_event_id"],
+            state_before=row["state_before"],
+            state_after=row["state_after"],
+            payload=json.loads(row["payload_json"]),
+            artifact_hashes=json.loads(row["artifact_hashes_json"]),
+            session_id=row["session_id"],
+            provider=row["provider"],
+            model=row["model"],
+            context_digest=row["context_digest"],
+            stop_reason=row["stop_reason"],
+            error=row["error"],
+            created_at=row["created_at"],
+        )

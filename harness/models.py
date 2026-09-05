@@ -1,0 +1,406 @@
+"""Loop System 领域对象：工件、事件、阶段和停止原因。"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field, is_dataclass
+from datetime import datetime, timezone
+from typing import Any
+from uuid import uuid4
+
+DEPARTMENTS = ("product", "engineering", "quality")
+
+PHASES = (
+    "CREATED",
+    "PRODUCT_SPEC",
+    "ENGINEERING",
+    "ASK_PRODUCT",
+    "PRODUCT_REACT",
+    "DELIVERY",
+    "QUALITY",
+    "REWORK_PRODUCT",
+    "REWORK_ENGINEERING",
+    "DONE",
+    "PAUSED",
+    "FAILED",
+)
+
+TERMINAL_PHASES = frozenset({"DONE", "PAUSED", "FAILED"})
+
+PRODUCT_ACTIVE = frozenset({"PRODUCT_SPEC", "PRODUCT_REACT", "REWORK_PRODUCT", "ASK_PRODUCT"})
+ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
+QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
+
+REACTION_DECISIONS = ("accept", "reply", "reject")
+QA_VERDICTS = ("rework_product", "rework_engineering", "release")
+PROPOSAL_KINDS = (
+    "product_spec",
+    "ask_request",
+    "product_reaction",
+    "delivery_spec",
+    "qa_review",
+)
+
+PAUSED_REASONS = frozenset({"max_cycles", "budget_exhausted"})
+FAILED_REASONS = frozenset(
+    {
+        "provider_error",
+        "provider_unavailable",
+        "cancelled",
+        "context_overflow",
+    }
+)
+
+HUMAN_ACTIONS = {
+    "max_cycles": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。",
+    "budget_exhausted": "token 预算已耗尽。检查 Context/Trace 中的消耗后，提高 token_budget 并新建 run。",
+}
+
+
+class EventType:
+    RUN_CREATED = "run_created"
+    DEPARTMENT_ACTIVATED = "department_activated"
+    CONTEXT_ASSEMBLED = "context_assembled"
+    TOOL_CALLED = "tool_called"
+    PROPOSAL_SUBMITTED = "proposal_submitted"
+    PROPOSAL_REJECTED = "proposal_rejected"
+    SPEC_ACCEPTED = "spec_accepted"
+    SPEC_SUPERSEDED = "spec_superseded"
+    ASK_SUBMITTED = "ask_submitted"
+    REACT_SUBMITTED = "react_submitted"
+    DELIVERY_ACCEPTED = "delivery_accepted"
+    QA_SUBMITTED = "qa_submitted"
+    TRANSITION = "transition"
+    RUN_DONE = "run_done"
+    RUN_PAUSED = "run_paused"
+    RUN_FAILED = "run_failed"
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex[:16]}"
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
+
+
+def _json_default(value: Any) -> Any:
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    if isinstance(value, tuple):
+        return list(value)
+    raise TypeError(f"not json serializable: {type(value)!r}")
+
+
+def canonical_hash(value: Any) -> str:
+    data = json_dumps(value).encode("utf-8")
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def hash_bytes(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return max(1, (len(text) + 3) // 4)
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    kind: str
+    content_hash: str
+    path: str
+    media_type: str | None = None
+
+
+@dataclass(frozen=True)
+class CheckReceipt:
+    name: str
+    department: str
+    exit_code: int
+    summary: str
+    snapshot_hash: str
+
+
+@dataclass(frozen=True)
+class ProductSpec:
+    id: str
+    run_id: str
+    revision: int
+    parent_hash: str | None
+    content_hash: str
+    issuer: str
+    status: str
+    created_event_id: str
+    goal: str
+    requirements: list[str]
+    boundaries: list[str]
+    constraints: list[str]
+    acceptance_criteria: list[str]
+    fatal_conditions: list[str]
+    non_goals: list[str]
+
+
+@dataclass(frozen=True)
+class AskRequest:
+    id: str
+    run_id: str
+    revision: int
+    parent_hash: str | None
+    content_hash: str
+    issuer: str
+    status: str
+    created_event_id: str
+    product_spec_hash: str
+    question: str
+    background: str
+    options: list[str]
+    impact: str
+    recommendation: str
+    decide_fields: list[str]
+
+
+@dataclass(frozen=True)
+class ProductReaction:
+    id: str
+    run_id: str
+    revision: int
+    parent_hash: str | None
+    content_hash: str
+    issuer: str
+    status: str
+    created_event_id: str
+    ask_id: str
+    ask_hash: str
+    decision: str
+    rationale: str
+    produces_new_spec: bool
+    new_spec_hash: str | None
+
+
+@dataclass(frozen=True)
+class DeliverySpec:
+    id: str
+    run_id: str
+    revision: int
+    parent_hash: str | None
+    content_hash: str
+    issuer: str
+    status: str
+    created_event_id: str
+    product_spec_hash: str
+    summary: str
+    files: list[str]
+    check_names: list[str]
+    checks: list[dict[str, Any]]
+    known_risks: list[str]
+    code_tree_digest: str
+    file_refs: list[ArtifactRef]
+
+
+@dataclass(frozen=True)
+class Defect:
+    severity: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class QAReview:
+    id: str
+    run_id: str
+    revision: int
+    parent_hash: str | None
+    content_hash: str
+    issuer: str
+    status: str
+    created_event_id: str
+    product_spec_hash: str
+    delivery_spec_hash: str
+    code_snapshot_hash: str
+    verdict: str
+    rationale: str
+    checks: list[dict[str, Any]]
+    defects: list[Defect]
+    evidence_refs: list[ArtifactRef]
+
+
+@dataclass(frozen=True)
+class ContextSource:
+    source: str
+    version: str | None
+    tokens: int
+    digest: str | None = None
+
+
+@dataclass(frozen=True)
+class ContextExclusion:
+    source: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class ContextManifest:
+    session_id: str
+    department: str
+    activation_id: str
+    injected: list[ContextSource]
+    excluded: list[ContextExclusion]
+    token_estimate: int
+    budget: int
+    digest: str
+    truncated: bool = False
+
+
+@dataclass
+class Event:
+    event_id: str
+    run_id: str
+    seq: int
+    type: str
+    role: str | None
+    parent_event_id: str | None
+    state_before: str
+    state_after: str
+    payload: dict[str, Any]
+    artifact_hashes: list[str]
+    session_id: str | None
+    provider: str | None
+    model: str | None
+    context_digest: str | None
+    stop_reason: str | None
+    error: str | None
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def summary(self) -> dict[str, Any]:
+        payload = self.payload
+        brief = {
+            "kind": payload.get("kind"),
+            "decision": payload.get("decision"),
+            "verdict": payload.get("verdict"),
+            "goal": payload.get("goal"),
+            "question": payload.get("question"),
+            "summary": payload.get("summary"),
+            "from": payload.get("from_phase") or payload.get("from"),
+            "to": payload.get("to_phase") or payload.get("to"),
+            "errors": payload.get("errors"),
+            "human_action": payload.get("human_action"),
+        }
+        return {key: value for key, value in brief.items() if value not in (None, [], {})}
+
+
+@dataclass
+class SessionRecord:
+    session_id: str
+    department: str
+    status: str
+    activations: int = 0
+
+
+@dataclass
+class Usage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    cost: float = 0.0
+    latency_ms: int = 0
+
+
+@dataclass
+class RunProjection:
+    run_id: str = ""
+    task: str = ""
+    phase: str = "CREATED"
+    active_department: str | None = None
+    waiting_reason: str | None = None
+    max_cycles: int = 8
+    token_budget: int = 100_000
+    context_window: int = 32_000
+    cycle_count: int = 0
+    token_used: int = 0
+    cost: float = 0.0
+    latency_ms: int = 0
+    tool_count: int = 0
+    rework_count: int = 0
+    ask_count: int = 0
+    provider: str = "fake"
+    model: str | None = None
+    outcome: str = "running"
+    stop_reason: str | None = None
+    human_action: str | None = None
+    error: str | None = None
+    product_spec: ProductSpec | None = None
+    delivery_spec: DeliverySpec | None = None
+    pending_ask: AskRequest | None = None
+    last_reaction: ProductReaction | None = None
+    last_review: QAReview | None = None
+    sessions: dict[str, SessionRecord] = field(default_factory=dict)
+    product_specs: list[ProductSpec] = field(default_factory=list)
+    delivery_specs: list[DeliverySpec] = field(default_factory=list)
+    asks: list[AskRequest] = field(default_factory=list)
+    reactions: list[ProductReaction] = field(default_factory=list)
+    reviews: list[QAReview] = field(default_factory=list)
+    manifests: list[ContextManifest] = field(default_factory=list)
+    transitions: list[str] = field(default_factory=list)
+    rejections: list[dict[str, Any]] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
+    last_event_id: str | None = None
+    last_seq: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return json.loads(json_dumps(self))
+
+    def canonical_state(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("last_event_id", None)
+        return data
+
+
+def department_for_phase(phase: str) -> str | None:
+    if phase in PRODUCT_ACTIVE:
+        return "product"
+    if phase in ENGINEERING_ACTIVE:
+        return "engineering"
+    if phase in QUALITY_ACTIVE:
+        return "quality"
+    return None
+
+
+def waiting_reason_for(phase: str, stop_reason: str | None = None) -> str | None:
+    if phase == "DONE":
+        return None
+    if phase == "PAUSED":
+        return f"paused:{stop_reason or 'unspecified'}"
+    if phase == "FAILED":
+        return f"failed:{stop_reason or 'unspecified'}"
+    return {
+        "CREATED": "waiting to start product spec",
+        "PRODUCT_SPEC": "product is drafting ProductSpec",
+        "ENGINEERING": "engineering is implementing against the current ProductSpec",
+        "ASK_PRODUCT": "ask submitted; routing to product",
+        "PRODUCT_REACT": "product is reacting to an AskRequest",
+        "DELIVERY": "delivery accepted; routing to quality",
+        "QUALITY": "quality is independently reviewing delivery",
+        "REWORK_PRODUCT": "quality returned work to product",
+        "REWORK_ENGINEERING": "quality returned work to engineering",
+    }.get(phase, phase)
+
+
+def spec_content_hash(kind: str, payload: dict[str, Any], *, parent_hash: str | None, revision: int) -> str:
+    return canonical_hash(
+        {
+            "kind": kind,
+            "parent_hash": parent_hash,
+            "payload": payload,
+            "revision": revision,
+        }
+    )
