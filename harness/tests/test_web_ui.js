@@ -405,7 +405,7 @@ function sampleBoard(extra = {}) {
     max_cycles: 8,
     token_used: 10,
     token_budget: 100000,
-    provider: "fake",
+    provider: extra.provider || "fake",
     task: extra.task || "build echo",
     human_action: "",
     error: "",
@@ -453,6 +453,73 @@ test("ask phase is visible on the product node and fact line", () => {
   assert.match(html, /cycle-node active/);
   assert.match(html, /处理 Ask/);
   assert.match(html, /Ask \/ React/);
+});
+
+test("board shows reported cost and event model, not adapter as vendor", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderBoard(
+    sampleBoard({ provider: "omp" }),
+    { ...emptyAgg, cost: 0.0123 },
+    {},
+    [
+      { seq: 1, model: "" },
+      { seq: 2, model: "acctual-model-v1" },
+      { seq: 3, model: "   " },
+    ],
+  );
+  const html = document.getElementById("board-body").innerHTML;
+  assert.match(html, /<dt>费用<\/dt><dd>0\.0123<\/dd>/);
+  assert.doesNotMatch(html, /\$/);
+  assert.match(html, /<dt>模型<\/dt><dd>acctual-model-v1<\/dd>/);
+  assert.doesNotMatch(html, /should-not-use/);
+  assert.match(html, /<dt>适配器<\/dt><dd>omp<\/dd>/);
+  assert.doesNotMatch(html, /<dt>Provider<\/dt>/);
+});
+
+test("zero missing and invalid cost display as 未上报", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  for (const cost of [0, null, undefined, Number.NaN, Number.POSITIVE_INFINITY, -2, "0.5"]) {
+    web.renderBoard(sampleBoard(), { ...emptyAgg, cost }, {}, []);
+    const html = document.getElementById("board-body").innerHTML;
+    assert.match(html, /<dt>费用<\/dt><dd>未上报<\/dd>/, String(cost));
+  }
+});
+
+test("tiny positive cost is not rounded to zero", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderBoard(sampleBoard(), { ...emptyAgg, cost: 1e-8 }, {}, []);
+  const html = document.getElementById("board-body").innerHTML;
+  assert.match(html, /<dt>费用<\/dt><dd>1e-8<\/dd>/);
+  assert.doesNotMatch(html, /<dt>费用<\/dt><dd>0<\/dd>/);
+  assert.doesNotMatch(html, /<dt>费用<\/dt><dd>未上报<\/dd>/);
+});
+
+test("missing event model is 未上报 and ignores board.model", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderBoard(sampleBoard({ model: "fake-script" }), emptyAgg, {}, [
+    { seq: 1, model: null },
+    { seq: 2, model: "" },
+  ]);
+  const html = document.getElementById("board-body").innerHTML;
+  assert.match(html, /<dt>模型<\/dt><dd>未上报<\/dd>/);
+  assert.doesNotMatch(html, /fake-script/);
+});
+
+test("latest event model follows seq and escapes untrusted text", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  const long = `${"vendor/very-long-model-name-".repeat(6)}<img src=x onerror=alert(1)>`;
+  web.renderBoard(sampleBoard(), emptyAgg, {}, [
+    { seq: 4, model: "later-wrong-order" },
+    { seq: 9, model: long },
+    { seq: 2, model: "early" },
+  ]);
+  const html = document.getElementById("board-body").innerHTML;
+  assert.match(html, /kv-model/);
+  assert.match(html, /vendor\/very-long-model-name-/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.doesNotMatch(html, /later-wrong-order/);
+  assert.doesNotMatch(html, />early</);
 });
 
 test("new-task entry focuses existing input and keeps typed text", () => {

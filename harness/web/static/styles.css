@@ -168,6 +168,7 @@ main { padding: 0 16px; display: flex; flex-direction: column; min-width: 0; }
   overflow-wrap: break-word;
   word-break: normal;
 }
+.kv-model dd { overflow-wrap: anywhere; }
 .task-text { overflow-wrap: break-word; word-break: normal; }
 .pill { display: inline-block; padding: 2px 8px; border: 1px solid var(--line); font-size: 12px; margin-bottom: 10px; }
 .pill.done { color: var(--good); border-color: var(--good); }

@@ -127,8 +127,23 @@ function pill(outcome) {
 
 function kv(entries) {
   return `<dl class="kv">${entries
-    .map(([key, value]) => `<div><dt>${t(key)}</dt><dd>${t(value)}</dd></div>`)
+    .map(([key, value, cls]) => `<div${cls ? ` class="${t(cls, "")}"` : ""}><dt>${t(key)}</dt><dd>${t(value)}</dd></div>`)
     .join("")}</dl>`;
+}
+
+function formatCost(cost) {
+  if (typeof cost !== "number" || !Number.isFinite(cost) || cost <= 0) return "未上报";
+  return String(cost);
+}
+
+function latestEventModel(events) {
+  if (!Array.isArray(events) || !events.length) return "未上报";
+  const ordered = events.slice().sort((a, b) => (Number(a && a.seq) || 0) - (Number(b && b.seq) || 0));
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    const model = ordered[i] && ordered[i].model;
+    if (typeof model === "string" && model.trim()) return model;
+  }
+  return "未上报";
 }
 
 function shortHash(value) {
@@ -294,7 +309,7 @@ async function refreshRun(runId, gen) {
   const seq = ++state.refreshSeq;
   const data = await fetchJSON(`/api/runs/${runId}`);
   if (!stillCurrent(runId, gen, seq)) return null;
-  renderBoard(data.board, data.aggregates, data.timeline);
+  renderBoard(data.board, data.aggregates, data.timeline, data.events);
   renderTimeline(data.timeline);
   renderEvidence(data.evidence);
   renderContext(data.context, data.events, gen);
@@ -394,9 +409,10 @@ function renderCycle(board, timeline) {
   return `<div class="cycle" role="list">${nodes}</div>${factLine}`;
 }
 
-function renderBoard(board, aggregates, timeline) {
+function renderBoard(board, aggregates, timeline, events) {
   const node = document.getElementById("board-body");
   if (!node) return;
+  const agg = aggregates || {};
   node.innerHTML = `
     ${renderCycle(board, timeline || {})}
     ${pill(board.outcome)}
@@ -407,11 +423,13 @@ function renderBoard(board, aggregates, timeline) {
       ["停止原因", board.stop_reason],
       ["循环", `${board.cycle_count} / ${board.max_cycles}`],
       ["Token", `${board.token_used} / ${board.token_budget}`],
-      ["耗时 ms", aggregates.latency_ms],
-      ["工具次数", aggregates.tool_count],
-      ["Ask", aggregates.ask_count],
-      ["返工", aggregates.rework_count],
-      ["Provider", board.provider],
+      ["耗时 ms", agg.latency_ms],
+      ["工具次数", agg.tool_count],
+      ["Ask", agg.ask_count],
+      ["返工", agg.rework_count],
+      ["费用", formatCost(agg.cost)],
+      ["模型", latestEventModel(events), "kv-model"],
+      ["适配器", board.provider],
     ])}
     <p class="task-text">${t(board.task)}</p>
     ${board.human_action ? `<p class="note">${t(board.human_action)}</p>` : ""}
@@ -705,6 +723,8 @@ globalThis.harnessWeb = {
   applyProviderAlert,
   renderBoard,
   renderCycle,
+  formatCost,
+  latestEventModel,
   openCompose,
   closeCompose,
   startRun,

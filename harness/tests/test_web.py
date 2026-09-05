@@ -164,6 +164,9 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
         assert "letter-spacing: 0.04" not in css
         js = request(host, port, "GET", "/static/app.js")[1]
         assert "产品" in js and "工程" in js and "质检" in js
+        assert "适配器" in js
+        assert '["Provider"' not in js
+        assert "未上报" in js
         health = get_json(host, port, "/api/health")
         assert health["ok"] is True
         assert health["adapter"] == "fake"
@@ -552,3 +555,8 @@ def test_web_ui_node_behaviors():
     assert "failed start stays on compose" in output
     assert "scrollBoardIntoView only moves the board on mobile" in output
     assert "desktop successful start does not force-scroll" in output
+    assert "board shows reported cost and event model" in output
+    assert "zero missing and invalid cost" in output
+    assert "tiny positive cost is not rounded to zero" in output
+    assert "missing event model is" in output
+    assert "latest event model follows seq" in output
