@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>循环控制台</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="top">
+    <h1>循环控制台</h1>
+    <div class="header-meta">
+      <p id="provider-alert" class="alert" hidden></p>
+      <p id="exec-alert" class="alert" hidden></p>
+      <p id="status" role="status">空闲</p>
+    </div>
+  </header>
+  <div class="shell">
+    <aside>
+      <form id="task-form" class="task-form">
+        <label for="task">任务</label>
+        <textarea id="task" name="task" required placeholder="描述要完成的任务"></textarea>
+        <div class="budget">
+          <label>循环 <input id="max_cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label>
+          <label>Token <input id="token_budget" name="token_budget" type="number" min="1" step="1" value="100000"></label>
+          <label>窗口 <input id="context_window" name="context_window" type="number" min="1" step="1" value="32000"></label>
+        </div>
+        <div class="actions">
+          <button type="submit" class="icon-btn" id="btn-start" aria-label="开始" title="开始">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path>
+            </svg>
+          </button>
+          <button type="button" class="icon-btn danger" id="btn-cancel" aria-label="取消" title="取消" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+            </svg>
+          </button>
+        </div>
+      </form>
+      <h2>任务</h2>
+      <p class="empty" id="run-empty">还没有任务。</p>
+      <ul id="runs"></ul>
+    </aside>
+    <main>
+      <section id="board" class="view">
+        <h2>运行看板</h2>
+        <div id="board-body" class="muted">选择一个任务。</div>
+      </section>
+      <div class="grid">
+        <section id="timeline" class="view">
+          <h2>规格时间线</h2>
+          <div id="timeline-body" class="muted">等待 spec、ask 与 react。</div>
+        </section>
+        <section id="evidence" class="view">
+          <h2>证据视图</h2>
+          <div id="evidence-body" class="muted">等待交付与质检证据。</div>
+        </section>
+      </div>
+      <section id="context" class="view">
+        <h2>上下文 / 追踪视图</h2>
+        <div id="context-body" class="muted">等待每次激活的上下文清单。</div>
+      </section>
+    </main>
+  </div>
+  <dialog id="event-dialog">
+    <form method="dialog">
+      <h3>事件详情</h3>
+      <pre id="event-json"></pre>
+      <button value="close">关闭</button>
+    </form>
+  </dialog>
+  <script src="/static/app.js"></script>
+</body>
+</html>
