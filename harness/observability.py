@@ -7,13 +7,14 @@
 from __future__ import annotations
 
 import json
+import math
 from collections import defaultdict
 from dataclasses import asdict
 from typing import Any, Iterable
 
 from .artifacts import ArtifactStore
 from .event_store import EventStore
-from .models import ArtifactRef, DEPARTMENTS, Event, EventType, Usage, json_dumps
+from .models import ArtifactRef, DEPARTMENTS, Event, EventType, Usage, canonical_hash, json_dumps
 from .projection import RunNotFoundError, project_run
 from .views import event_card, run_payload
 
@@ -338,16 +339,17 @@ class ObservabilityQuery:
              if event.type == EventType.DEPARTMENT_ACTIVATED and event.role == department),
             None,
         )
-        prompt = projection.department_prompts.get(department)
+        latest_prompt = projection.department_prompts.get(department)
+        prompt = None
         adopted_prompt_version = None if adopted_activation is None else adopted_activation.payload.get("prompt_version")
         adopted_prompt_hash = None if adopted_activation is None else adopted_activation.payload.get("prompt_hash")
-        if adopted_prompt_version is not None or adopted_prompt_hash is not None:
+        if adopted_activation is not None:
             prompt = next(
                 (item for item in reversed(projection.prompt_versions)
                  if item.department == department
                  and (adopted_prompt_version is None or item.version == adopted_prompt_version)
                  and (adopted_prompt_hash is None or item.prompt_ref.content_hash == adopted_prompt_hash)),
-                prompt,
+                None,
             )
         binding = projection.provider_bindings.get(department)
         provider = _department_provider(binding)
@@ -355,12 +357,13 @@ class ObservabilityQuery:
         context_items = []
         for attempt in attempts:
             context_items.append({
-                **_public_attempt(attempt),
-                "attempt_id": attempt.get("id"),
+                "id": attempt.get("id"),
                 "title": f"模型输入 · 第 {attempt.get('attempt') or '?'} 次",
                 "meta": f"{_public_status(attempt)} · {attempt.get('context_event_id') or 'Context 未记录'}",
                 "body": f"Context 快照 {attempt.get('context_event_id') or '未记录'}，对应尝试 {attempt.get('id')}",
                 "snapshot_at": attempt.get("prepared_at"),
+                "status": _public_status(attempt),
+                "stage": attempt.get("status"),
             })
         department_status = (
             "failed" if projection.phase == "FAILED" else
@@ -387,12 +390,17 @@ class ObservabilityQuery:
             "handovers": handovers,
             "contexts": context_items,
             "provider": provider,
-            "prompt": None if prompt is None else {
-                **asdict(prompt),
-                "status": "adopted" if adopted_activation is not None else "pending",
+            "prompt": {
+                "department": department,
+                "version": None if prompt is None else prompt.version,
+                "text": None if prompt is None else prompt.text,
+                "prompt_ref": None if prompt is None else asdict(prompt.prompt_ref),
+                "created_event_id": None if prompt is None else prompt.created_event_id,
+                "status": "adopted" if adopted_activation is not None and prompt is not None else "unknown" if adopted_activation is not None else "pending",
                 "adopted_activation_id": None if adopted_activation is None else adopted_activation.payload.get("activation_id"),
                 "adopted_event_id": None if adopted_activation is None else adopted_activation.event_id,
             },
+            "prompt_latest": None if latest_prompt is None else {**asdict(latest_prompt), "status": "pending"},
         }
 
     def _filtered_attempts(self, run_id: str, *, department: str | None,
@@ -477,18 +485,18 @@ class ObservabilityQuery:
         currency = None
         cost_source = None
         if isinstance(raw, dict):
-            values["input_tokens"] = _number(raw.get("input_tokens"))
+            values["input_tokens"] = _count_value(raw.get("input_tokens"))
             details = raw.get("input_tokens_details")
             if isinstance(details, dict):
-                values["cache_read_tokens"] = _number(details.get("cached_tokens"))
-                values["cache_write_tokens"] = _number(
+                values["cache_read_tokens"] = _count_value(details.get("cached_tokens"))
+                values["cache_write_tokens"] = _count_value(
                     details.get("cache_write_tokens")
                     if "cache_write_tokens" in details else details.get("cache_write")
                 )
-            values["cache_write_tokens"] = values["cache_write_tokens"] if values["cache_write_tokens"] is not None else _number(raw.get("cache_write_tokens"))
-            values["output_tokens"] = _number(raw.get("output_tokens"))
-            values["total_tokens"] = _number(raw.get("total_tokens"))
-            values["cost"] = _number(raw.get("cost"))
+            values["cache_write_tokens"] = values["cache_write_tokens"] if values["cache_write_tokens"] is not None else _count_value(raw.get("cache_write_tokens"))
+            values["output_tokens"] = _count_value(raw.get("output_tokens"))
+            values["total_tokens"] = _count_value(raw.get("total_tokens"))
+            values["cost"] = _cost_value(raw.get("cost"))
             currency = raw.get("currency") or raw.get("cost_currency")
             cost_source = raw.get("cost_source") or ("provider" if values["cost"] is not None else None)
             if values["cost"] is not None and not isinstance(currency, str):
@@ -498,12 +506,14 @@ class ObservabilityQuery:
             # from the raw provider usage object.
             for field in USAGE_FIELDS:
                 if values[field] is None and summary.get(field) is not None:
-                    values[field] = summary[field]
+                    values[field] = _cost_value(summary[field]) if field == "cost" else (
+                        _count_value(summary[field]) if field != "latency_ms" else _count_value(summary[field])
+                    )
             currency = summary.get("currency")
             cost_source = summary.get("cost_source")
             if values["cost"] is not None and not isinstance(currency, str):
                 values["cost"] = None
-        values["latency_ms"] = duration
+        values["latency_ms"] = _count_value(duration)
         return {
             **values,
             "currency": currency if isinstance(currency, str) and currency else None,
@@ -522,11 +532,27 @@ class ObservabilityQuery:
         if event is None:
             return None
         payload = event.payload or {}
+        request = self._artifact_json(run_id, payload.get("request_ref"))
+        if request is not None and payload.get("digest") and canonical_hash(request) != payload.get("digest"):
+            raise ValueError("context request artifact does not match its manifest digest")
+        parts_ref = payload.get("parts_ref")
+        parts = None
+        if parts_ref is not None:
+            if not isinstance(parts_ref, dict):
+                raise ValueError("context parts reference is invalid")
+            if parts_ref.get("content_hash") not in event.artifact_hashes:
+                raise ValueError("context parts artifact is not bound to its event")
+            parts = self._artifact_json(run_id, parts_ref)
+            if not isinstance(parts, list):
+                raise ValueError("context parts artifact is unavailable")
+            _validate_context_parts(parts, payload.get("injected"))
         return {
             "event_id": event.event_id,
             "seq": event.seq,
             "manifest": payload,
-            "request": self._artifact_json(run_id, payload.get("request_ref")),
+            "request": request,
+            "parts": parts,
+            "parts_ref": parts_ref,
             "source_event_ids": [event.event_id],
         }
 
@@ -823,8 +849,16 @@ def _collection_scope() -> dict[str, str]:
     }
 
 
-def _number(value: Any) -> int | float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+def _count_value(value: Any) -> int | None:
+    if isinstance(value, bool) or type(value) is not int or value < 0:
+        return None
+    return value
+
+
+def _cost_value(value: Any) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
 
@@ -859,6 +893,21 @@ def _material_summary(event: Event) -> str:
         EventType.QA_SUBMITTED: payload.get("rationale") or payload.get("verdict") or "已提交质检结果",
     }
     return _short_text(values.get(event.type) or event.type, 1200)
+
+
+def _validate_context_parts(parts: list[Any], injected: Any) -> None:
+    if not isinstance(injected, list) or len(parts) != len(injected):
+        raise ValueError("context parts do not match manifest sources")
+    for part, source in zip(parts, injected):
+        if not isinstance(part, dict) or not isinstance(source, dict):
+            raise ValueError("context part is not a JSON object")
+        if not isinstance(part.get("text"), str) or not isinstance(part.get("source"), str):
+            raise ValueError("context part is missing structured text")
+        digest = part.get("digest")
+        if digest != canonical_hash(part["text"]) or digest != source.get("digest"):
+            raise ValueError("context part digest does not match its manifest")
+        if part.get("source") != source.get("source") or part.get("version") != source.get("version"):
+            raise ValueError("context part identity does not match its manifest")
 
 
 def _handover_title(event: Event) -> str:

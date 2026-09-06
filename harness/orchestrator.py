@@ -769,6 +769,13 @@ class Orchestrator:
             if request.max_output_tokens is not None:
                 request_payload["max_output_tokens"] = request.max_output_tokens
             ref = self.artifacts.put(request.run_id, "model_request", json_dumps(request_payload), media_type="application/json")
+            parts = self._context_parts(assembled)
+            parts_ref = self.artifacts.put(
+                request.run_id,
+                "context_parts",
+                json_dumps(parts),
+                media_type="application/json",
+            )
             payload = asdict(assembled.manifest)
             payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=admitted,
                            tokens_charged=0, step_id=step_id, attempt=attempt, root_step_id=root_step_id,
@@ -776,7 +783,8 @@ class Orchestrator:
                            **self._target_metadata(identity.target, identity.adapter, identity.snapshot_id),
                            effective_context_window=effective_window,
                            input_token_estimate=input_estimate,
-                           output_reserve_tokens=output_reserve)
+                           output_reserve_tokens=output_reserve,
+                           parts_ref=asdict(parts_ref))
             payload.update(attempt_id=attempt_id, logical_call_id=logical_call_id,
                            collaboration_request_id=activation.request_id)
             context_event = self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
@@ -784,12 +792,26 @@ class Orchestrator:
                                               state_after=current.phase, session_id=request.session_id,
                                               provider=self._configured_provider(identity.target, identity.adapter),
                                               context_digest=assembled.manifest.digest,
-                                              artifact_hashes=[ref.content_hash], payload=payload)
+                                              artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload)
             request.context_event_id = context_event.event_id
             if overflow:
                 self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
                 return None
             return request
+
+    @staticmethod
+    def _context_parts(assembled: Any) -> list[dict[str, Any]]:
+        parts = list(getattr(assembled, "parts", []) or [])
+        injected = list(getattr(assembled.manifest, "injected", []) or [])
+        if len(parts) != len(injected):
+            raise ProviderError("assembled context sources do not match its manifest", reason="provider_protocol")
+        result = []
+        for part, source in zip(parts, injected):
+            digest = canonical_hash(part.text)
+            if source.digest != digest:
+                raise ProviderError("assembled context source digest is inconsistent", reason="provider_protocol")
+            result.append({"source": part.source, "version": part.version, "text": part.text, "digest": digest})
+        return result
 
     def _department_history_records(self, run_id: str, department: str) -> list[dict[str, Any]]:
         events = self.store.list_events(run_id)

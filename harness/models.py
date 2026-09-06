@@ -390,6 +390,7 @@ class ContextManifest:
     prompt_hash: str | None = None
     input_token_estimate: int | None = None
     output_reserve_tokens: int = 0
+    parts_ref: dict[str, Any] | None = None
 
 
 @dataclass

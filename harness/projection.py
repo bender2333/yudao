@@ -486,6 +486,7 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         prompt_hash=payload["prompt_hash"],
         input_token_estimate=payload.get("input_token_estimate"),
         output_reserve_tokens=int(payload.get("output_reserve_tokens", payload.get("max_output_tokens") or 0)),
+        parts_ref=payload.get("parts_ref"),
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],
