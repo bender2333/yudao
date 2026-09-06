@@ -16,10 +16,12 @@ class ProviderError(Exception):
         message: str,
         *,
         reason: str = "provider_error",
+        retryable: bool = False,
         diagnostics: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.reason = reason
+        self.retryable = retryable
         self.diagnostics = diagnostics
 
 
@@ -60,6 +62,9 @@ class ModelRequest:
     input_version: int = 0
     prompt_version: int = 0
     prompt_hash: str | None = None
+    attempt: int = 1
+    root_step_id: int | None = None
+    retry_of_step_id: int | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:

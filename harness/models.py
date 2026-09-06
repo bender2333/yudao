@@ -71,6 +71,8 @@ class EventType:
     CONTEXT_ASSEMBLED = "context_assembled"
     MODEL_MESSAGE = "model_message"
     MODEL_REQUESTED = "model_requested"
+    MODEL_ATTEMPT_FAILED = "model_attempt_failed"
+    MODEL_RETRY_SCHEDULED = "model_retry_scheduled"
     COMPACTION_RECORDED = "compaction_recorded"
     TOOL_CALLED = "tool_called"
     TOOL_STARTED = "tool_started"

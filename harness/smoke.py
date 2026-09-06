@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
@@ -24,6 +25,10 @@ from .tree_archive import load_tree
 
 
 DEFAULT_DIR = Path(".yudao") / "native-validation"
+
+MODEL_ATTEMPT_FAILED = EventType.MODEL_ATTEMPT_FAILED
+MODEL_RETRY_SCHEDULED = EventType.MODEL_RETRY_SCHEDULED
+RETRY_EVENTS = frozenset({MODEL_ATTEMPT_FAILED, MODEL_RETRY_SCHEDULED})
 
 HAPPY_TASK = (
     "Implement a local Python CLI at src/echo.py. "
@@ -420,12 +425,18 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     compacting: dict[tuple[str, int], dict[str, Any]] = {}
     checkpoints: dict[tuple[Any, ...], dict[str, Any]] = {}
     attempted: set[tuple[str, int]] = set()
+    failed_steps: set[tuple[str, int]] = set()
+    failed_attempts: dict[tuple[str, int], dict[str, Any]] = {}
+    step_meta: dict[tuple[str, int], dict[str, Any]] = {}
+    retry_schedules: dict[tuple[str, int], dict[str, Any]] = {}
     intend_bytes = b""
     received_version = 0
     prompt_versions: dict[str, int] = {}
     current_work = RunProjection()
     assembler = ContextAssembler()
-    for event in store.list_events(run_id):
+    events = store.list_events(run_id)
+    has_retry_evidence = any(event.type in RETRY_EVENTS for event in events)
+    for event in events:
         try:
             apply_event(current_work, event)
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
@@ -485,7 +496,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
-                              EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED}:
+                              EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                              *RETRY_EVENTS}:
             continue
         try:
             if not activation or not event.role or not event.session_id:
@@ -500,6 +512,70 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if event.type == EventType.TOOL_STARTED or (
                 event.type == EventType.TOOL_CALLED and payload.get("name") == "provider_usage"
             ):
+                continue
+            if event.type in RETRY_EVENTS:
+                # A late failure describes the request that was already admitted.  The
+                # user may have cancelled, appended input, or closed an expert request
+                # before the provider reported that failure, so its adopted work basis
+                # must be checked against the activation only.  A retry schedule is a
+                # new decision and therefore must still match the current projection.
+                for field in work_basis:
+                    value = basis[field]
+                    if field not in payload or payload[field] != value:
+                        raise ValueError(f"{field} does not match the activation basis")
+                    if event.type == MODEL_RETRY_SCHEDULED and work_basis[field] != value:
+                        raise ValueError(f"{field} does not match the activation and current work")
+                step = payload.get("step_id")
+                if type(step) is not int or step <= 0:
+                    raise ValueError("retry event has an invalid step_id")
+                key = (activation, step)
+                meta = step_meta.get(key)
+                if meta is None:
+                    raise ValueError("retry event does not match a prepared model step")
+                if "attempt" not in payload:
+                    raise ValueError("retry event is missing attempt")
+                attempt = payload["attempt"]
+                if type(attempt) is not int or attempt != meta["attempt"] or not 1 <= attempt <= 3:
+                    raise ValueError("retry event attempt does not match its model step")
+                max_attempts = payload.get("max_attempts")
+                if type(max_attempts) is not int or max_attempts != 3:
+                    raise ValueError("retry event has an invalid max_attempts")
+                for field in ("root_step_id", "retry_of_step_id"):
+                    expected = meta[field]
+                    if field not in payload or payload[field] != expected:
+                        raise ValueError(f"retry event {field} does not match its model step")
+                if event.type == MODEL_ATTEMPT_FAILED:
+                    if key not in attempted or key in failed_steps:
+                        raise ValueError("attempt failure does not match one unique model request")
+                    failed_steps.add(key)
+                    failed_attempts[key] = {**payload, "_context_digest": event.context_digest}
+                    compacting.pop(key, None)
+                    histories[event.role] = [
+                        record for record in histories.get(event.role, [])
+                        if record["type"] == EventType.DEPARTMENT_INPUT
+                        or (record["activation_id"], record["step_id"]) != key
+                    ]
+                    if payload.get("retryable") not in {True, False}:
+                        raise ValueError("attempt failure must record retryable")
+                else:
+                    failure = failed_attempts.get(key)
+                    if failure is None:
+                        raise ValueError("retry schedule does not follow a failed model step")
+                    next_step = payload.get("next_step_id")
+                    delay = payload.get("delay_sec")
+                    if type(next_step) is not int or next_step != step + 1:
+                        raise ValueError("retry schedule does not point to the next model step")
+                    if (type(delay) not in {int, float} or not math.isfinite(delay)
+                            or delay < 0 or delay > 60):
+                        raise ValueError("retry schedule has an invalid delay_sec")
+                    next_attempt = payload.get("next_attempt")
+                    if (payload.get("retryable") is not True or failure.get("retryable") is not True
+                            or attempt >= max_attempts or next_attempt != attempt + 1
+                            or payload.get("purpose") != failure.get("purpose")
+                            or event.context_digest != failure.get("_context_digest")
+                            or (activation, next_step) in retry_schedules):
+                        raise ValueError("retry schedule has an invalid retryability or attempt")
+                    retry_schedules[(activation, next_step)] = payload
                 continue
             if event.type in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED,
                               EventType.MODEL_REQUESTED, EventType.COMPACTION_RECORDED}:
@@ -530,6 +606,29 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if type(step) is not int or step != steps.get(activation, 0) + 1:
                     raise ValueError("model steps are missing, duplicated, or out of order")
                 steps[activation] = step
+                previous_key = (activation, step - 1)
+                retry_schedule = retry_schedules.pop((activation, step), None)
+                attempt = payload.get("attempt", 1)
+                root_step_id = payload.get("root_step_id", step)
+                retry_of_step_id = payload.get("retry_of_step_id")
+                if retry_schedule is not None:
+                    failure = failed_attempts.get(previous_key)
+                    expected_attempt = (failure or {}).get("attempt", 0) + 1
+                    expected_root = (failure or {}).get("root_step_id", step - 1)
+                    if failure is None or payload.get("purpose") != failure.get("purpose"):
+                        raise ValueError("retry context purpose does not match the failed model step")
+                    if attempt != expected_attempt:
+                        raise ValueError("retry context has a non-sequential attempt")
+                    if retry_of_step_id != step - 1 or root_step_id != expected_root:
+                        raise ValueError("retry context is not linked to the failed step")
+                elif attempt != 1 or root_step_id != step or retry_of_step_id is not None:
+                    raise ValueError("new model step has invalid retry metadata")
+                if type(attempt) is not int or not 1 <= attempt <= 3:
+                    raise ValueError("model step has an invalid attempt")
+                step_meta[(activation, step)] = {
+                    "attempt": attempt, "root_step_id": root_step_id,
+                    "retry_of_step_id": retry_of_step_id,
+                }
                 ref = payload.get("request_ref") or {}
                 if ref.get("content_hash") not in event.artifact_hashes:
                     raise ValueError("request artifact is not bound to its event")
@@ -600,6 +699,21 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         or event.context_digest != digests[activation] or key in attempted
                         or payload.get("attempted") is not True or payload.get("purpose") != purposes[activation]):
                     raise ValueError("model request attempt does not match a unique prepared input")
+                meta = step_meta.get(key)
+                if meta is None:
+                    raise ValueError("model request has no prepared attempt metadata")
+                if has_retry_evidence:
+                    for field in ("attempt", "max_attempts", "root_step_id", "retry_of_step_id"):
+                        if field not in payload:
+                            raise ValueError(f"model request is missing retry metadata: {field}")
+                    if type(payload["max_attempts"]) is not int or payload["max_attempts"] != 3:
+                        raise ValueError("model request has an invalid max_attempts")
+                if "attempt" in payload and payload["attempt"] != meta["attempt"]:
+                    raise ValueError("model request attempt does not match its prepared step")
+                if "root_step_id" in payload and payload["root_step_id"] != meta["root_step_id"]:
+                    raise ValueError("model request root_step_id does not match its prepared step")
+                if "retry_of_step_id" in payload and payload["retry_of_step_id"] != meta["retry_of_step_id"]:
+                    raise ValueError("model request retry_of_step_id does not match its prepared step")
                 attempted.add(key)
             elif event.type == EventType.COMPACTION_RECORDED:
                 key = (activation, payload.get("step_id"))
@@ -612,6 +726,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if (activation not in steps or payload.get("step_id") != steps[activation]
                         or (activation, steps[activation]) not in attempted or payload.get("purpose") != purposes[activation]):
                     raise ValueError("model/tool output is not bound to its model step")
+                if (activation, steps[activation]) in failed_steps:
+                    raise ValueError("failed model step produced output after its failure was recorded")
                 if event.type == EventType.MODEL_MESSAGE:
                     item = _read_artifact(artifacts, run_id, payload["message_ref"])
                     if purposes[activation] == "compaction":
@@ -629,14 +745,25 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 histories.setdefault(event.role, []).append(_history_record(event, item))
         except (AttributeError, IndexError, KeyError, TypeError, ValueError, OSError) as exc:
             notes.append(f"event {event.seq}: {exc}")
+    prepared_keys = set(step_meta)
+    unrequested = prepared_keys - attempted
+    orphaned = attempted - prepared_keys
+    if orphaned:
+        notes.append(f"model request has no prepared model step: {sorted(orphaned)}")
     if not attempted:
         notes.append("no model request attempts recorded")
     return {
         "status": "unverified" if notes else "verified",
         "request_count": len(attempted),
-        "prepared_count": sum(steps.values()),
+        "attempt_count": len(attempted),
+        "retry_count": sum(step_meta[key]["attempt"] > 1 for key in attempted),
+        "logical_request_count": len({(activation, step_meta[(activation, step)]["root_step_id"])
+                                       for activation, step in attempted}),
+        "prepared_count": len(step_meta),
+        "unrequested_count": len(unrequested),
+        "orphaned_request_count": len(orphaned),
         "activation_count": len(steps),
-        "compaction_count": sum(event.type == EventType.COMPACTION_RECORDED for event in store.list_events(run_id)),
+        "compaction_count": sum(event.type == EventType.COMPACTION_RECORDED for event in events),
         "notes": notes,
     }
 
@@ -765,6 +892,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- manifest boundary: `{scenario.get('manifest_boundary')}`",
                 f"- model input audit: `{(scenario.get('model_input_audit') or {}).get('status', 'unverified')}`",
                 f"- model requests: `{(scenario.get('model_input_audit') or {}).get('request_count', 0)}`",
+                f"- model attempts: `{(scenario.get('model_input_audit') or {}).get('attempt_count', 0)}` retries: `{(scenario.get('model_input_audit') or {}).get('retry_count', 0)}`",
                 f"- context isolated: `{scenario.get('context_isolated')}`",
                 f"- host receipts verified: `{scenario.get('check_receipts_verified')}`",
                 f"- delivery archive: `{(scenario.get('delivery_archive') or {}).get('status', 'unverified')}`",

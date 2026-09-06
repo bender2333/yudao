@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const APP_JS = fs.readFileSync(path.join(__dirname, "..", "web", "static", "app.js"), "utf8");
+const STYLES_CSS = fs.readFileSync(path.join(__dirname, "..", "web", "static", "styles.css"), "utf8");
 
 function makeClassList() {
   const names = new Set();
@@ -426,6 +427,7 @@ function sampleBoard(extra = {}) {
     request_count: extra.request_count || 0,
     pending_request: extra.pending_request || null,
     rework_count: extra.rework_count || 0,
+    retry: extra.retry || null,
   };
 }
 
@@ -683,6 +685,65 @@ test("done cycle marks quality and records completion", () => {
   assert.match(html, /cycle-node done/);
   assert.match(html, /已完成/);
   assert.match(html, /产品/);
+});
+
+test("retry state shows failed attempt, next attempt, and escapes provider error", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderBoard(sampleBoard({ retry: {
+    status: "waiting", department: "engineering", attempt: 1, max_attempts: 3,
+    next_attempt: 2, delay_sec: 2, last_error: '<provider failure>',
+  } }), emptyAgg, {});
+  const html = document.getElementById("board-body").innerHTML;
+  assert.match(html, /第 1\/3 次尝试失败/);
+  assert.match(html, /2 秒后进行第 2\/3 次尝试/);
+  assert.match(html, /&lt;provider failure&gt;/);
+  assert.doesNotMatch(html, /<provider failure>/);
+});
+
+test("terminal phase takes precedence over stale retry status", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  const retry = {
+    status: "waiting", department: "engineering", attempt: 1, max_attempts: 3,
+    next_attempt: 2, delay_sec: 2,
+  };
+  const done = sampleBoard({ phase: "DONE", outcome: "done", retry });
+  web.renderBoard(done, emptyAgg, {});
+  assert.doesNotMatch(document.getElementById("board-body").innerHTML, /尝试失败|请求中|进行第/);
+  web.applyRunStatus({
+    board: done,
+    events: [],
+  }, null);
+  assert.equal(document.getElementById("status").textContent, "已完成 run-a");
+
+  const paused = sampleBoard({ phase: "PAUSED", outcome: "paused", retry });
+  web.renderBoard(paused, emptyAgg, {});
+  assert.doesNotMatch(document.getElementById("board-body").innerHTML, /尝试失败|请求中|进行第/);
+});
+
+test("retry event card shows escaped failure and backoff", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderContext({ manifests: [], compactions: [] }, [{
+    event_id: "retry-event", seq: 4, type: "model_attempt_failed", role: "engineering",
+    state_before: "ENGINEERING", state_after: "ENGINEERING", attempt: 1, max_attempts: 3,
+    reason: "provider_error", error: '<connection failure>', retryable: true,
+  }], 0);
+  const html = document.getElementById("context-body").innerHTML;
+  assert.match(html, /模型尝试失败 · 第 1\/3 次尝试/);
+  assert.match(html, /&lt;connection failure&gt;/);
+  assert.doesNotMatch(html, /<connection failure>/);
+});
+
+test("long rejection details stay within the mobile content width", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderEvidence({
+    deliveries: [], reviews: [],
+    rejections: [{ department: "engineering", phase: "ENGINEERING", errors: [{
+      field: "reason", message: "an adjusted plan must explain the changed requirements and include a sufficiently long validation detail to exercise mobile wrapping",
+    }] }],
+    lesson_candidates: [],
+  });
+  assert.match(document.getElementById("evidence-body").innerHTML, /<pre>/);
+  assert.match(STYLES_CSS, /pre \{[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/);
 });
 
 test("consultation shows actual recipient and the work to return to without a special phase", () => {

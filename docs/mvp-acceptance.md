@@ -124,9 +124,26 @@ Web 两版交付的 Git 文件与封存字节一致，最终交付从持久封�
 
 ### H 模型等待与重试验收
 
-用户新增 D17 后，在 `95ba279` 上扩展原生内核的失败重试，实施中。验收需分别证明：约一分钟的慢响应可以正常等待；瞬时失败可在有界重试后继续；取消和新增输入能阻止旧请求重发；失败部分输出保留证据但不执行工具、不进入后续部门历史或摘要；实际调用、用量、上下文来源和 Web 状态一致。
+用户新增 D17 后，原生内核新增最多 3 次尝试，默认退避 1 秒、2 秒；有效 Retry-After 最多 60 秒。单次默认等待 600 秒，每个实际尝试计入既有 32 次模型步骤上限，不增加独立逻辑请求总时间预算。Responses adapter 只执行单次请求与错误分类，SDK 自动重试为 0。失败部分输出和用量即时留存，失败步骤从有效历史、摘要和工具执行排除。
 
-此前 F 的 TLS EOF 与无重试事实保留原记录。新基线需严格使用当前 provider.md 做真实 Web 方向调整和小窗压缩至独立 QA，成功的独立诊断不能冒充原任务恢复。确定性验证和真实验证的结果分别追加于本节，不预填通过。
+本地 SSE 实际延迟 65 秒，默认超时下 67.068 秒成功，仅 1 次请求、0 次重试。报告 `.tmp/native-provider-timeout-boundary-20260906T080150Z.json` 证明超过一分钟仍正常等待，不冒称外部 provider 的慢响应证据。
+
+本轮真实调用继续严格使用当前 `provider.md`：`https://penguinapi.org/v1`、`gpt-5.6-luna`、Responses、单次 600 秒。密钥未写入报告，旧失败 run 未恢复。真实场景使用当时未提交的 H 源码，之后独立审查继续修正上下文重新装配、响应接纳顺序与审计；因此这些运行不能冒称最终提交源码的完整验收。
+
+| 场景 | 证据 | 实际结果 |
+| --- | --- | --- |
+| 真实小窗 | `.yudao/stage1-retry-compaction-20260906T083307Z/compaction-smoke-report.json`，`run_8743dd750c0d43b1` | 24 次实际请求、19 次成功响应、13 次压缩、4 次自动重试；两次连接中断通过重试恢复，最后压缩请求连续 3 次连接失败。未形成 PRD、交付或 QA |
+| 真实 Web 方向调整 | `.tmp/native-f-browser-run_9c12dcee13724a52.json`，`run_9c12dcee13724a52` | 14 次实际请求、3 次失败、2 次重试；追加原文 v2 已处理、PRD 形成两版，只有一版计划与交付。第二版需求后的工程请求连续 3 次连接失败，未形成最终 QA |
+
+真实 Web 终态在桌面 1440 与手机 390 显示第 3/3 次尝试失败，没有残留等待重试。手机正文换行后无横向溢出，未见浏览器页面或控制台错误。只读截图为 `.tmp/native-f-retry-run_9c12dcee13724a52-desktop.png`、`.tmp/native-f-retry-run_9c12dcee13724a52-mobile-after-css.png`，主 agent 已目检。原始脚本因未达 DONE 的失败报告保留。
+
+收尾独立复验 `test_responses.py`、`test_retry_input_boundaries.py`、`test_activation_accounting.py` 共 56 项通过；子 agent 的 engine、activation responses、compaction、context、responses、retry 六文件组合 86 项通过，退出码 0、耗时 187.19 秒。随后主 agent 独立复验新增审计与 Web retry 视图，共 13 项通过。各组有重复用例，不相加成完整回归总数。覆盖错误分类、真实 SDK 本地请求、压缩重试、工具错误反馈、取消和追加输入交错、32 次步骤限制及真实 provider/model 身份保留。本批代码实现与 F 完整真实验收分开记录。
+
+修复输入审计中重试 `max_attempts` 检查的错误缩进，并补真实内核重试事件用例；新增 11 项与原 `test_smoke.py` 的 63 项全部通过。缺失关联、错误次数或失败后残余输出不能取得 verified。已准备但因取消或新输入未发出的请求单独计数，不直接判作缺失调用。两场真实数据只读重审另存 `.tmp/native-provider-result-audit-stage1-retry-compaction-20260906T083307Z-r2.json` 与 `.tmp/native-provider-result-audit-stage1-retry-web-20260906-165258176.json`：原文、实际模型、Git、replay、输入来源及尝试链 verified，小窗 13 次摘要来源亦通过，审计前后事件未改变。Web 只有旧交付，不能将其当作大写新要求的最终交付；小窗没有交付，缺少最终主机检查及 QA，报告整体仍为 `provider_failed / ok=false`。
+
+确定性浏览器报告 `.tmp/native-h-retry-browser.json` 通过：等待期间在手机取消返回 200，任务 `run_1cecfed1276f440f` 停止；手机追加输入返回 201，任务 `run_e925b1b759944815` 处理 v2 后经独立 QA 到 DONE。桌面/手机等待与终态均无页面错误或溢出，DONE/PAUSED 正文不再保留旧等待状态。主 agent 目检代表截图，并独立运行 `node --test harness/tests/test_web_ui.js`，50/50 通过。
+
+最终源码服务在 8774、PID 13076，数据目录 `.yudao/stage1-retry-final-20260906`，当前 provider.md 配置、单次 600 秒；健康检查正常、空闲且无 worker error。重启本轮旧 8773 服务的操作被自动审批拒绝，理由为 `blocked by policy`；原进程和真实证据保留，改用空闲端口和独立目录，未重试被拒操作。
 
 ## 第一阶段完整目标
 

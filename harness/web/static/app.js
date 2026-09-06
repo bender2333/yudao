@@ -392,7 +392,20 @@ function applyRunStatus(data, health) {
   if (board.phase === "DONE") setStatus("idle", `已完成 ${board.run_id}`);
   else if (board.phase === "FAILED") setStatus("error", board.error || board.stop_reason || "失败");
   else if (board.phase === "PAUSED") setStatus("conflict", board.human_action || board.stop_reason || "已暂停");
-  else setStatus("running", `${board.phase} · ${board.active_department || ""}`);
+  else {
+    const retry = board.retry;
+    if (retry?.status === "waiting") {
+      const delay = retry.delay_sec === null || retry.delay_sec === undefined ? "" : `${t(retry.delay_sec)} 秒后`;
+      const next = retry.next_attempt || (Number(retry.attempt) + 1);
+      setStatus("running", `${board.phase} · ${departmentLabel(retry.department)} · 第 ${t(retry.attempt)}/${t(retry.max_attempts || 3)} 次尝试失败，${delay || "稍后"}进行第 ${t(next)} 次`);
+      return;
+    }
+    if (retry?.status === "prepared" || retry?.status === "requesting") {
+      setStatus("running", `${board.phase} · ${departmentLabel(retry.department)} · 第 ${t(retry.attempt)}/${t(retry.max_attempts || 3)} 次尝试`);
+      return;
+    }
+    setStatus("running", `${board.phase} · ${board.active_department || ""}`);
+  }
 }
 
 const CYCLE_NODES = [
@@ -467,6 +480,35 @@ function renderCycle(board, timeline) {
   return `<div class="cycle" role="list">${nodes}</div>${factLine}`;
 }
 
+function retryAttemptText(retry) {
+  if (!retry || retry.attempt === null || retry.attempt === undefined) return "模型尝试";
+  const max = retry.max_attempts || 3;
+  return `第 ${t(retry.attempt)}/${t(max)} 次尝试`;
+}
+
+function retrySummary(retry) {
+  if (!retry || !retry.status || retry.status === "idle" || retry.status === "active") return "";
+  const department = retry.department ? `${departmentLabel(retry.department)} · ` : "";
+  const attempt = retryAttemptText(retry);
+  if (retry.status === "waiting") {
+    const delay = retry.delay_sec === null || retry.delay_sec === undefined ? "" : `${t(retry.delay_sec)} 秒后`;
+    const error = retry.last_error ? ` · ${t(retry.last_error)}` : "";
+    const next = retry.next_attempt || (Number(retry.attempt) + 1);
+    return `<p class="note retry-state">${department}${attempt}失败，${delay || "稍后"}进行第 ${t(next)}/${t(retry.max_attempts || 3)} 次尝试${error}</p>`;
+  }
+  if (retry.status === "prepared") {
+    return `<p class="note retry-state">${department}${attempt}已准备，等待请求</p>`;
+  }
+  if (retry.status === "requesting") {
+    return `<p class="note retry-state">${department}${attempt}请求中</p>`;
+  }
+  if (retry.status === "cancelled") {
+    return `<p class="note retry-state">${department}${attempt}已取消${retry.last_error ? ` · ${t(retry.last_error)}` : ""}</p>`;
+  }
+  const error = retry.last_error ? ` · ${t(retry.last_error)}` : "";
+  return `<p class="note retry-state">${department}${attempt}失败，未安排重试${error}</p>`;
+}
+
 function renderBoard(board, aggregates, timeline, events) {
   const node = document.getElementById("board-body");
   if (!node) return;
@@ -475,8 +517,10 @@ function renderBoard(board, aggregates, timeline, events) {
       waiting_reason: "", pending_request: null };
   }
   const agg = aggregates || {};
+  const visibleRetry = board.phase === "DONE" || board.phase === "PAUSED" ? null : board.retry;
   node.innerHTML = `
     ${renderCycle(board, timeline || {})}
+    ${retrySummary(visibleRetry)}
     ${pill(board.outcome)}
     ${kv([
       ["阶段", board.phase],
@@ -820,11 +864,22 @@ function renderContext(context, events, gen) {
     .slice(-12)
     .reverse()
     .map(
-      (event) => `
+      (event) => {
+        const retry = event.type === "model_attempt_failed" || event.type === "model_retry_scheduled";
+        const attempt = event.attempt === null || event.attempt === undefined
+          ? "" : ` · 第 ${t(event.attempt)}/${t(event.max_attempts || 3)} 次尝试`;
+        const retryText = event.type === "model_attempt_failed"
+          ? `模型尝试失败${attempt}${event.reason ? ` · ${t(event.reason)}` : ""}${event.error ? ` · ${t(event.error)}` : ""}`
+          : event.type === "model_retry_scheduled"
+            ? `已安排重试${attempt}${event.delay_sec === null || event.delay_sec === undefined ? "" : ` · 退避 ${t(event.delay_sec)} 秒`}${event.next_step_id === null || event.next_step_id === undefined ? "" : ` · 下一步 ${t(event.next_step_id)}`}`
+            : "";
+        return `
     <article class="item event" data-id="${t(event.event_id)}">
       <header><span>${t(event.seq)}. ${t(event.type)}</span><span>${t(event.role, "")}</span></header>
       <p class="muted">${t(event.state_before)} → ${t(event.state_after)}</p>
-    </article>`,
+      ${retry ? `<p class="note retry-state">${retryText}</p>` : ""}
+    </article>`;
+      },
     )
     .join("");
   node.innerHTML = `
@@ -1132,6 +1187,7 @@ globalThis.harnessWeb = {
   stopWorkerWatch,
   syncWorkerWatch,
   syncButtons,
+  applyRunStatus,
   applyExecAlert,
   applyProviderAlert,
   renderBoard,

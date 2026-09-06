@@ -1,6 +1,7 @@
 """Exercise the official SDK against local HTTP/SSE, without a model service."""
 
 import json
+import socket
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -9,12 +10,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Event, Thread
 
 import pytest
+import httpx
+from openai import APIConnectionError
 
 from harness.adapters.base import ModelRequest, ProviderError
 from harness.adapters.responses import ResponsesAdapter, ResponsesConfig
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
+from harness.proposals import product_spec
+from harness.runtime import LoopSystem
 
 
 KEY = "local-sdk-test-key"
@@ -28,6 +33,20 @@ RAW_USAGE = {"input_tokens": 100, "output_tokens": 30, "total_tokens": 130,
 TOOLS = [{"type": "function", "name": "read_file", "description": "Read a file",
           "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
           "strict": False}]
+
+
+def _submit_stream(response_id="resp-submit"):
+    proposal = product_spec()
+    proposal.pop("kind")
+    call = {
+        "id": "fc-submit",
+        "type": "function_call",
+        "name": "submit_product_spec",
+        "call_id": "call-submit",
+        "arguments": json.dumps(proposal),
+        "status": "completed",
+    }
+    return _stream([call], response_id=response_id)
 
 
 def _request(*, session_id="session", observations=None, history=None):
@@ -145,6 +164,43 @@ def test_sdk_sends_exact_host_context_and_preserves_stateless_tool_protocol(tmp_
         assert captures[1]["input"][-3:] == history
 
 
+@pytest.mark.parametrize("failure_kind", ["connection", "timeout", "429", "500", "partial_stream"])
+def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path, monkeypatch, failure_kind):
+    import harness.engine as engine
+
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+
+    def failure(handler, _body):
+        if failure_kind == "connection":
+            handler.connection.shutdown(socket.SHUT_RDWR)
+            handler.connection.close()
+        elif failure_kind == "timeout":
+            time.sleep(0.8)
+        elif failure_kind == "partial_stream":
+            _send(handler, _stream([CALL], terminal=False))
+        else:
+            status = int(failure_kind)
+            _send(handler, json.dumps({"error": {"code": "rate_limit_exceeded" if status == 429 else "server_error"}}).encode(),
+                  status=status, content_type="application/json")
+
+    with _server([failure, _submit_stream()]) as (config, captures, *_):
+        if failure_kind == "timeout":
+            config = replace(config, timeout_sec=0.3)
+        system = LoopSystem(tmp_path, ResponsesAdapter(config))
+        run_id = system.create_run("local retry")
+        result = system.activate_once(run_id)
+
+    assert result.phase == "ENGINEERING", result.error
+    assert len(captures) == 2 and captures[0] == captures[1]
+    events = system.store.list_events(run_id)
+    failed = [item for item in events if item.type == "model_attempt_failed"]
+    assert len(failed) == 1 and failed[0].payload["retryable"] is True
+    if failure_kind == "partial_stream":
+        assert "call-one" not in json.dumps(captures[1])
+        assert not any(item.type == "tool_started" and item.payload.get("id") == "call-one" for item in events)
+
+
 def test_completed_items_and_final_usage_are_observed_once():
     observations = []
     with _server([_stream([REASONING, CALL, TEXT], duplicate=True)]) as (config, *_):
@@ -225,6 +281,72 @@ def test_http_errors_are_explicit_sanitized_and_never_retried(status, code, reas
         assert secret not in str(caught.value) and KEY not in str(caught.value)
         assert str(status) in str(caught.value)
         assert len(captures) == 1
+
+
+def test_http_429_insufficient_quota_is_permanent_and_keeps_only_safe_diagnostics():
+    leaked_code = "quota-secret-should-not-be-stored"
+
+    def failure(handler, _body):
+        _send(handler, json.dumps({"error": {"code": "insufficient_quota", "message": leaked_code}}).encode(),
+              status=429, content_type="application/json")
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    assert caught.value.retryable is False
+    assert caught.value.diagnostics == {"status_code": 429, "error_code": "insufficient_quota"}
+    assert leaked_code not in str(caught.value.diagnostics)
+
+
+def test_unknown_provider_error_code_is_not_persisted():
+    leaked_code = "provider-echoed-secret-code"
+
+    def failure(handler, _body):
+        _send(handler, json.dumps({"error": {"code": leaked_code, "message": "opaque"}}).encode(),
+              status=500, content_type="application/json")
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    assert caught.value.retryable is True
+    assert caught.value.diagnostics == {"status_code": 500}
+    assert leaked_code not in str(caught.value)
+
+
+def test_observation_host_io_error_is_not_reclassified_as_retryable_connection():
+    def fail_observation(_observation):
+        raise OSError("host persistence failed")
+
+    with _server([_stream()]) as (config, *_):
+        with pytest.raises(OSError, match="host persistence failed"):
+            ResponsesAdapter(config).complete(_request(observations=fail_observation))
+
+
+def test_sdk_connection_error_with_local_protocol_cause_is_not_retryable(monkeypatch):
+    class FailingResponses:
+        async def create(self, **_kwargs):
+            error = APIConnectionError(
+                message="connection error",
+                request=httpx.Request("POST", "http://local.test/v1/responses"),
+            )
+            error.__cause__ = httpx.LocalProtocolError("invalid header")
+            raise error
+
+    class FailingClient:
+        def __init__(self, **_kwargs):
+            self.responses = FailingResponses()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+    monkeypatch.setattr("harness.adapters.responses.AsyncOpenAI", FailingClient)
+    with pytest.raises(ProviderError) as caught:
+        ResponsesAdapter(ResponsesConfig(model="local-model", api_key=KEY)).complete(_request())
+    assert caught.value.retryable is False
+    assert caught.value.diagnostics == {"error_type": "provider_protocol"}
 
 
 @pytest.mark.parametrize("status", ["incomplete", "failed"])

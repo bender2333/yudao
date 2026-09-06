@@ -6,6 +6,7 @@ from dataclasses import asdict, replace
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 import pytest
@@ -18,6 +19,8 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 from harness.web.server import serve
+from harness.views import retry_view
+from harness.models import EventType
 
 
 @contextmanager
@@ -110,6 +113,90 @@ def sse_id(block: str) -> int:
         if line.startswith("id:"):
             return int(line.split(":", 1)[1].strip())
     raise AssertionError(f"no id in {block!r}")
+
+
+def retry_event(seq, event_type, payload=None, *, role="engineering", error=None, stop_reason=None):
+    return SimpleNamespace(
+        event_id=f"event-{seq}", seq=seq, type=event_type, role=role,
+        payload=payload or {}, error=error, stop_reason=stop_reason,
+    )
+
+
+def test_retry_view_tracks_waiting_attempt_and_clears_on_next_logical_request():
+    activation = retry_event(1, EventType.DEPARTMENT_ACTIVATED, {"activation_id": "a1"})
+    context = retry_event(2, EventType.CONTEXT_ASSEMBLED, {
+        "activation_id": "a1", "step_id": 1, "attempt": 1, "root_step_id": 1,
+        "retry_of_step_id": None, "purpose": "work",
+    })
+    requested = retry_event(3, EventType.MODEL_REQUESTED, {
+        "activation_id": "a1", "step_id": 1, "attempt": 1,
+    })
+    failed = retry_event(4, EventType.MODEL_ATTEMPT_FAILED, {
+        "activation_id": "a1", "step_id": 1, "attempt": 1, "max_attempts": 3,
+        "root_step_id": 1, "retry_of_step_id": None, "reason": "provider_error",
+        "error": "sanitized provider failure", "retryable": True,
+    })
+    scheduled = retry_event(5, EventType.MODEL_RETRY_SCHEDULED, {
+        "activation_id": "a1", "step_id": 1, "attempt": 1, "max_attempts": 3,
+        "root_step_id": 1, "retry_of_step_id": None, "next_step_id": 2,
+        "next_attempt": 2, "delay_sec": 2,
+    })
+    waiting = retry_view([activation, context, requested, failed, scheduled])
+    assert waiting["status"] == "waiting"
+    assert waiting["attempt"] == 1
+    assert waiting["next_attempt"] == 2
+    assert waiting["delay_sec"] == 2
+    assert waiting["last_error"] == "sanitized provider failure"
+
+    next_context = retry_event(6, EventType.CONTEXT_ASSEMBLED, {
+        "activation_id": "a1", "step_id": 2, "attempt": 2, "root_step_id": 1,
+        "retry_of_step_id": 1, "purpose": "work",
+    })
+    next_request = retry_event(7, EventType.MODEL_REQUESTED, {
+        "activation_id": "a1", "step_id": 2, "attempt": 2,
+        "root_step_id": 1, "retry_of_step_id": 1,
+    })
+    recovered = retry_view([activation, context, requested, failed, scheduled, next_context, next_request])
+    assert recovered["status"] == "requesting"
+    assert recovered["attempt"] == 2
+
+    ordinary_context = retry_event(8, EventType.CONTEXT_ASSEMBLED, {
+        "activation_id": "a1", "step_id": 3, "attempt": 1, "root_step_id": 3,
+        "retry_of_step_id": None, "purpose": "work",
+    })
+    ordinary_request = retry_event(9, EventType.MODEL_REQUESTED, {
+        "activation_id": "a1", "step_id": 3, "attempt": 1,
+    })
+    ordinary_message = retry_event(10, EventType.MODEL_MESSAGE, {
+        "activation_id": "a1", "step_id": 3, "attempt": 1,
+    })
+    cleared = retry_view([
+        activation, context, requested, failed, scheduled, next_context, next_request,
+        ordinary_context, ordinary_request, ordinary_message,
+    ])
+    assert cleared["status"] == "idle"
+    assert cleared["last_error"] is None
+
+
+def test_retry_view_clears_waiting_when_a_new_activation_supersedes_it():
+    events = [
+        retry_event(1, EventType.DEPARTMENT_ACTIVATED, {"activation_id": "old"}),
+        retry_event(2, EventType.MODEL_REQUESTED, {"activation_id": "old", "step_id": 1, "attempt": 1}),
+        retry_event(3, EventType.MODEL_ATTEMPT_FAILED, {
+            "activation_id": "old", "step_id": 1, "attempt": 1, "max_attempts": 3,
+            "root_step_id": 1, "retry_of_step_id": None, "reason": "provider_error",
+            "error": "old failure", "retryable": True,
+        }),
+        retry_event(4, EventType.MODEL_RETRY_SCHEDULED, {
+            "activation_id": "old", "step_id": 1, "attempt": 1, "max_attempts": 3,
+            "root_step_id": 1, "retry_of_step_id": None, "next_step_id": 2,
+            "next_attempt": 2, "delay_sec": 2,
+        }),
+        retry_event(5, EventType.DEPARTMENT_ACTIVATED, {"activation_id": "new"}),
+    ]
+    result = retry_view(events)
+    assert result["status"] == "idle"
+    assert result["last_error"] is None
 
 
 def gated_adapter():

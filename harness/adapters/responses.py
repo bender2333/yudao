@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import email.utils
 import json
 import math
 import os
@@ -12,6 +13,7 @@ from threading import Lock
 from typing import Any
 from urllib.parse import urlsplit
 
+import httpx
 from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError, AsyncOpenAI
 
 from ..models import Usage
@@ -88,17 +90,36 @@ class ResponsesAdapter:
         except ProviderError:
             raise
         except (TimeoutError, APITimeoutError) as exc:
-            raise ProviderError("Model request timed out", reason="provider_timeout") from exc
+            raise ProviderError("Model request timed out", reason="provider_timeout", retryable=True,
+                                diagnostics={"error_type": "timeout"}) from exc
         except APIStatusError as exc:
             code = _error_code(exc.body)
-            reason = "context_overflow" if code == "context_length_exceeded" else "provider_error"
+            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
             # Provider error bodies may echo input or credentials; retain only status.
-            raise ProviderError(f"Model provider returned HTTP {exc.status_code}", reason=reason) from exc
+            diagnostics: dict[str, Any] = {"status_code": exc.status_code}
+            safe_code = _safe_error_code(code)
+            if safe_code is not None:
+                diagnostics["error_code"] = safe_code
+            retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
+            if retry_after is not None:
+                diagnostics["retry_after_sec"] = retry_after
+            raise ProviderError(
+                f"Model provider returned HTTP {exc.status_code}", reason=reason,
+                retryable=_retryable_http_status(exc.status_code, code),
+                diagnostics=diagnostics,
+            ) from exc
         except APIConnectionError as exc:
-            raise ProviderError("Model provider connection failed") from exc
+            if _has_nonretryable_connection_cause(exc):
+                raise _nonretryable_http_error() from exc
+            raise ProviderError("Model provider connection failed", retryable=True,
+                                diagnostics={"error_type": "connection"}) from exc
         except APIError as exc:
-            reason = "context_overflow" if _error_code(exc.body) == "context_length_exceeded" else "provider_error"
-            raise ProviderError("Model provider returned an invalid API response", reason=reason) from exc
+            code = _error_code(exc.body)
+            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+            raise ProviderError(
+                "Model provider returned an invalid API response", reason=reason,
+                diagnostics=_diagnostic_code(code, "provider_response"),
+            ) from exc
         except json.JSONDecodeError as exc:
             raise ProviderError("Model provider returned malformed stream JSON") from exc
 
@@ -107,7 +128,7 @@ class ResponsesAdapter:
         with self._lock:
             if self._active is not None:
                 raise ProviderError("Responses adapter already has an active model request")
-            task = asyncio.create_task(self._stream(request))
+            task = asyncio.create_task(self._stream_once(request))
             self._active = (request.session_id, loop, task)
         watcher = asyncio.create_task(self._watch_abort(request, task))
         try:
@@ -129,7 +150,7 @@ class ResponsesAdapter:
                 return
             await asyncio.sleep(0.02)
 
-    async def _stream(self, request: ModelRequest) -> ModelResponse:
+    async def _stream_once(self, request: ModelRequest) -> ModelResponse:
         started = time.monotonic()
         seen_items: set[str] = set()
         async with AsyncOpenAI(
@@ -139,16 +160,21 @@ class ResponsesAdapter:
             max_retries=0,
         ) as client:
             output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
-            stream = await client.responses.create(
-                model=self.config.model,
-                input=request.input_items,
-                tools=request.tools,
-                store=False,
-                stream=True,
-                **output_limit,
-            )
+            try:
+                stream = await client.responses.create(
+                    model=self.config.model,
+                    input=request.input_items,
+                    tools=request.tools,
+                    store=False,
+                    stream=True,
+                    **output_limit,
+                )
+            except _RETRYABLE_HTTP_ERRORS as exc:
+                raise _transport_provider_error(exc) from exc
+            except httpx.HTTPError as exc:
+                raise _nonretryable_http_error() from exc
             async with stream:
-                async for event in stream:
+                async for event in _provider_events(stream):
                     if request.abort_flag.is_set():
                         raise ProviderError("Model request cancelled", reason="cancelled")
                     if event.type == "response.output_item.done":
@@ -167,9 +193,23 @@ class ResponsesAdapter:
                         ))
                         if event.type != "response.completed" or response.status != "completed":
                             code = getattr(response.error, "code", None) if response.error else None
-                            reason = "context_overflow" if code == "context_length_exceeded" else "provider_error"
+                            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
                             detail = "incomplete" if event.type == "response.incomplete" else "failed"
-                            raise ProviderError(f"Model response {detail}", reason=reason)
+                            incomplete_reason = getattr(response.incomplete_details, "reason", None)
+                            retryable = (
+                                reason != "context_overflow"
+                                and (
+                                    _retryable_code(code)
+                                    or _retryable_code(incomplete_reason)
+                                )
+                            )
+                            diagnostics = _diagnostic_code(code, "terminal_response")
+                            if "error_code" not in diagnostics:
+                                diagnostics = _diagnostic_code(incomplete_reason, "terminal_response")
+                            raise ProviderError(
+                                f"Model response {detail}", reason=reason, retryable=retryable,
+                                diagnostics=diagnostics,
+                            )
                         if response.output is None:
                             raise ProviderError("Completed model response has no output array")
                         return ModelResponse(
@@ -177,9 +217,14 @@ class ResponsesAdapter:
                             model=response.model, response_id=response.id,
                         )
                     elif event.type == "error":
-                        reason = "context_overflow" if event.code == "context_length_exceeded" else "provider_error"
-                        raise ProviderError("Model provider reported a stream error", reason=reason)
-        raise ProviderError("Model response stream ended before a terminal response")
+                        reason = "context_overflow" if _is_context_overflow(event.code) else "provider_error"
+                        raise ProviderError(
+                            "Model provider reported a stream error", reason=reason,
+                            retryable=reason != "context_overflow" and _retryable_code(event.code),
+                            diagnostics=_diagnostic_code(event.code, "stream_error"),
+                        )
+        raise ProviderError("Model response stream ended before a terminal response", retryable=True,
+                            diagnostics={"error_type": "stream_incomplete"})
 
     def _observe_item(self, request: ModelRequest, item: dict[str, Any], seen: set[str]) -> None:
         item_id = item.get("id")
@@ -202,7 +247,125 @@ def _error_code(body: Any) -> str | None:
     if not isinstance(body, dict):
         return None
     error = body.get("error", body)
-    return error.get("code") if isinstance(error, dict) else None
+    code = error.get("code") if isinstance(error, dict) else None
+    return code if isinstance(code, str) else None
+
+
+def _retryable_status(status: int) -> bool:
+    return status in {408, 409, 429} or status >= 500
+
+
+def _retryable_http_status(status: int, code: Any) -> bool:
+    safe_code = _safe_error_code(code)
+    return _retryable_status(status) and safe_code not in _NONRETRYABLE_ERROR_CODES
+
+
+def _retryable_code(code: Any) -> bool:
+    return _safe_error_code(code) in _RETRYABLE_ERROR_CODES
+
+
+_RETRYABLE_ERROR_CODES = frozenset({
+    "server_error", "internal_server_error", "service_unavailable", "temporarily_unavailable",
+    "timeout", "rate_limit_exceeded", "too_many_requests",
+})
+
+_KNOWN_ERROR_CODES = frozenset({
+    "context_length_exceeded", *_RETRYABLE_ERROR_CODES,
+    "invalid_api_key", "authentication_error", "permission_denied", "insufficient_quota",
+    "model_not_found", "not_found", "bad_request", "invalid_request", "invalid_request_error",
+    "content_policy_violation",
+})
+
+_NONRETRYABLE_ERROR_CODES = _KNOWN_ERROR_CODES - _RETRYABLE_ERROR_CODES
+
+_RETRYABLE_HTTP_ERRORS = (
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    httpx.RemoteProtocolError,
+)
+
+_NONRETRYABLE_CONNECTION_ERRORS = (
+    httpx.LocalProtocolError,
+    httpx.UnsupportedProtocol,
+    httpx.InvalidURL,
+)
+
+
+def _safe_error_code(code: Any) -> str | None:
+    if not isinstance(code, str):
+        return None
+    normalized = code.casefold()
+    return normalized if normalized in _KNOWN_ERROR_CODES else None
+
+
+def _is_context_overflow(code: Any) -> bool:
+    return _safe_error_code(code) == "context_length_exceeded"
+
+
+def _diagnostic_code(code: Any, fallback: str) -> dict[str, str]:
+    safe_code = _safe_error_code(code)
+    return {"error_code": safe_code} if safe_code is not None else {"error_type": fallback}
+
+
+def _transport_provider_error(exc: BaseException) -> ProviderError:
+    error_type = "timeout" if isinstance(exc, httpx.TimeoutException) else "connection"
+    return ProviderError(
+        "Model request timed out" if error_type == "timeout" else "Model provider connection failed",
+        reason="provider_timeout" if error_type == "timeout" else "provider_error",
+        retryable=True,
+        diagnostics={"error_type": error_type},
+    )
+
+
+def _nonretryable_http_error() -> ProviderError:
+    return ProviderError(
+        "Model provider returned an invalid API response",
+        reason="provider_error",
+        diagnostics={"error_type": "provider_protocol"},
+    )
+
+
+def _has_nonretryable_connection_cause(exc: BaseException) -> bool:
+    return isinstance(exc.__cause__, _NONRETRYABLE_CONNECTION_ERRORS)
+
+
+async def _provider_events(stream: Any):
+    iterator = stream.__aiter__()
+    while True:
+        try:
+            event = await iterator.__anext__()
+        except StopAsyncIteration:
+            return
+        except _RETRYABLE_HTTP_ERRORS as exc:
+            raise _transport_provider_error(exc) from exc
+        except httpx.HTTPError as exc:
+            raise _nonretryable_http_error() from exc
+        yield event
+
+
+def _retry_after(headers: Any) -> float | None:
+    if headers is None:
+        return None
+    raw = headers.get("retry-after-ms") if hasattr(headers, "get") else None
+    if raw is not None:
+        try:
+            delay = float(raw) / 1000.0
+        except (TypeError, ValueError):
+            delay = None
+        if delay is not None and 0 < delay <= 60:
+            return delay
+    raw = headers.get("retry-after") if hasattr(headers, "get") else None
+    if not raw:
+        return None
+    try:
+        delay = float(raw)
+    except (TypeError, ValueError):
+        try:
+            date = email.utils.parsedate_to_datetime(str(raw))
+            delay = date.timestamp() - time.time()
+        except (TypeError, ValueError, OverflowError, OSError):
+            return None
+    return delay if 0 < delay <= 60 else None
 
 
 def _usage(raw: dict[str, Any] | None, started: float) -> Usage:

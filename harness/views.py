@@ -113,7 +113,90 @@ def context_view(projection: RunProjection) -> dict[str, Any]:
     }
 
 
+def _retry_record(event: Event, *, status: str, base: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = event.payload or {}
+    previous = base or {}
+    return {
+        "status": status,
+        "department": event.role or previous.get("department"),
+        "activation_id": payload.get("activation_id", previous.get("activation_id")),
+        "step_id": payload.get("step_id", previous.get("step_id")),
+        "attempt": payload.get("attempt", previous.get("attempt")),
+        "max_attempts": payload.get("max_attempts", previous.get("max_attempts", 3)),
+        "next_step_id": payload.get("next_step_id", previous.get("next_step_id")),
+        "delay_sec": payload.get("delay_sec", previous.get("delay_sec")),
+        "next_attempt": payload.get("next_attempt", previous.get("next_attempt")),
+        "last_reason": payload.get("reason", previous.get("last_reason")) or event.stop_reason,
+        "last_error": payload.get("error", previous.get("last_error")) or event.error,
+        "retryable": payload.get("retryable", previous.get("retryable")),
+        "root_step_id": payload.get("root_step_id", previous.get("root_step_id")),
+        "retry_of_step_id": payload.get("retry_of_step_id", previous.get("retry_of_step_id")),
+    }
+
+
+def retry_view(events: list[Event]) -> dict[str, Any]:
+    """Derive the latest provider retry state without extending the run projection."""
+
+    latest: dict[str, Any] | None = None
+    attempts: dict[tuple[str | None, int | None], dict[str, Any]] = {}
+    scheduled: dict[tuple[str | None, int | None], dict[str, Any]] = {}
+    for event in events:
+        payload = event.payload or {}
+        activation_id = payload.get("activation_id")
+        step_id = payload.get("step_id")
+        key = (activation_id, step_id)
+        if event.type == EventType.DEPARTMENT_ACTIVATED:
+            latest = None
+        elif event.type == EventType.MODEL_ATTEMPT_FAILED:
+            latest = _retry_record(event, status="failed")
+            attempts[key] = latest
+        elif event.type == EventType.MODEL_RETRY_SCHEDULED:
+            failure = attempts.get(key)
+            latest = _retry_record(event, status="waiting", base=failure)
+            scheduled[(activation_id, payload.get("next_step_id"))] = latest
+        elif event.type == EventType.CONTEXT_ASSEMBLED and payload.get("purpose") in {"work", "compaction"}:
+            retry = scheduled.pop(key, None)
+            if retry is not None:
+                latest = _retry_record(event, status="prepared", base=retry)
+        elif event.type == EventType.MODEL_REQUESTED:
+            attempt = payload.get("attempt", 1)
+            retry = (latest if attempt != 1 and latest and latest.get("activation_id") == activation_id else None)
+            request_record = _retry_record(event, status="requesting", base=retry)
+            attempts[key] = request_record
+            if retry is not None or attempt != 1:
+                latest = request_record
+            else:
+                latest = None
+        elif event.type == EventType.MODEL_MESSAGE:
+            retry = attempts.get(key)
+            if (retry is not None and retry.get("attempt", 1) > 1
+                    and latest is not None and latest.get("activation_id") == activation_id
+                    and latest.get("step_id") == step_id):
+                latest = _retry_record(event, status="active", base=retry)
+        elif event.type == EventType.RUN_FAILED and latest is not None:
+            latest = _retry_record(event, status="cancelled" if event.stop_reason == "cancelled" else "failed", base=latest)
+    if latest is None:
+        return {
+            "status": "idle",
+            "department": None,
+            "activation_id": None,
+            "step_id": None,
+            "attempt": None,
+            "max_attempts": 3,
+            "next_step_id": None,
+            "delay_sec": None,
+            "next_attempt": None,
+            "last_reason": None,
+            "last_error": None,
+            "retryable": None,
+            "root_step_id": None,
+            "retry_of_step_id": None,
+        }
+    return latest
+
+
 def event_card(event: Event) -> dict[str, Any]:
+    payload = event.payload or {}
     return {
         "event_id": event.event_id,
         "seq": event.seq,
@@ -122,7 +205,7 @@ def event_card(event: Event) -> dict[str, Any]:
         "state_before": event.state_before,
         "state_after": event.state_after,
         "stop_reason": event.stop_reason,
-        "error": event.error,
+        "error": event.error or (event.payload or {}).get("error"),
         "session_id": event.session_id,
         "provider": event.provider,
         "model": event.model,
@@ -130,6 +213,15 @@ def event_card(event: Event) -> dict[str, Any]:
         "created_at": event.created_at,
         "summary": event.summary(),
         "artifact_hashes": event.artifact_hashes,
+        "attempt": payload.get("attempt"),
+        "max_attempts": payload.get("max_attempts"),
+        "retry_of_step_id": payload.get("retry_of_step_id"),
+        "root_step_id": payload.get("root_step_id"),
+        "reason": payload.get("reason"),
+        "retryable": payload.get("retryable"),
+        "delay_sec": payload.get("delay_sec"),
+        "next_attempt": payload.get("next_attempt"),
+        "next_step_id": payload.get("next_step_id"),
         "git_version": _plain(event.payload.get("git_version")) if event.type in GIT_VERSION_EVENTS else None,
         "input_save_failure": _plain(event.payload.get("input_save_failure"))
         if event.type == EventType.RUN_FAILED and event.stop_reason == "cancelled" else None,
@@ -139,8 +231,11 @@ def event_card(event: Event) -> dict[str, Any]:
 def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
     projection = project_run(store, run_id)
     events = store.list_events(run_id)
+    retry = retry_view(events)
+    board = run_board(projection)
+    board["retry"] = retry
     return {
-        "board": run_board(projection),
+        "board": board,
         "timeline": spec_timeline(projection, events),
         "evidence": evidence_view(projection, events),
         "context": context_view(projection),

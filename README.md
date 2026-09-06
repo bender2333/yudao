@@ -4,9 +4,9 @@
 
 OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构的运行证据与本次原生循环的验证分开记录，见 [MVP 验收记录](docs/mvp-acceptance.md)。
 
-第一阶段正在按 [A-G 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。任务内 Git 版本和差异已实现并通过确定性验收。真实完整方向调整和压缩后最终放行仍有连接失败导致的验收缺口，结果见 [验收记录](docs/mvp-acceptance.md)。
+第一阶段正在按 [A-H 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。任务内 Git 版本和差异已实现并通过确定性验收。H 模型有界重试已实现，慢响应、取消、追加输入和桌面手机已验证；真实完整方向调整和压缩后最终放行仍有连续连接失败导致的缺口，结果见 [验收记录](docs/mvp-acceptance.md)。
 
-本机最新原生控制台地址为 [http://127.0.0.1:8771](http://127.0.0.1:8771)，数据目录为 `.yudao/stage1-real-web-20260906-145135728`。本轮按当前 `provider.md` 测试，已取得 `gpt-5.6-luna` 的真实响应；完整任务仍受间歇 TLS 连接中断影响。运行基线与历史服务记录见 [验收记录](docs/mvp-acceptance.md)。
+本机最新原生控制台地址为 [http://127.0.0.1:8774](http://127.0.0.1:8774)，数据目录为 `.yudao/stage1-retry-final-20260906`，采用当前 `provider.md` 配置及 600 秒默认等待。本轮已取得 `gpt-5.6-luna` 的真实响应和重试恢复证据；完整任务仍受连续连接中断影响。运行基线与历史服务记录见 [验收记录](docs/mvp-acceptance.md)。
 
 ## 分层
 
@@ -92,7 +92,7 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ## 模型配置
 
-真实模型通过官方 OpenAI Python SDK 发送单次、无服务端会话续接的 Responses 请求。未配置时 Web 返回配置错误并拒绝创建任务；直接调用运行内核时，run 进入 `FAILED / provider_unavailable`。不自动重试或切换 provider。
+真实模型通过官方 OpenAI Python SDK 发送单次、无服务端会话续接的 Responses 请求。未配置时 Web 返回配置错误并拒绝创建任务；直接调用运行内核时，run 进入 `FAILED / provider_unavailable`。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 provider，详见 [D17](docs/requirements/provider-retries.md)。
 
 需要 Python 3.11 或更新版本，`pip install -e ".[dev]"` 会安装 SDK。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
 
@@ -109,6 +109,8 @@ python -m harness serve --adapter responses --data-dir .yudao/native-loop --port
 
 `YUDAO_MODEL_API_KEY` 与 `YUDAO_MODEL_NAME` 必填；其余配置的默认值与示例相同。兼容 Responses 协议的服务可以修改 `YUDAO_MODEL_BASE_URL` 和 provider 标识。
 
+默认单次等待 600 秒，不在一分钟强制中止。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒。各实际尝试计入每次部门激活的 32 次模型调用上限，压缩调用同样适用。等待可被取消或新增输入打断，下一实际请求开始前重新核对当前工作。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
+
 工具由 Yudao 内核执行（读取、写入、删除、移动、检查和结构化提交）。Product/Quality 没有写工具，工程修改受有效合同及事前计划范围约束。检查在可丢弃的完整公开树副本执行，由主机签发绑定当前合同、计划、交付和激活的回执；模型自报 `exit_code` 不是证据。交付保存完整文件字节、二进制与空目录，原工作区不可用后仍可独立恢复。该副本机制不提供操作系统沙箱。
 
 三个部门均可通过 `submit_request` 咨询或请求职责内动作，经 `submit_response` 回应。一次只有一个未结请求，保留原工作，使用同一个部门循环。普通意见不改变需求，正式产品决定单独接纳；动作回复引用真实结果，最后仍须独立 QA。
@@ -117,7 +119,7 @@ python -m harness serve --adapter responses --data-dir .yudao/native-loop --port
 
 ## 停止与后续范围
 
-只有独立质检 release 才能进入 `DONE`。达到部门激活次数或单次激活模型步数上限进入 `PAUSED`；取消、provider 超时或错误、上下文溢出、压缩失败进入 `FAILED`。当前只使用循环次数、模型步数和单次请求超时限制执行，不设置 token 预算。固定原文与当前工作无法容纳时明确停止，不静默截断或无限压缩。停止后仍可查看、导出和重放事件，迟到结果不能继续提交。
+只有独立质检 release 才能进入 `DONE`。达到部门激活次数或单次激活模型步数上限进入 `PAUSED`；取消、不可重试的 provider 错误、重试耗尽、上下文溢出或压缩失败进入 `FAILED`。当前使用循环次数、模型步数、有界重试和单次请求超时限制执行，不设置 token 预算。固定原文与当前工作无法容纳时明确停止，不静默截断或无限压缩。停止后仍可查看、导出和重放事件，迟到结果不能继续提交。
 
 当前不提供暂停任务的继续执行，也不自动复用经验、修改规则或模型。知识图谱、长期记忆、异步恢复及新增部门属于后续阶段，见 [总体路线图](docs/program-roadmap.md)。
 

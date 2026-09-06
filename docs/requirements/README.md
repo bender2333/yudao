@@ -20,7 +20,7 @@
 | D14 | [受控删除与移动](workspace-refactoring.md) | 已实现，E 整体验证通过 |
 | D15 | [有效变化与执行依据](effective-contract-changes.md) | 合同、专家请求及在途输入适用性已验证 |
 | D16 | [使用 Git 管理任务内变化](git-change-management.md) | 已实现，真实 Git、同任务方向调整及桌面手机差异查看通过确定性验收 |
-| D17 | [模型等待与失败重试](provider-retries.md) | 已确认，H 实施中；有界重试、失败输出隔离和持续输入边界 |
+| D17 | [模型等待与失败重试](provider-retries.md) | H 已实现；慢响应、重试边界及桌面手机已验证，真实完整流程仍有连续连接失败 |
 | D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 已确认，架构及验收边界已记录；三部门可绑定不同 Provider/模型，尚未实现 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
