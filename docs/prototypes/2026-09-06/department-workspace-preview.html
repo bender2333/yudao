@@ -1,0 +1,2255 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Department Workspace</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Department Workspace" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Department Workspace&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;department-workspace-prototype&quot; role=&quot;region&quot; aria-label=&quot;三部门协作工作台原型&quot;&gt;
+  &lt;style&gt;
+    #department-workspace-prototype {
+      --dw-density: 1;
+      --dw-accent: light-dark(#087f69, #56d1b3);
+      --dw-accent-soft: light-dark(#e4f4ef, #17372f);
+      --dw-background: light-dark(#f3f4f3, #171918);
+      --dw-surface: light-dark(#ffffff, #1d1f1e);
+      --dw-surface-raised: light-dark(#fafbfa, #242625);
+      --dw-foreground: light-dark(#262827, #ecedeb);
+      --dw-muted: light-dark(#6f7472, #a5a9a6);
+      --dw-subtle: light-dark(#9da3a0, #747a76);
+      --dw-border: light-dark(#dfe2e0, #383c3a);
+      --dw-border-strong: light-dark(#c6cbc8, #515652);
+      --dw-amber: light-dark(#9a6200, #f1b949);
+      --dw-amber-soft: light-dark(#fff4d8, #443617);
+      --dw-red: light-dark(#b9473e, #ef8278);
+      --dw-red-soft: light-dark(#fde9e6, #432622);
+      --dw-blue: light-dark(#356e9f, #83b8e4);
+      --dw-blue-soft: light-dark(#e8f1fa, #1f3140);
+      --dw-inspector-width: 304px;
+      --dw-shadow: light-dark(0 12px 28px rgba(39, 45, 42, .08), 0 12px 28px rgba(0, 0, 0, .22));
+      color-scheme: light dark;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      background: var(--dw-background);
+      color: var(--dw-foreground);
+      font-family: &quot;Microsoft YaHei UI&quot;, &quot;Microsoft YaHei&quot;, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      letter-spacing: 0;
+    }
+
+    #department-workspace-prototype *,
+    #department-workspace-prototype *::before,
+    #department-workspace-prototype *::after { box-sizing: border-box; }
+    #department-workspace-prototype button,
+    #department-workspace-prototype input,
+    #department-workspace-prototype select,
+    #department-workspace-prototype textarea { font: inherit; }
+    #department-workspace-prototype button { color: inherit; }
+    #department-workspace-prototype h1,
+    #department-workspace-prototype h2,
+    #department-workspace-prototype h3,
+    #department-workspace-prototype p { margin: 0; }
+    #department-workspace-prototype h1 { font-size: 1.45rem; line-height: 1.25; font-weight: 500; }
+    #department-workspace-prototype h2 { font-size: 1rem; line-height: 1.35; font-weight: 500; }
+    #department-workspace-prototype h3 { font-size: .9rem; line-height: 1.4; font-weight: 500; }
+    #department-workspace-prototype .dw-muted { color: var(--dw-muted); }
+    #department-workspace-prototype .dw-small { color: var(--dw-muted); font-size: .78rem; }
+    #department-workspace-prototype .dw-tabular { font-variant-numeric: tabular-nums; }
+
+    #department-workspace-prototype .dw-shell { display: grid; grid-template-columns: 68px minmax(0, 1fr); min-width: 0; }
+    #department-workspace-prototype .dw-sidebar {
+      border-right: 1px solid var(--dw-border);
+      background: var(--dw-surface);
+      padding: calc(12px * var(--dw-density)) 8px;
+      min-width: 0;
+    }
+    #department-workspace-prototype .dw-brand {
+      display: grid; place-items: center; gap: 3px; padding: 4px 0 18px;
+      color: var(--dw-accent); font-size: .68rem; font-weight: 500;
+    }
+    #department-workspace-prototype .dw-brand i { width: 20px; height: 20px; }
+    #department-workspace-prototype .dw-nav { display: grid; gap: 5px; }
+    #department-workspace-prototype .dw-nav-item {
+      display: grid; justify-items: center; gap: 3px; min-width: 0; min-height: 54px;
+      padding: 7px 3px; border: 1px solid transparent; border-radius: 7px;
+      background: transparent; cursor: pointer; color: var(--dw-muted);
+    }
+    #department-workspace-prototype .dw-nav-item i { width: 17px; height: 17px; }
+    #department-workspace-prototype .dw-nav-item span { font-size: .72rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-nav-item:hover { color: var(--dw-foreground); background: var(--dw-background); }
+    #department-workspace-prototype .dw-nav-item.is-active {
+      color: var(--dw-accent); background: var(--dw-accent-soft); border-color: color-mix(in srgb, var(--dw-accent) 24%, transparent);
+    }
+    #department-workspace-prototype .dw-main { min-width: 0; padding: calc(28px * var(--dw-density)) clamp(16px, 3.4vw, 46px) calc(32px * var(--dw-density)); }
+    #department-workspace-prototype .dw-page { max-width: 1240px; margin: 0 auto; min-width: 0; }
+    #department-workspace-prototype .dw-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    #department-workspace-prototype .dw-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--dw-muted); font-size: .78rem; margin-bottom: 8px; }
+    #department-workspace-prototype .dw-eyebrow strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dw-accent); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-status-dot.waiting { background: var(--dw-amber); }
+    #department-workspace-prototype .dw-status-dot.issue { background: var(--dw-red); }
+    #department-workspace-prototype .dw-subtitle { margin-top: 7px; color: var(--dw-muted); font-size: .82rem; }
+    #department-workspace-prototype .dw-current-state {
+      display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+      padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--dw-accent) 28%, var(--dw-border));
+      border-radius: 999px; background: var(--dw-accent-soft); color: var(--dw-accent); font-size: .78rem; white-space: nowrap;
+    }
+    #department-workspace-prototype .dw-section { margin-top: calc(31px * var(--dw-density)); }
+    #department-workspace-prototype .dw-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
+    #department-workspace-prototype .dw-section-head p { color: var(--dw-muted); font-size: .78rem; }
+
+    #department-workspace-prototype .dw-flow-map {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(64px, .2fr) minmax(0, 1fr) minmax(64px, .2fr) minmax(0, 1fr);
+      align-items: stretch; gap: calc(10px * var(--dw-density)); min-width: 0;
+    }
+    #department-workspace-prototype .dw-dept-node {
+      display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 188px;
+      padding: calc(15px * var(--dw-density)); border: 1px solid var(--dw-border); border-radius: 8px;
+      background: var(--dw-surface); box-shadow: var(--dw-shadow); text-align: left; cursor: pointer;
+    }
+    #department-workspace-prototype .dw-dept-node:hover { border-color: var(--dw-accent); }
+    #department-workspace-prototype .dw-dept-node.is-active { border-color: var(--dw-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--dw-accent) 14%, transparent); }
+    #department-workspace-prototype .dw-node-meta { display: flex; justify-content: space-between; gap: 8px; align-items: center; color: var(--dw-muted); font-size: .73rem; }
+    #department-workspace-prototype .dw-node-index { color: var(--dw-subtle); font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-node-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    #department-workspace-prototype .dw-node-status.active { color: var(--dw-accent); }
+    #department-workspace-prototype .dw-node-status.waiting { color: var(--dw-amber); }
+    #department-workspace-prototype .dw-node-status.done { color: var(--dw-muted); }
+    #department-workspace-prototype .dw-dept-node h3 { margin-top: 18px; font-size: 1rem; }
+    #department-workspace-prototype .dw-node-role { display: block; margin-top: 2px; color: var(--dw-muted); font-size: .78rem; }
+    #department-workspace-prototype .dw-node-task { display: block; margin-top: 16px; min-height: 38px; font-size: .84rem; }
+    #department-workspace-prototype .dw-node-artifact { display: block; margin-top: 8px; color: var(--dw-muted); font-size: .75rem; }
+    #department-workspace-prototype .dw-node-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 13px; color: var(--dw-muted); font-size: .72rem; }
+    #department-workspace-prototype .dw-node-foot &gt; span:last-child { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    #department-workspace-prototype .dw-node-foot i,
+    #department-workspace-prototype .dw-node-foot svg { width: 13px; height: 13px; flex: 0 0 auto; }
+    #department-workspace-prototype .dw-flow-connector span { white-space: nowrap; flex: 0 0 auto; }
+    #department-workspace-prototype .dw-flow-connector { display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--dw-muted); font-size: .68rem; }
+    #department-workspace-prototype .dw-flow-connector::before,
+    #department-workspace-prototype .dw-flow-connector::after { content: &quot;&quot;; height: 1px; flex: 1; background: var(--dw-border-strong); }
+    #department-workspace-prototype .dw-flow-connector i { width: 14px; height: 14px; color: var(--dw-accent); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-feedback-lane { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: calc(10px * var(--dw-density)); margin-top: 15px; }
+    #department-workspace-prototype .dw-feedback-route { grid-column: 3 / 6; display: flex; align-items: center; gap: 9px; min-width: 0; }
+    #department-workspace-prototype .dw-feedback-route::before { content: &quot;&quot;; height: 1px; flex: 1; background: var(--dw-border-strong); }
+    #department-workspace-prototype .dw-handoff {
+      display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; padding: 9px 11px;
+      border: 1px solid var(--dw-border); border-radius: 7px; background: var(--dw-surface-raised); text-align: left; cursor: pointer;
+    }
+    #department-workspace-prototype .dw-handoff:hover,
+    #department-workspace-prototype .dw-handoff.is-selected { border-color: var(--dw-accent); background: var(--dw-accent-soft); }
+    #department-workspace-prototype .dw-handoff i { width: 16px; height: 16px; color: var(--dw-amber); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-handoff-copy { min-width: 0; }
+    #department-workspace-prototype .dw-handoff-copy strong { display: block; font-size: .79rem; font-weight: 500; }
+    #department-workspace-prototype .dw-handoff-copy span { display: block; color: var(--dw-muted); font-size: .71rem; }
+    #department-workspace-prototype .dw-handoff-arrow { color: var(--dw-accent); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-handoff-arrow i { width: 15px; height: 15px; }
+    #department-workspace-prototype .dw-detail {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 15px; align-items: start; margin-top: 13px;
+      padding: 13px 14px; border-top: 1px solid var(--dw-border); border-bottom: 1px solid var(--dw-border); background: var(--dw-surface-raised);
+    }
+    #department-workspace-prototype .dw-detail h3 { margin-bottom: 3px; }
+    #department-workspace-prototype .dw-detail p { color: var(--dw-muted); font-size: .79rem; }
+    #department-workspace-prototype .dw-detail-route { color: var(--dw-accent); font-size: .76rem; white-space: nowrap; }
+
+    #department-workspace-prototype .dw-record-list { border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-record-row {
+      display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: 13px; width: 100%; min-width: 0;
+      padding: 11px 2px; border: 0; border-bottom: 1px solid var(--dw-border); background: transparent; text-align: left; cursor: pointer;
+    }
+    #department-workspace-prototype .dw-record-row:hover { background: var(--dw-accent-soft); }
+    #department-workspace-prototype .dw-record-time { color: var(--dw-muted); font-size: .73rem; font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-record-text strong { display: block; font-size: .8rem; font-weight: 500; }
+    #department-workspace-prototype .dw-record-text span { display: block; color: var(--dw-muted); font-size: .74rem; }
+    #department-workspace-prototype .dw-record-state { color: var(--dw-muted); font-size: .73rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-record-state.waiting { color: var(--dw-amber); }
+
+    #department-workspace-prototype .dw-global { margin-top: calc(31px * var(--dw-density)); }
+    #department-workspace-prototype .dw-global-log { display: grid; gap: 8px; margin-bottom: 12px; }
+    #department-workspace-prototype .dw-global-entry { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--dw-border); min-width: 0; }
+    #department-workspace-prototype .dw-global-entry strong { color: var(--dw-accent); font-size: .74rem; font-weight: 500; white-space: nowrap; }
+    #department-workspace-prototype .dw-global-entry span { min-width: 0; font-size: .81rem; }
+    #department-workspace-prototype .dw-global-entry time { margin-left: auto; color: var(--dw-muted); font-size: .71rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-pending { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-left: 2px solid var(--dw-amber); background: var(--dw-amber-soft); color: var(--dw-amber); font-size: .76rem; }
+    #department-workspace-prototype .dw-pending i { width: 14px; height: 14px; }
+    #department-workspace-prototype .dw-compose { min-width: 0; padding-top: 12px; border-top: 1px solid var(--dw-border-strong); }
+    #department-workspace-prototype .dw-compose-meta,
+    #department-workspace-prototype .dw-compose-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    #department-workspace-prototype .dw-compose-meta { margin-bottom: 8px; color: var(--dw-muted); font-size: .75rem; }
+    #department-workspace-prototype .dw-compose-meta strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-textarea { display: block; width: 100%; min-width: 0; min-height: 76px; resize: vertical; padding: 10px 11px; border: 1px solid var(--dw-border-strong); border-radius: 7px; background: var(--dw-surface); color: var(--dw-foreground); line-height: 1.5; }
+    #department-workspace-prototype .dw-textarea::placeholder { color: var(--dw-subtle); }
+    #department-workspace-prototype .dw-compose-actions { margin-top: 8px; }
+    #department-workspace-prototype .dw-compose-actions span { color: var(--dw-muted); font-size: .72rem; }
+    #department-workspace-prototype .dw-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--dw-accent); border-radius: 6px; background: var(--dw-accent); color: light-dark(#ffffff, #10211c); cursor: pointer; }
+    #department-workspace-prototype .dw-primary:hover { filter: brightness(1.08); }
+    #department-workspace-prototype .dw-primary i { width: 15px; height: 15px; }
+
+    #department-workspace-prototype .dw-back { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--dw-muted); cursor: pointer; font-size: .78rem; }
+    #department-workspace-prototype .dw-back:hover { color: var(--dw-accent); }
+    #department-workspace-prototype .dw-back i { width: 15px; height: 15px; }
+    #department-workspace-prototype .dw-dept-header { display: grid; gap: 14px; }
+    #department-workspace-prototype .dw-dept-header-top { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    #department-workspace-prototype .dw-task-strip { display: flex; align-items: center; gap: 10px; margin-top: 22px; padding: 9px 12px; border-top: 1px solid var(--dw-border); border-bottom: 1px solid var(--dw-border); color: var(--dw-muted); font-size: .76rem; }
+    #department-workspace-prototype .dw-task-strip strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-task-strip i { width: 15px; height: 15px; color: var(--dw-accent); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-work-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--dw-inspector-width); gap: clamp(22px, 3.2vw, 42px); align-items: start; margin-top: calc(27px * var(--dw-density)); min-width: 0; }
+    #department-workspace-prototype .dw-work-grid.has-collapsed-inspector { grid-template-columns: minmax(0, 1fr) 44px; }
+    #department-workspace-prototype .dw-conversation { min-width: 0; }
+    #department-workspace-prototype .dw-conversation-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 15px; }
+    #department-workspace-prototype .dw-conversation-head p { color: var(--dw-muted); font-size: .75rem; }
+    #department-workspace-prototype .dw-timeline { display: grid; gap: 0; min-width: 0; }
+    #department-workspace-prototype .dw-message { position: relative; min-width: 0; padding: 0 0 20px 18px; border-left: 1px solid var(--dw-border-strong); }
+    #department-workspace-prototype .dw-message::before { content: &quot;&quot;; position: absolute; top: 4px; left: -4px; width: 7px; height: 7px; border-radius: 50%; background: var(--dw-subtle); }
+    #department-workspace-prototype .dw-message.is-user::before { background: var(--dw-blue); }
+    #department-workspace-prototype .dw-message.is-self::before { background: var(--dw-accent); }
+    #department-workspace-prototype .dw-message-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+    #department-workspace-prototype .dw-message-origin { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 500; }
+    #department-workspace-prototype .dw-message-origin span { color: var(--dw-muted); font-size: .71rem; font-weight: 400; }
+    #department-workspace-prototype .dw-message time { color: var(--dw-muted); font-size: .71rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-message p { max-width: 70ch; color: var(--dw-foreground); font-size: .84rem; white-space: pre-wrap; }
+    #department-workspace-prototype .dw-inspector { min-width: 0; border-left: 1px solid var(--dw-border); background: var(--dw-surface); box-shadow: var(--dw-shadow); }
+    #department-workspace-prototype .dw-inspector.is-collapsed { width: 44px; justify-self: end; }
+    #department-workspace-prototype .dw-inspector-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 13px; border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-inspector-kicker { display: block; color: var(--dw-muted); font-size: .7rem; }
+    #department-workspace-prototype .dw-inspector-head strong { display: block; margin-top: 2px; font-size: .82rem; font-weight: 500; }
+    #department-workspace-prototype .dw-icon-button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: var(--dw-muted); cursor: pointer; flex: 0 0 auto; }
+    #department-workspace-prototype .dw-icon-button:hover { background: var(--dw-accent-soft); color: var(--dw-accent); }
+    #department-workspace-prototype .dw-icon-button i { width: 16px; height: 16px; }
+    #department-workspace-prototype .dw-inspector-content { padding: 13px; min-width: 0; }
+    #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-content { display: none; }
+    #department-workspace-prototype .dw-inspector-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; background: var(--dw-background); border-radius: 6px; }
+    #department-workspace-prototype .dw-inspector-tab { min-width: 0; padding: 6px 3px; border: 0; border-radius: 4px; background: transparent; color: var(--dw-muted); cursor: pointer; font-size: .75rem; }
+    #department-workspace-prototype .dw-inspector-tab.is-active { background: var(--dw-surface); color: var(--dw-foreground); box-shadow: 0 1px 4px light-dark(rgba(30, 52, 44, .08), rgba(0, 0, 0, .18)); }
+    #department-workspace-prototype .dw-inspect-panel { margin-top: 17px; min-width: 0; }
+    #department-workspace-prototype .dw-inspect-panel h3 { margin-bottom: 9px; }
+    #department-workspace-prototype .dw-context-list { display: grid; gap: 4px; }
+    #department-workspace-prototype .dw-context-item { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--dw-foreground); text-align: left; cursor: pointer; }
+    #department-workspace-prototype .dw-context-item:hover { background: var(--dw-background); }
+    #department-workspace-prototype .dw-context-item.is-selected { border-color: color-mix(in srgb, var(--dw-accent) 28%, var(--dw-border)); background: var(--dw-accent-soft); }
+    #department-workspace-prototype .dw-context-item strong { font-size: .78rem; font-weight: 500; }
+    #department-workspace-prototype .dw-context-item span { color: var(--dw-muted); font-size: .7rem; }
+    #department-workspace-prototype .dw-context-body { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-context-snapshot-meta { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--dw-muted); font-size: .71rem; }
+    #department-workspace-prototype .dw-context-snapshot-meta strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-context-body p { color: var(--dw-muted); font-size: .78rem; }
+    #department-workspace-prototype .dw-data-list { display: grid; gap: 0; margin: 0; }
+    #department-workspace-prototype .dw-data-row { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--dw-border); font-size: .77rem; }
+    #department-workspace-prototype .dw-data-row dt { color: var(--dw-muted); }
+    #department-workspace-prototype .dw-data-row dd { margin: 0; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-prompt-version { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: var(--dw-muted); font-size: .73rem; }
+    #department-workspace-prototype .dw-prompt-block { margin: 0; padding: 11px; border: 1px solid var(--dw-border); border-radius: 5px; background: var(--dw-background); color: var(--dw-foreground); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .73rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-head { flex-direction: column; padding: 11px 6px; }
+    #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-kicker,
+    #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-head strong { display: none; }
+
+    #department-workspace-prototype .dw-observation-page { max-width: 1240px; margin: 0 auto; min-width: 0; }
+    #department-workspace-prototype .dw-observation-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    #department-workspace-prototype .dw-observation-head h1 { margin-top: 2px; }
+    #department-workspace-prototype .dw-observation-head .dw-subtitle { max-width: 70ch; }
+    #department-workspace-prototype .dw-observation-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; padding: 10px 12px; border-top: 1px solid var(--dw-border); border-bottom: 1px solid var(--dw-border); color: var(--dw-muted); font-size: .76rem; }
+    #department-workspace-prototype .dw-observation-scope strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-observation-scope i { width: 15px; height: 15px; color: var(--dw-accent); flex: 0 0 auto; }
+    #department-workspace-prototype .dw-observation-tabs { display: flex; gap: 22px; margin-top: 27px; border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-observation-tab { position: relative; padding: 0 0 10px; border: 0; background: transparent; color: var(--dw-muted); cursor: pointer; font-size: .84rem; }
+    #department-workspace-prototype .dw-observation-tab.is-active { color: var(--dw-foreground); }
+    #department-workspace-prototype .dw-observation-tab.is-active::after { content: &quot;&quot;; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--dw-accent); }
+    #department-workspace-prototype .dw-observation-filters { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(120px, .8fr) minmax(210px, 1.5fr); gap: 12px; margin-top: 18px; }
+    #department-workspace-prototype .dw-filter-field { display: grid; gap: 5px; min-width: 0; }
+    #department-workspace-prototype .dw-filter-field &gt; span { color: var(--dw-muted); font-size: .72rem; }
+    #department-workspace-prototype .dw-filter-select,
+    #department-workspace-prototype .dw-search-input { width: 100%; min-width: 0; min-height: 36px; padding: 7px 9px; border: 1px solid var(--dw-border-strong); border-radius: 6px; background: var(--dw-surface); color: var(--dw-foreground); }
+    #department-workspace-prototype .dw-search-input::placeholder { color: var(--dw-subtle); }
+    #department-workspace-prototype .dw-observation-results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 9px; }
+    #department-workspace-prototype .dw-observation-results-head h2 { font-size: .92rem; }
+    #department-workspace-prototype .dw-observation-results-head p { color: var(--dw-muted); font-size: .75rem; }
+    #department-workspace-prototype .dw-request-list { border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-request-row { display: grid; grid-template-columns: 116px minmax(0, 1fr) minmax(170px, .65fr); align-items: center; gap: 15px; width: 100%; min-width: 0; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--dw-border); background: transparent; color: var(--dw-foreground); text-align: left; cursor: pointer; }
+    #department-workspace-prototype .dw-request-row:hover { background: var(--dw-accent-soft); }
+    #department-workspace-prototype .dw-request-time { color: var(--dw-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-request-time &gt; span:last-child { display: block; margin-top: 3px; color: var(--dw-subtle); font-size: .68rem; }
+    #department-workspace-prototype .dw-request-main { min-width: 0; }
+    #department-workspace-prototype .dw-request-main strong { display: block; font-size: .81rem; font-weight: 500; }
+    #department-workspace-prototype .dw-request-main span { display: block; margin-top: 3px; color: var(--dw-muted); font-size: .73rem; }
+    #department-workspace-prototype .dw-request-state { display: inline-flex; align-items: center; gap: 6px; color: var(--dw-muted); font-size: .74rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-request-state.success { color: var(--dw-accent); }
+    #department-workspace-prototype .dw-request-state.failed { color: var(--dw-red); }
+    #department-workspace-prototype .dw-request-state.running { color: var(--dw-amber); }
+    #department-workspace-prototype .dw-request-metrics { display: grid; gap: 4px; justify-items: end; min-width: 0; color: var(--dw-muted); font-size: .72rem; font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-request-metrics span { white-space: nowrap; }
+    #department-workspace-prototype .dw-request-metrics strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-empty-results { padding: 24px 2px; border-bottom: 1px solid var(--dw-border); color: var(--dw-muted); font-size: .8rem; }
+    #department-workspace-prototype .dw-observation-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    #department-workspace-prototype .dw-observation-detail-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; min-width: 0; }
+    #department-workspace-prototype .dw-observation-detail-title h1 { font-size: 1.25rem; }
+    #department-workspace-prototype .dw-observation-detail-title p { color: var(--dw-muted); font-size: .78rem; }
+    #department-workspace-prototype .dw-observation-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; margin-top: 18px; padding: 10px 12px; border-top: 1px solid var(--dw-border); border-bottom: 1px solid var(--dw-border); color: var(--dw-muted); font-size: .74rem; }
+    #department-workspace-prototype .dw-observation-crumbs strong { color: var(--dw-foreground); font-weight: 500; }
+    #department-workspace-prototype .dw-observation-crumbs span[aria-hidden=&quot;true&quot;] { color: var(--dw-subtle); }
+    #department-workspace-prototype .dw-attempt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 18px; }
+    #department-workspace-prototype .dw-attempt-label { color: var(--dw-muted); font-size: .74rem; }
+    #department-workspace-prototype .dw-attempt-option { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--dw-border); border-radius: 5px; background: var(--dw-surface); color: var(--dw-muted); cursor: pointer; font-size: .74rem; }
+    #department-workspace-prototype .dw-attempt-option:hover { border-color: var(--dw-accent); }
+    #department-workspace-prototype .dw-attempt-option.is-active { border-color: var(--dw-accent); background: var(--dw-accent-soft); color: var(--dw-foreground); }
+    #department-workspace-prototype .dw-attempt-option.failed { color: var(--dw-red); }
+    #department-workspace-prototype .dw-observation-detail-tabs { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 25px; border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-detail-tab { position: relative; padding: 0 0 10px; border: 0; background: transparent; color: var(--dw-muted); cursor: pointer; font-size: .8rem; }
+    #department-workspace-prototype .dw-detail-tab.is-active { color: var(--dw-foreground); }
+    #department-workspace-prototype .dw-detail-tab.is-active::after { content: &quot;&quot;; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--dw-accent); }
+    #department-workspace-prototype .dw-detail-panel { margin-top: 19px; min-width: 0; }
+    #department-workspace-prototype .dw-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 25px; }
+    #department-workspace-prototype .dw-detail-field { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--dw-border); font-size: .78rem; }
+    #department-workspace-prototype .dw-detail-field dt { color: var(--dw-muted); }
+    #department-workspace-prototype .dw-detail-field dd { margin: 0; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-detail-usage { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    #department-workspace-prototype .dw-detail-usage-item { padding: 10px 0; border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-detail-usage-item span { display: block; color: var(--dw-muted); font-size: .71rem; }
+    #department-workspace-prototype .dw-detail-usage-item strong { display: block; margin-top: 3px; font-size: .93rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-json-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 9px; }
+    #department-workspace-prototype .dw-json-heading h3 { font-size: .86rem; }
+    #department-workspace-prototype .dw-json-heading span { color: var(--dw-muted); font-size: .71rem; }
+    #department-workspace-prototype .dw-json { margin: 0; padding: 12px; border: 1px solid var(--dw-border); border-radius: 6px; background: var(--dw-surface); color: var(--dw-foreground); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-observation-note { margin: 0 0 15px; color: var(--dw-muted); font-size: .75rem; }
+    #department-workspace-prototype .dw-response-empty { padding: 16px 12px; border-left: 2px solid var(--dw-amber); background: var(--dw-amber-soft); color: var(--dw-amber); font-size: .78rem; }
+    #department-workspace-prototype .dw-event-list { border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-event-item { border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-event-row { display: grid; grid-template-columns: 70px 110px minmax(0, 1fr) auto; gap: 12px; padding: 10px 2px; font-size: .76rem; cursor: pointer; }
+    #department-workspace-prototype .dw-event-row::-webkit-details-marker { display: none; }
+    #department-workspace-prototype .dw-event-row time { color: var(--dw-muted); font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-event-kind { color: var(--dw-accent); }
+    #department-workspace-prototype .dw-event-kind.error { color: var(--dw-red); }
+    #department-workspace-prototype .dw-event-kind.waiting { color: var(--dw-amber); }
+    #department-workspace-prototype .dw-event-row p { color: var(--dw-muted); }
+    #department-workspace-prototype .dw-event-expand { color: var(--dw-subtle); font-size: .68rem; white-space: nowrap; }
+    #department-workspace-prototype .dw-event-raw { margin: 0 0 11px 82px; }
+    #department-workspace-prototype .dw-usage-coverage { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 20px 0 16px; color: var(--dw-muted); font-size: .76rem; }
+    #department-workspace-prototype .dw-usage-coverage strong { color: var(--dw-foreground); font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+    #department-workspace-prototype .dw-usage-section { margin-top: 21px; }
+    #department-workspace-prototype .dw-usage-section h3 { margin-bottom: 9px; }
+    #department-workspace-prototype .dw-usage-rows { border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-usage-row { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 2fr); gap: 17px; align-items: center; padding: 11px 2px; border-bottom: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-usage-label { min-width: 0; }
+    #department-workspace-prototype .dw-usage-label strong { display: block; font-size: .79rem; font-weight: 500; }
+    #department-workspace-prototype .dw-usage-label span { display: block; margin-top: 3px; color: var(--dw-muted); font-size: .7rem; }
+    #department-workspace-prototype .dw-usage-track { height: 5px; margin-top: 7px; background: var(--dw-border); border-radius: 99px; overflow: hidden; }
+    #department-workspace-prototype .dw-usage-track i { display: block; height: 100%; background: var(--dw-accent); border-radius: inherit; }
+    #department-workspace-prototype .dw-usage-values { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; min-width: 0; }
+    #department-workspace-prototype .dw-usage-value { min-width: 0; }
+    #department-workspace-prototype .dw-usage-value span { display: block; color: var(--dw-muted); font-size: .68rem; }
+    #department-workspace-prototype .dw-usage-value strong { display: block; margin-top: 2px; font-size: .76rem; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-usage-total-strip { display: grid; grid-template-columns: minmax(130px, .8fr) repeat(4, minmax(0, 1fr)); gap: 17px; align-items: center; margin-top: 18px; padding: 12px 2px; border-top: 1px solid var(--dw-border-strong); border-bottom: 1px solid var(--dw-border-strong); }
+    #department-workspace-prototype .dw-usage-total-label { min-width: 0; }
+    #department-workspace-prototype .dw-usage-total-label strong { display: block; font-size: .83rem; font-weight: 500; }
+    #department-workspace-prototype .dw-usage-total-label span { display: block; margin-top: 3px; color: var(--dw-muted); font-size: .7rem; }
+    #department-workspace-prototype .dw-usage-total-strip .dw-usage-value span { font-size: .68rem; }
+    #department-workspace-prototype .dw-usage-total-strip .dw-usage-value strong { font-size: .79rem; }
+    #department-workspace-prototype .dw-observation-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 13px; padding: 0; border: 0; background: transparent; color: var(--dw-accent); cursor: pointer; font-size: .75rem; }
+    #department-workspace-prototype .dw-observation-link:hover { text-decoration: underline; }
+    #department-workspace-prototype .dw-observation-link i { width: 14px; height: 14px; }
+
+    @media (max-width: 760px) {
+      #department-workspace-prototype .dw-shell { grid-template-columns: 1fr; }
+      #department-workspace-prototype .dw-sidebar { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--dw-border); }
+      #department-workspace-prototype .dw-brand { padding: 0; }
+      #department-workspace-prototype .dw-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+      #department-workspace-prototype .dw-nav-item { min-height: 42px; padding: 4px 2px; }
+      #department-workspace-prototype .dw-main { padding: 22px 16px 28px; }
+      #department-workspace-prototype .dw-flow-map { grid-template-columns: 1fr; gap: 7px; }
+      #department-workspace-prototype .dw-flow-connector { justify-content: flex-start; min-height: 21px; padding-left: 14px; }
+      #department-workspace-prototype .dw-flow-connector::before { flex: 0 0 1px; width: 1px; height: 15px; margin-right: 2px; }
+      #department-workspace-prototype .dw-flow-connector::after { display: none; }
+      #department-workspace-prototype .dw-flow-connector i { transform: rotate(90deg); }
+      #department-workspace-prototype .dw-feedback-lane { grid-template-columns: 1fr; margin-top: 7px; }
+      #department-workspace-prototype .dw-feedback-route { grid-column: auto; }
+      #department-workspace-prototype .dw-feedback-route::before { display: none; }
+      #department-workspace-prototype .dw-detail { grid-template-columns: 1fr; gap: 4px; }
+      #department-workspace-prototype .dw-detail-route { white-space: normal; }
+      #department-workspace-prototype .dw-work-grid,
+      #department-workspace-prototype .dw-work-grid.has-collapsed-inspector { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+      #department-workspace-prototype .dw-inspector,
+      #department-workspace-prototype .dw-inspector.is-collapsed { width: 100%; justify-self: stretch; }
+      #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-head { flex-direction: row; padding: 12px 13px; }
+      #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-kicker,
+      #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-head strong { display: block; }
+      #department-workspace-prototype .dw-inspector.is-collapsed .dw-inspector-content { display: none; }
+      #department-workspace-prototype .dw-observation-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #department-workspace-prototype .dw-observation-filters .dw-filter-field:last-child { grid-column: 1 / -1; }
+      #department-workspace-prototype .dw-request-row { grid-template-columns: 82px minmax(0, 1fr); gap: 11px; }
+      #department-workspace-prototype .dw-request-metrics { grid-column: 2; display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 8px 13px; justify-items: start; }
+      #department-workspace-prototype .dw-detail-grid { grid-template-columns: minmax(0, 1fr); }
+      #department-workspace-prototype .dw-usage-total-strip { grid-template-columns: minmax(110px, .9fr) repeat(4, minmax(0, 1fr)); gap: 10px; }
+    }
+    @media (max-width: 430px) {
+      #department-workspace-prototype .dw-filter-select,
+      #department-workspace-prototype .dw-search-input { font-size: 16px; }
+      #department-workspace-prototype .dw-textarea { font-size: 16px; }
+      #department-workspace-prototype .dw-primary { min-height: 44px; }
+      #department-workspace-prototype .dw-icon-button { width: 44px; height: 44px; }
+      #department-workspace-prototype .dw-brand span { display: none; }
+      #department-workspace-prototype .dw-sidebar { grid-template-columns: 25px minmax(0, 1fr); gap: 7px; padding-left: 8px; padding-right: 8px; }
+      #department-workspace-prototype .dw-topline { display: block; }
+      #department-workspace-prototype .dw-current-state { margin-top: 14px; }
+      #department-workspace-prototype .dw-record-row { grid-template-columns: 48px minmax(0, 1fr); gap: 8px; }
+      #department-workspace-prototype .dw-record-state { grid-column: 2; }
+      #department-workspace-prototype .dw-compose-actions { align-items: flex-end; }
+      #department-workspace-prototype .dw-compose-actions span { max-width: 14ch; }
+      #department-workspace-prototype .dw-dept-header-top { align-items: flex-start; }
+      #department-workspace-prototype .dw-observation-head { display: block; }
+      #department-workspace-prototype .dw-observation-head .dw-current-state { margin-top: 14px; }
+      #department-workspace-prototype .dw-observation-tabs { gap: 16px; }
+      #department-workspace-prototype .dw-observation-filters { grid-template-columns: minmax(0, 1fr); }
+      #department-workspace-prototype .dw-observation-filters .dw-filter-field:last-child { grid-column: auto; }
+      #department-workspace-prototype .dw-request-row { grid-template-columns: minmax(0, 1fr); }
+      #department-workspace-prototype .dw-request-metrics { grid-column: auto; }
+      #department-workspace-prototype .dw-observation-detail-top { align-items: flex-start; }
+      #department-workspace-prototype .dw-observation-detail-title { display: block; }
+      #department-workspace-prototype .dw-observation-detail-title p { margin-top: 4px; }
+      #department-workspace-prototype .dw-detail-usage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #department-workspace-prototype .dw-usage-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 9px; }
+      #department-workspace-prototype .dw-usage-row { grid-template-columns: minmax(0, 1fr); gap: 9px; }
+      #department-workspace-prototype .dw-usage-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #department-workspace-prototype .dw-event-row { grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; }
+      #department-workspace-prototype .dw-event-row p { grid-column: 2; }
+      #department-workspace-prototype .dw-event-expand { grid-column: 3; grid-row: 1; }
+      #department-workspace-prototype .dw-event-raw { margin-left: 62px; }
+    }
+  &lt;/style&gt;
+
+  &lt;div class=&quot;dw-shell&quot;&gt;
+    &lt;aside class=&quot;dw-sidebar&quot; aria-label=&quot;协作导航&quot;&gt;
+      &lt;div class=&quot;dw-brand&quot;&gt;&lt;i data-lucide=&quot;layers-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;协作台&lt;/span&gt;&lt;/div&gt;
+      &lt;nav class=&quot;dw-nav&quot; aria-label=&quot;协作页面&quot;&gt;
+        &lt;button class=&quot;dw-nav-item is-active&quot; type=&quot;button&quot; data-view=&quot;overview&quot; aria-current=&quot;page&quot;&gt;&lt;i data-lucide=&quot;layout-dashboard&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;总览&lt;/span&gt;&lt;/button&gt;
+        &lt;button class=&quot;dw-nav-item&quot; type=&quot;button&quot; data-department=&quot;product&quot;&gt;&lt;i data-lucide=&quot;clipboard-list&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;产品&lt;/span&gt;&lt;/button&gt;
+        &lt;button class=&quot;dw-nav-item&quot; type=&quot;button&quot; data-department=&quot;engineering&quot;&gt;&lt;i data-lucide=&quot;braces&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;工程&lt;/span&gt;&lt;/button&gt;
+        &lt;button class=&quot;dw-nav-item&quot; type=&quot;button&quot; data-department=&quot;quality&quot;&gt;&lt;i data-lucide=&quot;check-check&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;质检&lt;/span&gt;&lt;/button&gt;
+        &lt;button class=&quot;dw-nav-item&quot; type=&quot;button&quot; data-view=&quot;observability&quot;&gt;&lt;i data-lucide=&quot;activity&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;观测&lt;/span&gt;&lt;/button&gt;
+      &lt;/nav&gt;
+    &lt;/aside&gt;
+    &lt;main class=&quot;dw-main&quot; id=&quot;dw-main&quot; aria-live=&quot;polite&quot;&gt;&lt;/main&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    (() =&gt; {
+      const root = document.getElementById(&quot;department-workspace-prototype&quot;);
+      const main = document.getElementById(&quot;dw-main&quot;);
+      if (!root || !main) return;
+
+      const departments = {
+        product: { name: &quot;产品部&quot;, role: &quot;需求与方案&quot;, status: &quot;已交付&quot;, tone: &quot;done&quot;, task: &quot;确认导出范围与交互入口&quot;, artifact: &quot;已交接字段、入口与命名规则&quot;, snapshot: &quot;10:02&quot; },
+        engineering: { name: &quot;工程部&quot;, role: &quot;实现与交付&quot;, status: &quot;处理中&quot;, tone: &quot;active&quot;, task: &quot;实现订单列表 CSV 导出&quot;, artifact: &quot;导出按钮与接口已接入&quot;, snapshot: &quot;10:42&quot; },
+        quality: { name: &quot;质检部&quot;, role: &quot;验证与反馈&quot;, status: &quot;待验收&quot;, tone: &quot;waiting&quot;, task: &quot;等待工程调整后开始验收&quot;, artifact: &quot;已记录窄屏操作区问题&quot;, snapshot: &quot;10:42&quot; }
+      };
+      const handoffs = {
+        &quot;handoff-product-eng&quot;: { title: &quot;产品部 → 工程部&quot;, kind: &quot;需求交接&quot;, status: &quot;已处理&quot;, time: &quot;09:28&quot;, body: &quot;订单列表增加 CSV 导出，字段沿用现有表格列；入口放在列表工具栏，文件名包含日期。&quot; },
+        &quot;handoff-eng-qa&quot;: { title: &quot;工程部 → 质检部&quot;, kind: &quot;版本交付&quot;, status: &quot;等待验收&quot;, time: &quot;10:18&quot;, body: &quot;导出按钮与接口已接入订单列表，工程部已提交待验收版本。&quot; },
+        &quot;handoff-qa-eng&quot;: { title: &quot;质检部 → 工程部&quot;, kind: &quot;问题反馈&quot;, status: &quot;待处理&quot;, time: &quot;10:42&quot;, body: &quot;窄屏列表中导出入口会与筛选项折行；请调整操作区布局后重新提交验证。&quot; }
+      };
+      const modelRequests = [
+        {
+          id: &quot;attempt-7E91-1&quot;, requestId: &quot;req-7E91&quot;, callId: &quot;call-7E91&quot;, attempt: 1, totalAttempts: 1,
+          time: &quot;09:28:14&quot;, department: &quot;product&quot;, departmentLabel: &quot;产品部&quot;, model: &quot;orion-2.1-pro&quot;, status: &quot;success&quot;,
+          inputTotalTokens: 4900, outputTokens: 486, cacheReadTokens: 1780, durationMs: 12800, usageReported: true,
+          provider: &quot;示例 Provider&quot;, workRound: &quot;需求整理&quot;, step: &quot;scope&quot;, contextVersion: &quot;ctx-product-01&quot;, promptVersion: &quot;v1.2&quot;, observedScope: &quot;模型请求、输出项、usage 摘要&quot;,
+          request: { model: &quot;orion-2.1-pro&quot;, input: [{ role: &quot;system&quot;, content: &quot;你负责整理产品需求并形成可交接结论。&quot; }, { role: &quot;user&quot;, content: &quot;确认订单列表 CSV 导出的字段范围、入口位置与文件命名规则。&quot; }], tools: [{ name: &quot;handoff_create&quot;, description: &quot;创建部门交接记录&quot; }], max_output_tokens: 1200 },
+          response: { id: &quot;resp-7E91&quot;, output: [{ type: &quot;message&quot;, role: &quot;assistant&quot;, content: [{ type: &quot;output_text&quot;, text: &quot;确认导出字段沿用现有表格列，入口放在列表工具栏。&quot; }] }], usage: { input_tokens: 4900, input_tokens_details: { cached_tokens: 1780 }, output_tokens: 486, total_tokens: 5386 } },
+          events: [
+            { time: &quot;09:28:14&quot;, kind: &quot;请求开始&quot;, tone: &quot;normal&quot;, detail: &quot;创建模型请求&quot; },
+            { time: &quot;09:28:16&quot;, kind: &quot;模型输出&quot;, tone: &quot;normal&quot;, detail: &quot;收到需求确认结果&quot; },
+            { time: &quot;09:28:27&quot;, kind: &quot;交接记录&quot;, tone: &quot;normal&quot;, detail: &quot;写入产品部 → 工程部交接&quot; }
+          ]
+        },
+        {
+          id: &quot;attempt-7F11-1&quot;, requestId: &quot;req-7F11&quot;, callId: &quot;call-7F11&quot;, attempt: 1, totalAttempts: 1,
+          time: &quot;10:18:03&quot;, department: &quot;engineering&quot;, departmentLabel: &quot;工程部&quot;, model: &quot;orion-2.1-pro&quot;, status: &quot;success&quot;,
+          inputTotalTokens: 9300, outputTokens: 702, cacheReadTokens: 4080, durationMs: 21400, usageReported: true,
+          provider: &quot;示例 Provider&quot;, workRound: &quot;版本交付&quot;, step: &quot;implementation&quot;, contextVersion: &quot;ctx-engineering-02&quot;, promptVersion: &quot;v1.4&quot;, observedScope: &quot;模型请求、输出项、usage 摘要&quot;,
+          request: { model: &quot;orion-2.1-pro&quot;, input: [{ role: &quot;system&quot;, content: &quot;你负责把已确认需求转成可交付的工程结果。&quot; }, { role: &quot;user&quot;, content: &quot;接入订单列表导出按钮与 CSV 接口，沿用当前筛选条件。&quot; }], tools: [{ name: &quot;workspace_lookup&quot;, description: &quot;读取当前项目约束&quot; }, { name: &quot;handoff_create&quot;, description: &quot;创建版本交付记录&quot; }], max_output_tokens: 1600 },
+          response: { id: &quot;resp-7F11&quot;, output: [{ type: &quot;message&quot;, role: &quot;assistant&quot;, content: [{ type: &quot;output_text&quot;, text: &quot;已提交当前导出版本，等待质检结果。&quot; }] }], usage: { input_tokens: 9300, input_tokens_details: { cached_tokens: 4080 }, output_tokens: 702, total_tokens: 10002 } },
+          events: [
+            { time: &quot;10:18:03&quot;, kind: &quot;请求开始&quot;, tone: &quot;normal&quot;, detail: &quot;创建模型请求&quot; },
+            { time: &quot;10:18:11&quot;, kind: &quot;工具相关&quot;, tone: &quot;normal&quot;, detail: &quot;整理导出接口与权限约束&quot; },
+            { time: &quot;10:18:24&quot;, kind: &quot;模型输出&quot;, tone: &quot;normal&quot;, detail: &quot;生成版本交付摘要&quot; }
+          ]
+        },
+        {
+          id: &quot;attempt-7F3A-1&quot;, requestId: &quot;req-7F3A&quot;, callId: &quot;call-7F3A&quot;, attempt: 1, totalAttempts: 2,
+          time: &quot;10:42:16&quot;, department: &quot;quality&quot;, departmentLabel: &quot;质检部&quot;, model: &quot;orion-2.1-pro&quot;, status: &quot;failed&quot;,
+          inputTotalTokens: null, outputTokens: null, cacheReadTokens: null, durationMs: 18200, usageReported: false,
+          provider: &quot;示例 Provider&quot;, workRound: &quot;验收反馈&quot;, step: &quot;acceptance&quot;, contextVersion: &quot;ctx-quality-03&quot;, promptVersion: &quot;v1.4&quot;, observedScope: &quot;模型请求、错误状态、usage 摘要&quot;,
+          request: { model: &quot;orion-2.1-pro&quot;, input: [{ role: &quot;system&quot;, content: &quot;你负责验证交付结果并形成可回传的问题反馈。&quot; }, { role: &quot;user&quot;, content: &quot;检查订单列表窄屏下的导出入口、字段与筛选条件。&quot; }], tools: [{ name: &quot;acceptance_report&quot;, description: &quot;提交验收结论&quot; }], max_output_tokens: 1400 },
+          response: { error: { status: 429, code: &quot;rate_limited&quot;, message: &quot;模型请求暂时限流，请稍后重试&quot; } },
+          events: [
+            { time: &quot;10:42:16&quot;, kind: &quot;请求开始&quot;, tone: &quot;normal&quot;, detail: &quot;创建第 1 次模型请求&quot; },
+            { time: &quot;10:42:24&quot;, kind: &quot;工具相关&quot;, tone: &quot;normal&quot;, detail: &quot;准备验收结果请求&quot; },
+            { time: &quot;10:42:34&quot;, kind: &quot;错误&quot;, tone: &quot;error&quot;, detail: &quot;HTTP 429 · rate_limited · 未生成响应&quot; },
+            { time: &quot;10:42:34&quot;, kind: &quot;错误重试&quot;, tone: &quot;error&quot;, detail: &quot;进入第 2 次尝试&quot; }
+          ]
+        },
+        {
+          id: &quot;attempt-7F3A-2&quot;, requestId: &quot;req-7F3A&quot;, callId: &quot;call-7F3A&quot;, attempt: 2, totalAttempts: 2,
+          time: &quot;10:42:35&quot;, department: &quot;quality&quot;, departmentLabel: &quot;质检部&quot;, model: &quot;orion-2.1-pro&quot;, status: &quot;success&quot;,
+          inputTotalTokens: 4820, outputTokens: 612, cacheReadTokens: 3200, durationMs: 23100, usageReported: true,
+          provider: &quot;示例 Provider&quot;, workRound: &quot;验收反馈&quot;, step: &quot;acceptance&quot;, contextVersion: &quot;ctx-quality-03&quot;, promptVersion: &quot;v1.4&quot;, observedScope: &quot;模型请求、输出项、usage 摘要&quot;,
+          request: { model: &quot;orion-2.1-pro&quot;, input: [{ role: &quot;system&quot;, content: &quot;你负责验证交付结果并形成可回传的问题反馈。&quot; }, { role: &quot;user&quot;, content: &quot;检查订单列表窄屏下的导出入口、字段与筛选条件。&quot; }], tools: [{ name: &quot;acceptance_report&quot;, description: &quot;提交验收结论&quot; }], max_output_tokens: 1400 },
+          response: { id: &quot;resp-7F3A-2&quot;, output: [{ type: &quot;message&quot;, role: &quot;assistant&quot;, content: [{ type: &quot;output_text&quot;, text: &quot;确认窄屏操作区折行，反馈工程部调整后重新验收。&quot; }] }], usage: { input_tokens: 4820, input_tokens_details: { cached_tokens: 3200 }, output_tokens: 612, total_tokens: 5432 } },
+          events: [
+            { time: &quot;10:42:35&quot;, kind: &quot;请求开始&quot;, tone: &quot;normal&quot;, detail: &quot;创建第 2 次模型请求&quot; },
+            { time: &quot;10:42:42&quot;, kind: &quot;工具相关&quot;, tone: &quot;normal&quot;, detail: &quot;完成验收结果结构化&quot; },
+            { time: &quot;10:42:56&quot;, kind: &quot;模型输出&quot;, tone: &quot;normal&quot;, detail: &quot;生成窄屏问题反馈&quot; },
+            { time: &quot;10:42:58&quot;, kind: &quot;交接记录&quot;, tone: &quot;normal&quot;, detail: &quot;写入质检部 → 工程部反馈&quot; }
+          ]
+        },
+        {
+          id: &quot;attempt-7F44-1&quot;, requestId: &quot;req-7F44&quot;, callId: &quot;call-7F44&quot;, attempt: 1, totalAttempts: 1,
+          time: &quot;10:47:02&quot;, department: &quot;engineering&quot;, departmentLabel: &quot;工程部&quot;, model: &quot;orion-2.1-pro&quot;, status: &quot;running&quot;,
+          inputTotalTokens: null, outputTokens: null, cacheReadTokens: null, durationMs: 12600, usageReported: false,
+          provider: &quot;示例 Provider&quot;, workRound: &quot;反馈处理&quot;, step: &quot;revision&quot;, contextVersion: &quot;ctx-engineering-03&quot;, promptVersion: &quot;v1.4&quot;, observedScope: &quot;模型请求、上下文摘要、usage 摘要&quot;,
+          request: { model: &quot;orion-2.1-pro&quot;, input: [{ role: &quot;system&quot;, content: &quot;你负责处理质检反馈并提交新的工程结果。&quot; }, { role: &quot;user&quot;, content: &quot;根据窄屏导出入口反馈调整订单列表操作区布局。&quot; }], tools: [{ name: &quot;workspace_lookup&quot;, description: &quot;读取当前页面布局约束&quot; }, { name: &quot;handoff_create&quot;, description: &quot;创建新的版本交付记录&quot; }], max_output_tokens: 1600 },
+          response: null,
+          events: [
+            { time: &quot;10:47:02&quot;, kind: &quot;请求开始&quot;, tone: &quot;normal&quot;, detail: &quot;创建进行中的模型请求&quot; },
+            { time: &quot;10:47:09&quot;, kind: &quot;工具相关&quot;, tone: &quot;normal&quot;, detail: &quot;读取当前布局约束&quot; },
+            { time: &quot;10:47:14&quot;, kind: &quot;模型输出&quot;, tone: &quot;waiting&quot;, detail: &quot;等待模型响应&quot; }
+          ]
+        }
+      ];
+      const contextData = {
+        product: [
+          { id: &quot;user-brief&quot;, title: &quot;用户补充&quot;, meta: &quot;用户 · 09:16&quot;, body: &quot;订单列表需要支持 CSV 导出，字段先按现有表格列保持一致。&quot; },
+          { id: &quot;product-scope&quot;, title: &quot;需求范围&quot;, meta: &quot;本部门 · 09:28&quot;, body: &quot;导出入口放在列表工具栏，文件名使用 order-list-YYYY-MM-DD.csv。&quot; },
+          { id: &quot;engineering-question&quot;, title: &quot;工程确认&quot;, meta: &quot;工程部 · 10:02&quot;, body: &quot;请确认大数据量导出的上限与文件命名规则。&quot; }
+        ],
+        engineering: [
+          { id: &quot;product-brief&quot;, title: &quot;产品需求&quot;, meta: &quot;产品部 · 09:28&quot;, body: &quot;订单列表增加 CSV 导出，沿用现有字段与列表工具栏位置。&quot; },
+          { id: &quot;api-constraint&quot;, title: &quot;接口约束&quot;, meta: &quot;工程部 · 09:44&quot;, body: &quot;导出沿用当前订单查询条件，服务端流式返回文件，单次请求保留现有权限校验。&quot; },
+          { id: &quot;qa-feedback&quot;, title: &quot;质检反馈&quot;, meta: &quot;质检部 · 10:42&quot;, body: &quot;窄屏列表中导出入口会与筛选项折行，需要调整操作区布局。&quot; }
+        ],
+        quality: [
+          { id: &quot;engineering-build&quot;, title: &quot;待验收版本&quot;, meta: &quot;工程部 · 10:18&quot;, body: &quot;订单列表已接入导出按钮与 CSV 接口，覆盖当前筛选条件。&quot; },
+          { id: &quot;acceptance-scope&quot;, title: &quot;验收范围&quot;, meta: &quot;产品部 · 09:28&quot;, body: &quot;字段与现有列表一致，文件名包含日期，入口位于列表工具栏。&quot; },
+          { id: &quot;qa-note&quot;, title: &quot;当前记录&quot;, meta: &quot;本部门 · 10:42&quot;, body: &quot;窄屏操作区存在折行问题，已整理为反馈交给工程部。&quot; }
+        ]
+      };
+      const state = {
+        view: &quot;observability&quot;,
+        department: &quot;engineering&quot;,
+        inspectorTab: &quot;context&quot;,
+        inspectorCollapsed: false,
+        observationTab: &quot;requests&quot;,
+        observationScreen: &quot;list&quot;,
+        observationDetailTab: &quot;overview&quot;,
+        selectedRequestId: null,
+        selectedAttemptId: null,
+        observationFilters: { department: &quot;all&quot;, status: &quot;all&quot;, search: &quot;&quot; },
+        selectedHandoff: &quot;handoff-qa-eng&quot;,
+        selectedContext: { product: &quot;user-brief&quot;, engineering: &quot;qa-feedback&quot;, quality: &quot;engineering-build&quot; },
+        globalDraft: &quot;&quot;,
+        deptDrafts: { product: &quot;&quot;, engineering: &quot;&quot;, quality: &quot;&quot; },
+        globalPending: false,
+        deptPending: { product: false, engineering: false, quality: false },
+        globalMessages: [
+          { source: &quot;用户&quot;, text: &quot;订单列表需要支持 CSV 导出，先保持现有字段不变。&quot;, time: &quot;09:16&quot; },
+          { source: &quot;系统记录&quot;, text: &quot;需求已进入三部门协作流。&quot;, time: &quot;09:17&quot; }
+        ],
+        deptMessages: {
+          product: [
+            { source: &quot;用户&quot;, detail: &quot;任务发起&quot;, text: &quot;订单列表需要支持 CSV 导出，字段先按现有表格列保持一致。&quot;, time: &quot;09:16&quot;, kind: &quot;user&quot; },
+            { source: &quot;本部门 · 产品部&quot;, detail: &quot;需求整理&quot;, text: &quot;已确认入口放在列表工具栏，并将字段范围交给工程部。&quot;, time: &quot;09:28&quot;, kind: &quot;self&quot; },
+            { source: &quot;其他部门 · 工程部&quot;, detail: &quot;待确认&quot;, text: &quot;请确认大数据量导出的上限与文件命名规则。&quot;, time: &quot;10:02&quot;, kind: &quot;other&quot; }
+          ],
+          engineering: [
+            { source: &quot;其他部门 · 产品部&quot;, detail: &quot;需求交接&quot;, text: &quot;订单列表增加 CSV 导出，沿用现有字段与列表工具栏位置。&quot;, time: &quot;09:28&quot;, kind: &quot;other&quot; },
+            { source: &quot;本部门 · 工程部&quot;, detail: &quot;版本交付&quot;, text: &quot;已提交当前导出版本，等待质检结果。&quot;, time: &quot;10:18&quot;, kind: &quot;self&quot; },
+            { source: &quot;其他部门 · 质检部&quot;, detail: &quot;问题反馈&quot;, text: &quot;窄屏列表中导出入口会与筛选项折行，请调整后重新提交验证。&quot;, time: &quot;10:42&quot;, kind: &quot;other&quot; }
+          ],
+          quality: [
+            { source: &quot;其他部门 · 工程部&quot;, detail: &quot;版本交付&quot;, text: &quot;订单列表已接入导出按钮与 CSV 接口，覆盖当前筛选条件。&quot;, time: &quot;10:18&quot;, kind: &quot;other&quot; },
+            { source: &quot;本部门 · 质检部&quot;, detail: &quot;验收准备&quot;, text: &quot;已根据当前字段范围准备验收项，等待工程部调整窄屏布局。&quot;, time: &quot;10:31&quot;, kind: &quot;self&quot; },
+            { source: &quot;用户&quot;, detail: &quot;补充关注&quot;, text: &quot;在手机宽度下也要能找到导出入口。&quot;, time: &quot;10:36&quot;, kind: &quot;user&quot; }
+          ]
+        }
+      };
+
+      const design = { density: 1, inspectorWidth: 304 };
+      function applyDesign() {
+        root.style.setProperty(&quot;--dw-density&quot;, design.density);
+        root.style.setProperty(&quot;--dw-inspector-width&quot;, `${design.inspectorWidth}px`);
+      }
+      applyDesign();
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: root, onChange: applyDesign });
+        tweak.addSlider(design, &quot;density&quot;, { label: &quot;信息密度&quot;, min: .85, max: 1.15, step: .05, reference: &quot;--dw-density&quot; });
+        tweak.addSlider(design, &quot;inspectorWidth&quot;, { label: &quot;检查区宽度&quot;, min: 260, max: 380, step: 4, unit: &quot;px&quot;, reference: &quot;--dw-inspector-width&quot; });
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g, character =&gt; ({ &quot;&amp;&quot;: &quot;&amp;amp;&quot;, &quot;&lt;&quot;: &quot;&amp;lt;&quot;, &quot;&gt;&quot;: &quot;&amp;gt;&quot;, &#x27;&quot;&#x27;: &quot;&amp;quot;&quot;, &quot;&#x27;&quot;: &quot;&amp;#39;&quot; }[character]));
+      }
+      function icons() {
+        root.querySelectorAll(&quot;.dw-icon-button[aria-label]&quot;).forEach(button =&gt; {
+          button.setAttribute(&quot;data-tooltip&quot;, button.getAttribute(&quot;aria-label&quot;));
+        });
+        if (globalThis.lucide &amp;&amp; typeof globalThis.lucide.createIcons === &quot;function&quot;) globalThis.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+      }
+      function statusMarkup(dept) {
+        return `&lt;span class=&quot;dw-node-status ${dept.tone}&quot;&gt;&lt;span class=&quot;dw-status-dot ${dept.tone === &quot;waiting&quot; ? &quot;waiting&quot; : &quot;&quot;}&quot;&gt;&lt;/span&gt;${dept.status}&lt;/span&gt;`;
+      }
+      function nodeMarkup(key) {
+        const dept = departments[key];
+        const index = key === &quot;product&quot; ? &quot;01&quot; : key === &quot;engineering&quot; ? &quot;02&quot; : &quot;03&quot;;
+        return `&lt;button class=&quot;dw-dept-node ${state.department === key &amp;&amp; state.view === &quot;department&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-department=&quot;${key}&quot;&gt;
+          &lt;span class=&quot;dw-node-meta&quot;&gt;&lt;span class=&quot;dw-node-index&quot;&gt;${index}&lt;/span&gt;${statusMarkup(dept)}&lt;/span&gt;
+          &lt;h3&gt;${dept.name}&lt;/h3&gt;&lt;span class=&quot;dw-node-role&quot;&gt;${dept.role}&lt;/span&gt;
+          &lt;span class=&quot;dw-node-task&quot;&gt;${dept.task}&lt;/span&gt;
+          &lt;span class=&quot;dw-node-artifact&quot;&gt;${dept.artifact}&lt;/span&gt;
+          &lt;span class=&quot;dw-node-foot&quot;&gt;&lt;span&gt;当前记录&lt;/span&gt;&lt;span&gt;进入工作区 &lt;i data-lucide=&quot;arrow-up-right&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;/span&gt;
+        &lt;/button&gt;`;
+      }
+      function handoffDetailMarkup() {
+        const item = handoffs[state.selectedHandoff];
+        return `&lt;div class=&quot;dw-detail&quot; id=&quot;dw-handoff-detail&quot; aria-live=&quot;polite&quot;&gt;&lt;div&gt;&lt;h3&gt;${item.kind}&lt;/h3&gt;&lt;p&gt;${item.body}&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;dw-detail-route&quot;&gt;${item.title} · ${item.time}&lt;/span&gt;&lt;/div&gt;`;
+      }
+      function globalLogMarkup() {
+        const entries = state.globalMessages.map(entry =&gt; `&lt;div class=&quot;dw-global-entry&quot;&gt;&lt;strong&gt;${escapeHtml(entry.source)}&lt;/strong&gt;&lt;span&gt;${escapeHtml(entry.text)}&lt;/span&gt;&lt;time&gt;${escapeHtml(entry.time)}&lt;/time&gt;&lt;/div&gt;`).join(&quot;&quot;);
+        const pending = state.globalPending ? `&lt;div class=&quot;dw-pending&quot;&gt;&lt;i data-lucide=&quot;clock-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;等待产品处理&lt;/span&gt;&lt;/div&gt;` : &quot;&quot;;
+        return entries + pending;
+      }
+      function formatNumber(value) { return typeof value === &quot;number&quot; &amp;&amp; Number.isFinite(value) ? value.toLocaleString(&quot;zh-CN&quot;) : &quot;未上报&quot;; }
+      function formatDuration(item) { return item.status === &quot;running&quot; ? &quot;进行中&quot; : typeof item.durationMs === &quot;number&quot; ? `${(item.durationMs / 1000).toFixed(1)}s` : &quot;未上报&quot;; }
+      function usageField(item, field) {
+        const usage = item.usageReported &amp;&amp; item.response &amp;&amp; item.response.usage;
+        if (!usage) return null;
+        if (field === &quot;inputTotalTokens&quot;) return typeof usage.input_tokens === &quot;number&quot; ? usage.input_tokens : null;
+        if (field === &quot;outputTokens&quot;) return typeof usage.output_tokens === &quot;number&quot; ? usage.output_tokens : null;
+        if (field === &quot;cacheReadTokens&quot;) return usage.input_tokens_details &amp;&amp; typeof usage.input_tokens_details.cached_tokens === &quot;number&quot; ? usage.input_tokens_details.cached_tokens : null;
+        return null;
+      }
+      function formatToken(item, field) {
+        const value = usageField(item, field);
+        if (typeof value === &quot;number&quot;) return formatNumber(value);
+        if (item.status === &quot;running&quot; &amp;&amp; field === &quot;outputTokens&quot;) return &quot;等待响应&quot;;
+        return &quot;未上报&quot;;
+      }
+      function statusLabel(status) { return { success: &quot;成功&quot;, failed: &quot;失败&quot;, running: &quot;进行中&quot; }[status] || &quot;未知&quot;; }
+      function requestStateMarkup(item) { return `&lt;span class=&quot;dw-request-state ${item.status}&quot;&gt;&lt;span class=&quot;dw-status-dot ${item.status === &quot;running&quot; ? &quot;waiting&quot; : item.status === &quot;failed&quot; ? &quot;issue&quot; : &quot;&quot;}&quot;&gt;&lt;/span&gt;${statusLabel(item.status)}&lt;/span&gt;`; }
+      function filteredRequests() {
+        const filters = state.observationFilters;
+        const query = filters.search.trim().toLowerCase();
+        return modelRequests.filter(item =&gt; {
+          const departmentMatch = filters.department === &quot;all&quot; || item.department === filters.department;
+          const statusMatch = filters.status === &quot;all&quot; || item.status === filters.status;
+          const searchMatch = !query || [item.requestId, item.callId, item.model, item.departmentLabel].some(value =&gt; String(value).toLowerCase().includes(query));
+          return departmentMatch &amp;&amp; statusMatch &amp;&amp; searchMatch;
+        });
+      }
+      function requestById(id) { return modelRequests.find(item =&gt; item.id === id); }
+      function requestRowMarkup(item) {
+        return `&lt;button class=&quot;dw-request-row&quot; type=&quot;button&quot; data-obs-request=&quot;${item.id}&quot; aria-label=&quot;查看 ${item.requestId} 第 ${item.attempt} 次尝试&quot;&gt;&lt;span class=&quot;dw-request-time&quot;&gt;${item.time}${requestStateMarkup(item)}&lt;span&gt;调用 ${item.callId}&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-request-main&quot;&gt;&lt;strong&gt;${item.departmentLabel} · ${item.model}&lt;/strong&gt;&lt;span&gt;${item.provider} · ${item.requestId} · 第 ${item.attempt}/${item.totalAttempts} 次尝试 · ${item.workRound}&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-request-metrics&quot;&gt;&lt;span&gt;Input &lt;strong&gt;${formatToken(item, &quot;inputTotalTokens&quot;)}&lt;/strong&gt; · Output &lt;strong&gt;${formatToken(item, &quot;outputTokens&quot;)}&lt;/strong&gt;&lt;/span&gt;&lt;span&gt;耗时 &lt;strong&gt;${formatDuration(item)}&lt;/strong&gt;&lt;/span&gt;&lt;/span&gt;&lt;/button&gt;`;
+      }
+      function requestListMarkup() {
+        const items = filteredRequests().slice().sort((a, b) =&gt; b.time.localeCompare(a.time));
+        const rows = items.length ? items.map(requestRowMarkup).join(&quot;&quot;) : `&lt;div class=&quot;dw-empty-results&quot;&gt;当前筛选没有模型请求&lt;/div&gt;`;
+        return `&lt;div class=&quot;dw-observation-results-head&quot;&gt;&lt;h2&gt;模型请求&lt;/h2&gt;&lt;p id=&quot;dw-observation-count&quot;&gt;显示 ${items.length} / ${modelRequests.length} 次尝试&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;dw-request-list&quot;&gt;${rows}&lt;/div&gt;`;
+      }
+      function sumKnown(items, field) {
+        const values = items.map(item =&gt; usageField(item, field));
+        if (!values.length || values.some(value =&gt; typeof value !== &quot;number&quot;)) return null;
+        return values.reduce((total, value) =&gt; total + value, 0);
+      }
+      function usageFor(items) {
+        const reportedItems = items.filter(item =&gt; item.usageReported &amp;&amp; usageField(item, &quot;inputTotalTokens&quot;) !== null &amp;&amp; usageField(item, &quot;outputTokens&quot;) !== null);
+        const inputTotal = sumKnown(reportedItems, &quot;inputTotalTokens&quot;);
+        const output = sumKnown(reportedItems, &quot;outputTokens&quot;);
+        const cacheRead = sumKnown(reportedItems, &quot;cacheReadTokens&quot;);
+        const outputWaiting = items.some(item =&gt; item.status === &quot;running&quot; &amp;&amp; item.outputTokens === null);
+        return { inputTotal, output, cacheRead, total: inputTotal !== null &amp;&amp; output !== null ? inputTotal + output : null, outputWaiting, reportedCount: reportedItems.length, totalCount: items.length };
+      }
+      function usageValue(usage, key) {
+        if ((key === &quot;output&quot; || key === &quot;total&quot;) &amp;&amp; usage.output === null &amp;&amp; usage.outputWaiting) return &quot;等待响应&quot;;
+        return usage[key] === null ? &quot;未上报&quot; : formatNumber(usage[key]);
+      }
+      function usageValueMarkup(label, value) { return `&lt;span class=&quot;dw-usage-value&quot;&gt;&lt;span&gt;${label}&lt;/span&gt;&lt;strong&gt;${value}&lt;/strong&gt;&lt;/span&gt;`; }
+      function groupRows(items, key, label, maxTotal) {
+        const usage = usageFor(items);
+        const totalForBar = usage.total === null ? 0 : Math.round((usage.total / Math.max(maxTotal, 1)) * 100);
+        const runningCount = items.filter(item =&gt; item.status === &quot;running&quot;).length;
+        const coverageLabel = `${usage.reportedCount}/${usage.totalCount} 次尝试已上报${runningCount ? ` · ${runningCount} 进行中` : &quot;&quot;}`;
+        return `&lt;div class=&quot;dw-usage-row&quot;&gt;&lt;div class=&quot;dw-usage-label&quot;&gt;&lt;strong&gt;${label}&lt;/strong&gt;&lt;span&gt;${coverageLabel}&lt;/span&gt;&lt;span class=&quot;dw-usage-track&quot; aria-hidden=&quot;true&quot;&gt;&lt;i style=&quot;width:${totalForBar}%&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;dw-usage-values&quot;&gt;${usageValueMarkup(&quot;输入（含缓存）&quot;, usageValue(usage, &quot;inputTotal&quot;))}${usageValueMarkup(&quot;输出&quot;, usageValue(usage, &quot;output&quot;))}${usageValueMarkup(&quot;缓存读取（输入子集）&quot;, usageValue(usage, &quot;cacheRead&quot;))}${usageValueMarkup(&quot;总 Token&quot;, usageValue(usage, &quot;total&quot;))}${usageValueMarkup(&quot;成本&quot;, &quot;未上报&quot;)}&lt;/div&gt;&lt;/div&gt;`;
+      }
+      function usageGroups(items, getKey, labels) {
+        const groups = new Map();
+        items.forEach(item =&gt; { const key = getKey(item); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); });
+        return Array.from(groups.entries()).map(([key, group]) =&gt; ({ key, group, label: labels ? labels[key] : key }));
+      }
+      function usageSection(title, groups) {
+        const totals = groups.map(item =&gt; usageFor(item.group).total).filter(value =&gt; typeof value === &quot;number&quot;);
+        const maxTotal = totals.length ? Math.max(...totals) : 1;
+        const rows = groups.length ? groups.map(item =&gt; groupRows(item.group, item.key, item.label, maxTotal)).join(&quot;&quot;) : `&lt;div class=&quot;dw-empty-results&quot;&gt;当前筛选没有可汇总的模型请求&lt;/div&gt;`;
+        return `&lt;section class=&quot;dw-usage-section&quot;&gt;&lt;h3&gt;${title}&lt;/h3&gt;&lt;div class=&quot;dw-usage-rows&quot;&gt;${rows}&lt;/div&gt;&lt;/section&gt;`;
+      }
+      function usageMarkup() {
+        const items = filteredRequests();
+        const reported = items.filter(item =&gt; item.usageReported).length;
+        const coverage = items.length ? Math.round((reported / items.length) * 100) : 0;
+        const totalUsage = usageFor(items);
+        const departmentsByKey = { product: &quot;产品部&quot;, engineering: &quot;工程部&quot;, quality: &quot;质检部&quot; };
+        const byDepartment = usageGroups(items, item =&gt; item.department, departmentsByKey);
+        const byModel = usageGroups(items, item =&gt; item.model);
+        return `&lt;div class=&quot;dw-observation-results-head&quot;&gt;&lt;h2&gt;用量统计&lt;/h2&gt;&lt;p&gt;覆盖率 ${coverage}%&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;dw-usage-coverage&quot;&gt;&lt;strong&gt;${reported} / ${items.length}&lt;/strong&gt;&lt;span&gt;次尝试已上报 usage&lt;/span&gt;&lt;span&gt;输入（含缓存）与缓存读取（输入子集）不重复相加&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;dw-usage-total-strip&quot;&gt;&lt;div class=&quot;dw-usage-total-label&quot;&gt;&lt;strong&gt;筛选总计&lt;/strong&gt;&lt;span&gt;${reported}/${items.length} 次尝试已上报&lt;/span&gt;&lt;/div&gt;${usageValueMarkup(&quot;输入（含缓存）&quot;, usageValue(totalUsage, &quot;inputTotal&quot;))}${usageValueMarkup(&quot;输出&quot;, usageValue(totalUsage, &quot;output&quot;))}${usageValueMarkup(&quot;缓存读取（输入子集）&quot;, usageValue(totalUsage, &quot;cacheRead&quot;))}${usageValueMarkup(&quot;总 Token&quot;, usageValue(totalUsage, &quot;total&quot;))}&lt;/div&gt;${usageSection(&quot;按部门&quot;, byDepartment)}${usageSection(&quot;按模型&quot;, byModel)}`;
+      }
+      function observationShellMarkup() {
+        const filters = state.observationFilters;
+        return `&lt;div class=&quot;dw-observation-page&quot; role=&quot;region&quot; aria-label=&quot;示例任务模型请求观测&quot;&gt;&lt;header class=&quot;dw-observation-head&quot;&gt;&lt;div&gt;&lt;div class=&quot;dw-eyebrow&quot;&gt;&lt;span class=&quot;dw-status-dot&quot;&gt;&lt;/span&gt;&lt;strong&gt;观测&lt;/strong&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;示例任务&lt;/span&gt;&lt;/div&gt;&lt;h1&gt;模型请求&lt;/h1&gt;&lt;p class=&quot;dw-subtitle&quot;&gt;请求 · 响应 · usage&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;dw-current-state&quot;&gt;&lt;span class=&quot;dw-status-dot waiting&quot;&gt;&lt;/span&gt;1 个请求进行中&lt;/span&gt;&lt;/header&gt;&lt;div class=&quot;dw-observation-scope&quot;&gt;&lt;i data-lucide=&quot;activity&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;任务范围&lt;/span&gt;&lt;strong&gt;为订单列表增加 CSV 导出&lt;/strong&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;观测时间 09:28–10:47&lt;/span&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;5 次尝试&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;dw-observation-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;观测页签&quot;&gt;&lt;button id=&quot;dw-ob-tab-requests&quot; class=&quot;dw-observation-tab ${state.observationTab === &quot;requests&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-tab=&quot;requests&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-content&quot; aria-selected=&quot;${state.observationTab === &quot;requests&quot;}&quot;&gt;请求记录&lt;/button&gt;&lt;button id=&quot;dw-ob-tab-usage&quot; class=&quot;dw-observation-tab ${state.observationTab === &quot;usage&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-tab=&quot;usage&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-content&quot; aria-selected=&quot;${state.observationTab === &quot;usage&quot;}&quot;&gt;用量统计&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;dw-observation-filters&quot;&gt;&lt;label class=&quot;dw-filter-field&quot;&gt;&lt;span&gt;部门&lt;/span&gt;&lt;select class=&quot;dw-filter-select&quot; data-obs-department aria-label=&quot;按部门筛选&quot;&gt;&lt;option value=&quot;all&quot; ${filters.department === &quot;all&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;全部部门&lt;/option&gt;&lt;option value=&quot;product&quot; ${filters.department === &quot;product&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;产品部&lt;/option&gt;&lt;option value=&quot;engineering&quot; ${filters.department === &quot;engineering&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;工程部&lt;/option&gt;&lt;option value=&quot;quality&quot; ${filters.department === &quot;quality&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;质检部&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;label class=&quot;dw-filter-field&quot;&gt;&lt;span&gt;状态&lt;/span&gt;&lt;select class=&quot;dw-filter-select&quot; data-obs-status aria-label=&quot;按状态筛选&quot;&gt;&lt;option value=&quot;all&quot; ${filters.status === &quot;all&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;全部状态&lt;/option&gt;&lt;option value=&quot;success&quot; ${filters.status === &quot;success&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;成功&lt;/option&gt;&lt;option value=&quot;failed&quot; ${filters.status === &quot;failed&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;失败&lt;/option&gt;&lt;option value=&quot;running&quot; ${filters.status === &quot;running&quot; ? &quot;selected&quot; : &quot;&quot;}&gt;进行中&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;label class=&quot;dw-filter-field&quot;&gt;&lt;span&gt;搜索&lt;/span&gt;&lt;input class=&quot;dw-search-input&quot; type=&quot;search&quot; data-obs-search aria-label=&quot;搜索请求 ID 或模型&quot; placeholder=&quot;请求 ID 或模型&quot; value=&quot;${escapeHtml(filters.search)}&quot;&gt;&lt;/label&gt;&lt;/div&gt;&lt;div id=&quot;dw-observation-content&quot; role=&quot;tabpanel&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;&lt;/div&gt;`;
+      }
+      function updateObservationContent() {
+        const content = root.querySelector(&quot;#dw-observation-content&quot;);
+        if (!content) return;
+        content.innerHTML = state.observationTab === &quot;requests&quot; ? requestListMarkup() : usageMarkup();
+        root.querySelectorAll(&quot;.dw-observation-tab&quot;).forEach(tab =&gt; {
+          const active = tab.dataset.obTab === state.observationTab;
+          tab.classList.toggle(&quot;is-active&quot;, active);
+          tab.setAttribute(&quot;aria-selected&quot;, String(active));
+        });
+        icons();
+      }
+      function renderObservability() {
+        state.view = &quot;observability&quot;;
+        state.observationScreen = &quot;list&quot;;
+        main.innerHTML = observationShellMarkup();
+        updateNav(); icons(); updateObservationContent();
+      }
+      function formatJson(value) { return escapeHtml(JSON.stringify(value, null, 2)); }
+      function detailOverviewMarkup(item) {
+        const usage = usageFor([item]);
+        return `&lt;div class=&quot;dw-detail-panel&quot;&gt;&lt;div class=&quot;dw-detail-usage&quot;&gt;${usageValueMarkup(&quot;输入（含缓存）&quot;, usageValue(usage, &quot;inputTotal&quot;))}${usageValueMarkup(&quot;输出&quot;, usageValue(usage, &quot;output&quot;))}${usageValueMarkup(&quot;缓存读取（输入子集）&quot;, usageValue(usage, &quot;cacheRead&quot;))}${usageValueMarkup(&quot;总 Token&quot;, usageValue(usage, &quot;total&quot;))}&lt;/div&gt;&lt;dl class=&quot;dw-detail-grid&quot;&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;Provider&lt;/dt&gt;&lt;dd&gt;${item.provider}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;Model&lt;/dt&gt;&lt;dd&gt;${item.model}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;耗时&lt;/dt&gt;&lt;dd&gt;${formatDuration(item)}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;成本&lt;/dt&gt;&lt;dd&gt;未上报&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;本轮工作&lt;/dt&gt;&lt;dd&gt;${item.workRound}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;步骤&lt;/dt&gt;&lt;dd&gt;${item.step}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;Context 快照&lt;/dt&gt;&lt;dd&gt;${item.contextVersion}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;Prompt 版本&lt;/dt&gt;&lt;dd&gt;${item.promptVersion}&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;数据来源&lt;/dt&gt;&lt;dd&gt;示例运行记录&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-detail-field&quot;&gt;&lt;dt&gt;采集范围&lt;/dt&gt;&lt;dd&gt;${item.observedScope}&lt;/dd&gt;&lt;/div&gt;&lt;/dl&gt;&lt;/div&gt;`;
+      }
+      function detailRequestMarkup(item) {
+        return `&lt;div class=&quot;dw-detail-panel&quot;&gt;&lt;div class=&quot;dw-json-heading&quot;&gt;&lt;h3&gt;请求 JSON（示例）&lt;/h3&gt;&lt;span&gt;${item.requestId} · 第 ${item.attempt}/${item.totalAttempts} 次&lt;/span&gt;&lt;/div&gt;&lt;pre class=&quot;dw-json&quot;&gt;${formatJson(item.request)}&lt;/pre&gt;&lt;/div&gt;`;
+      }
+      function detailResponseMarkup(item) {
+        if (!item.response) return `&lt;div class=&quot;dw-detail-panel&quot;&gt;&lt;div class=&quot;dw-response-empty&quot;&gt;等待模型响应&lt;/div&gt;&lt;/div&gt;`;
+        return `&lt;div class=&quot;dw-detail-panel&quot;&gt;&lt;div class=&quot;dw-json-heading&quot;&gt;&lt;h3&gt;响应 JSON（示例）&lt;/h3&gt;&lt;span&gt;${statusLabel(item.status)}&lt;/span&gt;&lt;/div&gt;&lt;pre class=&quot;dw-json&quot;&gt;${formatJson(item.response)}&lt;/pre&gt;&lt;/div&gt;`;
+      }
+      function detailEventsMarkup(item) {
+        const rows = item.events.map(event =&gt; `&lt;details class=&quot;dw-event-item&quot;&gt;&lt;summary class=&quot;dw-event-row&quot;&gt;&lt;time&gt;${event.time}&lt;/time&gt;&lt;span class=&quot;dw-event-kind ${event.tone === &quot;error&quot; ? &quot;error&quot; : event.tone === &quot;waiting&quot; ? &quot;waiting&quot; : &quot;&quot;}&quot;&gt;${event.kind}&lt;/span&gt;&lt;p&gt;${event.detail}&lt;/p&gt;&lt;span class=&quot;dw-event-expand&quot;&gt;查看原文&lt;/span&gt;&lt;/summary&gt;&lt;pre class=&quot;dw-json dw-event-raw&quot;&gt;${formatJson({ request_id: item.requestId, attempt: item.attempt, event })}&lt;/pre&gt;&lt;/details&gt;`).join(&quot;&quot;);
+        return `&lt;div class=&quot;dw-detail-panel&quot;&gt;&lt;div class=&quot;dw-event-list&quot;&gt;${rows}&lt;/div&gt;&lt;/div&gt;`;
+      }
+      function updateObservationDetailContent() {
+        const content = root.querySelector(&quot;#dw-observation-detail-content&quot;);
+        const item = requestById(state.selectedAttemptId);
+        if (!content || !item) return;
+        const panels = { overview: detailOverviewMarkup(item), request: detailRequestMarkup(item), response: detailResponseMarkup(item), events: detailEventsMarkup(item) };
+        content.innerHTML = panels[state.observationDetailTab];
+        root.querySelectorAll(&quot;.dw-detail-tab&quot;).forEach(tab =&gt; {
+          const active = tab.dataset.obDetailTab === state.observationDetailTab;
+          tab.classList.toggle(&quot;is-active&quot;, active);
+          tab.setAttribute(&quot;aria-selected&quot;, String(active));
+        });
+      }
+      function renderObservationDetail(requestId, attemptId) {
+        const requested = requestById(attemptId) || modelRequests.find(item =&gt; item.requestId === requestId);
+        if (!requested) { renderObservability(); return; }
+        state.view = &quot;observability&quot;;
+        state.observationScreen = &quot;detail&quot;;
+        state.selectedRequestId = requested.requestId;
+        state.selectedAttemptId = requested.id;
+        const attempts = modelRequests.filter(item =&gt; item.requestId === requested.requestId).sort((a, b) =&gt; a.attempt - b.attempt);
+        main.innerHTML = `&lt;div class=&quot;dw-observation-page&quot; role=&quot;region&quot; aria-label=&quot;模型请求详情&quot;&gt;&lt;div class=&quot;dw-observation-detail-top&quot;&gt;&lt;button class=&quot;dw-back&quot; type=&quot;button&quot; data-obs-back&gt;&lt;i data-lucide=&quot;arrow-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;返回请求记录&lt;/button&gt;&lt;button class=&quot;dw-back&quot; type=&quot;button&quot; data-department=&quot;${requested.department}&quot;&gt;&lt;i data-lucide=&quot;corner-up-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;返回${requested.departmentLabel}&lt;/button&gt;&lt;/div&gt;&lt;header class=&quot;dw-observation-detail-title&quot; style=&quot;margin-top:18px&quot;&gt;&lt;h1&gt;模型请求详情&lt;/h1&gt;&lt;p&gt;${requested.requestId} · &lt;span class=&quot;dw-request-state ${requested.status}&quot;&gt;${statusLabel(requested.status)}&lt;/span&gt;&lt;/p&gt;&lt;/header&gt;&lt;div class=&quot;dw-observation-crumbs&quot; aria-label=&quot;请求关联&quot;&gt;&lt;span&gt;任务&lt;/span&gt;&lt;strong&gt;为订单列表增加 CSV 导出&lt;/strong&gt;&lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;&lt;span&gt;部门&lt;/span&gt;&lt;strong&gt;${requested.departmentLabel}&lt;/strong&gt;&lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;&lt;span&gt;本轮工作&lt;/span&gt;&lt;strong&gt;${requested.workRound}&lt;/strong&gt;&lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;&lt;span&gt;请求&lt;/span&gt;&lt;strong&gt;${requested.requestId}&lt;/strong&gt;&lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;&lt;span&gt;尝试&lt;/span&gt;&lt;strong&gt;第 ${requested.attempt}/${requested.totalAttempts} 次&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;dw-attempt-bar&quot;&gt;&lt;span class=&quot;dw-attempt-label&quot;&gt;同次调用 · ${requested.callId}&lt;/span&gt;${attempts.map(item =&gt; `&lt;button class=&quot;dw-attempt-option ${item.status === &quot;failed&quot; ? &quot;failed&quot; : &quot;&quot;} ${item.id === requested.id ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-obs-attempt=&quot;${item.id}&quot;&gt;第 ${item.attempt} 次 · ${statusLabel(item.status)}&lt;/button&gt;`).join(&quot;&quot;)}&lt;/div&gt;&lt;div class=&quot;dw-observation-detail-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;请求详情页签&quot;&gt;&lt;button id=&quot;dw-detail-tab-overview&quot; class=&quot;dw-detail-tab ${state.observationDetailTab === &quot;overview&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;overview&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-detail-content&quot; aria-selected=&quot;${state.observationDetailTab === &quot;overview&quot;}&quot;&gt;概览&lt;/button&gt;&lt;button id=&quot;dw-detail-tab-request&quot; class=&quot;dw-detail-tab ${state.observationDetailTab === &quot;request&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;request&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-detail-content&quot; aria-selected=&quot;${state.observationDetailTab === &quot;request&quot;}&quot;&gt;Request&lt;/button&gt;&lt;button id=&quot;dw-detail-tab-response&quot; class=&quot;dw-detail-tab ${state.observationDetailTab === &quot;response&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;response&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-detail-content&quot; aria-selected=&quot;${state.observationDetailTab === &quot;response&quot;}&quot;&gt;Response&lt;/button&gt;&lt;button id=&quot;dw-detail-tab-events&quot; class=&quot;dw-detail-tab ${state.observationDetailTab === &quot;events&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;events&quot; role=&quot;tab&quot; aria-controls=&quot;dw-observation-detail-content&quot; aria-selected=&quot;${state.observationDetailTab === &quot;events&quot;}&quot;&gt;事件&lt;/button&gt;&lt;/div&gt;&lt;div id=&quot;dw-observation-detail-content&quot; role=&quot;tabpanel&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;&lt;/div&gt;`;
+        updateNav(); icons(); updateObservationDetailContent();
+      }
+      function renderOverview() {
+        state.view = &quot;overview&quot;;
+        main.innerHTML = `&lt;div class=&quot;dw-page dw-overview-page&quot;&gt;
+          &lt;header class=&quot;dw-topline&quot;&gt;&lt;div&gt;&lt;div class=&quot;dw-eyebrow&quot;&gt;&lt;span class=&quot;dw-status-dot&quot;&gt;&lt;/span&gt;&lt;strong&gt;示例任务&lt;/strong&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;三部门协作&lt;/span&gt;&lt;/div&gt;&lt;h1&gt;为订单列表增加 CSV 导出&lt;/h1&gt;&lt;p class=&quot;dw-subtitle&quot;&gt;最近更新 10:47 · 当前协作节点为工程部&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;dw-current-state&quot;&gt;&lt;span class=&quot;dw-status-dot&quot;&gt;&lt;/span&gt;工程处理中&lt;/span&gt;&lt;/header&gt;
+          &lt;section class=&quot;dw-section&quot; aria-labelledby=&quot;flow-title&quot;&gt;&lt;div class=&quot;dw-section-head&quot;&gt;&lt;h2 id=&quot;flow-title&quot;&gt;协作流转&lt;/h2&gt;&lt;p&gt;需求交接 → 版本交付 → 验收反馈&lt;/p&gt;&lt;/div&gt;
+            &lt;div class=&quot;dw-flow-map&quot;&gt;${nodeMarkup(&quot;product&quot;)}&lt;div class=&quot;dw-flow-connector&quot; aria-hidden=&quot;true&quot;&gt;&lt;span&gt;需求&lt;/span&gt;&lt;i data-lucide=&quot;arrow-right&quot;&gt;&lt;/i&gt;&lt;/div&gt;${nodeMarkup(&quot;engineering&quot;)}&lt;div class=&quot;dw-flow-connector&quot; aria-hidden=&quot;true&quot;&gt;&lt;span&gt;交付&lt;/span&gt;&lt;i data-lucide=&quot;arrow-right&quot;&gt;&lt;/i&gt;&lt;/div&gt;${nodeMarkup(&quot;quality&quot;)}&lt;/div&gt;
+            &lt;div class=&quot;dw-feedback-lane&quot;&gt;&lt;div class=&quot;dw-feedback-route&quot;&gt;&lt;button class=&quot;dw-handoff ${state.selectedHandoff === &quot;handoff-qa-eng&quot; ? &quot;is-selected&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-handoff=&quot;handoff-qa-eng&quot;&gt;&lt;i data-lucide=&quot;corner-up-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span class=&quot;dw-handoff-copy&quot;&gt;&lt;strong&gt;质检部 → 工程部&lt;/strong&gt;&lt;span&gt;问题反馈 · 10:42 · 待处理&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-handoff-arrow&quot;&gt;&lt;i data-lucide=&quot;arrow-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;
+            ${handoffDetailMarkup()}
+          &lt;/section&gt;
+          &lt;section class=&quot;dw-section&quot; aria-labelledby=&quot;recent-title&quot;&gt;&lt;div class=&quot;dw-section-head&quot;&gt;&lt;h2 id=&quot;recent-title&quot;&gt;最近流转&lt;/h2&gt;&lt;p&gt;按时间倒序&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;dw-record-list&quot;&gt;
+            &lt;button class=&quot;dw-record-row&quot; type=&quot;button&quot; data-handoff=&quot;handoff-qa-eng&quot;&gt;&lt;span class=&quot;dw-record-time&quot;&gt;10:42&lt;/span&gt;&lt;span class=&quot;dw-record-text&quot;&gt;&lt;strong&gt;质检部 → 工程部&lt;/strong&gt;&lt;span&gt;窄屏导出入口折行，需要调整操作区布局&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-record-state waiting&quot;&gt;待处理&lt;/span&gt;&lt;/button&gt;
+            &lt;button class=&quot;dw-record-row&quot; type=&quot;button&quot; data-handoff=&quot;handoff-eng-qa&quot;&gt;&lt;span class=&quot;dw-record-time&quot;&gt;10:18&lt;/span&gt;&lt;span class=&quot;dw-record-text&quot;&gt;&lt;strong&gt;工程部 → 质检部&lt;/strong&gt;&lt;span&gt;提交订单列表导出版本，等待验收&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-record-state&quot;&gt;等待验收&lt;/span&gt;&lt;/button&gt;
+            &lt;button class=&quot;dw-record-row&quot; type=&quot;button&quot; data-handoff=&quot;handoff-product-eng&quot;&gt;&lt;span class=&quot;dw-record-time&quot;&gt;09:28&lt;/span&gt;&lt;span class=&quot;dw-record-text&quot;&gt;&lt;strong&gt;产品部 → 工程部&lt;/strong&gt;&lt;span&gt;确认字段、入口位置与文件命名规则&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;dw-record-state&quot;&gt;已处理&lt;/span&gt;&lt;/button&gt;
+          &lt;/div&gt;&lt;/section&gt;
+          &lt;section class=&quot;dw-global&quot; aria-labelledby=&quot;global-title&quot;&gt;&lt;div class=&quot;dw-section-head&quot;&gt;&lt;h2 id=&quot;global-title&quot;&gt;任务输入&lt;/h2&gt;&lt;p&gt;从用户端追加需求&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;dw-global-log&quot; id=&quot;dw-global-log&quot;&gt;${globalLogMarkup()}&lt;/div&gt;
+            &lt;form class=&quot;dw-compose&quot; id=&quot;dw-global-form&quot;&gt;&lt;div class=&quot;dw-compose-meta&quot;&gt;&lt;span&gt;当前接收方&lt;/span&gt;&lt;strong&gt;产品部 · 任务入口&lt;/strong&gt;&lt;/div&gt;&lt;textarea class=&quot;dw-textarea&quot; rows=&quot;2&quot; data-global-draft aria-label=&quot;追加任务需求&quot; placeholder=&quot;补充目标、优先级或需要确认的事项&quot;&gt;${escapeHtml(state.globalDraft)}&lt;/textarea&gt;&lt;div class=&quot;dw-compose-actions&quot;&gt;&lt;span&gt;提交后等待产品处理&lt;/span&gt;&lt;button class=&quot;dw-primary&quot; type=&quot;submit&quot;&gt;&lt;i data-lucide=&quot;send&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;发送&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;
+          &lt;/section&gt;
+        &lt;/div&gt;`;
+        updateNav(); icons();
+      }
+      function messageMarkup(message) {
+        return `&lt;article class=&quot;dw-message is-${message.kind}&quot;&gt;&lt;div class=&quot;dw-message-head&quot;&gt;&lt;span class=&quot;dw-message-origin&quot;&gt;${escapeHtml(message.source)} &lt;span&gt;${escapeHtml(message.detail)}&lt;/span&gt;&lt;/span&gt;&lt;time&gt;${escapeHtml(message.time)}&lt;/time&gt;&lt;/div&gt;&lt;p&gt;${escapeHtml(message.text)}&lt;/p&gt;&lt;/article&gt;`;
+      }
+      function inspectorMarkup(key) {
+        const items = contextData[key];
+        const selectedId = state.selectedContext[key];
+        const contextItems = items.map(item =&gt; `&lt;button class=&quot;dw-context-item ${item.id === selectedId ? &quot;is-selected&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-context-id=&quot;${item.id}&quot; aria-pressed=&quot;${item.id === selectedId}&quot;&gt;&lt;strong&gt;${item.title}&lt;/strong&gt;&lt;span&gt;${item.meta}&lt;/span&gt;&lt;/button&gt;`).join(&quot;&quot;);
+        const selected = items.find(item =&gt; item.id === selectedId) || items[0];
+        const panes = {
+          context: `&lt;div class=&quot;dw-inspect-panel&quot; id=&quot;dw-panel-context&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;dw-tab-context&quot;&gt;&lt;h3&gt;Context 快照&lt;/h3&gt;&lt;div class=&quot;dw-context-snapshot-meta&quot;&gt;&lt;strong&gt;本次工作输入&lt;/strong&gt;&lt;time&gt;快照时间 · ${departments[key].snapshot}&lt;/time&gt;&lt;/div&gt;&lt;div class=&quot;dw-context-list&quot;&gt;${contextItems}&lt;/div&gt;&lt;div class=&quot;dw-context-body&quot;&gt;&lt;p&gt;${escapeHtml(selected.body)}&lt;/p&gt;&lt;/div&gt;&lt;button class=&quot;dw-observation-link&quot; type=&quot;button&quot; data-observe-department=&quot;${key}&quot;&gt;&lt;i data-lucide=&quot;activity&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;查看模型请求&lt;/button&gt;&lt;/div&gt;`,
+          provider: `&lt;div class=&quot;dw-inspect-panel&quot; id=&quot;dw-panel-provider&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;dw-tab-provider&quot;&gt;&lt;h3&gt;Provider 配置&lt;/h3&gt;&lt;dl class=&quot;dw-data-list&quot;&gt;&lt;div class=&quot;dw-data-row&quot;&gt;&lt;dt&gt;提供方&lt;/dt&gt;&lt;dd&gt;示例 Provider&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-data-row&quot;&gt;&lt;dt&gt;模型&lt;/dt&gt;&lt;dd&gt;协作模型 · standard&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-data-row&quot;&gt;&lt;dt&gt;温度&lt;/dt&gt;&lt;dd class=&quot;dw-tabular&quot;&gt;0.2&lt;/dd&gt;&lt;/div&gt;&lt;div class=&quot;dw-data-row&quot;&gt;&lt;dt&gt;上下文窗&lt;/dt&gt;&lt;dd class=&quot;dw-tabular&quot;&gt;32k tokens&lt;/dd&gt;&lt;/div&gt;&lt;/dl&gt;&lt;/div&gt;`,
+          prompt: `&lt;div class=&quot;dw-inspect-panel&quot; id=&quot;dw-panel-prompt&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;dw-tab-prompt&quot;&gt;&lt;div class=&quot;dw-prompt-version&quot;&gt;&lt;span&gt;当前 Prompt&lt;/span&gt;&lt;span&gt;v1.4 · 生效中&lt;/span&gt;&lt;/div&gt;&lt;pre class=&quot;dw-prompt-block&quot;&gt;你是${departments[key].name}。\n围绕“为订单列表增加 CSV 导出”推进当前职责。\n先读取已有交接，再给出可交接的明确结果。\n遇到需要确认的事项，保留问题并交给对应部门。&lt;/pre&gt;&lt;/div&gt;`
+        };
+        return `&lt;aside class=&quot;dw-inspector ${state.inspectorCollapsed ? &quot;is-collapsed&quot; : &quot;&quot;}&quot; aria-label=&quot;${departments[key].name}检查区&quot;&gt;&lt;div class=&quot;dw-inspector-head&quot;&gt;&lt;div&gt;&lt;span class=&quot;dw-inspector-kicker&quot;&gt;检查区&lt;/span&gt;&lt;strong&gt;${departments[key].name}&lt;/strong&gt;&lt;/div&gt;&lt;button class=&quot;dw-icon-button&quot; type=&quot;button&quot; data-inspector-toggle aria-label=&quot;${state.inspectorCollapsed ? &quot;展开检查区&quot; : &quot;收起检查区&quot;}&quot;&gt;&lt;i data-lucide=&quot;${state.inspectorCollapsed ? &quot;panel-right-open&quot; : &quot;panel-right-close&quot;}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;dw-inspector-content&quot;&gt;&lt;div class=&quot;dw-inspector-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;检查项&quot;&gt;&lt;button id=&quot;dw-tab-context&quot; class=&quot;dw-inspector-tab ${state.inspectorTab === &quot;context&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-inspector-tab=&quot;context&quot; role=&quot;tab&quot; aria-controls=&quot;dw-panel-context&quot; aria-selected=&quot;${state.inspectorTab === &quot;context&quot;}&quot;&gt;Context&lt;/button&gt;&lt;button id=&quot;dw-tab-provider&quot; class=&quot;dw-inspector-tab ${state.inspectorTab === &quot;provider&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-inspector-tab=&quot;provider&quot; role=&quot;tab&quot; aria-controls=&quot;dw-panel-provider&quot; aria-selected=&quot;${state.inspectorTab === &quot;provider&quot;}&quot;&gt;Provider&lt;/button&gt;&lt;button id=&quot;dw-tab-prompt&quot; class=&quot;dw-inspector-tab ${state.inspectorTab === &quot;prompt&quot; ? &quot;is-active&quot; : &quot;&quot;}&quot; type=&quot;button&quot; data-inspector-tab=&quot;prompt&quot; role=&quot;tab&quot; aria-controls=&quot;dw-panel-prompt&quot; aria-selected=&quot;${state.inspectorTab === &quot;prompt&quot;}&quot;&gt;Prompt&lt;/button&gt;&lt;/div&gt;${panes[state.inspectorTab]}&lt;/div&gt;&lt;/aside&gt;`;
+      }
+      function renderDepartment(key) {
+        state.view = &quot;department&quot;; state.department = key;
+        const dept = departments[key];
+        const messages = state.deptMessages[key].map(messageMarkup).join(&quot;&quot;);
+        const pending = state.deptPending[key] ? `&lt;div class=&quot;dw-pending&quot;&gt;&lt;i data-lucide=&quot;clock-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;等待${dept.name}处理&lt;/span&gt;&lt;/div&gt;` : &quot;&quot;;
+        main.innerHTML = `&lt;div class=&quot;dw-page dw-department-page&quot;&gt;&lt;header class=&quot;dw-dept-header&quot;&gt;&lt;div class=&quot;dw-dept-header-top&quot;&gt;&lt;button class=&quot;dw-back&quot; type=&quot;button&quot; data-view=&quot;overview&quot;&gt;&lt;i data-lucide=&quot;arrow-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;回到总览&lt;/button&gt;&lt;span class=&quot;dw-current-state&quot;&gt;&lt;span class=&quot;dw-status-dot ${dept.tone === &quot;waiting&quot; ? &quot;waiting&quot; : &quot;&quot;}&quot;&gt;&lt;/span&gt;${dept.name} · ${dept.status}&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;div class=&quot;dw-eyebrow&quot;&gt;&lt;span class=&quot;dw-status-dot ${dept.tone === &quot;waiting&quot; ? &quot;waiting&quot; : &quot;&quot;}&quot;&gt;&lt;/span&gt;&lt;strong&gt;${dept.name}&lt;/strong&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;${dept.role}&lt;/span&gt;&lt;/div&gt;&lt;h1&gt;${dept.task}&lt;/h1&gt;&lt;p class=&quot;dw-subtitle&quot;&gt;为订单列表增加 CSV 导出 · 部门工作区&lt;/p&gt;&lt;/div&gt;&lt;/header&gt;&lt;div class=&quot;dw-task-strip&quot;&gt;&lt;i data-lucide=&quot;route&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;当前任务&lt;/span&gt;&lt;strong&gt;为订单列表增加 CSV 导出&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;dw-work-grid ${state.inspectorCollapsed ? &quot;has-collapsed-inspector&quot; : &quot;&quot;}&quot;&gt;&lt;section class=&quot;dw-conversation&quot; aria-labelledby=&quot;conversation-title&quot;&gt;&lt;div class=&quot;dw-conversation-head&quot;&gt;&lt;h2 id=&quot;conversation-title&quot;&gt;工作消息&lt;/h2&gt;&lt;p&gt;${state.deptMessages[key].length} 条记录 · ${dept.status}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;dw-timeline&quot; aria-live=&quot;polite&quot;&gt;${messages}${pending}&lt;/div&gt;&lt;form class=&quot;dw-compose&quot; id=&quot;dw-dept-form&quot; data-department-form=&quot;${key}&quot;&gt;&lt;div class=&quot;dw-compose-meta&quot;&gt;&lt;span&gt;当前接收方&lt;/span&gt;&lt;strong&gt;发给${dept.name}&lt;/strong&gt;&lt;/div&gt;&lt;textarea class=&quot;dw-textarea&quot; rows=&quot;3&quot; data-dept-draft=&quot;${key}&quot; aria-label=&quot;发给${dept.name}&quot; placeholder=&quot;追加对话或指导&quot;&gt;${escapeHtml(state.deptDrafts[key])}&lt;/textarea&gt;&lt;div class=&quot;dw-compose-actions&quot;&gt;&lt;span&gt;当前部门消息&lt;/span&gt;&lt;button class=&quot;dw-primary&quot; type=&quot;submit&quot;&gt;&lt;i data-lucide=&quot;send&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;发送指导&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;&lt;/section&gt;${inspectorMarkup(key)}&lt;/div&gt;&lt;/div&gt;`;
+        updateNav(); icons();
+      }
+      function updateNav() {
+        root.querySelectorAll(&quot;.dw-nav-item&quot;).forEach(item =&gt; {
+          const active = state.view === &quot;overview&quot; ? item.dataset.view === &quot;overview&quot; : state.view === &quot;observability&quot; ? item.dataset.view === &quot;observability&quot; : item.dataset.department === state.department;
+          item.classList.toggle(&quot;is-active&quot;, active);
+          if (active) item.setAttribute(&quot;aria-current&quot;, &quot;page&quot;); else item.removeAttribute(&quot;aria-current&quot;);
+        });
+      }
+      function render() { if (state.view === &quot;overview&quot;) renderOverview(); else if (state.view === &quot;observability&quot;) renderObservability(); else renderDepartment(state.department); }
+
+      root.addEventListener(&quot;click&quot;, event =&gt; {
+        const target = event.target.closest(&quot;button&quot;);
+        if (!target || !root.contains(target)) return;
+        if (target.type === &quot;submit&quot; &amp;&amp; target.form) {
+          event.preventDefault();
+          appendMessage(target.form);
+          return;
+        }
+        if (target.dataset.department) { renderDepartment(target.dataset.department); return; }
+        if (target.dataset.view) { if (target.dataset.view === &quot;observability&quot;) renderObservability(); else renderOverview(); return; }
+        if (target.dataset.handoff) { state.selectedHandoff = target.dataset.handoff; renderOverview(); return; }
+        if (target.dataset.obsBack !== undefined) { renderObservability(); return; }
+        if (target.dataset.obsRequest) { const item = requestById(target.dataset.obsRequest); if (item) { state.observationDetailTab = &quot;overview&quot;; renderObservationDetail(item.requestId, item.id); } return; }
+        if (target.dataset.obsAttempt) { const item = requestById(target.dataset.obsAttempt); if (item) renderObservationDetail(item.requestId, item.id); return; }
+        if (target.dataset.obTab) { state.observationTab = target.dataset.obTab; updateObservationContent(); return; }
+        if (target.dataset.obDetailTab) { state.observationDetailTab = target.dataset.obDetailTab; updateObservationDetailContent(); return; }
+        if (target.dataset.observeDepartment) {
+          const key = target.dataset.observeDepartment;
+          const latest = modelRequests.filter(item =&gt; item.department === key).sort((a, b) =&gt; b.time.localeCompare(a.time))[0];
+          state.observationFilters.department = key; state.observationTab = &quot;requests&quot;;
+          if (latest) { state.observationDetailTab = &quot;overview&quot;; renderObservationDetail(latest.requestId, latest.id); } else renderObservability();
+          return;
+        }
+        if (target.dataset.inspectorTab) { state.inspectorTab = target.dataset.inspectorTab; renderDepartment(state.department); return; }
+        if (target.dataset.contextId) { state.selectedContext[state.department] = target.dataset.contextId; renderDepartment(state.department); return; }
+        if (target.dataset.inspectorToggle !== undefined) { state.inspectorCollapsed = !state.inspectorCollapsed; renderDepartment(state.department); }
+      });
+      root.addEventListener(&quot;input&quot;, event =&gt; {
+        if (event.target.matches(&quot;[data-global-draft]&quot;)) state.globalDraft = event.target.value;
+        if (event.target.matches(&quot;[data-dept-draft]&quot;)) state.deptDrafts[event.target.dataset.deptDraft] = event.target.value;
+        if (event.target.matches(&quot;[data-obs-search]&quot;)) { state.observationFilters.search = event.target.value; updateObservationContent(); }
+      });
+      root.addEventListener(&quot;change&quot;, event =&gt; {
+        if (event.target.matches(&quot;[data-obs-department]&quot;)) { state.observationFilters.department = event.target.value; updateObservationContent(); }
+        if (event.target.matches(&quot;[data-obs-status]&quot;)) { state.observationFilters.status = event.target.value; updateObservationContent(); }
+      });
+      function appendMessage(form) {
+        if (form.id === &quot;dw-global-form&quot;) {
+          const text = state.globalDraft.trim();
+          if (!text) return;
+          state.globalMessages.push({ source: &quot;用户&quot;, text, time: &quot;刚刚&quot; }); state.globalDraft = &quot;&quot;; state.globalPending = true; renderOverview();
+          const input = root.querySelector(&quot;[data-global-draft]&quot;); if (input) input.focus();
+          return;
+        }
+        if (form.id === &quot;dw-dept-form&quot;) {
+          const key = form.dataset.departmentForm; const text = state.deptDrafts[key].trim();
+          if (!text) return;
+          state.deptMessages[key].push({ source: &quot;用户&quot;, detail: &quot;追加指导&quot;, text, time: &quot;刚刚&quot;, kind: &quot;user&quot; }); state.deptDrafts[key] = &quot;&quot;; state.deptPending[key] = true; renderDepartment(key);
+          const input = root.querySelector(`[data-dept-draft=&quot;${key}&quot;]`); if (input) input.focus();
+        }
+      }
+      renderObservability();
+    })();
+  &lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

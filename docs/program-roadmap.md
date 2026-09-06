@@ -3,7 +3,7 @@
 > 日期：2026-09-06。
 > 性质：根据“扩大每阶段 scope”的要求重新规划；这是架构方案，不表示后续代码实施已经启动。
 > 本文作为本轮总体路线入口。此前路线稿中的第二至第五阶段，按本文重新归组；原有运行记录保留各自的时间和证据边界。
-> 最新推进顺序：用户要求先完成 Provider 连接及统一管理与部门绑定、第一阶段真实验收、OMP 系统审查、Context/Trace View、等待原型后的 Web 完善、Prompt 优化，再启动大功能。当前工作入口见 [第二阶段计划](stage-2-plan.md)，本文后续里程碑不覆盖这一顺序。
+> 最新推进顺序：用户要求先完成 Provider 连接及统一管理与部门绑定、第一阶段真实验收、OMP 系统审查、Context/Trace View、按原型完善 Web、Prompt 优化，再启动大功能。工作台与观测原型已完成，Provider 等配置原型预留；当前工作入口见 [第二阶段计划](stage-2-plan.md)。
 
 ## 1. 按完整能力划阶段
 
@@ -179,7 +179,7 @@
 
 ## 9. 最近的推进方式
 
-近期依次推进 Provider 连接及统一管理与部门绑定、第一阶段真实验收、OMP 系统审查、Context/Trace View、Web 完善与 Prompt 优化。部门可分别绑定不同 Provider 和模型，目标与边界见 [D18](requirements/department-providers.md)。Web 新布局与交互等待用户原型；这六项未完成前不启动 2.1 离线分析、2.E 项目接续或控制/记忆等大功能。各项结果和验收边界见 [当前工作计划](stage-2-plan.md)。
+近期依次推进 Provider 连接及统一管理与部门绑定、第一阶段真实验收、OMP 系统审查、Context/Trace View、Web 完善与 Prompt 优化。部门绑定见 [D18](requirements/department-providers.md)。工作台与观测原型已完成，按 [Web 原型实施计划](web-prototype-implementation-plan.md) 开展设计开发；Provider 等配置部分预留。这六项未完成前不启动 2.1 离线分析、2.E 项目接续或控制/记忆等大功能。
 
 主代理负责架构、设计、独立审查与验收，具体实现由子代理按文件和模块责任推进。现有 H 批次仍负责 Provider 等待与重试，避免另开一套实现。完成前置工作后，再以研究资料展开对应大功能的具体任务与评价约定。
 
