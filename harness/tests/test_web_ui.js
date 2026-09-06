@@ -167,6 +167,12 @@ function runPayload(runId, extra = {}) {
       max_cycles: 8,
       token_used: 0,
       provider: "fake",
+      requested_provider: null,
+      requested_model: null,
+      actual_provider: null,
+      actual_model: null,
+      protocol: null,
+      provider_bindings: {},
       task: extra.task || "task",
       human_action: "",
       error: extra.error || "",
@@ -421,6 +427,12 @@ function sampleBoard(extra = {}) {
     token_used: 10,
     provider: extra.provider || "fake",
     adapter: extra.adapter || "fake",
+    protocol: extra.protocol || null,
+    requested_provider: extra.requested_provider || null,
+    requested_model: extra.requested_model || null,
+    actual_provider: extra.actual_provider || null,
+    actual_model: extra.actual_model || null,
+    provider_bindings: extra.provider_bindings || {},
     task: extra.task || "build echo",
     human_action: "",
     error: "",
@@ -802,10 +814,11 @@ test("terminated collaboration shows its reason and original closure record", ()
   assert.doesNotMatch(html, /查看回应/);
 });
 
-test("board distinguishes actual provider from adapter and shows reported cost", () => {
+test("board distinguishes requested and returned provider facts from the protocol", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   web.renderBoard(
-    sampleBoard({ adapter: "responses", provider: "blackrouter" }),
+    sampleBoard({ adapter: "directory", protocol: "responses", requested_provider: "blackrouter",
+      requested_model: "configured-model", actual_provider: "blackrouter", actual_model: "actual-model-v1" }),
     { ...emptyAgg, cost: 0.0123 },
     {},
     [
@@ -817,11 +830,12 @@ test("board distinguishes actual provider from adapter and shows reported cost",
   const html = document.getElementById("board-body").innerHTML;
   assert.match(html, /<dt>费用<\/dt><dd>0\.0123<\/dd>/);
   assert.doesNotMatch(html, /\$/);
-  assert.match(html, /<dt>模型<\/dt><dd>acctual-model-v1<\/dd>/);
-  assert.doesNotMatch(html, /should-not-use/);
+  assert.match(html, /<dt>请求模型<\/dt><dd>configured-model<\/dd>/);
+  assert.match(html, /<dt>返回模型<\/dt><dd>actual-model-v1<\/dd>/);
   assert.match(html, /<dt>适配器<\/dt><dd>responses<\/dd>/);
-  assert.match(html, /<dt>供应商<\/dt><dd>blackrouter<\/dd>/);
-  assert.doesNotMatch(html, /<dt>Provider<\/dt>/);
+  assert.match(html, /<dt>请求供应商<\/dt><dd>blackrouter<\/dd>/);
+  assert.match(html, /<dt>返回供应商<\/dt><dd>blackrouter<\/dd>/);
+  assert.doesNotMatch(html, /latest-model/);
 });
 
 test("zero missing and invalid cost display as 未上报", () => {
@@ -911,21 +925,22 @@ test("tiny positive cost is not rounded to zero", () => {
   assert.doesNotMatch(html, /<dt>费用<\/dt><dd>未上报<\/dd>/);
 });
 
-test("missing event model is 未上报 and ignores board.model", () => {
+test("missing returned model is 未上报 and ignores stale board or event models", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   web.renderBoard(sampleBoard({ model: "fake-script" }), emptyAgg, {}, [
     { seq: 1, model: null },
     { seq: 2, model: "" },
   ]);
   const html = document.getElementById("board-body").innerHTML;
-  assert.match(html, /<dt>模型<\/dt><dd>未上报<\/dd>/);
+  assert.match(html, /<dt>请求模型<\/dt><dd>未上报<\/dd>/);
+  assert.match(html, /<dt>返回模型<\/dt><dd>未上报<\/dd>/);
   assert.doesNotMatch(html, /fake-script/);
 });
 
-test("latest event model follows seq and escapes untrusted text", () => {
+test("board model facts come from the current request and escape untrusted text", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   const long = `${"vendor/very-long-model-name-".repeat(6)}<img src=x onerror=alert(1)>`;
-  web.renderBoard(sampleBoard(), emptyAgg, {}, [
+  web.renderBoard(sampleBoard({ requested_model: long, actual_model: "current-returned-model" }), emptyAgg, {}, [
     { seq: 4, model: "later-wrong-order" },
     { seq: 9, model: long },
     { seq: 2, model: "early" },
@@ -935,6 +950,7 @@ test("latest event model follows seq and escapes untrusted text", () => {
   assert.match(html, /vendor\/very-long-model-name-/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /current-returned-model/);
   assert.doesNotMatch(html, /later-wrong-order/);
   assert.doesNotMatch(html, />early</);
 });

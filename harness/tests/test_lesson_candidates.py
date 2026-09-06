@@ -73,7 +73,7 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
         assert any(receipt["department"] == "quality" and all(check[key] == receipt[key] for key in (
             "name", "snapshot_hash", "product_spec_hash", "delivery_spec_hash", "activation_id"
         )) for receipt in receipts)
-    assert len(system.adapter.invocations) == len(script)
+    assert len(system.test_adapter.invocations) == len(script)
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
     before = result.last_seq
@@ -91,12 +91,12 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
         with_candidate = assembler.assemble(result, **args)
         without_candidate = assembler.assemble(replace(result, lesson_candidates=[]), **args)
         assert with_candidate == without_candidate
-    for invocation in system.adapter.invocations:
+    for invocation in system.test_adapter.invocations:
         assert candidate.id not in invocation.context.prompt_text
         assert candidate.suggestion not in invocation.context.prompt_text
         assert all("lesson" not in item.source for item in invocation.context.manifest.injected)
     assert DEFAULT_PROMPTS == rules
-    assert (system.adapter.name, system.adapter.model) == ("fake", "fake-script")
+    assert (system.test_adapter.name, system.test_adapter.model) == ("fake", "fake-script")
 
 
 @pytest.mark.parametrize("with_delivery", [False, True])
@@ -122,7 +122,7 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
         assert candidate.product_spec_hash is None
         assert candidate.delivery_spec_hash is None
         assert candidate.checks == candidate.evidence_refs == []
-    assert len(system.adapter.invocations) == len(script)
+    assert len(system.test_adapter.invocations) == len(script)
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
 
@@ -153,7 +153,7 @@ def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candid
     assert result.phase == "DONE"
     assert result.lesson_candidates == []
     assert result.rejections[0]["errors"] == [{"field": "defects", "message": "release requires an empty defect list"}]
-    assert len(system.adapter.invocations) == 5
+    assert len(system.test_adapter.invocations) == 5
     assert_candidate_does_not_change_execution(system, result)
 
 

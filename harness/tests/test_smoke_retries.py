@@ -20,7 +20,7 @@ def _fast_retries(monkeypatch):
 def _retry_run(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("retry audit")
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
@@ -108,7 +108,7 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
         raise ProviderError("stream disconnected", retryable=True)
 
     adapter = FakeAdapter([fail_after_partial, product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("partial retry audit")
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
@@ -133,7 +133,7 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
 def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
     adapter = FakeAdapter([ModelResponse(), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("prepared but not sent")
     original = system.orchestrator._begin_request
 

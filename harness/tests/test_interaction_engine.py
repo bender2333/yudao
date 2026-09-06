@@ -52,7 +52,7 @@ def _parts(request):
 
 def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_path):
     texts = ["  build echo\r\n", "Uppercase output", "\n\n  keep one argument  "]
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run(texts[0])
     for text in texts[1:]:
         received = system.add_input(run_id, text)
@@ -67,7 +67,7 @@ def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_pa
     accepted = system.activate_once(run_id)
     assert (accepted.input_version, accepted.product_work_input_version, accepted.processed_input_version) == (3, 3, 3)
     assert accepted.product_spec.input_version == accepted.effective_contract.input_version == 3
-    request = system.adapter.invocations[-1]
+    request = system.test_adapter.invocations[-1]
     assert request.input_version == 3 and _parts(request)["intend"] == "".join(texts)
     assert [item["text"] for item in json.loads(_parts(request)["pending_inputs"])] == texts
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
@@ -75,7 +75,7 @@ def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_pa
 
 @pytest.mark.parametrize("failure", ["partial_write", "replace"])
 def test_failed_intend_publication_preserves_previous_original_and_received_state(tmp_path, monkeypatch, failure):
-    system = LoopSystem(tmp_path, FakeAdapter())
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original input without newline")
     before = system.project(run_id).canonical_state()
     path = tmp_path / "materials" / run_id / "intend.md"
@@ -111,7 +111,7 @@ def test_failed_intend_publication_preserves_previous_original_and_received_stat
 
 
 def test_only_complete_product_spec_can_process_received_input(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), product_decision("Uppercase all output", "This cannot consume pending input"),
         product_spec(requirements=["print the argument in uppercase"]), _revision(),
     ]))
@@ -134,7 +134,7 @@ def test_only_complete_product_spec_can_process_received_input(tmp_path):
 
 
 def test_product_can_consult_while_current_inputs_still_wait_for_requirement_acceptance(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("quality", "How should uppercase output be verified?"),
         response_turn("answered", "Check mixed-case input against uppercase output."), _revision(),
     ]))
@@ -156,7 +156,7 @@ def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_respon
         system.add_input(request.run_id, "Make the output uppercase")
         return collaboration_response(request.request_id, "answered", "Advice for the earlier input")
 
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request("engineering"), reply, product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering"), reply, product_spec()]))
     run_id = system.create_run("build echo")
     pending = system.activate_once(run_id)
     current = system.activate_once(run_id)
@@ -173,18 +173,18 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
         system.add_input(request.run_id, "Also require uppercase output")
         return product_spec()
 
-    system = LoopSystem(tmp_path, FakeAdapter([old_spec, product_spec(requirements=["Print uppercase output"])]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([old_spec, product_spec(requirements=["Print uppercase output"])]))
     run_id = system.create_run("build echo")
     stale = system.activate_once(run_id)
     assert stale.phase == "PRODUCT_SPEC" and stale.product_spec is None and stale.processed_input_version == 0
     assert len(_events(system, run_id, EventType.TOOL_SKIPPED)) == 1
     current = system.activate_once(run_id)
     assert current.product_spec.revision == 1 and current.processed_input_version == 2
-    assert [request.input_version for request in system.adapter.invocations] == [1, 2]
+    assert [request.input_version for request in system.test_adapter.invocations] == [1, 2]
 
 
 def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("build echo")
     begin = system.orchestrator._begin_request
     received = False
@@ -198,10 +198,10 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
 
     monkeypatch.setattr(system.orchestrator, "_begin_request", receive_before_start)
     stopped = system.activate_once(run_id)
-    assert stopped.phase == "PRODUCT_SPEC" and not system.adapter.invocations
+    assert stopped.phase == "PRODUCT_SPEC" and not system.test_adapter.invocations
     assert not _events(system, run_id, EventType.MODEL_REQUESTED)
     assert system.activate_once(run_id).processed_input_version == 2
-    assert system.adapter.invocations[-1].input_version == 2
+    assert system.test_adapter.invocations[-1].input_version == 2
 
 
 def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path, monkeypatch):
@@ -210,7 +210,7 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
         return ModelResponse(output=[{"type": "message", "id": "old-output", "role": "assistant",
                                       "content": [{"type": "output_text", "text": "A response to the original input."}]}])
 
-    system = LoopSystem(tmp_path, FakeAdapter([final_old_response, product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([final_old_response, product_spec()]))
     run_id = system.create_run("build echo")
     monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 1)
     current = system.activate_once(run_id)
@@ -223,7 +223,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     calls = [_call("first", "write_file", path="src/first.py", content="completed first tool"),
              _call("second", "write_file", path="src/second.py", content="must not start"),
              _call("submission", "submit_delivery", summary="old delivery", files=["src/first.py"], check_names=["smoke"])]
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls), _revision()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls), _revision()]))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 2)
     execute = ToolRuntime.execute
@@ -256,7 +256,7 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
         system.add_input(request.run_id, "Print uppercase instead")
         return review_turn("release", "This belongs to the old input")
 
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn(), stale_release]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn(), stale_release]))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 3)
     current = system.activate_once(run_id)
@@ -267,7 +267,7 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
 
 
 def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Current check passed"),
     ]))
     run_id = system.create_run("build echo")
@@ -288,7 +288,7 @@ def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_pa
 
 
 def test_release_commit_and_later_input_share_one_control_order(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Current check passed"),
     ]))
     run_id = system.create_run("build echo")
@@ -323,7 +323,7 @@ def test_release_commit_and_later_input_share_one_control_order(tmp_path, monkey
 
 @pytest.mark.parametrize("command", ["/stop", "  /cancel\r\n"])
 def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_path, command):
-    system = LoopSystem(tmp_path, FakeAdapter())
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
     current = system.add_input(run_id, command)
     assert current.phase == "FAILED" and current.stop_reason == "cancelled"
@@ -334,7 +334,7 @@ def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_
 
 
 def test_cancel_button_does_not_fabricate_text_and_terminal_work_never_resumes(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter())
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
     current = system.cancel(run_id)
     assert len(current.inputs) == 1 and current.input_version == 1
@@ -353,14 +353,14 @@ def test_prompt_changes_apply_next_activation_and_keep_all_current_steps_bound(t
         system.update_prompt(request.run_id, "engineering", replacement)
         return ModelResponse(output=[_call("inspect", "list_files")])
 
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), update, plan_turn(), collaboration_request("product"),
     ]))
     run_id = system.create_run("build echo")
     initial = system.project(run_id).department_prompts["engineering"]
     system.activate_once(run_id)
     current = system.activate_once(run_id)
-    first, second = system.adapter.invocations[-2:]
+    first, second = system.test_adapter.invocations[-2:]
     assert first.activation_id == second.activation_id
     for request in (first, second):
         assert request.prompt_version == 1 and request.prompt_hash == initial.prompt_ref.content_hash
@@ -368,7 +368,7 @@ def test_prompt_changes_apply_next_activation_and_keep_all_current_steps_bound(t
     assert current.department_prompts["engineering"].version == 2
     assert current.department_prompts["engineering"].text == replacement
     system.activate_once(run_id)
-    next_request = system.adapter.invocations[-1]
+    next_request = system.test_adapter.invocations[-1]
     assert next_request.activation_id != first.activation_id and next_request.prompt_version == 2
     assert _parts(next_request)["department_rules"] == replacement
     assert next_request.prompt_hash == system.project(run_id).department_prompts["engineering"].prompt_ref.content_hash
@@ -381,7 +381,7 @@ def test_prompt_changes_apply_next_activation_and_keep_all_current_steps_bound(t
 
 
 def test_editable_prompt_does_not_grant_product_write_permission(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         FakeTurn(writes={"src/bypass.py": "not permitted"}, proposal=product_spec()),
     ]))
     run_id = system.create_run("build echo")
@@ -389,7 +389,7 @@ def test_editable_prompt_does_not_grant_product_write_permission(tmp_path):
     assert current.input_version == 1 and current.processed_input_version == 0
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING" and system.workspace(run_id).list_files() == []
-    assert system.adapter.invocations[-1].prompt_version == 2
+    assert system.test_adapter.invocations[-1].prompt_version == 2
     assert not next(event for event in _events(system, run_id, EventType.TOOL_CALLED)
                     if event.payload.get("name") == "write_file").payload["ok"]
 
@@ -399,7 +399,7 @@ def test_identical_requirement_text_for_new_input_still_has_new_contract_and_pla
         "changed": [], "retained": ["Echo the argument exactly"], "retired": [],
         "rationale": "The new user input confirms the existing behavior",
     })
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), same_requirements]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), same_requirements]))
     run_id = system.create_run("build echo")
     old = _steps(system, run_id, 2)
     system.add_input(run_id, "Confirm the existing echo behavior")
@@ -439,7 +439,7 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
             return product_spec(acceptance_criteria=[])
         return product_spec()
 
-    system = LoopSystem(tmp_path, FakeAdapter([respond] * 100))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([respond] * 100))
     run_id = system.create_run("build echo", context_window=8000)
     system.workspace(run_id).write_file("notes.txt", "PRESERVED_TOOL_BYTES " * 1800)
     first = system.activate_once(run_id)
@@ -462,7 +462,7 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
                     if event.payload.get("name") == "read_file")
     assert original.event_id in {ref["event_id"] for item in later for ref in item["source_refs"]}
     assert system.artifacts.get_text(original.payload["output_ref"]["content_hash"]).count("PRESERVED_TOOL_BYTES") == 1800
-    for request in system.adapter.invocations:
+    for request in system.test_adapter.invocations:
         if request.activation_id == first_activation:
             assert request.input_version == 1 and request.prompt_version == 1
         else:
@@ -471,7 +471,7 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
 
 
 def test_updated_requirements_flow_through_new_plan_delivery_and_independent_quality(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), _revision(),
         plan_turn(reason="Implement the newly accepted uppercase requirement"),
         delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),

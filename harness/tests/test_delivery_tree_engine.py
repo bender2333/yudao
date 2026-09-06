@@ -23,7 +23,7 @@ def _engineering(tmp_path, actions, *, planned=True, scope=None):
     if planned:
         script.append(plan_turn(scope=scope or ["src/"]))
     script.extend([ModelResponse(output=actions), collaboration_request()])
-    system = LoopSystem(tmp_path, FakeAdapter(script))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
     run_id = system.create_run("Refactor the echo implementation")
     system.activate_once(run_id)
     if planned:
@@ -36,7 +36,7 @@ def _engineering(tmp_path, actions, *, planned=True, scope=None):
 
 
 def test_accepted_delivery_restores_complete_tree_without_the_original_workspace(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
     run_id = system.create_run("echo")
     workspace = system.workspace(run_id)
     (workspace.root / "assets").mkdir()
@@ -63,7 +63,7 @@ def test_accepted_delivery_restores_complete_tree_without_the_original_workspace
 
 
 def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
@@ -104,7 +104,7 @@ def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, m
 
 
 def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Verified the complete tree"),
     ]))
     run_id = system.create_run("echo")
@@ -131,7 +131,7 @@ def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_pa
 
 
 def test_tree_archive_failure_has_a_persisted_host_error_and_no_accepted_delivery(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
@@ -194,7 +194,7 @@ def test_delete_and_both_move_endpoints_require_current_plan_scope(tmp_path, pla
 def test_product_cannot_start_delete_or_move_actions(tmp_path):
     actions = [_call("product-delete", "delete_file", path="src/old.py", reason="Delete"),
                _call("product-move", "move_file", source="src/keep.py", destination="src/new.py", reason="Move")]
-    system = LoopSystem(tmp_path, FakeAdapter([ModelResponse(output=actions), product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([ModelResponse(output=actions), product_spec()]))
     run_id = system.create_run("echo")
     workspace = system.workspace(run_id)
     workspace.write_file("src/old.py", "old source")

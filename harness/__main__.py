@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 from .demo import run_demo
-from .runtime import LoopSystem, build_adapter
+from .provider_catalog import CatalogValidationError, ProviderCatalog
+from .runtime import LoopSystem, environment_credentials
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
 from .web.server import serve
@@ -28,13 +29,14 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--data-dir", default=str(DEFAULT_DIR))
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
-    web.add_argument("--adapter", choices=("responses", "fake"), default="responses")
+    web.add_argument("--provider-config", required=True)
     replay = sub.add_parser("replay", help="rebuild projection from the event store")
     replay.add_argument("run_id")
     replay.add_argument("--data-dir", default=str(DEFAULT_DIR))
     smoke = sub.add_parser("smoke", help="run a real-provider three-department smoke test")
     smoke.add_argument("--data-dir", default=str(SMOKE_DIR))
     smoke.add_argument("--scenario", choices=("happy", "collaboration", "all"), default="all")
+    smoke.add_argument("--provider-config", required=True)
     args = parser.parse_args(argv)
 
     if args.command == "demo":
@@ -46,20 +48,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.last_seq}")
         if args.serve:
             return _serve(system, args.host, args.port)
-        print(f"console: python -m harness serve --adapter fake --data-dir {args.data_dir}")
+        print(f"console: python -m harness demo --serve --data-dir {args.data_dir}")
         return 0
     if args.command == "serve":
-        adapter = build_adapter(args.adapter)
-        system = LoopSystem(args.data_dir, adapter)
+        system = _production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
     if args.command == "replay":
-        system = LoopSystem(args.data_dir, build_adapter("fake"))
+        system = LoopSystem(args.data_dir)
         projection = system.replay(args.run_id)
         print(json.dumps(projection.canonical_state(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "smoke":
         scenarios = ["happy", "collaboration"] if args.scenario == "all" else [args.scenario]
-        report = run_smoke(args.data_dir, scenarios=scenarios)
+        report = run_smoke(
+            args.data_dir,
+            provider_config=args.provider_config,
+            credentials=environment_credentials,
+            scenarios=scenarios,
+        )
         print(json.dumps(report, ensure_ascii=False, indent=2))
         print(f"report: {Path(args.data_dir) / 'smoke-report.md'}")
         return smoke_exit_code(report)
@@ -67,9 +73,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _serve(system: LoopSystem, host: str, port: int) -> int:
-    availability = system.adapter.availability()
-    if not availability.available:
-        print(availability.message, file=sys.stderr)
+    status = system.provider_status()
+    if not status.get("available", False):
+        print(status.get("message", "provider unavailable"), file=sys.stderr)
     server = serve(system, host=host, port=port)
     print(f"Yudao console {server.base_url}")
     try:
@@ -79,6 +85,14 @@ def _serve(system: LoopSystem, host: str, port: int) -> int:
     finally:
         server.server_close()
     return 0
+
+
+def _production_system(data_dir: str | Path, provider_config: str | Path) -> LoopSystem:
+    try:
+        catalog = ProviderCatalog.load(provider_config)
+    except CatalogValidationError as exc:
+        raise SystemExit(f"provider config is invalid: {exc}") from exc
+    return LoopSystem(data_dir, provider_catalog=catalog, credentials=environment_credentials)
 
 
 if __name__ == "__main__":

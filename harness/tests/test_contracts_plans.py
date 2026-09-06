@@ -42,7 +42,7 @@ def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
         plan_turn(assumptions=[{"decision": "Use the standard argument parser", "basis": "Python standard library"}]),
         delivery_turn(), review_turn("release", "Verified the current requirements"),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE", result.error
@@ -86,7 +86,7 @@ def test_unplanned_and_out_of_scope_writes_have_repairable_tool_results(tmp_path
         return ModelResponse(output=[_call("out-of-scope", "write_file", path="docs/guide.md", content="no"),
                                      _call("adjust", "submit_plan", **plan)])
 
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), first_plan, adjusted_plan]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), first_plan, adjusted_plan]))
     run_id = system.create_run("echo")
     for _ in range(3):
         result = system.activate_once(run_id)
@@ -104,7 +104,7 @@ def test_unplanned_and_out_of_scope_writes_have_repairable_tool_results(tmp_path
 
 
 def test_supplementary_decision_invalidates_plan_and_old_receipts_without_new_spec(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(),
         FakeTurn(proposal=collaboration_request(request_type="action", action="revise_requirements"),
                  writes={"src/echo.py": "print('echo')"}, checks={"smoke": 0}),
@@ -135,7 +135,7 @@ def test_supplementary_decision_invalidates_plan_and_old_receipts_without_new_sp
 
 
 def test_plan_adjustment_requires_reason_and_current_contract(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     current = system.activate_once(run_id)
@@ -151,7 +151,7 @@ def test_plan_adjustment_requires_reason_and_current_contract(tmp_path):
 
 
 def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     original = system.activate_once(run_id)
@@ -176,7 +176,7 @@ def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(t
 def test_contract_change_before_tool_start_skips_unstarted_calls(tmp_path, monkeypatch):
     calls = [_call("first", "write_file", path="src/first.py", content="no"),
              _call("second", "write_file", path="src/second.py", content="no")]
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls)]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls)]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
@@ -196,7 +196,7 @@ def test_contract_change_before_tool_start_skips_unstarted_calls(tmp_path, monke
 
 
 def test_prd_artifact_failure_does_not_accept_product_or_contract(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("echo")
     put = system.artifacts.put
 

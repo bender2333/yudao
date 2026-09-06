@@ -4,12 +4,13 @@ from dataclasses import asdict, replace
 
 import pytest
 
-from harness.adapters.responses import ResponsesConfig
 from harness.adapters.fake import FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
+from harness.provider_catalog import ModelDefinition, ProviderCatalog, ProviderDefinition
+from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence, _git_evidence
 from harness.tests.helpers import run_scripted
 
@@ -77,6 +78,24 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert summary["git_audit"]["version_count"] == 5
     assert summary["replay_consistent"] is True
     assert summary["fake_used"] is True
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
+
+
+def test_directory_fake_protocol_is_rejected_even_when_it_fails_without_a_response(tmp_path):
+    catalog = ProviderCatalog(
+        [ProviderDefinition("fake-provider", "Fake", "fake")],
+        [ModelDefinition("fake-model", "fake-provider", "fake-script", 32_000, 4_096)],
+        {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
+         for department in ("product", "engineering", "quality")},
+    )
+    system = LoopSystem(tmp_path, provider_catalog=catalog)
+    run_id = system.create_run("fake provider fails before a response")
+    result = system.activate_once(run_id)
+    summary = summarize_run(system, run_id, scenario="happy")
+
+    assert result.phase == "FAILED"
+    assert summary["fake_used"] is True
+    assert summary["provider_bindings"]["product"]["protocol"] == "fake"
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
 
 
@@ -168,8 +187,8 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_ru
     assert summary["model_input_audit"]["status"] == "verified", summary["model_input_audit"]
     assert summary["check_receipts_verified"] is True
     assert summary["delivery_archive"]["status"] == "verified"
-    assert {request.input_version for request in system.adapter.invocations} == {1, 2}
-    assert {request.prompt_version for request in system.adapter.invocations if request.department == "product"} == {1, 2}
+    assert {request.input_version for request in system.test_adapter.invocations} == {1, 2}
+    assert {request.prompt_version for request in system.test_adapter.invocations if request.department == "product"} == {1, 2}
 
 
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
@@ -208,11 +227,11 @@ def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
             "arguments": "{}",
         }])
 
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), update, plan_turn(), collaboration_request()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), update, plan_turn(), collaboration_request()]))
     run_id = system.create_run("echo")
     for _ in range(3):
         system.activate_once(run_id)
-    first, second, third = system.adapter.invocations[1:]
+    first, second, third = system.test_adapter.invocations[1:]
     assert first.activation_id == second.activation_id and first.prompt_version == second.prompt_version == 1
     assert third.activation_id != first.activation_id and third.prompt_version == 2
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
@@ -482,11 +501,18 @@ def test_unmatched_host_receipt_does_not_pass(native_run, monkeypatch):
     assert any("no matching host execution" in note for note in summary["check_receipt_notes"])
 
 
-def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path, monkeypatch):
+def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
     (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"phase": "DONE"}}}), encoding="utf-8")
-    monkeypatch.setattr(ResponsesConfig, "from_env", classmethod(lambda cls: ResponsesConfig()))
-    report = run_smoke(tmp_path)
-    assert report["adapter"] == "responses"
+    config = tmp_path / "providers.json"
+    config.write_text(json.dumps({
+        "providers": [{"id": "provider", "name": "Provider", "protocol": "responses",
+                       "base_url": "https://provider.example/v1", "credential_ref": "MISSING_KEY"}],
+        "models": [{"id": "model", "provider_id": "provider", "model": "model",
+                     "context_window": 32000, "max_output_tokens": 4096}],
+        "bindings": {department: {"provider_id": "provider", "model_id": "model"}
+                     for department in ("product", "engineering", "quality")},
+    }), encoding="utf-8")
+    report = run_smoke(tmp_path, provider_config=config, credentials={})
     assert report["available"] is False
     assert report["scenarios"] == {}
 

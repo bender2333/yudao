@@ -48,7 +48,7 @@ def test_native_loop_executes_tool_and_persists_exact_inputs_before_each_request
         _send(handler, _stream([SUBMIT], response_id="resp-two"))
 
     with _server([_stream([REASONING, CALL], duplicate=True), second_response]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("local tool roundtrip")
             system.workspace(run_id).write_file("proof.txt", "host-read-evidence")
@@ -91,7 +91,7 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
         _send(handler, _stream([CALL], response_id="resp-two"))
 
     with _server([_stream([CALL]), repeat_call, _stream([SUBMIT], response_id="resp-three")]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("distinct executions")
             system.workspace(run_id).write_file("proof.txt", "first-result")
@@ -124,7 +124,7 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_message
 
     try:
         with _server([_stream([CALL]), silence, silence, silence]) as (config, captures, *_):
-            system = LoopSystem(tmp_path / "data", ResponsesAdapter(replace(config, timeout_sec=0.8)))
+            system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(replace(config, timeout_sec=0.8)))
             try:
                 run_id = system.create_run("later timeout")
                 system.workspace(run_id).write_file("proof.txt", "survives-timeout")
@@ -157,7 +157,7 @@ def test_failed_first_model_request_still_has_durable_exact_input(tmp_path, monk
               status=500, content_type="application/json")
 
     with _server([fail, fail, fail]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("failed provider request")
             result = system.activate_once(run_id)
@@ -180,7 +180,7 @@ def test_http_500_retry_then_success_reaches_native_loop(tmp_path, monkeypatch):
               status=500, content_type="application/json")
 
     with _server([fail, _stream([SUBMIT], response_id="retry-success")]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("HTTP retry to success")
             result = system.activate_once(run_id)
@@ -200,7 +200,7 @@ def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path,
     partial = {**CALL, "id": "partial-call", "call_id": "partial-call"}
 
     with _server([_stream([partial], terminal=False), _stream([SUBMIT], response_id="partial-success")]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("partial stream retry")
             result = system.activate_once(run_id)
@@ -217,7 +217,7 @@ def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path,
 
 def test_missing_provider_usage_is_not_estimated_and_does_not_stop_work(tmp_path):
     with _server([_stream([SUBMIT], usage=None)]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("provider did not report usage")
             result = system.activate_once(run_id)
@@ -235,7 +235,7 @@ def test_missing_provider_usage_is_not_estimated_and_does_not_stop_work(tmp_path
 def test_duplicate_call_ids_in_one_response_are_rejected_before_any_tool_starts(tmp_path):
     duplicate = {**CALL, "id": "fc-other", "arguments": '{"path":"second.txt"}'}
     with _server([_stream([CALL, duplicate]), _stream([SUBMIT], response_id="resp-two")]) as (config, captures, *_):
-        system = LoopSystem(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("ambiguous provider call identity")
             system.workspace(run_id).write_file("proof.txt", "first output")

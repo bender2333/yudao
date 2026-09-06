@@ -19,7 +19,7 @@ def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_
         raise ProviderError("temporary connection failure", retryable=True)
 
     adapter = FakeAdapter([fail_after_input, product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("original task")
     run_id_holder.append(run_id)
 
@@ -41,7 +41,7 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeyp
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.2)
     monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.2)
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("original task")
     original = system.orchestrator._record_retry_scheduled
 
@@ -73,7 +73,7 @@ def test_retry_schedule_admission_rechecks_interleaved_input_or_cancel(tmp_path,
     entered = Event()
     release = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("original task")
     original = system.orchestrator._record_retry_scheduled
 
@@ -112,7 +112,7 @@ def test_model_attempts_are_bounded_by_model_steps(tmp_path, monkeypatch):
         return ProviderError("temporary", retryable=True)
 
     adapter = FakeAdapter([transient_until_step_limit] * 10)
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     result = system.activate_once(system.create_run("original task"))
 
     assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"

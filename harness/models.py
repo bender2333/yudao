@@ -47,6 +47,7 @@ FAILED_REASONS = frozenset(
         "provider_error",
         "provider_timeout",
         "provider_unavailable",
+        "provider_credentials_lost",
         "cancelled",
         "context_overflow",
         "compaction_failed",
@@ -69,6 +70,7 @@ class EventType:
     DEPARTMENT_INPUT = "department_input"
     ACTIVATION_FINISHED = "activation_finished"
     CONTEXT_ASSEMBLED = "context_assembled"
+    MODEL_REQUEST_SERIALIZED = "model_request_serialized"
     MODEL_MESSAGE = "model_message"
     MODEL_REQUESTED = "model_requested"
     MODEL_ATTEMPT_FAILED = "model_attempt_failed"
@@ -385,6 +387,8 @@ class ContextManifest:
     input_version: int = 0
     prompt_version: int = 0
     prompt_hash: str | None = None
+    input_token_estimate: int | None = None
+    output_reserve_tokens: int = 0
 
 
 @dataclass
@@ -489,6 +493,12 @@ class RunProjection:
     provider: str = "fake"
     adapter: str = "fake"
     model: str | None = None
+    provider_snapshot: dict[str, Any] = field(default_factory=dict)
+    model_requests: list[dict[str, Any]] = field(default_factory=list)
+    requested_provider: str | None = None
+    requested_model: str | None = None
+    actual_provider: str | None = None
+    actual_model: str | None = None
     outcome: str = "running"
     stop_reason: str | None = None
     human_action: str | None = None
@@ -528,6 +538,13 @@ class RunProjection:
         data = self.to_dict()
         data.pop("last_event_id", None)
         return data
+
+    @property
+    def provider_bindings(self) -> dict[str, dict[str, Any]]:
+        departments = self.provider_snapshot.get("departments")
+        if not isinstance(departments, dict):
+            return {}
+        return departments
 
 
 def department_for_phase(phase: str) -> str | None:

@@ -80,34 +80,47 @@ def plan_compaction(
     context_window: int,
     pinned_input: list[dict[str, Any]],
     tools: list[dict[str, Any]],
+    output_limit: int | None = None,
 ) -> CompactionPlan | None:
     """Plan exactly one bounded summary call; the engine drives subsequent calls."""
     if not isinstance(context_window, int) or isinstance(context_window, bool) or context_window < 1:
         raise CompactionError("context_window must be a positive integer")
+    if output_limit is not None and (
+            not isinstance(output_limit, int) or isinstance(output_limit, bool) or output_limit < 1):
+        raise CompactionError("output_limit must be a positive integer")
     texts, boundaries = _validate_records(records)
     start, offset = _cursor(records, texts, boundaries, checkpoint)
     threshold = max(1, context_window * 85 // 100)
-    pinned_tokens = _request_tokens(pinned_input, tools)
+    pinned_tokens = _request_tokens(pinned_input, tools, output_limit)
     if pinned_tokens >= threshold:
         raise CompactionError("Pinned intend/current work and tool schemas leave no room for history and a response")
     active = ([] if checkpoint is None else [_summary_item(checkpoint)]) + [
         record["item"] for record in records[start:]
     ]
-    before = _request_tokens([*pinned_input, *active], tools)
+    before = _request_tokens([*pinned_input, *active], tools, output_limit)
     unfinished = checkpoint is not None and not checkpoint.boundary
     if not unfinished and before <= threshold:
         return None
     if start >= len(records):
         raise CompactionError("History is already summarized and still does not fit the model window")
 
-    summary_limit = min(4096, max(1, context_window // 10), max(1, (threshold - pinned_tokens) // 2))
+    max_output_tokens = context_window - threshold
+    if output_limit is not None:
+        max_output_tokens = min(max_output_tokens, output_limit)
+    if max_output_tokens < 1:
+        raise CompactionError("The model output limit leaves no room for a compaction summary")
+    summary_limit = min(
+        4096,
+        max(1, context_window // 10),
+        max(1, (threshold - pinned_tokens) // 2),
+        max_output_tokens,
+    )
     if summary_limit < 32:
         raise CompactionError("Pinned context leaves insufficient room for a useful history summary")
     end = _choose_prefix_end(records, texts, boundaries, start, context_window, threshold - pinned_tokens - summary_limit)
     previous_summary = None if checkpoint is None else checkpoint.summary
     parts: list[dict[str, Any]] = []
     material_budget = threshold
-    max_output_tokens = context_window - threshold
 
     def inputs(candidate: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [

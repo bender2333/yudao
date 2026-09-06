@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from ..git_audit import git_version_detail
 from ..models import ArtifactRef, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..provider_catalog import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
 from ..runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from ..tree_archive import load_tree
@@ -72,11 +73,11 @@ class LoopConsoleServer(ThreadingHTTPServer):
         with self._worker_lock:
             if self._worker is not None and self._worker.is_alive():
                 raise BusyError("已有任务正在运行")
-            availability = self.system.adapter.availability()
-            if not availability.available:
+            status = self.system.provider_status()
+            if not status.get("available", False):
                 raise ProviderUnavailableError(
-                    availability.message or "provider unavailable",
-                    availability.reason or "provider_unavailable",
+                    status.get("message") or "provider unavailable",
+                    status.get("reason") or "provider_unavailable",
                 )
             run_id = self.system.create_run(task, **options)
             worker = threading.Thread(
@@ -161,6 +162,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                              "cancellation_recorded": exc.cancellation_recorded}, 503)
         except ProviderUnavailableError as exc:
             self._send_json({"error": str(exc), "reason": exc.reason}, 503)
+        except CatalogValidationError as exc:
+            self._send_json({"error": str(exc), "reason": "provider_unavailable"}, 503)
         except RunNotFoundError as exc:
             self._send_json({"error": f"run not found: {exc}"}, 404)
         except ValueError as exc:
@@ -169,15 +172,17 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc)}, 500)
 
     def _health(self) -> dict[str, Any]:
-        availability = self.server.system.adapter.availability()
-        adapter = self.server.system.adapter
+        status = self.server.system.provider_status()
+        test_adapter = getattr(self.server.system, "test_adapter", None)
         return {
             "ok": True,
             "busy": self.server.busy(),
             "active_run_id": self.server.active_run_id(),
-            "adapter": getattr(adapter, "name", "unknown"),
-            "provider_available": availability.available,
-            "provider_message": availability.message,
+            "adapter": getattr(test_adapter, "name", "directory"),
+            "provider_available": bool(status.get("available", False)),
+            "provider_message": status.get("message", ""),
+            "provider_bindings": status.get("departments", {}),
+            "provider_status": status,
             "worker_error": self.server.last_worker_error(),
         }
 
@@ -411,6 +416,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                     "phase": projection.phase,
                     "outcome": projection.outcome,
                     "stop_reason": projection.stop_reason,
+                    "provider_bindings": projection.provider_bindings,
+                    "requested_model": projection.requested_model,
+                    "actual_model": projection.actual_model,
                     "cycle_count": projection.cycle_count,
                     "last_seq": projection.last_seq,
                 }

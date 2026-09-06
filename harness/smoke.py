@@ -9,7 +9,6 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .adapters.responses import ResponsesConfig, ResponsesAdapter
 from .artifacts import ArtifactStore
 from .collaboration import tool_error
 from .compaction import CompactionCheckpoint, plan_compaction
@@ -17,10 +16,11 @@ from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
 from .event_store import EventStore
 from .git_audit import verify_git_history
-from .models import ArtifactRef, EventType, RunProjection, canonical_hash, json_dumps
+from .models import ArtifactRef, EventType, RunProjection, canonical_hash, estimate_tokens, json_dumps
+from .provider_catalog import CatalogValidationError, ProviderCatalog
 from .projection import apply_event, project_run
 from .public_tree import capture_public_tree, materialize_tree
-from .runtime import LoopSystem
+from .runtime import LoopSystem, environment_credentials
 from .tree_archive import load_tree
 
 
@@ -53,6 +53,8 @@ COLLABORATION_TASK = (
 def run_smoke(
     data_dir: str | Path = DEFAULT_DIR,
     *,
+    provider_config: str | Path,
+    credentials=None,
     scenarios: list[str] | None = None,
 ) -> dict[str, Any]:
     data_dir = Path(data_dir)
@@ -60,22 +62,33 @@ def run_smoke(
     selected = scenarios or ["happy", "collaboration"]
     if any(name not in {"happy", "collaboration"} for name in selected):
         raise ValueError("unknown smoke scenario")
-    config = ResponsesConfig.from_env()
-    adapter = ResponsesAdapter(config)
-    availability = adapter.availability()
+    credentials = environment_credentials if credentials is None else credentials
     report: dict[str, Any] = {
-        "provider": config.provider,
-        "model": config.model,
-        "adapter": adapter.name,
-        "available": availability.available,
+        "provider_config": str(provider_config),
+        "available": False,
         "scenarios": {},
     }
-    if not availability.available:
-        report["error"] = availability.message
-        report["stop_reason"] = availability.reason
+    try:
+        catalog = ProviderCatalog.load(provider_config)
+        system = LoopSystem(data_dir, provider_catalog=catalog, credentials=credentials)
+        status = system.provider_status()
+    except CatalogValidationError as exc:
+        report["error"] = str(exc)
+        report["stop_reason"] = "provider_unavailable"
         _write_report(data_dir, report)
         return report
-    system = LoopSystem(data_dir, adapter)
+    report.update({
+        "available": bool(status.get("available")),
+        "provider_bindings": status.get("departments", {}),
+        "provider": None,
+        "model": None,
+        "adapter": status.get("adapter", "directory"),
+    })
+    if not report["available"]:
+        report["error"] = status.get("message", "provider unavailable")
+        report["stop_reason"] = status.get("reason", "provider_unavailable")
+        _write_report(data_dir, report)
+        return report
     for name in selected:
         report["scenarios"][name] = _run_scenario(system, name)
     _write_report(data_dir, report)
@@ -93,13 +106,17 @@ def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
     try:
         projection = system.run_until_stop(run_id)
     except Exception as exc:  # noqa: BLE001 - smoke must record provider failure
+        try:
+            failed_projection = system.project(run_id)
+        except Exception:  # noqa: BLE001 - preserve the original smoke failure
+            failed_projection = None
         return {
             "run_id": run_id,
             "scenario": name,
             "phase": "FAILED",
             "stop_reason": "provider_error",
             "error": str(exc),
-            "fake_used": False,
+            "fake_used": _fake_used(failed_projection),
         }
     return summarize_run(system, run_id, scenario=name)
 
@@ -122,6 +139,12 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "adapter": projection.adapter,
         "provider": projection.provider,
         "model": projection.model,
+        "provider_bindings": projection.provider_bindings,
+        "model_requests": projection.model_requests,
+        "requested_provider": projection.requested_provider,
+        "requested_model": projection.requested_model,
+        "actual_provider": projection.actual_provider,
+        "actual_model": projection.actual_model,
         "route": list(projection.transitions),
         "request_count": projection.request_count,
         "collaboration_requests": [asdict(item) for item in projection.requests],
@@ -138,11 +161,26 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "git_audit": _git_evidence(system, run_id),
         "replay_consistent": replayed.canonical_state() == projection.canonical_state(),
         **isolation,
-        "fake_used": projection.adapter == "fake",
+        "fake_used": _fake_used(projection),
         "product_spec_hash": None if projection.product_spec is None else projection.product_spec.content_hash,
         "delivery_files": [] if projection.delivery_spec is None else list(projection.delivery_spec.files),
         "qa_verdict": None if projection.last_review is None else projection.last_review.verdict,
     }
+
+
+def _fake_used(projection: RunProjection | None) -> bool:
+    """判断任务是否使用了明确的 fake 协议或测试适配器。"""
+
+    if projection is None:
+        return False
+    if projection.adapter == "fake":
+        return True
+    if any(item.get("protocol") == "fake" for item in projection.provider_bindings.values()):
+        return True
+    return any(
+        item.get("protocol") == "fake" or item.get("requested_protocol") == "fake"
+        for item in projection.model_requests
+    )
 
 
 def _git_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
@@ -384,10 +422,23 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     summary = artifacts.get_for_run(event.run_id, ArtifactRef(**payload["summary_ref"])).decode("utf-8")
     plan = _read_artifact(artifacts, event.run_id, payload["plan_ref"])
     limit = plan["summary_token_limit"]
-    if (plan["input_items"] != audit["request"]["input"] or plan["source_refs"] != audit["source_refs"]
+    expected_effective = _compaction_output_limit(
+        audit["effective_context_window"], audit["configured_max_output_tokens"],
+    )
+    if ((payload.get("effective_context_window") is not None
+         and payload.get("effective_context_window") != audit["effective_context_window"])
+            or payload.get("configured_max_output_tokens") != audit["configured_max_output_tokens"]
+            or payload.get("context_window") != audit["target_context_window"]
+            or expected_effective != audit["effective_max_output_tokens"]
+            or plan["input_items"] != audit["request"]["input"] or plan["source_refs"] != audit["source_refs"]
             or payload["source_refs"] != audit["source_refs"] or plan["next_checkpoint"] != audit["next_checkpoint"]
             or plan["previous_summary_digest"] != audit["previous_summary_digest"]
-            or plan["max_output_tokens"] != audit["request"]["max_output_tokens"]
+            or plan["max_output_tokens"] != audit["effective_max_output_tokens"]
+            or plan.get("input_token_estimate") != estimate_tokens(json_dumps({
+                "input": plan["input_items"],
+                "tools": [],
+                "max_output_tokens": plan["max_output_tokens"],
+            }))
             or payload["max_output_tokens"] != plan["max_output_tokens"]
             or type(limit) is not int or not 0 < limit <= plan["max_output_tokens"]
             or payload["summary_token_limit"] != limit):
@@ -408,6 +459,18 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     if payload["checkpoint"] != expected:
         raise ValueError("summary checkpoint coverage differs from its original sources")
     return expected
+
+
+def _effective_output_limit(effective_window: int, configured_output_limit: int | None) -> int | None:
+    if configured_output_limit is None:
+        return None
+    available = effective_window - max(1, (effective_window * 85) // 100)
+    return min(configured_output_limit, available)
+
+
+def _compaction_output_limit(effective_window: int, configured_output_limit: int | None) -> int:
+    available = effective_window - max(1, (effective_window * 85) // 100)
+    return available if configured_output_limit is None else min(configured_output_limit, available)
 
 
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
@@ -493,6 +556,20 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 for field, value in basis.items():
                     if field not in payload or payload[field] != value:
                         notes.append(f"event {event.seq}: activation {field} does not match current work")
+                frozen_binding = current_work.provider_bindings.get(event.role or "")
+                if frozen_binding:
+                    expected_binding = {
+                        "provider_config_id": frozen_binding.get("provider_id"),
+                        "model_id": frozen_binding.get("model_id"),
+                        "protocol": frozen_binding.get("protocol"),
+                        "base_url": frozen_binding.get("base_url"),
+                        "requested_model": frozen_binding.get("model"),
+                        "context_window": frozen_binding.get("context_window"),
+                        "configured_max_output_tokens": frozen_binding.get("max_output_tokens"),
+                    }
+                    for field, value in expected_binding.items():
+                        if payload.get(field) != value:
+                            notes.append(f"event {event.seq}: provider binding {field} differs from the frozen task snapshot")
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
@@ -585,9 +662,19 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError(f"{field} does not match the activation and current work")
             checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"],
                               basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
-            pinned = assembler.assemble(current_work, department=event.role, session_id=event.session_id,
-                                         activation_id=activation, step_id=payload.get("step_id", 1),
-                                         prompt=activation_prompts[activation])
+            frozen_binding = current_work.provider_bindings.get(event.role or "")
+            target_window = frozen_binding.get("context_window") if frozen_binding else None
+            configured_output_limit = frozen_binding.get("max_output_tokens") if frozen_binding else None
+            effective_window = current_work.context_window
+            if isinstance(target_window, int) and target_window > 0:
+                effective_window = min(effective_window, target_window)
+            effective_output_limit = _effective_output_limit(effective_window, configured_output_limit)
+            pinned = assembler.assemble(
+                current_work, department=event.role, session_id=event.session_id,
+                activation_id=activation, step_id=payload.get("step_id", 1),
+                prompt=activation_prompts[activation], context_window=effective_window,
+                max_output_tokens=effective_output_limit,
+            )
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:
                     raise ValueError("department input does not belong to its activation start")
@@ -641,6 +728,10 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if purpose not in {"work", "compaction"}:
                     raise ValueError("unknown model request purpose")
                 purposes[activation] = purpose
+                expected_output_limit = (
+                    _compaction_output_limit(effective_window, configured_output_limit)
+                    if purpose == "compaction" else effective_output_limit
+                )
                 allowed = {"input", "tools"}
                 limit = payload.get("max_output_tokens")
                 if limit is not None:
@@ -661,13 +752,29 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 previous = checkpoints.get(checkpoint_key)
                 if payload.get("compaction_event_id") != (previous or {}).get("event_id"):
                     raise ValueError("model request uses an unrelated compaction checkpoint")
+                if event.type == EventType.CONTEXT_ASSEMBLED:
+                    if payload.get("effective_context_window") != effective_window:
+                        raise ValueError("effective context window does not match the frozen department model")
+                    if payload.get("configured_max_output_tokens") != configured_output_limit:
+                        raise ValueError("configured output limit does not match the frozen department model")
+                    if payload.get("max_output_tokens") != expected_output_limit:
+                        raise ValueError("effective output limit does not match the frozen department model")
                 records = histories.get(event.role, [])
                 if purpose == "compaction":
                     if schemas or limit is None:
                         raise ValueError("compaction must have no tools and an explicit output limit")
                     compacting[(activation, step)] = _audit_compaction_input(request, records, previous)
+                    compacting[(activation, step)].update(
+                        effective_context_window=effective_window,
+                        target_context_window=target_window,
+                        configured_max_output_tokens=configured_output_limit,
+                        effective_max_output_tokens=expected_output_limit,
+                    )
                     checkpoint = CompactionCheckpoint(**previous["checkpoint"]) if previous else None
-                    plan = plan_compaction(records, checkpoint, current_work.context_window, pinned.input_items, pinned.tools)
+                    plan = plan_compaction(
+                        records, checkpoint, effective_window, pinned.input_items, pinned.tools,
+                        output_limit=expected_output_limit,
+                    )
                     if plan is None or request["input"] != plan.input_items or limit != plan.max_output_tokens:
                         raise ValueError("compaction input differs from its allowed source assembly")
                     expected_context = assembler.assemble_compaction(
@@ -685,14 +792,32 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     expected_context = assembler.assemble(
                         current_work, department=event.role, session_id=event.session_id, activation_id=activation,
                         step_id=step, history=visible, compaction_event_id=(previous or {}).get("event_id"),
-                        prompt=activation_prompts[activation],
+                        prompt=activation_prompts[activation], context_window=effective_window,
+                        max_output_tokens=effective_output_limit,
                     )
                     if schemas != expected_context.tools:
                         raise ValueError("actual tool schemas differ from the allowed definitions")
+                if event.type == EventType.CONTEXT_ASSEMBLED:
+                    input_estimate = estimate_tokens(json_dumps({"input": items, "tools": schemas}))
+                    request_estimate = estimate_tokens(json_dumps(request))
+                    output_reserve = expected_output_limit or 0
+                    if (payload.get("input_token_estimate") != input_estimate
+                            or payload.get("token_estimate") != request_estimate
+                            or payload.get("output_reserve_tokens") != output_reserve
+                            or payload.get("budget") != effective_window
+                            or payload.get("admitted") != (input_estimate + output_reserve <= effective_window)):
+                        raise ValueError("context token accounting or admission differs from the effective model limits")
                 if payload.get("injected") != [asdict(item) for item in expected_context.manifest.injected]:
                     raise ValueError("injected source metadata differs from current allowed materials")
                 if payload.get("excluded") != [asdict(item) for item in expected_context.manifest.excluded]:
                     raise ValueError("excluded source metadata differs from current allowed materials")
+                if event.type == EventType.CONTEXT_ASSEMBLED:
+                    manifest = expected_context.manifest
+                    if (manifest.budget != effective_window
+                            or manifest.max_output_tokens != expected_output_limit
+                            or manifest.input_token_estimate != input_estimate
+                            or manifest.output_reserve_tokens != (expected_output_limit or 0)):
+                        raise ValueError("rebuilt context manifest differs from the effective model limits")
             elif event.type == EventType.MODEL_REQUESTED:
                 key = (activation, payload.get("step_id"))
                 if (activation not in steps or key[1] != steps[activation]
@@ -871,6 +996,7 @@ def _markdown(report: dict[str, Any]) -> str:
         f"- provider: `{report.get('provider')}`",
         f"- model: `{report.get('model')}`",
         f"- available: `{report.get('available')}`",
+        f"- provider bindings: `{json.dumps(report.get('provider_bindings') or {}, ensure_ascii=False, sort_keys=True)}`",
         "",
     ]
     if report.get("error"):
@@ -886,6 +1012,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- stop reason: `{scenario.get('stop_reason')}`",
                 f"- adapter: `{scenario.get('adapter')}`",
                 f"- provider/model: `{scenario.get('provider')}` / `{scenario.get('model')}`",
+                f"- provider bindings: `{json.dumps(scenario.get('provider_bindings') or {}, ensure_ascii=False, sort_keys=True)}`",
                 f"- route: `{' | '.join(scenario.get('route') or [])}`",
                 f"- requests: `{scenario.get('request_count')}` reworks: `{scenario.get('rework_count')}`",
                 f"- replay consistent: `{scenario.get('replay_consistent')}`",

@@ -6,7 +6,7 @@ from harness.runtime import LoopSystem
 
 
 def system_with(data_dir: Path, script) -> LoopSystem:
-    return LoopSystem(data_dir, FakeAdapter(script))
+    return LoopSystem.for_testing(data_dir, FakeAdapter(script))
 
 
 def run_scripted(data_dir: Path, script, task: str = "build echo", **kwargs):

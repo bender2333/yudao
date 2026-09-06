@@ -48,7 +48,7 @@ def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp
                   text="Keep the initial acceptance measurable.", result_event_ids=[]),
         ])
 
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request(recipient), advise, product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request(recipient), advise, product_spec()]))
     run_id = system.create_run("build echo")
     pending = system.activate_once(run_id)
     assert pending.phase == "PRODUCT_SPEC"
@@ -66,7 +66,7 @@ def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp
 
 
 def test_quality_clarification_preserves_contract_and_requires_a_new_independent_check(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(),
         FakeTurn(proposal=collaboration_request("product"), checks={"smoke": 0}),
         response_turn("answered", "Print the argument as defined in the current requirement."),
@@ -89,7 +89,7 @@ def test_quality_clarification_preserves_contract_and_requires_a_new_independent
 
 
 def test_revision_request_accepts_plan_delivery_then_response_without_changing_main_phase(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(),
         collaboration_request("engineering", "Correct the implementation.", request_type="action", action="revise_delivery"),
         plan_turn(reason="Correct the implementation requested by quality."),
@@ -133,7 +133,7 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
                   text="Files changed, but the requested revision still needs engineering work.", result_event_ids=[]),
         ])
 
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(),
         collaboration_request("engineering", request_type="action", action="revise_delivery"), partial,
     ]))
@@ -161,7 +161,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
             "rationale": "Make the handling of this earlier decision explicit.",
         }])
 
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("product", request_type="action", action="revise_requirements"),
         product_decision("Reject unknown flags.", "Invalid options require an explicit error."),
         response_turn("completed", result_types=[EventType.PRODUCT_DECISION_ACCEPTED]),
@@ -197,7 +197,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
 def test_consultation_cannot_submit_nested_request_or_formal_decision(tmp_path):
     decision = product_decision("Change the goal.", "Not authorized by a consultation.")
     decision.pop("kind")
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("product"),
         ModelResponse(output=[_call("nested", "submit_request", recipient="engineering", request_type="consultation",
                                     question="Nested?", background="Need more help", expected_result="Advice", action=None)]),
@@ -216,7 +216,7 @@ def test_consultation_cannot_submit_nested_request_or_formal_decision(tmp_path):
 
 
 def test_completed_action_requires_an_accepted_result_not_model_claims(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("product", request_type="action", action="revise_requirements"),
         response_turn("completed", "I changed the requirements.", result_event_ids=["model-call-id"]),
         response_turn("declined", "No product decision was actually accepted."),
@@ -231,7 +231,7 @@ def test_completed_action_requires_an_accepted_result_not_model_claims(tmp_path)
 
 
 def test_quality_recipient_cannot_release_while_answering_a_consultation(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), collaboration_request("quality"),
         review_turn("release", "A consultation must not release the run."),
         response_turn("answered", "The engineering checks should cover normal and invalid input."),
@@ -246,7 +246,7 @@ def test_quality_recipient_cannot_release_while_answering_a_consultation(tmp_pat
 
 
 def test_response_rejects_wrong_request_or_department_without_closing_current_request(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request("engineering")]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering")]))
     run_id = system.create_run("build echo")
     pending = system.activate_once(run_id)
     for department, request_id in (("quality", pending.pending_request.id), ("engineering", "another-request")):
@@ -263,7 +263,7 @@ def test_response_rejects_wrong_request_or_department_without_closing_current_re
 def test_read_and_check_actions_use_real_host_results_even_when_check_finds_failure(tmp_path, action, recipient):
     tool_turn = (ModelResponse(output=[_call("inspect-files", "list_files")]) if action == "inspect"
                  else FakeTurn(checks={"smoke": 2}))
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         collaboration_request(recipient, request_type="action", action=action), tool_turn,
         response_turn("completed", "The requested inspection was performed.", result_types=[EventType.TOOL_CALLED]),
     ]))
@@ -283,7 +283,7 @@ def test_read_and_check_actions_use_real_host_results_even_when_check_finds_fail
     ("model_steps_exhausted", "stopped", "PAUSED"),
 ])
 def test_pending_request_is_closed_before_provider_or_loop_stop(tmp_path, reason, status, phase):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         collaboration_request("quality"), ProviderError("The receiver stopped.", reason=reason),
     ]))
     run_id = system.create_run("build echo")
@@ -298,13 +298,13 @@ def test_pending_request_is_closed_before_provider_or_loop_stop(tmp_path, reason
 
 
 def test_pending_request_is_closed_when_activation_limit_is_reached(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request("engineering")]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering")]))
     run_id = system.create_run("build echo", max_cycles=1)
     system.activate_once(run_id)
     current = system.activate_once(run_id)
     assert current.phase == "PAUSED" and current.stop_reason == "max_cycles"
     assert current.pending_request is None and current.requests[-1].status == "stopped"
-    assert len(system.adapter.invocations) == 1
+    assert len(system.test_adapter.invocations) == 1
 
 
 def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(tmp_path):
@@ -312,7 +312,7 @@ def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(
         system.cancel(request.run_id)
         return collaboration_response(request.request_id, "answered", "Late answer")
 
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request("quality"), cancel]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("quality"), cancel]))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     current = system.activate_once(run_id)
@@ -323,7 +323,7 @@ def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(
 
 
 def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), collaboration_request("product"), plan_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), collaboration_request("product"), plan_turn()]))
     run_id = system.create_run("build echo")
     before = _steps(system, run_id, 2)
     external = replace(before, phase="PRODUCT_SPEC", pending_request=None)
@@ -348,7 +348,7 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
 
 def test_private_receiver_history_is_not_injected_into_requester_context(tmp_path):
     marker = "RECEIVER_PRIVATE_ANALYSIS_735912"
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         collaboration_request("engineering"), FakeTurn(transcript=marker), response_turn("answered", "Use one clear output check."),
         product_spec(), plan_turn(),
     ]))
@@ -356,12 +356,12 @@ def test_private_receiver_history_is_not_injected_into_requester_context(tmp_pat
     system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
-    resumed_product = system.adapter.invocations[-1]
+    resumed_product = system.test_adapter.invocations[-1]
     assert resumed_product.department == "product"
     assert marker not in json_dumps(resumed_product.input_items)
     assert "Use one clear output check." in _parts(resumed_product)["latest_response"]
     system.activate_once(run_id)
-    resumed_engineering = system.adapter.invocations[-1]
+    resumed_engineering = system.test_adapter.invocations[-1]
     assert marker in json_dumps(resumed_engineering.input_items)
     assert all(set(item) == {"event_id", "type", "request_id", "role", "name", "ok", "content_hash"}
                for item in system.project(run_id).request_results)

@@ -30,9 +30,11 @@ from .models import (
     Usage,
     canonical_hash,
     department_for_phase,
+    estimate_tokens,
     json_dumps,
     new_id,
 )
+from .provider_catalog import CredentialSource, ProviderCatalog, ProviderCatalogSnapshot, ResolvedProviderTarget
 from .projection import RunProjection, project_run
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
@@ -49,6 +51,9 @@ class _Activation:
     activation_id: str
     abort_flag: Event
     parent_event_id: str
+    adapter: ModelAdapter
+    target: ResolvedProviderTarget | None
+    snapshot_id: str | None
     input_version: int
     prompt: DepartmentPrompt
     request: ModelRequest | None = None
@@ -81,7 +86,12 @@ class Orchestrator:
         store: EventStore,
         artifacts: ArtifactStore,
         workspace_root: str | Path,
-        adapter: ModelAdapter,
+        *,
+        provider_catalog: ProviderCatalog | None = None,
+        credentials: CredentialSource | None = None,
+        test_adapter_factory: Any | None = None,
+        test_provider: str = "test",
+        test_adapter_name: str = "test",
         assembler: ContextAssembler | None = None,
         sessions: SessionFactory | None = None,
     ) -> None:
@@ -92,12 +102,17 @@ class Orchestrator:
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(store, artifacts, self.materials_root, self.git_versions)
         self.interactions = InteractionWriter(store, artifacts, self.materials_root, self.git_versions)
-        self.adapter = adapter
+        self.provider_catalog = provider_catalog
+        self.credentials = credentials
+        self.test_adapter_factory = test_adapter_factory
+        self.test_provider = test_provider
+        self.test_adapter_name = test_adapter_name
         self.assembler = assembler or ContextAssembler()
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
         self._state_lock = RLock()
         self._active: dict[str, _Activation] = {}
+        self._snapshots: dict[str, ProviderCatalogSnapshot] = {}
 
     def create_run(
         self,
@@ -113,6 +128,11 @@ class Orchestrator:
             raise ValueError("max_cycles must be positive")
         if context_window < 1:
             raise ValueError("context_window must be positive")
+        if self.provider_catalog is None and self.test_adapter_factory is None:
+            raise ValueError("provider_catalog is required for production runs")
+        snapshot = None
+        if self.provider_catalog is not None:
+            snapshot = self.provider_catalog.resolve_snapshot(self.credentials)
         run_id = run_id or new_id("run")
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
@@ -120,6 +140,14 @@ class Orchestrator:
         initial = self.interactions.initial(run_id, task)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
+        if snapshot is not None:
+            self._snapshots[run_id] = snapshot
+        provider_snapshot = {} if snapshot is None else snapshot.public_dict()
+        if snapshot is not None:
+            provider_snapshot = {
+                "snapshot_id": canonical_hash(provider_snapshot),
+                **provider_snapshot,
+            }
         Workspace(self.workspace_root / run_id)
         self.store.append(
             run_id,
@@ -133,8 +161,9 @@ class Orchestrator:
                 "intend_path": (Path("materials") / run_id / "intend.md").as_posix(),
                 "max_cycles": max_cycles,
                 "context_window": context_window,
-                "provider": getattr(self.adapter, "name", "unknown"),
-                "adapter": self.adapter.name,
+                "provider": self.test_provider if snapshot is None else "directory",
+                "adapter": self.test_adapter_name if snapshot is None else "directory",
+                "provider_snapshot": provider_snapshot,
                 "sessions": {name: session.session_id for name, session in sessions.items()},
             },
         )
@@ -174,7 +203,7 @@ class Orchestrator:
                     self._abort.setdefault(run_id, Event()).set()
                     if activation is not None:
                         try:
-                            self.adapter.abort(activation.session_id)
+                            activation.adapter.abort(activation.session_id)
                             abort_notified = True
                         except Exception as exc:
                             stop_error = exc
@@ -194,7 +223,7 @@ class Orchestrator:
         finally:
             if command and activation is not None and not abort_notified:
                 try:
-                    self.adapter.abort(activation.session_id)
+                    activation.adapter.abort(activation.session_id)
                 except Exception as exc:
                     stop_error = stop_error or exc
         if save_error is not None:
@@ -277,12 +306,12 @@ class Orchestrator:
                 self._abort.setdefault(run_id, Event()).set()
                 activation = self._active.get(run_id)
                 if activation is not None:
-                    self.adapter.abort(activation.session_id)
+                    activation.adapter.abort(activation.session_id)
                     abort_notified = True
                 self._fail(run_id, projection, "cancelled", "run cancelled")
         finally:
             if activation is not None and not abort_notified:
-                self.adapter.abort(activation.session_id)
+                activation.adapter.abort(activation.session_id)
         return self.project(run_id)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
@@ -343,7 +372,50 @@ class Orchestrator:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
 
-        availability = self.adapter.availability()
+        target: ResolvedProviderTarget | None = None
+        snapshot_id: str | None = None
+        run_has_frozen_provider = bool(projection.provider_snapshot.get("snapshot_id"))
+        snapshot = self._snapshots.get(run_id)
+        if run_has_frozen_provider or snapshot is not None:
+            if snapshot is None:
+                self._fail(
+                    run_id,
+                    projection,
+                    "provider_credentials_lost",
+                    "The task's frozen provider credentials are unavailable after restart; create a new run.",
+                )
+                return None
+            try:
+                target = snapshot.target(department)
+                snapshot_id = canonical_hash(snapshot.public_dict())
+                if target.max_output_tokens is None:
+                    self._fail(
+                        run_id,
+                        projection,
+                        "provider_unavailable",
+                        f"The bound model for {department} has no declared output limit.",
+                    )
+                    return None
+                adapter = target.create_adapter()
+            except (KeyError, ValueError) as exc:
+                self._fail(run_id, projection, "provider_unavailable", str(exc))
+                return None
+        else:
+            if self.test_adapter_factory is None:
+                self._fail(
+                    run_id,
+                    projection,
+                    "provider_credentials_lost",
+                    "The task's model credentials are unavailable in this process; create a new run.",
+                )
+                return None
+            try:
+                adapter = self.test_adapter_factory(department)
+            except Exception as exc:
+                self._fail(run_id, projection, "provider_unavailable", f"test adapter creation failed: {exc}")
+                return None
+
+        availability = adapter.availability()
         if not availability.available:
             self._fail(run_id, projection, availability.reason or "provider_unavailable", availability.message)
             return None
@@ -364,17 +436,79 @@ class Orchestrator:
             state_before=projection.phase,
             state_after=projection.phase,
             session_id=session.session_id,
+            provider=self._configured_provider(target, adapter),
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": current_contract_hash(projection),
                      "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection),
                      "input_version": projection.input_version, "prompt_version": prompt.version,
-                     "prompt_hash": prompt.prompt_ref.content_hash},
+                     "prompt_hash": prompt.prompt_ref.content_hash,
+                     **self._target_metadata(target, adapter, snapshot_id)},
         )
         abort_flag = self._abort.setdefault(run_id, Event())
         return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
+                           adapter, target, snapshot_id,
                            input_version=projection.input_version, prompt=prompt,
                            effective_contract_hash=current_contract_hash(projection),
                            engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection))
+
+    @staticmethod
+    def _configured_provider(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
+        return target.provider_id if target is not None else getattr(adapter, "name", "test")
+
+    @staticmethod
+    def _configured_model(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
+        return target.model if target is not None else getattr(adapter, "model", "unknown")
+
+    @classmethod
+    def _target_metadata(
+        cls,
+        target: ResolvedProviderTarget | None,
+        adapter: ModelAdapter,
+        snapshot_id: str | None = None,
+    ) -> dict[str, Any]:
+        if target is None:
+            return {
+                "snapshot_id": snapshot_id,
+                "provider_config_id": None,
+                "model_id": None,
+                "provider_name": cls._configured_provider(target, adapter),
+                "protocol": "test",
+                "base_url": None,
+                "requested_provider": cls._configured_provider(target, adapter),
+                "requested_protocol": "test",
+                "requested_model": cls._configured_model(target, adapter),
+                "credential_ref": None,
+                "credential_version": None,
+                "context_window": None,
+                "configured_max_output_tokens": None,
+            }
+        return {
+            "snapshot_id": snapshot_id,
+            "provider_config_id": target.provider_id,
+            "model_id": target.model_id,
+            "provider_name": target.provider_name,
+            "protocol": target.protocol,
+            "base_url": target.base_url,
+            "requested_provider": target.provider_id,
+            "requested_protocol": target.protocol,
+            "requested_model": target.model,
+            "credential_ref": target.credential_ref,
+            "credential_version": target.credential_version,
+            "context_window": target.context_window,
+            "configured_max_output_tokens": target.max_output_tokens,
+        }
+
+    @staticmethod
+    def _effective_limits(projection: RunProjection, target: ResolvedProviderTarget | None) -> tuple[int, int | None]:
+        if target is None:
+            return projection.context_window, None
+        effective_window = min(projection.context_window, target.context_window)
+        reserve = max(1, effective_window * 85 // 100)
+        output_budget = effective_window - reserve
+        if output_budget < 1:
+            raise ValueError("the effective context window leaves no room for model output")
+        output_limit = min(target.max_output_tokens, output_budget)
+        return effective_window, output_limit
 
     def _invoke_activation(self, activation: _Activation) -> None:
         request = activation
@@ -390,7 +524,7 @@ class Orchestrator:
                 engineering_plan_hash=request.engineering_plan_hash,
             )
             submission = run_department(
-                self.adapter, ToolRuntime(workspace),
+                activation.adapter, ToolRuntime(workspace),
                 prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
                     activation, step, attempt, root, retry_of,
                 ),
@@ -432,7 +566,9 @@ class Orchestrator:
                 run_id, department=department, projection=projection, proposal=submission.proposal,
                 input_version=activation.input_version,
                 transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
-                session_id=request.session_id, provider=submission.response.provider, model=submission.response.model,
+                session_id=request.session_id,
+                provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
+                model=submission.response.model,
             )
         except Exception as exc:
             self._fail(run_id, self.project(run_id), "host_commit_error", f"{type(exc).__name__}: {exc}")
@@ -456,10 +592,15 @@ class Orchestrator:
                     or self._request_id(current) != activation.request_id
                     or current.input_version != activation.input_version):
                 return None
-            pinned = self.assembler.assemble(
-                current, department=identity.department, session_id=identity.session_id,
-                activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
-            )
+            try:
+                effective_window, output_limit = self._effective_limits(current, identity.target)
+                pinned = self.assembler.assemble(
+                    current, department=identity.department, session_id=identity.session_id,
+                    activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
+                    context_window=effective_window, max_output_tokens=output_limit,
+                )
+            except ValueError as exc:
+                raise ProviderError(str(exc), reason="context_overflow") from exc
             if step_id == 1:
                 content = department_work_text(pinned)
                 input_item = {"role": "user", "content": content}
@@ -492,7 +633,8 @@ class Orchestrator:
                         raise CompactionError("Compaction summary does not match its original artifact")
                     checkpoint_id = checkpoint_event["source_event_id"]
                 activation.compaction_plan = plan_compaction(
-                    records, checkpoint, current.context_window, pinned.input_items, pinned.tools,
+                    records, checkpoint, effective_window, pinned.input_items, pinned.tools,
+                    output_limit=output_limit,
                 )
                 if activation.compaction_plan is not None:
                     plan = activation.compaction_plan
@@ -507,9 +649,10 @@ class Orchestrator:
                         prompt=activation.prompt,
                         history=visible_history(records, checkpoint),
                         compaction_event_id=checkpoint_id,
+                        context_window=effective_window, max_output_tokens=output_limit,
                     )
             except (CompactionError, ValueError, FileNotFoundError) as exc:
-                reason = "context_overflow" if pinned.manifest.token_estimate >= current.context_window * 85 // 100 else "compaction_failed"
+                reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window * 85 // 100 else "compaction_failed"
                 raise ProviderError(str(exc), reason=reason) from exc
             request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
                                    step_id, assembled, assembled.tools, identity.abort_flag,
@@ -520,11 +663,15 @@ class Orchestrator:
                                    retry_of_step_id=retry_of_step_id, **activation.versions())
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
+            activation.provider = None
+            activation.model = None
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
             activation.step_usage = None
             activation.raw_usage_ref = None
             estimate = assembled.manifest.token_estimate
-            overflow = estimate > current.context_window
+            input_estimate = estimate_tokens(json_dumps({"input": request.input_items, "tools": request.tools}))
+            output_reserve = request.max_output_tokens or 0
+            overflow = input_estimate + output_reserve > effective_window
             admitted = not overflow
             request_payload = {"input": request.input_items, "tools": request.tools}
             if request.max_output_tokens is not None:
@@ -533,11 +680,17 @@ class Orchestrator:
             payload = asdict(assembled.manifest)
             payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=admitted,
                            tokens_charged=0, step_id=step_id, attempt=attempt, root_step_id=root_step_id,
-                           retry_of_step_id=retry_of_step_id)
+                           retry_of_step_id=retry_of_step_id,
+                           **self._target_metadata(identity.target, identity.adapter, identity.snapshot_id),
+                           effective_context_window=effective_window,
+                           input_token_estimate=input_estimate,
+                           output_reserve_tokens=output_reserve)
             self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
-                              context_digest=assembled.manifest.digest, artifact_hashes=[ref.content_hash], payload=payload)
+                              provider=self._configured_provider(identity.target, identity.adapter),
+                              context_digest=assembled.manifest.digest,
+                              artifact_hashes=[ref.content_hash], payload=payload)
             if overflow:
                 self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
                 return None
@@ -595,7 +748,8 @@ class Orchestrator:
             self.store.append(activation.run_id, EventType.COMPACTION_RECORDED, role=activation.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=activation.session_id,
-                              provider=response.provider, model=response.model,
+                              provider=response.provider or self._configured_provider(activation.target, activation.adapter),
+                              model=response.model,
                               context_digest=request.context.manifest.digest,
                               artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
                               payload={"run_id": activation.run_id, "department": activation.department,
@@ -608,6 +762,7 @@ class Orchestrator:
                                        "effective_contract_hash": activation.effective_contract_hash,
                                        "engineering_plan_hash": activation.engineering_plan_hash,
                                        "request_id": activation.request_id,
+                                       **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
                                        "previous_compaction_event_id": request.context.manifest.compaction_event_id})
 
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
@@ -624,6 +779,7 @@ class Orchestrator:
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
+                              provider=self._configured_provider(activation.target, activation.adapter),
                               context_digest=request.context.manifest.digest,
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
                                        **activation.versions(),
@@ -632,7 +788,10 @@ class Orchestrator:
                                        "retry_of_step_id": request.retry_of_step_id,
                                        "attempted": True, "purpose": request.purpose,
                                        "effective_contract_hash": request.effective_contract_hash,
-                                       "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id})
+                                       "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id,
+                                       **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
+                                       "effective_context_window": request.context.manifest.budget,
+                                       "max_output_tokens": request.max_output_tokens})
             return True
 
     def _record_attempt_failed(
@@ -652,14 +811,12 @@ class Orchestrator:
             ]
             activation.messages = [text for text, _key in kept]
             activation.message_steps = [key for _text, key in kept]
-            provider = activation.provider or current.provider or self.adapter.name
-            model = activation.model or current.model or self.adapter.model
+            provider = self._configured_provider(activation.target, activation.adapter)
             self.store.append(
                 request.run_id, EventType.MODEL_ATTEMPT_FAILED, role=request.department,
                 parent_event_id=activation.parent_event_id, state_before=current.phase,
                 state_after=current.phase, session_id=request.session_id,
                 provider=provider,
-                model=model,
                 context_digest=request.context.manifest.digest,
                 error=str(error),
                 payload={
@@ -678,6 +835,7 @@ class Orchestrator:
                     "retryable": error.retryable,
                     "will_retry": will_retry,
                     "diagnostics": dict(error.diagnostics or {}),
+                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
                 },
             )
 
@@ -697,14 +855,12 @@ class Orchestrator:
                     or self._request_id(current) != activation.request_id
                     or current.input_version != activation.input_version):
                 return False
-            provider = activation.provider or current.provider or self.adapter.name
-            model = activation.model or current.model or self.adapter.model
+            provider = self._configured_provider(activation.target, activation.adapter)
             self.store.append(
                 request.run_id, EventType.MODEL_RETRY_SCHEDULED, role=request.department,
                 parent_event_id=activation.parent_event_id, state_before=current.phase,
                 state_after=current.phase, session_id=request.session_id,
                 provider=provider,
-                model=model,
                 context_digest=request.context.manifest.digest,
                 payload={
                     "activation_id": request.activation_id,
@@ -723,6 +879,7 @@ class Orchestrator:
                     "reason": error.reason,
                     "retryable": True,
                     "delay_sec": delay,
+                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
                 },
             )
             return True
@@ -777,19 +934,73 @@ class Orchestrator:
                 return
             activation.seen.add(key)
             current = self.project(request.run_id)
+            if observation.kind == "request":
+                if not isinstance(observation.payload, dict):
+                    raise ProviderError("Serialized provider request is not a JSON object", reason="provider_protocol")
+                ref = self.artifacts.put(
+                    request.run_id,
+                    "sdk_request",
+                    json_dumps(observation.payload),
+                    media_type="application/json",
+                )
+                payload = {
+                    "activation_id": request.activation_id,
+                    "step_id": request.step_id,
+                    "attempt": request.attempt,
+                    "root_step_id": request.root_step_id,
+                    "retry_of_step_id": request.retry_of_step_id,
+                    "purpose": request.purpose,
+                    "request_ref": asdict(ref),
+                    "request_digest": canonical_hash(observation.payload),
+                    "serialization": "sdk_request_json_object",
+                    "effective_contract_hash": activation.effective_contract_hash,
+                    "engineering_plan_hash": activation.engineering_plan_hash,
+                    "request_id": activation.request_id,
+                    **activation.versions(),
+                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
+                }
+                self.store.append(
+                    request.run_id,
+                    EventType.MODEL_REQUEST_SERIALIZED,
+                    role=request.department,
+                    parent_event_id=activation.parent_event_id,
+                    state_before=current.phase,
+                    state_after=current.phase,
+                    session_id=request.session_id,
+                    provider=self._configured_provider(activation.target, activation.adapter),
+                    context_digest=request.context.manifest.digest,
+                    artifact_hashes=[ref.content_hash],
+                    payload=payload,
+                )
+                return
             if observation.provider:
                 activation.provider = observation.provider
             if observation.model:
                 activation.model = observation.model
-            provider = activation.provider or self.adapter.name
-            model = activation.model or self.adapter.model
+            provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
+            model = activation.model
             if observation.kind == "usage":
                 if observation.usage is not None:
                     ref = self.artifacts.put(request.run_id, "model_usage", json_dumps(observation.payload), media_type="application/json")
                     activation.raw_usage_ref = asdict(ref)
-                    if observation.usage.reported or observation.usage.total_tokens or observation.usage.cost:
+                    has_usage = bool(
+                        observation.usage.reported
+                        or observation.usage.total_tokens
+                        or observation.usage.cost
+                    )
+                    if has_usage:
                         activation.step_usage = observation.usage
-                        self._record_usage(activation, activation.previous_usage.plus(observation.usage), provider=provider, model=model)
+                        usage = activation.previous_usage.plus(observation.usage)
+                    else:
+                        usage = activation.usage if activation.has_usage else Usage(reported=False)
+                    self._record_usage(
+                        activation,
+                        usage,
+                        provider=provider,
+                        model=model,
+                        force=bool(observation.model),
+                        reported=(observation.usage.reported if has_usage else False),
+                    )
                 return
             if observation.kind in {"tool", "skipped_tool"}:
                 payload = dict(observation.payload)
@@ -824,6 +1035,7 @@ class Orchestrator:
             payload["engineering_plan_hash"] = activation.engineering_plan_hash
             payload["request_id"] = activation.request_id
             payload.update(activation.versions())
+            payload.update(self._target_metadata(activation.target, activation.adapter, activation.snapshot_id))
             self.store.append(
                 request.run_id, event_type, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -835,7 +1047,16 @@ class Orchestrator:
                 usage = activation.previous_usage.plus(observation.usage)
                 self._record_usage(activation, usage, provider=provider, model=model)
 
-    def _record_usage(self, activation: _Activation, usage: Usage, *, provider: str, model: str) -> None:
+    def _record_usage(
+        self,
+        activation: _Activation,
+        usage: Usage,
+        *,
+        provider: str,
+        model: str | None,
+        force: bool = False,
+        reported: bool | None = None,
+    ) -> None:
         request = activation.request
         token_delta = usage.total_tokens - activation.tokens_charged
         cost_delta = usage.cost - activation.cost_charged
@@ -845,7 +1066,7 @@ class Orchestrator:
         activation.tokens_charged = usage.total_tokens
         activation.cost_charged = usage.cost
         current = self.project(request.run_id)
-        if first or token_delta or cost_delta:
+        if first or token_delta or cost_delta or force:
             self.store.append(
                 request.run_id, EventType.TOOL_CALLED, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -859,7 +1080,7 @@ class Orchestrator:
                     "purpose": request.purpose,
                     "accounting": "activation_total_with_charge_delta",
                     "scope": "observable_main_dialogue",
-                    "source": "reported" if usage.reported else "unreported",
+                    "source": "reported" if (usage.reported if reported is None else reported) else "unreported",
                     "cost_reported": usage.cost_reported,
                     "raw_usage_ref": activation.raw_usage_ref,
                     "tokens_charged": token_delta,
@@ -870,23 +1091,33 @@ class Orchestrator:
                     "input_total_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
                     "output_tokens": usage.output_tokens,
                     "cost": cost_delta, "total_cost": usage.cost,
+                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
                 },
             )
 
     def _reconcile_response(self, activation: _Activation, result: ModelResponse) -> None:
+        provider = result.provider or self._configured_provider(activation.target, activation.adapter)
+        model = result.model
         for index, item in enumerate(result.output):
             content = item.get("content") or []
             text = "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict)) if isinstance(content, list) else str(content)
             self._record_observation(activation, ModelObservation(
                 str(item.get("id") or f"output-{index}"), "message", item, text,
-                provider=result.provider, model=result.model,
+                provider=provider, model=model,
             ))
         usage = result.usage
         if not usage or not (usage.reported or usage.total_tokens or usage.cost):
             usage = activation.step_usage or Usage(reported=False)
         activation.step_usage = usage
         with self._state_lock:
-            self._record_usage(activation, activation.previous_usage.plus(usage), provider=result.provider, model=result.model)
+            self._record_usage(
+                activation,
+                activation.previous_usage.plus(usage),
+                provider=provider,
+                model=model,
+                force=bool(result.model) and activation.model != result.model,
+                reported=usage.reported,
+            )
 
     def _apply_proposal(
         self,
@@ -1070,6 +1301,7 @@ class Orchestrator:
               *, input_save_failure: dict[str, str] | None = None) -> None:
         human = {
             "provider_unavailable": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。",
+            "provider_credentials_lost": "任务创建时冻结的 provider 凭据已不在当前进程中。请新建 run，不能用新凭据续跑旧任务。",
             "provider_error": "模型提供方失败。查看错误事件后新建 run 或更换 provider。",
             "provider_timeout": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。",
             "cancelled": "运行已被取消。如需继续，新建 run。",

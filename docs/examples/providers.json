@@ -1,0 +1,57 @@
+{
+  "providers": [
+    {
+      "id": "provider-a",
+      "name": "Provider A",
+      "protocol": "responses",
+      "base_url": "https://provider-a.example/v1",
+      "credential_ref": "YUDAO_PROVIDER_A_KEY",
+      "timeout_sec": 600
+    },
+    {
+      "id": "provider-b",
+      "name": "Provider B",
+      "protocol": "responses",
+      "base_url": "https://provider-b.example/v1",
+      "credential_ref": "YUDAO_PROVIDER_B_KEY",
+      "timeout_sec": 600
+    }
+  ],
+  "models": [
+    {
+      "id": "product-model",
+      "provider_id": "provider-a",
+      "model": "model-product",
+      "context_window": 128000,
+      "max_output_tokens": 8192
+    },
+    {
+      "id": "engineering-model",
+      "provider_id": "provider-b",
+      "model": "model-engineering",
+      "context_window": 64000,
+      "max_output_tokens": 8192
+    },
+    {
+      "id": "quality-model",
+      "provider_id": "provider-a",
+      "model": "model-quality",
+      "context_window": 128000,
+      "max_output_tokens": 8192
+    }
+  ],
+  "bindings": {
+    "product": {
+      "provider_id": "provider-a",
+      "model_id": "product-model"
+    },
+    "engineering": {
+      "provider_id": "provider-b",
+      "model_id": "engineering-model"
+    },
+    "quality": {
+      "provider_id": "provider-a",
+      "model_id": "quality-model"
+    }
+  }
+}

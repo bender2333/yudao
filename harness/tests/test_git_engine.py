@@ -43,7 +43,7 @@ def _commit_spec(system, run_id, proposal):
 
 
 def test_new_input_and_requirement_diff_form_one_accepted_history_through_redelivery(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), _revision(), plan_turn(reason="Apply the uppercase requirement"),
         delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
         review_turn("release", "Uppercase output was independently verified"),
@@ -91,7 +91,7 @@ def test_new_input_and_requirement_diff_form_one_accepted_history_through_redeli
 
 @pytest.mark.parametrize("operation", ["initial", "input", "spec"])
 def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, monkeypatch, operation):
-    system = LoopSystem(tmp_path)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = "git_failure"
     if operation != "initial":
         system.create_run("original", run_id=run_id)
@@ -118,7 +118,7 @@ def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, 
 
 
 def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_accepted(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
     before = system.project(run_id)
     candidates = []
@@ -148,7 +148,7 @@ def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_acc
 
 
 def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.add_input(run_id, "Print uppercase")
@@ -184,7 +184,7 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
 
 
 def test_git_delivery_and_archive_share_binary_bytes_and_complete_directory_manifest(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
     run_id = system.create_run("build echo")
     workspace = system.workspace(run_id)
     (workspace.root / "empty").mkdir()
@@ -212,14 +212,14 @@ def test_git_delivery_and_archive_share_binary_bytes_and_complete_directory_mani
 
 @pytest.mark.parametrize("path", [".git/config", "src/.git/config", ".GIT/config", "src/.GiT/HEAD"])
 def test_git_metadata_is_not_accessible_to_workspace_tools(tmp_path, path):
-    system = LoopSystem(tmp_path)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("build echo")
     with pytest.raises(TreeError):
         system.workspace(run_id).write_file(path, "must not write")
 
 
 def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
-    system = LoopSystem(tmp_path)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("build echo")
     before = system.project(run_id)
     system.store.append(run_id, EventType.MODEL_MESSAGE, role="product", state_before=before.phase,
@@ -241,7 +241,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
             assert released.wait(10)
             return response
 
-    system = LoopSystem(tmp_path, LateResponseAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, LateResponseAdapter([product_spec()]))
     run_id = system.create_run("original")
     before = system.project(run_id)
 
@@ -274,7 +274,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
             else:
                 patch.setattr(system.store, "_insert", fail_event)
             if failure == "adapter_abort":
-                abort = system.adapter.abort
+                abort = system.test_adapter.abort
                 attempts = []
 
                 def abort_after_transient_error(session_id):
@@ -283,13 +283,13 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
                         raise RuntimeError("injected transient abort notification failure")
                     abort(session_id)
 
-                patch.setattr(system.adapter, "abort", abort_after_transient_error)
+                patch.setattr(system.test_adapter, "abort", abort_after_transient_error)
             with pytest.raises(CancelledInputSaveError) as caught:
                 system.add_input(run_id, command)
         assert caught.value.cancelled and caught.value.run_id == run_id
         assert caught.value.cancellation_recorded == (failure != "cancellation_event")
         assert system.orchestrator._abort[run_id].is_set()
-        assert system.adapter._aborted == {before.sessions["product"].session_id}
+        assert system.test_adapter._aborted == {before.sessions["product"].session_id}
         current = system.project(run_id)
         assert current.git_version == before.git_version and current.input_version == before.input_version
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]
@@ -304,9 +304,9 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
     assert not worker.is_alive() and not errors
     assert system.project(run_id).product_spec is None
     assert not [event for event in _formal(system, run_id) if event.type == EventType.SPEC_ACCEPTED]
-    assert len(system.adapter.invocations) == 1
+    assert len(system.test_adapter.invocations) == 1
     system.activate_once(run_id)
-    assert len(system.adapter.invocations) == 1
+    assert len(system.test_adapter.invocations) == 1
     with pytest.raises(RunTerminalError):
         system.add_input(run_id, "Do not resume stopped work")
     with pytest.raises(RunTerminalError):
@@ -326,7 +326,7 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
             assert model_release.wait(10)
             return response
 
-    system = LoopSystem(tmp_path, LateResponseAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, LateResponseAdapter([product_spec()]))
     run_id = system.create_run("original")
     prepare = system.git_versions.prepare
 
@@ -357,9 +357,9 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
         monkeypatch.setattr(system.git_versions, "prepare", blocked_git)
         cancelling.start()
         assert git_entered.wait(10)
-        request = system.adapter.invocations[0]
+        request = system.test_adapter.invocations[0]
         assert request.abort_flag.is_set()
-        assert request.session_id in system.adapter._aborted
+        assert request.session_id in system.test_adapter._aborted
         assert cancelling.is_alive()
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]
         model_release.set()
@@ -374,5 +374,5 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
     assert isinstance(cancel_results[0], CancelledInputSaveError) == git_fails
     current = system.project(run_id)
     assert current.phase == "FAILED" and current.stop_reason == "cancelled"
-    assert current.product_spec is None and len(system.adapter.invocations) == 1
+    assert current.product_spec is None and len(system.test_adapter.invocations) == 1
     assert current.input_version == (1 if git_fails else 2)

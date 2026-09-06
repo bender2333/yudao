@@ -13,7 +13,7 @@ from harness.runtime import LoopSystem
 
 
 def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path, monkeypatch):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Independent checks passed"),
     ]))
     run_id = system.create_run("build echo")

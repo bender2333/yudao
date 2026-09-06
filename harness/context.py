@@ -138,7 +138,16 @@ def department_work_text(pinned: AssembledContext) -> str:
 class ContextAssembler:
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
-                 compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None) -> AssembledContext:
+                 compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
+                 context_window: int | None = None, max_output_tokens: int | None = None) -> AssembledContext:
+        effective_window = projection.context_window if context_window is None else context_window
+        if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
+                or effective_window < 1):
+            raise ValueError("context_window must be a positive integer")
+        if max_output_tokens is not None and (
+                not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool)
+                or max_output_tokens < 1):
+            raise ValueError("max_output_tokens must be a positive integer")
         prompt = projection.department_prompts[department] if prompt is None else prompt
         if prompt.department != department:
             raise ValueError("the prompt must belong to the activated department")
@@ -295,7 +304,10 @@ class ContextAssembler:
             ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
         ]
         actual_request = {"input": input_items, "tools": tools}
+        if max_output_tokens is not None:
+            actual_request["max_output_tokens"] = max_output_tokens
         token_estimate = estimate_tokens(json_dumps(actual_request))
+        input_token_estimate = estimate_tokens(json_dumps({"input": input_items, "tools": tools}))
         digest = canonical_hash(actual_request)
         manifest = ContextManifest(
             session_id=session_id,
@@ -304,7 +316,7 @@ class ContextAssembler:
             injected=injected,
             excluded=excluded,
             token_estimate=token_estimate,
-            budget=projection.context_window,
+            budget=effective_window,
             digest=digest,
             truncated=False,
             step_id=step_id,
@@ -315,6 +327,9 @@ class ContextAssembler:
             input_version=projection.input_version,
             prompt_version=prompt.version,
             prompt_hash=prompt.prompt_ref.content_hash,
+            max_output_tokens=max_output_tokens,
+            input_token_estimate=input_token_estimate,
+            output_reserve_tokens=max_output_tokens or 0,
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -322,10 +337,16 @@ class ContextAssembler:
     def assemble_compaction(self, pinned: AssembledContext, *, input_items: list[dict[str, Any]],
                             source_refs: list[dict[str, Any]], max_output_tokens: int,
                             compaction_event_id: str | None) -> AssembledContext:
+        if (not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool)
+                or max_output_tokens < 1):
+            raise ValueError("max_output_tokens must be a positive integer")
+        if max_output_tokens > pinned.manifest.budget:
+            raise ValueError("max_output_tokens cannot exceed the effective context window")
         parts = [ContextPart("pinned_work", pinned.department, pinned.prompt_text),
                  ContextPart("compaction_request", compaction_event_id, json_dumps(input_items)),
                  ContextPart("compaction_sources", pinned.department, json_dumps(source_refs))]
         request = {"input": input_items, "tools": [], "max_output_tokens": max_output_tokens}
+        input_token_estimate = estimate_tokens(json_dumps({"input": input_items, "tools": []}))
         manifest = ContextManifest(
             session_id=pinned.manifest.session_id, department=pinned.department,
             activation_id=pinned.manifest.activation_id, step_id=pinned.manifest.step_id,
@@ -339,6 +360,8 @@ class ContextAssembler:
             input_version=pinned.manifest.input_version,
             prompt_version=pinned.manifest.prompt_version,
             prompt_hash=pinned.manifest.prompt_hash,
+            input_token_estimate=input_token_estimate,
+            output_reserve_tokens=max_output_tokens,
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 

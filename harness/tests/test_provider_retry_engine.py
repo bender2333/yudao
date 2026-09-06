@@ -24,7 +24,7 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path, 
                       diagnostics={"error_type": "connection"}),
         product_spec(),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -45,7 +45,7 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path, 
 def test_retry_reassembles_context_before_each_attempt(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     assemble_calls = 0
     original_assemble = system.orchestrator.assembler.assemble
@@ -72,7 +72,7 @@ def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path, monkeypa
     _fast_retries(monkeypatch)
     failures = [ProviderError("temporary", retryable=True) for _ in range(3)]
     adapter = FakeAdapter(failures)
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -95,7 +95,7 @@ def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path, monkey
         ProviderError("single request timed out", reason="provider_timeout", retryable=True),
         product_spec(),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     result = system.activate_once(system.create_run("echo"))
 
     assert result.phase == "ENGINEERING"
@@ -115,7 +115,7 @@ def test_retry_after_over_max_stops_without_waiting(tmp_path, monkeypatch):
         ProviderError("temporary", retryable=True, diagnostics={"retry_after_sec": 60.1}),
         product_spec(),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -140,7 +140,7 @@ def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path, monkeypatch):
         return ProviderError("temporary", retryable=True)
 
     adapter = FakeAdapter([transient_until_step_limit] * engine.MAX_MODEL_STEPS)
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     result = system.activate_once(system.create_run("echo"))
 
     assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"
@@ -152,7 +152,7 @@ def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path, monkeypatch):
 def test_nonretryable_provider_error_is_never_retried(tmp_path, monkeypatch, reason):
     _fast_retries(monkeypatch)
     adapter = FakeAdapter([ProviderError("permanent", reason=reason), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -168,7 +168,7 @@ def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path, monkeypa
     scheduled = Event()
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 5.0)
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     original = system.orchestrator._record_retry_scheduled
 
@@ -210,7 +210,7 @@ def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path, monk
                             diagnostics={"error_type": "stream_incomplete"})
 
     adapter = FakeAdapter([fail_after_partial, product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -238,7 +238,7 @@ def test_malformed_tool_arguments_are_returned_to_model_without_starting_tool(tm
         "name": "read_file", "arguments": raw_arguments,
     }])
     adapter = FakeAdapter([malformed, product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -269,7 +269,7 @@ def test_malformed_tool_arguments_are_returned_to_model_without_starting_tool(tm
 def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_path, monkeypatch, response):
     _fast_retries(monkeypatch)
     adapter = FakeAdapter([response, product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     recorded = []
     monkeypatch.setattr(system.orchestrator, "_reconcile_response", lambda *_args: recorded.append(True))
     run_id = system.create_run("echo")
@@ -304,7 +304,7 @@ def test_compaction_uses_the_same_retry_path(tmp_path, monkeypatch):
         return _read(request, "large.txt") if work_count == 1 else product_spec()
 
     adapter = FakeAdapter([respond] * 8)
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5000)
 

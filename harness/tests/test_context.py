@@ -33,7 +33,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             review_turn("release", "ok"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -66,7 +66,7 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
             review_turn("release", "v2"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -91,7 +91,7 @@ def test_each_department_has_its_own_session(data_dir):
 
 def test_product_and_quality_do_not_receive_write_tools(data_dir):
     adapter = FakeAdapter(happy_script())
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
     by_dept = {item.department: [tool["name"] for tool in item.tools] for item in adapter.invocations}
@@ -102,7 +102,7 @@ def test_product_and_quality_do_not_receive_write_tools(data_dir):
 
 def test_proposal_contract_and_binding_refs_are_injected(data_dir):
     adapter = FakeAdapter(happy_script())
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
     for item in adapter.invocations:
@@ -125,7 +125,7 @@ def test_validation_feedback_is_injected_after_rejection(data_dir):
             review_turn("release", "ok"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
     product_calls = [item for item in adapter.invocations if item.department == "product"]
@@ -149,7 +149,7 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
             review_turn("release", "accepted both product decisions"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -191,7 +191,7 @@ def test_effective_decision_keeps_explicit_requirement_and_request_source(data_d
             review_turn("release", "accepted the described approach"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -245,7 +245,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
             review_turn("release", "new contract checked"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -278,7 +278,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
             review_turn("release", "new delivery checked"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -329,7 +329,7 @@ def test_rework_engineering_keeps_only_one_active_delivery(data_dir):
             review_turn("release", "ok"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
@@ -366,7 +366,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
             review_turn("release", "ok"),
         ]
     )
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"

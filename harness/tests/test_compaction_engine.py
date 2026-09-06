@@ -42,7 +42,7 @@ def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False):
         return product_spec() if request.request_id is None else response_turn("answered", "The original requirements remain applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     original = "  Original intent\r\nDo not rewrite this. \n"
     run_id = system.create_run(original, context_window=6000)
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
@@ -87,7 +87,7 @@ def test_compaction_checkpoint_survives_reactivation_and_new_controller(tmp_path
     assert first.rejections[-1]["errors"][0]["field"] == "acceptance_criteria"
     first_checkpoint = first.compactions[-1]["source_event_id"]
     system.workspace(run_id).write_file("large.txt", "SECOND_TOOL_ORIGINAL " * 2200)
-    reloaded = LoopSystem(tmp_path, adapter)
+    reloaded = LoopSystem.for_testing(tmp_path, adapter)
     result = reloaded.activate_once(run_id)
     assert result.phase == "ENGINEERING", result.error
     later = [record for record in result.compactions if record["source_event_id"] not in {item["source_event_id"] for item in first.compactions}]
@@ -115,7 +115,7 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     assert "department_memory" not in json_dumps(engineering.input_items)
     assert "FIRST_TOOL_ORIGINAL" not in json_dumps(engineering.input_items)
     system.workspace(run_id).write_file("large.txt", "SECOND_TOOL_ORIGINAL " * 2200)
-    reloaded = LoopSystem(tmp_path, adapter)
+    reloaded = LoopSystem.for_testing(tmp_path, adapter)
     result = reloaded.activate_once(run_id)
     assert result.phase == "ENGINEERING", result.error
     previous_ids = {item["source_event_id"] for item in first.compactions}

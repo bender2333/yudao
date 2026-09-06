@@ -75,10 +75,26 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.request_results.append({"event_id": event.event_id, "type": etype, "request_id": payload["request_id"],
                                       "role": event.role, "name": payload.get("name"), "ok": payload.get("ok"),
                                       "content_hash": payload.get("content_hash")})
-    if event.provider:
+    if event.provider and etype not in {
+            EventType.DEPARTMENT_ACTIVATED,
+            EventType.CONTEXT_ASSEMBLED,
+            EventType.MODEL_REQUESTED,
+            EventType.MODEL_ATTEMPT_FAILED,
+            EventType.MODEL_RETRY_SCHEDULED,
+    }:
         state.provider = event.provider
-    if event.model:
+    if event.model and etype not in {
+            EventType.DEPARTMENT_ACTIVATED,
+            EventType.CONTEXT_ASSEMBLED,
+            EventType.MODEL_REQUESTED,
+            EventType.MODEL_ATTEMPT_FAILED,
+            EventType.MODEL_RETRY_SCHEDULED,
+    }:
+        state.provider = event.provider or state.provider
         state.model = event.model
+        state.actual_provider = event.provider or state.actual_provider
+        state.actual_model = event.model
+        _bind_actual_model(state, event)
 
     if etype == EventType.RUN_CREATED:
         state.run_id = event.run_id
@@ -97,6 +113,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.context_window = int(payload.get("context_window", 32_000))
         state.provider = payload.get("provider", "fake")
         state.adapter = payload["adapter"]
+        snapshot = payload.get("provider_snapshot") or {}
+        state.provider_snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
         state.sessions = {
             department: SessionRecord(session_id=session_id, department=department, status="idle")
             for department, session_id in payload.get("sessions", {}).items()
@@ -139,15 +157,62 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.CONTEXT_ASSEMBLED:
         manifest = _manifest_from_payload(payload, event.event_id)
         state.manifests.append(manifest)
-        if event.model:
-            state.model = event.model
+        return
+
+    if etype == EventType.MODEL_REQUEST_SERIALIZED:
+        for request in reversed(state.model_requests):
+            if (request.get("activation_id"), request.get("step_id"), request.get("attempt")) == (
+                    payload.get("activation_id"), payload.get("step_id"), payload.get("attempt")):
+                request["serialized_event_id"] = event.event_id
+                request["serialized_request_ref"] = payload.get("request_ref")
+                request["serialized_request_digest"] = payload.get("request_digest")
+                request["serialization"] = payload.get("serialization")
+                break
         return
 
     if etype == EventType.COMPACTION_RECORDED:
         state.compactions.append({**payload, "source_event_id": event.event_id, "department": event.role})
+        _bind_actual_model(state, event)
         return
 
     if etype == EventType.MODEL_REQUESTED:
+        requested_provider = payload.get("requested_provider")
+        requested_model = payload.get("requested_model")
+        state.requested_provider = requested_provider
+        state.requested_model = requested_model
+        state.actual_provider = None
+        state.actual_model = None
+        state.model = None
+        state.model_requests.append({
+            "event_id": event.event_id,
+            "seq": event.seq,
+            "department": event.role,
+            "activation_id": payload.get("activation_id"),
+            "step_id": payload.get("step_id"),
+            "attempt": payload.get("attempt"),
+            "max_attempts": payload.get("max_attempts"),
+            "root_step_id": payload.get("root_step_id"),
+            "retry_of_step_id": payload.get("retry_of_step_id"),
+            "purpose": payload.get("purpose"),
+            "snapshot_id": payload.get("snapshot_id"),
+            "provider_config_id": payload.get("provider_config_id"),
+            "model_id": payload.get("model_id"),
+            "provider_name": payload.get("provider_name"),
+            "credential_ref": payload.get("credential_ref"),
+            "credential_version": payload.get("credential_version"),
+            "provider": requested_provider,
+            "requested_provider": requested_provider,
+            "requested_protocol": payload.get("requested_protocol"),
+            "protocol": payload.get("protocol"),
+            "base_url": payload.get("base_url"),
+            "requested_model": requested_model,
+            "effective_context_window": payload.get("effective_context_window"),
+            "max_output_tokens": payload.get("max_output_tokens"),
+            "configured_max_output_tokens": payload.get("configured_max_output_tokens"),
+            "actual_provider": None,
+            "actual_model": None,
+            "context_digest": event.context_digest,
+        })
         return
 
     if etype == EventType.TOOL_CALLED:
@@ -159,8 +224,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
             state.token_used += int(payload.get("tokens_charged", 0))
         state.cost += float(payload.get("cost", 0.0))
         state.latency_ms += int(payload.get("latency_ms", 0))
-        if event.model:
-            state.model = event.model
+        if payload.get("name") == "provider_usage":
+            _bind_actual_model(state, event)
         return
 
     if etype == EventType.ACTIVATION_FINISHED:
@@ -387,6 +452,8 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         input_version=payload["input_version"],
         prompt_version=payload["prompt_version"],
         prompt_hash=payload["prompt_hash"],
+        input_token_estimate=payload.get("input_token_estimate"),
+        output_reserve_tokens=int(payload.get("output_reserve_tokens", payload.get("max_output_tokens") or 0)),
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],
@@ -400,6 +467,26 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         digest=payload["digest"],
         truncated=bool(payload.get("truncated", False)),
     )
+
+
+def _bind_actual_model(state: RunProjection, event: Event) -> None:
+    """Attach a returned model only to the request that produced this event."""
+
+    if not event.model or not state.model_requests:
+        return
+    payload = event.payload
+    activation_id = payload.get("activation_id")
+    step_id = payload.get("step_id")
+    candidates = [
+        item for item in state.model_requests
+        if item.get("activation_id") == activation_id and item.get("step_id") == step_id
+        and item.get("seq", -1) < event.seq
+    ]
+    if not candidates:
+        return
+    request = candidates[-1]
+    request["actual_provider"] = event.provider
+    request["actual_model"] = event.model
 
 
 def _product_spec_from_payload(payload: dict[str, Any], event: Event) -> ProductSpec:

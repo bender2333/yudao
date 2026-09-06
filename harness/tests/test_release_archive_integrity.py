@@ -17,7 +17,7 @@ def _quality_ready(tmp_path, *, runs=1):
     for _ in range(runs):
         script.extend([product_spec(), plan_turn(), delivery_turn()])
     script.extend(review_turn("release", "Checks passed") for _ in range(runs))
-    system = LoopSystem(tmp_path / "data", FakeAdapter(script))
+    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter(script))
     run_ids = [system.create_run(f"Build echo {index}") for index in range(runs)]
     ready = []
     for run_id in run_ids:

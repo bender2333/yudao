@@ -17,7 +17,7 @@ from harness.workspace import Workspace
 
 
 def _system_with_delivery(tmp_path):
-    system = LoopSystem(tmp_path / "new" / "data", FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path / "new" / "data", FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Checks passed"),
     ]))
     run_id = system.create_run("Build echo")

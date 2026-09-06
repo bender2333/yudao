@@ -61,6 +61,19 @@ def get_json(host, port, path):
     return json.loads(body)
 
 
+def provider_config(tmp_path, *, credential_ref="MISSING_PROVIDER_KEY"):
+    config = tmp_path / "providers.json"
+    config.write_text(json.dumps({
+        "providers": [{"id": "provider", "name": "Provider", "protocol": "responses",
+                       "base_url": "https://provider.example/v1", "credential_ref": credential_ref}],
+        "models": [{"id": "model", "provider_id": "provider", "model": "model",
+                     "context_window": 32000, "max_output_tokens": 4096}],
+        "bindings": {department: {"provider_id": "provider", "model_id": "model"}
+                     for department in ("product", "engineering", "quality")},
+    }), encoding="utf-8")
+    return config
+
+
 def wait_until(predicate, timeout=45.0, interval=0.05):
     deadline = time.monotonic() + timeout
     last = None
@@ -213,7 +226,7 @@ def gated_adapter():
 
 
 def test_serve_binds_loop_system(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     server = serve(system, host="127.0.0.1", port=0)
     try:
         assert server.system is system
@@ -265,7 +278,7 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
 
 
 def test_create_run_goes_through_engine_and_replays(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     calls = []
     original_create = system.create_run
     original_run = system.run_until_stop
@@ -313,7 +326,7 @@ def test_create_run_goes_through_engine_and_replays(data_dir):
 
 def test_second_start_returns_409_until_worker_exits(data_dir):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
         status, body, _ = request(host, port, "POST", "/api/runs", {"task": "first"})
         assert status == 201, body
@@ -341,7 +354,7 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
         return product_spec()
 
     adapter = FakeAdapter([held, *happy_script()])
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     original, addition, prompt = "  echo\r\n", "继续\n  ", "  PRODUCT_PROMPT_V2\r\n按原文处理需求。  "
     with running_server(system) as (server, host, port):
         status, body, _ = request(host, port, "POST", "/api/runs", {"task": original})
@@ -381,7 +394,7 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
 @pytest.mark.parametrize("text", [" /stop\r\n", "\n/cancel  "])
 def test_text_cancel_records_raw_command_before_immediate_cancellation(data_dir, text):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
         _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
         run_id = json.loads(body)["run_id"]
@@ -404,7 +417,7 @@ def test_text_cancel_records_raw_command_before_immediate_cancellation(data_dir,
 @pytest.mark.parametrize("record_cancellation", [True, False])
 def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeypatch, text, record_cancellation):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
         _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
         run_id = json.loads(body)["run_id"]
@@ -460,7 +473,7 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
 
 def test_cancel_button_needs_no_git_save_or_raw_command(data_dir, monkeypatch):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
         _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
         run_id = json.loads(body)["run_id"]
@@ -486,7 +499,7 @@ def test_cancel_button_needs_no_git_save_or_raw_command(data_dir, monkeypatch):
 
 
 def test_input_and_prompt_api_reject_unknown_fields_and_terminal_runs(data_dir):
-    system = LoopSystem(data_dir)
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("echo")
     with running_server(system) as (_server, host, port):
         for suffix in ("inputs", "prompts/product"):
@@ -506,7 +519,7 @@ def test_input_and_prompt_api_reject_unknown_fields_and_terminal_runs(data_dir):
 
 def test_cancel_keeps_slot_until_worker_exits(data_dir):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     calls = []
     original_cancel = system.cancel
 
@@ -537,7 +550,7 @@ def test_cancel_keeps_slot_until_worker_exits(data_dir):
 
 
 def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     with running_server(system) as (_server, host, port):
         before = system.list_run_ids()
         bad_bodies = [
@@ -568,9 +581,9 @@ def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
         assert json.loads(events_missing[1]).get("error")
 
 
-def test_unconfigured_provider_is_clear_error_and_does_not_create(data_dir):
+def test_unconfigured_test_provider_is_clear_error_and_does_not_create(data_dir):
     adapter = ResponsesAdapter(ResponsesConfig(api_key="", model=""))
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     before = system.list_run_ids()
     with running_server(system) as (_server, host, port):
         health = get_json(host, port, "/api/health")
@@ -580,9 +593,9 @@ def test_unconfigured_provider_is_clear_error_and_does_not_create(data_dir):
         assert status == 503, body
         payload = json.loads(body)
         assert payload.get("reason") == "provider_unavailable"
-        assert "YUDAO_MODEL_API_KEY" in payload["error"]
+        assert "provider credential" in payload["error"]
         assert system.list_run_ids() == before
-        assert system.adapter.name == "responses"
+        assert system.test_adapter.name == "responses"
 
 
 def test_sse_resumes_from_after_seq_and_last_event_id(data_dir):
@@ -709,26 +722,23 @@ def test_compaction_details_link_to_complete_original_tool_output(tmp_path):
         assert original["role"] == detail["role"]
 
 
-def test_serve_cli_defaults_to_responses_and_accepts_fake(monkeypatch, tmp_path):
+def test_serve_cli_requires_provider_config(monkeypatch, tmp_path):
     seen = {}
 
     def fake_serve(system, host, port):
-        seen["name"] = system.adapter.name
+        seen["catalog"] = system.provider_catalog
         seen["host"] = host
         seen["port"] = port
         return 0
 
     monkeypatch.setattr("harness.__main__._serve", fake_serve)
-    assert main(["serve", "--data-dir", str(tmp_path)]) == 0
-    assert seen["name"] == "responses"
-    assert main(["serve", "--adapter", "fake", "--data-dir", str(tmp_path), "--host", "127.0.0.1", "--port", "0"]) == 0
-    assert seen["name"] == "fake"
+    config = provider_config(tmp_path)
+    assert main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"]) == 0
+    assert seen["catalog"] is not None
     assert seen["port"] == 0
 
 
 def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, tmp_path, capsys):
-    monkeypatch.delenv("YUDAO_MODEL_API_KEY", raising=False)
-    monkeypatch.delenv("YUDAO_MODEL_NAME", raising=False)
     started = {}
 
     class Dummy:
@@ -742,23 +752,24 @@ def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, t
             started["closed"] = True
 
     monkeypatch.setattr("harness.__main__.serve", lambda system, host, port: Dummy())
-    code = main(["serve", "--data-dir", str(tmp_path), "--port", "0"])
+    config = provider_config(tmp_path)
+    code = main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"])
     assert code == 0
     err = capsys.readouterr().err
-    assert "YUDAO_MODEL_API_KEY" in err
+    assert "credential reference cannot be resolved" in err
     assert started["ok"] is True
     assert started["closed"] is True
 
 
-def test_serve_cli_rejects_unknown_adapter(tmp_path):
+def test_serve_cli_rejects_missing_or_removed_adapter_flags(tmp_path):
     with pytest.raises(SystemExit):
-        main(["serve", "--adapter", "openai", "--data-dir", str(tmp_path)])
+        main(["serve", "--data-dir", str(tmp_path)])
     with pytest.raises(SystemExit):
-        main(["serve", "--adapter", "omp", "--data-dir", str(tmp_path)])
+        main(["serve", "--adapter", "fake", "--provider-config", str(provider_config(tmp_path)), "--data-dir", str(tmp_path)])
 
 
 def test_worker_exception_is_visible_and_does_not_complete(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
 
     def boom(_run_id):
         raise RuntimeError("boom-worker")
@@ -793,7 +804,7 @@ def test_worker_exception_is_visible_and_does_not_complete(data_dir):
 def test_unconfigured_provider_stays_on_health_after_listing_runs(data_dir):
     adapter = ResponsesAdapter(ResponsesConfig(api_key="", model=""))
     system, projection = run_scripted(data_dir, happy_script())
-    system.adapter = adapter
+    system.test_adapter = adapter
     with running_server(system) as (_server, host, port):
         listed = get_json(host, port, "/api/runs")
         assert listed["runs"][0]["run_id"] == projection.run_id
@@ -809,7 +820,7 @@ def test_unconfigured_provider_stays_on_health_after_listing_runs(data_dir):
 
 def test_health_stays_busy_after_cancel_until_worker_exits_without_new_events(data_dir):
     adapter, entered, release = gated_adapter()
-    system = LoopSystem(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
         status, body, _ = request(host, port, "POST", "/api/runs", {"task": "hold"})
         assert status == 201, body
@@ -843,7 +854,7 @@ def test_worker_error_after_last_event_is_on_that_run_only(data_dir):
             raise TimeoutError("late worker was not released")
         raise RuntimeError("late-boom")
 
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     original_run = system.run_until_stop
     system.run_until_stop = late
     with running_server(system) as (server, host, port):
@@ -898,16 +909,16 @@ def test_web_ui_node_behaviors():
     assert "failed start stays on compose" in output
     assert "scrollBoardIntoView only moves the board on mobile" in output
     assert "desktop successful start does not force-scroll" in output
-    assert "board distinguishes actual provider from adapter" in output
+    assert "board distinguishes requested and returned provider facts" in output
     assert "zero missing and invalid cost" in output
     assert "tiny positive cost is not rounded to zero" in output
-    assert "missing event model is" in output
-    assert "latest event model follows seq" in output
+    assert "missing returned model is" in output
+    assert "board model facts come from the current request" in output
 
 
 @pytest.fixture
 def archived_run(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("build echo")
     workspace = system.workspace(run_id)
     workspace.write_file(".settings", "hidden configuration\n")
@@ -1010,7 +1021,7 @@ def test_delivery_web_rejects_archive_not_bound_to_its_acceptance(archived_run, 
 
 @pytest.fixture
 def revised_git_run(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter([
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([
         product_spec(goal="Echo the argument unchanged"),
         product_spec(goal="Echo the argument in uppercase", requirements=["Uppercase the given argument"],
                      acceptance=["hello prints HELLO"], change_record={

@@ -127,7 +127,7 @@ def demo_script():
 
 
 def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
-    system = LoopSystem(data_dir, FakeAdapter(demo_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script()))
     run_id = system.create_run(DEMO_TASK, max_cycles=20)
     for _ in range(7):
         system.activate_once(run_id)

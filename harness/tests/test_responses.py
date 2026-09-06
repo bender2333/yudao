@@ -189,7 +189,7 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
     with _server([failure, _submit_stream()]) as (config, captures, *_):
         if failure_kind == "timeout":
             config = replace(config, timeout_sec=0.3)
-        system = LoopSystem(tmp_path, ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
         run_id = system.create_run("local retry")
         result = system.activate_once(run_id)
 
@@ -221,6 +221,42 @@ def test_completed_items_and_final_usage_are_observed_once():
     assert result.output == [REASONING, CALL, TEXT]
 
 
+def test_request_observation_matches_the_json_body_sent_by_httpx():
+    observations = []
+    model_request = _request(observations=observations.append)
+    model_request.request_id = "logical-request"
+    with _server([_stream([TEXT])]) as (config, captures, *_):
+        ResponsesAdapter(config).complete(model_request)
+    requests = [event for event in observations if event.kind == "request"]
+    assert len(requests) == 1
+    assert requests[0].id == "logical-request:1:attempt-1"
+    assert requests[0].payload == captures[0]
+    assert requests[0].provider == "local-stub"
+    assert requests[0].model == "local-model"
+    assert "Authorization" not in requests[0].payload
+
+
+def test_request_observation_failure_stops_before_network_send():
+    def reject(_observation):
+        raise OSError("request evidence could not be persisted")
+
+    with _server([_stream([TEXT])]) as (config, captures, *_):
+        with pytest.raises(OSError, match="request evidence could not be persisted"):
+            ResponsesAdapter(config).complete(_request(observations=reject))
+    assert captures == []
+
+
+def test_stream_item_observation_does_not_invent_the_returned_model():
+    observations = []
+    with _server([_stream([TEXT])]) as (config, *_):
+        result = ResponsesAdapter(config).complete(_request(observations=observations.append))
+    messages = [event for event in observations if event.kind == "message"]
+    usage = [event for event in observations if event.kind == "usage"]
+    assert len(messages) == 1 and messages[0].model is None
+    assert len(usage) == 1 and usage[0].model == "local-model"
+    assert result.model == "local-model"
+
+
 def test_missing_usage_is_unknown_not_a_provider_estimate():
     with _server([_stream(usage=None)]) as (config, *_):
         result = ResponsesAdapter(config).complete(_request())
@@ -245,7 +281,8 @@ def test_nullable_reasoning_content_is_preserved_through_sdk_and_next_request():
         adapter = ResponsesAdapter(config)
         result = adapter.complete(_request(observations=observations.append))
         assert result.output == [reasoning, CALL]
-        assert observations[0].payload == reasoning and observations[0].text == ""
+        message = next(event for event in observations if event.kind == "message")
+        assert message.payload == reasoning and message.text == ""
         next_request = _request(history=[*result.output, {"type": "function_call_output", "call_id": CALL["call_id"], "output": "proof"}])
         adapter.complete(next_request)
         assert captures[1]["input"][-3] == reasoning
@@ -380,7 +417,7 @@ def test_stream_disconnect_does_not_turn_partial_output_into_success():
         with pytest.raises(ProviderError, match="ended before"):
             ResponsesAdapter(config).complete(_request(observations=observations.append))
         assert len(captures) == 1
-    assert [event.id for event in observations] == ["msg-one"]
+    assert [event.id for event in observations if event.kind != "request"] == ["msg-one"]
 
 
 @pytest.mark.parametrize("nested", [False, True])
@@ -442,7 +479,7 @@ def test_silent_network_times_out_and_keeps_completed_output(headers_sent):
                 ResponsesAdapter(replace(config, timeout_sec=0.8)).complete(_request(observations=observations.append))
             assert caught.value.reason == "provider_timeout"
             assert len(captures) == 1
-        assert len(observations) == int(headers_sent)
+            assert len([event for event in observations if event.kind != "request"]) == int(headers_sent)
     finally:
         release.set()
 
@@ -516,22 +553,17 @@ def test_concurrent_request_is_rejected_without_disturbing_registered_request():
         release.set()
 
 
-def test_config_uses_only_explicit_model_environment(monkeypatch):
-    for key in ["YUDAO_MODEL_NAME", "YUDAO_MODEL_API_KEY", "YUDAO_MODEL_PROVIDER", "YUDAO_MODEL_BASE_URL", "YUDAO_MODEL_TIMEOUT_SEC"]:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-implicitly-used")
-    adapter = ResponsesAdapter()
+def test_config_requires_explicit_values_and_never_reads_environment(monkeypatch):
+    monkeypatch.setenv("YUDAO_MODEL_NAME", "must-not-be-used")
+    monkeypatch.setenv("YUDAO_MODEL_API_KEY", "must-not-be-used")
+    adapter = ResponsesAdapter(ResponsesConfig())
     assert adapter.availability().available is False
     assert adapter.availability().reason == "provider_unavailable"
     with pytest.raises(ProviderError) as caught:
         adapter.complete(_request())
     assert caught.value.reason == "provider_unavailable"
-    monkeypatch.setenv("YUDAO_MODEL_NAME", "configured-model")
-    monkeypatch.setenv("YUDAO_MODEL_API_KEY", KEY)
-    monkeypatch.setenv("YUDAO_MODEL_PROVIDER", "configured-provider")
-    monkeypatch.setenv("YUDAO_MODEL_BASE_URL", "http://127.0.0.1:1234/v1")
-    monkeypatch.setenv("YUDAO_MODEL_TIMEOUT_SEC", "45")
-    config = ResponsesConfig.from_env()
+    config = ResponsesConfig(model="configured-model", api_key=KEY, provider="configured-provider",
+                             base_url="http://127.0.0.1:1234/v1", timeout_sec=45)
     assert config.model == "configured-model" and config.provider == "configured-provider"
     assert config.timeout_sec == 45 and config.base_url == "http://127.0.0.1:1234/v1"
     assert KEY not in repr(config)
@@ -540,9 +572,7 @@ def test_config_uses_only_explicit_model_environment(monkeypatch):
 
 @pytest.mark.parametrize("timeout", ["0", "-1", "invalid", "nan", "inf"])
 def test_invalid_timeout_is_unavailable_without_exposing_secrets(monkeypatch, timeout):
-    monkeypatch.setenv("YUDAO_MODEL_NAME", "local-model")
-    monkeypatch.setenv("YUDAO_MODEL_API_KEY", KEY)
-    monkeypatch.setenv("YUDAO_MODEL_TIMEOUT_SEC", timeout)
-    availability = ResponsesAdapter().availability()
+    availability = ResponsesAdapter(ResponsesConfig(model="local-model", api_key=KEY,
+                                                     timeout_sec=float(timeout) if timeout not in {"invalid"} else 0.0)).availability()
     assert availability.available is False and availability.reason == "provider_unavailable"
     assert KEY not in availability.message

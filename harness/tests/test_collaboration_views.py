@@ -19,7 +19,7 @@ def test_every_consultation_direction_is_visible_and_returns_to_original_work(tm
     prefix = [] if requester == "product" else product if requester == "engineering" else product + engineering
     suffix = product + engineering + quality if requester == "product" else engineering + quality if requester == "engineering" else quality
     phase = {"product": "PRODUCT_SPEC", "engineering": "ENGINEERING", "quality": "QUALITY"}[requester]
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         *prefix, collaboration_request(recipient, "Clarify the current work.", expected_result="Provide an explanation."),
         response_turn("answered", "The current work can continue without changing requirements or files."), *suffix,
     ]))
@@ -51,7 +51,7 @@ def test_every_consultation_direction_is_visible_and_returns_to_original_work(tm
 
 
 def test_cancelled_request_is_visible_with_its_closure_reason_and_event(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([collaboration_request("quality", "Review the initial acceptance approach.")]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("quality", "Review the initial acceptance approach.")]))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.cancel(run_id)
@@ -69,7 +69,7 @@ def test_cancelled_request_is_visible_with_its_closure_reason_and_event(tmp_path
 
 
 def test_views_keep_product_decision_and_response_as_separate_accepted_events(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(),
         collaboration_request("product", "Define handling of dash-prefixed input.",
                               request_type="action", action="revise_requirements"),

@@ -27,6 +27,7 @@ def _with_git(value: Any, events: list[Event]) -> Any:
 
 
 def run_board(projection: RunProjection) -> dict[str, Any]:
+    latest_request = projection.model_requests[-1] if projection.model_requests else None
     return {
         "run_id": projection.run_id,
         "task": projection.task,
@@ -49,6 +50,14 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "provider": projection.provider,
         "adapter": projection.adapter,
         "model": projection.model,
+        "provider_snapshot": _plain(projection.provider_snapshot),
+        "provider_bindings": _plain(projection.provider_bindings),
+        "protocol": None if latest_request is None else latest_request.get("protocol"),
+        "model_requests": _plain(projection.model_requests),
+        "requested_provider": projection.requested_provider,
+        "requested_model": projection.requested_model,
+        "actual_provider": projection.actual_provider,
+        "actual_model": projection.actual_model,
         "input_version": projection.input_version,
         "product_work_input_version": projection.product_work_input_version,
         "processed_input_version": projection.processed_input_version,
@@ -209,6 +218,17 @@ def event_card(event: Event) -> dict[str, Any]:
         "session_id": event.session_id,
         "provider": event.provider,
         "model": event.model,
+        "provider_config_id": payload.get("provider_config_id"),
+        "model_id": payload.get("model_id"),
+        "protocol": payload.get("protocol"),
+        "base_url": payload.get("base_url"),
+        "requested_model": payload.get("requested_model"),
+        "actual_provider": payload.get("actual_provider"),
+        "actual_model": payload.get("actual_model"),
+        "credential_ref": payload.get("credential_ref"),
+        "credential_version": payload.get("credential_version"),
+        "effective_context_window": payload.get("effective_context_window"),
+        "configured_max_output_tokens": payload.get("configured_max_output_tokens"),
         "context_digest": event.context_digest,
         "created_at": event.created_at,
         "summary": event.summary(),

@@ -21,7 +21,7 @@
 | D15 | [有效变化与执行依据](effective-contract-changes.md) | 合同、专家请求及在途输入适用性已验证 |
 | D16 | [使用 Git 管理任务内变化](git-change-management.md) | 已实现，真实 Git、同任务方向调整及桌面手机差异查看通过确定性验收 |
 | D17 | [模型等待与失败重试](provider-retries.md) | H 已实现；慢响应、重试边界及桌面手机已验证，真实完整流程仍有连续连接失败 |
-| D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 已确认，架构及验收边界已记录；三部门可绑定不同 Provider/模型，尚未实现 |
+| D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 底层及原生循环已接入；本地多连接验证，真实跨 Provider 最终 QA 待验收，配置 UI 待原型 |
 | D19 | [按原型建设 Web 工作台](web-workspace-prototype.md) | 原型已归档、任务已规划；Provider 等配置原型预留 |
 | D20 | [部门定向追加指导](department-guidance.md) | 用户场景已确认；处理时机、原文范围及放行关系待设计，尚未实现 |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件，完整采集及新查询/页面待实现 |

@@ -6,7 +6,9 @@ OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构�
 
 第一阶段正在按 [A-H 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。任务内 Git 版本和差异已实现并通过确定性验收。H 模型有界重试已实现，慢响应、取消、追加输入和桌面手机已验证；真实完整方向调整和压缩后最终放行仍有连续连接失败导致的缺口，结果见 [验收记录](docs/mvp-acceptance.md)。
 
-本机最新原生控制台地址为 [http://127.0.0.1:8774](http://127.0.0.1:8774)，数据目录为 `.yudao/stage1-retry-final-20260906`，采用当前 `provider.md` 配置及 600 秒默认等待。本轮已取得 `gpt-5.6-luna` 的真实响应和重试恢复证据；完整任务仍受连续连接中断影响。运行基线与历史服务记录见 [验收记录](docs/mvp-acceptance.md)。
+第二阶段首批已接入统一 Provider/模型目录和三部门独立绑定，覆盖任务冻结、请求路由、模型容量及只读观察，见 [D18](docs/requirements/department-providers.md)。本地多连接与完整回归已通过；真实跨 Provider 最终 QA 仍待验收，Provider 配置界面等待原型。
+
+第一阶段此前保留的真实控制台地址为 [http://127.0.0.1:8774](http://127.0.0.1:8774)，数据目录为 `.yudao/stage1-retry-final-20260906`，对应当时的单 Provider 基线及 600 秒默认等待。该历史基线取得了 `gpt-5.6-luna` 的真实响应和重试恢复证据，但未完成最终 QA；不能将这个旧进程视为当前部门绑定实现。运行基线与历史服务记录见 [验收记录](docs/mvp-acceptance.md)。
 
 ## 分层
 
@@ -31,7 +33,6 @@ python -m harness demo --serve --port 8765
 
 ```bash
 python -m harness demo
-python -m harness serve --adapter fake --data-dir .yudao/native-loop
 ```
 
 重放：
@@ -49,12 +50,12 @@ python -m pytest harness/tests -q
 node --test harness/tests/test_web_ui.js
 ```
 
-真实主 provider 三部门 smoke（读取环境变量，不读取 `provider.md`，失败时不会改用 fake）：
+按目录绑定执行三部门真实 smoke（凭据引用从环境解析，应用不读取 `provider.md`）：
 
 ```bash
-python -m harness smoke --data-dir .yudao/native-validation
-python -m harness smoke --scenario happy
-python -m harness smoke --scenario collaboration
+python -m harness smoke --provider-config .yudao/providers.json --data-dir .yudao/native-validation
+python -m harness smoke --provider-config .yudao/providers.json --scenario happy
+python -m harness smoke --provider-config .yudao/providers.json --scenario collaboration
 ```
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
@@ -92,24 +93,23 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ## 模型配置
 
-真实模型通过官方 OpenAI Python SDK 发送单次、无服务端会话续接的 Responses 请求。未配置时 Web 返回配置错误并拒绝创建任务；直接调用运行内核时，run 进入 `FAILED / provider_unavailable`。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 provider，详见 [D17](docs/requirements/provider-retries.md)。
+真实模型通过官方 OpenAI Python SDK 发送单次、无服务端会话续接的 Responses 请求。Provider 和模型由统一目录管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定和凭据；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md) 和 [D18](docs/requirements/department-providers.md)。
 
 需要 Python 3.11 或更新版本，`pip install -e ".[dev]"` 会安装 SDK。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
 
-PowerShell 配置示例。密钥通过当前终端环境注入，应用不读取 `provider.md`：
+目录格式见 [两套 Provider、三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 和 `max_output_tokens` 必须明确；当前真实协议仅支持 `responses`。有效窗口取任务限制与模型窗口较小值，工作与压缩输出均受该模型限制。
+
+PowerShell 启动示例，目录放在 `.yudao/providers.json`。`credential_ref` 对应环境变量名称，密钥只通过当前终端环境注入，应用不读取 `provider.md`：
 
 ```powershell
-$env:YUDAO_MODEL_API_KEY = '<your-api-key>'
-$env:YUDAO_MODEL_NAME = '<model-name>'
-$env:YUDAO_MODEL_BASE_URL = 'https://api.openai.com/v1'
-$env:YUDAO_MODEL_PROVIDER = 'openai'
-$env:YUDAO_MODEL_TIMEOUT_SEC = '600'
-python -m harness serve --adapter responses --data-dir .yudao/native-loop --port 8766
+$env:YUDAO_PROVIDER_A_KEY = '<provider-a-key>'
+$env:YUDAO_PROVIDER_B_KEY = '<provider-b-key>'
+python -m harness serve --provider-config .yudao/providers.json --data-dir .yudao/native-loop --port 8766
 ```
 
-`YUDAO_MODEL_API_KEY` 与 `YUDAO_MODEL_NAME` 必填；其余配置的默认值与示例相同。兼容 Responses 协议的服务可以修改 `YUDAO_MODEL_BASE_URL` 和 provider 标识。
+旧的 `YUDAO_MODEL_*` 单配置入口已移除。任务创建时冻结三部门配置，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。CLI 在服务启动时读取 JSON 文件，不自动重载文件变更。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。Provider 配置及绑定选择界面等待对应原型。
 
-默认单次等待 600 秒，不在一分钟强制中止。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒。各实际尝试计入每次部门激活的 32 次模型调用上限，压缩调用同样适用。等待可被取消或新增输入打断，下一实际请求开始前重新核对当前工作。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
+默认单次等待 600 秒，由目录中 Provider 的 `timeout_sec` 设置。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒，超过时明确停止而不提前重发。各实际尝试计入每次部门激活的 32 次模型调用上限，压缩调用同样适用，不另设累计耗时预算。等待可被取消或新增输入打断，每次实际尝试重新装配上下文并准入。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
 
 工具由 Yudao 内核执行（读取、写入、删除、移动、检查和结构化提交）。Product/Quality 没有写工具，工程修改受有效合同及事前计划范围约束。检查在可丢弃的完整公开树副本执行，由主机签发绑定当前合同、计划、交付和激活的回执；模型自报 `exit_code` 不是证据。交付保存完整文件字节、二进制与空目录，原工作区不可用后仍可独立恢复。该副本机制不提供操作系统沙箱。
 

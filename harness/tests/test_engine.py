@@ -25,7 +25,7 @@ def _submit(identity="submit"):
 
 
 def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
-    system = LoopSystem(tmp_path)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("echo")
     context = ContextAssembler().assemble(system.project(run_id), department="engineering",
                                           session_id="session", activation_id="activation")
@@ -47,7 +47,7 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
         plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
@@ -80,7 +80,7 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
 def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
     adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
                                          usage=Usage(total_tokens=100)), product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("proof.txt", "x" * 40000)
     result = system.activate_once(run_id)
@@ -102,7 +102,7 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
 def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monkeypatch):
     prepared, release = Event(), Event()
     adapter = FakeAdapter([product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     begin = system.orchestrator._begin_request
 
@@ -129,7 +129,7 @@ def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monke
 def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path, monkeypatch):
     pending, release = Event(), Event()
     adapter = FakeAdapter([product_spec(), ModelResponse(output=[_call("write-1", "write_file", path="new.txt", content="new")])])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     begin = system.orchestrator._begin_tool
@@ -157,7 +157,7 @@ def test_cancel_records_inflight_tool_but_does_not_start_following_tool(tmp_path
     first = _call("write-1", "write_file", path="started.txt", content="started")
     second = _call("write-2", "write_file", path="later.txt", content="later")
     adapter = FakeAdapter([product_spec(), plan_turn(scope=["started.txt", "later.txt"]), ModelResponse(output=[first, second])])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
@@ -191,7 +191,7 @@ def test_cancel_records_inflight_tool_but_does_not_start_following_tool(tmp_path
 def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_path):
     original = "  Original request\r\n\r\nKeep these spaces.  \n\t"
     adapter = FakeAdapter([product_spec()])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run(original)
     result = system.activate_once(run_id)
     assert result.task == original
@@ -211,12 +211,12 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
         response_turn("answered", "The existing requirements define the current behavior."),
         plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("Original intent")
     system.activate_once(run_id)
     system.activate_once(run_id)
     # A fresh controller restores history from persisted events, not in-memory provider state.
-    reloaded = LoopSystem(tmp_path, adapter)
+    reloaded = LoopSystem.for_testing(tmp_path, adapter)
     result = reloaded.run_until_stop(run_id)
     assert result.phase == "DONE", result.error
     resumed_product = adapter.invocations[2]

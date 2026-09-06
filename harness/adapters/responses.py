@@ -6,7 +6,6 @@ import asyncio
 import email.utils
 import json
 import math
-import os
 import time
 from dataclasses import dataclass, field
 from threading import Lock
@@ -14,7 +13,14 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError, AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    DefaultAsyncHttpxClient,
+)
 
 from ..models import Usage
 from .base import Availability, ModelObservation, ModelRequest, ModelResponse, ProviderError
@@ -28,26 +34,11 @@ class ResponsesConfig:
     base_url: str = "https://api.openai.com/v1"
     timeout_sec: float = 600.0
 
-    @classmethod
-    def from_env(cls) -> ResponsesConfig:
-        try:
-            timeout = float(os.environ.get("YUDAO_MODEL_TIMEOUT_SEC", "600"))
-        except ValueError:
-            timeout = 0.0
-        return cls(
-            model=os.environ.get("YUDAO_MODEL_NAME", "").strip(),
-            api_key=os.environ.get("YUDAO_MODEL_API_KEY", "").strip(),
-            provider=os.environ.get("YUDAO_MODEL_PROVIDER", "openai").strip(),
-            base_url=os.environ.get("YUDAO_MODEL_BASE_URL", "https://api.openai.com/v1").strip(),
-            timeout_sec=timeout,
-        )
-
-
 class ResponsesAdapter:
     name = "responses"
 
-    def __init__(self, config: ResponsesConfig | None = None) -> None:
-        self.config = config if config is not None else ResponsesConfig.from_env()
+    def __init__(self, config: ResponsesConfig) -> None:
+        self.config = config
         self.model = self.config.model or "unconfigured"
         self._lock = Lock()
         self._active: tuple[str, asyncio.AbstractEventLoop, asyncio.Task] | None = None
@@ -55,9 +46,9 @@ class ResponsesAdapter:
     def availability(self) -> Availability:
         missing = []
         if not self.config.api_key:
-            missing.append("YUDAO_MODEL_API_KEY")
+            missing.append("provider credential")
         if not self.config.model:
-            missing.append("YUDAO_MODEL_NAME")
+            missing.append("model")
         if missing:
             return Availability(False, "provider_unavailable", "Missing configuration: " + ", ".join(missing))
         try:
@@ -66,11 +57,11 @@ class ResponsesAdapter:
         except ValueError:
             valid_url = False
         if not valid_url:
-            return Availability(False, "provider_unavailable", "Invalid YUDAO_MODEL_BASE_URL")
+            return Availability(False, "provider_unavailable", "Invalid provider base URL")
         if not math.isfinite(self.config.timeout_sec) or self.config.timeout_sec <= 0:
-            return Availability(False, "provider_unavailable", "YUDAO_MODEL_TIMEOUT_SEC must be positive and finite")
+            return Availability(False, "provider_unavailable", "Provider timeout must be positive and finite")
         if not self.config.provider:
-            return Availability(False, "provider_unavailable", "YUDAO_MODEL_PROVIDER must not be empty")
+            return Availability(False, "provider_unavailable", "Provider identity must not be empty")
         return Availability(True)
 
     def abort(self, session_id: str) -> None:
@@ -153,11 +144,31 @@ class ResponsesAdapter:
     async def _stream_once(self, request: ModelRequest) -> ModelResponse:
         started = time.monotonic()
         seen_items: set[str] = set()
+        observation_errors: list[BaseException] = []
+        async def observe_request(http_request: httpx.Request) -> None:
+            try:
+                body = _request_body(http_request)
+                request.observe(ModelObservation(
+                    id=_request_observation_id(request),
+                    kind="request",
+                    payload=body,
+                    provider=self.config.provider,
+                    model=self.config.model,
+                ))
+            except BaseException as exc:
+                observation_errors.append(exc)
+                raise
+
+        http_client = DefaultAsyncHttpxClient(
+            timeout=self.config.timeout_sec,
+            event_hooks={"request": [observe_request]},
+        )
         async with AsyncOpenAI(
             api_key=self.config.api_key,
             base_url=self.config.base_url,
             timeout=self.config.timeout_sec,
             max_retries=0,
+            http_client=http_client,
         ) as client:
             output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
             try:
@@ -169,10 +180,16 @@ class ResponsesAdapter:
                     stream=True,
                     **output_limit,
                 )
-            except _RETRYABLE_HTTP_ERRORS as exc:
-                raise _transport_provider_error(exc) from exc
-            except httpx.HTTPError as exc:
-                raise _nonretryable_http_error() from exc
+            except Exception as exc:
+                if observation_errors:
+                    raise observation_errors[0]
+                if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
+                    raise _transport_provider_error(exc) from exc
+                if isinstance(exc, httpx.HTTPError):
+                    raise _nonretryable_http_error() from exc
+                raise
+            if observation_errors:
+                raise observation_errors[0]
             async with stream:
                 async for event in _provider_events(stream):
                     if request.abort_flag.is_set():
@@ -181,9 +198,10 @@ class ResponsesAdapter:
                         self._observe_item(request, event.item.model_dump(mode="json", exclude_unset=True), seen_items)
                     elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
                         response = event.response
+                        actual_model = _actual_model(response)
                         output = [item.model_dump(mode="json", exclude_unset=True) for item in (response.output or [])]
                         for item in output:
-                            self._observe_item(request, item, seen_items)
+                            self._observe_item(request, item, seen_items, actual_model=actual_model)
                         raw_usage = response.usage.model_dump(mode="json", exclude_unset=True) if response.usage else None
                         usage = _usage(raw_usage, started)
                         request.observe(ModelObservation(
@@ -214,7 +232,7 @@ class ResponsesAdapter:
                             raise ProviderError("Completed model response has no output array")
                         return ModelResponse(
                             output=output, usage=usage, provider=self.config.provider,
-                            model=response.model, response_id=response.id,
+                            model=actual_model or "", response_id=response.id,
                         )
                     elif event.type == "error":
                         reason = "context_overflow" if _is_context_overflow(event.code) else "provider_error"
@@ -226,7 +244,14 @@ class ResponsesAdapter:
         raise ProviderError("Model response stream ended before a terminal response", retryable=True,
                             diagnostics={"error_type": "stream_incomplete"})
 
-    def _observe_item(self, request: ModelRequest, item: dict[str, Any], seen: set[str]) -> None:
+    def _observe_item(
+        self,
+        request: ModelRequest,
+        item: dict[str, Any],
+        seen: set[str],
+        *,
+        actual_model: str | None = None,
+    ) -> None:
         item_id = item.get("id")
         if not isinstance(item_id, str) or not item_id:
             raise ProviderError("Model output item has no identity")
@@ -239,7 +264,8 @@ class ResponsesAdapter:
         )
         request.observe(ModelObservation(
             id=item_id, kind="message", payload=item, text=text,
-            provider=self.config.provider, model=self.model,
+            provider=self.config.provider,
+            model=_actual_model(item) or actual_model,
         ))
 
 
@@ -249,6 +275,30 @@ def _error_code(body: Any) -> str | None:
     error = body.get("error", body)
     code = error.get("code") if isinstance(error, dict) else None
     return code if isinstance(code, str) else None
+
+
+def _actual_model(value: Any) -> str | None:
+    """读取服务实际返回的模型；配置中的请求模型不是返回模型证据。"""
+
+    model = getattr(value, "model", None)
+    if model is None and isinstance(value, dict):
+        model = value.get("model")
+    return model.strip() if isinstance(model, str) and model.strip() else None
+
+
+def _request_observation_id(request: ModelRequest) -> str:
+    root = request.request_id or request.activation_id
+    return f"{root}:{request.step_id}:attempt-{request.attempt}"
+
+
+def _request_body(http_request: httpx.Request) -> dict[str, Any]:
+    try:
+        body = json.loads(http_request.content)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProviderError("Model request body was not valid JSON", reason="provider_protocol") from exc
+    if not isinstance(body, dict):
+        raise ProviderError("Model request body was not a JSON object", reason="provider_protocol")
+    return body
 
 
 def _retryable_status(status: int) -> bool:

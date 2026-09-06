@@ -169,16 +169,6 @@ function formatCost(cost) {
   return String(cost);
 }
 
-function latestEventModel(events) {
-  if (!Array.isArray(events) || !events.length) return "未上报";
-  const ordered = events.slice().sort((a, b) => (Number(a && a.seq) || 0) - (Number(b && b.seq) || 0));
-  for (let i = ordered.length - 1; i >= 0; i -= 1) {
-    const model = ordered[i] && ordered[i].model;
-    if (typeof model === "string" && model.trim()) return model;
-  }
-  return "未上报";
-}
-
 function shortHash(value) {
   if (!value) return "—";
   return String(value).replace(/^sha256:/, "").slice(0, 12);
@@ -518,6 +508,11 @@ function renderBoard(board, aggregates, timeline, events) {
   }
   const agg = aggregates || {};
   const visibleRetry = board.phase === "DONE" || board.phase === "PAUSED" ? null : board.retry;
+  const requestModel = board.requested_model || "未上报";
+  const actualModel = board.actual_model || "未上报";
+  const requestProvider = board.requested_provider || "未上报";
+  const actualProvider = board.actual_provider || "未上报";
+  const protocol = board.protocol || "未上报";
   node.innerHTML = `
     ${renderCycle(board, timeline || {})}
     ${retrySummary(visibleRetry)}
@@ -534,9 +529,11 @@ function renderBoard(board, aggregates, timeline, events) {
       ["协作请求", agg.request_count],
       ["返工", agg.rework_count],
       ["费用", formatCost(agg.cost)],
-      ["模型", latestEventModel(events), "kv-model"],
-      ["适配器", board.adapter],
-      ["供应商", board.provider === board.adapter ? "未上报" : board.provider],
+      ["请求模型", requestModel, "kv-model"],
+      ["返回模型", actualModel],
+      ["适配器", protocol],
+      ["请求供应商", requestProvider],
+      ["返回供应商", actualProvider],
     ])}
     <p class="task-text">${t(board.task)}</p>
     ${board.human_action ? `<p class="note">${t(board.human_action)}</p>` : ""}
@@ -1197,7 +1194,6 @@ globalThis.harnessWeb = {
   renderContext,
   openEvent,
   formatCost,
-  latestEventModel,
   openCompose,
   closeCompose,
   startRun,

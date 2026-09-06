@@ -30,7 +30,7 @@ def test_cancel_between_validation_and_commit_preserves_terminal_state(tmp_path,
         return decision
 
     monkeypatch.setattr(module, "evaluate_proposal", blocked_validation)
-    system = LoopSystem(tmp_path, FakeAdapter([product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("echo")
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
@@ -57,7 +57,7 @@ def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
         assert release.wait(5)
         raise ProviderError("late provider failure")
 
-    system = LoopSystem(tmp_path, FakeAdapter([turn]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([turn]))
     run_id = system.create_run("echo")
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
@@ -95,7 +95,7 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
         return ModelResponse(output=[{"id": "submit-1", "call_id": "submit-1", "type": "function_call",
                                       "name": "submit_product_spec", "arguments": json_dumps(payload)}], usage=usage)
 
-    system = LoopSystem(tmp_path, FakeAdapter([first, turn]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([first, turn]))
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "durable tool evidence")
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -142,7 +142,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
         return product_spec()
 
     adapter = FakeAdapter([turn])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
@@ -164,7 +164,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
 
 
 def test_large_provider_usage_is_recorded_without_stopping_handoff(tmp_path):
-    system = LoopSystem(tmp_path, FakeAdapter([FakeTurn(product_spec(), usage=Usage(total_tokens=1_000_000))]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([FakeTurn(product_spec(), usage=Usage(total_tokens=1_000_000))]))
     result = system.activate_once(system.create_run("echo"))
     assert result.token_used == 1_000_000
     assert result.phase == "ENGINEERING" and result.stop_reason is None
@@ -182,7 +182,7 @@ def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
         return product_spec()
 
     adapter = FakeAdapter([turn])
-    system = LoopSystem(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter)
     active = system.create_run("active")
     abandoned = system.create_run("abandoned")
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -204,11 +204,19 @@ def test_stop_preserves_reported_vendor_and_model_separately_from_adapter(tmp_pa
         usage=Usage(total_tokens=10000),
         provider="actual-vendor", model="actual-model",
     )
-    system = LoopSystem(tmp_path, FakeAdapter([response, ProviderError("late failure")]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([response, ProviderError("late failure")]))
     result = system.run_until_stop(system.create_run("echo", max_cycles=1 if reason == "max_cycles" else 8))
     assert result.stop_reason == reason
-    assert result.provider == "actual-vendor" and result.model == "actual-model"
+    assert result.provider == "actual-vendor"
+    if reason == "provider_error":
+        assert result.model is None and result.actual_model is None
+    else:
+        assert result.model == "actual-model" and result.actual_model == "actual-model"
     assert result.adapter == "fake"
     stop = next(event for event in system.store.list_events(result.run_id)
                 if event.type in {EventType.RUN_FAILED, EventType.RUN_PAUSED})
-    assert stop.provider == "actual-vendor" and stop.model == "actual-model"
+    assert stop.provider == "actual-vendor"
+    if reason == "provider_error":
+        assert stop.model is None
+    else:
+        assert stop.model == "actual-model"

@@ -167,7 +167,7 @@ def test_quality_rework_routes_to_product(data_dir):
 
 
 def test_illegal_workpiece_stays_in_department(data_dir):
-    system = LoopSystem(
+    system = LoopSystem.for_testing(
         data_dir,
         FakeAdapter(
             [
@@ -196,7 +196,7 @@ def test_natural_language_completion_does_not_finish(data_dir):
         delivery_turn(),
         *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(MAX_MODEL_STEPS)],
     ]
-    system = LoopSystem(data_dir, FakeAdapter(script))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
@@ -226,7 +226,7 @@ def test_cycle_limit_pauses_after_work_without_provider_usage(data_dir):
 
 
 def test_cancel_is_explicit_failure(data_dir):
-    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("build echo")
     projection = system.cancel(run_id)
     assert projection.phase == "FAILED"
@@ -318,7 +318,7 @@ def test_release_without_quality_evidence_is_rejected(data_dir):
         delivery_turn(),
         FakeTurn(proposal={"kind": "qa_review", "verdict": "release", "rationale": "looks good", "checks": ["smoke"], "defects": []}),
     ]
-    system = LoopSystem(data_dir, FakeAdapter(script))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo", max_cycles=8)
     projection = system.run_until_stop(run_id)
     assert projection.phase != "DONE"
