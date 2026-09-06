@@ -9,6 +9,7 @@ from .event_store import EventStore
 from .models import (
     CollaborationRequest,
     CollaborationResponse,
+    DepartmentGuidance,
     DepartmentPrompt,
     ArtifactRef,
     ContextExclusion,
@@ -140,6 +141,36 @@ def apply_event(state: RunProjection, event: Event) -> None:
         prompt = _prompt_from_payload(payload, event)
         state.department_prompts[prompt.department] = prompt
         state.prompt_versions.append(prompt)
+        return
+
+    if etype == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
+        state.department_guidance.append(_guidance_from_payload(payload, event))
+        return
+
+    if etype == EventType.DEPARTMENT_GUIDANCE_APPLIED:
+        ids = set(payload.get("guidance_ids", []))
+        for index, guidance in enumerate(state.department_guidance):
+            if guidance.id in ids and guidance.status in {"received", "in_input"}:
+                state.department_guidance[index] = replace(
+                    guidance,
+                    status="in_input",
+                    applied_activation_id=payload.get("activation_id"),
+                    applied_context_event_id=payload.get("context_event_id"),
+                )
+        return
+
+    if etype == EventType.DEPARTMENT_GUIDANCE_RESPONDED:
+        guidance_id = payload.get("guidance_id")
+        for index, guidance in enumerate(state.department_guidance):
+            if guidance.id == guidance_id:
+                state.department_guidance[index] = replace(
+                    guidance,
+                    status=payload.get("status", "needs_work"),
+                    response_event_id=event.event_id,
+                    response_status=payload.get("status"),
+                    response_text=payload.get("text"),
+                )
+                break
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
@@ -472,6 +503,24 @@ def _prompt_from_payload(payload: dict[str, Any], event: Event) -> DepartmentPro
     )
 
 
+def _guidance_from_payload(payload: dict[str, Any], event: Event) -> DepartmentGuidance:
+    return DepartmentGuidance(
+        id=payload["id"],
+        run_id=event.run_id,
+        department=payload["department"],
+        version=int(payload["version"]),
+        text=payload["text"],
+        guidance_ref=ArtifactRef(**payload["guidance_ref"]),
+        created_event_id=event.event_id,
+        status=payload.get("status", "received"),
+        applied_activation_id=payload.get("applied_activation_id"),
+        applied_context_event_id=payload.get("applied_context_event_id"),
+        response_event_id=payload.get("response_event_id"),
+        response_status=payload.get("response_status"),
+        response_text=payload.get("response_text"),
+    )
+
+
 def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextManifest:
     return ContextManifest(
         source_event_id=event_id,
@@ -487,6 +536,8 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         input_token_estimate=payload.get("input_token_estimate"),
         output_reserve_tokens=int(payload.get("output_reserve_tokens", payload.get("max_output_tokens") or 0)),
         parts_ref=payload.get("parts_ref"),
+        guidance_ids=list(payload.get("guidance_ids", [])),
+        guidance_only=bool(payload.get("guidance_only", False)),
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],

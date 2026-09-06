@@ -88,6 +88,7 @@
     creating: false,
     cancelling: false,
     inputSubmitting: null,
+    guidanceSubmitting: {},
     promptSubmitting: false,
     newTaskDraft: { task: "", max_cycles: "8", context_window: "32000" },
     error: "",
@@ -160,6 +161,16 @@
 
   function promptStatusLabel(status) {
     return ({ adopted: "生效中", pending: "待下次激活" }[status] || status || "未知状态");
+  }
+
+  function guidanceStatusLabel(status) {
+    return ({
+      received: "已接收",
+      in_input: "已进入模型输入",
+      completed: "已处理",
+      declined: "已说明边界",
+      needs_work: "需要后续处理",
+    }[status] || status || "未知状态");
   }
 
   function formatTime(value, includeDate = false) {
@@ -569,6 +580,13 @@
     return `<article class="dw-message is-${safeClass(messageKind(message))}"><div class="dw-message-head"><span class="dw-message-origin">${text(message.source)} <span>${text(message.detail, "")}</span></span><time>${text(formatTime(message.created_at || message.time))}</time></div><p>${text(parsed.text, "原文不可用")}</p>${eventLink}</article>`;
   }
 
+  function guidanceMarkup(data) {
+    const items = Array.isArray(data?.guidance) ? data.guidance : [];
+    if (!items.length) return '<section class="dw-guidance-section"><div class="dw-section-head"><h3>部门指导记录</h3><p>发送后由本部门在下一次安全激活中处理</p></div><p class="dw-small">暂无部门指导。</p></section>';
+    const rows = items.map(item => `<article class="dw-guidance-item"><div class="dw-guidance-head"><strong>指导 v${text(item.version)}</strong><span class="dw-record-state ${["received", "in_input", "needs_work"].includes(item.status) ? "waiting" : ""}">${text(guidanceStatusLabel(item.status))}</span></div><p>${text(item.text, "原文不可用")}</p><div class="dw-guidance-meta"><span>${text(item.id)}</span>${item.applied_context_event_id ? `<span>Context ${text(item.applied_context_event_id)}</span>` : ""}${item.response_event_id ? legacyLink(item.response_event_id, "", "查看回应") : ""}</div>${item.response_text ? `<p class="dw-guidance-response">部门回应：${text(item.response_text)}</p>` : ""}</article>`).join("");
+    return `<section class="dw-guidance-section"><div class="dw-section-head"><h3>部门指导记录</h3><p>${count(items.length)} 条 · 原文、进入输入与回应分开记录</p></div><div class="dw-guidance-list">${rows}</div></section>`;
+  }
+
   function contextDefaultId(contexts) {
     const work = contexts.filter(item => item.purpose === "work");
     return (work.at(-1) || contexts.at(-1) || null)?.id || null;
@@ -665,6 +683,20 @@
     const deptDraftKey = `${state.runId}/${department}`;
     const departmentTask = departmentTitle(department, data, board);
     main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button><span class="dw-current-state"><span class="dw-status-dot ${statusTone(status)}"></span>${text(departmentName(department))} · ${text(status)}</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(status) === "waiting" ? "waiting" : ""}"></span><strong>${text(departmentName(department))}</strong><span>·</span><span>${text(data.role || DEPARTMENTS[department].role)}</span></div><h1>${text(departmentTask)}</h1><p class="dw-subtitle">${text(board.run_id)} · 部门工作区</p></div></header><div class="dw-task-strip"><i data-lucide="route" aria-hidden="true"></i><span>当前任务</span><strong>${text(departmentTask)}</strong></div><div class="dw-work-grid ${state.inspectorCollapsed ? "has-collapsed-inspector" : ""}"><section class="dw-conversation" aria-labelledby="conversation-title"><div class="dw-conversation-head"><h2 id="conversation-title">工作消息</h2><p>${number((data.messages || []).length, "0")} 条记录 · ${text(status)}</p></div><div class="dw-timeline" aria-live="polite">${messages || '<p class="dw-small">暂无部门消息</p>'}</div><form class="dw-compose" id="dw-dept-form" data-department-form="${escapeHtml(department)}"><div class="dw-compose-meta"><span>当前接收方</span><strong>发给${text(departmentName(department))}</strong></div><textarea class="dw-textarea" rows="3" data-dept-draft="${escapeHtml(department)}" aria-label="发给${escapeHtml(departmentName(department))}" placeholder="追加对话或指导" disabled>${escapeHtml(currentDraft(state.deptDrafts, deptDraftKey))}</textarea><div class="dw-compose-actions"><span>部门指导将在 W6 接入真实内核</span><button class="dw-primary" type="submit" disabled><i data-lucide="send" aria-hidden="true"></i>发送指导</button></div></form></section>${inspectorMarkup(department, data)}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    const guidanceHistory = main.querySelector?.(".dw-timeline");
+    guidanceHistory?.insertAdjacentHTML?.("afterend", guidanceMarkup(data));
+    const guidanceKey = `${state.runId}/${department}`;
+    const guidanceBusy = Boolean(state.guidanceSubmitting[guidanceKey]);
+    const guidanceDisabled = TERMINAL.has(board.phase) || guidanceBusy;
+    const guidanceForm = main.querySelector?.("#dw-dept-form");
+    const guidanceTextarea = guidanceForm?.querySelector?.("[data-dept-draft]");
+    const guidanceSubmit = guidanceForm?.querySelector?.("button[type='submit']");
+    const guidanceStatus = guidanceForm?.querySelector?.(".dw-compose-actions span");
+    if (guidanceTextarea) guidanceTextarea.disabled = guidanceDisabled;
+    if (guidanceSubmit) guidanceSubmit.disabled = guidanceDisabled;
+    if (guidanceStatus) guidanceStatus.textContent = TERMINAL.has(board.phase)
+      ? "任务已结束，请新建任务"
+      : guidanceBusy ? "正在保存指导" : "保存后由目标部门在下一次安全激活中处理";
     updateNav(); icons();
     restoreScroll(scrollY);
   }
@@ -1112,6 +1144,37 @@
     }
   }
 
+  async function addDepartmentGuidance(form) {
+    const department = form?.dataset?.departmentForm;
+    if (!state.runId || !department) return;
+    const textarea = form.querySelector?.("[data-dept-draft]");
+    const value = textarea?.value || "";
+    if (!value.trim()) return;
+    const runId = state.runId;
+    const token = state.routeToken;
+    const key = `${runId}/${department}`;
+    state.deptDrafts[key] = value;
+    state.guidanceSubmitting[key] = true;
+    renderDepartment(department);
+    try {
+      await fetchJSON(apiPath(runId, `/departments/${encodeURIComponent(department)}/guidance`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: value }),
+      });
+      if (token !== state.routeToken || runId !== state.runId) return;
+      if (state.deptDrafts[key] === value) delete state.deptDrafts[key];
+      await loadDepartment(department, token);
+      await loadRunPayload(runId, token, true);
+      setStatus("部门指导已接收", "success");
+    } catch (error) {
+      if (token === state.routeToken && runId === state.runId) setStatus(error.message, "error");
+    } finally {
+      delete state.guidanceSubmitting[key];
+      if (token === state.routeToken && runId === state.runId && state.view === "department") renderDepartment(department);
+    }
+  }
+
   function openTaskDialog() {
     const dialog = document.getElementById("dw-task-dialog");
     if (!dialog) return;
@@ -1374,7 +1437,7 @@
   function submitHandler(event) {
     const form = event.target;
     if (form.id === "dw-global-form") { event.preventDefault(); addGlobalInput(form); }
-    if (form.id === "dw-dept-form") event.preventDefault();
+    if (form.id === "dw-dept-form") { event.preventDefault(); addDepartmentGuidance(form); }
   }
 
   function bootDialogs() {
@@ -1430,6 +1493,7 @@
     createRun,
     cancelRun,
     addGlobalInput,
+    addDepartmentGuidance,
     openTaskDialog,
     openPromptDialog,
     savePrompt,

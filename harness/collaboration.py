@@ -35,6 +35,8 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
     if projection.phase in TERMINAL_PHASES or department not in DEPARTMENTS:
         return set()
     request = projection.pending_request
+    has_guidance = any(item.department == department and item.status in {"received", "in_input"}
+                       for item in projection.department_guidance)
     if request is not None:
         if request.status != "open" or department != request.recipient:
             return set()
@@ -43,14 +45,18 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
             allowed.update({"product_spec", "product_decision"})
         if request.request_type == "action" and request.action == "revise_delivery":
             allowed.update({"engineering_plan", "delivery_spec"})
+        if has_guidance:
+            allowed.add("department_guidance_response")
         return allowed
     if department != department_for_phase(projection.phase):
-        return set()
+        return {"department_guidance_response"} if has_guidance else set()
     allowed = {"collaboration_request"} | {
         "product": {"product_spec", "product_decision"},
         "engineering": {"engineering_plan", "delivery_spec"},
         "quality": {"qa_review"},
     }[department]
+    if has_guidance:
+        allowed.add("department_guidance_response")
     if projection.input_version > projection.processed_input_version:
         return allowed - {"product_decision"} if department == "product" else set()
     return allowed

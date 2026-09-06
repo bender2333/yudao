@@ -63,6 +63,9 @@ class ModelRequest:
     engineering_plan_hash: str | None = None
     request_id: str | None = None
     input_version: int = 0
+    guidance_version: int = 0
+    guidance_ids: list[str] = field(default_factory=list)
+    guidance_only: bool = False
     prompt_version: int = 0
     prompt_hash: str | None = None
     attempt: int = 1

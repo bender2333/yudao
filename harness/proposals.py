@@ -60,6 +60,16 @@ def collaboration_response(request_id: str, status: str, text: str,
     }
 
 
+def guidance_response(guidance_id: str, status: str = "completed",
+                      text: str = "The department reviewed and handled this guidance.") -> dict[str, Any]:
+    return {
+        "kind": "department_guidance_response",
+        "guidance_id": guidance_id,
+        "status": status,
+        "text": text,
+    }
+
+
 def product_decision(statement: str, rationale: str) -> dict[str, Any]:
     return {"kind": "product_decision", "statement": statement, "rationale": rationale}
 

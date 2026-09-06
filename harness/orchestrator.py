@@ -77,11 +77,16 @@ class _Activation:
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
+    guidance_version: int = 0
+    guidance_ids: tuple[str, ...] = ()
+    guidance_only: bool = False
+    guidance_applied: bool = False
     attempt_captures: dict[str, "_AttemptCapture"] = field(default_factory=dict)
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.input_version, "prompt_version": self.prompt.version,
-                "prompt_hash": self.prompt.prompt_ref.content_hash}
+                "prompt_hash": self.prompt.prompt_ref.content_hash,
+                "guidance_ids": list(self.guidance_ids), "guidance_only": self.guidance_only}
 
 
 @dataclass
@@ -312,6 +317,16 @@ class Orchestrator:
             self.interactions.update_prompt(current, department, text)
             return self.project(run_id)
 
+    def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
+        if department not in DEPARTMENTS:
+            raise ValueError("unknown department")
+        with self._state_lock:
+            current = self.project(run_id)
+            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+                raise RunTerminalError("This run has ended; guidance can be sent to a new task.")
+            self.interactions.receive_guidance(current, department, text)
+            return self.project(run_id)
+
     def _assign_new_inputs(self, run_id: str, projection: RunProjection) -> RunProjection:
         if projection.phase in TERMINAL_PHASES or projection.input_version <= projection.product_work_input_version:
             return projection
@@ -331,7 +346,18 @@ class Orchestrator:
                 return True
             current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
             return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
-                    or current.input_version != activation.input_version)
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version)
+
+    @staticmethod
+    def _guidance_version(projection: RunProjection, department: str) -> int:
+        return max((item.version for item in projection.department_guidance
+                    if item.department == department), default=0)
+
+    @staticmethod
+    def _pending_guidance(projection: RunProjection, department: str) -> list[Any]:
+        return [item for item in projection.department_guidance
+                if item.department == department and item.status in {"received", "in_input"}]
 
     @staticmethod
     def _request_id(projection: RunProjection) -> str | None:
@@ -442,7 +468,15 @@ class Orchestrator:
         if projection.cycle_count >= projection.max_cycles:
             self._pause(run_id, projection, "max_cycles")
             return None
-        department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
+        normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
+        pending_guidance = [item for item in projection.department_guidance
+                            if item.status in {"received", "in_input"}]
+        guidance_only = False
+        department = normal_department
+        if projection.pending_request is None and pending_guidance:
+            if normal_department is None or pending_guidance[0].department != normal_department:
+                department = pending_guidance[0].department
+                guidance_only = True
         if department is None:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
@@ -515,6 +549,9 @@ class Orchestrator:
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": current_contract_hash(projection),
                      "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection),
+                     "guidance_ids": [item.id for item in self._pending_guidance(projection, department)],
+                     "guidance_only": guidance_only,
+                     "guidance_version": self._guidance_version(projection, department),
                      "input_version": projection.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash,
                      **self._target_metadata(target, adapter, snapshot_id)},
@@ -524,7 +561,10 @@ class Orchestrator:
                            adapter, target, snapshot_id,
                            input_version=projection.input_version, prompt=prompt,
                            effective_contract_hash=current_contract_hash(projection),
-                           engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection))
+                           engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection),
+                           guidance_version=self._guidance_version(projection, department),
+                           guidance_ids=tuple(item.id for item in self._pending_guidance(projection, department)),
+                           guidance_only=guidance_only)
 
     @staticmethod
     def _configured_provider(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
@@ -653,6 +693,7 @@ class Orchestrator:
                 input_version=activation.input_version,
                 transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
                 session_id=request.session_id,
+                guidance_version=activation.guidance_version,
                 provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
                 model=submission.response.model,
             )
@@ -676,14 +717,18 @@ class Orchestrator:
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version):
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return None
             try:
                 effective_window, output_limit = self._effective_limits(current, identity.target)
+                guidance_items = self._pending_guidance(current, identity.department) if step_id == 1 else []
                 pinned = self.assembler.assemble(
                     current, department=identity.department, session_id=identity.session_id,
                     activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
                     context_window=effective_window, max_output_tokens=output_limit,
+                    guidance=guidance_items,
+                    guidance_only=identity.guidance_only,
                 )
             except ValueError as exc:
                 raise ProviderError(str(exc), reason="context_overflow") from exc
@@ -736,6 +781,7 @@ class Orchestrator:
                         history=visible_history(records, checkpoint),
                         compaction_event_id=checkpoint_id,
                         context_window=effective_window, max_output_tokens=output_limit,
+                        guidance=guidance_items, guidance_only=identity.guidance_only,
                     )
             except (CompactionError, ValueError, FileNotFoundError) as exc:
                 reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window * 85 // 100 else "compaction_failed"
@@ -751,7 +797,8 @@ class Orchestrator:
                                    engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id,
                                    attempt=attempt, root_step_id=root_step_id,
                                    retry_of_step_id=retry_of_step_id, attempt_id=attempt_id,
-                                   logical_call_id=logical_call_id, **activation.versions())
+                                   logical_call_id=logical_call_id,
+                                   guidance_version=activation.guidance_version, **activation.versions())
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
             request.on_raw_observation = lambda observation: self._record_observation(activation, observation)
@@ -853,7 +900,8 @@ class Orchestrator:
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version):
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return
             plan = activation.compaction_plan
             try:
@@ -891,8 +939,26 @@ class Orchestrator:
             if (current_contract_hash(current) != request.effective_contract_hash
                     or current_plan_hash(current) != request.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version):
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return False
+            if request.context.manifest.guidance_ids and not activation.guidance_applied:
+                self.store.append(
+                    request.run_id,
+                    EventType.DEPARTMENT_GUIDANCE_APPLIED,
+                    role=request.department,
+                    parent_event_id=activation.parent_event_id,
+                    state_before=current.phase,
+                    state_after=current.phase,
+                    session_id=request.session_id,
+                    payload={
+                        "guidance_ids": list(request.context.manifest.guidance_ids),
+                        "activation_id": request.activation_id,
+                        "context_event_id": request.context_event_id,
+                        "input_version": request.input_version,
+                    },
+                )
+                activation.guidance_applied = True
             request.attempt_started_at = request.attempt_started_at or utc_now()
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
@@ -1144,7 +1210,8 @@ class Orchestrator:
                     or current_contract_hash(current) != request.effective_contract_hash
                     or current_plan_hash(current) != request.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version):
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return False
             provider = self._configured_provider(activation.target, activation.adapter)
             self.store.append(
@@ -1189,7 +1256,8 @@ class Orchestrator:
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version):
+                    or current.input_version != activation.input_version
+                    or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return ToolAdmission(stopped=True)
             if not has_tool(request.department, call["name"]):
                 return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
@@ -1498,6 +1566,7 @@ class Orchestrator:
         transcript_ref: dict[str, Any] | None,
         parent_event_id: str,
         session_id: str,
+        guidance_version: int,
         provider: str | None,
         model: str | None,
     ) -> None:
@@ -1524,6 +1593,7 @@ class Orchestrator:
             current = self._close_obsolete_request(run_id, current)
             if (current.phase != projection.phase
                     or current.input_version != input_version
+                    or self._guidance_version(current, department) != guidance_version
                     or current_contract_hash(current) != current_contract_hash(projection)
                     or current_plan_hash(current) != current_plan_hash(projection)
                     or self._request_id(current) != self._request_id(projection)

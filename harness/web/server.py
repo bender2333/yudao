@@ -149,6 +149,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._add_input(parts[2])
             if len(parts) == 5 and parts[:2] == ["api", "runs"] and parts[3] == "prompts":
                 return self._update_prompt(parts[2], parts[4])
+            if len(parts) == 6 and parts[:2] == ["api", "runs"] and parts[3] == "departments" and parts[5] == "guidance":
+                return self._add_guidance(parts[2], parts[4])
             if path.startswith("/api/"):
                 return self._send_json({"error": "not found"}, 404)
             self._send_json({"error": "not found"}, 404)
@@ -239,6 +241,21 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self._send_json({"ok": True, "run_id": run_id, "department": department,
                          "prompt_version": prompt.version,
                          "prompt_hash": prompt.prompt_ref.content_hash}, 201)
+
+    def _add_guidance(self, run_id: str, department: str) -> None:
+        projection = self.server.system.add_guidance(run_id, department, self._text_body())
+        guidance = max(
+            (item for item in projection.department_guidance if item.department == department),
+            key=lambda item: item.version,
+        )
+        self._send_json({
+            "ok": True,
+            "run_id": run_id,
+            "department": department,
+            "guidance_id": guidance.id,
+            "guidance_version": guidance.version,
+            "status": guidance.status,
+        }, 201)
 
     def _replay_run(self, run_id: str) -> None:
         self._drain_body()
@@ -331,12 +348,15 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 detail["model_input"] = json.loads(
                     self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**request_ref))
                 )
-            for key in ("input_ref", "message_ref", "output_ref"):
+            for key in ("input_ref", "message_ref", "output_ref", "guidance_ref"):
                 ref = event.payload.get(key)
                 if ref:
                     raw = self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**ref))
                     detail[key.removesuffix("_ref")] = (
-                        raw.decode("utf-8") if event.type == EventType.USER_INPUT_RECEIVED
+                        raw.decode("utf-8") if event.type in {
+                            EventType.USER_INPUT_RECEIVED,
+                            EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+                        }
                         else json.loads(raw)
                     )
             for key in ("intend_ref", "prompt_ref"):

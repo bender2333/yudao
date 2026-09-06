@@ -12,6 +12,7 @@ from .models import (
     ContextExclusion,
     ContextManifest,
     ContextSource,
+    DepartmentGuidance,
     DeliverySpec,
     DepartmentPrompt,
     ProductDecision,
@@ -97,7 +98,7 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
 }
 
 for _contract in PROPOSAL_CONTRACTS.values():
-    _contract["submit_tools"].extend(["submit_request", "submit_response"])
+    _contract["submit_tools"].extend(["submit_request", "submit_response", "submit_guidance_response"])
     _contract["kinds"].update({
         "collaboration_request": {
             "required": ["recipient", "request_type", "question", "background", "expected_result"],
@@ -108,6 +109,11 @@ for _contract in PROPOSAL_CONTRACTS.values():
             "required": ["request_id", "status", "text", "result_event_ids"],
             "status": ["answered", "completed", "declined", "needs_work"],
             "result_event_ids": "actual host event ids from request_results, never model call ids",
+        },
+        "department_guidance_response": {
+            "required": ["guidance_id", "status", "text"],
+            "status": ["completed", "declined", "needs_work"],
+            "bind": ["the target department guidance id and the current activation"],
         },
     })
 
@@ -139,7 +145,9 @@ class ContextAssembler:
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
                  compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
-                 context_window: int | None = None, max_output_tokens: int | None = None) -> AssembledContext:
+                 context_window: int | None = None, max_output_tokens: int | None = None,
+                 guidance: list[DepartmentGuidance] | None = None,
+                 guidance_only: bool = False) -> AssembledContext:
         effective_window = projection.context_window if context_window is None else context_window
         if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
                 or effective_window < 1):
@@ -151,6 +159,10 @@ class ContextAssembler:
         prompt = projection.department_prompts[department] if prompt is None else prompt
         if prompt.department != department:
             raise ValueError("the prompt must belong to the activated department")
+        guidance_items = list(guidance or [])
+        if any(item.department != department for item in guidance_items):
+            raise ValueError("department guidance must belong to the activated department")
+        tool_names = _tools_for(projection, department, guidance_only=guidance_only)
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
@@ -184,8 +196,28 @@ class ContextAssembler:
                     }
                 ),
             ),
-            ContextPart("allowed_tools", department, json_dumps(_tools_for(projection, department))),
+            ContextPart("allowed_tools", department, json_dumps(tool_names)),
         ]
+        if guidance_items:
+            parts.insert(
+                2,
+                ContextPart(
+                    "department_guidance",
+                    str(max(item.version for item in guidance_items)),
+                    json_dumps([
+                        {
+                            "id": item.id,
+                            "department": item.department,
+                            "version": item.version,
+                            "text": item.text,
+                            "guidance_ref": asdict(item.guidance_ref),
+                            "created_event_id": item.created_event_id,
+                            "status": item.status,
+                        }
+                        for item in guidance_items
+                    ]),
+                ),
+            )
         pending_inputs = [item for item in projection.inputs
                           if item.version > projection.processed_input_version and item.kind == "text"]
         if pending_inputs:
@@ -288,7 +320,7 @@ class ContextAssembler:
         tools = [
             {"type": "function", "name": item["name"], "description": item["description"],
              "parameters": item["parameters"], "strict": False}
-            for item in host_tool_definitions(_tools_for(projection, department))
+            for item in host_tool_definitions(tool_names)
         ]
         if history:
             parts.append(ContextPart("department_history", department, json_dumps(history)))
@@ -330,6 +362,8 @@ class ContextAssembler:
             max_output_tokens=max_output_tokens,
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens or 0,
+            guidance_ids=[item.id for item in guidance_items],
+            guidance_only=guidance_only,
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -362,6 +396,8 @@ class ContextAssembler:
             prompt_hash=pinned.manifest.prompt_hash,
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens,
+            guidance_ids=list(pinned.manifest.guidance_ids),
+            guidance_only=pinned.manifest.guidance_only,
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 
@@ -383,6 +419,11 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
         work = (f"处理来自 {request.requester} 的请求 {request.id}：{request.question}。"
                 f"预期结果：{request.expected_result}。完成正常动作或形成意见后用 submit_response 回应；"
                 "已经正式接纳的结果会列在 request_results 中，回复不能替代正常需求、计划或交付接纳。")
+    pending_guidance = [item for item in projection.department_guidance
+                        if item.department == department and item.status in {"received", "in_input"}]
+    if pending_guidance:
+        work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文，"
+                 "完成可核对的处理后必须用 submit_guidance_response 逐条回应；指导不能替代产品要求、工程计划或质检放行。")
     return {
         "department": department, "phase": projection.phase, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
@@ -406,6 +447,8 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,
         "request_id": None if projection.pending_request is None else projection.pending_request.id,
         "effective_decision_count": len(projection.effective_decisions),
+        "pending_guidance_ids": [item.id for item in projection.department_guidance
+                                 if item.department == department and item.status in {"received", "in_input"}],
     }
 
 
@@ -484,7 +527,10 @@ def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None
     return None
 
 
-def _tools_for(projection: RunProjection, department: str) -> list[str]:
+def _tools_for(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
     from .tools import tools_for
 
-    return [name for name in tools_for(department) if tool_error(projection, department, name, {}) is None]
+    available = tools_for(department)
+    if guidance_only:
+        available = [name for name in available if name in {"read_file", "list_files", "run_check", "submit_guidance_response"}]
+    return [name for name in available if tool_error(projection, department, name, {}) is None]

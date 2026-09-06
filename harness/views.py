@@ -61,6 +61,9 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "input_version": projection.input_version,
         "product_work_input_version": projection.product_work_input_version,
         "processed_input_version": projection.processed_input_version,
+        "department_guidance": _plain(projection.department_guidance),
+        "pending_guidance_count": sum(item.status in {"received", "in_input"}
+                                       for item in projection.department_guidance),
     }
 
 
@@ -119,6 +122,7 @@ def context_view(projection: RunProjection) -> dict[str, Any]:
         "sessions": _plain(projection.sessions),
         "stop_reason": projection.stop_reason,
         "human_action": projection.human_action,
+        "department_guidance": _plain(projection.department_guidance),
     }
 
 
@@ -260,6 +264,8 @@ def event_card(event: Event) -> dict[str, Any]:
         "git_version": _plain(event.payload.get("git_version")) if event.type in GIT_VERSION_EVENTS else None,
         "input_save_failure": _plain(event.payload.get("input_save_failure"))
         if event.type == EventType.RUN_FAILED and event.stop_reason == "cancelled" else None,
+        "guidance_ids": _plain(payload.get("guidance_ids", [])),
+        "guidance_id": payload.get("guidance_id"),
     }
 
 
@@ -275,6 +281,7 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
         "evidence": evidence_view(projection, events),
         "context": context_view(projection),
         "inputs": _with_git(projection.inputs, events),
+        "department_guidance": _plain(projection.department_guidance),
         "prompts": {
             "current": _plain(projection.department_prompts),
             "versions": _plain(projection.prompt_versions),

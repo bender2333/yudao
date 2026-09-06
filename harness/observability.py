@@ -240,8 +240,19 @@ class ObservabilityQuery:
         for event in events:
             payload = event.payload or {}
             role = event.role
-            if event.type in {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_INPUT, EventType.MODEL_MESSAGE}:
+            if event.type in {
+                EventType.USER_INPUT_RECEIVED,
+                EventType.DEPARTMENT_INPUT,
+                EventType.MODEL_MESSAGE,
+                EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+            }:
                 if event.type == EventType.USER_INPUT_RECEIVED:
+                    source_type = "user"
+                    source_role = "user"
+                    text = payload.get("text", "")
+                elif event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
+                    if payload.get("department") != department:
+                        continue
                     source_type = "user"
                     source_role = "user"
                     text = payload.get("text", "")
@@ -257,13 +268,31 @@ class ObservabilityQuery:
                     "type": event.type,
                     "source_type": source_type,
                     "source_role": source_role,
-                    "source": {"user": "用户", "department": "本部门", "other_department": "其他部门"}[source_type],
+                    "source": "用户指导" if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED else {
+                        "user": "用户", "department": "本部门", "other_department": "其他部门"
+                    }[source_type],
                     "kind": {"user": "user", "department": "self", "other_department": "other"}[source_type],
                     "detail": f"{event.type} · {event.event_id}",
                     "text": text,
                     "created_at": event.created_at,
                     "attempt_id": payload.get("attempt_id"),
                     "context_event_id": payload.get("context_event_id"),
+                    "guidance_id": payload.get("id") if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED else None,
+                })
+            if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED and payload.get("department") == department:
+                messages.append({
+                    "event_id": event.event_id,
+                    "seq": event.seq,
+                    "type": event.type,
+                    "source_type": "department",
+                    "source_role": department,
+                    "source": "本部门",
+                    "kind": "self",
+                    "detail": f"部门指导回应 · {event.event_id}",
+                    "text": payload.get("text", ""),
+                    "created_at": event.created_at,
+                    "guidance_id": payload.get("guidance_id"),
+                    "status": payload.get("status"),
                 })
             if event.type in {EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED}:
                 requester = payload.get("requester")
@@ -389,6 +418,17 @@ class ObservabilityQuery:
             "messages": messages,
             "handovers": handovers,
             "contexts": context_items,
+            "guidance": [
+                {
+                    **asdict(item),
+                    "guidance_ref": asdict(item.guidance_ref),
+                }
+                for item in projection.department_guidance if item.department == department
+            ],
+            "pending_guidance": [
+                item.id for item in projection.department_guidance
+                if item.department == department and item.status in {"received", "in_input"}
+            ],
             "provider": provider,
             "prompt": {
                 "department": department,

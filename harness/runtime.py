@@ -123,6 +123,9 @@ class LoopSystem:
     def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
         return self.orchestrator.update_prompt(run_id, department, text)
 
+    def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
+        return self.orchestrator.add_guidance(run_id, department, text)
+
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
 

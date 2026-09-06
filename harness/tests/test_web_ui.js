@@ -403,7 +403,7 @@ test("late run projection cannot overwrite a newer selected task", async () => {
   assert.equal(web.state.runPayload, null);
 });
 
-test("department context renders its own attempt id and keeps guidance disabled", () => {
+test("department context renders its own attempt id and exposes guidance controls", () => {
   const { document, nodes } = uiDocument();
   const web = loadApp(async () => response({}), document);
   web.state.runId = "run-a";
@@ -415,6 +415,34 @@ test("department context renders its own attempt id and keeps guidance disabled"
   assert.match(nodes.get("dw-main").innerHTML, /data-observe-attempt="attempt-exact"/);
   assert.match(nodes.get("dw-main").innerHTML, /data-dept-draft/);
   assert.match(nodes.get("dw-main").innerHTML, /发送指导/);
+  assert.match(APP_JS, /function addDepartmentGuidance\(form\)/);
+  assert.match(APP_JS, /departments\/\$\{encodeURIComponent\(department\)\}\/guidance/);
+});
+
+test("department guidance posts to the captured run and keeps the draft scoped", async () => {
+  const { document, nodes } = uiDocument();
+  const calls = [];
+  const web = loadApp(async (url, options = {}) => {
+    calls.push([url, options]);
+    if (url.includes("/guidance")) return response({ ok: true, guidance_id: "guidance-1", status: "received" }, 201);
+    if (url.endsWith("/departments/engineering")) return response({ run_id: "run-a", department: "engineering", guidance: [], contexts: [], messages: [], history: {}, materials: {}, provider: {}, prompt: null });
+    if (url === "/api/runs/run-a") return response({ board: { run_id: "run-a", task: "task", phase: "ENGINEERING" }, timeline: {}, evidence: {}, inputs: [], events: [] });
+    return response({});
+  }, document);
+  web.state.runId = "run-a";
+  web.state.view = "department";
+  web.state.department = "engineering";
+  web.state.routeToken = 4;
+  web.state.runPayload = { board: { run_id: "run-a", task: "task", phase: "ENGINEERING" } };
+  const textarea = { value: "  inspect the boundary  " };
+  const form = {
+    dataset: { departmentForm: "engineering" },
+    querySelector(selector) { return selector === "[data-dept-draft]" ? textarea : null; },
+  };
+  await web.addDepartmentGuidance(form);
+  assert.equal(calls[0][0], "/api/runs/run-a/departments/engineering/guidance");
+  assert.deepEqual(JSON.parse(calls[0][1].body), { text: "  inspect the boundary  " });
+  assert.equal(web.state.deptDrafts["run-a/engineering"], undefined);
 });
 
 test("Context defaults to the latest work snapshot and renders its own source parts", () => {

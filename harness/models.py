@@ -36,6 +36,7 @@ PROPOSAL_KINDS = (
     "engineering_plan",
     "collaboration_request",
     "collaboration_response",
+    "department_guidance_response",
     "product_decision",
     "delivery_spec",
     "qa_review",
@@ -66,6 +67,9 @@ class EventType:
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
     DEPARTMENT_PROMPT_UPDATED = "department_prompt_updated"
+    DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
+    DEPARTMENT_GUIDANCE_APPLIED = "department_guidance_applied"
+    DEPARTMENT_GUIDANCE_RESPONDED = "department_guidance_responded"
     DEPARTMENT_ACTIVATED = "department_activated"
     DEPARTMENT_INPUT = "department_input"
     ACTIVATION_FINISHED = "activation_finished"
@@ -170,6 +174,23 @@ class DepartmentPrompt:
     text: str
     prompt_ref: ArtifactRef
     created_event_id: str
+
+
+@dataclass(frozen=True)
+class DepartmentGuidance:
+    id: str
+    run_id: str
+    department: str
+    version: int
+    text: str
+    guidance_ref: ArtifactRef
+    created_event_id: str
+    status: str
+    applied_activation_id: str | None = None
+    applied_context_event_id: str | None = None
+    response_event_id: str | None = None
+    response_status: str | None = None
+    response_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -391,6 +412,8 @@ class ContextManifest:
     input_token_estimate: int | None = None
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
+    guidance_ids: list[str] = field(default_factory=list)
+    guidance_only: bool = False
 
 
 @dataclass
@@ -480,6 +503,7 @@ class RunProjection:
     inputs: list[UserInput] = field(default_factory=list)
     department_prompts: dict[str, DepartmentPrompt] = field(default_factory=dict)
     prompt_versions: list[DepartmentPrompt] = field(default_factory=list)
+    department_guidance: list[DepartmentGuidance] = field(default_factory=list)
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None

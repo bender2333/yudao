@@ -41,7 +41,11 @@ class SubmissionWriter:
         request_id = None if projection.pending_request is None else projection.pending_request.id
 
         def append(event_type: str, payload: dict[str, Any], hashes: list[str] | None = None) -> int:
-            if event_type not in {EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED}:
+            if event_type not in {
+                EventType.COLLABORATION_REQUESTED,
+                EventType.COLLABORATION_RESPONDED,
+                EventType.DEPARTMENT_GUIDANCE_RESPONDED,
+            }:
                 payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
             event = Event(event_id="uncommitted", run_id=run_id, seq=projection.last_seq + len(prepared),
@@ -80,6 +84,8 @@ class SubmissionWriter:
             metadata["state_after"] = artifact["return_phase"]
             verify_public_tree(workspace_root, snapshot.tree.manifest)
             event = append(EventType.COLLABORATION_RESPONDED, artifact, [artifact["content_hash"]])
+        elif kind == "department_guidance_response":
+            event = append(EventType.DEPARTMENT_GUIDANCE_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":
             if artifact["code_tree_digest"] != snapshot.digest:
                 raise ValueError("Delivery does not match the validated workspace snapshot")

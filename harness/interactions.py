@@ -13,7 +13,7 @@ from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
 from .event_store import EventStore
 from .git_versions import GitVersionStore
 from .materials import append_intend
-from .models import ArtifactRef, Event, EventType, RunProjection, new_id
+from .models import ArtifactRef, DEPARTMENTS, Event, EventType, RunProjection, new_id
 
 
 class RunTerminalError(ValueError):
@@ -64,6 +64,32 @@ class InteractionWriter:
             projection.run_id, EventType.DEPARTMENT_PROMPT_UPDATED, role="user",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["prompt_ref"]["content_hash"]],
+        )
+
+    def receive_guidance(self, projection: RunProjection, department: str, text: str) -> Event:
+        if department not in DEPARTMENTS:
+            raise ValueError("unknown department")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("guidance must be a non-empty string")
+        previous = [item.version for item in projection.department_guidance if item.department == department]
+        version = max(previous, default=0) + 1
+        ref = self.artifacts.put(projection.run_id, "department_guidance", text, media_type="text/plain")
+        payload = {
+            "id": new_id("guidance"),
+            "department": department,
+            "version": version,
+            "text": text,
+            "guidance_ref": asdict(ref),
+            "status": "received",
+        }
+        return self.store.append(
+            projection.run_id,
+            EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+            role="user",
+            state_before=projection.phase,
+            state_after=projection.phase,
+            payload=payload,
+            artifact_hashes=[ref.content_hash],
         )
 
     def _input(self, run_id: str, text: str, *, version: int, kind: str,
