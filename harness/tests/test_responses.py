@@ -608,6 +608,7 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
 
     class HoldingStream(httpx.AsyncByteStream):
         async def __aiter__(self):
+            await asyncio.sleep(0)
             yield body
             await asyncio.Event().wait()
 
@@ -615,7 +616,6 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
             closed.set()
 
     async def delayed_response(_request):
-        await asyncio.sleep(0.15)
         return httpx.Response(
             200,
             headers={"Content-Type": "text/event-stream"},
@@ -624,7 +624,7 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
 
     _mock_transport(monkeypatch, delayed_response)
     config = ResponsesConfig(model="local-model", api_key=KEY,
-                             base_url="http://mock.test/v1", timeout_sec=0.6)
+                             base_url="http://mock.test/v1", timeout_sec=0.3)
     started = time.monotonic()
     with ResponsesExecutionScope() as scope:
         result = ResponsesAdapter(config, execution_scope=scope).complete(_request())
