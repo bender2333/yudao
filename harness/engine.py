@@ -14,6 +14,7 @@ from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
 MAX_MODEL_STEPS = 32
 MAX_PROVIDER_ATTEMPTS = 3
+RETRY_BUDGET_SEC = 1805.0
 RETRY_INITIAL_DELAY_SEC = 1.0
 RETRY_MAX_DELAY_SEC = 60.0
 
@@ -48,20 +49,27 @@ def run_department(
     attempt = 1
     root_step_id = 1
     retry_of_step_id = None
+    logical_request_started_at: float | None = None
     for step_id in range(1, MAX_MODEL_STEPS + 1):
         if stopped():
             return None
+        if retry_of_step_id is None:
+            logical_request_started_at = time.monotonic()
         request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
         if request is None or not begin_request(request):
             return None
         try:
             response = adapter.complete(request)
+            _validate_response(response)
         except ProviderError as exc:
             delay = _retry_delay(exc, attempt)
+            elapsed = (time.monotonic() - logical_request_started_at
+                       if logical_request_started_at is not None else 0.0)
             can_retry = (
                 exc.retryable
                 and attempt < MAX_PROVIDER_ATTEMPTS
                 and step_id < MAX_MODEL_STEPS
+                and elapsed + delay < RETRY_BUDGET_SEC
             )
             will_retry = can_retry and not stopped()
             record_attempt_failed(request, exc, will_retry)
@@ -91,21 +99,9 @@ def run_department(
             _skip_calls(response.output, step_id, record_skipped_tool,
                         "Not executed because this activation ended or its input changed during the model request.")
             return None
-        if response.finish_reason != "completed":
-            reason = {"aborted": "cancelled", "overflow": "context_overflow",
-                      "unavailable": "provider_unavailable"}.get(response.finish_reason, "provider_error")
-            raise ProviderError(response.error or f"model response {response.finish_reason}", reason=reason)
         if request.purpose == "compaction":
             finish_compaction(response)
             continue
-        call_ids = [item.get("call_id") for item in response.output if item.get("type") == "function_call"]
-        if any(not isinstance(identity, str) or not identity for identity in call_ids):
-            raise ProviderError("model tool call has no valid call_id")
-        if len(call_ids) != len(set(call_ids)):
-            raise ProviderError("model response contains duplicate tool call_id values")
-        output_ids = [item["id"] for item in response.output if item.get("id")]
-        if len(output_ids) != len(set(output_ids)):
-            raise ProviderError("model response contains duplicate output item id values")
         for index, item in enumerate(response.output):
             if item.get("type") != "function_call":
                 continue
@@ -153,6 +149,67 @@ def _retry_delay(error: ProviderError, attempt: int) -> float:
     if isinstance(retry_after, (int, float)) and retry_after > 0:
         return min(float(retry_after), RETRY_MAX_DELAY_SEC)
     return min(RETRY_INITIAL_DELAY_SEC * (2 ** (attempt - 1)), RETRY_MAX_DELAY_SEC)
+
+
+def _validate_response(response: ModelResponse) -> None:
+    """Reject malformed provider responses before they can enter effective history."""
+    if not isinstance(response, ModelResponse):
+        raise ProviderError("model adapter returned an invalid response", diagnostics={"error_type": "protocol"})
+    if response.finish_reason != "completed":
+        reason = {"aborted": "cancelled", "overflow": "context_overflow",
+                  "unavailable": "provider_unavailable"}.get(response.finish_reason, "provider_error")
+        raise ProviderError(
+            response.error or f"model response {response.finish_reason}",
+            reason=reason,
+            diagnostics={"error_type": "protocol", "finish_reason": response.finish_reason},
+        )
+    if not isinstance(response.output, list):
+        raise ProviderError("model response output must be an array",
+                            diagnostics={"error_type": "protocol"})
+    output_ids: list[str] = []
+    call_ids: list[str] = []
+    for item in response.output:
+        if not isinstance(item, dict):
+            raise ProviderError("model response output item must be an object",
+                                diagnostics={"error_type": "protocol"})
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            raise ProviderError("model output item has no identity",
+                                diagnostics={"error_type": "protocol"})
+        output_ids.append(item_id)
+        item_type = item.get("type")
+        if not isinstance(item_type, str) or not item_type:
+            raise ProviderError("model output item has no type",
+                                diagnostics={"error_type": "protocol"})
+        if item_type != "function_call":
+            continue
+        call_id = item.get("call_id")
+        name = item.get("name")
+        if not isinstance(call_id, str) or not call_id:
+            raise ProviderError("model tool call has no valid call_id",
+                                diagnostics={"error_type": "protocol"})
+        if not isinstance(name, str) or not name:
+            raise ProviderError("model tool call has no valid name",
+                                diagnostics={"error_type": "protocol"})
+        arguments = item.get("arguments")
+        if not isinstance(arguments, str):
+            raise ProviderError("model tool call arguments must be a JSON object",
+                                diagnostics={"error_type": "protocol"})
+        try:
+            parsed = json.loads(arguments)
+        except (TypeError, ValueError) as exc:
+            raise ProviderError("model tool call arguments must be valid JSON",
+                                diagnostics={"error_type": "protocol"}) from exc
+        if not isinstance(parsed, dict):
+            raise ProviderError("model tool call arguments must be a JSON object",
+                                diagnostics={"error_type": "protocol"})
+        call_ids.append(call_id)
+    if len(output_ids) != len(set(output_ids)):
+        raise ProviderError("model response contains duplicate output item id values",
+                            diagnostics={"error_type": "protocol"})
+    if len(call_ids) != len(set(call_ids)):
+        raise ProviderError("model response contains duplicate tool call_id values",
+                            diagnostics={"error_type": "protocol"})
 
 
 def _wait_for_retry(delay: float, stopped: Callable[[], bool]) -> bool:

@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from threading import Event
 
 import pytest
@@ -16,6 +15,22 @@ from harness.runtime import LoopSystem
 def _fast_retries(monkeypatch):
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
     monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+
+
+def _patch_engine_clock(monkeypatch, values):
+    class Clock:
+        def __init__(self, readings):
+            self._readings = iter(readings)
+
+        def monotonic(self):
+            return next(self._readings)
+
+        def sleep(self, _seconds):
+            return None
+
+    clock = Clock(values)
+    monkeypatch.setattr(engine, "time", clock)
+    return clock
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path, monkeypatch):
@@ -43,45 +58,29 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path, 
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_retry_reassembles_a_new_context_with_current_effective_input(tmp_path, monkeypatch):
+def test_retry_reuses_the_first_assembled_context(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
-    marker = "CURRENT_EFFECTIVE_INPUT"
-    current = {"changed": False}
-    adapter = FakeAdapter([ProviderError("temporary", retryable=True), None])
+    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem(tmp_path, adapter)
     run_id = system.create_run("echo")
-    original_project = system.orchestrator.project
+    assemble_calls = 0
+    original_assemble = system.orchestrator.assembler.assemble
 
-    def current_project(identity):
-        projection = original_project(identity)
-        if current["changed"]:
-            return replace(projection, task=f"{projection.task} {marker}")
-        return projection
+    def assemble(*args, **kwargs):
+        nonlocal assemble_calls
+        assemble_calls += 1
+        return original_assemble(*args, **kwargs)
 
-    original_schedule = system.orchestrator._record_retry_scheduled
-
-    def schedule(*args):
-        result = original_schedule(*args)
-        if result:
-            current["changed"] = True
-            monkeypatch.setattr(system.orchestrator, "project", current_project)
-        return result
-
-    monkeypatch.setattr(system.orchestrator, "_record_retry_scheduled", schedule)
-
-    def succeed(request):
-        assert marker in json_dumps(request.input_items)
-        current["changed"] = False
-        return product_spec()
-
-    adapter.script[1] = succeed
+    monkeypatch.setattr(system.orchestrator.assembler, "assemble", assemble)
     result = system.activate_once(run_id)
 
     assert result.phase == "ENGINEERING"
     first, second = adapter.invocations
-    assert first.context is not second.context
-    assert marker not in json_dumps(first.input_items)
-    assert marker in json_dumps(second.input_items)
+    assert assemble_calls == 2
+    assert first.context is second.context
+    assert first.input_items is second.input_items
+    assert first.tools is second.tools
+    assert first.input_items == second.input_items and first.tools == second.tools
     assert second.step_id == 2 and second.retry_of_step_id == 1
 
 
@@ -101,6 +100,88 @@ def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path, monkeypa
     scheduled = [item for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED]
     assert len(failed) == 3 and len(scheduled) == 2
     assert failed[-1].payload["will_retry"] is False
+
+
+def test_provider_timeout_retries_when_single_request_and_logical_budgets_allow(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_BUDGET_SEC", 0.02)
+    _patch_engine_clock(monkeypatch, [0.0, 0.0])
+    waited = []
+    monkeypatch.setattr(engine, "_wait_for_retry", lambda delay, _stopped: (waited.append(delay) or True))
+    adapter = FakeAdapter([
+        ProviderError("single request timed out", reason="provider_timeout", retryable=True),
+        product_spec(),
+    ])
+    system = LoopSystem(tmp_path, adapter)
+    result = system.activate_once(system.create_run("echo"))
+
+    assert result.phase == "ENGINEERING"
+    assert len(adapter.invocations) == 2
+    assert waited == [0.01]
+    failed = next(item for item in system.store.list_events(result.run_id)
+                  if item.type == EventType.MODEL_ATTEMPT_FAILED)
+    assert failed.payload["reason"] == "provider_timeout"
+    assert failed.payload["will_retry"] is True
+
+
+def test_retry_budget_resets_for_each_logical_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_BUDGET_SEC", 0.02)
+    # A large elapsed time before the second logical request must not consume its
+    # budget; only the elapsed time since that request started is relevant.
+    _patch_engine_clock(monkeypatch, [0.0, 0.0, 100.0, 100.0])
+    waited = []
+    monkeypatch.setattr(engine, "_wait_for_retry", lambda delay, _stopped: (waited.append(delay) or True))
+    read_call = {
+        "id": "read-step",
+        "type": "function_call",
+        "call_id": "read-step",
+        "name": "read_file",
+        "arguments": json_dumps({"path": "proof.txt"}),
+    }
+    adapter = FakeAdapter([
+        ProviderError("first timeout", reason="provider_timeout", retryable=True),
+        ModelResponse(output=[read_call]),
+        ProviderError("second timeout", reason="provider_timeout", retryable=True),
+        product_spec(),
+    ])
+    system = LoopSystem(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.workspace(run_id).write_file("proof.txt", "evidence")
+
+    result = system.activate_once(run_id)
+
+    assert result.phase == "ENGINEERING"
+    assert len(adapter.invocations) == 4
+    assert [request.attempt for request in adapter.invocations] == [1, 2, 1, 2]
+    assert [request.step_id for request in adapter.invocations] == [1, 2, 3, 4]
+    assert waited == [0.01, 0.01]
+    events = system.store.list_events(run_id)
+    assert len([item for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED]) == 2
+
+
+def test_retry_budget_blocks_delay_that_would_cross_logical_request_budget(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.02)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    monkeypatch.setattr(engine, "RETRY_BUDGET_SEC", 0.1)
+    _patch_engine_clock(monkeypatch, [0.0, 0.09])
+    waited = []
+    monkeypatch.setattr(engine, "_wait_for_retry", lambda delay, _stopped: (waited.append(delay) or True))
+    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
+    system = LoopSystem(tmp_path, adapter)
+    run_id = system.create_run("echo")
+
+    result = system.activate_once(run_id)
+
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert len(adapter.invocations) == 1
+    assert waited == []
+    events = system.store.list_events(run_id)
+    assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
+    failed = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
+    assert failed.payload["will_retry"] is False
 
 
 def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path, monkeypatch):
@@ -202,7 +283,7 @@ def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path, monk
     assert result.token_used == 7
 
 
-def test_malformed_tool_arguments_are_returned_as_tool_failure(tmp_path, monkeypatch):
+def test_malformed_tool_arguments_are_nonretryable_protocol_failure(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
     malformed = ModelResponse(output=[{
         "id": "bad-call", "call_id": "bad-call", "type": "function_call",
@@ -214,15 +295,51 @@ def test_malformed_tool_arguments_are_returned_as_tool_failure(tmp_path, monkeyp
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
-    assert len(adapter.invocations) == 2
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert len(adapter.invocations) == 1
     events = system.store.list_events(run_id)
-    tool = next(item for item in events if item.type == EventType.TOOL_CALLED and item.payload.get("id") == "bad-call")
-    assert tool.payload["ok"] is False
-    assert "invalid tool arguments" in tool.payload["error"]
-    assert any(item.type == EventType.MODEL_MESSAGE and item.payload.get("response_id") == "bad-call" for item in events)
-    assert "invalid tool arguments" in json_dumps(adapter.invocations[1].input_items)
+    failed = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
+    assert failed.payload["retryable"] is False
+    assert failed.payload["will_retry"] is False
+    assert not any(item.type == EventType.MODEL_MESSAGE and item.payload.get("response_id") == "bad-call" for item in events)
     assert not any(item.type == EventType.TOOL_STARTED and item.payload.get("id") == "bad-call" for item in events)
+
+
+@pytest.mark.parametrize("response", [
+    ModelResponse(finish_reason="failed", error="terminal failure"),
+    ModelResponse(output=[{"type": "message"}]),
+    ModelResponse(output=[{"id": "same", "type": "message"}, {"id": "same", "type": "reasoning"}]),
+    ModelResponse(output=[{
+        "id": "bad-call", "type": "function_call", "call_id": "", "name": "read_file",
+        "arguments": "{}",
+    }]),
+    ModelResponse(output=[{
+        "id": "bad-call", "type": "function_call", "call_id": "bad-call", "name": "",
+        "arguments": "{}",
+    }]),
+    ModelResponse(output=[{
+        "id": "bad-call", "type": "function_call", "call_id": "bad-call", "name": "read_file",
+        "arguments": "[]",
+    }]),
+])
+def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_path, monkeypatch, response):
+    _fast_retries(monkeypatch)
+    adapter = FakeAdapter([response, product_spec()])
+    system = LoopSystem(tmp_path, adapter)
+    recorded = []
+    monkeypatch.setattr(system.orchestrator, "_reconcile_response", lambda *_args: recorded.append(True))
+    run_id = system.create_run("echo")
+
+    result = system.activate_once(run_id)
+
+    assert result.phase == "FAILED" and result.stop_reason in {"provider_error", "cancelled"}
+    assert len(adapter.invocations) == 1
+    assert recorded == []
+    events = system.store.list_events(run_id)
+    failure = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
+    assert failure.payload["retryable"] is False and failure.payload["will_retry"] is False
+    assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
+    assert not any(item.type == EventType.TOOL_STARTED for item in events)
 
 
 def test_compaction_uses_the_same_retry_path(tmp_path, monkeypatch):
