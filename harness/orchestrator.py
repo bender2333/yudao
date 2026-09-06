@@ -11,7 +11,7 @@ from typing import Any
 
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
 from .artifacts import ArtifactStore
-from .context import AssembledContext, ContextAssembler, department_work_text
+from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .collaboration import request_basis, request_still_applicable, resume_phase, tool_error
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
@@ -52,7 +52,6 @@ class _Activation:
     input_version: int
     prompt: DepartmentPrompt
     request: ModelRequest | None = None
-    retry_context: AssembledContext | None = None
     tokens_charged: int = 0
     usage: Usage = field(default_factory=lambda: Usage(reported=False))
     has_usage: bool = False
@@ -457,67 +456,61 @@ class Orchestrator:
                     or self._request_id(current) != activation.request_id
                     or current.input_version != activation.input_version):
                 return None
-            if retry_of_step_id is not None:
-                assembled = activation.retry_context
-                if assembled is None:
-                    raise ProviderError("retry context is unavailable")
-            else:
-                pinned = self.assembler.assemble(
-                    current, department=identity.department, session_id=identity.session_id,
-                    activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
+            pinned = self.assembler.assemble(
+                current, department=identity.department, session_id=identity.session_id,
+                activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
+            )
+            if step_id == 1:
+                content = department_work_text(pinned)
+                input_item = {"role": "user", "content": content}
+                received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
+                self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
+                                  parent_event_id=activation.parent_event_id, state_before=current.phase,
+                                  state_after=current.phase, session_id=identity.session_id,
+                                  artifact_hashes=[received_ref.content_hash],
+                                  payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
+                                           **activation.versions(),
+                                           "effective_contract_hash": activation.effective_contract_hash,
+                                           "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
+            records = self._department_history_records(identity.run_id, identity.department)
+            checkpoint_event = next((item for item in reversed(current.compactions)
+                                     if item["department"] == identity.department
+                                     and item["effective_contract_hash"] == activation.effective_contract_hash
+                                     and item["engineering_plan_hash"] == activation.engineering_plan_hash
+                                     and item["input_version"] == activation.input_version
+                                     and item["prompt_version"] == activation.prompt.version
+                                     and item["prompt_hash"] == activation.prompt.prompt_ref.content_hash), None)
+            checkpoint = None
+            checkpoint_id = None
+            try:
+                if checkpoint_event is not None:
+                    if checkpoint_event["run_id"] != identity.run_id:
+                        raise CompactionError("Compaction checkpoint belongs to a different run")
+                    checkpoint = CompactionCheckpoint(**checkpoint_event["checkpoint"])
+                    saved_summary = self.artifacts.get_for_run(identity.run_id, ArtifactRef(**checkpoint_event["summary_ref"])).decode("utf-8")
+                    if saved_summary != checkpoint.summary:
+                        raise CompactionError("Compaction summary does not match its original artifact")
+                    checkpoint_id = checkpoint_event["source_event_id"]
+                activation.compaction_plan = plan_compaction(
+                    records, checkpoint, current.context_window, pinned.input_items, pinned.tools,
                 )
-                if step_id == 1:
-                    content = department_work_text(pinned)
-                    input_item = {"role": "user", "content": content}
-                    received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
-                    self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
-                                      parent_event_id=activation.parent_event_id, state_before=current.phase,
-                                      state_after=current.phase, session_id=identity.session_id,
-                                      artifact_hashes=[received_ref.content_hash],
-                                      payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
-                                               **activation.versions(),
-                                               "effective_contract_hash": activation.effective_contract_hash,
-                                               "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
-                records = self._department_history_records(identity.run_id, identity.department)
-                checkpoint_event = next((item for item in reversed(current.compactions)
-                                         if item["department"] == identity.department
-                                         and item["effective_contract_hash"] == activation.effective_contract_hash
-                                         and item["engineering_plan_hash"] == activation.engineering_plan_hash
-                                         and item["input_version"] == activation.input_version
-                                         and item["prompt_version"] == activation.prompt.version
-                                         and item["prompt_hash"] == activation.prompt.prompt_ref.content_hash), None)
-                checkpoint = None
-                checkpoint_id = None
-                try:
-                    if checkpoint_event is not None:
-                        if checkpoint_event["run_id"] != identity.run_id:
-                            raise CompactionError("Compaction checkpoint belongs to a different run")
-                        checkpoint = CompactionCheckpoint(**checkpoint_event["checkpoint"])
-                        saved_summary = self.artifacts.get_for_run(identity.run_id, ArtifactRef(**checkpoint_event["summary_ref"])).decode("utf-8")
-                        if saved_summary != checkpoint.summary:
-                            raise CompactionError("Compaction summary does not match its original artifact")
-                        checkpoint_id = checkpoint_event["source_event_id"]
-                    activation.compaction_plan = plan_compaction(
-                        records, checkpoint, current.context_window, pinned.input_items, pinned.tools,
+                if activation.compaction_plan is not None:
+                    plan = activation.compaction_plan
+                    assembled = self.assembler.assemble_compaction(
+                        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
+                        max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
                     )
-                    if activation.compaction_plan is not None:
-                        plan = activation.compaction_plan
-                        assembled = self.assembler.assemble_compaction(
-                            pinned, input_items=plan.input_items, source_refs=plan.source_refs,
-                            max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
-                        )
-                    else:
-                        assembled = self.assembler.assemble(
-                            current, department=identity.department, session_id=identity.session_id,
-                            activation_id=identity.activation_id, step_id=step_id,
-                            prompt=activation.prompt,
-                            history=visible_history(records, checkpoint),
-                            compaction_event_id=checkpoint_id,
-                        )
-                except (CompactionError, ValueError, FileNotFoundError) as exc:
-                    reason = "context_overflow" if pinned.manifest.token_estimate >= current.context_window * 85 // 100 else "compaction_failed"
-                    raise ProviderError(str(exc), reason=reason) from exc
-                activation.retry_context = assembled
+                else:
+                    assembled = self.assembler.assemble(
+                        current, department=identity.department, session_id=identity.session_id,
+                        activation_id=identity.activation_id, step_id=step_id,
+                        prompt=activation.prompt,
+                        history=visible_history(records, checkpoint),
+                        compaction_event_id=checkpoint_id,
+                    )
+            except (CompactionError, ValueError, FileNotFoundError) as exc:
+                reason = "context_overflow" if pinned.manifest.token_estimate >= current.context_window * 85 // 100 else "compaction_failed"
+                raise ProviderError(str(exc), reason=reason) from exc
             request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
                                    step_id, assembled, assembled.tools, identity.abort_flag,
                                    purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,

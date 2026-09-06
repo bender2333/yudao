@@ -87,10 +87,12 @@ def _stream(output=None, *, status="completed", usage=RAW_USAGE, response_id="re
     return b"".join(frames)
 
 
-def _send(handler, body, *, status=200, content_type="text/event-stream"):
+def _send(handler, body, *, status=200, content_type="text/event-stream", headers=None):
     handler.send_response(status)
     handler.send_header("Content-Type", content_type)
     handler.send_header("Content-Length", str(len(body)))
+    for name, value in (headers or {}).items():
+        handler.send_header(name, value)
     handler.end_headers()
     handler.wfile.write(body)
     handler.wfile.flush()
@@ -281,6 +283,19 @@ def test_http_errors_are_explicit_sanitized_and_never_retried(status, code, reas
         assert secret not in str(caught.value) and KEY not in str(caught.value)
         assert str(status) in str(caught.value)
         assert len(captures) == 1
+
+
+@pytest.mark.parametrize("retry_after", ["61", "120"])
+def test_http_retry_after_preserves_long_server_delay_for_engine(retry_after):
+    def failure(handler, _body):
+        _send(handler, b'{"error":{"code":"rate_limit_exceeded"}}', status=429,
+              content_type="application/json", headers={"Retry-After": retry_after})
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    assert caught.value.retryable is True
+    assert caught.value.diagnostics["retry_after_sec"] == float(retry_after)
 
 
 def test_http_429_insufficient_quota_is_permanent_and_keeps_only_safe_diagnostics():

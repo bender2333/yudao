@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,7 +15,6 @@ from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
 MAX_MODEL_STEPS = 32
 MAX_PROVIDER_ATTEMPTS = 3
-RETRY_BUDGET_SEC = 1805.0
 RETRY_INITIAL_DELAY_SEC = 1.0
 RETRY_MAX_DELAY_SEC = 60.0
 
@@ -49,12 +49,9 @@ def run_department(
     attempt = 1
     root_step_id = 1
     retry_of_step_id = None
-    logical_request_started_at: float | None = None
     for step_id in range(1, MAX_MODEL_STEPS + 1):
         if stopped():
             return None
-        if retry_of_step_id is None:
-            logical_request_started_at = time.monotonic()
         request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
         if request is None or not begin_request(request):
             return None
@@ -62,29 +59,27 @@ def run_department(
             response = adapter.complete(request)
             _validate_response(response)
         except ProviderError as exc:
-            delay = _retry_delay(exc, attempt)
-            elapsed = (time.monotonic() - logical_request_started_at
-                       if logical_request_started_at is not None else 0.0)
+            retry_error = _retry_after_error(exc)
+            delay = _retry_delay(retry_error, attempt)
             can_retry = (
-                exc.retryable
+                retry_error.retryable
                 and attempt < MAX_PROVIDER_ATTEMPTS
                 and step_id < MAX_MODEL_STEPS
-                and elapsed + delay < RETRY_BUDGET_SEC
             )
             will_retry = can_retry and not stopped()
-            record_attempt_failed(request, exc, will_retry)
+            record_attempt_failed(request, retry_error, will_retry)
             if stopped():
                 return None
             if not will_retry:
-                if exc.retryable and step_id >= MAX_MODEL_STEPS:
+                if retry_error.retryable and step_id >= MAX_MODEL_STEPS:
                     raise ProviderError(
                         "department reached the model step limit during provider retries",
                         reason="model_steps_exhausted",
-                    ) from exc
-                diagnostics = dict(exc.diagnostics or {})
+                    ) from retry_error
+                diagnostics = dict(retry_error.diagnostics or {})
                 diagnostics.update(attempts=attempt, max_attempts=MAX_PROVIDER_ATTEMPTS)
-                raise ProviderError(str(exc), reason=exc.reason, diagnostics=diagnostics) from exc
-            if not record_retry_scheduled(request, exc, delay, step_id + 1):
+                raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
+            if not record_retry_scheduled(request, retry_error, delay, step_id + 1):
                 return None
             if not _wait_for_retry(delay, stopped):
                 return None
@@ -111,7 +106,7 @@ def run_department(
                 return None
             identity = str(item.get("call_id") or "")
             name = str(item.get("name") or "")
-            raw_args = item.get("arguments", "{}")
+            raw_args = item.get("arguments")
             try:
                 args = json.loads(raw_args)
                 if not isinstance(args, dict):
@@ -145,10 +140,33 @@ def run_department(
 
 
 def _retry_delay(error: ProviderError, attempt: int) -> float:
-    retry_after = (error.diagnostics or {}).get("retry_after_sec")
-    if isinstance(retry_after, (int, float)) and retry_after > 0:
-        return min(float(retry_after), RETRY_MAX_DELAY_SEC)
+    retry_after = _retry_after_seconds(error)
+    if retry_after is not None:
+        return retry_after
     return min(RETRY_INITIAL_DELAY_SEC * (2 ** (attempt - 1)), RETRY_MAX_DELAY_SEC)
+
+
+def _retry_after_seconds(error: ProviderError) -> float | None:
+    value = (error.diagnostics or {}).get("retry_after_sec")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    value = float(value)
+    return value if value > 0 and math.isfinite(value) else None
+
+
+def _retry_after_error(error: ProviderError) -> ProviderError:
+    retry_after = _retry_after_seconds(error)
+    if not error.retryable or retry_after is None or retry_after <= RETRY_MAX_DELAY_SEC:
+        return error
+    diagnostics = dict(error.diagnostics or {})
+    diagnostics["retry_after_sec"] = retry_after
+    diagnostics["retry_after_limit_sec"] = RETRY_MAX_DELAY_SEC
+    diagnostics["underlying_reason"] = error.reason
+    return ProviderError(
+        f"Provider requested Retry-After of {retry_after:g} seconds, exceeding the {RETRY_MAX_DELAY_SEC:g}-second limit",
+        reason="retry_after_too_long",
+        diagnostics=diagnostics,
+    )
 
 
 def _validate_response(response: ModelResponse) -> None:
@@ -190,18 +208,6 @@ def _validate_response(response: ModelResponse) -> None:
                                 diagnostics={"error_type": "protocol"})
         if not isinstance(name, str) or not name:
             raise ProviderError("model tool call has no valid name",
-                                diagnostics={"error_type": "protocol"})
-        arguments = item.get("arguments")
-        if not isinstance(arguments, str):
-            raise ProviderError("model tool call arguments must be a JSON object",
-                                diagnostics={"error_type": "protocol"})
-        try:
-            parsed = json.loads(arguments)
-        except (TypeError, ValueError) as exc:
-            raise ProviderError("model tool call arguments must be valid JSON",
-                                diagnostics={"error_type": "protocol"}) from exc
-        if not isinstance(parsed, dict):
-            raise ProviderError("model tool call arguments must be a JSON object",
                                 diagnostics={"error_type": "protocol"})
         call_ids.append(call_id)
     if len(output_ids) != len(set(output_ids)):

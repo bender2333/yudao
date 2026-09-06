@@ -352,7 +352,7 @@ def _retry_after(headers: Any) -> float | None:
             delay = float(raw) / 1000.0
         except (TypeError, ValueError):
             delay = None
-        if delay is not None and 0 < delay <= 60:
+        if delay is not None and 0 < delay and math.isfinite(delay):
             return delay
     raw = headers.get("retry-after") if hasattr(headers, "get") else None
     if not raw:
@@ -365,7 +365,7 @@ def _retry_after(headers: Any) -> float | None:
             delay = date.timestamp() - time.time()
         except (TypeError, ValueError, OverflowError, OSError):
             return None
-    return delay if 0 < delay <= 60 else None
+    return delay if 0 < delay and math.isfinite(delay) else None
 
 
 def _usage(raw: dict[str, Any] | None, started: float) -> Usage:
