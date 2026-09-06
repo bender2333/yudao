@@ -7,6 +7,7 @@ import email.utils
 import json
 import math
 import time
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
@@ -24,6 +25,9 @@ from openai import (
 
 from ..models import Usage
 from .base import Availability, ModelObservation, ModelRequest, ModelResponse, ProviderError
+
+
+_STREAM_DRAIN_TIMEOUT_SEC = 0.1
 
 
 @dataclass(frozen=True)
@@ -65,12 +69,116 @@ class _TransportTrace:
         }
 
 
+@dataclass
+class _RequestContext:
+    request: ModelRequest
+    config: ResponsesConfig
+    trace: _TransportTrace
+    observation_errors: list[BaseException]
+
+
+class _CompletionDeadline:
+    def __init__(self) -> None:
+        self._timeout: Any | None = None
+
+    def bind(self, timeout: Any) -> None:
+        self._timeout = timeout
+
+    def stop(self) -> None:
+        if self._timeout is not None:
+            self._timeout.reschedule(None)
+
+
+class ResponsesExecutionScope:
+    """Own one synchronous run's event loop and reusable provider clients."""
+
+    def __init__(self) -> None:
+        self._runner = asyncio.Runner()
+        self._clients: dict[tuple[str, str, float, str], AsyncOpenAI] = {}
+        self._request_context: ContextVar[_RequestContext | None] = ContextVar(
+            "yudao_responses_request_context", default=None,
+        )
+        self._closed = False
+
+    def __enter__(self) -> "ResponsesExecutionScope":
+        return self
+
+    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
+        self.close()
+
+    def run(self, awaitable: Any) -> Any:
+        if self._closed:
+            raise RuntimeError("Responses execution scope is closed")
+        return self._runner.run(awaitable)
+
+    async def client_for(self, config: ResponsesConfig) -> AsyncOpenAI:
+        if self._closed:
+            raise RuntimeError("Responses execution scope is closed")
+        # The credential is an in-memory connection identity only; it is never logged or persisted.
+        key = (config.provider, config.base_url, float(config.timeout_sec), config.api_key)
+        client = self._clients.get(key)
+        if client is None:
+            http_client = DefaultAsyncHttpxClient(
+                timeout=config.timeout_sec,
+                event_hooks={"request": [self._observe_request]},
+            )
+            client = AsyncOpenAI(
+                api_key=config.api_key,
+                base_url=config.base_url,
+                timeout=config.timeout_sec,
+                max_retries=0,
+                http_client=http_client,
+            )
+            self._clients[key] = client
+        return client
+
+    def bind(self, context: _RequestContext) -> Any:
+        return self._request_context.set(context)
+
+    def reset(self, token: Any) -> None:
+        self._request_context.reset(token)
+
+    async def _observe_request(self, http_request: httpx.Request) -> None:
+        context = self._request_context.get()
+        if context is None:
+            raise ProviderError("Provider request context is unavailable", reason="provider_protocol")
+        http_request.extensions["trace"] = context.trace
+        try:
+            body = _request_body(http_request)
+            context.request.observe(ModelObservation(
+                id=_request_observation_id(context.request),
+                kind="request",
+                payload=body,
+                provider=context.config.provider,
+                model=context.config.model,
+            ))
+        except BaseException as exc:
+            context.observation_errors.append(exc)
+            raise
+
+    async def _close_clients(self) -> None:
+        clients = tuple(self._clients.values())
+        self._clients.clear()
+        if clients:
+            await asyncio.gather(*(client.close() for client in clients), return_exceptions=False)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        try:
+            self._runner.run(self._close_clients())
+        finally:
+            self._closed = True
+            self._runner.close()
+
+
 class ResponsesAdapter:
     name = "responses"
 
-    def __init__(self, config: ResponsesConfig) -> None:
+    def __init__(self, config: ResponsesConfig, *, execution_scope: ResponsesExecutionScope | None = None) -> None:
         self.config = config
         self.model = self.config.model or "unconfigured"
+        self.execution_scope = execution_scope
         self._lock = Lock()
         self._active: tuple[str, asyncio.AbstractEventLoop, asyncio.Task] | None = None
 
@@ -108,7 +216,9 @@ class ResponsesAdapter:
         if request.abort_flag.is_set():
             raise ProviderError("Model request cancelled", reason="cancelled")
         try:
-            return asyncio.run(self._complete(request))
+            if self.execution_scope is None:
+                return asyncio.run(self._complete(request))
+            return self.execution_scope.run(self._complete(request))
         except ProviderError:
             raise
         except (TimeoutError, APITimeoutError) as exc:
@@ -148,17 +258,22 @@ class ResponsesAdapter:
     async def _complete(self, request: ModelRequest) -> ModelResponse:
         loop = asyncio.get_running_loop()
         trace = _TransportTrace()
+        deadline = _CompletionDeadline()
         with self._lock:
             if self._active is not None:
                 raise ProviderError("Responses adapter already has an active model request")
-            task = asyncio.create_task(self._stream_once(request, trace))
+            task = asyncio.create_task(self._stream_once(request, trace, deadline))
             self._active = (request.session_id, loop, task)
         watcher = asyncio.create_task(self._watch_abort(request, task))
         try:
-            async with asyncio.timeout(self.config.timeout_sec):
+            async with asyncio.timeout(self.config.timeout_sec) as timeout:
+                deadline.bind(timeout)
                 return await task
         except asyncio.CancelledError as exc:
             raise ProviderError("Model request cancelled", reason="cancelled") from exc
+        except TimeoutError as exc:
+            _attach_transport_trace(exc, trace.snapshot())
+            raise
         except Exception as exc:
             _attach_transport_trace(exc, trace.snapshot())
             raise
@@ -176,10 +291,26 @@ class ResponsesAdapter:
                 return
             await asyncio.sleep(0.02)
 
-    async def _stream_once(self, request: ModelRequest, trace: _TransportTrace) -> ModelResponse:
+    async def _stream_once(
+        self,
+        request: ModelRequest,
+        trace: _TransportTrace,
+        deadline: _CompletionDeadline,
+    ) -> ModelResponse:
         started = time.monotonic()
         seen_items: set[str] = set()
         observation_errors: list[BaseException] = []
+        if self.execution_scope is not None:
+            context = _RequestContext(request, self.config, trace, observation_errors)
+            token = self.execution_scope.bind(context)
+            try:
+                client = await self.execution_scope.client_for(self.config)
+                return await self._stream_with_client(
+                    request, trace, observation_errors, client, started, deadline,
+                )
+            finally:
+                self.execution_scope.reset(token)
+
         async def observe_request(http_request: httpx.Request) -> None:
             http_request.extensions["trace"] = trace
             try:
@@ -206,77 +337,98 @@ class ResponsesAdapter:
             max_retries=0,
             http_client=http_client,
         ) as client:
-            output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
-            try:
-                stream = await client.responses.create(
-                    model=self.config.model,
-                    input=request.input_items,
-                    tools=request.tools,
-                    store=False,
-                    stream=True,
-                    **output_limit,
-                )
-            except Exception as exc:
-                if observation_errors:
-                    raise observation_errors[0]
-                if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
-                    raise _transport_provider_error(exc, trace=trace) from exc
-                if isinstance(exc, httpx.HTTPError):
-                    raise _nonretryable_http_error() from exc
-                raise
+            return await self._stream_with_client(
+                request, trace, observation_errors, client, started, deadline,
+            )
+
+    async def _stream_with_client(
+        self,
+        request: ModelRequest,
+        trace: _TransportTrace,
+        observation_errors: list[BaseException],
+        client: AsyncOpenAI,
+        started: float,
+        deadline: _CompletionDeadline,
+    ) -> ModelResponse:
+        output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
+        try:
+            stream = await client.responses.create(
+                model=self.config.model,
+                input=request.input_items,
+                tools=request.tools,
+                store=False,
+                stream=True,
+                **output_limit,
+            )
+        except Exception as exc:
             if observation_errors:
                 raise observation_errors[0]
-            async with stream:
-                async for event in _provider_events(stream, trace):
-                    if request.abort_flag.is_set():
-                        raise ProviderError("Model request cancelled", reason="cancelled")
-                    if event.type == "response.output_item.done":
-                        self._observe_item(request, event.item.model_dump(mode="json", exclude_unset=True), seen_items)
-                    elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
-                        response = event.response
-                        actual_model = _actual_model(response)
-                        output = [item.model_dump(mode="json", exclude_unset=True) for item in (response.output or [])]
-                        for item in output:
-                            self._observe_item(request, item, seen_items, actual_model=actual_model)
-                        raw_usage = response.usage.model_dump(mode="json", exclude_unset=True) if response.usage else None
-                        usage = _usage(raw_usage, started)
-                        request.observe(ModelObservation(
-                            id=response.id, kind="usage",
-                            payload={"response_id": response.id, "usage": raw_usage},
-                            usage=usage, provider=self.config.provider, model=response.model,
-                        ))
-                        if event.type != "response.completed" or response.status != "completed":
-                            code = getattr(response.error, "code", None) if response.error else None
-                            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
-                            detail = "incomplete" if event.type == "response.incomplete" else "failed"
-                            incomplete_reason = getattr(response.incomplete_details, "reason", None)
-                            retryable = (
-                                reason != "context_overflow"
-                                and (
-                                    _retryable_code(code)
-                                    or _retryable_code(incomplete_reason)
-                                )
+            if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
+                raise _transport_provider_error(exc, trace=trace) from exc
+            if isinstance(exc, httpx.HTTPError):
+                raise _nonretryable_http_error() from exc
+            raise
+        if observation_errors:
+            raise observation_errors[0]
+        seen_items: set[str] = set()
+        completed_response: ModelResponse | None = None
+        async with stream:
+            event_source = _provider_events(stream, trace)
+            async for event in event_source:
+                if request.abort_flag.is_set():
+                    raise ProviderError("Model request cancelled", reason="cancelled")
+                if event.type == "response.output_item.done":
+                    self._observe_item(request, event.item.model_dump(mode="json", exclude_unset=True), seen_items)
+                elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
+                    response = event.response
+                    actual_model = _actual_model(response)
+                    output = [item.model_dump(mode="json", exclude_unset=True) for item in (response.output or [])]
+                    for item in output:
+                        self._observe_item(request, item, seen_items, actual_model=actual_model)
+                    raw_usage = response.usage.model_dump(mode="json", exclude_unset=True) if response.usage else None
+                    usage = _usage(raw_usage, started)
+                    request.observe(ModelObservation(
+                        id=response.id, kind="usage",
+                        payload={"response_id": response.id, "usage": raw_usage},
+                        usage=usage, provider=self.config.provider, model=response.model,
+                    ))
+                    if event.type != "response.completed" or response.status != "completed":
+                        code = getattr(response.error, "code", None) if response.error else None
+                        reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+                        detail = "incomplete" if event.type == "response.incomplete" else "failed"
+                        incomplete_reason = getattr(response.incomplete_details, "reason", None)
+                        retryable = (
+                            reason != "context_overflow"
+                            and (
+                                _retryable_code(code)
+                                or _retryable_code(incomplete_reason)
                             )
-                            diagnostics = _diagnostic_code(code, "terminal_response")
-                            if "error_code" not in diagnostics:
-                                diagnostics = _diagnostic_code(incomplete_reason, "terminal_response")
-                            raise ProviderError(
-                                f"Model response {detail}", reason=reason, retryable=retryable,
-                                diagnostics=diagnostics,
-                            )
-                        if response.output is None:
-                            raise ProviderError("Completed model response has no output array")
-                        return ModelResponse(
-                            output=output, usage=usage, provider=self.config.provider,
-                            model=actual_model or "", response_id=response.id,
                         )
-                    elif event.type == "error":
-                        reason = "context_overflow" if _is_context_overflow(event.code) else "provider_error"
+                        diagnostics = _diagnostic_code(code, "terminal_response")
+                        if "error_code" not in diagnostics:
+                            diagnostics = _diagnostic_code(incomplete_reason, "terminal_response")
                         raise ProviderError(
-                            "Model provider reported a stream error", reason=reason,
-                            retryable=reason != "context_overflow" and _retryable_code(event.code),
-                            diagnostics=_diagnostic_code(event.code, "stream_error"),
+                            f"Model response {detail}", reason=reason, retryable=retryable,
+                            diagnostics=diagnostics,
                         )
+                    if response.output is None:
+                        raise ProviderError("Completed model response has no output array")
+                    completed_response = ModelResponse(
+                        output=output, usage=usage, provider=self.config.provider,
+                        model=actual_model or "", response_id=response.id,
+                    )
+                    deadline.stop()
+                    break
+                elif event.type == "error":
+                    reason = "context_overflow" if _is_context_overflow(event.code) else "provider_error"
+                    raise ProviderError(
+                        "Model provider reported a stream error", reason=reason,
+                        retryable=reason != "context_overflow" and _retryable_code(event.code),
+                        diagnostics=_diagnostic_code(event.code, "stream_error"),
+                    )
+            if completed_response is not None:
+                await _drain_completed_stream(event_source, request)
+                return completed_response
         raise ProviderError(
             "Model response stream ended before a terminal response",
             retryable=True,
@@ -475,6 +627,22 @@ async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
         except httpx.HTTPError as exc:
             raise _nonretryable_http_error() from exc
         yield event
+
+
+async def _drain_completed_stream(event_source: Any, request: ModelRequest) -> None:
+    """Give a completed SDK stream a short chance to reach EOF for reuse."""
+
+    try:
+        async with asyncio.timeout(_STREAM_DRAIN_TIMEOUT_SEC):
+            async for _event in event_source:
+                pass
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        if request.abort_flag.is_set():
+            raise ProviderError("Model request cancelled", reason="cancelled")
+    if request.abort_flag.is_set():
+        raise ProviderError("Model request cancelled", reason="cancelled")
 
 
 def _retry_after(headers: Any) -> float | None:

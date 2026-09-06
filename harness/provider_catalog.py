@@ -158,20 +158,28 @@ class ResolvedProviderTarget:
             "credential_version": self.credential_version,
         }
 
-    def create_adapter(self, *, fake_script: Sequence[Any] | None = None):
+    def create_adapter(
+        self,
+        *,
+        fake_script: Sequence[Any] | None = None,
+        execution_scope: Any | None = None,
+    ):
         """为一次激活创建独立适配器实例，不共享活动请求状态。"""
 
         if self.protocol == "responses":
             from .adapters.responses import ResponsesAdapter
             from .adapters.responses import ResponsesConfig
 
-            return ResponsesAdapter(ResponsesConfig(
-                model=self.model,
-                api_key=self.api_key,
-                provider=self.provider_id,
-                base_url=self.base_url,
-                timeout_sec=self.timeout_sec,
-            ))
+            return ResponsesAdapter(
+                ResponsesConfig(
+                    model=self.model,
+                    api_key=self.api_key,
+                    provider=self.provider_id,
+                    base_url=self.base_url,
+                    timeout_sec=self.timeout_sec,
+                ),
+                execution_scope=execution_scope,
+            )
         if self.protocol == "fake":
             from .adapters.fake import FakeAdapter
 

@@ -107,6 +107,8 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
     errors: list[BaseException] = []
 
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def log_message(self, *_args: Any) -> None:
             return
 
@@ -117,6 +119,7 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
                     "body": body,
                     "path": self.path,
                     "authorization": self.headers.get("Authorization"),
+                    "client_port": self.client_address[1],
                 })
                 reply = responder(body, len(captures))
             except BaseException as exc:
@@ -125,6 +128,7 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
             self.send_response(reply.status)
             self.send_header("Content-Type", reply.content_type)
             self.send_header("Content-Length", str(len(reply.body)))
+            self.send_header("Connection", "keep-alive")
             for name, value in (reply.headers or {}).items():
                 self.send_header(name, value)
             self.end_headers()
@@ -314,6 +318,11 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert all(item["authorization"] == "Bearer provider-b-key-v1" for item in captures_b)
         assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product", "a-quality", "a-quality"]
         assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 4
+        assert len({item["client_port"] for item in captures_a}) == 1
+        assert len({item["client_port"] for item in captures_b}) == 1
+        assert {item["client_port"] for item in captures_a}.isdisjoint(
+            item["client_port"] for item in captures_b
+        )
         assert result.provider_bindings["product"]["provider_id"] == "provider-a"
         assert result.provider_bindings["engineering"]["provider_id"] == "provider-b"
         assert result.provider_bindings["quality"]["provider_id"] == "provider-a"

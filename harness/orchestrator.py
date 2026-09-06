@@ -10,6 +10,7 @@ from threading import Event, RLock
 from typing import Any
 
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
+from .adapters.responses import ResponsesExecutionScope
 from .artifacts import ArtifactStore
 from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
@@ -315,19 +316,24 @@ class Orchestrator:
         return self.project(run_id)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
-        while True:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
-                return projection
-            if self._abort.get(run_id) and self._abort[run_id].is_set():
-                return self.cancel(run_id)
-            self.activate_once(run_id)
+        with ResponsesExecutionScope() as execution_scope:
+            while True:
+                projection = self.project(run_id)
+                if projection.phase in TERMINAL_PHASES:
+                    return projection
+                if self._abort.get(run_id) and self._abort[run_id].is_set():
+                    return self.cancel(run_id)
+                self._activate_once(run_id, execution_scope)
 
     def activate_once(self, run_id: str) -> RunProjection:
+        with ResponsesExecutionScope() as execution_scope:
+            return self._activate_once(run_id, execution_scope)
+
+    def _activate_once(self, run_id: str, execution_scope: ResponsesExecutionScope) -> RunProjection:
         with self._state_lock:
             if run_id in self._active:
                 raise RuntimeError("run already has an active department invocation")
-            activation = self._prepare_activation(run_id)
+            activation = self._prepare_activation(run_id, execution_scope)
             if activation is None:
                 return self.project(run_id)
             self._active[run_id] = activation
@@ -357,7 +363,7 @@ class Orchestrator:
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
-    def _prepare_activation(self, run_id: str) -> _Activation | None:
+    def _prepare_activation(self, run_id: str, execution_scope: ResponsesExecutionScope) -> _Activation | None:
         projection = self.project(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
@@ -396,7 +402,7 @@ class Orchestrator:
                         f"The bound model for {department} has no declared output limit.",
                     )
                     return None
-                adapter = target.create_adapter()
+                adapter = target.create_adapter(execution_scope=execution_scope)
             except (KeyError, ValueError) as exc:
                 self._fail(run_id, projection, "provider_unavailable", str(exc))
                 return None
