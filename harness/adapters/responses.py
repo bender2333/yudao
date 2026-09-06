@@ -30,6 +30,10 @@ from .base import Availability, ModelObservation, ModelRequest, ModelResponse, P
 _STREAM_DRAIN_TIMEOUT_SEC = 0.1
 
 
+class _ObservationCaptureError(Exception):
+    """A raw observation sink failure that must never be swallowed by stream drain."""
+
+
 @dataclass(frozen=True)
 class ResponsesConfig:
     model: str = ""
@@ -299,7 +303,6 @@ class ResponsesAdapter:
         deadline: _CompletionDeadline,
     ) -> ModelResponse:
         started = time.monotonic()
-        seen_items: set[str] = set()
         observation_errors: list[BaseException] = []
         if self.execution_scope is not None:
             context = _RequestContext(request, self.config, trace, observation_errors)
@@ -342,6 +345,25 @@ class ResponsesAdapter:
                 request, trace, observation_errors, client, started, deadline,
             )
 
+    async def _observed_events(self, request: ModelRequest, event_source: Any):
+        event_index = 0
+        async for event in event_source:
+            event_payload = _sdk_json(event, secrets=(self.config.api_key,))
+            try:
+                request.observe_raw(ModelObservation(
+                    id=f"{_request_observation_id(request)}:stream-{event_index}",
+                    kind="stream_event",
+                    payload=event_payload,
+                    provider=self.config.provider,
+                    model=_actual_model(event_payload) or _actual_model(event_payload.get("response")),
+                    source="sdk_decoded_stream",
+                    sequence=event_index,
+                ))
+            except BaseException as exc:
+                raise _ObservationCaptureError from exc
+            event_index += 1
+            yield event
+
     async def _stream_with_client(
         self,
         request: ModelRequest,
@@ -374,19 +396,44 @@ class ResponsesAdapter:
         seen_items: set[str] = set()
         completed_response: ModelResponse | None = None
         async with stream:
-            event_source = _provider_events(stream, trace)
+            event_source = self._observed_events(request, _provider_events(stream, trace))
             async for event in event_source:
                 if request.abort_flag.is_set():
                     raise ProviderError("Model request cancelled", reason="cancelled")
                 if event.type == "response.output_item.done":
-                    self._observe_item(request, event.item.model_dump(mode="json", exclude_unset=True), seen_items)
+                    self._observe_item(
+                        request,
+                        event.item.model_dump(mode="json", exclude_unset=True),
+                        seen_items,
+                    )
                 elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
                     response = event.response
                     actual_model = _actual_model(response)
-                    output = [item.model_dump(mode="json", exclude_unset=True) for item in (response.output or [])]
+                    raw_response = _sdk_json(response, secrets=(self.config.api_key,))
+                    request.observe_raw(ModelObservation(
+                        id=str(raw_response.get("id") or _request_observation_id(request)),
+                        kind="response",
+                        payload=raw_response,
+                        provider=self.config.provider,
+                        model=actual_model,
+                        source="sdk_response",
+                    ))
+                    output = [
+                        _redact_sdk_json(
+                            item.model_dump(mode="json", exclude_unset=True),
+                            secrets=(self.config.api_key,),
+                        )
+                        for item in (response.output or [])
+                    ]
                     for item in output:
                         self._observe_item(request, item, seen_items, actual_model=actual_model)
-                    raw_usage = response.usage.model_dump(mode="json", exclude_unset=True) if response.usage else None
+                    raw_usage = (
+                        _redact_sdk_json(
+                            response.usage.model_dump(mode="json", exclude_unset=True),
+                            secrets=(self.config.api_key,),
+                        )
+                        if response.usage else None
+                    )
                     usage = _usage(raw_usage, started)
                     request.observe(ModelObservation(
                         id=response.id, kind="usage",
@@ -417,6 +464,7 @@ class ResponsesAdapter:
                     completed_response = ModelResponse(
                         output=output, usage=usage, provider=self.config.provider,
                         model=actual_model or "", response_id=response.id,
+                        sdk_response=raw_response,
                     )
                     deadline.stop()
                     break
@@ -444,6 +492,7 @@ class ResponsesAdapter:
         *,
         actual_model: str | None = None,
     ) -> None:
+        item = _redact_sdk_json(item, secrets=(self.config.api_key,))
         item_id = item.get("id")
         if not isinstance(item_id, str) or not item_id:
             raise ProviderError("Model output item has no identity")
@@ -476,6 +525,47 @@ def _actual_model(value: Any) -> str | None:
     if model is None and isinstance(value, dict):
         model = value.get("model")
     return model.strip() if isinstance(model, str) and model.strip() else None
+
+
+def _sdk_json(value: Any, *, secrets: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Return the JSON object exposed by an SDK model without capturing HTTP bytes."""
+
+    if isinstance(value, dict):
+        payload = json.loads(json.dumps(value, ensure_ascii=False))
+        return _redact_sdk_json(payload, secrets=secrets)
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        payload = dump(mode="json", exclude_unset=True)
+        if isinstance(payload, dict):
+            return _redact_sdk_json(payload, secrets=secrets)
+    raise ProviderError("Model provider returned an unserializable SDK object", reason="provider_protocol")
+
+
+_SENSITIVE_SDK_KEYS = frozenset({
+    "authorization", "api_key", "apikey", "access_token", "refresh_token",
+    "client_secret", "password", "cookie", "set_cookie", "credential",
+    "credentials", "headers", "proxy_authorization",
+})
+
+
+def _redact_sdk_json(value: Any, *, secrets: tuple[str, ...] = (), key: str | None = None) -> Any:
+    normalized_key = key.casefold().replace("-", "_") if isinstance(key, str) else ""
+    if normalized_key in _SENSITIVE_SDK_KEYS or normalized_key.endswith("_api_key"):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {
+            str(child_key): _redact_sdk_json(child_value, secrets=secrets, key=str(child_key))
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_sdk_json(item, secrets=secrets, key=key) for item in value]
+    if isinstance(value, str):
+        result = value
+        for secret in secrets:
+            if secret:
+                result = result.replace(secret, "[REDACTED]")
+        return result
+    return value
 
 
 def _request_observation_id(request: ModelRequest) -> str:
@@ -639,9 +729,15 @@ async def _drain_completed_stream(event_source: Any, request: ModelRequest) -> N
                 pass
     except asyncio.CancelledError:
         raise
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, _ObservationCaptureError):
+            cause = exc.__cause__
+            if cause is not None:
+                raise cause
+            raise
         if request.abort_flag.is_set():
             raise ProviderError("Model request cancelled", reason="cancelled")
+        return
     if request.abort_flag.is_set():
         raise ProviderError("Model request cancelled", reason="cancelled")
 
@@ -675,11 +771,20 @@ def _usage(raw: dict[str, Any] | None, started: float) -> Usage:
     latency = int((time.monotonic() - started) * 1000)
     if raw is None:
         return Usage(latency_ms=latency, reported=False)
-    cached = (raw.get("input_tokens_details") or {}).get("cached_tokens", 0)
+    details = raw.get("input_tokens_details")
+    details = details if isinstance(details, dict) else {}
+    input_tokens = raw.get("input_tokens", 0)
+    output_tokens = raw.get("output_tokens", 0)
+    total_tokens = raw.get("total_tokens", 0)
+    cached = details.get("cached_tokens", 0)
+    input_tokens = input_tokens if isinstance(input_tokens, int) and not isinstance(input_tokens, bool) else 0
+    output_tokens = output_tokens if isinstance(output_tokens, int) and not isinstance(output_tokens, bool) else 0
+    total_tokens = total_tokens if isinstance(total_tokens, int) and not isinstance(total_tokens, bool) else 0
+    cached = cached if isinstance(cached, int) and not isinstance(cached, bool) else 0
     return Usage(
-        input_tokens=max(0, raw["input_tokens"] - cached),
-        output_tokens=raw["output_tokens"],
-        total_tokens=raw["total_tokens"],
+        input_tokens=max(0, input_tokens - cached),
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
         cache_read_tokens=cached,
         latency_ms=latency,
         reported=True,

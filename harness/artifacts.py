@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import re
+import tempfile
 from pathlib import Path
+from collections.abc import Iterable
 
 from .models import ArtifactRef, hash_bytes
 
@@ -23,6 +27,52 @@ class ArtifactStore:
         if not path.exists():
             path.write_bytes(raw)
         return ArtifactRef(kind=kind, content_hash=digest, path=rel.as_posix(), media_type=media_type)
+
+    def put_stream(
+        self,
+        run_id: str,
+        kind: str,
+        chunks: Iterable[bytes],
+        *,
+        media_type: str = "application/octet-stream",
+    ) -> ArtifactRef:
+        """Persist an iterable without materializing the complete artifact in memory."""
+
+        run_root = self.root / run_id
+        run_root.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256()
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=run_root, prefix=".stream-", delete=False) as temporary:
+                temporary_path = Path(temporary.name)
+                for chunk in chunks:
+                    if not isinstance(chunk, (bytes, bytearray, memoryview)):
+                        raise TypeError("artifact stream chunks must be bytes")
+                    raw = bytes(chunk)
+                    digest.update(raw)
+                    temporary.write(raw)
+                temporary.flush()
+            digest_value = digest.hexdigest()
+            relative = Path(run_id) / digest_value[:2] / digest_value
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not path.exists():
+                os.replace(temporary_path, path)
+            else:
+                temporary_path.unlink(missing_ok=True)
+        except Exception:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise
+        return ArtifactRef(
+            kind=kind,
+            content_hash="sha256:" + digest_value,
+            path=relative.as_posix(),
+            media_type=media_type,
+        )
 
     def get(self, ref: ArtifactRef | str) -> bytes:
         if isinstance(ref, ArtifactRef):

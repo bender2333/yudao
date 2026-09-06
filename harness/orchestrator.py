@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -34,6 +35,7 @@ from .models import (
     estimate_tokens,
     json_dumps,
     new_id,
+    utc_now,
 )
 from .provider_catalog import CredentialSource, ProviderCatalog, ProviderCatalogSnapshot, ResolvedProviderTarget
 from .projection import RunProjection, project_run
@@ -75,10 +77,75 @@ class _Activation:
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
+    attempt_captures: dict[str, "_AttemptCapture"] = field(default_factory=dict)
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.input_version, "prompt_version": self.prompt.version,
                 "prompt_hash": self.prompt.prompt_ref.content_hash}
+
+
+@dataclass
+class _AttemptCapture:
+    """Bounded-memory capture for one Provider SDK attempt."""
+
+    stream: Any | None = None
+    stream_event_count: int = 0
+    stream_bytes: int = 0
+    stream_ref: dict[str, Any] | None = None
+    response_ref: dict[str, Any] | None = None
+    provider_response_id: str | None = None
+    actual_provider: str | None = None
+    actual_model: str | None = None
+    usage: Usage | None = None
+    usage_ref: dict[str, Any] | None = None
+    started_at: str | None = None
+
+    def add_stream_event(self, sequence: int | None, payload: dict[str, Any]) -> None:
+        if self.stream is None:
+            self.stream = tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
+        record = {"sequence": sequence if sequence is not None else self.stream_event_count,
+                  "event": payload}
+        raw = (json_dumps(record) + "\n").encode("utf-8")
+        self.stream.write(raw)
+        self.stream_event_count += 1
+        self.stream_bytes += len(raw)
+
+    def stream_chunks(self, chunk_size: int = 64 * 1024):
+        if self.stream is None:
+            return
+        self.stream.seek(0)
+        while True:
+            chunk = self.stream.read(chunk_size)
+            if not chunk:
+                return
+            yield chunk
+
+    def close(self) -> None:
+        if self.stream is not None:
+            self.stream.close()
+
+
+_SENSITIVE_OBSERVATION_KEYS = frozenset({
+    "authorization", "api_key", "apikey", "access_token", "refresh_token",
+    "client_secret", "password", "cookie", "set_cookie", "credential",
+    "credentials", "headers", "proxy_authorization",
+})
+
+
+def _redact_observation(value: Any, *, secret: str | None = None, key: str | None = None) -> Any:
+    normalized_key = key.casefold().replace("-", "_") if isinstance(key, str) else ""
+    if normalized_key in _SENSITIVE_OBSERVATION_KEYS or normalized_key.endswith("_api_key"):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {
+            str(child_key): _redact_observation(child_value, secret=secret, key=str(child_key))
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_observation(item, secret=secret, key=key) for item in value]
+    if isinstance(value, str) and secret:
+        return value.replace(secret, "[REDACTED]")
+    return value
 
 
 class Orchestrator:
@@ -360,6 +427,8 @@ class Orchestrator:
                     },
                 )
                 self.sessions.get(run_id, request.department).idle()
+                for capture in activation.attempt_captures.values():
+                    capture.close()
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
@@ -462,6 +531,14 @@ class Orchestrator:
         return target.provider_id if target is not None else getattr(adapter, "name", "test")
 
     @staticmethod
+    def _logical_call_id(activation_id: str, root_step_id: int, purpose: str) -> str:
+        return f"{activation_id}:root-{root_step_id}:{purpose}"
+
+    @staticmethod
+    def _attempt_id(logical_call_id: str, attempt: int) -> str:
+        return f"{logical_call_id}:attempt-{attempt}"
+
+    @staticmethod
     def _configured_model(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
         return target.model if target is not None else getattr(adapter, "model", "unknown")
 
@@ -540,6 +617,9 @@ class Orchestrator:
                 begin_tool=lambda call: self._begin_tool(activation, call),
                 begin_request=lambda request: self._begin_request(activation, request),
                 finish_compaction=lambda response: self._finish_compaction(activation, response),
+                record_attempt_finished=lambda request, response: self._record_attempt_finished(
+                    activation, request, response,
+                ),
                 record_attempt_failed=lambda request, error, will_retry: self._record_attempt_failed(
                     activation, request, error, will_retry,
                 ),
@@ -660,15 +740,21 @@ class Orchestrator:
             except (CompactionError, ValueError, FileNotFoundError) as exc:
                 reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window * 85 // 100 else "compaction_failed"
                 raise ProviderError(str(exc), reason=reason) from exc
+            logical_call_id = self._logical_call_id(
+                identity.activation_id, root_step_id, assembled.manifest.purpose,
+            )
+            attempt_id = self._attempt_id(logical_call_id, attempt)
             request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
                                    step_id, assembled, assembled.tools, identity.abort_flag,
                                    purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
                                    effective_contract_hash=activation.effective_contract_hash,
                                    engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id,
                                    attempt=attempt, root_step_id=root_step_id,
-                                   retry_of_step_id=retry_of_step_id, **activation.versions())
+                                   retry_of_step_id=retry_of_step_id, attempt_id=attempt_id,
+                                   logical_call_id=logical_call_id, **activation.versions())
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
+            request.on_raw_observation = lambda observation: self._record_observation(activation, observation)
             activation.provider = None
             activation.model = None
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
@@ -691,12 +777,15 @@ class Orchestrator:
                            effective_context_window=effective_window,
                            input_token_estimate=input_estimate,
                            output_reserve_tokens=output_reserve)
-            self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
-                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                              state_after=current.phase, session_id=request.session_id,
-                              provider=self._configured_provider(identity.target, identity.adapter),
-                              context_digest=assembled.manifest.digest,
-                              artifact_hashes=[ref.content_hash], payload=payload)
+            payload.update(attempt_id=attempt_id, logical_call_id=logical_call_id,
+                           collaboration_request_id=activation.request_id)
+            context_event = self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
+                                              parent_event_id=activation.parent_event_id, state_before=current.phase,
+                                              state_after=current.phase, session_id=request.session_id,
+                                              provider=self._configured_provider(identity.target, identity.adapter),
+                                              context_digest=assembled.manifest.digest,
+                                              artifact_hashes=[ref.content_hash], payload=payload)
+            request.context_event_id = context_event.event_id
             if overflow:
                 self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
                 return None
@@ -782,6 +871,7 @@ class Orchestrator:
                     or self._request_id(current) != activation.request_id
                     or current.input_version != activation.input_version):
                 return False
+            request.attempt_started_at = request.attempt_started_at or utc_now()
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
@@ -792,6 +882,11 @@ class Orchestrator:
                                        "attempt": request.attempt, "max_attempts": MAX_PROVIDER_ATTEMPTS,
                                        "root_step_id": request.root_step_id,
                                        "retry_of_step_id": request.retry_of_step_id,
+                                       "attempt_id": request.attempt_id,
+                                       "logical_call_id": request.logical_call_id,
+                                       "context_event_id": request.context_event_id,
+                                       "collaboration_request_id": request.request_id,
+                                       "started_at": request.attempt_started_at,
                                        "attempted": True, "purpose": request.purpose,
                                        "effective_contract_hash": request.effective_contract_hash,
                                        "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id,
@@ -799,6 +894,137 @@ class Orchestrator:
                                        "effective_context_window": request.context.manifest.budget,
                                        "max_output_tokens": request.max_output_tokens})
             return True
+
+    @staticmethod
+    def _attempt_collection_scope() -> dict[str, Any]:
+        return {
+            "request": "SDK request JSON object captured from the prepared HTTP request; authentication headers and raw HTTP bytes are excluded.",
+            "response": "Complete SDK response object exposed by the provider SDK when a terminal response was received, with credential and header fields redacted.",
+            "events": "SDK decoded stream event JSON objects captured as JSON Lines with credential and header fields redacted; raw HTTP/SSE bytes are not available.",
+            "credentials": "excluded",
+        }
+
+    def _capture_for(self, activation: _Activation, request: ModelRequest) -> _AttemptCapture:
+        attempt_id = request.attempt_id or self._attempt_id(
+            request.logical_call_id or self._logical_call_id(request.activation_id, request.root_step_id or request.step_id, request.purpose),
+            request.attempt,
+        )
+        request.attempt_id = attempt_id
+        request.logical_call_id = request.logical_call_id or attempt_id.rsplit(":attempt-", 1)[0]
+        capture = activation.attempt_captures.get(attempt_id)
+        if capture is None:
+            capture = _AttemptCapture()
+            activation.attempt_captures[attempt_id] = capture
+        return capture
+
+    def _finalize_capture(self, activation: _Activation, request: ModelRequest) -> _AttemptCapture:
+        capture = activation.attempt_captures.pop(request.attempt_id or "", None)
+        if capture is None:
+            capture = _AttemptCapture()
+        try:
+            if capture.stream_event_count:
+                ref = self.artifacts.put_stream(
+                    request.run_id,
+                    "sdk_stream_events",
+                    capture.stream_chunks(),
+                    media_type="application/x-ndjson",
+                )
+                capture.stream_ref = asdict(ref)
+        finally:
+            capture.close()
+        return capture
+
+    @staticmethod
+    def _usage_summary(usage: Usage | None) -> dict[str, Any] | None:
+        if usage is None or not (usage.reported or usage.total_tokens or usage.input_tokens
+                                 or usage.output_tokens or usage.cache_read_tokens
+                                 or usage.cache_write_tokens or usage.cost):
+            return None
+        return {
+            "input_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
+            "output_tokens": usage.output_tokens,
+            "cache_read_tokens": usage.cache_read_tokens,
+            "cache_write_tokens": usage.cache_write_tokens,
+            "total_tokens": usage.total_tokens,
+            "cost": usage.cost if usage.cost_reported else None,
+            "currency": None,
+            "cost_source": None,
+            "latency_ms": usage.latency_ms if usage.latency_ms else None,
+            "reported": bool(usage.reported),
+        }
+
+    def _record_attempt_finished(
+        self,
+        activation: _Activation,
+        request: ModelRequest,
+        response: ModelResponse,
+    ) -> None:
+        with self._state_lock:
+            current = self.project(request.run_id)
+            finished_at = utc_now()
+            started_monotonic = request.attempt_started_monotonic
+            finished_monotonic = request.attempt_finished_monotonic or time.monotonic()
+            duration_ms = None if started_monotonic is None else max(
+                0, int((finished_monotonic - started_monotonic) * 1000)
+            )
+            capture = self._finalize_capture(activation, request)
+            if capture.response_ref is None and isinstance(response.sdk_response, dict):
+                safe_response = _redact_observation(
+                    response.sdk_response,
+                    secret=getattr(activation.target, "api_key", None),
+                )
+                response_ref = self.artifacts.put(
+                    request.run_id,
+                    "sdk_response",
+                    json_dumps(safe_response),
+                    media_type="application/json",
+                )
+                capture.response_ref = asdict(response_ref)
+                capture.provider_response_id = safe_response.get("id") or response.response_id
+            provider = response.provider or self._configured_provider(activation.target, activation.adapter)
+            model = response.model or activation.model
+            payload = {
+                "attempt_id": request.attempt_id,
+                "logical_call_id": request.logical_call_id,
+                "collaboration_request_id": request.request_id,
+                "context_event_id": request.context_event_id,
+                "activation_id": request.activation_id,
+                "step_id": request.step_id,
+                "root_step_id": request.root_step_id,
+                "retry_of_step_id": request.retry_of_step_id,
+                "attempt": request.attempt,
+                "purpose": request.purpose,
+                "status": "completed",
+                "started_at": request.attempt_started_at,
+                "finished_at": finished_at,
+                "duration_ms": duration_ms,
+                "duration_source": "monotonic",
+                "provider_response_id": response.response_id or capture.provider_response_id,
+                "actual_provider": capture.actual_provider or (provider if response.response_id or response.model else None),
+                "actual_model": capture.actual_model or (response.model or None),
+                "response_ref": capture.response_ref,
+                "stream_events_ref": getattr(capture, "stream_ref", None),
+                "stream_event_count": capture.stream_event_count,
+                "collection_scope": self._attempt_collection_scope(),
+                "usage": self._usage_summary(capture.usage or activation.step_usage),
+                "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
+                **activation.versions(),
+                **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
+            }
+            self.store.append(
+                request.run_id,
+                EventType.MODEL_ATTEMPT_FINISHED,
+                role=request.department,
+                parent_event_id=activation.parent_event_id,
+                state_before=current.phase,
+                state_after=current.phase,
+                session_id=request.session_id,
+                provider=provider,
+                model=model or None,
+                context_digest=request.context.manifest.digest,
+                artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, getattr(capture, "stream_ref", None)) if ref],
+                payload=payload,
+            )
 
     def _record_attempt_failed(
         self,
@@ -817,15 +1043,38 @@ class Orchestrator:
             ]
             activation.messages = [text for text, _key in kept]
             activation.message_steps = [key for _text, key in kept]
-            provider = self._configured_provider(activation.target, activation.adapter)
+            capture = self._finalize_capture(activation, request)
+            provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
+            model = activation.model
+            finished_at = utc_now()
+            started_monotonic = request.attempt_started_monotonic
+            finished_monotonic = request.attempt_finished_monotonic or time.monotonic()
+            duration_ms = None if started_monotonic is None else max(
+                0, int((finished_monotonic - started_monotonic) * 1000)
+            )
+            status = "cancelled" if error.reason == "cancelled" else "failed"
+            safe_error = _redact_observation(
+                str(error),
+                secret=getattr(activation.target, "api_key", None),
+            )
+            safe_diagnostics = _redact_observation(
+                dict(error.diagnostics or {}),
+                secret=getattr(activation.target, "api_key", None),
+            )
             self.store.append(
                 request.run_id, EventType.MODEL_ATTEMPT_FAILED, role=request.department,
                 parent_event_id=activation.parent_event_id, state_before=current.phase,
                 state_after=current.phase, session_id=request.session_id,
                 provider=provider,
+                model=model,
                 context_digest=request.context.manifest.digest,
-                error=str(error),
+                error=safe_error,
+                artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, capture.stream_ref) if ref],
                 payload={
+                    "attempt_id": request.attempt_id,
+                    "logical_call_id": request.logical_call_id,
+                    "collaboration_request_id": request.request_id,
+                    "context_event_id": request.context_event_id,
                     "activation_id": request.activation_id,
                     "step_id": request.step_id,
                     **activation.versions(),
@@ -834,13 +1083,27 @@ class Orchestrator:
                     "root_step_id": request.root_step_id,
                     "retry_of_step_id": request.retry_of_step_id,
                     "purpose": request.purpose,
+                    "status": status,
+                    "started_at": request.attempt_started_at,
+                    "finished_at": finished_at,
+                    "duration_ms": duration_ms,
+                    "duration_source": "monotonic",
+                    "actual_provider": capture.actual_provider,
+                    "actual_model": capture.actual_model,
+                    "provider_response_id": capture.provider_response_id,
+                    "response_ref": capture.response_ref,
+                    "stream_events_ref": capture.stream_ref,
+                    "stream_event_count": capture.stream_event_count,
+                    "collection_scope": self._attempt_collection_scope(),
+                    "usage": self._usage_summary(capture.usage or activation.step_usage),
+                    "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
                     "effective_contract_hash": request.effective_contract_hash,
                     "engineering_plan_hash": request.engineering_plan_hash,
                     "request_id": request.request_id,
                     "reason": error.reason,
                     "retryable": error.retryable,
                     "will_retry": will_retry,
-                    "diagnostics": dict(error.diagnostics or {}),
+                    "diagnostics": safe_diagnostics,
                     **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
                 },
             )
@@ -876,6 +1139,10 @@ class Orchestrator:
                     "max_attempts": MAX_PROVIDER_ATTEMPTS,
                     "root_step_id": request.root_step_id,
                     "retry_of_step_id": request.retry_of_step_id,
+                    "attempt_id": request.attempt_id,
+                    "logical_call_id": request.logical_call_id,
+                    "context_event_id": request.context_event_id,
+                    "collaboration_request_id": request.request_id,
                     "next_step_id": next_step_id,
                     "next_attempt": request.attempt + 1,
                     "purpose": request.purpose,
@@ -927,6 +1194,11 @@ class Orchestrator:
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
                               payload={**call, "activation_id": request.activation_id,
+                                       "attempt_id": request.attempt_id,
+                                       "logical_call_id": request.logical_call_id,
+                                       "collaboration_request_id": request.request_id,
+                                       "context_event_id": request.context_event_id,
+                                       "attempt": request.attempt,
                                        **activation.versions(),
                                        "effective_contract_hash": activation.effective_contract_hash,
                                        "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
@@ -935,12 +1207,13 @@ class Orchestrator:
     def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:
         request = activation.request
         with self._state_lock:
-            key = (f"{request.step_id}:{observation.kind}", observation.id)
-            if key in activation.seen:
-                return
-            activation.seen.add(key)
-            current = self.project(request.run_id)
+            if observation.kind != "stream_event":
+                key = (f"{request.attempt_id or request.step_id}:{observation.kind}", observation.id)
+                if key in activation.seen:
+                    return
+                activation.seen.add(key)
             if observation.kind == "request":
+                current = self.project(request.run_id)
                 if not isinstance(observation.payload, dict):
                     raise ProviderError("Serialized provider request is not a JSON object", reason="provider_protocol")
                 ref = self.artifacts.put(
@@ -950,6 +1223,10 @@ class Orchestrator:
                     media_type="application/json",
                 )
                 payload = {
+                    "attempt_id": request.attempt_id,
+                    "logical_call_id": request.logical_call_id,
+                    "collaboration_request_id": request.request_id,
+                    "context_event_id": request.context_event_id,
                     "activation_id": request.activation_id,
                     "step_id": request.step_id,
                     "attempt": request.attempt,
@@ -985,10 +1262,58 @@ class Orchestrator:
                 activation.model = observation.model
             provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
             model = activation.model
+            if observation.kind == "stream_event":
+                if not isinstance(observation.payload, dict):
+                    raise ProviderError("Decoded provider stream event is not a JSON object", reason="provider_protocol")
+                capture = self._capture_for(activation, request)
+                observation.payload = _redact_observation(
+                    observation.payload,
+                    secret=getattr(activation.target, "api_key", None),
+                )
+                capture.actual_provider = observation.provider or capture.actual_provider
+                capture.actual_model = observation.model or capture.actual_model
+                nested_response = observation.payload.get("response")
+                if isinstance(nested_response, dict):
+                    response_id = nested_response.get("id")
+                    if isinstance(response_id, str) and response_id:
+                        capture.provider_response_id = response_id
+                    nested_model = nested_response.get("model")
+                    if isinstance(nested_model, str) and nested_model.strip():
+                        capture.actual_model = nested_model.strip()
+                capture.add_stream_event(observation.sequence, observation.payload)
+                return
+            if observation.kind == "response":
+                if not isinstance(observation.payload, dict):
+                    raise ProviderError("Provider response is not a JSON object", reason="provider_protocol")
+                capture = self._capture_for(activation, request)
+                observation.payload = _redact_observation(
+                    observation.payload,
+                    secret=getattr(activation.target, "api_key", None),
+                )
+                capture.actual_provider = observation.provider or capture.actual_provider
+                capture.actual_model = observation.model or capture.actual_model
+                ref = self.artifacts.put(
+                    request.run_id,
+                    "sdk_response",
+                    json_dumps(observation.payload),
+                    media_type="application/json",
+                )
+                capture.response_ref = asdict(ref)
+                capture.provider_response_id = (
+                    observation.payload.get("id") if isinstance(observation.payload.get("id"), str) else observation.id
+                )
+                return
             if observation.kind == "usage":
                 if observation.usage is not None:
-                    ref = self.artifacts.put(request.run_id, "model_usage", json_dumps(observation.payload), media_type="application/json")
+                    capture = self._capture_for(activation, request)
+                    safe_usage = _redact_observation(
+                        observation.payload,
+                        secret=getattr(activation.target, "api_key", None),
+                    )
+                    ref = self.artifacts.put(request.run_id, "model_usage", json_dumps(safe_usage), media_type="application/json")
                     activation.raw_usage_ref = asdict(ref)
+                    capture.usage = observation.usage
+                    capture.usage_ref = asdict(ref)
                     has_usage = bool(
                         observation.usage.reported
                         or observation.usage.total_tokens
@@ -1008,8 +1333,12 @@ class Orchestrator:
                         reported=(observation.usage.reported if has_usage else False),
                     )
                 return
+            current = self.project(request.run_id)
             if observation.kind in {"tool", "skipped_tool"}:
-                payload = dict(observation.payload)
+                payload = _redact_observation(
+                    dict(observation.payload),
+                    secret=getattr(activation.target, "api_key", None),
+                )
                 tool_id = f"{request.step_id}:{payload.get('id') or observation.id}"
                 if tool_id in activation.tool_ids:
                     return
@@ -1020,20 +1349,31 @@ class Orchestrator:
                     payload["output_ref"] = asdict(ref)
                 event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED
             elif observation.kind == "message":
-                activation.messages.append(observation.text)
+                safe_text = _redact_observation(
+                    observation.text,
+                    secret=getattr(activation.target, "api_key", None),
+                )
+                activation.messages.append(safe_text)
                 activation.message_steps.append((request.activation_id, request.step_id))
-                message = observation.payload or {"role": "assistant", "content": observation.text}
+                message = _redact_observation(
+                    observation.payload or {"role": "assistant", "content": safe_text},
+                    secret=getattr(activation.target, "api_key", None),
+                )
                 ref = self.artifacts.put(request.run_id, "model_message", json_dumps(message), media_type="application/json")
                 payload = {
                     "message_ref": asdict(ref),
                     "message_index": len(activation.messages),
                     "response_id": message.get("id"),
                     "stop_reason": message.get("status"),
-                    "summary": observation.text[:160],
+                    "summary": safe_text[:160],
                 }
                 event_type = EventType.MODEL_MESSAGE
             else:
                 raise ValueError(f"unknown adapter observation: {observation.kind}")
+            payload["attempt_id"] = request.attempt_id
+            payload["logical_call_id"] = request.logical_call_id
+            payload["collaboration_request_id"] = request.request_id
+            payload["context_event_id"] = request.context_event_id
             payload["activation_id"] = request.activation_id
             payload["step_id"] = request.step_id
             payload["purpose"] = request.purpose

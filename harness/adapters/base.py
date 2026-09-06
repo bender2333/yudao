@@ -41,6 +41,8 @@ class ModelObservation:
     usage: Usage | None = None
     provider: str | None = None
     model: str | None = None
+    source: str = "provider_sdk"
+    sequence: int | None = None
 
 
 @dataclass
@@ -54,6 +56,7 @@ class ModelRequest:
     tools: list[dict[str, Any]]
     abort_flag: Event
     on_observation: Callable[[ModelObservation], None] | None = None
+    on_raw_observation: Callable[[ModelObservation], None] | None = None
     purpose: str = "work"
     max_output_tokens: int | None = None
     effective_contract_hash: str | None = None
@@ -65,6 +68,12 @@ class ModelRequest:
     attempt: int = 1
     root_step_id: int | None = None
     retry_of_step_id: int | None = None
+    attempt_id: str | None = None
+    logical_call_id: str | None = None
+    context_event_id: str | None = None
+    attempt_started_at: str | None = None
+    attempt_started_monotonic: float | None = None
+    attempt_finished_monotonic: float | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:
@@ -73,6 +82,10 @@ class ModelRequest:
     def observe(self, observation: ModelObservation) -> None:
         if self.on_observation is not None:
             self.on_observation(observation)
+
+    def observe_raw(self, observation: ModelObservation) -> None:
+        if self.on_raw_observation is not None:
+            self.on_raw_observation(observation)
 
 
 @dataclass
@@ -84,6 +97,7 @@ class ModelResponse:
     provider: str = "fake"
     model: str = "fake-script"
     response_id: str | None = None
+    sdk_response: dict[str, Any] | None = None
 
 
 class ModelAdapter(Protocol):

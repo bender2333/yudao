@@ -42,6 +42,7 @@ def run_department(
     begin_tool: Callable[[dict[str, Any]], ToolAdmission],
     begin_request: Callable[[ModelRequest], bool],
     finish_compaction: Callable[[ModelResponse], None],
+    record_attempt_finished: Callable[[ModelRequest, ModelResponse], None],
     record_attempt_failed: Callable[[ModelRequest, ProviderError, bool], None],
     record_retry_scheduled: Callable[[ModelRequest, ProviderError, float, int], bool],
     stopped: Callable[[], bool],
@@ -55,10 +56,19 @@ def run_department(
         request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
         if request is None or not begin_request(request):
             return None
+        request.attempt_started_monotonic = time.monotonic()
         try:
             response = adapter.complete(request)
             _validate_response(response)
-        except ProviderError as exc:
+            request.attempt_finished_monotonic = time.monotonic()
+        except Exception as exc:
+            if not isinstance(exc, ProviderError):
+                exc = ProviderError(
+                    f"model adapter failed: {type(exc).__name__}",
+                    reason="provider_error",
+                    retryable=False,
+                    diagnostics={"error_type": "adapter_failure"},
+                )
             retry_error = _retry_after_error(exc)
             delay = _retry_delay(retry_error, attempt)
             can_retry = (
@@ -86,7 +96,18 @@ def run_department(
             attempt += 1
             retry_of_step_id = step_id
             continue
-        record_response(response)
+        try:
+            record_response(response)
+        except Exception as exc:
+            host_error = ProviderError(
+                f"model observation persistence failed: {type(exc).__name__}",
+                reason="provider_error",
+                retryable=False,
+                diagnostics={"error_type": "observation_persistence"},
+            )
+            record_attempt_failed(request, host_error, False)
+            raise host_error from exc
+        record_attempt_finished(request, response)
         attempt = 1
         root_step_id = step_id + 1
         retry_of_step_id = None

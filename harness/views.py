@@ -182,6 +182,8 @@ def retry_view(events: list[Event]) -> dict[str, Any]:
                     and latest is not None and latest.get("activation_id") == activation_id
                     and latest.get("step_id") == step_id):
                 latest = _retry_record(event, status="active", base=retry)
+        elif event.type == EventType.MODEL_ATTEMPT_FINISHED:
+            latest = None
         elif event.type == EventType.RUN_FAILED and latest is not None:
             latest = _retry_record(event, status="cancelled" if event.stop_reason == "cancelled" else "failed", base=latest)
     if latest is None:
@@ -234,6 +236,10 @@ def event_card(event: Event) -> dict[str, Any]:
         "summary": event.summary(),
         "artifact_hashes": event.artifact_hashes,
         "attempt": payload.get("attempt"),
+        "attempt_id": payload.get("attempt_id"),
+        "logical_call_id": payload.get("logical_call_id"),
+        "collaboration_request_id": payload.get("collaboration_request_id", payload.get("request_id")),
+        "context_event_id": payload.get("context_event_id"),
         "max_attempts": payload.get("max_attempts"),
         "retry_of_step_id": payload.get("retry_of_step_id"),
         "root_step_id": payload.get("root_step_id"),
@@ -242,6 +248,15 @@ def event_card(event: Event) -> dict[str, Any]:
         "delay_sec": payload.get("delay_sec"),
         "next_attempt": payload.get("next_attempt"),
         "next_step_id": payload.get("next_step_id"),
+        "provider_response_id": payload.get("provider_response_id"),
+        "status": payload.get("status"),
+        "started_at": payload.get("started_at"),
+        "finished_at": payload.get("finished_at"),
+        "duration_ms": payload.get("duration_ms"),
+        "response_ref": _plain(payload.get("response_ref")),
+        "stream_events_ref": _plain(payload.get("stream_events_ref")),
+        "stream_event_count": payload.get("stream_event_count"),
+        "collection_scope": _plain(payload.get("collection_scope")),
         "git_version": _plain(event.payload.get("git_version")) if event.type in GIT_VERSION_EVENTS else None,
         "input_save_failure": _plain(event.payload.get("input_save_failure"))
         if event.type == EventType.RUN_FAILED and event.stop_reason == "cancelled" else None,

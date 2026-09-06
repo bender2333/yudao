@@ -3,109 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>循环控制台</title>
+  <title>协作台</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
-      <h1>循环控制台</h1>
-      <button type="button" class="icon-btn" id="btn-new" aria-label="新任务" title="新任务">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14"></path>
-          <path d="M12 5v14"></path>
-        </svg>
-      </button>
+  <div id="department-workspace-prototype" role="region" aria-label="三部门协作工作台">
+    <div class="dw-shell">
+      <aside class="dw-sidebar" aria-label="协作导航">
+        <div class="dw-brand"><i data-lucide="layers-3" aria-hidden="true"></i><span>协作台</span></div>
+        <nav class="dw-nav" aria-label="协作页面">
+          <button class="dw-nav-item is-active" type="button" data-view="overview" aria-current="page"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>总览</span></button>
+          <button class="dw-nav-item" type="button" data-department="product"><i data-lucide="clipboard-list" aria-hidden="true"></i><span>产品</span></button>
+          <button class="dw-nav-item" type="button" data-department="engineering"><i data-lucide="braces" aria-hidden="true"></i><span>工程</span></button>
+          <button class="dw-nav-item" type="button" data-department="quality"><i data-lucide="check-check" aria-hidden="true"></i><span>质检</span></button>
+          <button class="dw-nav-item" type="button" data-view="observability"><i data-lucide="activity" aria-hidden="true"></i><span>观测</span></button>
+        </nav>
+      </aside>
+      <main class="dw-main" id="dw-main" aria-live="polite"></main>
     </div>
-    <div class="header-meta">
-      <p id="provider-alert" class="alert" hidden></p>
-      <p id="exec-alert" class="alert" hidden></p>
-      <p id="status" role="status">空闲</p>
-    </div>
-  </header>
-  <div class="shell">
-    <aside>
-      <form id="task-form" class="task-form">
-        <label for="task" id="input-target">新任务</label>
-        <textarea id="task" name="task" required placeholder="描述要完成的任务"></textarea>
-        <div class="budget" id="task-limits">
-          <label>循环 <input id="max_cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label>
-          <label>窗口 <input id="context_window" name="context_window" type="number" min="1" step="1" value="32000"></label>
-        </div>
-        <div class="actions">
-          <button type="submit" class="icon-btn" id="btn-start" aria-label="开始" title="开始">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path>
-            </svg>
-          </button>
-          <button type="button" class="icon-btn danger" id="btn-cancel" aria-label="取消" title="取消" disabled>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect width="18" height="18" x="3" y="3" rx="2"></rect>
-            </svg>
-          </button>
-        </div>
-      </form>
-      <h2>任务</h2>
-      <p class="empty" id="run-empty">还没有任务。</p>
-      <ul id="runs"></ul>
-    </aside>
-    <main>
-      <section id="board" class="view">
-        <h2>运行看板</h2>
-        <div id="board-body" class="muted">选择一个任务。</div>
-      </section>
-      <section id="inputs" class="view">
-        <h2>用户输入</h2>
-        <div id="inputs-body" class="muted">尚无输入。</div>
-      </section>
-      <div class="grid">
-        <section id="timeline" class="view">
-          <h2>规格时间线</h2>
-          <div id="timeline-body" class="muted">等待产品需求与工程计划。</div>
-        </section>
-        <section id="evidence" class="view">
-          <h2>证据视图</h2>
-          <div id="evidence-body" class="muted">等待交付与质检证据。</div>
-        </section>
-      </div>
-      <section id="context" class="view">
-        <h2>上下文 / 追踪视图</h2>
-        <form id="prompt-form" class="prompt-form">
-          <label for="prompt-department">部门提示词</label>
-          <select id="prompt-department" name="department">
-            <option value="product">产品</option>
-            <option value="engineering">工程</option>
-            <option value="quality">质检</option>
-          </select>
-          <p id="prompt-target" class="muted">选择一个任务。</p>
-          <details id="prompt-current">
-            <summary>当前提示词 <span id="prompt-version"></span></summary>
-            <pre id="prompt-current-text" class="raw-text"></pre>
-          </details>
-          <details id="prompt-editor">
-            <summary>编辑提示词</summary>
-            <label for="prompt-text">新版原文</label>
-            <textarea id="prompt-text" name="text" required></textarea>
-            <button type="submit" id="btn-prompt-save" disabled>保存提示词</button>
-          </details>
-          <div id="prompt-history"></div>
-        </form>
-        <div id="context-body" class="muted">等待每一步的上下文清单。</div>
-      </section>
-    </main>
   </div>
-  <dialog id="event-dialog">
-    <form method="dialog">
-      <h3 id="event-title">事件详情</h3>
-      <p id="event-version" class="hash" hidden></p>
-      <ul id="event-files" class="version-files" hidden></ul>
-      <pre id="event-document" hidden></pre>
-      <pre id="event-json"></pre>
-      <div id="event-sources" class="actions"></div>
-      <button value="close">关闭</button>
+  <dialog id="dw-task-dialog" aria-labelledby="dw-task-dialog-title">
+    <form method="dialog" id="dw-task-dialog-form" class="dw-dialog-form">
+      <div class="dw-dialog-head"><h2 id="dw-task-dialog-title">新建任务</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      <label for="dw-task-text">任务目标</label>
+      <textarea id="dw-task-text" name="task" rows="4" required placeholder="描述要完成的任务"></textarea>
+      <div class="dw-dialog-grid"><label for="dw-max-cycles">循环上限<input id="dw-max-cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label><label for="dw-context-window">上下文窗口<input id="dw-context-window" name="context_window" type="number" min="1" step="1" value="32000"></label></div>
+      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" id="dw-task-submit" value="default" type="submit"><i data-lucide="plus" aria-hidden="true"></i>创建任务</button></div>
+      <p class="dw-dialog-error" id="dw-task-error" role="alert" hidden></p>
     </form>
   </dialog>
+  <dialog id="dw-history-dialog" aria-labelledby="dw-history-dialog-title">
+    <form method="dialog" class="dw-dialog-form"><div class="dw-dialog-head"><h2 id="dw-history-dialog-title">任务历史</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div><div id="dw-history-list" class="dw-history-list"></div></form>
+  </dialog>
+  <dialog id="dw-prompt-dialog" aria-labelledby="dw-prompt-dialog-title">
+    <form method="dialog" id="dw-prompt-dialog-form" class="dw-dialog-form">
+      <div class="dw-dialog-head"><h2 id="dw-prompt-dialog-title">编辑 Prompt</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      <label for="dw-prompt-text">Prompt 原文<textarea id="dw-prompt-text" name="text" rows="10" required></textarea></label>
+      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" value="default" type="submit"><i data-lucide="save" aria-hidden="true"></i>保存</button></div>
+      <p class="dw-dialog-error" id="dw-prompt-error" role="alert" hidden></p>
+    </form>
+  </dialog>
+  <dialog id="dw-event-dialog" aria-labelledby="dw-event-title">
+    <form method="dialog" class="dw-dialog-form"><div class="dw-dialog-head"><h2 id="dw-event-title">事件详情</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div><p id="dw-event-version" class="dw-dialog-meta" hidden></p><ul id="dw-event-files" class="dw-dialog-files" hidden></ul><pre id="dw-event-document" class="dw-dialog-json" hidden></pre><pre id="dw-event-json" class="dw-dialog-json"></pre><div id="dw-event-sources" class="dw-dialog-sources"></div></form>
+  </dialog>
+  <script src="/static/lucide.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

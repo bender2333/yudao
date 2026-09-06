@@ -73,6 +73,7 @@ class EventType:
     MODEL_REQUEST_SERIALIZED = "model_request_serialized"
     MODEL_MESSAGE = "model_message"
     MODEL_REQUESTED = "model_requested"
+    MODEL_ATTEMPT_FINISHED = "model_attempt_finished"
     MODEL_ATTEMPT_FAILED = "model_attempt_failed"
     MODEL_RETRY_SCHEDULED = "model_retry_scheduled"
     COMPACTION_RECORDED = "compaction_recorded"

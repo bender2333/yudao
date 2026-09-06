@@ -161,8 +161,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.MODEL_REQUEST_SERIALIZED:
         for request in reversed(state.model_requests):
-            if (request.get("activation_id"), request.get("step_id"), request.get("attempt")) == (
-                    payload.get("activation_id"), payload.get("step_id"), payload.get("attempt")):
+            if ((payload.get("attempt_id") and request.get("attempt_id") == payload.get("attempt_id"))
+                    or (request.get("activation_id"), request.get("step_id"), request.get("attempt")) == (
+                    payload.get("activation_id"), payload.get("step_id"), payload.get("attempt"))):
                 request["serialized_event_id"] = event.event_id
                 request["serialized_request_ref"] = payload.get("request_ref")
                 request["serialized_request_digest"] = payload.get("request_digest")
@@ -193,6 +194,10 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "max_attempts": payload.get("max_attempts"),
             "root_step_id": payload.get("root_step_id"),
             "retry_of_step_id": payload.get("retry_of_step_id"),
+            "attempt_id": payload.get("attempt_id"),
+            "logical_call_id": payload.get("logical_call_id"),
+            "collaboration_request_id": payload.get("collaboration_request_id", payload.get("request_id")),
+            "context_event_id": payload.get("context_event_id"),
             "purpose": payload.get("purpose"),
             "snapshot_id": payload.get("snapshot_id"),
             "provider_config_id": payload.get("provider_config_id"),
@@ -212,7 +217,34 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "actual_provider": None,
             "actual_model": None,
             "context_digest": event.context_digest,
+            "started_at": payload.get("started_at"),
+            "status": "requesting",
         })
+        return
+
+    if etype in {EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED}:
+        attempt_id = payload.get("attempt_id")
+        request = next((item for item in reversed(state.model_requests)
+                        if attempt_id and item.get("attempt_id") == attempt_id), None)
+        if request is None:
+            request = next((item for item in reversed(state.model_requests)
+                            if (item.get("activation_id"), item.get("step_id"), item.get("attempt")) == (
+                                payload.get("activation_id"), payload.get("step_id"), payload.get("attempt"))), None)
+        if request is not None:
+            request.update({
+                "status": payload.get("status", "completed" if etype == EventType.MODEL_ATTEMPT_FINISHED else "failed"),
+                "finished_at": payload.get("finished_at"),
+                "duration_ms": payload.get("duration_ms"),
+                "response_ref": payload.get("response_ref"),
+                "stream_events_ref": payload.get("stream_events_ref"),
+                "stream_event_count": payload.get("stream_event_count"),
+                "provider_response_id": payload.get("provider_response_id"),
+                "usage": payload.get("usage"),
+                "raw_usage_ref": payload.get("raw_usage_ref"),
+                "collection_scope": payload.get("collection_scope"),
+            })
+        if event.model:
+            _bind_actual_model(state, event)
         return
 
     if etype == EventType.TOOL_CALLED:

@@ -1,1214 +1,1299 @@
-const TERMINAL = new Set(["DONE", "FAILED", "PAUSED"]);
-const HEALTH_POLL_MS = 1000;
+(() => {
+  "use strict";
 
-const state = {
-  runId: null,
-  source: null,
-  gen: 0,
-  refreshSeq: 0,
-  refreshInFlight: false,
-  pendingRefresh: null,
-  submittingStart: false,
-  submittingCancel: false,
-  busy: false,
-  activeRunId: null,
-  selectedPhase: null,
-  forceNewTask: false,
-  submittingPrompt: false,
-  promptData: null,
-  promptDrafts: {},
-  eventRequestSeq: 0,
-  cancelledInputFailures: {},
-};
+  const root = document.getElementById("department-workspace-prototype");
+  const main = document.getElementById("dw-main");
+  const TERMINAL = new Set(["DONE", "FAILED", "PAUSED"]);
+  const DEPARTMENTS = {
+    product: { name: "产品部", role: "需求与方案", icon: "clipboard-list" },
+    engineering: { name: "工程部", role: "实现与交付", icon: "braces" },
+    quality: { name: "质检部", role: "验证与反馈", icon: "check-check" },
+  };
+  const DEPARTMENT_ORDER = ["product", "engineering", "quality"];
+  const STATUS_LABELS = { success: "成功", failed: "失败", running: "进行中" };
+  const PHASE_LABELS = {
+    PRODUCT_SPEC: "产品处理中",
+    ENGINEERING_PLAN: "工程计划中",
+    ENGINEERING: "工程处理中",
+    QUALITY: "质检处理中",
+    DONE: "已完成",
+    FAILED: "执行失败",
+    PAUSED: "已暂停",
+  };
 
-let workerWatchTimer = null;
-let workerWatchInFlight = false;
+  const state = {
+    view: "overview",
+    department: "product",
+    runId: null,
+    runs: [],
+    runPayload: null,
+    health: null,
+    departmentData: new Map(),
+    departmentLoading: false,
+    observationTab: "requests",
+    observationScreen: "list",
+    observationDetailTab: "overview",
+    observationData: null,
+    observationLoading: false,
+    observationFilters: { department: "all", status: "all", q: "" },
+    observationCursor: null,
+    observationMoreLoading: false,
+    observationDetail: null,
+    selectedAttemptId: null,
+    selectedContext: {},
+    inspectorTab: "context",
+    inspectorCollapsed: false,
+    selectedHandoff: null,
+    globalDrafts: {},
+    deptDrafts: {},
+    promptDrafts: {},
+    routeToken: 0,
+    observationSeq: 0,
+    detailSeq: 0,
+    eventSeq: 0,
+    busy: false,
+    creating: false,
+    cancelling: false,
+    inputSubmitting: null,
+    promptSubmitting: false,
+    newTaskDraft: { task: "", max_cycles: "8", context_window: "32000" },
+    error: "",
+    scrollPositions: {},
+  };
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+  let stream = null;
+  let refreshTimer = null;
+  let filterTimer = null;
+  let runRequestSeq = 0;
+  const departmentRequestSeq = new Map();
 
-function t(value, fallback = "—") {
-  if (value === null || value === undefined || value === "") return fallback;
-  return escapeHtml(value);
-}
-
-function stillCurrent(runId, gen, seq) {
-  return state.runId === runId && state.gen === gen && state.refreshSeq === seq;
-}
-
-function setStatus(kind, text) {
-  const el = document.getElementById("status");
-  if (!el) return;
-  el.dataset.kind = kind;
-  el.textContent = text;
-}
-
-function setAlert(id, text) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (text) {
-    el.hidden = false;
-    el.textContent = text;
-  } else {
-    el.hidden = true;
-    el.textContent = "";
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+    }[character]));
   }
-}
 
-function syncButtons() {
-  const start = document.getElementById("btn-start");
-  const cancel = document.getElementById("btn-cancel");
-  const targetRun = inputRunId();
-  if (start) {
-    start.disabled = state.submittingStart || (!targetRun && state.busy);
-    start.title = targetRun ? "提交输入" : "开始新任务";
-    start.setAttribute?.("aria-label", start.title);
+  function text(value, fallback = "未知") {
+    return value === null || value === undefined || value === "" ? fallback : escapeHtml(value);
   }
-  const target = document.getElementById("input-target");
-  if (target) target.textContent = targetRun ? `当前任务 ${targetRun}` : "新任务";
-  const compose = document.getElementById("btn-new");
-  if (compose) {
-    compose.title = targetRun ? "补充输入" : "新任务";
-    compose.setAttribute?.("aria-label", compose.title);
-  }
-  const limits = document.getElementById("task-limits");
-  if (limits) limits.hidden = Boolean(targetRun);
-  const save = document.getElementById("btn-prompt-save");
-  if (save) save.disabled = state.submittingPrompt || !state.runId || !state.selectedPhase || TERMINAL.has(state.selectedPhase);
-  if (!cancel) return;
-  const selectedLive = Boolean(state.runId) && state.runId === state.activeRunId;
-  const selectedRunning = Boolean(state.runId) && state.selectedPhase && !TERMINAL.has(state.selectedPhase);
-  cancel.disabled = state.submittingCancel || !state.runId || Boolean(state.cancelledInputFailures[state.runId])
-    || !(selectedLive || selectedRunning);
-}
 
-function inputRunId() {
-  return !state.forceNewTask && state.runId && !state.cancelledInputFailures[state.runId]
-    && state.selectedPhase && !TERMINAL.has(state.selectedPhase)
-    ? state.runId : null;
-}
+  function displayValue(value, fallback = "未知") {
+    if (value === null || value === undefined || value === "") return fallback;
+    if (typeof value === "object") {
+      try { return escapeHtml(JSON.stringify(value)); } catch { return "无法显示"; }
+    }
+    return escapeHtml(value);
+  }
 
-function applyProviderAlert(health) {
-  if (!health) return;
-  if (!health.provider_available && health.provider_message) {
-    setAlert("provider-alert", health.provider_message);
-  } else {
-    setAlert("provider-alert", "");
+  function number(value, fallback = "未上报") {
+    return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("zh-CN") : fallback;
   }
-}
 
-function applyExecAlert(runPayload, health) {
-  const selected = state.runId;
-  if (!selected) {
-    setAlert("exec-alert", "");
-    return;
+  function count(value) {
+    return number(value, "未上报");
   }
-  if (state.cancelledInputFailures[selected]) {
-    setAlert("exec-alert", state.cancelledInputFailures[selected]);
-    return;
-  }
-  if (runPayload && runPayload.board && runPayload.board.run_id === selected) {
-    setAlert("exec-alert", runPayload.execution_error || "");
-    return;
-  }
-  if (health && health.worker_error && health.worker_error.run_id === selected) {
-    setAlert("exec-alert", health.worker_error.message || "");
-    return;
-  }
-  if (health && health.worker_error && health.worker_error.run_id !== selected) {
-    setAlert("exec-alert", "");
-  }
-}
 
-async function fetchJSON(url, options) {
-  let response;
-  try {
-    response = await fetch(url, options);
-  } catch (error) {
-    const err = new Error(error.message || "网络请求失败");
-    err.status = 0;
-    throw err;
+  function safeClass(value) {
+    return String(value || "unknown").replace(/[^a-z0-9_-]/gi, "-");
   }
-  const text = await response.text();
-  let data = {};
-  if (text) {
+
+  function json(value) {
+    if (value === null || value === undefined) return "未知";
+    try { return escapeHtml(JSON.stringify(value, null, 2)); } catch { return "无法显示原始数据"; }
+  }
+
+  function departmentName(key) {
+    return DEPARTMENTS[key]?.name || key || "未知部门";
+  }
+
+  function phaseLabel(phase) {
+    return PHASE_LABELS[phase] || phase || "未知状态";
+  }
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || status || "未知";
+  }
+
+  function departmentStatusLabel(status, fallback) {
+    return ({ success: "已完成", failed: "失败", running: "处理中", waiting: "等待" }[status] || status || fallback || "未知");
+  }
+
+  function promptStatusLabel(status) {
+    return ({ adopted: "生效中", pending: "待下次激活" }[status] || status || "未知状态");
+  }
+
+  function formatTime(value, includeDate = false) {
+    if (!value) return "未知时间";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    const date = parsed.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+    const time = parsed.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return includeDate ? `${date} ${time}` : time;
+  }
+
+  function duration(value, status) {
+    if (status === "running") return "进行中";
+    if (typeof value !== "number" || !Number.isFinite(value)) return "未上报";
+    return value < 1000 ? `${Math.round(value)}ms` : `${(value / 1000).toFixed(1)}s`;
+  }
+
+  function usageOf(item) {
+    return item && item.usage && typeof item.usage === "object" ? item.usage : null;
+  }
+
+  function usageValue(item, key, runningFallback = null) {
+    const usage = usageOf(item);
+    const value = usage ? usage[key] : null;
+    if (typeof value === "number" && Number.isFinite(value)) return number(value);
+    if (runningFallback && item?.status === "running") return runningFallback;
+    return "未上报";
+  }
+
+  function usageRawValue(item, key) {
+    const usage = usageOf(item);
+    const value = usage ? usage[key] : null;
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  function reportedUsage(item) {
+    const usage = usageOf(item);
+    if (!usage) return false;
+    if (usage.reported === true) return true;
+    return ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "total_tokens", "cost"]
+      .some(key => typeof usage[key] === "number" && Number.isFinite(usage[key]));
+  }
+
+  function currentDraft(map, key) {
+    return map[key] || "";
+  }
+
+  function attemptIdFromContext(context) {
+    return context?.id || null;
+  }
+
+  function currentDepartmentData(department = state.department) {
+    if (!state.runId) return null;
+    return state.departmentData.get(`${state.runId}/${department}`) || null;
+  }
+
+  function scrollKey() {
+    return `${state.runId || "none"}/${state.view}/${state.department}/${state.selectedAttemptId || "list"}`;
+  }
+
+  function captureScroll() {
+    const current = typeof globalThis.scrollY === "number" ? globalThis.scrollY : (document.documentElement?.scrollTop || 0);
+    state.scrollPositions[scrollKey()] = current;
+    return current;
+  }
+
+  function restoreScroll(value) {
+    if (typeof globalThis.scrollTo !== "function") return;
+    const restore = () => globalThis.scrollTo(0, value);
+    if (typeof globalThis.requestAnimationFrame === "function") globalThis.requestAnimationFrame(restore);
+    else restore();
+  }
+
+  function setStatus(message, kind = "") {
+    state.error = message || "";
+    const node = root?.querySelector?.(".dw-action-error");
+    if (node) {
+      node.textContent = message || "";
+      node.hidden = !message;
+      node.className = `dw-action-error ${kind}`.trim();
+    }
+  }
+
+  async function fetchJSON(url, options = {}) {
+    let response;
     try {
-      data = JSON.parse(text);
-    } catch {
-      data = { error: text };
-    }
-  }
-  if (!response.ok) {
-    const err = new Error(data.error || text || response.statusText);
-    err.status = response.status;
-    err.payload = data;
-    throw err;
-  }
-  return data;
-}
-
-function pill(outcome) {
-  const label = outcome || "running";
-  return `<span class="pill ${t(label, "")}">${t(label)}</span>`;
-}
-
-function kv(entries) {
-  return `<dl class="kv">${entries
-    .map(([key, value, cls]) => `<div${cls ? ` class="${t(cls, "")}"` : ""}><dt>${t(key)}</dt><dd>${t(value)}</dd></div>`)
-    .join("")}</dl>`;
-}
-
-function formatCost(cost) {
-  if (typeof cost !== "number" || !Number.isFinite(cost) || cost <= 0) return "未上报";
-  return String(cost);
-}
-
-function shortHash(value) {
-  if (!value) return "—";
-  return String(value).replace(/^sha256:/, "").slice(0, 12);
-}
-
-function gitVersionLink(item) {
-  const version = item?.git_version;
-  if (!version) return "";
-  return `<div class="git-version"><p class="hash">Git ${t(shortHash(version.commit))} · 父提交 ${version.parent_commit ? t(shortHash(version.parent_commit)) : "初始版本"}</p>
-    <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="git">查看本次变更</button></div>`;
-}
-
-function closeSource() {
-  if (state.source) {
-    state.source.close();
-    state.source = null;
-  }
-}
-
-function startWorkerWatch() {
-  if (workerWatchTimer != null) return;
-  workerWatchTimer = setInterval(() => {
-    pollWorkerHealth();
-  }, HEALTH_POLL_MS);
-  if (workerWatchTimer && typeof workerWatchTimer.unref === "function") {
-    workerWatchTimer.unref();
-  }
-}
-
-function stopWorkerWatch() {
-  if (workerWatchTimer == null) return;
-  clearInterval(workerWatchTimer);
-  workerWatchTimer = null;
-}
-
-function syncWorkerWatch() {
-  if (state.busy) startWorkerWatch();
-  else stopWorkerWatch();
-}
-
-async function pollWorkerHealth() {
-  if (workerWatchInFlight) return;
-  if (!state.busy && !state.activeRunId) {
-    stopWorkerWatch();
-    return;
-  }
-  workerWatchInFlight = true;
-  const gen = state.gen;
-  const runId = state.runId;
-  try {
-    const health = await fetchJSON("/api/health");
-    applyProviderAlert(health);
-    if (gen !== state.gen) return;
-    const wasBusy = state.busy;
-    state.busy = Boolean(health.busy);
-    state.activeRunId = health.active_run_id || null;
-    applyExecAlert(null, health);
-    syncButtons();
-    syncWorkerWatch();
-    if (wasBusy && !state.busy && runId && runId === state.runId) {
-      scheduleRefresh(state.runId, state.gen);
-    }
-  } catch (error) {
-    if (gen === state.gen) setStatus("error", error.message);
-  } finally {
-    workerWatchInFlight = false;
-  }
-}
-
-async function loadHealth(gen) {
-  try {
-    const health = await fetchJSON("/api/health");
-    applyProviderAlert(health);
-    if (gen === undefined || gen === state.gen) {
-      state.busy = Boolean(health.busy);
-      state.activeRunId = health.active_run_id || null;
-      applyExecAlert(null, health);
-      syncButtons();
-      syncWorkerWatch();
-    }
-    return health;
-  } catch (error) {
-    if (gen !== undefined && gen !== state.gen) return null;
-    setStatus("error", error.message);
-    return null;
-  }
-}
-
-async function loadRuns(runId, gen, seq) {
-  const data = await fetchJSON("/api/runs");
-  if (seq !== undefined && !stillCurrent(runId, gen, seq)) return data;
-  const list = document.getElementById("runs");
-  const empty = document.getElementById("run-empty");
-  if (!list) return data;
-  list.replaceChildren();
-  if (!data.runs.length) {
-    if (empty) empty.style.display = "block";
-    return data;
-  }
-  if (empty) empty.style.display = "none";
-  for (const run of data.runs) {
-    const item = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.id = run.run_id;
-    const strong = document.createElement("strong");
-    strong.textContent = run.phase;
-    const task = document.createElement("span");
-    task.className = "muted";
-    task.textContent = run.task;
-    button.append(strong, document.createElement("br"), task);
-    if (run.run_id === state.runId) button.classList.add("active");
-    button.addEventListener("click", () => selectRun(run.run_id));
-    item.appendChild(button);
-    list.appendChild(item);
-  }
-  return data;
-}
-
-async function selectRun(runId) {
-  const gen = ++state.gen;
-  state.runId = runId;
-  state.selectedPhase = null;
-  state.forceNewTask = false;
-  state.pendingRefresh = null;
-  setAlert("exec-alert", "");
-  document.querySelectorAll("#runs button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.id === runId);
-  });
-  closeSource();
-  syncButtons();
-  try {
-    const data = await refreshRun(runId, gen);
-    if (gen !== state.gen || !data) return;
-    listen(runId, data.events.at(-1)?.seq || 0, gen);
-  } catch (error) {
-    if (gen !== state.gen) return;
-    setStatus("error", error.message);
-  }
-}
-
-function scheduleRefresh(runId, gen) {
-  if (gen !== state.gen || runId !== state.runId) return;
-  if (state.refreshInFlight) {
-    state.pendingRefresh = { runId, gen };
-    return;
-  }
-  state.refreshInFlight = true;
-  (async () => {
-    try {
-      let current = { runId, gen };
-      while (current && current.gen === state.gen && current.runId === state.runId) {
-        state.pendingRefresh = null;
-        await refreshRun(current.runId, current.gen);
-        current = state.pendingRefresh;
-      }
+      response = await fetch(url, options);
     } catch (error) {
-      if (state.gen === gen) setStatus("error", error.message);
-    } finally {
-      state.refreshInFlight = false;
-      const pending = state.pendingRefresh;
-      if (pending && pending.gen === state.gen && pending.runId === state.runId) {
-        scheduleRefresh(pending.runId, pending.gen);
+      const failure = new Error(error?.message || "网络请求失败");
+      failure.status = 0;
+      throw failure;
+    }
+    const raw = await response.text();
+    let payload = {};
+    if (raw) {
+      try { payload = JSON.parse(raw); } catch {
+        const failure = new Error("响应不是有效 JSON");
+        failure.status = response.status;
+        failure.payload = { raw };
+        throw failure;
       }
     }
-  })();
-}
-
-async function refreshRun(runId, gen) {
-  const seq = ++state.refreshSeq;
-  const data = await fetchJSON(`/api/runs/${runId}`);
-  if (!stillCurrent(runId, gen, seq)) return null;
-  renderBoard(data.board, data.aggregates, data.timeline, data.events);
-  renderTimeline(data.timeline);
-  renderEvidence(data.evidence, gen);
-  renderContext(data.context, data.events, gen);
-  renderInputs(data.inputs || [], data.board, gen);
-  renderPrompts(data.prompts, data.board, gen);
-  await loadRuns(runId, gen, seq);
-  if (!stillCurrent(runId, gen, seq)) return null;
-  const health = await loadHealth(gen);
-  if (!stillCurrent(runId, gen, seq)) return null;
-  applyRunStatus(data, health);
-  syncButtons();
-  return data;
-}
-
-function applyRunStatus(data, health) {
-  const board = data.board;
-  if (data.events?.some(event => event.type === "run_failed" && event.stop_reason === "cancelled" && event.input_save_failure)) {
-    state.cancelledInputFailures[board.run_id] = "执行已取消，但命令原文未形成正式 Git 版本。";
-  }
-  state.selectedPhase = board.phase;
-  if (health) {
-    state.busy = Boolean(health.busy);
-    state.activeRunId = health.active_run_id || null;
-  } else if (data.worker_active) {
-    state.busy = true;
-    state.activeRunId = board.run_id;
-  }
-  applyExecAlert(data, health);
-  syncWorkerWatch();
-  if (state.cancelledInputFailures[board.run_id]) {
-    setStatus("error", state.cancelledInputFailures[board.run_id]);
-    return;
-  }
-  if (data.execution_error) {
-    setStatus("error", "执行中断");
-    return;
-  }
-  if (board.phase === "DONE") setStatus("idle", `已完成 ${board.run_id}`);
-  else if (board.phase === "FAILED") setStatus("error", board.error || board.stop_reason || "失败");
-  else if (board.phase === "PAUSED") setStatus("conflict", board.human_action || board.stop_reason || "已暂停");
-  else {
-    const retry = board.retry;
-    if (retry?.status === "waiting") {
-      const delay = retry.delay_sec === null || retry.delay_sec === undefined ? "" : `${t(retry.delay_sec)} 秒后`;
-      const next = retry.next_attempt || (Number(retry.attempt) + 1);
-      setStatus("running", `${board.phase} · ${departmentLabel(retry.department)} · 第 ${t(retry.attempt)}/${t(retry.max_attempts || 3)} 次尝试失败，${delay || "稍后"}进行第 ${t(next)} 次`);
-      return;
+    if (!response.ok) {
+      const failure = new Error(payload.error || response.statusText || "请求失败");
+      failure.status = response.status;
+      failure.payload = payload;
+      throw failure;
     }
-    if (retry?.status === "prepared" || retry?.status === "requesting") {
-      setStatus("running", `${board.phase} · ${departmentLabel(retry.department)} · 第 ${t(retry.attempt)}/${t(retry.max_attempts || 3)} 次尝试`);
-      return;
+    return payload;
+  }
+
+  function apiPath(runId, suffix = "") {
+    return `/api/runs/${encodeURIComponent(runId)}${suffix}`;
+  }
+
+  function queryPath(path, params) {
+    const search = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "" && value !== "all") search.set(key, value);
+    });
+    const query = search.toString();
+    return query ? `${path}?${query}` : path;
+  }
+
+  function routeFromLocation() {
+    const search = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
+    const view = search.get("view");
+    state.view = view === "observability" || view === "department" ? view : "overview";
+    state.department = DEPARTMENTS[search.get("department")] ? search.get("department") : "product";
+    state.runId = search.get("run") || null;
+    state.observationTab = search.get("obTab") === "usage" ? "usage" : "requests";
+    state.observationScreen = search.get("attempt") ? "detail" : "list";
+    state.selectedAttemptId = search.get("attempt") || null;
+    state.observationDetailTab = ["overview", "request", "response", "events"].includes(search.get("detailTab"))
+      ? search.get("detailTab") : "overview";
+    state.inspectorTab = ["context", "provider", "prompt"].includes(search.get("inspectorTab"))
+      ? search.get("inspectorTab") : "context";
+    state.inspectorCollapsed = search.get("inspector") === "collapsed";
+    const contextId = search.get("context");
+    if (contextId && state.runId) state.selectedContext[`${state.runId}/${state.department}`] = contextId;
+    state.observationFilters = {
+      department: ["product", "engineering", "quality"].includes(search.get("departmentFilter")) ? search.get("departmentFilter") : "all",
+      status: ["success", "failed", "running"].includes(search.get("status")) ? search.get("status") : "all",
+      q: search.get("q") || "",
+    };
+  }
+
+  function updateRoute({ push = true } = {}) {
+    if (typeof history === "undefined" || typeof location === "undefined") return;
+    const params = new URLSearchParams();
+    if (state.runId) params.set("run", state.runId);
+    if (state.view !== "overview") params.set("view", state.view);
+    if (state.view === "department") params.set("department", state.department);
+    if (state.view === "observability") {
+      if (state.observationTab !== "requests") params.set("obTab", state.observationTab);
+      if (state.observationScreen === "detail" && state.selectedAttemptId) params.set("attempt", state.selectedAttemptId);
+      if (state.observationScreen === "detail" && state.observationDetailTab !== "overview") params.set("detailTab", state.observationDetailTab);
+      if (state.observationFilters.department !== "all") params.set("departmentFilter", state.observationFilters.department);
+      if (state.observationFilters.status !== "all") params.set("status", state.observationFilters.status);
+      if (state.observationFilters.q) params.set("q", state.observationFilters.q);
     }
-    setStatus("running", `${board.phase} · ${board.active_department || ""}`);
+    if (state.view === "department") {
+      if (state.inspectorTab !== "context") params.set("inspectorTab", state.inspectorTab);
+      if (state.inspectorCollapsed) params.set("inspector", "collapsed");
+      const contextId = state.selectedContext[`${state.runId}/${state.department}`];
+      if (contextId) params.set("context", contextId);
+    }
+    const next = `${location.pathname}${params.toString() ? `?${params}` : ""}${location.hash || ""}`;
+    const method = push ? "pushState" : "replaceState";
+    history[method]({}, "", next);
   }
-}
 
-const CYCLE_NODES = [
-  { id: "product", name: "产品" },
-  { id: "engineering", name: "工程" },
-  { id: "quality", name: "质检" },
-];
-
-const PHASE_LABEL = {
-  PRODUCT_SPEC: "写规格",
-  ENGINEERING: "实现",
-  REWORK_ENGINEERING: "返工开发",
-  DELIVERY: "提交交付",
-  QUALITY: "检查",
-  REWORK_PRODUCT: "退回产品",
-  DONE: "完成",
-  FAILED: "停止",
-  PAUSED: "暂停",
-};
-
-function stopLabel(reason) {
-  return { model_steps_exhausted: "模型步骤已达上限", provider_timeout: "模型请求超时" }[reason] || reason;
-}
-
-function cycleNodeClass(nodeId, board) {
-  const phase = board.phase || "";
-  const active = board.active_department || "";
-  if (phase === "DONE") return nodeId === "quality" ? " done" : "";
-  if (phase === "FAILED" || phase === "PAUSED") return nodeId === active ? " stop" : "";
-  return nodeId === active ? " active" : "";
-}
-
-function cycleLinkClass(index, board) {
-  if (board.pending_request) return "";
-  const phase = board.phase || "";
-  if (index === 0) {
-    return ["ENGINEERING", "DELIVERY", "REWORK_ENGINEERING"].includes(phase)
-      ? " active"
-      : "";
-  }
-  return ["QUALITY", "DELIVERY", "REWORK_PRODUCT", "REWORK_ENGINEERING", "DONE"].includes(phase) ? " active" : "";
-}
-
-function renderCycle(board, timeline) {
-  const phase = board.phase || "";
-  const pending = board.pending_request;
-  const nodes = CYCLE_NODES.map((node, index) => {
-    const on = (board.active_department || "") === node.id || (phase === "DONE" && node.id === "quality");
-    const phaseText = pending && node.id === pending.requester ? "等待回应"
-      : on ? pending ? collaborationType(pending) : PHASE_LABEL[phase] || phase : "";
-    const link =
-      index < CYCLE_NODES.length - 1
-        ? `<div class="cycle-link${cycleLinkClass(index, board)}" aria-hidden="true">${pending ? "·" : "→"}</div>`
-        : "";
-    return `<div class="cycle-node${cycleNodeClass(node.id, board)}" title="${t(phase, "")}">
-        <div class="cycle-name">${node.name}</div>
-        <div class="cycle-phase">${t(phaseText, "")}</div>
-      </div>${link}`;
-  }).join("");
-  const facts = [];
-  if (pending) {
-    facts.push(`${departmentLabel(pending.requester)} → ${departmentLabel(pending.recipient)} · ${collaborationType(pending)}`);
-    facts.push(`返回 ${PHASE_LABEL[pending.return_phase] || pending.return_phase}`);
-  } else if (board.request_count) {
-    facts.push(`协作 ${board.request_count}`);
-  }
-  if (board.rework_count) facts.push(`返工 ${board.rework_count}`);
-  if (phase === "DONE") facts.push("已完成");
-  else if (phase === "FAILED") facts.push(board.stop_reason || "失败");
-  else if (phase === "PAUSED") facts.push(stopLabel(board.stop_reason) || "已暂停");
-  const factLine = facts.length ? `<p class="cycle-fact">${facts.map((item) => t(item)).join(" · ")}</p>` : "";
-  return `<div class="cycle" role="list">${nodes}</div>${factLine}`;
-}
-
-function retryAttemptText(retry) {
-  if (!retry || retry.attempt === null || retry.attempt === undefined) return "模型尝试";
-  const max = retry.max_attempts || 3;
-  return `第 ${t(retry.attempt)}/${t(max)} 次尝试`;
-}
-
-function retrySummary(retry) {
-  if (!retry || !retry.status || retry.status === "idle" || retry.status === "active") return "";
-  const department = retry.department ? `${departmentLabel(retry.department)} · ` : "";
-  const attempt = retryAttemptText(retry);
-  if (retry.status === "waiting") {
-    const delay = retry.delay_sec === null || retry.delay_sec === undefined ? "" : `${t(retry.delay_sec)} 秒后`;
-    const error = retry.last_error ? ` · ${t(retry.last_error)}` : "";
-    const next = retry.next_attempt || (Number(retry.attempt) + 1);
-    return `<p class="note retry-state">${department}${attempt}失败，${delay || "稍后"}进行第 ${t(next)}/${t(retry.max_attempts || 3)} 次尝试${error}</p>`;
-  }
-  if (retry.status === "prepared") {
-    return `<p class="note retry-state">${department}${attempt}已准备，等待请求</p>`;
-  }
-  if (retry.status === "requesting") {
-    return `<p class="note retry-state">${department}${attempt}请求中</p>`;
-  }
-  if (retry.status === "cancelled") {
-    return `<p class="note retry-state">${department}${attempt}已取消${retry.last_error ? ` · ${t(retry.last_error)}` : ""}</p>`;
-  }
-  const error = retry.last_error ? ` · ${t(retry.last_error)}` : "";
-  return `<p class="note retry-state">${department}${attempt}失败，未安排重试${error}</p>`;
-}
-
-function renderBoard(board, aggregates, timeline, events) {
-  const node = document.getElementById("board-body");
-  if (!node) return;
-  if (state.cancelledInputFailures[board.run_id] && !TERMINAL.has(board.phase)) {
-    board = { ...board, phase: "FAILED", outcome: "failed", stop_reason: "cancelled",
-      waiting_reason: "", pending_request: null };
-  }
-  const agg = aggregates || {};
-  const visibleRetry = board.phase === "DONE" || board.phase === "PAUSED" ? null : board.retry;
-  const requestModel = board.requested_model || "未上报";
-  const actualModel = board.actual_model || "未上报";
-  const requestProvider = board.requested_provider || "未上报";
-  const actualProvider = board.actual_provider || "未上报";
-  const protocol = board.protocol || "未上报";
-  node.innerHTML = `
-    ${renderCycle(board, timeline || {})}
-    ${retrySummary(visibleRetry)}
-    ${pill(board.outcome)}
-    ${kv([
-      ["阶段", board.phase],
-      ["活动部门", board.active_department],
-      ["等待原因", board.waiting_reason],
-      ["停止原因", stopLabel(board.stop_reason)],
-      ["循环", `${board.cycle_count} / ${board.max_cycles}`],
-      ["Token", board.token_used || "未上报"],
-      ["耗时 ms", agg.latency_ms],
-      ["工具次数", agg.tool_count],
-      ["协作请求", agg.request_count],
-      ["返工", agg.rework_count],
-      ["费用", formatCost(agg.cost)],
-      ["请求模型", requestModel, "kv-model"],
-      ["返回模型", actualModel],
-      ["适配器", protocol],
-      ["请求供应商", requestProvider],
-      ["返回供应商", actualProvider],
-    ])}
-    <p class="task-text">${t(board.task)}</p>
-    ${board.human_action ? `<p class="note">${t(board.human_action)}</p>` : ""}
-    ${board.error ? `<p class="note">${t(board.error)}</p>` : ""}
-  `;
-}
-
-function renderTimeline(timeline, gen = state.gen) {
-  const node = document.getElementById("timeline-body");
-  if (!node) return;
-  const contract = timeline.effective_contract;
-  const product = timeline.current_product_spec;
-  const plan = timeline.engineering_plan;
-  const currentPlan = plan && contract && plan.status === "active" && plan.effective_contract_hash === contract.content_hash;
-  const current = `
-    <div class="work-document">
-      <h3>当前需求</h3>
-      ${contract ? `
-      <p class="document-heading">PRD.md <span>r${t(contract.revision)} · 当前有效</span></p>
-      <p>${t(product && product.goal, "")}</p>
-      <p class="hash">合同 ${t(shortHash(contract.content_hash))}</p>
-      <button type="button" class="event-link" data-event-id="${t(contract.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
-      ${gitVersionLink(contract)}
-      ` : '<p class="muted">产品尚未接纳有效需求。</p>'}
-    </div>
-    <div class="work-document">
-      <h3>工程计划</h3>
-      ${plan ? `
-      <p class="document-heading">PLAN.md <span>r${t(plan.revision)} · ${currentPlan ? "当前有效" : "已失效"}</span></p>
-      <p>${t(plan.objective)}</p>
-      <p class="path">范围：${t((plan.scope || []).join(", "))}</p>
-      <ol class="plan-tasks">${(plan.tasks || []).map((task) => `<li>
-        <strong>${t(task.title)}</strong>
-        <p>产出：${t((task.outputs || []).join("；"))}</p>
-        <p class="muted">验证：${t(task.verification)}</p>
-      </li>`).join("")}</ol>
-      ${plan.reason ? `<p>调整原因：${t(plan.reason)}</p>` : ""}
-      ${(plan.assumptions || []).length ? `<details><summary>专业默认与依据</summary><ul>${plan.assumptions.map((item) => `<li>${t(item.decision)}<p class="muted">${t(item.basis)}</p></li>`).join("")}</ul></details>` : ""}
-      <p class="hash">依据合同 ${t(shortHash(plan.effective_contract_hash))}</p>
-      <button type="button" class="event-link" data-event-id="${t(plan.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
-      ${gitVersionLink(plan)}
-      ` : '<p class="muted">工程尚未接纳实施计划。</p>'}
-    </div>`;
-  const contracts = (timeline.effective_contracts || []).map((item) => `
-    <article class="item">
-      <header><span>PRD r${t(item.revision)}</span><span>${contract && item.content_hash === contract.content_hash ? "当前有效" : "已被替代"}</span></header>
-      <p class="hash">${t(shortHash(item.content_hash))}</p>
-      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
-      ${gitVersionLink(item)}
-    </article>`).join("");
-  const plans = (timeline.engineering_plans || []).map((item) => `
-    <article class="item">
-      <header><span>计划 r${t(item.revision)}</span><span>${currentPlan && item.content_hash === plan.content_hash ? "当前有效" : "已失效"}</span></header>
-      <p>${t(item.objective)}</p>
-      ${item.reason ? `<p>调整原因：${t(item.reason)}</p>` : ""}
-      <p class="hash">依据合同 ${t(shortHash(item.effective_contract_hash))}</p>
-      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
-      ${gitVersionLink(item)}
-    </article>`).join("");
-  const specs = (timeline.specs || [])
-    .map(
-      (spec) => `
-    <article class="item">
-      <header><span>ProductSpec r${t(spec.revision)}</span><span>${t(spec.status)}</span></header>
-      <p>${t(spec.goal, "")}</p>
-      <p class="muted">已处理输入 v${t(spec.input_version)}</p>
-      ${renderChangeRecord(spec.change_record)}
-      <p class="hash">${t(shortHash(spec.content_hash))} ← ${t(shortHash(spec.parent_hash))}</p>
-      ${(timeline.effective_contracts || []).some(item => item.git_version?.commit === spec.git_version?.commit) ? "" : gitVersionLink(spec)}
-    </article>`,
-    )
-    .join("");
-  const requests = (timeline.requests || []).map((request) => {
-    const responses = (timeline.responses || []).filter(item => item.request_id === request.id).map((response) => `
-      <div class="collaboration-response">
-        <p><strong>${t(collaborationStatus(response.status))}</strong> · ${t(response.text)}</p>
-        <p class="muted">${response.return_work_valid === false ? "原工作已失效，转到" : "返回"} ${t(PHASE_LABEL[response.return_phase] || response.return_phase)}</p>
-        <div class="actions">
-          <button type="button" class="event-link" data-event-id="${t(response.created_event_id)}">查看回应</button>
-          ${(response.result_event_ids || []).map((eventId, index) => `<button type="button" class="event-link" data-event-id="${t(eventId)}">结果 ${index + 1}</button>`).join("")}
-        </div>
-      </div>`).join("");
-    const closures = (timeline.request_closures || []).filter(item => item.request_id === request.id).map((closure) => `
-      <div class="collaboration-response">
-        <p><strong>${t(collaborationStatus(closure.status))}</strong> · ${t(closure.reason)}</p>
-        <p class="muted">${closure.return_work_valid ? "返回" : "原工作未继续"} ${t(PHASE_LABEL[closure.return_phase] || closure.return_phase)}</p>
-        <button type="button" class="event-link" data-event-id="${t(closure.created_event_id)}">查看关闭记录</button>
-      </div>`).join("");
-    return `<article class="item collaboration-request">
-      <header><span>${t(departmentLabel(request.requester))} → ${t(departmentLabel(request.recipient))} · ${t(collaborationType(request))}</span><span>${t(collaborationStatus(request.status))}</span></header>
-      <p>${t(request.question)}</p>
-      <p class="muted">${t(request.background)}</p>
-      <p>期望结果：${t(request.expected_result)}</p>
-      <button type="button" class="event-link" data-event-id="${t(request.created_event_id)}">查看请求</button>
-      ${responses}${closures}
-    </article>`;
-  }).join("");
-  const effective = new Set((timeline.effective_decisions || []).map(item => item.content_hash));
-  const decisions = (timeline.product_decisions || []).map((decision) => `<article class="item">
-    <header><span>产品正式决定</span><span>${effective.has(decision.content_hash) ? "当前有效" : "已处理"}</span></header>
-    <p>${t(decision.statement)}</p><p class="muted">${t(decision.rationale)}</p>
-    <button type="button" class="event-link" data-event-id="${t(decision.created_event_id)}">查看决定</button>
-    ${gitVersionLink(decision)}
-  </article>`).join("");
-  node.innerHTML = `
-    ${current}
-    <details class="work-history"><summary>需求与计划历史</summary><div class="list">${contracts}${plans}</div></details>
-    <p class="muted">transitions: ${t((timeline.transitions || []).join(" · "), "—")}</p>
-    <div class="list">${specs}${decisions}</div>
-    <h3>部门协作</h3>
-    <div class="list">${requests || '<p class="muted">尚无协作请求。</p>'}</div>
-  `;
-  node.querySelectorAll(".event-link").forEach((button) => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
-  });
-}
-
-function departmentLabel(department) {
-  return CYCLE_NODES.find(node => node.id === department)?.name || department;
-}
-
-function collaborationType(request) {
-  if (request.request_type === "consultation") return "咨询";
-  return { inspect: "查看", check: "检查", revise_requirements: "修订需求", revise_delivery: "修订交付" }[request.action] || "动作";
-}
-
-function collaborationStatus(status) {
-  return { open: "待回应", answered: "已回答", completed: "已完成", declined: "未接受", needs_work: "仍需处理",
-    cancelled: "已取消", superseded: "已失效", stopped: "已停止" }[status] || status;
-}
-
-function renderEvidence(evidence, gen = state.gen) {
-  const node = document.getElementById("evidence-body");
-  if (!node) return;
-  const deliveries = (evidence.deliveries || [])
-    .map(
-      (item) => `
-    <article class="item">
-      <header><span>Delivery r${t(item.revision)}</span><span class="path">${t((item.files || []).join(", "))}</span></header>
-      <p>${t(item.summary)}</p>
-      <p class="hash">${t(shortHash(item.code_tree_digest))}</p>
-      <p class="muted">${t((item.checks || []).map((check) => `${check.name}:${check.exit_code}`).join(" "))}</p>
-      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="tree">查看完整交付</button>
-      ${gitVersionLink(item)}
-    </article>`,
-    )
-    .join("");
-  const reviews = (evidence.reviews || [])
-    .map(
-      (item) => `
-    <article class="item">
-      <header><span>QA ${t(item.verdict)}</span><span>${t((item.defects || []).length)} defects</span></header>
-      <p>${t(item.rationale)}</p>
-      <p class="hash">spec ${t(shortHash(item.product_spec_hash))} snapshot ${t(shortHash(item.code_snapshot_hash))}</p>
-      ${gitVersionLink(item)}
-    </article>`,
-    )
-    .join("");
-  const rejections = (evidence.rejections || [])
-    .map(
-      (item) => `
-    <article class="item">
-      <header><span>Rejected ${t(item.department)}</span><span>${t(item.phase)}</span></header>
-      <pre>${t(JSON.stringify(item.errors, null, 2))}</pre>
-    </article>`,
-    )
-    .join("");
-  const candidates = (evidence.lesson_candidates || [])
-    .map((item) => {
-      const observation = item.observation;
-      const isReview = Boolean(observation.verdict);
-      const defects = (observation.defects || [])
-        .map((defect) => `<li>${t(defect.severity)} · ${t(defect.summary)}</li>`)
-        .join("");
-      return `
-    <article class="item lesson-candidate">
-      <header><span>候选 ${t(item.id)}</span><span>待验证</span></header>
-      <p><strong>${isReview ? "质检记录" : "失败记录"}</strong> · ${t(isReview ? observation.verdict : observation.stop_reason)}</p>
-      <p>${t(isReview ? observation.rationale : observation.message)}</p>
-      ${defects ? `<ul>${defects}</ul>` : ""}
-      <p><strong>待验证建议</strong>：${t(item.suggestion)}</p>
-      <div class="actions">
-        <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看候选</button>
-        <button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看来源</button>
-      </div>
-    </article>`;
-    })
-    .join("");
-  node.innerHTML =
-    deliveries || reviews || rejections || candidates
-      ? `<div class="list">${deliveries}${reviews}${rejections}</div>${candidates ? `<h3 class="lesson-heading">经验候选</h3><div class="list">${candidates}</div>` : ""}`
-      : `<p class="muted">尚无交付或质检证据。</p>`;
-  node.querySelectorAll(".event-link").forEach((button) => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
-  });
-}
-
-function renderChangeRecord(record) {
-  if (!record) return "";
-  return `<div class="change-record">${[["变更", record.changed], ["保留", record.retained], ["移除", record.retired]]
-    .map(([label, items]) => `<p><strong>${label}</strong>：${t((items || []).join("；"), "无")}</p>`).join("")}
-    <p><strong>原因</strong>：${t(record.rationale)}</p></div>`;
-}
-
-function renderInputs(inputs, board, gen) {
-  const node = document.getElementById("inputs-body");
-  if (!node) return;
-  node.innerHTML = inputs.length ? inputs.map((item) => {
-    const status = item.kind === "command" ? "取消命令已执行"
-      : item.version <= board.processed_input_version ? "已进入需求"
-      : TERMINAL.has(board.phase) ? "未进入需求（任务已结束）"
-      : item.version <= board.product_work_input_version ? "产品处理中" : "等待产品处理";
-    return `<article class="item user-input" data-input-version="${t(item.version)}">
-      <header><span>输入 v${t(item.version)}</span><span>${status}</span></header>
-      <pre class="raw-text">${escapeHtml(item.text)}</pre>
-      <p class="hash">UTF-8 字节 [${t(item.byte_start)}, ${t(item.byte_end)}) · ${t(shortHash(item.input_ref?.content_hash))}</p>
-      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看接收记录</button>
-      ${gitVersionLink(item)}
-    </article>`;
-  }).join("") : '<p class="muted">尚无输入。</p>';
-  node.querySelectorAll(".event-link").forEach(button => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
-  });
-}
-
-function promptKey() {
-  const department = document.getElementById("prompt-department")?.value;
-  return state.runId && department ? `${state.runId}/${department}` : null;
-}
-
-function renderPrompts(prompts, board, gen) {
-  state.promptData = { prompts, board, gen };
-  renderPromptSelection();
-}
-
-function renderPromptSelection() {
-  const data = state.promptData;
-  const selector = document.getElementById("prompt-department");
-  if (!data || !selector || data.board.run_id !== state.runId) return;
-  const department = selector.value;
-  const current = data.prompts?.current?.[department];
-  const target = document.getElementById("prompt-target");
-  if (target) target.textContent = TERMINAL.has(data.board.phase)
-    ? `${data.board.run_id} · 任务已结束`
-    : `${data.board.run_id} · 保存后在${departmentLabel(department)}下次激活采用`;
-  const version = document.getElementById("prompt-version");
-  if (version) version.textContent = current ? `v${current.version} · ${shortHash(current.prompt_ref?.content_hash)}` : "";
-  const original = document.getElementById("prompt-current-text");
-  if (original) original.textContent = current?.text || "";
-  const editor = document.getElementById("prompt-text");
-  if (editor) editor.value = state.promptDrafts[promptKey()] ?? current?.text ?? "";
-  const history = document.getElementById("prompt-history");
-  if (history) {
-    const versions = (data.prompts?.versions || []).filter(item => item.department === department);
-    history.innerHTML = versions.map(item => {
-      const activations = (data.prompts?.activations || []).filter(item2 =>
-        item2.department === department && item2.prompt_version === item.version);
-      return `<details class="work-history" data-prompt-version="${t(item.version)}">
-        <summary>v${t(item.version)} · ${activations.length ? `已采用 ${activations.length} 次` : "尚未采用"}</summary>
-        <pre class="raw-text">${escapeHtml(item.text)}</pre>
-        <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看保存记录</button>
-        ${activations.map(active => `<p class="muted">输入 v${t(active.input_version)} · 激活 ${t(active.activation_id)}
-          <button type="button" class="event-link" data-event-id="${t(active.event_id)}">查看采用记录</button></p>`).join("")}
-      </details>`;
-    }).join("");
-    history.querySelectorAll(".event-link").forEach(button => {
-      button.addEventListener("click", () => openEvent(button.dataset.eventId, data.gen));
+  function icons() {
+    if (!root) return;
+    root.querySelectorAll(".dw-icon-button[aria-label], .dw-tool-button[title], .dw-inline-action[title]").forEach(button => {
+      if (button.getAttribute("title")) button.setAttribute("data-tooltip", button.getAttribute("title"));
+      if (button.getAttribute("aria-label")) button.setAttribute("data-tooltip", button.getAttribute("aria-label"));
     });
+    if (globalThis.lucide && typeof globalThis.lucide.createIcons === "function") {
+      globalThis.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+    }
   }
-}
 
-async function savePrompt(event) {
-  event.preventDefault();
-  if (state.submittingPrompt || !state.runId || TERMINAL.has(state.selectedPhase)) return;
-  const runId = state.runId;
-  const gen = state.gen;
-  const department = document.getElementById("prompt-department").value;
-  const text = document.getElementById("prompt-text").value;
-  const key = promptKey();
-  if (!text.trim()) return;
-  state.promptDrafts[key] = text;
-  state.submittingPrompt = true;
-  syncButtons();
-  try {
-    const saved = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/prompts/${department}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
-    });
-    if (state.promptDrafts[key] === text) delete state.promptDrafts[key];
-    if (gen !== state.gen) return;
-    await refreshRun(runId, gen);
-    setStatus("idle", `提示词 v${saved.prompt_version} 已保存`);
-  } catch (error) {
-    if (gen === state.gen) setStatus("error", error.message);
-  } finally {
-    state.submittingPrompt = false;
-    syncButtons();
+  function renderLoading(label = "正在读取真实记录") {
+    if (main) main.innerHTML = `<div class="dw-page"><div class="dw-load-state">${escapeHtml(label)}…</div></div>`;
+    updateNav();
+    icons();
   }
-}
 
-function renderContext(context, events, gen) {
-  const node = document.getElementById("context-body");
-  if (!node) return;
-  const manifests = (context.manifests || [])
-    .map((item) => {
-      return `
-    <article class="item">
-      <header><span>${t(item.department)} · 第 ${t(item.step_id)} 步${item.purpose === "compaction" ? " · 压缩" : ""}</span><span>${t(item.token_estimate)} tok / 窗口 ${t(item.budget)}</span></header>
-      <p class="muted">采用输入 v${t(item.input_version)} · 提示词 v${t(item.prompt_version)} · ${t(shortHash(item.prompt_hash))}</p>
-      <p>注入：${t((item.injected || []).map((part) => part.source).join(", "))}</p>
-      <p class="muted">排除：${t((item.excluded || []).map((part) => part.source).join(", "))}</p>
-      <p class="hash">${t(shortHash(item.digest))}</p>
-      ${item.source_event_id && item.request_ref ? `<button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看模型输入</button>` : ""}
-      ${item.compaction_event_id ? `<button type="button" class="event-link" data-event-id="${t(item.compaction_event_id)}">查看使用的摘要</button>` : ""}
-    </article>`;
-    })
-    .join("");
-  const compactions = (context.compactions || [])
-    .map((item) => `
-    <article class="item">
-      <header><span>${t(item.department)} · 上下文摘要</span><span>第 ${t(item.step_id)} 步</span></header>
-      <button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看摘要与原始记录</button>
-    </article>`)
-    .join("");
-  const cards = (events || [])
-    .slice(-12)
-    .reverse()
-    .map(
-      (event) => {
-        const retry = event.type === "model_attempt_failed" || event.type === "model_retry_scheduled";
-        const attempt = event.attempt === null || event.attempt === undefined
-          ? "" : ` · 第 ${t(event.attempt)}/${t(event.max_attempts || 3)} 次尝试`;
-        const retryText = event.type === "model_attempt_failed"
-          ? `模型尝试失败${attempt}${event.reason ? ` · ${t(event.reason)}` : ""}${event.error ? ` · ${t(event.error)}` : ""}`
-          : event.type === "model_retry_scheduled"
-            ? `已安排重试${attempt}${event.delay_sec === null || event.delay_sec === undefined ? "" : ` · 退避 ${t(event.delay_sec)} 秒`}${event.next_step_id === null || event.next_step_id === undefined ? "" : ` · 下一步 ${t(event.next_step_id)}`}`
-            : "";
-        return `
-    <article class="item event" data-id="${t(event.event_id)}">
-      <header><span>${t(event.seq)}. ${t(event.type)}</span><span>${t(event.role, "")}</span></header>
-      <p class="muted">${t(event.state_before)} → ${t(event.state_after)}</p>
-      ${retry ? `<p class="note retry-state">${retryText}</p>` : ""}
-    </article>`;
-      },
-    )
-    .join("");
-  node.innerHTML = `
-    <div class="list">${manifests}</div>
-    ${compactions ? `<h3>压缩记录</h3><div class="list">${compactions}</div>` : ""}
-    <h3>最近事件</h3>
-    <div class="list">${cards}</div>
-  `;
-  document.querySelectorAll(".event").forEach((nodeEl) => {
-    nodeEl.addEventListener("click", () => {
-      openEvent(nodeEl.dataset.id, gen).catch((error) => {
-        if (gen !== state.gen) return;
-        setStatus("error", error.message);
+  function renderError(error) {
+    const message = error?.message || String(error || "读取失败");
+    state.error = message;
+    if (main) main.innerHTML = `<div class="dw-page"><div class="dw-load-state error">${escapeHtml(message)}</div><div class="dw-task-tools"><button class="dw-tool-button" type="button" data-action="refresh" title="重新读取"><i data-lucide="refresh-cw" aria-hidden="true"></i><span>重新读取</span></button></div></div>`;
+    updateNav();
+    icons();
+  }
+
+  function taskToolsMarkup() {
+    const phase = state.runPayload?.board?.phase;
+    const canCancel = Boolean(state.runId && phase && !TERMINAL.has(phase) && !state.cancelling);
+    const options = state.runs.map(run => `<option value="${escapeHtml(run.run_id)}" ${run.run_id === state.runId ? "selected" : ""}>${escapeHtml(run.task || run.run_id)}</option>`).join("");
+    return `<div class="dw-task-tools"><label class="dw-run-picker"><span class="dw-small">任务</span><select data-run-picker aria-label="选择任务">${options || "<option>暂无任务</option>"}</select></label><button class="dw-tool-button" type="button" data-action="new-task" title="新建任务"><i data-lucide="plus" aria-hidden="true"></i><span>新建</span></button><button class="dw-tool-button" type="button" data-action="history" title="任务历史"><i data-lucide="history" aria-hidden="true"></i><span>历史</span></button><button class="dw-tool-button${canCancel ? " danger" : ""}" type="button" data-action="cancel" title="取消当前任务" ${canCancel ? "" : "disabled"}><i data-lucide="square" aria-hidden="true"></i><span>取消</span></button></div>`;
+  }
+
+  function statusTone(status) {
+    if (status === "success" || status === "done" || status === "completed") return "done";
+    if (status === "failed" || status === "error") return "issue";
+    if (status === "running" || status === "active" || status === "waiting") return "waiting";
+    return "";
+  }
+
+  function nodeState(key, data) {
+    const board = data?.board;
+    if (!board) return { status: "等待", tone: "waiting" };
+    const phase = board.phase || "";
+    if (phase === "DONE") return { status: "已完成", tone: "done" };
+    if (phase === "FAILED") return { status: "失败", tone: key === board.active_department ? "issue" : "waiting" };
+    if (phase === "PAUSED") return { status: "已暂停", tone: "waiting" };
+    const pending = data.timeline?.pending_request || board.pending_request;
+    if (pending?.recipient === key) {
+      if (pending.request_type === "consultation") return { status: "咨询待回应", tone: "waiting" };
+      if (String(pending.action || "").startsWith("revise")) return { status: "返工待处理", tone: "waiting" };
+      return { status: "待处理", tone: "waiting" };
+    }
+    if (board.active_department === key) return { status: phaseLabel(phase), tone: "active" };
+    const latest = (data.events || []).filter(event => event.role === key).at(-1);
+    if (latest?.type === "collaboration_requested") return { status: "已发起协作", tone: "active" };
+    if (latest?.type === "collaboration_responded") return { status: "已回应", tone: "done" };
+    if (latest?.type === "proposal_rejected") return { status: "需要处理", tone: "issue" };
+    const index = { product: 0, engineering: 1, quality: 2 }[key];
+    const activeIndex = { product: 0, engineering: 1, quality: 2 }[board.active_department];
+    if (Number.isInteger(index) && Number.isInteger(activeIndex) && index < activeIndex) return { status: "已处理", tone: "done" };
+    return { status: "等待", tone: "waiting" };
+  }
+
+  function statusMarkup(status) {
+    return `<span class="dw-node-status ${safeClass(status.tone)}"><span class="dw-status-dot ${status.tone === "waiting" ? "waiting" : status.tone === "issue" ? "issue" : ""}"></span>${text(status.status)}</span>`;
+  }
+
+  function artifactFor(key, timeline, evidence) {
+    if (key === "product") {
+      const item = timeline?.effective_contract || timeline?.current_product_spec;
+      return item?.revision ? `PRD.md r${item.revision}` : item?.goal || "暂无产品材料";
+    }
+    if (key === "engineering") {
+      const item = timeline?.engineering_plan;
+      return item?.revision ? `PLAN.md r${item.revision}` : item?.objective || "暂无工程计划";
+    }
+    const review = evidence?.reviews?.[evidence.reviews.length - 1];
+    const delivery = timeline?.current_delivery_spec;
+    return review?.verdict || delivery?.summary || (delivery?.revision ? `交付 r${delivery.revision}` : "暂无质检记录");
+  }
+
+  function taskFor(key, timeline, board, evidence) {
+    if (key === "product") return timeline?.effective_contract?.goal || timeline?.current_product_spec?.goal || "等待产品需求";
+    if (key === "engineering") return timeline?.engineering_plan?.objective || "等待工程计划";
+    return evidence?.reviews?.[evidence.reviews.length - 1]?.rationale || timeline?.current_delivery_spec?.summary || "等待工程交付";
+  }
+
+  function departmentTitle(key, data, board) {
+    const history = data?.history || data?.overview?.timeline || {};
+    const materials = data?.materials || data?.overview?.evidence || {};
+    if (key === "product") return history.effective_contract?.goal || history.current_product_spec?.goal || data?.task || board?.task || "产品工作区";
+    if (key === "engineering") return history.engineering_plan?.objective || data?.task || board?.task || "工程工作区";
+    return materials.reviews?.at(-1)?.rationale || history.current_delivery_spec?.summary || data?.task || board?.task || "质检工作区";
+  }
+
+  function nodeMarkup(key, data) {
+    const status = nodeState(key, data);
+    const index = String(DEPARTMENT_ORDER.indexOf(key) + 1).padStart(2, "0");
+    return `<button class="dw-dept-node" type="button" data-department="${key}"><span class="dw-node-meta"><span class="dw-node-index">${index}</span>${statusMarkup(status)}</span><h3>${departmentName(key)}</h3><span class="dw-node-role">${text(DEPARTMENTS[key].role)}</span><span class="dw-node-task">${text(taskFor(key, data.timeline, data.board, data.evidence))}</span><span class="dw-node-artifact">${text(artifactFor(key, data.timeline, data.evidence))}</span><span class="dw-node-foot"><span>当前记录</span><span>进入工作区 <i data-lucide="arrow-up-right" aria-hidden="true"></i></span></span></button>`;
+  }
+
+  function eventById() {
+    return new Map((state.runPayload?.events || []).map(item => [item.event_id, item]));
+  }
+
+  function handovers() {
+    const timeline = state.runPayload?.timeline || {};
+    const evidence = state.runPayload?.evidence || {};
+    const events = eventById();
+    const requests = timeline.requests || [];
+    const responses = timeline.responses || [];
+    const closures = timeline.request_closures || [];
+    const rows = [];
+    const seen = new Set();
+    const deliveries = evidence.deliveries || [];
+    const reviews = evidence.reviews || [];
+    const eventSeq = eventId => events.get(eventId)?.seq || 0;
+    const releaseByDelivery = new Map(reviews.filter(review => review.verdict === "release" && review.delivery_spec_hash).map(review => [review.delivery_spec_hash, review]));
+    const addRow = row => {
+      if (!row.id || seen.has(row.id)) return;
+      seen.add(row.id);
+      rows.push(row);
+    };
+    requests.forEach(request => {
+      const response = responses.find(item => item.request_id === request.id);
+      const closure = closures.find(item => item.request_id === request.id);
+      const source = events.get(request.created_event_id);
+      addRow({
+        id: request.id || request.created_event_id,
+        title: `${departmentName(request.requester)} → ${departmentName(request.recipient)}`,
+        kind: request.request_type === "consultation" ? "咨询" : ({ inspect: "查看", check: "检查", revise_requirements: "需求修订", revise_delivery: "交付修订" }[request.action] || request.action || "协作请求"),
+        status: closure?.status || response?.status || request.status,
+        time: source?.created_at,
+        body: request.question || request.background || "",
+        detail: request.expected_result || request.background || "",
+        sourceEventId: request.created_event_id,
       });
     });
-  });
-  node.querySelectorAll(".event-link").forEach((button) => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
-  });
-}
-
-async function openEvent(eventId, gen, documentKind) {
-  const runId = state.runId;
-  const token = gen === undefined ? state.gen : gen;
-  if (token !== state.gen || !runId) return;
-  const lookup = ++state.eventRequestSeq;
-  try {
-    const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
-    if (token !== state.gen || state.runId !== runId || lookup !== state.eventRequestSeq) return;
-    const documentText = documentKind === "tree" && data.tree_archive
-      ? JSON.stringify({ format: data.tree_archive.format, tree_digest: data.tree_archive.tree_digest,
-        tree: data.tree_archive.tree, blobs: data.tree_archive.blobs }, null, 2)
-      : documentKind === "git" ? data.git_version_detail?.diff
-      : documentKind === "prd" || documentKind === "plan" ? data[`${documentKind}_markdown`] : null;
-    if (documentKind && typeof documentText !== "string") throw new Error(documentKind === "git" ? "Git 版本不可用" : "原文工件不可用");
-    const jsonNode = document.getElementById("event-json");
-    const documentNode = document.getElementById("event-document");
-    const titleNode = document.getElementById("event-title");
-    jsonNode.textContent = JSON.stringify(data, null, 2);
-    jsonNode.hidden = Boolean(documentKind);
-    if (documentNode) {
-      documentNode.textContent = documentText || "";
-      documentNode.hidden = !documentKind;
+    const contract = timeline.effective_contract || timeline.current_product_spec;
+    if (contract?.created_event_id) {
+      const source = events.get(contract.created_event_id);
+      addRow({ id: contract.created_event_id, title: "产品部 → 工程部", kind: "需求交接", status: contract.status || "已处理", time: source?.created_at, body: contract.goal || "产品材料已形成", detail: contract.content_hash || "", sourceEventId: contract.created_event_id });
     }
-    if (titleNode) titleNode.textContent = documentKind === "git" ? "Git 变更" : documentKind === "tree" ? "完整交付清单" : documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
-    const versionNode = document.getElementById("event-version");
-    const filesNode = document.getElementById("event-files");
-    const version = data.git_version_detail;
-    if (versionNode) {
-      versionNode.hidden = !version;
-      versionNode.textContent = version ? `提交 ${version.commit}\n父提交 ${version.parent_commit || "初始版本"}\n树 ${version.tree}` : "";
-    }
-    if (filesNode) {
-      filesNode.replaceChildren();
-      filesNode.hidden = !version;
-      for (const file of version?.files || []) {
-        const item = document.createElement("li");
-        const status = { A: "新增", M: "修改", D: "删除", R: "移动", C: "复制", T: "类型变化" }[file.status] || file.status;
-        item.textContent = `${status} ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}${file.binary ? "（二进制）" : ""}`;
-        filesNode.appendChild(item);
-      }
-      if (version && !version.files.length) {
-        const item = document.createElement("li");
-        item.textContent = "无文件变化";
-        filesNode.appendChild(item);
-      }
-    }
-    const sources = document.getElementById("event-sources");
-    if (sources) {
-      sources.replaceChildren();
-      if (documentKind) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "event-link";
-        button.textContent = "查看接纳记录";
-        button.addEventListener("click", () => openEvent(eventId, token));
-        sources.appendChild(button);
-      }
-      if (version && documentKind !== "git") {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "event-link";
-        button.textContent = "查看本次变更";
-        button.addEventListener("click", () => openEvent(eventId, token, "git"));
-        sources.appendChild(button);
-      }
-      for (const file of data.tree_archive?.tree.files || []) {
-        const link = document.createElement("a");
-        link.className = "event-link";
-        link.textContent = `${file.path} (${file.size} B)`;
-        link.href = `/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}/files?path=${encodeURIComponent(file.path)}`;
-        link.download = file.path.split("/").pop();
-        sources.appendChild(link);
-      }
-      for (const source of data.source_events || []) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "event-link";
-        button.textContent = `${source.seq}. ${source.type}`;
-        button.addEventListener("click", () => openEvent(source.event_id, token));
-        sources.appendChild(button);
-      }
-    }
-    document.getElementById("event-dialog").showModal();
-  } catch (error) {
-    if (token !== state.gen || state.runId !== runId || lookup !== state.eventRequestSeq) return;
-    if (documentKind === "git") {
-      document.getElementById("event-dialog").close?.();
-      document.getElementById("event-document").textContent = "";
-    }
-    setStatus("error", error.message);
-  }
-}
-
-function listen(runId, afterSeq, gen) {
-  closeSource();
-  const source = new EventSource(`/api/runs/${runId}/stream?after_seq=${encodeURIComponent(afterSeq)}`);
-  state.source = source;
-  source.addEventListener("loop", () => {
-    if (gen !== state.gen || state.source !== source || state.runId !== runId) return;
-    scheduleRefresh(runId, gen);
-  });
-  source.onerror = () => {
-    if (gen !== state.gen || state.source !== source) return;
-    setStatus("error", "事件流连接中断");
-  };
-  source.onopen = () => {
-    if (gen !== state.gen || state.source !== source) return;
-    if (document.getElementById("status") && document.getElementById("status").textContent === "事件流连接中断") {
-      setStatus("running", "事件流已恢复");
-    }
-  };
-}
-
-function isMobileLayout() {
-  try {
-    return Boolean(globalThis.matchMedia && globalThis.matchMedia("(max-width: 960px)").matches);
-  } catch {
-    return false;
-  }
-}
-
-function blurTask() {
-  const task = document.getElementById("task");
-  if (task && typeof task.blur === "function") task.blur();
-}
-
-function openCompose() {
-  if (document.body && document.body.classList) document.body.classList.add("compose");
-  const form = document.getElementById("task-form");
-  const task = document.getElementById("task");
-  if (form && typeof form.scrollIntoView === "function") form.scrollIntoView({ block: "start" });
-  if (task && typeof task.focus === "function") task.focus();
-}
-
-function newTask() {
-  state.forceNewTask = state.forceNewTask || !state.runId || !state.selectedPhase || TERMINAL.has(state.selectedPhase);
-  syncButtons();
-  openCompose();
-}
-
-function closeCompose() {
-  if (document.body && document.body.classList) document.body.classList.remove("compose");
-}
-
-function scrollBoardIntoView() {
-  if (!isMobileLayout()) return;
-  blurTask();
-  if (typeof globalThis.scrollTo === "function") globalThis.scrollTo(0, 0);
-  const board = document.getElementById("board");
-  if (board && typeof board.scrollIntoView === "function") board.scrollIntoView({ block: "start" });
-}
-
-function readLimits() {
-  const options = {};
-  for (const key of ["max_cycles", "context_window"]) {
-    const raw = document.getElementById(key).value;
-    if (raw === "") continue;
-    if (!/^[0-9]+$/.test(raw)) throw new Error(`${key} 必须是正整数`);
-    const value = Number(raw);
-    if (!Number.isInteger(value) || value < 1) throw new Error(`${key} 必须是正整数`);
-    options[key] = value;
-  }
-  return options;
-}
-
-async function startRun(event) {
-  event.preventDefault();
-  const targetRun = inputRunId();
-  if (state.submittingStart || (!targetRun && state.busy)) return;
-  const taskNode = document.getElementById("task");
-  const task = taskNode.value;
-  if (!task.trim()) return;
-  let options;
-  try {
-    options = targetRun ? {} : readLimits();
-  } catch (error) {
-    setStatus("error", error.message);
-    openCompose();
-    return;
-  }
-  state.submittingStart = true;
-  syncButtons();
-  try {
-    const created = await fetchJSON(targetRun ? `/api/runs/${encodeURIComponent(targetRun)}/inputs` : "/api/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(targetRun ? { text: task } : { task, ...options }),
+    deliveries.forEach(delivery => {
+      const source = events.get(delivery.created_event_id);
+      const release = releaseByDelivery.get(delivery.content_hash);
+      const status = release ? "accepted" : delivery.status === "superseded" ? "superseded" : delivery.status || "waiting";
+      addRow({ id: delivery.created_event_id, title: "工程部 → 质检部", kind: "版本交付", status, time: source?.created_at, body: delivery.summary || "工程交付已形成", detail: (delivery.files || []).join("、"), sourceEventId: delivery.created_event_id });
     });
-    if (taskNode.value === task) taskNode.value = "";
-    if (!targetRun) {
-      state.busy = true;
-      state.activeRunId = created.run_id;
-    }
-    syncButtons();
-    syncWorkerWatch();
-    blurTask();
-    closeCompose();
-    await selectRun(created.run_id);
-    scrollBoardIntoView();
-  } catch (error) {
-    if (error.payload?.code === "cancelled_input_not_saved" && error.payload.cancelled === true
-        && error.payload.run_id === targetRun) {
-      state.cancelledInputFailures[targetRun] = error.message;
-      if (targetRun === state.runId) {
-        const gen = state.gen;
-        state.forceNewTask = true;
-        let refreshFailure = "";
-        try {
-          await refreshRun(targetRun, gen);
-        } catch (refreshError) {
-          refreshFailure = ` 状态刷新失败：${refreshError.message}`;
-        }
-        if (gen === state.gen) {
-          applyExecAlert(null, null);
-          setStatus("error", state.cancelledInputFailures[targetRun] + refreshFailure);
-          openCompose();
-        }
-      }
+    reviews.forEach(review => {
+      if (!String(review.verdict || "").startsWith("rework")) return;
+      const source = events.get(review.created_event_id);
+      const followup = deliveries.find(delivery => delivery.parent_hash === review.delivery_spec_hash && eventSeq(delivery.created_event_id) > eventSeq(review.created_event_id));
+      addRow({ id: review.created_event_id, title: "质检部 → 工程部", kind: "问题反馈", status: followup ? "superseded" : "needs_work", time: source?.created_at, body: review.rationale || "质检记录要求重新处理", detail: (review.defects || []).map(item => item.summary).join("；"), sourceEventId: review.created_event_id });
+    });
+    return rows.sort((a, b) => String(b.time || "").localeCompare(String(a.time || "")));
+  }
+
+  function handoffStatus(status) {
+    return ({ open: "待回应", answered: "已回答", completed: "已完成", accepted: "已验收", active: "处理中", waiting: "等待处理", declined: "未接受", needs_work: "仍需处理", superseded: "已被后续交付接续", cancelled: "已取消", stopped: "已停止" })[status] || status || "未知";
+  }
+
+  function handoffDetailMarkup(item) {
+    if (!item) return `<div class="dw-empty-results">暂无部门交接记录</div>`;
+    return `<div class="dw-detail" id="dw-handoff-detail" aria-live="polite"><div><h3>${text(item.kind)}</h3><p>${text(item.body)}</p>${item.detail && item.detail !== item.body ? `<p class="dw-small">期望结果：${text(item.detail)}</p>` : ""}<p>${legacyLink(item.sourceEventId, "", "查看原始交接")}</p></div><span class="dw-detail-route">${text(item.title)} · ${text(formatTime(item.time))}</span></div>`;
+  }
+
+  function globalLogMarkup() {
+    const inputs = state.runPayload?.inputs || [];
+    const events = eventById();
+    const entries = inputs.map(item => `<div class="dw-global-entry"><strong>${item.kind === "command" ? "系统命令" : "用户"} · v${text(item.version)}</strong><span>${text(item.text, "原文不可用")}</span><time>${text(formatTime(item.created_at || events.get(item.created_event_id)?.created_at))}</time></div>`).join("");
+    if (!entries) return `<p class="dw-small">暂无任务输入。</p>`;
+    return entries;
+  }
+
+  function legacyLink(eventId, documentKind, label) {
+    if (!eventId) return "";
+    return `<button class="dw-inline-action" type="button" data-event-id="${escapeHtml(eventId)}" data-document="${escapeHtml(documentKind || "")}" title="${escapeHtml(label)}"><i data-lucide="external-link" aria-hidden="true"></i>${escapeHtml(label)}</button>`;
+  }
+
+  function gitVersionMarkup(item) {
+    const version = item?.git_version;
+    if (!version) return "";
+    return `<span class="dw-small dw-git-version">Git ${text(String(version.commit || "").slice(0, 12))} · ${version.parent_commit ? `父提交 ${text(String(version.parent_commit).slice(0, 12))}` : "初始版本"} ${legacyLink(item.created_event_id, "git", "查看 Git 差异")}</span>`;
+  }
+
+  function legacyOverviewMarkup(data) {
+    const timeline = data.timeline || {};
+    const evidence = data.evidence || {};
+    const inputs = data.inputs || [];
+    const contractHistory = Array.isArray(timeline.effective_contracts) && timeline.effective_contracts.length ? timeline.effective_contracts : (timeline.specs || []);
+    const contracts = contractHistory.map(item => `<article class="item"><header><span>PRD.md r${text(item.revision)}</span><span>${text(item.status, "已记录")}</span></header><p>${text(item.goal)}</p><p>${legacyLink(item.created_event_id, "prd", "查看 PRD.md 原文")}${gitVersionMarkup(item)}</p></article>`).join("");
+    const plans = (timeline.engineering_plans || []).map(item => `<article class="item"><header><span>PLAN.md r${text(item.revision)}</span><span>${text(item.status, "已记录")}</span></header><p>${text(item.objective)}</p><p>${legacyLink(item.created_event_id, "plan", "查看 PLAN.md 原文")}${gitVersionMarkup(item)}</p></article>`).join("");
+    const deliveries = (evidence.deliveries || []).map(item => `<article class="item"><header><span>交付 r${text(item.revision)}</span><span>${text((item.files || []).join("、"), "文件清单未知")}</span></header><p>${text(item.summary)}</p><p>${legacyLink(item.created_event_id, "tree", "查看封存清单")}${gitVersionMarkup(item)}</p></article>`).join("");
+    const reviews = (evidence.reviews || []).map(item => `<article class="item"><header><span>QA ${text(item.verdict)}</span><span>${text(item.created_at ? formatTime(item.created_at) : "")}</span></header><p>${text(item.rationale)}</p></article>`).join("");
+    const inputHistory = inputs.map(item => `<article class="item"><header><span>输入 v${text(item.version)}</span><span>${text(item.kind === "command" ? "系统命令" : "用户原文")}</span></header><pre class="dw-json">${text(item.text, "原文不可用")}</pre><p class="dw-small">UTF-8 字节 [${text(item.byte_start)}, ${text(item.byte_end)}) ${legacyLink(item.created_event_id, "", "查看接收记录")}</p>${gitVersionMarkup(item)}</article>`).join("");
+    if (!(contracts || plans || deliveries || reviews || inputHistory)) return "";
+    return `<section class="dw-materials-section" aria-labelledby="dw-history-heading"><div class="dw-section-head"><h2 id="dw-history-heading">材料与证据</h2><p>原文、Git 差异与封存下载</p></div><div class="dw-material-groups"><details class="dw-material-group"><summary>用户输入 <span>${count(inputs.length)} 条</span></summary><div class="list">${inputHistory || '<p class="dw-small">暂无用户输入记录</p>'}</div></details><details class="dw-material-group"><summary>需求与计划 <span>${count(contractHistory.length + (timeline.engineering_plans || []).length)} 条</span></summary><div class="list">${contracts || '<p class="dw-small">暂无 PRD 记录</p>'}${plans || '<p class="dw-small">暂无 PLAN 记录</p>'}</div></details><details class="dw-material-group"><summary>交付与质检 <span>${count((evidence.deliveries || []).length + (evidence.reviews || []).length)} 条</span></summary><div class="list">${deliveries || '<p class="dw-small">暂无交付记录</p>'}${reviews || '<p class="dw-small">暂无质检记录</p>'}</div></details></div></section>`;
+  }
+
+  function renderOverview() {
+    const scrollY = captureScroll();
+    const data = state.runPayload;
+    if (!data || !data.board) {
+      main.innerHTML = `<div class="dw-page dw-overview-page"><header class="dw-topline"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>协作台</strong><span>·</span><span>请选择任务</span></div><h1>没有选中的任务</h1><p class="dw-subtitle">从任务历史中打开一个任务，或创建新的任务。</p></div>${taskToolsMarkup()}</header><div class="dw-no-run"><h2>任务工作区</h2><p>当前页面只显示真实任务记录。创建任务后，产品、工程、质检和观测入口会使用同一任务范围。</p></div></div>`;
+      updateNav(); icons();
+      restoreScroll(scrollY);
       return;
     }
-    if (error.payload?.reason === "run_terminal") setStatus("conflict", "任务已经结束，输入尚未提交。新任务");
-    else if (error.status === 409) setStatus("conflict", error.message);
-    else setStatus("error", error.message);
-    openCompose();
-    await loadHealth(state.gen);
-    if (error.payload?.reason === "run_terminal" && targetRun === state.runId) {
-      state.forceNewTask = true;
+    const board = data.board;
+    const rows = handovers();
+    if (!state.selectedHandoff || !rows.some(item => item.id === state.selectedHandoff)) state.selectedHandoff = rows[0]?.id || null;
+    const selected = rows.find(item => item.id === state.selectedHandoff);
+    const lastEvent = (data.events || [])[data.events?.length - 1];
+    const active = board.active_department ? departmentName(board.active_department) : "暂无";
+    const records = rows.slice(0, 8).map(item => `<button class="dw-record-row" type="button" data-handoff="${escapeHtml(item.id)}"><span class="dw-record-time">${escapeHtml(formatTime(item.time))}</span><span class="dw-record-text"><strong>${text(item.title)}</strong><span>${text(item.body)}</span></span><span class="dw-record-state ${["open", "needs_work", "active", "waiting"].includes(item.status) ? "waiting" : ""}">${text(handoffStatus(item.status))}</span></button>`).join("");
+    main.innerHTML = `<div class="dw-page dw-overview-page"><header class="dw-topline"><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(board.phase) === "waiting" ? "waiting" : ""}"></span><strong>任务</strong><span>·</span><span>三部门协作</span></div><h1>${text(board.task)}</h1><p class="dw-subtitle">最近更新 ${text(formatTime(lastEvent?.created_at))} · 当前协作节点为 ${text(active)}</p></div><div><span class="dw-current-state"><span class="dw-status-dot ${statusTone(board.phase) === "waiting" ? "waiting" : ""}"></span>${text(phaseLabel(board.phase))}</span>${taskToolsMarkup()}</div></header><section class="dw-section" aria-labelledby="flow-title"><div class="dw-section-head"><h2 id="flow-title">协作流转</h2><p>需求交接 → 版本交付 → 验收反馈</p></div><div class="dw-flow-map">${nodeMarkup("product", data)}<div class="dw-flow-connector" aria-hidden="true"><span>需求</span><i data-lucide="arrow-right"></i></div>${nodeMarkup("engineering", data)}<div class="dw-flow-connector" aria-hidden="true"><span>交付</span><i data-lucide="arrow-right"></i></div>${nodeMarkup("quality", data)}</div>${rows.length ? `<div class="dw-feedback-lane"><div class="dw-feedback-route">${rows.slice(0, 1).map(item => `<button class="dw-handoff ${item.id === state.selectedHandoff ? "is-selected" : ""}" type="button" data-handoff="${escapeHtml(item.id)}"><i data-lucide="corner-up-left" aria-hidden="true"></i><span class="dw-handoff-copy"><strong>${text(item.title)}</strong><span>${text(item.kind)} · ${text(formatTime(item.time))} · ${text(handoffStatus(item.status))}</span></span><span class="dw-handoff-arrow"><i data-lucide="arrow-left" aria-hidden="true"></i></span></button>`).join("")}</div></div>` : ""}${handoffDetailMarkup(selected)}</section><section class="dw-section" aria-labelledby="recent-title"><div class="dw-section-head"><h2 id="recent-title">最近流转</h2><p>按真实事件时间倒序</p></div><div class="dw-record-list">${records || '<div class="dw-empty-results">暂无部门交接记录</div>'}</div></section><section class="dw-global" aria-labelledby="global-title"><div class="dw-section-head"><h2 id="global-title">任务输入</h2><p>从用户端追加需求</p></div><div class="dw-global-log" id="dw-global-log">${globalLogMarkup()}</div><form class="dw-compose" id="dw-global-form"><div class="dw-compose-meta"><span>当前接收方</span><strong>产品部 · 任务入口</strong></div><textarea class="dw-textarea" rows="2" data-global-draft aria-label="追加任务需求" placeholder="补充目标、优先级或需要确认的事项" ${TERMINAL.has(board.phase) ? "disabled" : ""}>${escapeHtml(currentDraft(state.globalDrafts, state.runId))}</textarea><div class="dw-compose-actions"><span>${TERMINAL.has(board.phase) ? "任务已结束，请新建任务" : "提交后等待产品处理"}</span><button class="dw-primary" type="submit" ${TERMINAL.has(board.phase) || state.inputSubmitting === state.runId ? "disabled" : ""}><i data-lucide="send" aria-hidden="true"></i>发送</button></div></form></section>${legacyOverviewMarkup(data)}<p class="dw-action-error" role="alert" hidden></p></div>`;
+    updateNav(); icons();
+    restoreScroll(scrollY);
+  }
+
+  function messageKind(message) {
+    if (message.kind === "user") return "user";
+    if (message.kind === "self" || message.source === "本部门") return "self";
+    return "other";
+  }
+
+  function messageMarkup(message) {
+    return `<article class="dw-message is-${safeClass(messageKind(message))}"><div class="dw-message-head"><span class="dw-message-origin">${text(message.source)} <span>${text(message.detail, "")}</span></span><time>${text(formatTime(message.created_at || message.time))}</time></div><p>${text(message.text, "原文不可用")}</p></article>`;
+  }
+
+  function contextMarkup(department, data) {
+    const contexts = Array.isArray(data?.contexts) ? data.contexts : [];
+    const contextKey = `${state.runId}/${department}`;
+    const requestedId = state.selectedContext[contextKey];
+    const selected = contexts.find(item => item.id === requestedId) || contexts[0] || null;
+    const selectedId = selected?.id || null;
+    state.selectedContext[contextKey] = selectedId;
+    const items = contexts.map(item => `<button class="dw-context-item ${item.id === selectedId ? "is-selected" : ""}" type="button" data-context-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><strong>${text(item.title)}</strong><span>${text(item.meta || formatTime(item.snapshot_at))}</span></button>`).join("");
+    const selectedAttempt = attemptIdFromContext(selected);
+    const observe = selectedAttempt ? `<button class="dw-observation-link" type="button" data-observe-attempt="${escapeHtml(selectedAttempt)}"><i data-lucide="activity" aria-hidden="true"></i>查看模型请求</button>` : `<span class="dw-observation-link is-disabled"><i data-lucide="circle-help" aria-hidden="true"></i>本次 Context 尚未发起模型请求</span>`;
+    return `<div class="dw-inspect-panel" id="dw-panel-context" role="tabpanel" aria-labelledby="dw-tab-context"><h3>Context 快照</h3><div class="dw-context-snapshot-meta"><strong>本次工作输入</strong><time>快照时间 · ${text(formatTime(selected?.snapshot_at || data?.snapshot_at))}</time></div><div class="dw-context-list">${items || '<p class="dw-small">暂无 Context 快照</p>'}</div><div class="dw-context-body"><p>${text(selected?.body, "当前没有可查看的 Context 原文")}</p></div>${observe}</div>`;
+  }
+
+  function providerMarkup(provider) {
+    const value = provider || {};
+    const rows = [["提供方", value.provider], ["模型", value.model], ["协议", value.protocol], ["温度", value.temperature], ["上下文窗", value.context_window], ["最大输出", value.max_output_tokens]];
+    return `<div class="dw-inspect-panel" id="dw-panel-provider" role="tabpanel" aria-labelledby="dw-tab-provider"><h3>Provider 配置</h3><dl class="dw-data-list">${rows.map(([key, item]) => `<div class="dw-data-row"><dt>${key}</dt><dd>${text(item)}</dd></div>`).join("")}</dl><p class="dw-small">以上为本次任务采用的只读快照。</p></div>`;
+  }
+
+  function promptMarkup(department, data) {
+    const prompt = data?.prompt || {};
+    const key = `${state.runId}/${department}`;
+    const editable = Boolean(prompt.text) && !TERMINAL.has(state.runPayload?.board?.phase);
+    return `<div class="dw-inspect-panel" id="dw-panel-prompt" role="tabpanel" aria-labelledby="dw-tab-prompt"><div class="dw-prompt-version"><span>当前 Prompt</span><span>${text(prompt.version ? `v${prompt.version}` : null)} · ${text(promptStatusLabel(prompt.status))}</span></div><pre class="dw-prompt-block">${text(prompt.text, "当前 Prompt 原文不可用")}</pre>${editable ? `<button class="dw-observation-link" type="button" data-prompt-edit="${escapeHtml(key)}" title="编辑 Prompt"><i data-lucide="pencil" aria-hidden="true"></i>编辑 Prompt</button>` : ""}</div>`;
+  }
+
+  function inspectorMarkup(department, data) {
+    return `<aside class="dw-inspector ${state.inspectorCollapsed ? "is-collapsed" : ""}" aria-label="${departmentName(department)}检查区"><div class="dw-inspector-head"><div><span class="dw-inspector-kicker">检查区</span><strong>${departmentName(department)}</strong></div><button class="dw-icon-button" type="button" data-inspector-toggle aria-label="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}" title="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}"><i data-lucide="${state.inspectorCollapsed ? "panel-right-open" : "panel-right-close"}" aria-hidden="true"></i></button></div><div class="dw-inspector-content"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-controls="dw-panel-context" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-controls="dw-panel-provider" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-controls="dw-panel-prompt" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${state.inspectorTab === "provider" ? providerMarkup(data.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data)}</div></aside>`;
+  }
+
+  function renderDepartment(department) {
+    const scrollY = captureScroll();
+    state.view = "department";
+    state.department = department;
+    const data = currentDepartmentData(department);
+    const board = state.runPayload?.board;
+    if (!board) {
+      main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button></div><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>${departmentName(department)}</strong></div><h1>没有选中的任务</h1><p class="dw-subtitle">请选择任务后查看部门工作区。</p></div></header></div>`;
+      updateNav(); icons();
+      restoreScroll(scrollY);
+      return;
     }
-  } finally {
-    state.submittingStart = false;
-    syncButtons();
+    if (!data) {
+      main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button><span class="dw-current-state"><span class="dw-status-dot waiting"></span>正在读取</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot waiting"></span><strong>${departmentName(department)}</strong><span>·</span><span>${text(DEPARTMENTS[department].role)}</span></div><h1>${text(board.task)}</h1><p class="dw-subtitle">${text(board.run_id)} · 部门工作区</p></div></header><div class="dw-load-state">正在读取部门消息与检查区…</div></div>`;
+      updateNav(); icons();
+      restoreScroll(scrollY);
+      return;
+    }
+    const messages = (data.messages || []).map(messageMarkup).join("");
+    const status = departmentStatusLabel(data.status, phaseLabel(board.phase));
+    const deptDraftKey = `${state.runId}/${department}`;
+    const departmentTask = departmentTitle(department, data, board);
+    main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button><span class="dw-current-state"><span class="dw-status-dot ${statusTone(status)}"></span>${text(departmentName(department))} · ${text(status)}</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(status) === "waiting" ? "waiting" : ""}"></span><strong>${text(departmentName(department))}</strong><span>·</span><span>${text(data.role || DEPARTMENTS[department].role)}</span></div><h1>${text(departmentTask)}</h1><p class="dw-subtitle">${text(board.run_id)} · 部门工作区</p></div></header><div class="dw-task-strip"><i data-lucide="route" aria-hidden="true"></i><span>当前任务</span><strong>${text(departmentTask)}</strong></div><div class="dw-work-grid ${state.inspectorCollapsed ? "has-collapsed-inspector" : ""}"><section class="dw-conversation" aria-labelledby="conversation-title"><div class="dw-conversation-head"><h2 id="conversation-title">工作消息</h2><p>${number((data.messages || []).length, "0")} 条记录 · ${text(status)}</p></div><div class="dw-timeline" aria-live="polite">${messages || '<p class="dw-small">暂无部门消息</p>'}</div><form class="dw-compose" id="dw-dept-form" data-department-form="${escapeHtml(department)}"><div class="dw-compose-meta"><span>当前接收方</span><strong>发给${text(departmentName(department))}</strong></div><textarea class="dw-textarea" rows="3" data-dept-draft="${escapeHtml(department)}" aria-label="发给${escapeHtml(departmentName(department))}" placeholder="追加对话或指导" disabled>${escapeHtml(currentDraft(state.deptDrafts, deptDraftKey))}</textarea><div class="dw-compose-actions"><span>部门指导将在 W6 接入真实内核</span><button class="dw-primary" type="submit" disabled><i data-lucide="send" aria-hidden="true"></i>发送指导</button></div></form></section>${inspectorMarkup(department, data)}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    updateNav(); icons();
+    restoreScroll(scrollY);
   }
-}
 
-async function cancelRun() {
-  if (!state.runId || state.submittingCancel) return;
-  const runId = state.runId;
-  const gen = state.gen;
-  state.submittingCancel = true;
-  syncButtons();
-  try {
-    const result = await fetchJSON(`/api/runs/${runId}/cancel`, { method: "POST" });
-    if (gen !== state.gen) return;
-    setStatus("error", result.stop_reason === "cancelled" ? "已取消" : result.phase);
-    await refreshRun(runId, gen);
-    syncWorkerWatch();
-  } catch (error) {
-    if (gen !== state.gen) return;
-    setStatus("error", error.message);
-  } finally {
-    state.submittingCancel = false;
-    if (gen === state.gen) syncButtons();
+  function requestStateMarkup(item) {
+    const status = item.status;
+    return `<span class="dw-request-state ${safeClass(status)}"><span class="dw-status-dot ${status === "running" ? "waiting" : status === "failed" ? "issue" : ""}"></span>${text(statusLabel(status))}</span>`;
   }
-}
 
-function boot() {
-  document.getElementById("task-form").addEventListener("submit", startRun);
-  document.getElementById("btn-cancel").addEventListener("click", cancelRun);
-  const newer = document.getElementById("btn-new");
-  if (newer) newer.addEventListener("click", newTask);
-  document.getElementById("prompt-form")?.addEventListener("submit", savePrompt);
-  document.getElementById("prompt-department")?.addEventListener("change", () => renderPromptSelection());
-  document.getElementById("prompt-text")?.addEventListener("input", () => {
-    const key = promptKey();
-    if (key) state.promptDrafts[key] = document.getElementById("prompt-text").value;
-  });
-  syncButtons();
-  loadHealth()
-    .then(() => loadRuns())
-    .then((data) => {
-      if (data && data.runs.length && !state.runId) return selectRun(data.runs[0].run_id);
+  function attemptRowMarkup(item) {
+    const provider = item.provider || "未知提供方";
+    const model = item.model || "未知模型";
+    const logical = item.logical_call_id || "未知调用";
+    const attemptText = `${number(item.attempt, "?")}/${number(item.attempt_count, "?")}`;
+    return `<button class="dw-request-row" type="button" data-obs-request="${escapeHtml(item.id)}" aria-label="查看 ${escapeHtml(logical)} 第 ${escapeHtml(item.attempt ?? "?")} 次尝试"><span class="dw-request-time">${text(formatTime(item.created_at))}${requestStateMarkup(item)}<span>尝试 ${escapeHtml(attemptText)}</span></span><span class="dw-request-main"><strong>${text(departmentName(item.department))} · ${text(model)}</strong><span>${text(provider)} · ${text(item.provider_response_id)} · ${text(item.work_round)} · ${text(item.step)}</span></span><span class="dw-request-metrics"><span>Input <strong>${usageValue(item, "input_tokens")}</strong> · Output <strong>${usageValue(item, "output_tokens", "等待响应")}</strong></span><span>耗时 <strong>${duration(usageRawValue(item, "latency_ms"), item.status)}</strong></span></span></button>`;
+  }
+
+  function observationShellMarkup() {
+    const filters = state.observationFilters;
+    const items = state.observationData?.items || [];
+    const current = items.filter(item => item.status === "running").length;
+    const task = state.runPayload?.board?.task;
+    const scope = state.observationData?.scope || {};
+    return `<div class="dw-observation-page" role="region" aria-label="任务模型请求观测"><header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>任务</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${number(current, "0")} 个请求进行中</span>${taskToolsMarkup()}</div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>任务范围</span><strong>${text(task)}</strong><span>·</span><span>${text(scope.time_range || "真实查询结果")}</span><span>·</span><span>${count(scope.attempts ?? state.observationData?.total)} 次尝试</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
+  }
+
+  function requestListMarkup() {
+    const data = state.observationData;
+    if (!data) return `<div class="dw-load-state">正在读取模型请求…</div>`;
+    const items = data.items || [];
+    const rows = items.length ? items.map(attemptRowMarkup).join("") : `<div class="dw-empty-results">当前筛选没有模型请求</div>`;
+    const more = data.next_cursor ? `<div class="dw-task-tools"><button class="dw-tool-button" type="button" data-obs-more ${state.observationMoreLoading ? "disabled" : ""} title="加载更多请求"><i data-lucide="chevrons-down" aria-hidden="true"></i><span>${state.observationMoreLoading ? "正在加载" : "加载更多"}</span></button></div>` : "";
+    return `<div class="dw-observation-results-head"><h2>模型请求</h2><p>显示 ${number(items.length, "0")} / ${count(data.total)} 次尝试</p></div><div class="dw-request-list">${rows}</div>${more}`;
+  }
+
+  function coverageLabel(group) {
+    if (group?.coverage && typeof group.coverage === "object") {
+      return `${count(group.coverage.reported_attempts)}/${count(group.coverage.attempts)} 次尝试已上报`;
+    }
+    return `${count(group?.reported_attempts)}/${count(group?.attempts)} 次尝试已上报`;
+  }
+
+  function usageStatValue(value, running = false) {
+    if (typeof value === "number" && Number.isFinite(value)) return number(value);
+    return running ? "等待响应" : "未上报";
+  }
+
+  function usageValueMarkup(label, value) {
+    return `<span class="dw-usage-value"><span>${escapeHtml(label)}</span><strong>${value}</strong></span>`;
+  }
+
+  function usageGroupMarkup(group, maxTotal) {
+    const total = group?.total_tokens;
+    const width = typeof total === "number" && maxTotal > 0 ? Math.min(100, Math.round((total / maxTotal) * 100)) : 0;
+    const runningCount = typeof group?.running_attempts === "number" ? group.running_attempts : null;
+    const running = runningCount !== null && runningCount > 0;
+    return `<div class="dw-usage-row"><div class="dw-usage-label"><strong>${text(group?.label || group?.key)}</strong><span>${text(coverageLabel(group))}${running ? ` · ${number(runningCount)} 进行中` : ""}</span><span class="dw-usage-track" aria-hidden="true"><i style="width:${width}%"></i></span></div><div class="dw-usage-values">${usageValueMarkup("输入（含缓存）", usageStatValue(group?.input_tokens, running))}${usageValueMarkup("输出", usageStatValue(group?.output_tokens, running))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(group?.cache_read_tokens, running))}${usageValueMarkup("总 Token", usageStatValue(group?.total_tokens, running))}${usageValueMarkup("成本", usageStatValue(group?.cost))}</div></div>`;
+  }
+
+  function usageSection(title, groups) {
+    const list = Array.isArray(groups) ? groups : [];
+    const totals = list.map(group => group.total_tokens).filter(value => typeof value === "number" && Number.isFinite(value));
+    const max = totals.length ? Math.max(...totals) : 0;
+    return `<section class="dw-usage-section"><h3>${escapeHtml(title)}</h3><div class="dw-usage-rows">${list.length ? list.map(group => usageGroupMarkup(group, max)).join("") : '<div class="dw-empty-results">当前筛选没有可汇总的模型请求</div>'}</div></section>`;
+  }
+
+  function usageMarkup() {
+    const data = state.usageData;
+    if (!data) return `<div class="dw-load-state">正在读取用量统计…</div>`;
+    const totals = data.totals || {};
+    const coverage = data.coverage || {};
+    const reported = coverage.reported_attempts ?? data.reported_attempts;
+    const attempts = coverage.attempts ?? data.total_attempts;
+    return `<div class="dw-observation-results-head"><h2>用量统计</h2><p>覆盖率 ${text(coverage.percent == null ? null : `${coverage.percent}%`)}</p></div><div class="dw-usage-coverage"><strong>${count(reported)} / ${count(attempts)}</strong><span>次尝试已上报 usage</span><span>输入（含缓存）与缓存读取（输入子集）不重复相加</span></div><div class="dw-usage-total-strip"><div class="dw-usage-total-label"><strong>筛选总计</strong><span>${count(reported)}/${count(attempts)} 次尝试已上报</span></div>${usageValueMarkup("输入（含缓存）", usageStatValue(totals.input_tokens))}${usageValueMarkup("输出", usageStatValue(totals.output_tokens))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(totals.cache_read_tokens))}${usageValueMarkup("总 Token", usageStatValue(totals.total_tokens))}</div>${usageSection("按部门", data.groups?.departments)}${usageSection("按模型", data.groups?.models)}`;
+  }
+
+  function updateObservationContent() {
+    const content = root?.querySelector?.("#dw-observation-content");
+    if (!content) return;
+    content.innerHTML = state.observationTab === "requests" ? requestListMarkup() : usageMarkup();
+    root.querySelectorAll(".dw-observation-tab").forEach(tab => {
+      const active = tab.dataset.obTab === state.observationTab;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+    icons();
+  }
+
+  function renderObservability() {
+    const scrollY = captureScroll();
+    state.view = "observability";
+    state.observationScreen = state.selectedAttemptId ? "detail" : "list";
+    main.innerHTML = observationShellMarkup();
+    updateNav();
+    icons();
+    updateObservationContent();
+    restoreScroll(scrollY);
+  }
+
+  function detailOverviewMarkup(detail) {
+    const item = detail.attempt || {};
+    const usage = usageOf(item);
+    const fields = [["Provider", item.provider], ["Model", item.model], ["耗时", duration(usageRawValue(item, "latency_ms"), item.status)], ["成本", usageStatValue(usage?.cost)], ["本轮工作", item.work_round], ["步骤", item.step], ["Context 快照", item.context_event_id], ["Prompt 版本", item.prompt_version], ["协作请求", item.collaboration_request_id], ["采集范围", item.observed_scope]];
+    const tools = detail.tools?.length ? `<details class="dw-detail-extra"><summary>工具调用 <span>${count(detail.tools.length)} 条</span></summary><pre class="dw-json">${json(detail.tools)}</pre></details>` : "";
+    return `<div class="dw-detail-panel"><div class="dw-detail-usage">${usageValueMarkup("输入（含缓存）", usageValue(item, "input_tokens"))}${usageValueMarkup("输出", usageValue(item, "output_tokens", "等待响应"))}${usageValueMarkup("缓存读取（输入子集）", usageValue(item, "cache_read_tokens"))}${usageValueMarkup("总 Token", usageValue(item, "total_tokens"))}</div><dl class="dw-detail-grid">${fields.map(([key, value]) => `<div class="dw-detail-field"><dt>${escapeHtml(key)}</dt><dd>${displayValue(value)}</dd></div>`).join("")}</dl>${tools}</div>`;
+  }
+
+  function detailRequestMarkup(detail) {
+    if (!detail.request) return `<div class="dw-detail-panel"><div class="dw-response-empty">请求原文不可用</div></div>`;
+    return `<div class="dw-detail-panel"><div class="dw-json-heading"><h3>Request JSON</h3><span>${text(detail.attempt?.status)}</span></div><pre class="dw-json">${json(detail.request)}</pre></div>`;
+  }
+
+  function detailResponseMarkup(detail) {
+    if (!detail.response) return `<div class="dw-detail-panel"><div class="dw-response-empty">等待模型响应</div></div>`;
+    return `<div class="dw-detail-panel"><div class="dw-json-heading"><h3>Response JSON</h3><span>${text(statusLabel(detail.attempt?.status))}</span></div><pre class="dw-json">${json(detail.response)}</pre></div>`;
+  }
+
+  function detailEventsMarkup(detail) {
+    const rows = (detail.events || []).map(event => `<details class="dw-event-item"><summary class="dw-event-row"><time>${text(formatTime(event.time || event.created_at))}</time><span class="dw-event-kind ${event.tone === "error" ? "error" : event.tone === "waiting" ? "waiting" : ""}">${text(event.type)}</span><p>${text(event.summary)}</p><span class="dw-event-expand">查看原文</span></summary><pre class="dw-json dw-event-raw">${json(event.raw ?? event)}</pre></details>`).join("");
+    return `<div class="dw-detail-panel"><div class="dw-event-list">${rows || '<div class="dw-empty-results">暂无事件记录</div>'}</div></div>`;
+  }
+
+  function detailTabContent() {
+    const detail = state.observationDetail;
+    if (!detail) return "";
+    return ({ overview: detailOverviewMarkup(detail), request: detailRequestMarkup(detail), response: detailResponseMarkup(detail), events: detailEventsMarkup(detail) })[state.observationDetailTab] || detailOverviewMarkup(detail);
+  }
+
+  function renderObservationDetail() {
+    const scrollY = captureScroll();
+    const detail = state.observationDetail;
+    if (!detail) {
+      renderObservability();
+      return;
+    }
+    const item = detail.attempt || {};
+    const siblings = Array.isArray(detail.siblings) ? detail.siblings : [];
+    const attempts = [...siblings.filter(sibling => sibling.id !== item.id), item].sort((a, b) => Number(a.attempt || 0) - Number(b.attempt || 0));
+    state.view = "observability";
+    state.observationScreen = "detail";
+    state.selectedAttemptId = item.id;
+    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-department="${escapeHtml(item.department)}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(item.department))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(statusLabel(item.status))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>任务</span><strong>${text(state.runPayload?.board?.task)}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}">第 ${text(attempt.attempt)} 次 · ${text(statusLabel(attempt.status))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    updateNav(); icons();
+    restoreScroll(scrollY);
+  }
+
+  function updateNav() {
+    if (!root) return;
+    root.querySelectorAll(".dw-nav-item").forEach(item => {
+      const active = state.view === "overview" ? item.dataset.view === "overview" : state.view === "observability" ? item.dataset.view === "observability" : item.dataset.department === state.department;
+      item.classList.toggle("is-active", active);
+      if (active) item.setAttribute("aria-current", "page"); else item.removeAttribute("aria-current");
+    });
+  }
+
+  function renderCurrent() {
+    if (!main) return;
+    if (state.view === "observability" && state.observationScreen === "detail" && state.observationDetail) renderObservationDetail();
+    else if (state.view === "observability") renderObservability();
+    else if (state.view === "department") renderDepartment(state.department);
+    else renderOverview();
+  }
+
+  function closeStream() {
+    if (stream) {
+      stream.close();
+      stream = null;
+    }
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+  }
+
+  function openStream(runId, token) {
+    closeStream();
+    if (typeof EventSource !== "function" || !runId) return;
+    try {
+      stream = new EventSource(apiPath(runId, "/stream"));
+      stream.addEventListener("loop", () => {
+        if (token !== state.routeToken || runId !== state.runId) return;
+        loadRunPayload(runId, token, true);
+      });
+      stream.onerror = () => {};
+    } catch { stream = null; }
+    refreshTimer = setInterval(() => {
+      if (token === state.routeToken && runId === state.runId) loadRunPayload(runId, token, true);
+    }, 5000);
+  }
+
+  async function loadRunPayload(runId, token, silent = false) {
+    const seq = ++runRequestSeq;
+    try {
+      const data = await fetchJSON(apiPath(runId));
+      if (token !== state.routeToken || runId !== state.runId || seq !== runRequestSeq) return null;
+      state.runPayload = data;
+      state.busy = Boolean(data.worker_active);
+      state.error = data.execution_error || "";
+      if (!silent || !main?.innerHTML) renderCurrent();
+      else if (state.view === "overview") renderOverview();
+      else if (state.view === "department" && currentDepartmentData(state.department)) renderDepartment(state.department);
+      else if (state.view === "observability" && state.observationScreen === "list") loadObservationData();
+      return data;
+    } catch (error) {
+      if (token !== state.routeToken || runId !== state.runId || seq !== runRequestSeq) return null;
+      if (!silent) renderError(error);
       return null;
-    })
-    .catch((error) => setStatus("error", error.message));
-}
+    }
+  }
 
-globalThis.harnessWeb = {
-  state,
-  scheduleRefresh,
-  refreshRun,
-  selectRun,
-  pollWorkerHealth,
-  startWorkerWatch,
-  stopWorkerWatch,
-  syncWorkerWatch,
-  syncButtons,
-  applyRunStatus,
-  applyExecAlert,
-  applyProviderAlert,
-  renderBoard,
-  renderCycle,
-  renderTimeline,
-  renderEvidence,
-  renderContext,
-  openEvent,
-  formatCost,
-  openCompose,
-  closeCompose,
-  startRun,
-  newTask,
-  inputRunId,
-  renderInputs,
-  renderPrompts,
-  renderPromptSelection,
-  savePrompt,
-  isMobileLayout,
-  scrollBoardIntoView,
-  blurTask,
-  HEALTH_POLL_MS,
-};
+  async function loadDepartment(department, token) {
+    if (!state.runId) return;
+    const runId = state.runId;
+    const dataKey = `${runId}/${department}`;
+    const seq = (departmentRequestSeq.get(dataKey) || 0) + 1;
+    departmentRequestSeq.set(dataKey, seq);
+    state.departmentLoading = true;
+    try {
+      const data = await fetchJSON(apiPath(runId, `/departments/${encodeURIComponent(department)}`));
+      if (token !== state.routeToken || runId !== state.runId || seq !== departmentRequestSeq.get(dataKey)) return;
+      state.departmentData.set(dataKey, data);
+      state.departmentLoading = false;
+      if (state.view === "department" && state.department === department) renderDepartment(department);
+    } catch (error) {
+      if (token !== state.routeToken || runId !== state.runId || seq !== departmentRequestSeq.get(dataKey)) return;
+      state.departmentLoading = false;
+      renderError(error);
+    }
+  }
 
-if (!globalThis.__HARNESS_SKIP_BOOT__ && typeof document !== "undefined" && document.getElementById && document.getElementById("task-form")) {
+  async function loadObservationData({ append = false } = {}) {
+    if (!state.runId) return;
+    const runId = state.runId;
+    const token = state.routeToken;
+    const seq = ++state.observationSeq;
+    const params = { department: state.observationFilters.department, status: state.observationFilters.status, q: state.observationFilters.q, limit: 50 };
+    if (append) params.cursor = state.observationData?.next_cursor;
+    state.observationMoreLoading = append;
+    if (!append) state.observationLoading = true;
+    try {
+      const requests = await fetchJSON(queryPath(apiPath(runId, "/model-attempts"), params));
+      let usage = state.usageData;
+      if (!append || !usage || state.observationTab === "usage") {
+        usage = await fetchJSON(queryPath(apiPath(runId, "/model-usage"), { department: state.observationFilters.department, status: state.observationFilters.status, q: state.observationFilters.q }));
+      }
+      if (token !== state.routeToken || runId !== state.runId || seq !== state.observationSeq) return;
+      const prior = append && state.observationData ? state.observationData.items || [] : [];
+      state.observationData = { ...requests, items: [...prior, ...(requests.items || [])] };
+      state.usageData = usage;
+      state.observationLoading = false;
+      state.observationMoreLoading = false;
+      if (state.view === "observability" && state.observationScreen === "list") {
+        renderObservability();
+        if (state.observationTab === "usage") updateObservationContent();
+      }
+    } catch (error) {
+      if (token !== state.routeToken || runId !== state.runId || seq !== state.observationSeq) return;
+      state.observationLoading = false;
+      state.observationMoreLoading = false;
+      renderError(error);
+    }
+  }
+
+  async function loadAttemptDetail(attemptId, { push = true } = {}) {
+    if (!state.runId || !attemptId) return;
+    const runId = state.runId;
+    state.selectedAttemptId = attemptId;
+    state.observationScreen = "detail";
+    state.observationDetail = null;
+    state.view = "observability";
+    const token = ++state.routeToken;
+    if (push) updateRoute({ push: true });
+    closeStream();
+    renderLoading("正在读取模型请求详情");
+    try {
+      const detail = await fetchJSON(apiPath(runId, `/model-attempts/${encodeURIComponent(attemptId)}`));
+      if (token !== state.routeToken || runId !== state.runId || attemptId !== state.selectedAttemptId) return;
+      state.observationDetail = detail;
+      renderObservationDetail();
+    } catch (error) {
+      if (token !== state.routeToken || runId !== state.runId) return;
+      renderError(error);
+    }
+  }
+
+  async function activateRun(runId, { push = true, preserveRoute = false } = {}) {
+    if (!runId || !state.runs.some(item => item.run_id === runId)) return;
+    const requestedAttempt = preserveRoute ? state.selectedAttemptId : null;
+    const requestedScreen = preserveRoute ? state.observationScreen : "list";
+    closeStream();
+    state.runId = runId;
+    state.runPayload = null;
+    state.observationData = null;
+    state.usageData = null;
+    state.observationDetail = null;
+    state.selectedAttemptId = requestedAttempt;
+    state.observationScreen = requestedAttempt && requestedScreen === "detail" ? "detail" : "list";
+    const token = ++state.routeToken;
+    if (push) updateRoute({ push: true });
+    renderLoading("正在读取任务");
+    await loadRunPayload(runId, token);
+    if (token === state.routeToken && state.runId === runId) openStream(runId, token);
+    if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
+    if (token === state.routeToken && state.view === "observability") {
+      if (state.observationScreen === "detail" && state.selectedAttemptId) await loadAttemptDetail(state.selectedAttemptId, { push: false });
+      else await loadObservationData();
+    }
+  }
+
+  async function loadRuns(preferredRunId = null, push = false) {
+    try {
+      const payload = await fetchJSON("/api/runs");
+      if (!Array.isArray(payload.runs)) throw new Error("任务列表格式无效");
+      state.runs = payload.runs;
+      const selected = preferredRunId && state.runs.some(item => item.run_id === preferredRunId)
+        ? preferredRunId
+        : state.runId && state.runs.some(item => item.run_id === state.runId) ? state.runId : state.runs[0]?.run_id || null;
+      if (selected) await activateRun(selected, { push, preserveRoute: !push && Boolean(state.selectedAttemptId) });
+      else renderCurrent();
+    } catch (error) {
+      renderError(error);
+    }
+  }
+
+  async function refreshCurrent() {
+    if (!state.runId) return loadRuns();
+    const token = state.routeToken;
+    await loadRunPayload(state.runId, token);
+    if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
+    if (token === state.routeToken && state.view === "observability" && state.observationScreen === "list") await loadObservationData();
+  }
+
+  async function createRun(event) {
+    event.preventDefault();
+    if (state.creating) return;
+    if (event.submitter && event.submitter.value === "cancel") return document.getElementById("dw-task-dialog")?.close();
+    const form = event.currentTarget;
+    const task = form.elements.task.value;
+    if (!task.trim()) return;
+    state.newTaskDraft = {
+      task,
+      max_cycles: form.elements.max_cycles.value,
+      context_window: form.elements.context_window.value,
+    };
+    state.creating = true;
+    const submit = document.getElementById("dw-task-submit");
+    if (submit) submit.disabled = true;
+    const errorNode = document.getElementById("dw-task-error");
+    if (errorNode) errorNode.hidden = true;
+    try {
+      const body = { task };
+      if (form.elements.max_cycles.value) body.max_cycles = Number(form.elements.max_cycles.value);
+      if (form.elements.context_window.value) body.context_window = Number(form.elements.context_window.value);
+      const result = await fetchJSON("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      document.getElementById("dw-task-dialog")?.close();
+      state.newTaskDraft = { task: "", max_cycles: "8", context_window: "32000" };
+      if (result.run_id) {
+        state.view = "overview";
+        state.observationScreen = "list";
+        state.observationDetail = null;
+        state.selectedAttemptId = null;
+        await loadRuns(result.run_id, true);
+      }
+    } catch (error) {
+      if (errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
+    } finally {
+      state.creating = false;
+      if (submit) submit.disabled = false;
+    }
+  }
+
+  async function cancelRun() {
+    if (!state.runId || state.cancelling || TERMINAL.has(state.runPayload?.board?.phase)) return;
+    state.cancelling = true;
+    try {
+      await fetchJSON(apiPath(state.runId, "/cancel"), { method: "POST" });
+      await refreshCurrent();
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      state.cancelling = false;
+    }
+  }
+
+  async function addGlobalInput(form) {
+    if (!state.runId || state.inputSubmitting === state.runId || TERMINAL.has(state.runPayload?.board?.phase)) return;
+    const textarea = form.querySelector("[data-global-draft]");
+    const value = textarea?.value || "";
+    if (!value.trim()) return;
+    const runId = state.runId;
+    const token = state.routeToken;
+    state.globalDrafts[runId] = value;
+    state.inputSubmitting = runId;
+    try {
+      await fetchJSON(apiPath(runId, "/inputs"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: value }) });
+      if (token !== state.routeToken || runId !== state.runId) return;
+      if (state.globalDrafts[runId] === value) state.globalDrafts[runId] = "";
+      await refreshCurrent();
+    } catch (error) {
+      if (token === state.routeToken && runId === state.runId) setStatus(error.message, "error");
+    } finally {
+      if (state.inputSubmitting === runId) state.inputSubmitting = null;
+    }
+  }
+
+  function openTaskDialog() {
+    const dialog = document.getElementById("dw-task-dialog");
+    if (!dialog) return;
+    const form = document.getElementById("dw-task-dialog-form");
+    if (form) {
+      form.elements.task.value = state.newTaskDraft.task;
+      form.elements.max_cycles.value = state.newTaskDraft.max_cycles;
+      form.elements.context_window.value = state.newTaskDraft.context_window;
+    }
+    dialog.showModal();
+    icons();
+    document.getElementById("dw-task-text")?.focus();
+  }
+
+  function openHistoryDialog() {
+    const dialog = document.getElementById("dw-history-dialog");
+    const list = document.getElementById("dw-history-list");
+    if (!dialog || !list) return;
+    list.innerHTML = state.runs.length ? state.runs.map(run => `<div class="dw-history-row"><button type="button" data-history-run="${escapeHtml(run.run_id)}"><strong>${text(run.task || run.run_id)}</strong><span>${text(run.run_id)} · ${text(phaseLabel(run.phase))}</span></button><span class="dw-record-state ${TERMINAL.has(run.phase) ? "" : "waiting"}">${text(run.outcome || phaseLabel(run.phase))}</span></div>`).join("") : `<p class="dw-small">暂无历史任务</p>`;
+    list.querySelectorAll("[data-history-run]").forEach(button => button.addEventListener("click", () => {
+      dialog.close();
+      activateRun(button.dataset.historyRun, { push: true });
+    }));
+    dialog.showModal();
+    icons();
+  }
+
+  function openPromptDialog(key) {
+    const [runId, department] = String(key).split("/");
+    if (runId !== state.runId) return;
+    const data = currentDepartmentData(department);
+    const prompt = data?.prompt;
+    if (!prompt?.text) return;
+    state.promptDrafts[key] = state.promptDrafts[key] ?? prompt.text;
+    const dialog = document.getElementById("dw-prompt-dialog");
+    const textarea = document.getElementById("dw-prompt-text");
+    if (!dialog || !textarea) return;
+    textarea.value = state.promptDrafts[key];
+    dialog.dataset.promptKey = key;
+    dialog.dataset.promptRouteToken = String(state.routeToken);
+    dialog.showModal();
+    icons();
+    textarea.focus();
+  }
+
+  async function savePrompt(event) {
+    event.preventDefault();
+    if (event.submitter?.value === "cancel") return document.getElementById("dw-prompt-dialog")?.close();
+    if (state.promptSubmitting) return;
+    const dialog = document.getElementById("dw-prompt-dialog");
+    const key = dialog?.dataset.promptKey;
+    const textValue = document.getElementById("dw-prompt-text")?.value || "";
+    if (!key || !textValue.trim() || !state.runId) return;
+    const separator = key.lastIndexOf("/");
+    const runId = separator < 0 ? "" : key.slice(0, separator);
+    const department = separator < 0 ? "" : key.slice(separator + 1);
+    const token = Number(dialog.dataset.promptRouteToken);
+    if (!runId || runId !== state.runId || token !== state.routeToken) return;
+    state.promptDrafts[key] = textValue;
+    state.promptSubmitting = true;
+    const submit = dialog.querySelector("button[value='default']");
+    if (submit) submit.disabled = true;
+    const errorNode = document.getElementById("dw-prompt-error");
+    if (errorNode) errorNode.hidden = true;
+    try {
+      await fetchJSON(apiPath(runId, `/prompts/${encodeURIComponent(department)}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: textValue }) });
+      if (token !== state.routeToken || runId !== state.runId) return;
+      delete state.promptDrafts[key];
+      dialog.close();
+      await loadDepartment(department, token);
+      await loadRunPayload(runId, token);
+    } catch (error) {
+      if (token === state.routeToken && runId === state.runId && errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
+    } finally {
+      state.promptSubmitting = false;
+      if (submit) submit.disabled = false;
+    }
+  }
+
+  async function openEvent(eventId, documentKind = "") {
+    if (!state.runId || !eventId) return;
+    const runId = state.runId;
+    const token = state.routeToken;
+    const seq = ++state.eventSeq;
+    const dialog = document.getElementById("dw-event-dialog");
+    const documentNode = document.getElementById("dw-event-document");
+    const jsonNode = document.getElementById("dw-event-json");
+    const titleNode = document.getElementById("dw-event-title");
+    const versionNode = document.getElementById("dw-event-version");
+    const filesNode = document.getElementById("dw-event-files");
+    const sourcesNode = document.getElementById("dw-event-sources");
+    if (documentNode) { documentNode.textContent = ""; documentNode.hidden = true; }
+    if (jsonNode) { jsonNode.textContent = "正在读取…"; jsonNode.hidden = false; }
+    if (versionNode) { versionNode.textContent = ""; versionNode.hidden = true; }
+    if (filesNode) { filesNode.replaceChildren(); filesNode.hidden = true; }
+    if (sourcesNode) sourcesNode.replaceChildren();
+    try {
+      const data = await fetchJSON(apiPath(runId, `/events/${encodeURIComponent(eventId)}`));
+      if (token !== state.routeToken || runId !== state.runId || seq !== state.eventSeq) return;
+      let documentText = null;
+      if (documentKind === "tree" && data.tree_archive) documentText = JSON.stringify(data.tree_archive, null, 2);
+      else if (documentKind === "git") documentText = data.git_version_detail?.diff;
+      else if (documentKind === "prd" || documentKind === "plan") documentText = data[`${documentKind}_markdown`];
+      if (documentKind && typeof documentText !== "string") throw new Error(documentKind === "git" ? "Git 版本不可用" : "原文工件不可用");
+      if (titleNode) titleNode.textContent = documentKind === "git" ? "Git 变更" : documentKind === "tree" ? "完整交付清单" : documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
+      if (jsonNode) { jsonNode.textContent = JSON.stringify(data, null, 2); jsonNode.hidden = Boolean(documentKind); }
+      if (documentNode) { documentNode.textContent = documentText || ""; documentNode.hidden = !documentKind; }
+      const version = data.git_version_detail;
+      if (versionNode && version) { versionNode.hidden = false; versionNode.textContent = `提交 ${version.commit || "未知"}\n父提交 ${version.parent_commit || "初始版本"}\n树 ${version.tree || "未知"}`; }
+      if (filesNode && version) {
+        filesNode.hidden = false;
+        const files = version.files || [];
+        files.forEach(file => { const item = document.createElement("li"); item.textContent = `${({ A: "新增", M: "修改", D: "删除", R: "移动", C: "复制", T: "类型变化" }[file.status] || file.status || "变化")} ${file.old_path ? `${file.old_path} -> ` : ""}${file.path || "未知文件"}${file.binary ? "（二进制）" : ""}`; filesNode.appendChild(item); });
+        if (!files.length) { const item = document.createElement("li"); item.textContent = "无文件变化"; filesNode.appendChild(item); }
+      }
+      if (sourcesNode && data.tree_archive?.tree?.files) {
+        data.tree_archive.tree.files.forEach(file => {
+          const link = document.createElement("a");
+          link.textContent = `${file.path} (${number(file.size, "未知大小")}${typeof file.size === "number" ? " B" : ""})`;
+          link.href = `${apiPath(runId, `/events/${encodeURIComponent(eventId)}/files`)}?path=${encodeURIComponent(file.path)}`;
+          link.download = String(file.path).split("/").pop();
+          sourcesNode.appendChild(link);
+        });
+      }
+      if (dialog) dialog.showModal();
+    } catch (error) {
+      if (token !== state.routeToken || runId !== state.runId || seq !== state.eventSeq) return;
+      setStatus(error.message, "error");
+      dialog?.close();
+    }
+  }
+
+  function clickHandler(event) {
+    const target = event.target.closest?.("button");
+    if (!target || !root?.contains?.(target)) return;
+    if (target.dataset.action === "new-task") return openTaskDialog();
+    if (target.dataset.action === "history") return openHistoryDialog();
+    if (target.dataset.action === "cancel") return cancelRun();
+    if (target.dataset.action === "refresh") return refreshCurrent();
+    if (target.dataset.historyRun) {
+      document.getElementById("dw-history-dialog")?.close();
+      return activateRun(target.dataset.historyRun, { push: true });
+    }
+    if (target.dataset.runPicker) return activateRun(target.value, { push: true });
+    if (target.dataset.department) {
+      state.view = "department";
+      state.department = target.dataset.department;
+      state.observationDetail = null;
+      state.selectedAttemptId = null;
+      const token = ++state.routeToken;
+      updateRoute({ push: true });
+      renderCurrent();
+      if (state.runId) loadDepartment(state.department, token);
+      return;
+    }
+    if (target.dataset.view) {
+      state.view = target.dataset.view === "observability" ? "observability" : "overview";
+      state.observationScreen = "list";
+      state.observationDetail = null;
+      state.selectedAttemptId = null;
+      const token = ++state.routeToken;
+      updateRoute({ push: true });
+      renderCurrent();
+      if (state.runId) openStream(state.runId, token);
+      if (state.view === "observability" && state.runId) loadObservationData();
+      if (state.view === "overview" && state.runId) loadRunPayload(state.runId, token);
+      return;
+    }
+    if (target.dataset.handoff) {
+      state.selectedHandoff = target.dataset.handoff;
+      updateRoute({ push: false });
+      renderOverview();
+      return;
+    }
+    if (target.dataset.eventId) return openEvent(target.dataset.eventId, target.dataset.document);
+    if (target.dataset.obsBack !== undefined) {
+      state.observationScreen = "list";
+      state.observationDetail = null;
+      state.selectedAttemptId = null;
+      updateRoute({ push: true });
+      renderObservability();
+      openStream(state.runId, state.routeToken);
+      loadObservationData();
+      return;
+    }
+    if (target.dataset.obsRequest) return loadAttemptDetail(target.dataset.obsRequest);
+    if (target.dataset.obsAttempt) return loadAttemptDetail(target.dataset.obsAttempt);
+    if (target.dataset.obTab) {
+      state.observationTab = target.dataset.obTab;
+      updateRoute({ push: true });
+      updateObservationContent();
+      loadObservationData();
+      return;
+    }
+    if (target.dataset.obDetailTab) {
+      state.observationDetailTab = target.dataset.obDetailTab;
+      updateRoute({ push: false });
+      if (state.observationDetail) renderObservationDetail();
+      return;
+    }
+    if (target.dataset.obsMore !== undefined) return loadObservationData({ append: true });
+    if (target.dataset.observeAttempt) {
+      state.observationFilters.department = currentDepartmentData()?.department || state.observationFilters.department;
+      return loadAttemptDetail(target.dataset.observeAttempt);
+    }
+    if (target.dataset.inspectorTab) {
+      state.inspectorTab = target.dataset.inspectorTab;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.contextId) {
+      state.selectedContext[`${state.runId}/${state.department}`] = target.dataset.contextId;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.inspectorToggle !== undefined) {
+      state.inspectorCollapsed = !state.inspectorCollapsed;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.promptEdit) return openPromptDialog(target.dataset.promptEdit);
+  }
+
+  function inputHandler(event) {
+    const target = event.target;
+    if (target.matches?.("[data-global-draft]") && state.runId) state.globalDrafts[state.runId] = target.value;
+    if (target.matches?.("[data-dept-draft]") && state.runId) state.deptDrafts[`${state.runId}/${target.dataset.deptDraft}`] = target.value;
+    if (target.matches?.("[data-obs-search]")) {
+      state.observationFilters.q = target.value;
+      updateRoute({ push: false });
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(() => loadObservationData(), 180);
+    }
+  }
+
+  function changeHandler(event) {
+    const target = event.target;
+    if (target.matches?.("[data-obs-department]")) state.observationFilters.department = target.value;
+    if (target.matches?.("[data-obs-status]")) state.observationFilters.status = target.value;
+    if (target.matches?.("[data-run-picker]")) return activateRun(target.value, { push: true });
+    if (target.matches?.("[data-obs-department], [data-obs-status]")) {
+      state.observationData = null;
+      state.usageData = null;
+      updateRoute({ push: false });
+      loadObservationData();
+    }
+  }
+
+  function submitHandler(event) {
+    const form = event.target;
+    if (form.id === "dw-global-form") { event.preventDefault(); addGlobalInput(form); }
+    if (form.id === "dw-dept-form") event.preventDefault();
+  }
+
+  function bootDialogs() {
+    const taskForm = document.getElementById("dw-task-dialog-form");
+    taskForm?.addEventListener("input", () => {
+      state.newTaskDraft = { task: taskForm.elements.task.value, max_cycles: taskForm.elements.max_cycles.value, context_window: taskForm.elements.context_window.value };
+    });
+    taskForm?.addEventListener("submit", createRun);
+    document.getElementById("dw-prompt-dialog-form")?.addEventListener("submit", savePrompt);
+  }
+
+  function boot() {
+    routeFromLocation();
+    root.addEventListener("click", clickHandler);
+    root.addEventListener("input", inputHandler);
+    root.addEventListener("change", changeHandler);
+    root.addEventListener("submit", submitHandler);
+    globalThis.addEventListener?.("popstate", () => {
+      routeFromLocation();
+      const token = ++state.routeToken;
+      state.observationDetail = null;
+      renderCurrent();
+      if (state.runId && !state.runPayload) loadRunPayload(state.runId, token);
+      if (state.view === "department" && state.runId) loadDepartment(state.department, token);
+      if (state.view === "observability" && state.runId && state.observationScreen === "list") loadObservationData();
+      if (state.view === "observability" && state.selectedAttemptId && state.runId) loadAttemptDetail(state.selectedAttemptId, { push: false });
+      if (state.runId && !(state.view === "observability" && state.observationScreen === "detail")) openStream(state.runId, token);
+    });
+    bootDialogs();
+    loadRuns();
+  }
+
+  const api = {
+    state,
+    escapeHtml,
+    fetchJSON,
+    renderOverview,
+    renderDepartment,
+    renderObservability,
+    renderObservationDetail,
+    updateObservationContent,
+    loadRuns,
+    activateRun,
+    loadRunPayload,
+    loadDepartment,
+    loadObservationData,
+    loadAttemptDetail,
+    openEvent,
+    createRun,
+    cancelRun,
+    addGlobalInput,
+    openTaskDialog,
+    openPromptDialog,
+    savePrompt,
+    refreshCurrent,
+    updateRoute,
+  };
+  globalThis.harnessWeb = api;
+  if (!root || !main || globalThis.__HARNESS_SKIP_BOOT__) return;
   boot();
-}
+})();

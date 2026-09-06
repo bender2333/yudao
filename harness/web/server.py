@@ -9,10 +9,11 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from ..git_audit import git_version_detail
 from ..models import ArtifactRef, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..observability import AttemptNotFoundError, ObservabilityQuery
 from ..provider_catalog import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
 from ..runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
@@ -126,6 +127,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "not found"}, 404)
         except RunNotFoundError as exc:
             self._send_json({"error": f"run not found: {exc}"}, 404)
+        except AttemptNotFoundError as exc:
+            self._send_json({"error": f"model attempt not found: {exc}"}, 404)
         except ValueError as exc:
             self._send_json({"error": str(exc)}, 400)
         except Exception as exc:
@@ -260,6 +263,29 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             payload["execution_error"] = self.server.error_for(run_id)
             payload["worker_active"] = self.server.active_run_id() == run_id
             return self._send_json(payload)
+        observability = ObservabilityQuery(store, self.server.system.artifacts)
+        if rest == ["model-attempts"]:
+            return self._send_json(observability.list_model_attempts(
+                run_id,
+                department=self._query_scalar(query, "department"),
+                status=self._query_scalar(query, "status"),
+                q=self._query_scalar(query, "q"),
+                cursor=self._query_scalar(query, "cursor"),
+                limit=self._query_limit(query),
+            ))
+        if rest[:1] == ["model-attempts"] and len(rest) == 2:
+            return self._send_json(observability.model_attempt_detail(run_id, unquote(rest[1])))
+        if rest == ["model-usage"]:
+            return self._send_json(observability.model_usage(
+                run_id,
+                department=self._query_scalar(query, "department"),
+                status=self._query_scalar(query, "status"),
+                q=self._query_scalar(query, "q"),
+                cursor=self._query_scalar(query, "cursor"),
+                limit=self._query_limit(query),
+            ))
+        if len(rest) == 2 and rest[0] == "departments":
+            return self._send_json(observability.department(run_id, unquote(rest[1])))
         if rest == ["events"]:
             project_run(store, run_id)
             after = self._resume_seq(query, default=0)
@@ -357,6 +383,22 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if rest == ["board"]:
             return self._send_json(run_board(project_run(store, run_id)))
         self._send_json({"error": "not found"}, 404)
+
+    @staticmethod
+    def _query_scalar(query: dict[str, list[str]], key: str) -> str | None:
+        values = query.get(key, [])
+        if len(values) > 1:
+            raise ValueError(f"{key} must appear at most once")
+        return values[0] if values else None
+
+    def _query_limit(self, query: dict[str, list[str]]) -> int:
+        raw = self._query_scalar(query, "limit")
+        if raw in (None, ""):
+            return 50
+        try:
+            return int(raw)
+        except ValueError as exc:
+            raise ValueError("limit must be an integer") from exc
 
     def _delivery_archive(self, event):
         ref = ArtifactRef(**event.payload["tree_ref"])
