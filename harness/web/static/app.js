@@ -376,7 +376,7 @@
     const phase = state.runPayload?.board?.phase;
     const canCancel = Boolean(state.runId && phase && !TERMINAL.has(phase) && !state.cancelling);
     const options = state.runs.map(run => `<option value="${escapeHtml(run.run_id)}" ${run.run_id === state.runId ? "selected" : ""}>${escapeHtml(run.task || run.run_id)}</option>`).join("");
-    return `<div class="dw-task-tools"><label class="dw-run-picker"><span class="dw-small">任务</span><select data-run-picker aria-label="选择任务">${options || "<option>暂无任务</option>"}</select></label><button class="dw-tool-button" type="button" data-action="new-task" title="新建任务"><i data-lucide="plus" aria-hidden="true"></i><span>新建</span></button><button class="dw-tool-button" type="button" data-action="history" title="任务历史"><i data-lucide="history" aria-hidden="true"></i><span>历史</span></button><button class="dw-tool-button${canCancel ? " danger" : ""}" type="button" data-action="cancel" title="取消当前任务" ${canCancel ? "" : "disabled"}><i data-lucide="square" aria-hidden="true"></i><span>取消</span></button></div>`;
+    return `<div class="dw-task-tools"><label class="dw-run-picker"><span class="dw-small">任务</span><select data-run-picker aria-label="选择任务">${options || "<option>暂无任务</option>"}</select></label><button class="dw-tool-button" type="button" data-action="new-task" title="新建任务"><i data-lucide="plus" aria-hidden="true"></i><span>新建</span></button><button class="dw-tool-button" type="button" data-action="history" title="任务历史"><i data-lucide="history" aria-hidden="true"></i><span>历史</span></button><button class="dw-tool-button" type="button" data-action="export" title="导出任务观测"><i data-lucide="download" aria-hidden="true"></i><span>导出</span></button><button class="dw-tool-button${canCancel ? " danger" : ""}" type="button" data-action="cancel" title="取消当前任务" ${canCancel ? "" : "disabled"}><i data-lucide="square" aria-hidden="true"></i><span>取消</span></button></div>`;
   }
 
   function statusTone(status) {
@@ -1144,6 +1144,21 @@
     }
   }
 
+  async function exportRun() {
+    if (!state.runId) return;
+    const runId = state.runId;
+    try {
+      const payload = await fetchJSON(apiPath(runId, "/export"));
+      const link = document.createElement("a");
+      link.href = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(payload, null, 2))}`;
+      link.download = `${runId}-observations.json`;
+      link.click?.();
+      setStatus("任务观测已导出", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
+  }
+
   async function addDepartmentGuidance(form) {
     const department = form?.dataset?.departmentForm;
     if (!state.runId || !department) return;
@@ -1313,6 +1328,7 @@
     if (target.dataset.action === "new-task") return openTaskDialog();
     if (target.dataset.action === "history") return openHistoryDialog();
     if (target.dataset.action === "cancel") return cancelRun();
+    if (target.dataset.action === "export") return exportRun();
     if (target.dataset.action === "refresh") return refreshCurrent();
     if (target.dataset.historyRun) {
       document.getElementById("dw-history-dialog")?.close();
@@ -1492,6 +1508,7 @@
     promptMarkup,
     createRun,
     cancelRun,
+    exportRun,
     addGlobalInput,
     addDepartmentGuidance,
     openTaskDialog,
