@@ -455,10 +455,9 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "submit_plan": {
         "name": "submit_plan",
         "label": "submit_plan",
-        "description": "Submit an engineering plan before changing delivery files. Bind the current effective_contract_hash. Plan adjustments require a reason; product requirements must be decided by product.",
+        "description": "Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.",
         "parameters": _object_schema(
             {
-                "effective_contract_hash": {"type": "string", "description": "Current effective contract hash supplied in context"},
                 "objective": {"type": "string"},
                 "scope": _string_list_schema("Relative files or directories ending with /; . means the entire public workspace"),
                 "tasks": {
@@ -484,7 +483,7 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
                 "reason": {"type": "string", "description": "Reason for adjusting an existing plan; may be empty for the first plan"},
             },
-            ["effective_contract_hash", "objective", "scope", "tasks", "refactoring", "assumptions", "reason"],
+            ["objective", "scope", "tasks", "refactoring", "assumptions", "reason"],
         ),
         "loadMode": "essential",
     },

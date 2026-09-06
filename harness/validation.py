@@ -142,9 +142,11 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
 
 
 def _plan_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
-    errors = (_require_text(proposal, "effective_contract_hash") + _require_text(proposal, "objective")
-              + _require_string_list(proposal, "scope", min_items=1)
-              + _optional_string_list(proposal, "refactoring"))
+    allowed = {"kind", "objective", "scope", "tasks", "refactoring", "assumptions", "reason"}
+    errors = [FieldError(str(key), "unknown field") for key in proposal if key not in allowed]
+    errors.extend(_require_text(proposal, "objective")
+                  + _require_string_list(proposal, "scope", min_items=1)
+                  + _optional_string_list(proposal, "refactoring"))
     tasks = proposal.get("tasks")
     if not isinstance(tasks, list) or not tasks:
         errors.append(FieldError("tasks", "at least one ordered task is required"))
@@ -173,8 +175,8 @@ def _plan_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
 
 def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     contract_hash = current_contract_hash(projection)
-    if contract_hash is None or proposal["effective_contract_hash"] != contract_hash:
-        return ProposalDecision(False, [FieldError("effective_contract_hash", "plan must reference the current effective contract")])
+    if contract_hash is None:
+        return ProposalDecision(False, [FieldError("effective_contract", "plan requires a current effective contract")])
     previous = projection.engineering_plans[-1] if projection.engineering_plans else None
     reason = proposal.get("reason", "").strip()
     if previous is not None and not reason:

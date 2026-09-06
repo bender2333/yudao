@@ -49,12 +49,12 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
         "kinds": {
             "engineering_plan": {
                 "when": ["ENGINEERING", "REWORK_ENGINEERING"],
-                "required": ["kind=engineering_plan", "effective_contract_hash", "objective", "scope", "tasks"],
+                "required": ["kind=engineering_plan", "objective", "scope", "tasks"],
                 "optional": ["refactoring", "assumptions", "reason"],
                 "scope": "relative files, directories ending with /, or . for the full public workspace",
                 "tasks": [{"title": "ordered task", "outputs": ["verifiable output"], "verification": "how to verify"}],
                 "assumptions": [{"decision": "professional default", "basis": "project convention, standard, or maintained component"}],
-                "bind": ["current_contract.content_hash"],
+                "bind": ["current_contract.content_hash (bound by the host when the proposal is accepted)"],
             },
             "delivery_spec": {
                 "when": ["ENGINEERING", "REWORK_ENGINEERING"],

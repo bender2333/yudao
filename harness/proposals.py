@@ -99,7 +99,6 @@ def delivery(
 
 
 def engineering_plan(
-    effective_contract_hash: str,
     objective: str = "Implement and verify the current echo CLI requirements",
     *,
     scope: list[str] | None = None,
@@ -110,7 +109,6 @@ def engineering_plan(
 ) -> dict[str, Any]:
     return {
         "kind": "engineering_plan",
-        "effective_contract_hash": effective_contract_hash,
         "objective": objective,
         "scope": ["src/"] if scope is None else scope,
         "tasks": [{
@@ -126,7 +124,7 @@ def engineering_plan(
 
 def plan_turn(**kwargs: Any) -> Callable[[ModelRequest], dict[str, Any]]:
     def submit(request: ModelRequest) -> dict[str, Any]:
-        return engineering_plan(request.effective_contract_hash, **kwargs)
+        return engineering_plan(**kwargs)
 
     return submit
 

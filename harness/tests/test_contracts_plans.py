@@ -73,14 +73,14 @@ def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
 
 def test_unplanned_and_out_of_scope_writes_have_repairable_tool_results(tmp_path):
     def first_plan(request):
-        plan = engineering_plan(request.effective_contract_hash)
+        plan = engineering_plan()
         plan.pop("kind")
         return ModelResponse(output=[_call("unplanned", "write_file", path="unplanned.txt", content="no"),
                                      _call("plan", "submit_plan", **plan),
                                      _call("after-submit", "write_file", path="src/later.py", content="no")])
 
     def adjusted_plan(request):
-        plan = engineering_plan(request.effective_contract_hash, scope=["src/", "docs/"],
+        plan = engineering_plan(scope=["src/", "docs/"],
                                 reason="Document the implemented command beside its code")
         plan.pop("kind")
         return ModelResponse(output=[_call("out-of-scope", "write_file", path="docs/guide.md", content="no"),
@@ -139,15 +139,51 @@ def test_plan_adjustment_requires_reason_and_current_contract(tmp_path):
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     current = system.activate_once(run_id)
+    old_hash = engineering_plan()
+    old_hash["effective_contract_hash"] = "sha256:old"
     for proposal, field in (
-        (engineering_plan(current.effective_contract.content_hash), "reason"),
-        (engineering_plan("sha256:old", reason="Change requirements"), "effective_contract_hash"),
-        (engineering_plan(current.effective_contract.content_hash, scope=["../materials/"], reason="Move files"), "scope"),
+        (engineering_plan(), "reason"),
+        (old_hash, "effective_contract_hash"),
+        (engineering_plan(scope=["../materials/"], reason="Move files"), "scope"),
     ):
         decision = evaluate_proposal(phase=current.phase, department="engineering", projection=current,
                                      snapshot=system.workspace(run_id).snapshot(), proposal=proposal)
         assert not decision.accepted
         assert any(error.field == field for error in decision.errors)
+
+
+def test_plan_without_model_hash_is_bound_to_current_contract_by_host(tmp_path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    result = system.activate_once(run_id)
+
+    assert result.engineering_plan is not None
+    assert result.engineering_plan.effective_contract_hash == result.effective_contract.content_hash
+    assert all("effective_contract_hash" not in event.payload.get("raw_keys", [])
+               for event in system.store.list_events(run_id)
+               if event.type == EventType.PROPOSAL_SUBMITTED)
+
+
+def test_sent_plan_cannot_be_rebound_after_contract_changes(tmp_path, monkeypatch):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    evaluate = orchestration.evaluate_proposal
+
+    def change_after_evaluation(**arguments):
+        decision = evaluate(**arguments)
+        assert decision.accepted
+        _accept_new_spec(system, run_id)
+        return decision
+
+    monkeypatch.setattr(orchestration, "evaluate_proposal", change_after_evaluation)
+    result = system.activate_once(run_id)
+
+    assert result.engineering_plan is None
+    rejection = result.rejections[-1]
+    assert rejection["errors"][0]["field"] == "execution_basis"
+    assert not any(event.type == EventType.PLAN_ACCEPTED for event in system.store.list_events(run_id))
 
 
 def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(tmp_path, monkeypatch):

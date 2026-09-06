@@ -276,7 +276,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             return _stream([_call("engineering-consultation", "submit_request", payload)],
                            response_id="b-consultation", model="b-engineering-actual")
         if counts[department] == 2:
-            payload = engineering_plan(_contract_hash(body))
+            payload = engineering_plan()
             payload.pop("kind")
             return _stream([_call("engineering-plan", "submit_plan", payload)],
                            response_id="b-plan", model="b-engineering-actual")
