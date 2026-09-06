@@ -138,7 +138,7 @@ test("model attempt and usage queries use one exact cursor contract and preserve
   const calls = [];
   const web = loadApp(async (url) => {
     calls.push(url);
-    if (url.includes("/model-attempts")) return response({ items: [{ id: "attempt-1", status: "failed", usage: { input_tokens: null, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: null, latency_ms: 0 } }], total: 1, next_cursor: null });
+    if (url.includes("/model-attempts")) return response({ items: [{ id: "attempt-1", status: "failed", usage: { input_tokens: null, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: null, latency_ms: 0 } }], total: 1, total_attempts: 1, running_attempts: 0, prepared_attempts: 0, next_cursor: null });
     return response({ total_attempts: 1, reported_attempts: 0, totals: { input_tokens: null, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: null }, groups: { departments: [], models: [] } });
   });
   web.state.runId = "run-1";
@@ -149,6 +149,26 @@ test("model attempt and usage queries use one exact cursor contract and preserve
   assert.equal(web.state.observationData.items[0].usage.input_tokens, null);
   assert.equal(web.state.usageData.totals.total_tokens, null);
   assert.doesNotMatch(calls.join("\n"), /page=|page_size=|request_id=/);
+});
+
+test("observation cursor pagination appends records while usage keeps the complete filter", async () => {
+  const calls = [];
+  const web = loadApp(async url => {
+    calls.push(url);
+    if (url.includes("/model-attempts")) {
+      const cursor = new URL(url, "http://local").searchParams.get("cursor");
+      return response(cursor ? { items: [{ id: "attempt-2", status: "success" }], total: 2, total_attempts: 2, running_attempts: 0, prepared_attempts: 0, next_cursor: null } : { items: [{ id: "attempt-1", status: "success" }], total: 2, total_attempts: 2, running_attempts: 0, prepared_attempts: 0, next_cursor: "1" });
+    }
+    return response({ total_attempts: 2, prepared_attempts: 0, coverage: { attempts: 2, reported_attempts: 0, percent: 0, fields: {} }, totals: {}, groups: { departments: [], models: [] } });
+  });
+  web.state.runId = "run-1";
+  web.state.routeToken = 1;
+  await web.loadObservationData();
+  await web.loadObservationData({ append: true });
+  assert.match(calls[0], /model-attempts\?limit=50$/);
+  assert.match(calls[2], /model-attempts\?limit=50&cursor=1$/);
+  assert.equal(calls.filter(url => url.includes("model-usage")).length, 1);
+  assert.equal(Array.from(web.state.observationData.items, item => item.id).join(","), "attempt-1,attempt-2");
 });
 
 test("usage view uses server coverage, prepared count, and explicit currency without filling nulls", () => {
@@ -341,7 +361,9 @@ test("Prompt save is tied to its dialog run, locks duplicate submits, and keeps 
   web.state.runId = "run-a";
   web.state.routeToken = 8;
   web.state.runPayload = { board: { run_id: "run-a", task: "task", phase: "PRODUCT_SPEC" }, prompts: { current: { product: { version: 2, text: "latest saved" } } } };
-  web.state.departmentData.set("run-a/product", { department: "product", prompt: { version: 1, text: "old" } });
+  web.state.departmentData.set("run-a/product", { department: "product", prompt: { version: 1, status: "adopted", text: "old" }, prompt_latest: { version: 2, status: "pending", text: "latest saved" } });
+  assert.match(web.promptMarkup("product", web.state.departmentData.get("run-a/product")), /实际使用 v1/);
+  assert.match(web.promptMarkup("product", web.state.departmentData.get("run-a/product")), /待下次激活 v2/);
   web.openPromptDialog("run-a/product");
   assert.equal(nodes.get("dw-prompt-text").value, "latest saved");
   nodes.get("dw-prompt-text").value = "new prompt";
@@ -411,6 +433,19 @@ test("Context defaults to the latest work snapshot and renders its own source pa
   assert.match(html, /用户原文正文/);
   assert.match(html, /data-observe-attempt="attempt-new"/);
   assert.match(html, /data-context-id="attempt-old" aria-pressed="false"/);
+});
+
+test("selected Context source is fetched by its exact attempt id", async () => {
+  const calls = [];
+  const web = loadApp(async url => {
+    calls.push(url);
+    return response({ run_id: "run-a", attempt: { id: "attempt-exact" }, context: { parts: [{ source: "intend", version: "1", text: "body", digest: "sha256:body" }] } });
+  });
+  web.state.runId = "run-a";
+  web.state.routeToken = 2;
+  await web.loadContextDetail("attempt-exact", 2);
+  assert.deepEqual(calls, ["/api/runs/run-a/model-attempts/attempt-exact"]);
+  assert.equal(web.state.contextDetails.get("run-a/attempt-exact").context.parts[0].source, "intend");
 });
 
 test("terminal overview marks each delivery from its own QA evidence", () => {

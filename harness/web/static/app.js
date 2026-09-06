@@ -1420,6 +1420,7 @@
     activateRun,
     loadRunPayload,
     loadDepartment,
+    loadContextDetail,
     loadObservationData,
     loadAttemptDetail,
     openEvent,
