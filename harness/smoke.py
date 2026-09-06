@@ -297,7 +297,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- run id: `{scenario.get('run_id')}`",
                 f"- phase: `{scenario.get('phase')}`",
                 f"- stop reason: `{scenario.get('stop_reason')}`",
-                f"- provider/model: `{scenario.get('provider')}` / `{scenario.get('model')}`",
+                f"- adapter/model: `{scenario.get('provider')}` / `{scenario.get('model')}`",
                 f"- route: `{' | '.join(scenario.get('route') or [])}`",
                 f"- asks: `{scenario.get('ask_count')}` reworks: `{scenario.get('rework_count')}`",
                 f"- replay consistent: `{scenario.get('replay_consistent')}`",
