@@ -394,10 +394,12 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._stream(run_id, after, store)
         if rest == ["export"]:
             projection = project_run(store, run_id)
+            observability = ObservabilityQuery(store, self.server.system.artifacts)
             return self._send_json(
                 {
                     "events": [event.to_dict() for event in store.list_events(run_id)],
                     "projection": projection.to_dict(),
+                    "observability": observability.export_run(run_id),
                 }
             )
         if rest == ["board"]:

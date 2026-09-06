@@ -279,3 +279,20 @@ def test_observability_routes_are_run_scoped_and_query_only(tmp_path: Path):
         server.server_close()
         thread.join(timeout=2)
     assert system.project(run_id).last_seq == before
+
+
+def test_observability_export_contains_attempt_context_and_usage_without_mutating_run(tmp_path: Path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
+    run_id = system.create_run("export observations")
+    system.run_until_stop(run_id)
+    before = system.project(run_id).last_seq
+
+    exported = ObservabilityQuery(system.store, system.artifacts).export_run(run_id)
+
+    assert exported["run_id"] == run_id
+    assert len(exported["attempts"]) == 4
+    assert exported["attempts"][0]["context"]["parts"]
+    assert "request" in exported["attempts"][0]
+    assert exported["usage"]["total_attempts"] == 4
+    assert set(exported["departments"]) == {"product", "engineering", "quality"}
+    assert system.project(run_id).last_seq == before

@@ -149,6 +149,22 @@ class ObservabilityQuery:
             },
         }
 
+    def export_run(self, run_id: str) -> dict[str, Any]:
+        """Return the complete read-only observation bundle for one run."""
+
+        records = self._attempt_records(run_id)
+        attempts = [
+            self.model_attempt_detail(run_id, item["id"])
+            for item in sorted(records.values(), key=lambda value: (value.get("seq", 0), value.get("attempt", 0)))
+        ]
+        return {
+            "run_id": run_id,
+            "version": SCHEMA_VERSION,
+            "attempts": attempts,
+            "usage": self.model_usage(run_id),
+            "departments": {department: self.department(run_id, department) for department in DEPARTMENTS},
+        }
+
     def model_usage(
         self,
         run_id: str,
@@ -660,6 +676,10 @@ def model_attempt_detail(store: EventStore, artifacts: ArtifactStore, run_id: st
 
 def model_usage(store: EventStore, artifacts: ArtifactStore, run_id: str, **filters: Any) -> dict[str, Any]:
     return ObservabilityQuery(store, artifacts).model_usage(run_id, **filters)
+
+
+def export_observability(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
+    return ObservabilityQuery(store, artifacts).export_run(run_id)
 
 
 def department_view(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> dict[str, Any]:
