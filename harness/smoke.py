@@ -401,13 +401,17 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     histories: dict[str, list[dict[str, Any]]] = {}
     activations: dict[str, tuple[str, str, str]] = {}
     activation_bases: dict[str, dict[str, Any]] = {}
+    activation_prompts = {}
+    activation_intends: dict[str, str] = {}
     steps: dict[str, int] = {}
     digests: dict[str, str] = {}
     purposes: dict[str, str] = {}
     compacting: dict[tuple[str, int], dict[str, Any]] = {}
-    checkpoints: dict[tuple[str, str | None, str | None], dict[str, Any]] = {}
+    checkpoints: dict[tuple[Any, ...], dict[str, Any]] = {}
     attempted: set[tuple[str, int]] = set()
-    intend: str | None = None
+    intend_bytes = b""
+    received_version = 0
+    prompt_versions: dict[str, int] = {}
     current_work = RunProjection()
     assembler = ContextAssembler()
     for event in store.list_events(run_id):
@@ -423,12 +427,33 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             "engineering_plan_hash": current_plan_hash(current_work),
             "request_id": None if current_work.pending_request is None else current_work.pending_request.id,
         }
-        if event.type == EventType.RUN_CREATED:
-            intend = payload.get("task")
+        if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED}:
             try:
-                recorded = artifacts.get_for_run(run_id, ArtifactRef(**payload["intend_ref"]))
-                if not isinstance(intend, str) or recorded != intend.encode("utf-8"):
-                    raise ValueError("original task differs from its recorded intend artifact")
+                if event.type != EventType.DEPARTMENT_PROMPT_UPDATED:
+                    item = payload["initial_input"] if event.type == EventType.RUN_CREATED else payload
+                    if not isinstance(item["text"], str) or item["version"] != received_version + 1:
+                        raise ValueError("input version or original text is invalid")
+                    raw = item["text"].encode("utf-8")
+                    if (artifacts.get_for_run(run_id, ArtifactRef(**item["input_ref"])) != raw
+                            or item["byte_start"] != len(intend_bytes)
+                            or item["byte_end"] != len(intend_bytes) + len(raw)):
+                        raise ValueError("input bytes or range differ from their recorded original")
+                    intend_bytes += raw
+                    received_version += 1
+                    if artifacts.get_for_run(run_id, ArtifactRef(**item["intend_ref"])) != intend_bytes:
+                        raise ValueError("intend artifact is not the exact concatenation of received inputs")
+                    if current_work.task.encode("utf-8") != intend_bytes:
+                        raise ValueError("projected intend differs from received input originals")
+                updates = payload["department_prompts"].values() if event.type == EventType.RUN_CREATED else (
+                    [payload] if event.type == EventType.DEPARTMENT_PROMPT_UPDATED else []
+                )
+                for item in updates:
+                    department = item["department"]
+                    if item["version"] != prompt_versions.get(department, 0) + 1:
+                        raise ValueError("prompt version is not sequential")
+                    if artifacts.get_for_run(run_id, ArtifactRef(**item["prompt_ref"])) != item["text"].encode("utf-8"):
+                        raise ValueError("prompt differs from its recorded original")
+                    prompt_versions[department] = item["version"]
             except (KeyError, TypeError, ValueError, OSError) as exc:
                 notes.append(f"event {event.seq}: {exc}")
             continue
@@ -437,16 +462,19 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 notes.append(f"event {event.seq}: missing or duplicate department activation")
             else:
                 activations[activation] = (event.role, event.session_id, event.event_id)
-                activation_bases[activation] = work_basis
-                for field, value in work_basis.items():
+                prompt = current_work.department_prompts[event.role]
+                activation_prompts[activation] = prompt
+                activation_intends[activation] = current_work.task
+                basis = {**work_basis, "input_version": current_work.input_version,
+                         "prompt_version": prompt.version, "prompt_hash": prompt.prompt_ref.content_hash}
+                activation_bases[activation] = basis
+                for field, value in basis.items():
                     if field not in payload or payload[field] != value:
                         notes.append(f"event {event.seq}: activation {field} does not match current work")
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
-                              EventType.TOOL_CALLED, EventType.TOOL_SKIPPED}:
-            continue
-        if event.type == EventType.TOOL_CALLED and payload.get("name") == "provider_usage":
+                              EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED}:
             continue
         try:
             if not activation or not event.role or not event.session_id:
@@ -455,14 +483,24 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if activations.get(activation) != binding:
                 raise ValueError("input or output does not match its department activation")
             basis = activation_bases[activation]
+            for field in ("input_version", "prompt_version", "prompt_hash"):
+                if payload.get(field) != basis[field]:
+                    raise ValueError(f"{field} does not match the version adopted at activation")
+            if event.type == EventType.TOOL_STARTED or (
+                event.type == EventType.TOOL_CALLED and payload.get("name") == "provider_usage"
+            ):
+                continue
             if event.type in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED,
                               EventType.MODEL_REQUESTED, EventType.COMPACTION_RECORDED}:
-                for field, value in basis.items():
+                for field in work_basis:
+                    value = basis[field]
                     if field not in payload or payload[field] != value or work_basis[field] != value:
                         raise ValueError(f"{field} does not match the activation and current work")
-            checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"])
+            checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"],
+                              basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
             pinned = assembler.assemble(current_work, department=event.role, session_id=event.session_id,
-                                         activation_id=activation, step_id=payload.get("step_id", 1))
+                                         activation_id=activation, step_id=payload.get("step_id", 1),
+                                         prompt=activation_prompts[activation])
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:
                     raise ValueError("department input does not belong to its activation start")
@@ -505,8 +543,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if not isinstance(items, list) or not items or items[0].get("role") != "developer":
                     raise ValueError("missing explicit department instructions")
                 instructions = items[0].get("content")
-                if (intend is None or not isinstance(instructions, str)
-                        or not instructions.startswith(f"[intend]\n{intend}\n\n[current_work]\n")):
+                if (not isinstance(instructions, str)
+                        or not instructions.startswith(f"[intend]\n{activation_intends[activation]}\n\n[current_work]\n")):
                     raise ValueError("model input does not start with the verbatim task followed by current work")
                 if items[0] != pinned.input_items[0]:
                     raise ValueError("pinned developer input differs from current allowed materials")
@@ -537,6 +575,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     expected_context = assembler.assemble(
                         current_work, department=event.role, session_id=event.session_id, activation_id=activation,
                         step_id=step, history=visible, compaction_event_id=(previous or {}).get("event_id"),
+                        prompt=activation_prompts[activation],
                     )
                     if schemas != expected_context.tools:
                         raise ValueError("actual tool schemas differ from the allowed definitions")

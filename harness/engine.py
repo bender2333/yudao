@@ -48,6 +48,8 @@ def run_department(
         response = adapter.complete(request)
         record_response(response)
         if stopped():
+            _skip_calls(response.output, step_id, record_skipped_tool,
+                        "Not executed because this activation ended or its input changed during the model request.")
             return None
         if response.finish_reason != "completed":
             reason = {"aborted": "cancelled", "overflow": "context_overflow",
@@ -68,6 +70,8 @@ def run_department(
             if item.get("type") != "function_call":
                 continue
             if stopped():
+                _skip_calls(response.output[index:], step_id, record_skipped_tool,
+                            "Not executed because this activation ended or its input changed before these tools started.")
                 return None
             identity = str(item.get("call_id") or "")
             name = str(item.get("name") or "")
@@ -93,6 +97,8 @@ def run_department(
                     "output": result.output, "error": result.error, "step_id": step_id, "input_item": input_item}
             record_tool(call)
             if stopped():
+                _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,
+                            "Not executed because this activation ended or its input changed after the current tool.")
                 return None
             if name in SUBMIT_KINDS:
                 _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,

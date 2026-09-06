@@ -13,7 +13,8 @@ import pytest
 from harness.adapters.base import ModelRequest, ProviderError
 from harness.adapters.responses import ResponsesAdapter, ResponsesConfig
 from harness.context import ContextAssembler
-from harness.models import RunProjection
+from harness.department_prompts import DEFAULT_PROMPTS
+from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
 
 
 KEY = "local-sdk-test-key"
@@ -30,8 +31,14 @@ TOOLS = [{"type": "function", "name": "read_file", "description": "Read a file",
 
 
 def _request(*, session_id="session", observations=None, history=None):
+    prompt_text = DEFAULT_PROMPTS["product"]
+    prompt_hash = hash_bytes(prompt_text.encode("utf-8"))
+    prompt_ref = ArtifactRef("department_prompt", prompt_hash, f"run/{prompt_hash[7:9]}/{prompt_hash[7:]}")
+    projection = RunProjection(task="local request", department_prompts={
+        "product": DepartmentPrompt("product", 1, prompt_text, prompt_ref, "initial-prompt"),
+    })
     context = ContextAssembler().assemble(
-        RunProjection(task="local request"), department="product", session_id=session_id, activation_id="activation",
+        projection, department="product", session_id=session_id, activation_id="activation",
     )
     if history:
         context.input_items.extend(history)

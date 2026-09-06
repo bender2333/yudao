@@ -46,11 +46,14 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
         return allowed
     if department != department_for_phase(projection.phase):
         return set()
-    return {"collaboration_request"} | {
+    allowed = {"collaboration_request"} | {
         "product": {"product_spec", "product_decision"},
         "engineering": {"engineering_plan", "delivery_spec"},
         "quality": {"qa_review"},
     }[department]
+    if projection.input_version > projection.processed_input_version:
+        return allowed - {"product_decision"} if department == "product" else set()
+    return allowed
 
 
 def request_errors(proposal: dict[str, Any], projection: RunProjection,
@@ -80,6 +83,8 @@ def request_errors(proposal: dict[str, Any], projection: RunProjection,
             errors.append(_error("recipient", f"{action} requires the {expected} department"))
         if projection.effective_contract is None:
             errors.append(_error("effective_contract", "revision requires an existing effective contract"))
+        if projection.input_version > projection.processed_input_version:
+            errors.append(_error("input_version", "accept the pending user input in a complete ProductSpec before revising downstream work"))
     return errors
 
 

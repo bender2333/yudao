@@ -62,6 +62,9 @@ HUMAN_ACTIONS = {
 
 class EventType:
     RUN_CREATED = "run_created"
+    USER_INPUT_RECEIVED = "user_input_received"
+    PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
+    DEPARTMENT_PROMPT_UPDATED = "department_prompt_updated"
     DEPARTMENT_ACTIVATED = "department_activated"
     DEPARTMENT_INPUT = "department_input"
     ACTIVATION_FINISHED = "activation_finished"
@@ -135,6 +138,29 @@ class ArtifactRef:
 
 
 @dataclass(frozen=True)
+class UserInput:
+    id: str
+    run_id: str
+    version: int
+    text: str
+    kind: str
+    input_ref: ArtifactRef
+    intend_ref: ArtifactRef
+    byte_start: int
+    byte_end: int
+    created_event_id: str
+
+
+@dataclass(frozen=True)
+class DepartmentPrompt:
+    department: str
+    version: int
+    text: str
+    prompt_ref: ArtifactRef
+    created_event_id: str
+
+
+@dataclass(frozen=True)
 class CheckReceipt:
     name: str
     department: str
@@ -167,6 +193,8 @@ class ProductSpec:
     fatal_conditions: list[str]
     non_goals: list[str]
     decision_changes: list[dict[str, str]]
+    change_record: dict[str, Any] | None
+    input_version: int
 
 
 @dataclass(frozen=True)
@@ -218,6 +246,7 @@ class EffectiveContract:
     content_hash: str
     revision: int
     product_spec_hash: str
+    input_version: int
     decision_hashes: list[str]
     created_event_id: str
     prd_ref: ArtifactRef
@@ -344,6 +373,9 @@ class ContextManifest:
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
+    input_version: int = 0
+    prompt_version: int = 0
+    prompt_hash: str | None = None
 
 
 @dataclass
@@ -425,6 +457,12 @@ class RunProjection:
     run_id: str = ""
     task: str = ""
     intend_ref: dict[str, Any] | None = None
+    input_version: int = 0
+    product_work_input_version: int = 0
+    processed_input_version: int = 0
+    inputs: list[UserInput] = field(default_factory=list)
+    department_prompts: dict[str, DepartmentPrompt] = field(default_factory=dict)
+    prompt_versions: list[DepartmentPrompt] = field(default_factory=list)
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None

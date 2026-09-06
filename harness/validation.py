@@ -117,7 +117,7 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
             proposal, "acceptance_criteria", min_items=1
         ) + _optional_string_list(proposal, "boundaries") + _optional_string_list(proposal, "constraints") + _optional_string_list(
             proposal, "fatal_conditions"
-        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal)
+        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal) + _change_record_errors(proposal)
     if kind == "delivery_spec":
         return (
             _require_text(proposal, "summary")
@@ -201,6 +201,10 @@ def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> Proposa
 
 
 def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+    if projection.input_version != projection.product_work_input_version:
+        return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
+    if projection.product_spec is not None and proposal.get("change_record") is None:
+        return ProposalDecision(False, [FieldError("change_record", "a revised ProductSpec must explain changed, retained, and retired behavior and its rationale")])
     active_hashes = {item.content_hash for item in projection.effective_decisions}
     changes = proposal.get("decision_changes", [])
     declared = [item["decision_hash"] for item in changes]
@@ -209,6 +213,7 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
     parent = projection.product_spec.content_hash if projection.product_spec else None
     revision = (projection.product_spec.revision + 1) if projection.product_spec else 1
     payload = _product_payload(proposal)
+    payload["input_version"] = projection.input_version
     artifact = {
         **payload,
         "kind": "product_spec",
@@ -418,7 +423,23 @@ def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:
         "non_goals": [item.strip() for item in proposal.get("non_goals", [])],
         "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"],
                               "rationale": item["rationale"].strip()} for item in proposal.get("decision_changes", [])],
+        "change_record": None if proposal.get("change_record") is None else {
+            **{field: [item.strip() for item in proposal["change_record"][field]] for field in ("changed", "retained", "retired")},
+            "rationale": proposal["change_record"]["rationale"].strip(),
+        },
     }
+
+
+def _change_record_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    record = proposal.get("change_record")
+    if record is None:
+        return []
+    if not isinstance(record, dict):
+        return [FieldError("change_record", "change_record must describe changed, retained, and retired behavior and rationale")]
+    errors = _require_text(record, "rationale")
+    for field in ("changed", "retained", "retired"):
+        errors.extend(_require_string_list(record, field, min_items=0))
+    return [FieldError(f"change_record.{item.field}", item.message) for item in errors]
 
 
 def _decision_change_errors(proposal: dict[str, Any]) -> list[FieldError]:

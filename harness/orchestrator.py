@@ -17,9 +17,12 @@ from .collaboration import request_basis, request_still_applicable, resume_phase
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
 from .engine import ToolAdmission, run_department
+from .interactions import InteractionWriter, RunTerminalError
 from .models import (
     Event as RunEvent,
     ArtifactRef,
+    DEPARTMENTS,
+    DepartmentPrompt,
     EventType,
     HUMAN_ACTIONS,
     TERMINAL_PHASES,
@@ -45,6 +48,8 @@ class _Activation:
     activation_id: str
     abort_flag: Event
     parent_event_id: str
+    input_version: int
+    prompt: DepartmentPrompt
     request: ModelRequest | None = None
     tokens_charged: int = 0
     usage: Usage = field(default_factory=lambda: Usage(reported=False))
@@ -63,6 +68,10 @@ class _Activation:
     engineering_plan_hash: str | None = None
     request_id: str | None = None
 
+    def versions(self) -> dict[str, Any]:
+        return {"input_version": self.input_version, "prompt_version": self.prompt.version,
+                "prompt_hash": self.prompt.prompt_ref.content_hash}
+
 
 class Orchestrator:
     def __init__(
@@ -79,6 +88,7 @@ class Orchestrator:
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
         self.submissions = SubmissionWriter(store, artifacts, self.materials_root)
+        self.interactions = InteractionWriter(store, artifacts, self.materials_root)
         self.adapter = adapter
         self.assembler = assembler or ContextAssembler()
         self.sessions = sessions or SessionFactory()
@@ -104,9 +114,7 @@ class Orchestrator:
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
             raise ValueError("run_id must stay within the run materials directory")
-        material_dir.mkdir(parents=True, exist_ok=True)
-        (material_dir / "intend.md").write_bytes(task.encode("utf-8"))
-        intend_ref = self.artifacts.put(run_id, "intend", task, media_type="text/markdown")
+        initial = self.interactions.initial(run_id, task)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
         Workspace(self.workspace_root / run_id)
@@ -118,7 +126,7 @@ class Orchestrator:
             state_after="PRODUCT_SPEC",
             payload={
                 "task": task,
-                "intend_ref": asdict(intend_ref),
+                **initial,
                 "intend_path": (Path("materials") / run_id / "intend.md").as_posix(),
                 "max_cycles": max_cycles,
                 "context_window": context_window,
@@ -143,6 +151,54 @@ class Orchestrator:
     def workspace(self, run_id: str) -> Workspace:
         return Workspace(self.workspace_root / run_id)
 
+    def add_input(self, run_id: str, text: str) -> RunProjection:
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("input must be a non-empty string")
+        command = text.strip() in {"/stop", "/cancel"}
+        with self._state_lock:
+            current = self.project(run_id)
+            if current.phase in TERMINAL_PHASES:
+                raise RunTerminalError("This run has ended; create a new task for this input.")
+            self.interactions.receive(current, text, command=command)
+            if command:
+                self._abort.setdefault(run_id, Event()).set()
+                self._fail(run_id, self.project(run_id), "cancelled", "run cancelled by user command")
+            activation = self._active.get(run_id)
+        if command and activation is not None:
+            self.adapter.abort(activation.session_id)
+        return self.project(run_id)
+
+    def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
+        if department not in DEPARTMENTS:
+            raise ValueError("unknown department")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("prompt must be a non-empty string")
+        with self._state_lock:
+            current = self.project(run_id)
+            if current.phase in TERMINAL_PHASES:
+                raise RunTerminalError("This run has ended; prompts can be edited in a new task.")
+            self.interactions.update_prompt(current, department, text)
+            return self.project(run_id)
+
+    def _assign_new_inputs(self, run_id: str, projection: RunProjection) -> RunProjection:
+        if projection.phase in TERMINAL_PHASES or projection.input_version <= projection.product_work_input_version:
+            return projection
+        projection = self._close_request(run_id, projection, status="superseded",
+                                         reason="New user input requires updated product work.",
+                                         return_phase="PRODUCT_SPEC", return_work_valid=False)
+        self.store.append(
+            run_id, EventType.PRODUCT_INPUT_ASSIGNED, role="product",
+            state_before=projection.phase, state_after="PRODUCT_SPEC",
+            payload={"through_version": projection.input_version},
+        )
+        return self.project(run_id)
+
+    def _activation_stopped(self, activation: _Activation) -> bool:
+        with self._state_lock:
+            current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
+            return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
+                    or current.input_version != activation.input_version)
+
     @staticmethod
     def _request_id(projection: RunProjection) -> str | None:
         return None if projection.pending_request is None else projection.pending_request.id
@@ -162,6 +218,7 @@ class Orchestrator:
         return self.project(run_id)
 
     def _close_obsolete_request(self, run_id: str, projection: RunProjection) -> RunProjection:
+        projection = self._assign_new_inputs(run_id, projection)
         request = projection.pending_request
         if request is None or projection.phase in TERMINAL_PHASES:
             return projection
@@ -218,6 +275,7 @@ class Orchestrator:
                     session_id=request.session_id,
                     payload={
                         "activation_id": request.activation_id,
+                        **activation.versions(),
                         "latency_ms": int((time.monotonic() - started) * 1000),
                         "stop_reason": current.stop_reason,
                     },
@@ -252,6 +310,7 @@ class Orchestrator:
             session = self.sessions.get(run_id, department)
 
         activation_id = session.activate()
+        prompt = projection.department_prompts[department]
         parent = self.store.append(
             run_id,
             EventType.DEPARTMENT_ACTIVATED,
@@ -261,10 +320,13 @@ class Orchestrator:
             session_id=session.session_id,
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": current_contract_hash(projection),
-                     "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection)},
+                     "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection),
+                     "input_version": projection.input_version, "prompt_version": prompt.version,
+                     "prompt_hash": prompt.prompt_ref.content_hash},
         )
         abort_flag = self._abort.setdefault(run_id, Event())
         return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
+                           input_version=projection.input_version, prompt=prompt,
                            effective_contract_hash=current_contract_hash(projection),
                            engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection))
 
@@ -290,7 +352,7 @@ class Orchestrator:
                 begin_tool=lambda call: self._begin_tool(activation, call),
                 begin_request=lambda request: self._begin_request(activation, request),
                 finish_compaction=lambda response: self._finish_compaction(activation, response),
-                stopped=lambda: self.project(run_id).phase in TERMINAL_PHASES or request.abort_flag.is_set(),
+                stopped=lambda: self._activation_stopped(activation),
             )
         except ProviderError as exc:
             if exc.reason == "model_steps_exhausted":
@@ -314,6 +376,7 @@ class Orchestrator:
                 transcript_ref = ref.__dict__
             self._apply_proposal(
                 run_id, department=department, projection=projection, proposal=submission.proposal,
+                input_version=activation.input_version,
                 transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
                 session_id=request.session_id, provider=submission.response.provider, model=submission.response.model,
             )
@@ -329,11 +392,12 @@ class Orchestrator:
                 return None
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id):
+                    or self._request_id(current) != activation.request_id
+                    or current.input_version != activation.input_version):
                 return None
             pinned = self.assembler.assemble(
                 current, department=identity.department, session_id=identity.session_id,
-                activation_id=identity.activation_id, step_id=step_id,
+                activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
             )
             if step_id == 1:
                 content = department_work_text(pinned)
@@ -344,13 +408,17 @@ class Orchestrator:
                                   state_after=current.phase, session_id=identity.session_id,
                                   artifact_hashes=[received_ref.content_hash],
                                   payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
+                                           **activation.versions(),
                                            "effective_contract_hash": activation.effective_contract_hash,
                                            "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
             records = self._department_history_records(identity.run_id, identity.department)
             checkpoint_event = next((item for item in reversed(current.compactions)
                                      if item["department"] == identity.department
                                      and item["effective_contract_hash"] == activation.effective_contract_hash
-                                     and item["engineering_plan_hash"] == activation.engineering_plan_hash), None)
+                                     and item["engineering_plan_hash"] == activation.engineering_plan_hash
+                                     and item["input_version"] == activation.input_version
+                                     and item["prompt_version"] == activation.prompt.version
+                                     and item["prompt_hash"] == activation.prompt.prompt_ref.content_hash), None)
             checkpoint = None
             checkpoint_id = None
             try:
@@ -375,6 +443,7 @@ class Orchestrator:
                     assembled = self.assembler.assemble(
                         current, department=identity.department, session_id=identity.session_id,
                         activation_id=identity.activation_id, step_id=step_id,
+                        prompt=activation.prompt,
                         history=visible_history(records, checkpoint),
                         compaction_event_id=checkpoint_id,
                     )
@@ -385,7 +454,8 @@ class Orchestrator:
                                    step_id, assembled, assembled.tools, identity.abort_flag,
                                    purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
                                    effective_contract_hash=activation.effective_contract_hash,
-                                   engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id)
+                                   engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id,
+                                   **activation.versions())
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
@@ -437,7 +507,8 @@ class Orchestrator:
                 return
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id):
+                    or self._request_id(current) != activation.request_id
+                    or current.input_version != activation.input_version):
                 return
             plan = activation.compaction_plan
             try:
@@ -453,6 +524,7 @@ class Orchestrator:
                               context_digest=request.context.manifest.digest,
                               artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
                               payload={"run_id": activation.run_id, "department": activation.department,
+                                       **activation.versions(),
                                        "activation_id": activation.activation_id, "step_id": request.step_id,
                                        "purpose": "compaction", "checkpoint": asdict(checkpoint),
                                        "source_refs": plan.source_refs, "summary_ref": asdict(summary_ref),
@@ -471,13 +543,15 @@ class Orchestrator:
                 return False
             if (current_contract_hash(current) != request.effective_contract_hash
                     or current_plan_hash(current) != request.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id):
+                    or self._request_id(current) != activation.request_id
+                    or current.input_version != activation.input_version):
                 return False
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
                               context_digest=request.context.manifest.digest,
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
+                                       **activation.versions(),
                                        "attempted": True, "purpose": request.purpose,
                                        "effective_contract_hash": request.effective_contract_hash,
                                        "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id})
@@ -492,7 +566,8 @@ class Orchestrator:
                 return ToolAdmission(stopped=True)
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id):
+                    or self._request_id(current) != activation.request_id
+                    or current.input_version != activation.input_version):
                 return ToolAdmission(stopped=True)
             if not has_tool(request.department, call["name"]):
                 return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
@@ -519,6 +594,7 @@ class Orchestrator:
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
                               payload={**call, "activation_id": request.activation_id,
+                                       **activation.versions(),
                                        "effective_contract_hash": activation.effective_contract_hash,
                                        "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
             return ToolAdmission()
@@ -576,6 +652,7 @@ class Orchestrator:
             payload["effective_contract_hash"] = activation.effective_contract_hash
             payload["engineering_plan_hash"] = activation.engineering_plan_hash
             payload["request_id"] = activation.request_id
+            payload.update(activation.versions())
             self.store.append(
                 request.run_id, event_type, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -605,6 +682,7 @@ class Orchestrator:
                 session_id=request.session_id, provider=provider, model=model,
                 payload={
                     "name": "provider_usage", "ok": True,
+                    **activation.versions(),
                     "activation_id": request.activation_id,
                     "step_id": request.step_id,
                     "purpose": request.purpose,
@@ -645,6 +723,7 @@ class Orchestrator:
         *,
         department: str,
         projection: RunProjection,
+        input_version: int,
         proposal: dict[str, Any] | None,
         transcript_ref: dict[str, Any] | None,
         parent_event_id: str,
@@ -674,11 +753,12 @@ class Orchestrator:
             if current.phase in TERMINAL_PHASES:
                 return
             if (current.phase != projection.phase
+                    or current.input_version != input_version
                     or current_contract_hash(current) != current_contract_hash(projection)
                     or current_plan_hash(current) != current_plan_hash(projection)
                     or self._request_id(current) != self._request_id(projection)
                     or request_basis(current) != request_basis(evaluated)):
-                decision = ProposalDecision(False, [FieldError("execution_basis", "The contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
+                decision = ProposalDecision(False, [FieldError("execution_basis", "The input, contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
             projection = current
             if proposal is not None:
                 self.store.append(
@@ -686,7 +766,8 @@ class Orchestrator:
                     parent_event_id=parent_event_id,
                     state_before=projection.phase, state_after=projection.phase,
                     session_id=session_id, provider=provider, model=model,
-                    payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref, "raw_keys": sorted(proposal.keys())},
+                    payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
+                             "raw_keys": sorted(proposal.keys()), "input_version": input_version},
                 )
             if not decision.accepted:
                 self.store.append(
@@ -698,6 +779,7 @@ class Orchestrator:
                         "errors": decision.error_dicts,
                         "transcript_ref": transcript_ref,
                         "kind": None if proposal is None else proposal.get("kind"),
+                        "input_version": input_version,
                     },
                 )
                 return

@@ -16,6 +16,7 @@ def contract_payload(projection: RunProjection) -> dict[str, Any]:
     basis = {
         "product_spec_hash": spec.content_hash,
         "decision_hashes": [item.content_hash for item in projection.effective_decisions],
+        "input_version": spec.input_version,
     }
     return {**basis, "content_hash": canonical_hash(basis)}
 
@@ -55,7 +56,8 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
     if spec is None:
         raise ValueError("PRD requires an active ProductSpec")
     lines = ["# PRD", "", f"Effective contract: {contract['content_hash']}",
-             f"ProductSpec: {spec.content_hash}", "", "## Goal", "", spec.goal]
+             f"ProductSpec: {spec.content_hash}", f"Accepted user input through version: {spec.input_version}",
+             "", "## Goal", "", spec.goal]
     for title, values in (
         ("Requirements", spec.requirements), ("Boundaries", spec.boundaries),
         ("Constraints and recorded defaults", spec.constraints), ("Acceptance Criteria", spec.acceptance_criteria),
@@ -74,6 +76,14 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
     if spec.decision_changes:
         lines.extend(["", "## Treatment of Earlier Decisions", ""])
         lines.extend(f"- {item['decision_hash']}: {item['disposition']}. {item['rationale']}" for item in spec.decision_changes)
+    if spec.change_record is not None:
+        lines.extend(["", "## Requirement Changes", "", f"Previous ProductSpec: {spec.parent_hash}",
+                      f"Rationale: {spec.change_record['rationale']}"])
+        for field in ("changed", "retained", "retired"):
+            lines.extend(["", f"### {field.title()}", ""])
+            lines.extend(f"- {item}" for item in spec.change_record[field])
+            if not spec.change_record[field]:
+                lines.append("None.")
     return "\n".join(lines).rstrip() + "\n"
 
 

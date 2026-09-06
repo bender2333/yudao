@@ -27,9 +27,9 @@
   <div class="shell">
     <aside>
       <form id="task-form" class="task-form">
-        <label for="task">任务</label>
+        <label for="task" id="input-target">新任务</label>
         <textarea id="task" name="task" required placeholder="描述要完成的任务"></textarea>
-        <div class="budget">
+        <div class="budget" id="task-limits">
           <label>循环 <input id="max_cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label>
           <label>窗口 <input id="context_window" name="context_window" type="number" min="1" step="1" value="32000"></label>
         </div>
@@ -55,6 +55,10 @@
         <h2>运行看板</h2>
         <div id="board-body" class="muted">选择一个任务。</div>
       </section>
+      <section id="inputs" class="view">
+        <h2>用户输入</h2>
+        <div id="inputs-body" class="muted">尚无输入。</div>
+      </section>
       <div class="grid">
         <section id="timeline" class="view">
           <h2>规格时间线</h2>
@@ -67,6 +71,26 @@
       </div>
       <section id="context" class="view">
         <h2>上下文 / 追踪视图</h2>
+        <form id="prompt-form" class="prompt-form">
+          <label for="prompt-department">部门提示词</label>
+          <select id="prompt-department" name="department">
+            <option value="product">产品</option>
+            <option value="engineering">工程</option>
+            <option value="quality">质检</option>
+          </select>
+          <p id="prompt-target" class="muted">选择一个任务。</p>
+          <details id="prompt-current">
+            <summary>当前提示词 <span id="prompt-version"></span></summary>
+            <pre id="prompt-current-text" class="raw-text"></pre>
+          </details>
+          <details id="prompt-editor">
+            <summary>编辑提示词</summary>
+            <label for="prompt-text">新版原文</label>
+            <textarea id="prompt-text" name="text" required></textarea>
+            <button type="submit" id="btn-prompt-save" disabled>保存提示词</button>
+          </details>
+          <div id="prompt-history"></div>
+        </form>
         <div id="context-body" class="muted">等待每一步的上下文清单。</div>
       </section>
     </main>

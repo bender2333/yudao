@@ -26,6 +26,7 @@ def product_spec(
         "fatal_conditions": extra.get("fatal_conditions", ["non-zero exit on valid input"]),
         "non_goals": extra.get("non_goals", ["network access"]),
         "decision_changes": extra.get("decision_changes", []),
+        "change_record": extra.get("change_record"),
     }
     payload.update({key: value for key, value in extra.items() if key in payload})
     return payload

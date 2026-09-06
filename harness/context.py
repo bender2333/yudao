@@ -13,41 +13,13 @@ from .models import (
     ContextManifest,
     ContextSource,
     DeliverySpec,
+    DepartmentPrompt,
     ProductDecision,
     RunProjection,
     canonical_hash,
     estimate_tokens,
     json_dumps,
 )
-
-DEPARTMENT_RULES = {
-    "product": (
-        "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。"
-        "不能修改交付代码，不能直接放行任务。"
-        "专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。"
-        "新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。"
-        "使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。"
-    ),
-    "engineering": (
-        "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。"
-        "当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。"
-        "写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。"
-        "调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。"
-        "可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。"
-        "必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。"
-        "失效交付只作为修复依据，不是当前有效交付。"
-        "使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。"
-    ),
-    "quality": (
-        "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。"
-        "当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。"
-        "不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。"
-        "使用 collect_evidence 或 run_check 让主机执行检查，再 submit_review。"
-        "交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。"
-        "只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。"
-        "自然语言中的“完成”不会改变任务状态。"
-    ),
-}
 
 PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
     "product": {
@@ -56,8 +28,11 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
             "product_spec": {
                 "when": ["PRODUCT_SPEC", "REWORK_PRODUCT"],
                 "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria"],
-                "optional": ["boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes"],
+                "optional": ["boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes", "change_record"],
                 "decision_changes": [{"decision_hash": "every current decision", "disposition": "retain|integrate|retire", "rationale": "reason"}],
+                "change_record": {"when": "required for every revision of an existing ProductSpec",
+                                  "changed": ["changed behavior"], "retained": ["still valid behavior"],
+                                  "retired": ["legitimately removed behavior"], "rationale": "reason for the revision"},
             },
             "product_decision": {
                 "required": ["kind=product_decision", "statement", "rationale"],
@@ -155,7 +130,7 @@ class AssembledContext:
 
 
 def department_work_text(pinned: AssembledContext) -> str:
-    static = {"intend", "department_rules", "professional_completion", "collaboration_rules", "proposal_contract",
+    static = {"intend", "department_rules", "professional_completion", "collaboration_rules", "input_handling", "proposal_contract",
               "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
@@ -163,11 +138,23 @@ def department_work_text(pinned: AssembledContext) -> str:
 class ContextAssembler:
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
-                 compaction_event_id: str | None = None) -> AssembledContext:
+                 compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None) -> AssembledContext:
+        prompt = projection.department_prompts[department] if prompt is None else prompt
+        if prompt.department != department:
+            raise ValueError("the prompt must belong to the activated department")
         parts: list[ContextPart] = [
-            ContextPart("intend", None, projection.task),
+            ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
-            ContextPart("department_rules", department, DEPARTMENT_RULES[department]),
+            ContextPart("department_rules", str(prompt.version), prompt.text),
+            ContextPart("input_progress", str(projection.input_version), json_dumps({
+                "received": projection.input_version, "assigned_to_product": projection.product_work_input_version,
+                "accepted_in_requirements": projection.processed_input_version,
+            })),
+            ContextPart("input_handling", None,
+                        "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。"
+                        "修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；"
+                        "decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。"
+                        "部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。"),
             ContextPart("professional_completion", None,
                         "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。"
                         "模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。"
@@ -190,6 +177,10 @@ class ContextAssembler:
             ),
             ContextPart("allowed_tools", department, json_dumps(_tools_for(projection, department))),
         ]
+        pending_inputs = [item for item in projection.inputs
+                          if item.version > projection.processed_input_version and item.kind == "text"]
+        if pending_inputs:
+            parts.append(ContextPart("pending_inputs", str(projection.product_work_input_version), json_dumps(pending_inputs)))
         feedback = _validation_feedback(projection, department)
         if feedback:
             parts.append(ContextPart("validation_feedback", feedback.get("event_id"), json_dumps(feedback)))
@@ -230,6 +221,8 @@ class ContextAssembler:
                             "revision": spec.revision,
                             "status": spec.status,
                             "decision_changes": spec.decision_changes,
+                            "change_record": spec.change_record,
+                            "input_version": spec.input_version,
                         }
                     ),
                 )
@@ -319,6 +312,9 @@ class ContextAssembler:
             effective_contract_hash=current_contract_hash(projection),
             engineering_plan_hash=current_plan_hash(projection),
             request_id=None if projection.pending_request is None else projection.pending_request.id,
+            input_version=projection.input_version,
+            prompt_version=prompt.version,
+            prompt_hash=prompt.prompt_ref.content_hash,
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -340,6 +336,9 @@ class ContextAssembler:
             effective_contract_hash=pinned.manifest.effective_contract_hash,
             engineering_plan_hash=pinned.manifest.engineering_plan_hash,
             request_id=pinned.manifest.request_id,
+            input_version=pinned.manifest.input_version,
+            prompt_version=pinned.manifest.prompt_version,
+            prompt_hash=pinned.manifest.prompt_hash,
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 

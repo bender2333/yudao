@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from ..models import ArtifactRef, EventType, json_dumps
 from ..projection import RunNotFoundError, project_run
-from ..runtime import LoopSystem
+from ..runtime import LoopSystem, RunTerminalError
 from ..tree_archive import load_tree
 from ..views import event_card, run_board, run_payload
 
@@ -140,11 +140,17 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._cancel_run(parts[2])
             if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "replay":
                 return self._replay_run(parts[2])
+            if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "inputs":
+                return self._add_input(parts[2])
+            if len(parts) == 5 and parts[:2] == ["api", "runs"] and parts[3] == "prompts":
+                return self._update_prompt(parts[2], parts[4])
             if path.startswith("/api/"):
                 return self._send_json({"error": "not found"}, 404)
             self._send_json({"error": "not found"}, 404)
         except BusyError as exc:
             self._send_json({"error": str(exc), "reason": "busy"}, 409)
+        except RunTerminalError as exc:
+            self._send_json({"error": str(exc), "reason": "run_terminal"}, 409)
         except ProviderUnavailableError as exc:
             self._send_json({"error": str(exc), "reason": exc.reason}, 503)
         except RunNotFoundError as exc:
@@ -195,6 +201,28 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 "stop_reason": projection.stop_reason,
             }
         )
+
+    def _text_body(self) -> str:
+        body = self._read_json_body()
+        if set(body) != {"text"}:
+            raise ValueError("body must contain only text")
+        text = body["text"]
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("text must be a non-empty string")
+        return text
+
+    def _add_input(self, run_id: str) -> None:
+        projection = self.server.system.add_input(run_id, self._text_body())
+        self._send_json({"ok": True, "run_id": run_id, "phase": projection.phase,
+                         "input_version": projection.input_version,
+                         "processed_input_version": projection.processed_input_version}, 201)
+
+    def _update_prompt(self, run_id: str, department: str) -> None:
+        projection = self.server.system.update_prompt(run_id, department, self._text_body())
+        prompt = projection.department_prompts[department]
+        self._send_json({"ok": True, "run_id": run_id, "department": department,
+                         "prompt_version": prompt.version,
+                         "prompt_hash": prompt.prompt_ref.content_hash}, 201)
 
     def _replay_run(self, run_id: str) -> None:
         self._drain_body()
@@ -257,9 +285,17 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             for key in ("input_ref", "message_ref", "output_ref"):
                 ref = event.payload.get(key)
                 if ref:
-                    detail[key.removesuffix("_ref")] = json.loads(
-                        self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**ref))
+                    raw = self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**ref))
+                    detail[key.removesuffix("_ref")] = (
+                        raw.decode("utf-8") if event.type == EventType.USER_INPUT_RECEIVED
+                        else json.loads(raw)
                     )
+            for key in ("intend_ref", "prompt_ref"):
+                ref = event.payload.get(key)
+                if ref:
+                    detail[key.removesuffix("_ref")] = self.server.system.artifacts.get_for_run(
+                        run_id, ArtifactRef(**ref)
+                    ).decode("utf-8")
             if event.payload.get("summary_ref"):
                 detail["compaction_summary"] = self.server.system.artifacts.get_for_run(
                     run_id, ArtifactRef(**event.payload["summary_ref"])

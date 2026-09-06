@@ -25,7 +25,9 @@ def _submit(identity="submit"):
 
 
 def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
-    context = ContextAssembler().assemble(RunProjection(task="echo"), department="engineering",
+    system = LoopSystem(tmp_path)
+    run_id = system.create_run("echo")
+    context = ContextAssembler().assemble(system.project(run_id), department="engineering",
                                           session_id="session", activation_id="activation")
     request = ModelRequest("run", "engineering", "session", "activation", 1, context, context.tools, Event())
     adapter = FakeAdapter([FakeTurn(writes={"owned.txt": "content"})])

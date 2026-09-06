@@ -1,8 +1,10 @@
 import json
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.artifacts import ArtifactStore
 from harness.context import ContextAssembler
-from harness.models import RunProjection, SessionRecord
+from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from harness.models import DepartmentPrompt, RunProjection, SessionRecord
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
@@ -49,7 +51,10 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
 
 def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     unique = "UNIQUE_GOAL_V1_MUST_NOT_LEAK"
-    v2 = product_spec(goal="Build echo v2", acceptance=["v2 works"])
+    v2 = product_spec(goal="Build echo v2", acceptance=["v2 works"], change_record={
+        "changed": ["Use the v2 goal and acceptance criteria"], "retained": ["The echo CLI scope"],
+        "retired": ["The original goal and acceptance criteria"], "rationale": "The requested revision replaces v1.",
+    })
     adapter = FakeAdapter(
         [
             product_spec(goal=unique),
@@ -212,7 +217,11 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
 
     def retire_decisions(request):
         decisions = _part(request, "current_product_decisions")
-        return product_spec(acceptance=["new behavior"], decision_changes=[
+        return product_spec(acceptance=["new behavior"], change_record={
+            "changed": ["Use the new behavior acceptance criterion"], "retained": ["The echo CLI scope"],
+            "retired": ["The previous acceptance criterion and product decision"],
+            "rationale": "Quality found that the previous product contract was wrong.",
+        }, decision_changes=[
             {"decision_hash": item["content_hash"], "disposition": "retire", "rationale": "The new behavior replaces this requirement."}
             for item in decisions
         ])
@@ -260,7 +269,10 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
                 "contract is wrong",
                 defects=[{"severity": "major", "summary": "contract issue"}],
             ),
-            product_spec(acceptance=["new behavior"]),
+            product_spec(acceptance=["new behavior"], change_record={
+                "changed": ["Replace old behavior with new behavior"], "retained": ["The echo CLI scope"],
+                "retired": ["The old behavior acceptance criterion"], "rationale": "Address the quality contract defect.",
+            }),
             plan_turn(reason="Implement the current replacement contract"),
             delivery_turn(summary="NEW_DELIVERY_CANARY"),
             review_turn("release", "new delivery checked"),
@@ -365,13 +377,16 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     assert later.context.prompt_text.count("validation_feedback") == 0
 
 
-def test_assembler_records_budget_and_digest():
+def test_assembler_records_budget_and_digest(tmp_path):
+    prompt_text = DEFAULT_PROMPTS["engineering"]
+    prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
     projection = RunProjection(
         run_id="run_x",
         task="task",
         phase="ENGINEERING",
         context_window=8000,
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
+        department_prompts={"engineering": DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")},
     )
     assembled = ContextAssembler().assemble(projection, department="engineering", session_id="ses_e", activation_id="act_1")
     assert assembled.manifest.budget == 8000

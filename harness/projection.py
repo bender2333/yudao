@@ -9,6 +9,7 @@ from .event_store import EventStore
 from .models import (
     CollaborationRequest,
     CollaborationResponse,
+    DepartmentPrompt,
     ArtifactRef,
     ContextExclusion,
     ContextManifest,
@@ -25,6 +26,7 @@ from .models import (
     QAReview,
     RunProjection,
     SessionRecord,
+    UserInput,
     TERMINAL_PHASES,
     department_for_phase,
     waiting_reason_for,
@@ -76,6 +78,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.run_id = event.run_id
         state.task = payload["task"]
         state.intend_ref = payload["intend_ref"]
+        initial = _input_from_payload(payload["initial_input"], event)
+        state.inputs.append(initial)
+        state.input_version = initial.version
+        state.product_work_input_version = initial.version
+        for value in payload["department_prompts"].values():
+            prompt = _prompt_from_payload(value, event)
+            state.department_prompts[prompt.department] = prompt
+            state.prompt_versions.append(prompt)
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
         state.context_window = int(payload.get("context_window", 32_000))
@@ -86,6 +96,26 @@ def apply_event(state: RunProjection, event: Event) -> None:
             for department, session_id in payload.get("sessions", {}).items()
         }
         state.active_department = "product"
+        return
+
+    if etype == EventType.USER_INPUT_RECEIVED:
+        received = _input_from_payload(payload, event)
+        state.inputs.append(received)
+        state.input_version = received.version
+        state.task += received.text
+        state.intend_ref = payload["intend_ref"]
+        return
+
+    if etype == EventType.PRODUCT_INPUT_ASSIGNED:
+        state.product_work_input_version = payload["through_version"]
+        state.phase = "PRODUCT_SPEC"
+        state.active_department = "product"
+        return
+
+    if etype == EventType.DEPARTMENT_PROMPT_UPDATED:
+        prompt = _prompt_from_payload(payload, event)
+        state.department_prompts[prompt.department] = prompt
+        state.prompt_versions.append(prompt)
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
@@ -165,6 +195,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 state.product_specs[state.product_specs.index(existing)] = replace(existing, status="superseded")
         state.product_specs.append(spec)
         state.product_spec = spec
+        state.processed_input_version = spec.input_version
         _supersede_active_deliveries(state, "product_spec_changed")
         _refresh_effective_decisions(state)
         return
@@ -182,6 +213,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         contract = EffectiveContract(
             content_hash=payload["content_hash"], revision=payload["revision"],
             product_spec_hash=payload["product_spec_hash"], decision_hashes=list(payload["decision_hashes"]),
+            input_version=payload["input_version"],
             created_event_id=event.event_id, prd_ref=ArtifactRef(**payload["prd_ref"]),
         )
         if state.effective_contract is None or state.effective_contract.content_hash != contract.content_hash:
@@ -321,6 +353,22 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
 
+def _input_from_payload(payload: dict[str, Any], event: Event) -> UserInput:
+    return UserInput(
+        id=payload["id"], run_id=event.run_id, version=payload["version"], text=payload["text"],
+        kind=payload["kind"], input_ref=ArtifactRef(**payload["input_ref"]),
+        intend_ref=ArtifactRef(**payload["intend_ref"]), byte_start=payload["byte_start"],
+        byte_end=payload["byte_end"], created_event_id=event.event_id,
+    )
+
+
+def _prompt_from_payload(payload: dict[str, Any], event: Event) -> DepartmentPrompt:
+    return DepartmentPrompt(
+        department=payload["department"], version=payload["version"], text=payload["text"],
+        prompt_ref=ArtifactRef(**payload["prompt_ref"]), created_event_id=event.event_id,
+    )
+
+
 def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextManifest:
     return ContextManifest(
         source_event_id=event_id,
@@ -330,6 +378,9 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         effective_contract_hash=payload["effective_contract_hash"],
         engineering_plan_hash=payload["engineering_plan_hash"],
         request_id=payload["request_id"],
+        input_version=payload["input_version"],
+        prompt_version=payload["prompt_version"],
+        prompt_hash=payload["prompt_hash"],
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],
@@ -363,6 +414,8 @@ def _product_spec_from_payload(payload: dict[str, Any], event: Event) -> Product
         fatal_conditions=list(payload.get("fatal_conditions", [])),
         non_goals=list(payload.get("non_goals", [])),
         decision_changes=list(payload["decision_changes"]),
+        change_record=payload["change_record"],
+        input_version=payload["input_version"],
     )
 
 

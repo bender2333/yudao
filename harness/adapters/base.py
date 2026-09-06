@@ -57,6 +57,9 @@ class ModelRequest:
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
+    input_version: int = 0
+    prompt_version: int = 0
+    prompt_hash: str | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:

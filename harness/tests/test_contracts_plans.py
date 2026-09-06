@@ -22,7 +22,10 @@ def _accept_new_spec(system, run_id):
     projection = system.project(run_id)
     decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=replace(projection, phase="PRODUCT_SPEC"),
                                  snapshot=system.workspace(run_id).snapshot(),
-                                 proposal=product_spec(requirements=["print the argument in uppercase"]))
+                                 proposal=product_spec(requirements=["print the argument in uppercase"], change_record={
+                                     "changed": ["Print the argument in uppercase"], "retained": ["Keep a single argument CLI"],
+                                     "retired": ["Preserve the original case"], "rationale": "The product now requires uppercase output",
+                                 }))
     assert decision.accepted
     system.orchestrator._commit_accepted(
         run_id, department="product", projection=projection, snapshot=system.workspace(run_id).snapshot(), artifact=decision.artifact,

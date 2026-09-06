@@ -13,6 +13,10 @@ const state = {
   busy: false,
   activeRunId: null,
   selectedPhase: null,
+  forceNewTask: false,
+  submittingPrompt: false,
+  promptData: null,
+  promptDrafts: {},
 };
 
 let workerWatchTimer = null;
@@ -58,11 +62,32 @@ function setAlert(id, text) {
 function syncButtons() {
   const start = document.getElementById("btn-start");
   const cancel = document.getElementById("btn-cancel");
-  if (start) start.disabled = state.submittingStart || state.busy;
+  const targetRun = inputRunId();
+  if (start) {
+    start.disabled = state.submittingStart || (!targetRun && state.busy);
+    start.title = targetRun ? "提交输入" : "开始新任务";
+    start.setAttribute?.("aria-label", start.title);
+  }
+  const target = document.getElementById("input-target");
+  if (target) target.textContent = targetRun ? `当前任务 ${targetRun}` : "新任务";
+  const compose = document.getElementById("btn-new");
+  if (compose) {
+    compose.title = targetRun ? "补充输入" : "新任务";
+    compose.setAttribute?.("aria-label", compose.title);
+  }
+  const limits = document.getElementById("task-limits");
+  if (limits) limits.hidden = Boolean(targetRun);
+  const save = document.getElementById("btn-prompt-save");
+  if (save) save.disabled = state.submittingPrompt || !state.runId || !state.selectedPhase || TERMINAL.has(state.selectedPhase);
   if (!cancel) return;
   const selectedLive = Boolean(state.runId) && state.runId === state.activeRunId;
   const selectedRunning = Boolean(state.runId) && state.selectedPhase && !TERMINAL.has(state.selectedPhase);
   cancel.disabled = state.submittingCancel || !state.runId || !(selectedLive || selectedRunning);
+}
+
+function inputRunId() {
+  return !state.forceNewTask && state.runId && state.selectedPhase && !TERMINAL.has(state.selectedPhase)
+    ? state.runId : null;
 }
 
 function applyProviderAlert(health) {
@@ -261,6 +286,8 @@ async function loadRuns(runId, gen, seq) {
 async function selectRun(runId) {
   const gen = ++state.gen;
   state.runId = runId;
+  state.selectedPhase = null;
+  state.forceNewTask = false;
   state.pendingRefresh = null;
   setAlert("exec-alert", "");
   document.querySelectorAll("#runs button").forEach((button) => {
@@ -313,6 +340,8 @@ async function refreshRun(runId, gen) {
   renderTimeline(data.timeline);
   renderEvidence(data.evidence, gen);
   renderContext(data.context, data.events, gen);
+  renderInputs(data.inputs || [], data.board, gen);
+  renderPrompts(data.prompts, data.board, gen);
   await loadRuns(runId, gen, seq);
   if (!stillCurrent(runId, gen, seq)) return null;
   const health = await loadHealth(gen);
@@ -499,6 +528,8 @@ function renderTimeline(timeline, gen = state.gen) {
     <article class="item">
       <header><span>ProductSpec r${t(spec.revision)}</span><span>${t(spec.status)}</span></header>
       <p>${t(spec.goal, "")}</p>
+      <p class="muted">已处理输入 v${t(spec.input_version)}</p>
+      ${renderChangeRecord(spec.change_record)}
       <p class="hash">${t(shortHash(spec.content_hash))} ← ${t(shortHash(spec.parent_hash))}</p>
     </article>`,
     )
@@ -625,6 +656,107 @@ function renderEvidence(evidence, gen = state.gen) {
   });
 }
 
+function renderChangeRecord(record) {
+  if (!record) return "";
+  return `<div class="change-record">${[["变更", record.changed], ["保留", record.retained], ["移除", record.retired]]
+    .map(([label, items]) => `<p><strong>${label}</strong>：${t((items || []).join("；"), "无")}</p>`).join("")}
+    <p><strong>原因</strong>：${t(record.rationale)}</p></div>`;
+}
+
+function renderInputs(inputs, board, gen) {
+  const node = document.getElementById("inputs-body");
+  if (!node) return;
+  node.innerHTML = inputs.length ? inputs.map((item) => {
+    const status = item.kind === "command" ? "取消命令已执行"
+      : item.version <= board.processed_input_version ? "已进入需求"
+      : TERMINAL.has(board.phase) ? "未进入需求（任务已结束）"
+      : item.version <= board.product_work_input_version ? "产品处理中" : "等待产品处理";
+    return `<article class="item user-input" data-input-version="${t(item.version)}">
+      <header><span>输入 v${t(item.version)}</span><span>${status}</span></header>
+      <pre class="raw-text">${escapeHtml(item.text)}</pre>
+      <p class="hash">UTF-8 字节 [${t(item.byte_start)}, ${t(item.byte_end)}) · ${t(shortHash(item.input_ref?.content_hash))}</p>
+      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看接收记录</button>
+    </article>`;
+  }).join("") : '<p class="muted">尚无输入。</p>';
+  node.querySelectorAll(".event-link").forEach(button => {
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
+  });
+}
+
+function promptKey() {
+  const department = document.getElementById("prompt-department")?.value;
+  return state.runId && department ? `${state.runId}/${department}` : null;
+}
+
+function renderPrompts(prompts, board, gen) {
+  state.promptData = { prompts, board, gen };
+  renderPromptSelection();
+}
+
+function renderPromptSelection() {
+  const data = state.promptData;
+  const selector = document.getElementById("prompt-department");
+  if (!data || !selector || data.board.run_id !== state.runId) return;
+  const department = selector.value;
+  const current = data.prompts?.current?.[department];
+  const target = document.getElementById("prompt-target");
+  if (target) target.textContent = TERMINAL.has(data.board.phase)
+    ? `${data.board.run_id} · 任务已结束`
+    : `${data.board.run_id} · 保存后在${departmentLabel(department)}下次激活采用`;
+  const version = document.getElementById("prompt-version");
+  if (version) version.textContent = current ? `v${current.version} · ${shortHash(current.prompt_ref?.content_hash)}` : "";
+  const original = document.getElementById("prompt-current-text");
+  if (original) original.textContent = current?.text || "";
+  const editor = document.getElementById("prompt-text");
+  if (editor) editor.value = state.promptDrafts[promptKey()] ?? current?.text ?? "";
+  const history = document.getElementById("prompt-history");
+  if (history) {
+    const versions = (data.prompts?.versions || []).filter(item => item.department === department);
+    history.innerHTML = versions.map(item => {
+      const activations = (data.prompts?.activations || []).filter(item2 =>
+        item2.department === department && item2.prompt_version === item.version);
+      return `<details class="work-history" data-prompt-version="${t(item.version)}">
+        <summary>v${t(item.version)} · ${activations.length ? `已采用 ${activations.length} 次` : "尚未采用"}</summary>
+        <pre class="raw-text">${escapeHtml(item.text)}</pre>
+        <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看保存记录</button>
+        ${activations.map(active => `<p class="muted">输入 v${t(active.input_version)} · 激活 ${t(active.activation_id)}
+          <button type="button" class="event-link" data-event-id="${t(active.event_id)}">查看采用记录</button></p>`).join("")}
+      </details>`;
+    }).join("");
+    history.querySelectorAll(".event-link").forEach(button => {
+      button.addEventListener("click", () => openEvent(button.dataset.eventId, data.gen));
+    });
+  }
+}
+
+async function savePrompt(event) {
+  event.preventDefault();
+  if (state.submittingPrompt || !state.runId || TERMINAL.has(state.selectedPhase)) return;
+  const runId = state.runId;
+  const gen = state.gen;
+  const department = document.getElementById("prompt-department").value;
+  const text = document.getElementById("prompt-text").value;
+  const key = promptKey();
+  if (!text.trim()) return;
+  state.promptDrafts[key] = text;
+  state.submittingPrompt = true;
+  syncButtons();
+  try {
+    const saved = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/prompts/${department}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    });
+    if (state.promptDrafts[key] === text) delete state.promptDrafts[key];
+    if (gen !== state.gen) return;
+    await refreshRun(runId, gen);
+    setStatus("idle", `提示词 v${saved.prompt_version} 已保存`);
+  } catch (error) {
+    if (gen === state.gen) setStatus("error", error.message);
+  } finally {
+    state.submittingPrompt = false;
+    syncButtons();
+  }
+}
+
 function renderContext(context, events, gen) {
   const node = document.getElementById("context-body");
   if (!node) return;
@@ -633,6 +765,7 @@ function renderContext(context, events, gen) {
       return `
     <article class="item">
       <header><span>${t(item.department)} · 第 ${t(item.step_id)} 步${item.purpose === "compaction" ? " · 压缩" : ""}</span><span>${t(item.token_estimate)} tok / 窗口 ${t(item.budget)}</span></header>
+      <p class="muted">采用输入 v${t(item.input_version)} · 提示词 v${t(item.prompt_version)} · ${t(shortHash(item.prompt_hash))}</p>
       <p>注入：${t((item.injected || []).map((part) => part.source).join(", "))}</p>
       <p class="muted">排除：${t((item.excluded || []).map((part) => part.source).join(", "))}</p>
       <p class="hash">${t(shortHash(item.digest))}</p>
@@ -776,6 +909,12 @@ function openCompose() {
   if (task && typeof task.focus === "function") task.focus();
 }
 
+function newTask() {
+  state.forceNewTask = state.forceNewTask || !state.runId || !state.selectedPhase || TERMINAL.has(state.selectedPhase);
+  syncButtons();
+  openCompose();
+}
+
 function closeCompose() {
   if (document.body && document.body.classList) document.body.classList.remove("compose");
 }
@@ -803,11 +942,14 @@ function readLimits() {
 
 async function startRun(event) {
   event.preventDefault();
-  if (state.submittingStart || state.busy) return;
-  const task = document.getElementById("task").value;
+  const targetRun = inputRunId();
+  if (state.submittingStart || (!targetRun && state.busy)) return;
+  const taskNode = document.getElementById("task");
+  const task = taskNode.value;
+  if (!task.trim()) return;
   let options;
   try {
-    options = readLimits();
+    options = targetRun ? {} : readLimits();
   } catch (error) {
     setStatus("error", error.message);
     openCompose();
@@ -816,13 +958,16 @@ async function startRun(event) {
   state.submittingStart = true;
   syncButtons();
   try {
-    const created = await fetchJSON("/api/runs", {
+    const created = await fetchJSON(targetRun ? `/api/runs/${encodeURIComponent(targetRun)}/inputs` : "/api/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task, ...options }),
+      body: JSON.stringify(targetRun ? { text: task } : { task, ...options }),
     });
-    state.busy = true;
-    state.activeRunId = created.run_id;
+    if (taskNode.value === task) taskNode.value = "";
+    if (!targetRun) {
+      state.busy = true;
+      state.activeRunId = created.run_id;
+    }
     syncButtons();
     syncWorkerWatch();
     blurTask();
@@ -830,10 +975,14 @@ async function startRun(event) {
     await selectRun(created.run_id);
     scrollBoardIntoView();
   } catch (error) {
-    if (error.status === 409) setStatus("conflict", error.message);
+    if (error.payload?.reason === "run_terminal") setStatus("conflict", "任务已经结束，输入尚未提交。新任务");
+    else if (error.status === 409) setStatus("conflict", error.message);
     else setStatus("error", error.message);
     openCompose();
     await loadHealth(state.gen);
+    if (error.payload?.reason === "run_terminal" && targetRun === state.runId) {
+      state.forceNewTask = true;
+    }
   } finally {
     state.submittingStart = false;
     syncButtons();
@@ -865,7 +1014,13 @@ function boot() {
   document.getElementById("task-form").addEventListener("submit", startRun);
   document.getElementById("btn-cancel").addEventListener("click", cancelRun);
   const newer = document.getElementById("btn-new");
-  if (newer) newer.addEventListener("click", openCompose);
+  if (newer) newer.addEventListener("click", newTask);
+  document.getElementById("prompt-form")?.addEventListener("submit", savePrompt);
+  document.getElementById("prompt-department")?.addEventListener("change", () => renderPromptSelection());
+  document.getElementById("prompt-text")?.addEventListener("input", () => {
+    const key = promptKey();
+    if (key) state.promptDrafts[key] = document.getElementById("prompt-text").value;
+  });
   syncButtons();
   loadHealth()
     .then(() => loadRuns())
@@ -899,6 +1054,12 @@ globalThis.harnessWeb = {
   openCompose,
   closeCompose,
   startRun,
+  newTask,
+  inputRunId,
+  renderInputs,
+  renderPrompts,
+  renderPromptSelection,
+  savePrompt,
   isMobileLayout,
   scrollBoardIntoView,
   blurTask,

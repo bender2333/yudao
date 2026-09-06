@@ -3,7 +3,8 @@ from dataclasses import asdict, replace
 import pytest
 
 from harness.adapters.base import ProviderError
-from harness.context import ContextAssembler, DEPARTMENT_RULES
+from harness.context import ContextAssembler
+from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import DEPARTMENTS, EventType, json_dumps
 from harness.projection import project_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
@@ -21,7 +22,10 @@ def rework_script(verdict="rework_engineering"):
         ]),
     ]
     if verdict == "rework_product":
-        script.append(product_spec(acceptance=["empty input prints an empty line"]))
+        script.append(product_spec(acceptance=["empty input prints an empty line"], change_record={
+            "changed": ["Require an empty output line for empty input"], "retained": ["Echo the provided argument"],
+            "retired": [], "rationale": "Quality identified missing empty-input behavior.",
+        }))
     return [
         *script,
         plan_turn(reason="Address the quality finding under the current product requirements"),
@@ -78,7 +82,7 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
 
 
 def test_candidate_is_never_injected_into_department_context(tmp_path):
-    rules = dict(DEPARTMENT_RULES)
+    rules = dict(DEFAULT_PROMPTS)
     system, result = run_scripted(tmp_path, rework_script())
     candidate = result.lesson_candidates[0]
     for department in DEPARTMENTS:
@@ -91,7 +95,7 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
         assert candidate.id not in invocation.context.prompt_text
         assert candidate.suggestion not in invocation.context.prompt_text
         assert all("lesson" not in item.source for item in invocation.context.manifest.injected)
-    assert DEPARTMENT_RULES == rules
+    assert DEFAULT_PROMPTS == rules
     assert (system.adapter.name, system.adapter.model) == ("fake", "fake-script")
 
 

@@ -30,7 +30,7 @@ code, pre { font-family: var(--mono); font-size: 12px; }
 .header-meta { min-width: 0; flex: 1 1 16rem; display: flex; flex-direction: column; gap: 4px; }
 h1, h2, h3 { margin: 0 0 12px; font-weight: 600; letter-spacing: 0; }
 h1 { font-size: 20px; margin: 0; }
-#btn-new { display: none; }
+#btn-new { display: inline-flex; }
 h2 { font-size: 13px; color: var(--muted); }
 .note, .muted, .empty { color: var(--muted); }
 #status, .alert { margin: 0; font-size: 13px; overflow-wrap: break-word; word-break: normal; }
@@ -170,6 +170,16 @@ main { padding: 0 16px; display: flex; flex-direction: column; min-width: 0; }
 }
 .kv-model dd { overflow-wrap: anywhere; }
 .task-text { overflow-wrap: break-word; word-break: normal; }
+.raw-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 24rem; overflow: auto; }
+#input-target { overflow-wrap: anywhere; }
+.budget[hidden] { display: none; }
+.prompt-form { display: grid; gap: 8px; margin-bottom: 20px; min-width: 0; }
+.prompt-form label, .prompt-form p { font-size: 12px; margin: 0; }
+.prompt-form select { width: 10rem; max-width: 100%; padding: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.prompt-form textarea { display: block; width: 100%; min-height: 160px; resize: vertical; margin: 6px 0; padding: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+.prompt-form button { padding: 6px 10px; border: 1px solid var(--line); color: var(--run); background: var(--surface); cursor: pointer; }
+.prompt-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+.change-record { font-size: 13px; }
 .pill { display: inline-block; padding: 2px 8px; border: 1px solid var(--line); font-size: 12px; margin-bottom: 10px; }
 .pill.done { color: var(--good); border-color: var(--good); }
 .pill.paused { color: var(--warn); border-color: var(--warn); }

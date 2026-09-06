@@ -37,6 +37,9 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "provider": projection.provider,
         "adapter": projection.adapter,
         "model": projection.model,
+        "input_version": projection.input_version,
+        "product_work_input_version": projection.product_work_input_version,
+        "processed_input_version": projection.processed_input_version,
     }
 
 
@@ -52,6 +55,9 @@ def spec_timeline(projection: RunProjection, events: list[Event]) -> dict[str, A
                 "content_hash": spec.content_hash,
                 "parent_hash": spec.parent_hash,
                 "goal": spec.goal,
+                "input_version": spec.input_version,
+                "change_record": _plain(spec.change_record),
+                "created_event_id": spec.created_event_id,
             }
         )
     return {
@@ -123,6 +129,15 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
         "timeline": spec_timeline(projection, events),
         "evidence": evidence_view(projection),
         "context": context_view(projection),
+        "inputs": _plain(projection.inputs),
+        "prompts": {
+            "current": _plain(projection.department_prompts),
+            "versions": _plain(projection.prompt_versions),
+            "activations": [
+                {"event_id": event.event_id, "department": event.role, **event.payload}
+                for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
+            ],
+        },
         "events": [event_card(event) for event in events],
         "aggregates": {
             "tokens": projection.token_used,

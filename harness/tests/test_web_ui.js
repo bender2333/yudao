@@ -108,6 +108,9 @@ function makeDocument() {
     "btn-new",
     "max_cycles",
     "context_window",
+    "input-target", "task-limits", "inputs-body", "prompt-form", "prompt-target",
+    "prompt-department", "prompt-text", "prompt-version", "prompt-current-text",
+    "prompt-history", "btn-prompt-save",
   ]) {
     nodes.set(id, makeEl(id));
   }
@@ -130,6 +133,7 @@ function makeDocument() {
   body.ownerDocument = doc;
   nodes.get("max_cycles").value = "8";
   nodes.get("context_window").value = "32000";
+  nodes.get("prompt-department").value = "product";
   return doc;
 }
 
@@ -909,7 +913,7 @@ test("successful start leaves compose and selects the new run", async () => {
   await web.startRun({ preventDefault() {} });
   assert.equal(document.body.classList.contains("compose"), false);
   assert.equal(web.state.runId, "run-new");
-  assert.equal(task.value, "ship it");
+  assert.equal(task.value, "");
   assert.notEqual(document.activeElement, task);
   assert.equal(board._scrolled, true);
 });
@@ -980,4 +984,150 @@ test("desktop successful start does not force-scroll the board", async () => {
   assert.equal(document.body.classList.contains("compose"), false);
   assert.equal(web.state.runId, "run-new");
   assert.equal(document.getElementById("board")._scrolled, undefined);
+});
+
+test("live task accepts exact text and the mobile compose entry keeps its target", async () => {
+  const posts = [];
+  const { web, document, sandbox } = loadApp(async (url, options) => {
+    if (options?.method === "POST") {
+      posts.push([url, JSON.parse(options.body)]);
+      return jsonResponse({ run_id: "running", phase: "ENGINEERING", input_version: 2 }, 201);
+    }
+    if (url === "/api/runs/running") return jsonResponse(runPayload("running", { phase: "ENGINEERING", worker_active: true }));
+    if (url === "/api/runs") return jsonResponse({ runs: [] });
+    return jsonResponse({ busy: true, active_run_id: "running", provider_available: true });
+  });
+  Object.assign(web.state, { runId: "running", selectedPhase: "ENGINEERING", activeRunId: "running", busy: true });
+  sandbox.__mobile = true;
+  web.newTask();
+  assert.equal(web.inputRunId(), "running");
+  assert.equal(document.getElementById("btn-new").title, "补充输入");
+  assert.equal(document.getElementById("btn-start").disabled, false);
+  assert.match(document.getElementById("input-target").textContent, /当前任务 running/);
+  assert.equal(document.getElementById("task-limits").hidden, true);
+  const original = "  补充\r\n\n";
+  document.getElementById("task").value = original;
+  await web.startRun({ preventDefault() {} });
+  assert.deepEqual(posts, [["/api/runs/running/inputs", { text: original }]]);
+  assert.equal(document.getElementById("task").value, "");
+  web.newTask();
+  assert.equal(web.inputRunId(), "running");
+  assert.equal(document.activeElement, document.getElementById("task"));
+  web.stopWorkerWatch();
+});
+
+test("submission blocks duplicates only until HTTP returns and preserves text typed meanwhile", async () => {
+  let finish;
+  let calls = 0;
+  const { web, document } = loadApp(async (url, options) => {
+    if (options?.method === "POST") {
+      calls += 1;
+      return new Promise(resolve => { finish = resolve; });
+    }
+    if (url === "/api/runs/running") return jsonResponse(runPayload("running"));
+    if (url === "/api/runs") return jsonResponse({ runs: [] });
+    return jsonResponse({ busy: true, active_run_id: "running", provider_available: true });
+  });
+  Object.assign(web.state, { runId: "running", selectedPhase: "ENGINEERING", busy: true });
+  const task = document.getElementById("task");
+  task.value = "sent";
+  const pending = web.startRun({ preventDefault() {} });
+  assert.equal(document.getElementById("btn-start").disabled, true);
+  assert.equal(task.disabled, false);
+  task.value = "next draft";
+  await web.startRun({ preventDefault() {} });
+  assert.equal(calls, 1);
+  finish(jsonResponse({ run_id: "running" }, 201));
+  await pending;
+  assert.equal(task.value, "next draft");
+  assert.equal(document.getElementById("btn-start").disabled, false);
+  web.stopWorkerWatch();
+});
+
+test("terminal race keeps raw input and targets a new task without automatic retry", async () => {
+  const posts = [];
+  const { web, document } = loadApp(async (url, options) => {
+    if (options?.method === "POST") {
+      posts.push(url);
+      return jsonResponse({ error: "ended", reason: "run_terminal" }, 409);
+    }
+    return jsonResponse({ busy: false, provider_available: true });
+  });
+  Object.assign(web.state, { runId: "ended", selectedPhase: "QUALITY" });
+  const raw = " \r\nKeep me  ";
+  document.getElementById("task").value = raw;
+  await web.startRun({ preventDefault() {} });
+  assert.deepEqual(posts, ["/api/runs/ended/inputs"]);
+  assert.equal(document.getElementById("task").value, raw);
+  assert.equal(document.getElementById("input-target").textContent, "新任务");
+  assert.equal(web.inputRunId(), null);
+  web.newTask();
+  assert.equal(web.inputRunId(), null);
+  assert.equal(document.getElementById("btn-new").title, "新任务");
+});
+
+test("selected terminal task sends ordinary input as a distinct new task", async () => {
+  const posts = [];
+  const { web, document } = loadApp(async (url, options) => {
+    if (options?.method === "POST") {
+      posts.push([url, JSON.parse(options.body)]);
+      return jsonResponse({ run_id: "new-run", phase: "PRODUCT_SPEC" }, 201);
+    }
+    if (url === "/api/runs/new-run") return jsonResponse(runPayload("new-run"));
+    if (url === "/api/runs") return jsonResponse({ runs: [] });
+    return jsonResponse({ busy: false, provider_available: true });
+  });
+  Object.assign(web.state, { runId: "done-run", selectedPhase: "DONE" });
+  web.syncButtons();
+  assert.equal(document.getElementById("input-target").textContent, "新任务");
+  document.getElementById("task").value = "  next task\r\n";
+  await web.startRun({ preventDefault() {} });
+  assert.equal(posts[0][0], "/api/runs");
+  assert.equal(posts[0][1].task, "  next task\r\n");
+  assert.equal(web.state.runId, "new-run");
+});
+
+test("input history exposes original ranges and each product processing state", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  web.renderInputs([
+    { version: 1, text: "  initial\n", kind: "text", byte_start: 0, byte_end: 10 },
+    { version: 2, text: "<pending>", kind: "text", byte_start: 10, byte_end: 19 },
+    { version: 3, text: "  waiting", kind: "text", byte_start: 19, byte_end: 28 },
+    { version: 4, text: " /stop\r\n", kind: "command", byte_start: 28, byte_end: 36 },
+  ], { processed_input_version: 1, product_work_input_version: 2 }, 1);
+  const shown = document.getElementById("inputs-body").innerHTML;
+  assert.match(shown, /已进入需求/);
+  assert.match(shown, /产品处理中/);
+  assert.match(shown, /等待产品处理/);
+  assert.match(shown, /取消命令已执行/);
+  assert.match(shown, /  initial\n/);
+  assert.match(shown, /\[10, 19\)/);
+  assert.match(shown, /&lt;pending&gt;/);
+  assert.doesNotMatch(shown, /<pending>/);
+});
+
+test("prompt editor shows adopted versions and preserves unsaved drafts through refresh and failure", async () => {
+  let submitted;
+  const { web, document } = loadApp(async (url, options) => {
+    submitted = [url, JSON.parse(options.body)];
+    return jsonResponse({ error: "network error" }, 500);
+  });
+  Object.assign(web.state, { runId: "running", selectedPhase: "ENGINEERING" });
+  const prompt = { department: "product", version: 2, text: "  saved <prompt>\r\n", prompt_ref: { content_hash: "sha256:abc" }, created_event_id: "saved" };
+  const prompts = { current: { product: prompt }, versions: [prompt], activations: [{ department: "product", prompt_version: 2, input_version: 3, activation_id: "active", event_id: "adopted" }] };
+  const board = { run_id: "running", phase: "ENGINEERING" };
+  web.renderPrompts(prompts, board, 0);
+  assert.equal(document.getElementById("prompt-text").value, prompt.text);
+  assert.equal(document.getElementById("prompt-current-text").textContent, prompt.text);
+  assert.match(document.getElementById("prompt-history").innerHTML, /已采用 1 次/);
+  assert.match(document.getElementById("prompt-history").innerHTML, /data-event-id="adopted"/);
+  assert.match(document.getElementById("prompt-history").innerHTML, /&lt;prompt&gt;/);
+  const raw = "  new prompt\r\n ";
+  web.state.promptDrafts["running/product"] = raw;
+  web.renderPrompts(prompts, board, 0);
+  assert.equal(document.getElementById("prompt-text").value, raw);
+  await web.savePrompt({ preventDefault() {} });
+  assert.deepEqual(submitted, ["/api/runs/running/prompts/product", { text: raw }]);
+  assert.equal(document.getElementById("prompt-text").value, raw);
+  assert.equal(web.state.promptDrafts["running/product"], raw);
 });

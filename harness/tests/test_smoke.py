@@ -142,6 +142,63 @@ def test_collaboration_audit_requires_actual_consultation_and_accepted_action_re
     assert audit["directions"] == ["product->engineering", "engineering->product", "quality->engineering"]
 
 
+def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_run):
+    system, run_id = collaboration_run
+    summary = summarize_run(system, run_id, scenario="collaboration")
+    assert summary["model_input_audit"]["status"] == "verified", summary["model_input_audit"]
+    assert summary["check_receipts_verified"] is True
+    assert summary["delivery_archive"]["status"] == "verified"
+    assert {request.input_version for request in system.adapter.invocations} == {1, 2}
+    assert {request.prompt_version for request in system.adapter.invocations if request.department == "product"} == {1, 2}
+
+
+@pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
+@pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED,
+                                      EventType.MODEL_MESSAGE, EventType.TOOL_CALLED])
+def test_model_input_audit_rejects_forged_adopted_versions(native_run, monkeypatch, field, event_type):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == event_type and item.payload.get("activation_id"))
+    event.payload[field] = "forged-prompt" if field == "prompt_hash" else 999
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "unverified", audit
+    assert any(field in note for note in audit["notes"])
+
+
+@pytest.mark.parametrize("field", ["text", "byte_start", "byte_end"])
+def test_model_input_audit_rejects_changed_received_original(collaboration_run, monkeypatch, field):
+    system, run_id = collaboration_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == EventType.USER_INPUT_RECEIVED)
+    event.payload[field] = "rewritten original" if field == "text" else 999
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "unverified", audit
+    assert any("input bytes or range" in note for note in audit["notes"])
+
+
+def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
+    from harness.adapters.base import ModelResponse
+    from harness.adapters.fake import FakeAdapter
+    from harness.runtime import LoopSystem
+
+    def update(request):
+        system.update_prompt(request.run_id, "engineering", "  NEW_ENGINEERING_PROMPT\r\n")
+        return ModelResponse(output=[{
+            "id": "inspect", "call_id": "inspect", "type": "function_call", "name": "list_files",
+            "arguments": "{}",
+        }])
+
+    system = LoopSystem(tmp_path, FakeAdapter([product_spec(), update, plan_turn(), collaboration_request()]))
+    run_id = system.create_run("echo")
+    for _ in range(3):
+        system.activate_once(run_id)
+    first, second, third = system.adapter.invocations[1:]
+    assert first.activation_id == second.activation_id and first.prompt_version == second.prompt_version == 1
+    assert third.activation_id != first.activation_id and third.prompt_version == 2
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "verified", audit
+
+
 def test_collaboration_audit_rejects_results_from_another_request(collaboration_run, monkeypatch):
     system, run_id = collaboration_run
     projection = system.project(run_id)

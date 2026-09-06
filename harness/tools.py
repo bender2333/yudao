@@ -387,6 +387,15 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "constraints": _string_list_schema("Optional"),
                 "fatal_conditions": _string_list_schema("Optional"),
                 "non_goals": _string_list_schema("Optional"),
+                "change_record": {
+                    "anyOf": [{"type": "null"}, _object_schema({
+                        "changed": _string_list_schema("Requirements added or changed in this revision"),
+                        "retained": _string_list_schema("Requirements explicitly preserved"),
+                        "retired": _string_list_schema("Requirements explicitly removed"),
+                        "rationale": {"type": "string", "minLength": 1},
+                    }, ["changed", "retained", "retired", "rationale"])],
+                    "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not.",
+                },
                 "decision_changes": {
                     "type": "array",
                     "items": _object_schema({

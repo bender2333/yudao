@@ -4,7 +4,7 @@
 
 OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构的运行证据与本次原生循环的验证分开记录，见 [MVP 验收记录](docs/mvp-acceptance.md)。
 
-第一阶段正在按 [A-F 工作包](docs/stage-1-alignment.md) 推进。已实现并验证原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动及通用专家协作。持续输入、prompt 编辑及最终完整验收待后续批次。真实压缩后的完整交付仍待补验，近期外部连接检查失败，不能据此称第一阶段整体完成。
+第一阶段正在按 [A-F 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。确定性 Web 同任务方向调整与独立交付验证通过；真实完整方向调整和压缩后最终放行仍在补验，结果见 [验收记录](docs/mvp-acceptance.md)。
 
 本机当前原生控制台为 [http://127.0.0.1:8766](http://127.0.0.1:8766)，使用 `.yudao/native-final-validation`；8765 的旧 OMP 服务不代表本次实现。
 
@@ -74,6 +74,10 @@ python -m harness smoke --scenario collaboration
 | GET | `/api/runs/{id}/export` | 导出事件与投影 |
 | POST | `/api/runs/{id}/replay` | 校验投影可重放，不写状态 |
 | POST | `/api/runs/{id}/cancel` | 取消当前 run |
+| POST | `/api/runs/{id}/inputs` | 按原文补充当前任务，正文 `{ "text": "..." }` |
+| POST | `/api/runs/{id}/prompts/{department}` | 修改当前任务的部门 prompt，正文 `{ "text": "..." }` |
+
+活动任务中可持续提交原文；当前已开始工具结束后回产品维护需求，尚未开始的工具跳过。输入接收、交给产品与有效需求处理分别展示。`/stop`、`/cancel` 先保存原文再立即取消；按钮取消不生成文本。终态任务不恢复，新的工作明确创建新任务。prompt 可折叠和编辑，一次激活固定版本，下一次目标部门激活采用更新，实际输入与采用历史可查。
 
 ## 模型配置
 

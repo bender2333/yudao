@@ -55,7 +55,15 @@ def test_consultation_response_returns_to_engineering(data_dir):
 
 
 def test_requested_requirements_revision_creates_normal_spec_before_response(data_dir):
-    updated = product_spec(goal="Build echo with strict flags", acceptance=["unknown flags exit 2"])
+    updated = product_spec(
+        goal="Build echo with strict flags", acceptance=["unknown flags exit 2"],
+        change_record={
+            "changed": ["Unknown flags must exit 2"],
+            "retained": ["Print the given argument to stdout", "Single-file implementation without file reads or network access"],
+            "retired": [],
+            "rationale": "Resolve the engineering action request by defining previously unspecified flag behavior.",
+        },
+    )
     script = [
         product_spec(),
         collaboration_request(request_type="action", action="revise_requirements"),
@@ -138,7 +146,15 @@ def test_quality_rework_routes_to_product(data_dir):
             "acceptance misses empty input",
             defects=[{"severity": "blocker", "summary": "empty input not in spec"}],
         ),
-        product_spec(goal="Build echo including empty input", acceptance=["empty input prints a blank line"]),
+        product_spec(
+            goal="Build echo including empty input", acceptance=["empty input prints a blank line"],
+            change_record={
+                "changed": ["Empty input must print a blank line"],
+                "retained": ["Print the given argument to stdout", "Single-file implementation without file reads or network access"],
+                "retired": [],
+                "rationale": "Address the quality review identifying missing acceptance coverage for empty input.",
+            },
+        ),
         plan_turn(reason="Apply the revised empty input requirement"),
         delivery_turn(summary="updated implementation", files={"src/echo.py": "print('')\n"}),
         review_turn("release", "spec now covers the case"),
@@ -241,7 +257,15 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
             "contract is wrong",
             defects=[{"severity": "major", "summary": "contract issue"}],
         ),
-        product_spec(acceptance=["new behavior"]),
+        product_spec(
+            acceptance=["new behavior"],
+            change_record={
+                "changed": ["Replace the acceptance criterion with new behavior"],
+                "retained": ["The echo goal, argument-printing requirement, and existing implementation constraints"],
+                "retired": ["The old behavior acceptance criterion"],
+                "rationale": "Correct the contract issue reported by quality; evidence must be collected against the revised criterion.",
+            },
+        ),
         plan_turn(reason="Apply the revised contract before implementation"),
         delivery_turn(summary="same code under new spec"),
         FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),

@@ -22,9 +22,10 @@ def work(phase="QUALITY"):
     projection.product_spec = ProductSpec(
         "spec", "run", 1, None, "spec-hash", "product", "active", "spec-event",
         "CLI", ["Print text"], [], [], ["Text appears"], [], [], [],
+        change_record=None, input_version=0,
     )
     projection.effective_contract = EffectiveContract(
-        "contract-hash", 1, "spec-hash", [], "contract-event", ArtifactRef("prd", "prd-hash", "PRD.md"),
+        "contract-hash", 1, "spec-hash", 0, [], "contract-event", ArtifactRef("prd", "prd-hash", "PRD.md"),
     )
     projection.engineering_plan = EngineeringPlan(
         "plan", "run", "plan-hash", 1, None, "active", "plan-event", "contract-hash",

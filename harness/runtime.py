@@ -8,7 +8,7 @@ from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
 from .event_store import EventStore
-from .orchestrator import Orchestrator
+from .orchestrator import Orchestrator, RunTerminalError
 from .projection import RunProjection, project_run
 
 
@@ -37,6 +37,12 @@ class LoopSystem:
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)
+
+    def add_input(self, run_id: str, text: str) -> RunProjection:
+        return self.orchestrator.add_input(run_id, text)
+
+    def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
+        return self.orchestrator.update_prompt(run_id, department, text)
 
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
