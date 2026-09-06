@@ -75,13 +75,30 @@ D 的实现和确定性验收完成；fake 产生的真实文件与主机检查�
 
 独立审查补齐两个反例：活动取消遇到 Git 保存失败仍立即 abort，保存失败也不接纳迟到结果，界面保留原文并说明取消/保存结果；diff 同时核验当前与直接父提交的正式材料，合法 Git 对象中的伪造父内容也不能展示。核心 Git/交互 46 项、最后取消边界 15 项、Web 异常 7 项、前端全部 46 项通过。真实 Git 对象、跨 run、二进制、换行、junction、篡改、filters/hooks 均有定向验证。
 
-完整回归首轮 663 通过、7 项平台或权限跳过、2 失败。失败分别为旧候选测试将 Git 展示字段与原事件整体比较、旧 smoke 成功夹具缺 Git 审计；仅更新两测试后相关文件 37 项通过，来源、导出、replay 与缺证据失败断言保留。最终统一回归正在核验。
+完整回归首轮 663 通过、7 项平台或权限跳过、2 失败。失败分别为旧候选测试将 Git 展示字段与原事件整体比较、旧 smoke 成功夹具缺 Git 审计；仅更新两测试后相关文件 37 项通过，来源、导出、replay 与缺证据失败断言保留。最终在 `0533c90` 同一冻结生产及测试源码完成完整回归：683 项 Python 通过、7 项平台或权限跳过，耗时 1122.15 秒；前端 46 项通过。没有剩余失败。
 
 确定性浏览器任务 `run_2abffdec82ab4f42` 在 QA 请求期间追加大写要求，经三次专家咨询、PRD/PLAN r2、工程 prompt r2 实际采用、两版交付及最终独立 QA，得到 9 个正式 Git 提交。初版需求为 `898f7ffbc57f5993a3afe4f3eca098cb6d0e4adb`，新需求为 `033d00d98be851895f4dccfa4a15a22a92735c9b`，最终 QA 为 `ed14dc30ab77febea4f1c67ad90db67d840a6418`。桌面 1440/手机 390 可查看真实 diff，无查询写入、页面错误或溢出，主 agent 已目检。
 
 浏览器首份 `.tmp/native-g-browser.json` 在业务完成与 API 核验后误选合并显示的按钮，截图阶段超时，原报告保留；修正选择器后的 `.tmp/native-g-readonly-browser.json` 对原任务只读复验通过。独立报告 `.tmp/native-g-independent-run_2abffdec82ab4f42-passed.json` 使用 Git CLI 核验对象摘要、父链和原文/PRD/PLAN，并将两版 Git 代码与封存逐字节比较；仅从封存恢复到新目录执行普通、flag、额外和缺失参数行为，输入来源、检查回执、Git 审计及 replay 均通过。首次脚本引用类型错误的失败报告亦保留。
 
 G 的确定性验收通过；真实模型能否在最终基线上完整调整方向、压缩并放行属于 F，不能用这些结果替代。
+
+### F 最终基线真实验收的缺口
+
+G 生产代码已提交推送 `0533c90`。两次最终真实运行使用相同的 G 生产源码，在提交前已冻结；Web 配置由主 agent 从当前 `provider.md` 注入进程环境，小窗配置由验收脚本读取同一文件。配置为 `https://penguinapi.org/v1`、`gpt-5.6-luna`、Responses，SDK 自动重试为 0、单次超时 120 秒。没有改 provider、切 fake 或把失败任务继续运行。
+
+| 场景 | 原始记录 | 实际结果 |
+| --- | --- | --- |
+| G 前真实 Web | `.tmp/native-f-browser.json`，`run_8a31544b82084a1a` | 首次请求连接失败，未取得完整流程证据 |
+| G 前真实小窗 | `.yudao/stage1-compaction-20260906/compaction-smoke-report.json`，`run_68d984647f754790` | 读取完整参考资料后，真实压缩请求连接失败，未产生该次摘要或最终 QA |
+| G 最终真实 Web | `.tmp/native-f-browser-run_c9f1b6ca018f41ef.json`，`run_c9f1b6ca018f41ef` | 首次 work 调用约 6.675 秒后连接失败，无模型输出、spec、计划或交付 |
+| G 最终真实小窗 | `.yudao/stage1-git-compaction-20260906/compaction-smoke-report.json`，`run_8af405b0b3da4b79` | 窗口 9000；首次调用返回 `list_files` 且工具成功，第二次 work 调用约 5.068 秒后连接失败，未进入压缩、spec、交付或 QA |
+
+`.yudao/stage1-final-provider-audit-20260906.json` 对最后两 run 进行只读核验：原文分别为 493/766 个 UTF-8 字节，事件、工件、intend 文件和 Git 一致；模型输入来源 verified、各自 1 个正式 Git 版本经独立 CLI 核验、replay 一致。旧报告摘要前后相同，审计没有新增 provider 请求。Web 首次失败前事件未记录具体 provider/model 响应身份，报告只依据启动记录说明所配置模型，不冒充观察到了成功执行。
+
+真实 Web 同任务方向调整至独立 QA、真实压缩后继续至独立 QA 仍未通过，当前受 provider 连接失败阻塞。此前连接小请求成功、TLS 握手成功、部分真实 Ask/摘要成功和确定性 G 验收均不替代这两项结果。没有降低完成条件或宣布第一阶段整体通过。
+
+本机新服务在 8768、PID 1464，数据目录 `.yudao/stage1-git-validation`，复验结束后健康检查正常、空闲、无 worker error。重启旧 8766 的命令曾被自动审批拒绝，理由仅为 `blocked by policy`；保留旧服务并使用当时空闲的 8768，没有重试被拒操作或混用旧数据。
 
 ## 第一阶段完整目标
 

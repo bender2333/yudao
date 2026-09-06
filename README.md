@@ -13,7 +13,7 @@ OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构�
 ```text
 任务与观察层  本地 Web 控制台 / REST / SSE
 三部门循环核  Orchestrator、逐步上下文装配、合同校验、循环次数与停止判定
-基础能力层    单次 Responses 模型请求、宿主工具、工作区、事件与工件存储
+基础能力层    单次 Responses 模型请求、宿主工具、工作区、事件、工件与 Git 版本存储
 ```
 
 Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。
@@ -71,7 +71,8 @@ python -m harness smoke --scenario collaboration
 | POST | `/api/runs` | 创建任务并由控制层执行 |
 | GET | `/api/runs/{id}` | 四个视图的聚合 |
 | GET | `/api/runs/{id}/events` | 事件卡片 |
-| GET | `/api/runs/{id}/events/{event_id}` | 完整事件；上下文事件附实际模型输入 |
+| GET | `/api/runs/{id}/events/{event_id}` | 完整事件；附实际模型输入或正式材料及经前后版本核验的 Git diff |
+| GET | `/api/runs/{id}/events/{event_id}/files?path=...` | 从已接纳交付封存下载文件原字节 |
 | GET | `/api/runs/{id}/stream` | SSE |
 | GET | `/api/runs/{id}/export` | 导出事件与投影 |
 | POST | `/api/runs/{id}/replay` | 校验投影可重放，不写状态 |
