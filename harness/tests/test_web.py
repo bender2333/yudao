@@ -239,24 +239,21 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
     system, _projection = run_scripted(data_dir, happy_script())
     with running_server(system) as (_server, host, port):
         html = request(host, port, "GET", "/")[1]
-        assert "运行看板" in html
-        assert "规格时间线" in html
-        assert "证据视图" in html
-        assert "上下文 / 追踪视图" in html
-        assert 'id="provider-alert"' in html
-        assert 'id="exec-alert"' in html
-        assert 'aria-label="开始"' in html
-        assert 'aria-label="取消"' in html
-        assert 'aria-label="新任务"' in html
-        assert 'title="新任务"' in html
-        assert 'd="M5 12h14"' in html
-        assert 'd="M12 5v14"' in html
+        assert 'id="department-workspace-prototype"' in html
+        assert 'class="dw-shell"' in html
+        assert 'data-view="overview"' in html
+        assert 'data-department="product"' in html
+        assert 'data-department="engineering"' in html
+        assert 'data-department="quality"' in html
+        assert 'data-view="observability"' in html
+        assert 'id="dw-task-dialog-form"' in html
+        assert 'src="/static/lucide.min.js"' in html
         assert "python -m" not in html
         assert "Event Store" not in html
         assert 'class="panel"' not in html
-        assert 'd="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"' in html
-        assert 'rx="2"' in html
         assert request(host, port, "GET", "/static/play.svg")[0] == 404
+        lucide_status, lucide = request(host, port, "GET", "/static/lucide.min.js")[:2]
+        assert lucide_status == 200 and "createIcons" in lucide
         license_text = request(host, port, "GET", "/static/LUCIDE-LICENSE.txt")[1]
         assert "ISC License" in license_text
         css = request(host, port, "GET", "/static/styles.css")[1]
@@ -267,9 +264,11 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
         assert "letter-spacing: 0.04" not in css
         js = request(host, port, "GET", "/static/app.js")[1]
         assert "产品" in js and "工程" in js and "质检" in js
-        assert "适配器" in js
-        assert '["Provider"' not in js
-        assert "未上报" in js
+        assert 'data-action="new-task"' in js
+        assert 'data-action="history"' in js
+        assert "/departments/" in js and "/events/" in js
+        assert "dw-panel-provider" in js
+        assert "/model-attempts" in js and "/model-usage" in js
         health = get_json(host, port, "/api/health")
         assert health["ok"] is True
         assert health["adapter"] == "fake"
@@ -814,7 +813,10 @@ def test_unconfigured_provider_stays_on_health_after_listing_runs(data_dir):
         assert health["provider_available"] is False
         assert health["provider_message"]
         html = request(host, port, "GET", "/")[1]
-        assert 'id="provider-alert"' in html
+        assert 'id="dw-task-dialog-form"' in html
+        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "must be rejected"})
+        assert status == 503
+        assert health["provider_message"] in body
         assert health["provider_message"] != done["board"]["phase"]
 
 
@@ -899,21 +901,9 @@ def test_web_ui_node_behaviors():
     print(output)
     if result.returncode != 0:
         raise AssertionError(output)
-    assert "scheduleRefresh of B runs after in-flight A when switching gen" in output
-    assert "pollWorkerHealth re-enables start after delayed busy=false without SSE" in output
-    assert "late worker_error for selected run appears from health without new events" in output
-    assert "worker_error of another run does not fill exec-alert" in output
-    assert "cycle band shows" in output
-    assert "new-task entry focuses existing input" in output
-    assert "successful start leaves compose" in output
-    assert "failed start stays on compose" in output
-    assert "scrollBoardIntoView only moves the board on mobile" in output
-    assert "desktop successful start does not force-scroll" in output
-    assert "board distinguishes requested and returned provider facts" in output
-    assert "zero missing and invalid cost" in output
-    assert "tiny positive cost is not rounded to zero" in output
-    assert "missing returned model is" in output
-    assert "board model facts come from the current request" in output
+    assert "tests" in output
+    assert "pass" in output
+    assert "fail 0" in output
 
 
 @pytest.fixture

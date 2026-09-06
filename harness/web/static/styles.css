@@ -224,6 +224,12 @@ body { overflow-x: hidden; }
     #department-workspace-prototype .dw-context-item.is-selected { border-color: color-mix(in srgb, var(--dw-accent) 28%, var(--dw-border)); background: var(--dw-accent-soft); }
     #department-workspace-prototype .dw-context-item strong { font-size: .78rem; font-weight: 500; }
     #department-workspace-prototype .dw-context-item span { color: var(--dw-muted); font-size: .7rem; }
+    #department-workspace-prototype .dw-context-part-list { display: grid; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--dw-border); }
+    #department-workspace-prototype .dw-context-part { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--dw-foreground); text-align: left; cursor: pointer; }
+    #department-workspace-prototype .dw-context-part:hover { background: var(--dw-background); }
+    #department-workspace-prototype .dw-context-part.is-selected { border-color: color-mix(in srgb, var(--dw-accent) 28%, var(--dw-border)); background: var(--dw-accent-soft); }
+    #department-workspace-prototype .dw-context-part strong { font-size: .76rem; font-weight: 500; }
+    #department-workspace-prototype .dw-context-part span { color: var(--dw-muted); font-size: .68rem; overflow-wrap: anywhere; }
     #department-workspace-prototype .dw-context-body { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--dw-border); }
     #department-workspace-prototype .dw-context-snapshot-meta { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--dw-muted); font-size: .71rem; }
     #department-workspace-prototype .dw-context-snapshot-meta strong { color: var(--dw-foreground); font-weight: 500; }
@@ -332,6 +338,7 @@ body { overflow-x: hidden; }
     #department-workspace-prototype .dw-usage-label span { display: block; margin-top: 3px; color: var(--dw-muted); font-size: .7rem; }
     #department-workspace-prototype .dw-usage-track { height: 5px; margin-top: 7px; background: var(--dw-border); border-radius: 99px; overflow: hidden; }
     #department-workspace-prototype .dw-usage-track i { display: block; height: 100%; background: var(--dw-accent); border-radius: inherit; }
+    #department-workspace-prototype .dw-usage-field-coverage { display: block; margin-top: 5px; color: var(--dw-subtle); font-size: .63rem; line-height: 1.35; overflow-wrap: anywhere; }
     #department-workspace-prototype .dw-usage-values { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; min-width: 0; }
     #department-workspace-prototype .dw-usage-value { min-width: 0; }
     #department-workspace-prototype .dw-usage-value span { display: block; color: var(--dw-muted); font-size: .68rem; }
@@ -433,6 +440,8 @@ body { overflow-x: hidden; }
     #department-workspace-prototype .dw-inline-action:hover { text-decoration: underline; }
     #department-workspace-prototype .dw-inline-action i { width: 13px; height: 13px; }
     #department-workspace-prototype .dw-git-version { display: block; margin-top: 5px; }
+    #department-workspace-prototype .dw-message-actions { margin-top: 6px; }
+    #department-workspace-prototype .dw-context-body { max-height: 260px; overflow: auto; }
     #department-workspace-prototype .dw-run-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
     #department-workspace-prototype .dw-run-picker select { min-width: 0; max-width: 34ch; min-height: 32px; padding: 5px 8px; border: 1px solid var(--dw-border-strong); border-radius: 6px; background: var(--dw-surface); color: var(--dw-foreground); font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #department-workspace-prototype .dw-topline > * { min-width: 0; }

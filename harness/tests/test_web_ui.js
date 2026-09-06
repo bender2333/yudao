@@ -151,6 +151,23 @@ test("model attempt and usage queries use one exact cursor contract and preserve
   assert.doesNotMatch(calls.join("\n"), /page=|page_size=|request_id=/);
 });
 
+test("usage view uses server coverage, prepared count, and explicit currency without filling nulls", () => {
+  const web = loadApp();
+  web.state.usageData = {
+    total_attempts: 2,
+    prepared_attempts: 1,
+    coverage: { attempts: 2, reported_attempts: 1, percent: 50, fields: { input_tokens: { reported: 1, total: 2 }, total_tokens: { reported: 1, total: 2 } } },
+    totals: { input_tokens: 12, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: 0.000001, currency: "CNY" },
+    groups: { departments: [{ key: "engineering", label: "工程部", attempts: 2, reported_attempts: 1, running_attempts: 0, input_tokens: 12, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: 0.000001, currency: "CNY", coverage: { reported_attempts: 1, attempts: 2, fields: {} } }], models: [] },
+  };
+  const html = web.usageMarkup();
+  assert.match(html, /1 条准备记录未发出/);
+  assert.match(html, /0\.000001 CNY/);
+  assert.match(html, /输出<\/span><strong>未上报/);
+  assert.doesNotMatch(html, /输出<\/span><strong>等待响应/);
+  assert.match(html, /输入 1\/2/);
+});
+
 test("late observation responses cannot replace a newer task or query", async () => {
   let release;
   const held = new Promise(resolve => { release = resolve; });
@@ -270,6 +287,26 @@ test("terminal task rejects global input without issuing a command", async () =>
   assert.equal(called, false);
 });
 
+test("SSE terminal refresh keeps the original run draft and exposes new-task as the only create path", async () => {
+  const { document, nodes } = uiDocument();
+  const calls = [];
+  const web = loadApp(async (url, options = {}) => {
+    calls.push([url, options]);
+    return response({ board: { run_id: "run-a", task: "finished task", phase: "DONE", active_department: null }, timeline: {}, evidence: {}, inputs: [], events: [] });
+  }, document);
+  web.state.runId = "run-a";
+  web.state.routeToken = 4;
+  web.state.globalDrafts["run-a"] = "draft kept for run-a";
+  await web.loadRunPayload("run-a", 4);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "/api/runs/run-a");
+  assert.equal(calls[0][1].method, undefined);
+  assert.match(nodes.get("dw-main").innerHTML, /draft kept for run-a/);
+  assert.match(nodes.get("dw-main").innerHTML, /data-action="new-task"/);
+  assert.match(nodes.get("dw-main").innerHTML, /data-global-draft[^>]*disabled/);
+  assert.equal(calls.some(item => item[0] === "/api/runs" && item[1].method === "POST"), false);
+});
+
 test("cancel uses the selected run and refreshes its projection", async () => {
   const { document } = uiDocument();
   const calls = [];
@@ -303,8 +340,10 @@ test("Prompt save is tied to its dialog run, locks duplicate submits, and keeps 
   }, document);
   web.state.runId = "run-a";
   web.state.routeToken = 8;
-  web.state.departmentData.set("run-a/product", { department: "product", prompt: { text: "old" } });
+  web.state.runPayload = { board: { run_id: "run-a", task: "task", phase: "PRODUCT_SPEC" }, prompts: { current: { product: { version: 2, text: "latest saved" } } } };
+  web.state.departmentData.set("run-a/product", { department: "product", prompt: { version: 1, text: "old" } });
   web.openPromptDialog("run-a/product");
+  assert.equal(nodes.get("dw-prompt-text").value, "latest saved");
   nodes.get("dw-prompt-text").value = "new prompt";
   const first = web.savePrompt({ preventDefault() {}, submitter: { value: "default" } });
   const second = web.savePrompt({ preventDefault() {}, submitter: { value: "default" } });
@@ -354,6 +393,24 @@ test("department context renders its own attempt id and keeps guidance disabled"
   assert.match(nodes.get("dw-main").innerHTML, /data-observe-attempt="attempt-exact"/);
   assert.match(nodes.get("dw-main").innerHTML, /data-dept-draft/);
   assert.match(nodes.get("dw-main").innerHTML, /发送指导/);
+});
+
+test("Context defaults to the latest work snapshot and renders its own source parts", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.runId = "run-a";
+  web.state.view = "department";
+  web.state.runPayload = { board: { run_id: "run-a", task: "task", phase: "ENGINEERING", active_department: "engineering" } };
+  web.state.departmentData.set("run-a/engineering", { run_id: "run-a", department: "engineering", task: "task", role: "实现与交付", status: "running", contexts: [{ id: "attempt-old", purpose: "work", title: "旧快照", meta: "旧" }, { id: "attempt-compact", purpose: "compaction", title: "压缩快照", meta: "中间" }, { id: "attempt-new", purpose: "work", title: "最新快照", meta: "新" }], history: {}, materials: {}, provider: {}, prompt: null });
+  web.state.contextDetails.set("run-a/attempt-new", { context: { parts: [{ source: "intend", version: "2", text: "用户原文正文", digest: "sha256:intend" }, { source: "department_rules", version: "1", text: "部门规则正文", digest: "sha256:rules" }] } });
+  web.renderDepartment("engineering");
+  const html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /data-context-id="attempt-new"[^>]*aria-pressed="true"/);
+  assert.match(html, /用户原文/);
+  assert.match(html, /部门规则/);
+  assert.match(html, /用户原文正文/);
+  assert.match(html, /data-observe-attempt="attempt-new"/);
+  assert.match(html, /data-context-id="attempt-old" aria-pressed="false"/);
 });
 
 test("terminal overview marks each delivery from its own QA evidence", () => {
