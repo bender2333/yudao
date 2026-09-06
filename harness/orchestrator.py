@@ -104,12 +104,16 @@ class _AttemptCapture:
     usage: Usage | None = None
     usage_ref: dict[str, Any] | None = None
     started_at: str | None = None
+    progress_stage: str | None = None
+    progress_last_emitted_monotonic: float | None = None
+    first_observed_at: str | None = None
+    first_output_at: str | None = None
 
-    def add_stream_event(self, sequence: int | None, payload: dict[str, Any]) -> None:
+    def add_stream_event(self, sequence: int | None, payload: dict[str, Any], observed_at: str) -> None:
         if self.stream is None:
             self.stream = tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
         record = {"sequence": sequence if sequence is not None else self.stream_event_count,
-                  "event": payload}
+                  "observed_at": observed_at, "event": payload}
         raw = (json_dumps(record) + "\n").encode("utf-8")
         self.stream.write(raw)
         self.stream_event_count += 1
@@ -135,6 +139,33 @@ _SENSITIVE_OBSERVATION_KEYS = frozenset({
     "client_secret", "password", "cookie", "set_cookie", "credential",
     "credentials", "headers", "proxy_authorization",
 })
+
+
+def _stream_progress_stage(payload: dict[str, Any]) -> str:
+    event_type = str(payload.get("type") or "")
+    if event_type == "response.created":
+        return "response_created"
+    if "output_text.delta" in event_type or "output_item.added" in event_type:
+        return "output"
+    if event_type == "response.output_item.done":
+        return "output_item_done"
+    if event_type == "response.completed":
+        return "completed"
+    if event_type in {"response.incomplete", "response.failed", "error"}:
+        return "error"
+    return "event"
+
+
+def _stream_progress_summary(payload: dict[str, Any]) -> str:
+    event_type = str(payload.get("type") or "provider_event")
+    if event_type == "response.output_item.done":
+        item = payload.get("item")
+        if isinstance(item, dict):
+            return f"{event_type}: {item.get('type') or 'output_item'}"
+    response = payload.get("response")
+    if isinstance(response, dict) and response.get("status"):
+        return f"{event_type}: {response['status']}"
+    return event_type
 
 
 def _redact_observation(value: Any, *, secret: str | None = None, key: str | None = None) -> Any:
@@ -1005,6 +1036,62 @@ class Orchestrator:
             activation.attempt_captures[attempt_id] = capture
         return capture
 
+    def _record_stream_progress(
+        self,
+        activation: _Activation,
+        request: ModelRequest,
+        capture: _AttemptCapture,
+        observation: ModelObservation,
+        observed_at: str,
+    ) -> None:
+        payload = observation.payload
+        stage = _stream_progress_stage(payload)
+        if capture.first_observed_at is None:
+            capture.first_observed_at = observed_at
+        if stage in {"output", "output_item_done"} and capture.first_output_at is None:
+            capture.first_output_at = observed_at
+        now = time.monotonic()
+        changed = stage != capture.progress_stage
+        due = capture.progress_last_emitted_monotonic is None or now - capture.progress_last_emitted_monotonic >= 0.25
+        capture.progress_stage = stage
+        if not changed and not due:
+            return
+        capture.progress_last_emitted_monotonic = now
+        provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
+        current = self.project(request.run_id)
+        self.store.append(
+            request.run_id,
+            EventType.MODEL_STREAM_PROGRESS,
+            role=request.department,
+            parent_event_id=activation.parent_event_id,
+            state_before=current.phase,
+            state_after=current.phase,
+            session_id=request.session_id,
+            provider=provider,
+            model=observation.model or activation.model,
+            context_digest=request.context.manifest.digest,
+            payload={
+                "attempt_id": request.attempt_id,
+                "logical_call_id": request.logical_call_id,
+                "collaboration_request_id": request.request_id,
+                "context_event_id": request.context_event_id,
+                "activation_id": request.activation_id,
+                "step_id": request.step_id,
+                "attempt": request.attempt,
+                "root_step_id": request.root_step_id,
+                "purpose": request.purpose,
+                "source": "sdk_decoded_stream",
+                "stage": stage,
+                "event_type": payload.get("type"),
+                "sequence": observation.sequence,
+                "observed_at": observed_at,
+                "first_observed_at": capture.first_observed_at,
+                "first_output_at": capture.first_output_at,
+                "summary": _stream_progress_summary(payload),
+                **activation.versions(),
+            },
+        )
+
     def _finalize_capture(self, activation: _Activation, request: ModelRequest) -> _AttemptCapture:
         capture = activation.attempt_captures.pop(request.attempt_id or "", None)
         if capture is None:
@@ -1093,6 +1180,9 @@ class Orchestrator:
                 "response_ref": capture.response_ref,
                 "stream_events_ref": getattr(capture, "stream_ref", None),
                 "stream_event_count": capture.stream_event_count,
+                "stream_first_observed_at": capture.first_observed_at,
+                "stream_first_output_at": capture.first_output_at,
+                "stream_last_stage": capture.progress_stage,
                 "collection_scope": self._attempt_collection_scope(),
                 "usage": self._usage_summary(capture.usage or activation.step_usage),
                 "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
@@ -1182,6 +1272,9 @@ class Orchestrator:
                     "response_ref": capture.response_ref,
                     "stream_events_ref": capture.stream_ref,
                     "stream_event_count": capture.stream_event_count,
+                    "stream_first_observed_at": capture.first_observed_at,
+                    "stream_first_output_at": capture.first_output_at,
+                    "stream_last_stage": capture.progress_stage,
                     "collection_scope": self._attempt_collection_scope(),
                     "usage": self._usage_summary(capture.usage or activation.step_usage),
                     "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
@@ -1370,7 +1463,9 @@ class Orchestrator:
                     nested_model = nested_response.get("model")
                     if isinstance(nested_model, str) and nested_model.strip():
                         capture.actual_model = nested_model.strip()
-                capture.add_stream_event(observation.sequence, observation.payload)
+                observed_at = utc_now()
+                capture.add_stream_event(observation.sequence, observation.payload, observed_at)
+                self._record_stream_progress(activation, request, capture, observation, observed_at)
                 return
             if observation.kind == "response":
                 if not isinstance(observation.payload, dict):

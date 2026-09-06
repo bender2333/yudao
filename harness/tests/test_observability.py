@@ -11,16 +11,49 @@ from http.client import HTTPConnection
 import pytest
 
 from harness.artifacts import ArtifactStore
-from harness.adapters.base import Availability, ModelObservation
+from harness.adapters.base import Availability, ModelObservation, ModelResponse, ProviderError
 from harness.adapters.responses import ResponsesAdapter
 from harness.models import ArtifactRef, EventType, Usage
-from harness.observability import ObservabilityQuery
+from harness.observability import ObservabilityQuery, _detail_events, _usage_totals
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.test_responses import _server, _stream, _submit_stream
 from harness.web.server import serve
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.proposals import product_spec
+
+
+class _BlockingPartialAdapter:
+    name = "stub"
+    model = "stub-model"
+
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def availability(self):
+        return Availability(True)
+
+    def abort(self, _session_id):
+        self.release.set()
+
+    def complete(self, request):
+        item = {
+            "id": "partial-message",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "PARTIAL_OUTPUT"}],
+        }
+        request.observe(ModelObservation(
+            item["id"], "message", item, "PARTIAL_OUTPUT",
+            provider=self.name, model=self.model,
+        ))
+        self.started.set()
+        self.release.wait(5)
+        return ModelResponse(
+            finish_reason="aborted", error="aborted",
+            provider=self.name, model=self.model,
+        )
 
 
 def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path: Path):
@@ -92,6 +125,116 @@ def test_invalid_usage_numbers_are_unknown_in_queries(tmp_path: Path):
     assert normalized["latency_ms"] is None
 
 
+def test_cancelled_attempt_is_independently_filterable(tmp_path: Path):
+    adapter = _BlockingPartialAdapter()
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("cancelled attempt")
+    worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
+    worker.start()
+    assert adapter.started.wait(3)
+    system.cancel(run_id)
+    worker.join(timeout=3)
+    assert not worker.is_alive()
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert row["status"] == "cancelled"
+    assert row["stage"] == "cancelled"
+    assert query.list_model_attempts(run_id, status="cancelled")["total"] == 1
+    assert query.list_model_attempts(run_id, status="failed")["total"] == 0
+    assert query.model_usage(run_id, status="cancelled")["total_attempts"] == 1
+
+
+def test_running_partial_output_is_in_attempt_detail_and_failed_output_is_not_department_history(tmp_path: Path):
+    adapter = _BlockingPartialAdapter()
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("partial attempt")
+    worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
+    worker.start()
+    assert adapter.started.wait(3)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert row["status"] == "running"
+    assert row["stage"] == "partial"
+    assert row["partial_output"] is True
+    assert row["output_item_count"] == 1
+    detail = query.model_attempt_detail(run_id, row["id"])
+    assert detail["response"] is None
+    assert detail["event_order"] == "source_grouped"
+    assert any(event["type"] == EventType.MODEL_MESSAGE for event in detail["events"])
+    assert any(event["event_group"] == "event_store" for event in detail["events"])
+
+    system.cancel(run_id)
+    worker.join(timeout=3)
+    assert not worker.is_alive()
+    cancelled = query.model_attempt_detail(run_id, row["id"])
+    assert cancelled["attempt"]["status"] == "cancelled"
+    assert cancelled["attempt"]["partial_output"] is True
+    assert any(event["type"] == EventType.MODEL_MESSAGE for event in cancelled["events"])
+    department = query.department(run_id, "product")
+    assert not any(message["text"] == "PARTIAL_OUTPUT" for message in department["messages"])
+
+
+def test_failed_partial_output_is_observation_only_but_detail_keeps_it(tmp_path: Path):
+    def fail_after_message(request):
+        item = {
+            "id": "failed-partial-message",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "FAILED_PARTIAL_OUTPUT"}],
+        }
+        request.observe(ModelObservation(
+            item["id"], "message", item, "FAILED_PARTIAL_OUTPUT",
+            provider="stub", model="stub-model",
+        ))
+        raise ProviderError("stream failed", retryable=False)
+
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([fail_after_message]))
+    run_id = system.create_run("failed partial attempt")
+    system.activate_once(run_id)
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert row["status"] == "failed"
+    assert row["stage"] == "failed"
+    assert row["partial_output"] is True
+    detail = query.model_attempt_detail(run_id, row["id"])
+    assert any(event["type"] == EventType.MODEL_MESSAGE for event in detail["events"])
+    department = query.department(run_id, "product")
+    assert not any(message["text"] == "FAILED_PARTIAL_OUTPUT" for message in department["messages"])
+
+
+def test_unreported_normalized_usage_keeps_unknown_source_and_is_excluded_from_provider_totals(tmp_path: Path):
+    usage = Usage(total_tokens=7, reported=False)
+    system = LoopSystem.for_testing(
+        tmp_path,
+        FakeAdapter([FakeTurn(proposal=product_spec(), usage=usage)]),
+    )
+    run_id = system.create_run("estimated usage")
+    system.activate_once(run_id)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert row["usage"]["source"] == "unknown"
+    assert row["usage"]["reported"] is False
+    assert row["usage"]["total_tokens"] == 7
+    summary = query.model_usage(run_id)
+    assert summary["coverage"]["reported_attempts"] == 0
+    assert summary["coverage"]["estimated_attempts"] == 0
+    assert summary["totals"]["total_tokens"] is None
+    assert summary["estimated_totals"]["total_tokens"] is None
+
+    estimated = query._attempt_usage(run_id, {
+        "raw_usage_ref": None,
+        "usage_summary": {"total_tokens": 9, "reported": False, "source": "estimated"},
+        "duration_ms": None,
+    })
+    assert estimated["source"] == "estimated"
+    assert estimated["total_tokens"] == 9
+    estimated_totals = _usage_totals([{"status": "completed", "usage": estimated}], source="estimated")
+    assert estimated_totals["total_tokens"] == 9
+
+
 def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):
     with _server([_submit_stream()]) as (config, *_):
         system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
@@ -120,8 +263,30 @@ def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):
     assert detail["context"]["parts"]
     assert all(set(part) == {"source", "version", "text", "digest"} for part in detail["context"]["parts"])
     assert any(item["source"] == "sdk_decoded_stream" for item in detail["events"])
+    assert detail["event_order"] == "source_grouped"
+    stream_events = [item for item in detail["events"] if item["source"] == "sdk_decoded_stream"]
+    assert stream_events and all(item["event_group"] == "provider_stream" for item in stream_events)
+    assert all(item["sequence_source"] == "provider" for item in stream_events)
+    assert all("observed_at" in item for item in stream_events)
+    assert all(item["time"] == item["observed_at"] for item in stream_events)
     assert detail["observed_scope"]["events"]
     assert sum(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id)) == 1
+
+
+def test_legacy_stream_events_keep_unknown_time_and_provider_sequence():
+    events = _detail_events([], [{"sequence": 7, "event": {"type": "response.created"}}])
+    assert events == [{
+        "event_id": None,
+        "time": None,
+        "type": "response.created",
+        "summary": "response.created",
+        "raw": {"type": "response.created"},
+        "source": "sdk_decoded_stream",
+        "event_group": "provider_stream",
+        "sequence": 7,
+        "sequence_source": "provider",
+        "observed_at": None,
+    }]
 
 
 def test_sdk_json_observation_redacts_configured_credential(tmp_path: Path):

@@ -23,6 +23,8 @@ SCHEMA_VERSION = 1
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 ATTEMPT_STATUSES = frozenset({"prepared", "requesting", "completed", "failed", "cancelled"})
+STREAM_PROGRESS_EVENT = "model_stream_progress"
+USAGE_SOURCES = frozenset({"reported", "estimated", "missing", "unknown"})
 USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -106,9 +108,11 @@ class ObservabilityQuery:
                 EventType.CONTEXT_ASSEMBLED,
                 EventType.MODEL_REQUESTED,
                 EventType.MODEL_REQUEST_SERIALIZED,
+                EventType.MODEL_MESSAGE,
                 EventType.MODEL_ATTEMPT_FINISHED,
                 EventType.MODEL_ATTEMPT_FAILED,
                 EventType.MODEL_RETRY_SCHEDULED,
+                STREAM_PROGRESS_EVENT,
             }
         ]
         tool_events = [
@@ -139,6 +143,7 @@ class ObservabilityQuery:
             "request": sdk_request,
             "response": sdk_response,
             "events": detail_events,
+            "event_order": "source_grouped",
             "tools": tool_events,
             "observed_scope": scope,
             "artifact_refs": {
@@ -185,7 +190,8 @@ class ObservabilityQuery:
         # accepted for the shared filter contract but never narrow the sum.
         _cursor_offset(cursor, len(all_records))
         _limit(limit)
-        total = _usage_totals(records)
+        total = _usage_totals(records, source="reported")
+        estimated_total = _usage_totals(records, source="estimated")
         department_groups: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
         model_groups: dict[tuple[str | None, str | None], list[dict[str, Any]]] = defaultdict(list)
         for record in records:
@@ -193,9 +199,11 @@ class ObservabilityQuery:
             model_groups[(record.get("requested_provider"), record.get("actual_model"))].append(record)
 
         def group_payload(label: str, items: list[dict[str, Any]], **identity: Any) -> dict[str, Any]:
-            summary = _usage_totals(items)
+            summary = _usage_totals(items, source="reported")
+            estimated_summary = _usage_totals(items, source="estimated")
             reported = sum(_has_reported_usage(item) for item in items)
-            group_coverage = _coverage(reported, len(items))
+            estimated = sum(_has_estimated_usage(item) for item in items)
+            group_coverage = _coverage(reported, len(items), estimated=estimated)
             group_coverage["fields"] = _field_coverage(items)
             return {
                 "key": label,
@@ -203,6 +211,8 @@ class ObservabilityQuery:
                 **identity,
                 **{field: summary[field] for field in USAGE_FIELDS},
                 "currency": summary.get("currency"),
+                "estimated_totals": {field: estimated_summary[field] for field in USAGE_FIELDS},
+                "estimated_currency": estimated_summary.get("currency"),
                 "coverage": group_coverage,
                 "running_attempts": sum(_public_status(item) == "running" for item in items),
             }
@@ -224,13 +234,16 @@ class ObservabilityQuery:
         department_payload.sort(key=lambda item: item["label"])
         model_payload.sort(key=lambda item: item["label"])
         reported = sum(_has_reported_usage(item) for item in records)
-        coverage = _coverage(reported, len(records))
+        estimated = sum(_has_estimated_usage(item) for item in records)
+        coverage = _coverage(reported, len(records), estimated=estimated)
         coverage["fields"] = _field_coverage(records)
         return {
             "run_id": run_id,
             "version": SCHEMA_VERSION,
             "totals": {field: total[field] for field in USAGE_FIELDS},
             "currency": total.get("currency"),
+            "estimated_totals": {field: estimated_total[field] for field in USAGE_FIELDS},
+            "estimated_currency": estimated_total.get("currency"),
             "coverage": coverage,
             "groups": {"departments": department_payload, "models": model_payload},
             "total_attempts": len(records),
@@ -262,6 +275,10 @@ class ObservabilityQuery:
                 EventType.MODEL_MESSAGE,
                 EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             }:
+                if event.type == EventType.MODEL_MESSAGE:
+                    attempt = records.get(_attempt_id_for(payload, role))
+                    if attempt is not None and attempt.get("status") in {"failed", "cancelled"}:
+                        continue
                 if event.type == EventType.USER_INPUT_RECEIVED:
                     source_type = "user"
                     source_role = "user"
@@ -408,7 +425,10 @@ class ObservabilityQuery:
                 "body": f"Context 快照 {attempt.get('context_event_id') or '未记录'}，对应尝试 {attempt.get('id')}",
                 "snapshot_at": attempt.get("prepared_at"),
                 "status": _public_status(attempt),
-                "stage": attempt.get("status"),
+                "stage": attempt.get("stage", attempt.get("status")),
+                "purpose": attempt.get("purpose"),
+                "partial_output": attempt.get("partial_output", False),
+                "output_item_count": attempt.get("output_item_count", 0),
             })
         department_status = (
             "failed" if projection.phase == "FAILED" else
@@ -463,7 +483,7 @@ class ObservabilityQuery:
                            status: str | None, q: str | None) -> list[dict[str, Any]]:
         if department is not None and department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        if status is not None and status not in {"success", "failed", "running"}:
+        if status is not None and status not in {"success", "failed", "cancelled", "running"}:
             raise ValueError("unknown model attempt status")
         records = list(self._attempt_records(run_id).values())
         needle = q.strip().casefold() if isinstance(q, str) and q.strip() else None
@@ -486,6 +506,9 @@ class ObservabilityQuery:
         records: dict[str, dict[str, Any]] = {}
         contexts: dict[str, Event] = {}
         activation_rounds: dict[str, Any] = {}
+        output_item_counts: dict[str, int] = defaultdict(int)
+        progress_attempts: set[str] = set()
+        progress_facts: dict[str, dict[str, Any]] = {}
         for event in events:
             payload = event.payload or {}
             if event.type == EventType.DEPARTMENT_ACTIVATED and payload.get("activation_id"):
@@ -514,6 +537,18 @@ class ObservabilityQuery:
                 record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
                 record["retry_scheduled_event_id"] = event.event_id
                 record["retry_delay_sec"] = payload.get("delay_sec")
+            elif event.type == EventType.MODEL_MESSAGE:
+                output_item_counts[_attempt_id_for(payload, event.role)] += 1
+            elif event.type == STREAM_PROGRESS_EVENT:
+                attempt_id = _attempt_id_for(payload, event.role)
+                stage = payload.get("stage")
+                if stage in {"output", "output_item_done"} or payload.get("first_output_at"):
+                    progress_attempts.add(attempt_id)
+                progress_facts[attempt_id] = {
+                    "stream_first_observed_at": payload.get("first_observed_at"),
+                    "stream_first_output_at": payload.get("first_output_at"),
+                    "stream_last_stage": stage,
+                }
 
         for record in records.values():
             context = contexts.get(record["id"])
@@ -522,6 +557,17 @@ class ObservabilityQuery:
                 record["context"] = context.payload
             record["usage"] = self._attempt_usage(run_id, record)
             record["work_round"] = activation_rounds.get(str(record.get("activation_id")))
+            output_count = output_item_counts.get(record["id"], 0)
+            record.update(progress_facts.get(record["id"], {}))
+            record["output_item_count"] = output_count
+            record["partial_output"] = bool(
+                record.get("status") in {"requesting", "failed", "cancelled"}
+                and (output_count or record["id"] in progress_attempts)
+            )
+            record["stage"] = (
+                "partial" if record.get("status") == "requesting" and record["partial_output"]
+                else record.get("status")
+            )
             record.pop("context", None)
         counts: dict[str, int] = defaultdict(int)
         for record in records.values():
@@ -540,6 +586,7 @@ class ObservabilityQuery:
         values: dict[str, Any] = {field: None for field in USAGE_FIELDS}
         currency = None
         cost_source = None
+        source = "missing"
         if isinstance(raw, dict):
             values["input_tokens"] = _count_value(raw.get("input_tokens"))
             details = raw.get("input_tokens_details")
@@ -557,6 +604,7 @@ class ObservabilityQuery:
             cost_source = raw.get("cost_source") or ("provider" if values["cost"] is not None else None)
             if values["cost"] is not None and not isinstance(currency, str):
                 values["cost"] = None
+            source = "reported" if _has_usage_values(values) else "missing"
         if raw is None and isinstance(summary, dict):
             # Persisted normalized summaries are used only for fields absent
             # from the raw provider usage object.
@@ -569,16 +617,25 @@ class ObservabilityQuery:
             cost_source = summary.get("cost_source")
             if values["cost"] is not None and not isinstance(currency, str):
                 values["cost"] = None
+            if _has_usage_values(values):
+                declared_source = summary.get("source")
+                if declared_source in USAGE_SOURCES:
+                    source = declared_source
+                elif summary.get("reported") is True:
+                    source = "reported"
+                elif summary.get("reported") is False:
+                    source = "unknown"
+                else:
+                    source = "unknown"
         values["latency_ms"] = _count_value(duration)
         return {
             **values,
             "currency": currency if isinstance(currency, str) and currency else None,
             "cost_source": cost_source if isinstance(cost_source, str) and cost_source else None,
-            "reported": any(values[field] is not None for field in (
-                "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "total_tokens", "cost",
-            )),
+            "source": source,
+            "reported": source == "reported",
             "coverage": {
-                field: "reported" if values[field] is not None else "missing"
+                field: _usage_field_state(field, values[field], source)
                 for field in USAGE_FIELDS
             },
         }
@@ -710,7 +767,12 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
         "actual_provider": record.get("actual_provider"),
         "actual_model": record.get("actual_model"),
         "status": _public_status(record),
-        "stage": record.get("status"),
+        "stage": record.get("stage", record.get("status")),
+        "partial_output": record.get("partial_output", False),
+        "output_item_count": record.get("output_item_count", 0),
+        "stream_first_observed_at": record.get("stream_first_observed_at"),
+        "stream_first_output_at": record.get("stream_first_output_at"),
+        "stream_last_stage": record.get("stream_last_stage"),
         "prepared_at": record.get("prepared_at"),
         "started_at": record.get("started_at"),
         "finished_at": record.get("finished_at"),
@@ -722,7 +784,13 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
 
 def _public_status(record: dict[str, Any]) -> str:
     status = record.get("status")
-    return "success" if status == "completed" else "running" if status in {"prepared", "requesting"} else "failed"
+    if status == "completed":
+        return "success"
+    if status in {"prepared", "requesting"}:
+        return "running"
+    if status == "cancelled":
+        return "cancelled"
+    return "failed"
 
 
 def _department_provider(binding: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -775,6 +843,9 @@ def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict
         "raw_usage_ref": None,
         "usage_summary": None,
         "collection_scope": _collection_scope(),
+        "stream_first_observed_at": None,
+        "stream_first_output_at": None,
+        "stream_last_stage": None,
     }
 
 
@@ -823,6 +894,9 @@ def _merge_finished(record: dict[str, Any], event: Event, payload: dict[str, Any
         "raw_usage_ref": payload.get("raw_usage_ref"),
         "usage_summary": payload.get("usage"),
         "collection_scope": payload.get("collection_scope") or record.get("collection_scope") or _collection_scope(),
+        "stream_first_observed_at": payload.get("stream_first_observed_at"),
+        "stream_first_output_at": payload.get("stream_first_output_at"),
+        "stream_last_stage": payload.get("stream_last_stage"),
         "finished_event_id": event.event_id,
         "actual_provider": (payload.get("actual_provider") or event.provider) if has_response else record.get("actual_provider"),
         "actual_model": actual_model if has_response else record.get("actual_model"),
@@ -885,17 +959,25 @@ def _detail_events(lifecycle: list[dict[str, Any]], sdk_events: list[dict[str, A
             "summary": summary,
             "raw": event,
             "source": "yudao_event_store",
+            "event_group": "event_store",
+            "sequence": event.get("seq"),
+            "sequence_source": "event_store",
+            "observed_at": event.get("created_at"),
         })
     for item in sdk_events:
         raw = item.get("event") if isinstance(item.get("event"), dict) else item
+        observed_at = item.get("observed_at")
         result.append({
             "event_id": None,
-            "time": None,
+            "time": observed_at,
             "type": raw.get("type"),
             "summary": raw.get("type") or "sdk event",
             "raw": raw,
             "source": "sdk_decoded_stream",
+            "event_group": "provider_stream",
             "sequence": item.get("sequence"),
+            "sequence_source": "provider",
+            "observed_at": observed_at,
         })
     return result
 
@@ -1033,17 +1115,50 @@ def _cursor_offset(cursor: str | None, total: int) -> int:
     return offset
 
 
-def _usage_totals(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def _has_usage_values(values: dict[str, Any]) -> bool:
+    return any(values.get(field) is not None for field in USAGE_FIELDS if field != "latency_ms")
+
+
+def _usage_field_state(field: str, value: Any, source: str) -> str:
+    if value is None:
+        return "missing"
+    if field == "latency_ms":
+        return "measured"
+    return source if source in {"reported", "estimated", "unknown"} else "unknown"
+
+
+def _usage_source(usage: Any) -> str:
+    if not isinstance(usage, dict):
+        return "missing"
+    source = usage.get("source")
+    if source in USAGE_SOURCES:
+        return source
+    if usage.get("reported") is True:
+        return "reported"
+    if usage.get("reported") is False and _has_usage_values(usage):
+        return "unknown"
+    return "missing" if not _has_usage_values(usage) else "unknown"
+
+
+def _usage_totals(
+    records: Iterable[dict[str, Any]],
+    *,
+    source: str | None = None,
+) -> dict[str, Any]:
     items = list(records)
+    selected = [item for item in items if source is None or _usage_source(item.get("usage")) == source]
     values: dict[str, Any] = {}
     coverage: dict[str, dict[str, Any]] = {}
     currency: str | None = None
     for field in USAGE_FIELDS:
-        known = [item.get("usage", {}).get(field) for item in items if item.get("usage", {}).get(field) is not None]
+        candidates = [] if source == "estimated" and field == "latency_ms" else (
+            items if field == "latency_ms" else selected
+        )
+        known = [item.get("usage", {}).get(field) for item in candidates if item.get("usage", {}).get(field) is not None]
         if field == "cost" and known:
             currencies = {
                 item.get("usage", {}).get("currency")
-                for item in items if item.get("usage", {}).get(field) is not None
+                for item in candidates if item.get("usage", {}).get(field) is not None
             }
             if len(currencies) == 1 and None not in currencies:
                 currency = next(iter(currencies))
@@ -1074,14 +1189,18 @@ def _usage_totals(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
 
 def _has_reported_usage(record: dict[str, Any]) -> bool:
     usage = record.get("usage") or {}
-    return any(usage.get(field) is not None for field in (
-        "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "total_tokens", "cost",
-    ))
+    return _usage_source(usage) == "reported" and _has_usage_values(usage)
 
 
-def _coverage(reported: int, total: int) -> dict[str, Any]:
+def _has_estimated_usage(record: dict[str, Any]) -> bool:
+    usage = record.get("usage") or {}
+    return _usage_source(usage) == "estimated" and _has_usage_values(usage)
+
+
+def _coverage(reported: int, total: int, *, estimated: int = 0) -> dict[str, Any]:
     return {
         "reported_attempts": reported,
+        "estimated_attempts": estimated,
         "attempts": total,
         "percent": round(reported * 100 / total, 2) if total else 0.0,
     }
@@ -1092,6 +1211,15 @@ def _field_coverage(records: Iterable[dict[str, Any]]) -> dict[str, dict[str, An
     total = len(items)
     result = {}
     for field in USAGE_FIELDS:
-        reported = sum(item.get("usage", {}).get(field) is not None for item in items)
-        result[field] = _coverage(reported, total)
+        reported = sum(
+            _usage_source(item.get("usage")) == "reported"
+            and item.get("usage", {}).get(field) is not None
+            for item in items
+        )
+        estimated = sum(
+            _usage_source(item.get("usage")) == "estimated"
+            and item.get("usage", {}).get(field) is not None
+            for item in items
+        )
+        result[field] = _coverage(reported, total, estimated=estimated)
     return result
