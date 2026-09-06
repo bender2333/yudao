@@ -250,6 +250,7 @@ class ResponsesAdapter:
             reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
             raise ProviderError(
                 "Model provider returned an invalid API response", reason=reason,
+                retryable=reason != "context_overflow" and _retryable_code(code),
                 diagnostics=_diagnostic_code(code, "provider_response"),
             ) from exc
         except json.JSONDecodeError as exc:
@@ -507,7 +508,7 @@ def _retryable_code(code: Any) -> bool:
 
 _RETRYABLE_ERROR_CODES = frozenset({
     "server_error", "internal_server_error", "service_unavailable", "temporarily_unavailable",
-    "timeout", "rate_limit_exceeded", "too_many_requests",
+    "timeout", "rate_limit_exceeded", "too_many_requests", "server_is_overloaded",
 })
 
 _KNOWN_ERROR_CODES = frozenset({

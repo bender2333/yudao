@@ -357,6 +357,65 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
         assert not any(item.type == "tool_started" and item.payload.get("id") == "call-one" for item in events)
 
 
+def test_server_overloaded_stream_error_retries_after_partial_output_without_running_tools(tmp_path, monkeypatch):
+    import harness.engine as engine
+
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    partial = _stream([CALL], terminal=False) + _event(
+        "error", code="server_is_overloaded", message=KEY,
+    )
+    with _server([partial, _submit_stream()]) as (config, captures, *_):
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        result = system.activate_once(system.create_run("retry provider overload"))
+
+    assert result.phase == "ENGINEERING", result.error
+    assert len(captures) == 2
+    assert "call-one" not in json.dumps(captures[1])
+    events = system.store.list_events(result.run_id)
+    failed = [event for event in events if event.type == "model_attempt_failed"]
+    assert len(failed) == 1
+    assert failed[0].payload["retryable"] is True
+    assert failed[0].payload["diagnostics"]["error_code"] == "server_is_overloaded"
+    assert not any(event.type == "tool_started" and event.payload.get("id") == "call-one" for event in events)
+
+
+def test_server_overloaded_stream_error_is_exhausted_at_three_attempts(tmp_path, monkeypatch):
+    import harness.engine as engine
+
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    overload = _event("error", code="server_is_overloaded", message="overloaded")
+    with _server([overload, overload, overload]) as (config, captures, *_):
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        result = system.activate_once(system.create_run("provider overload exhaustion"))
+
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert len(captures) == 3
+    events = system.store.list_events(result.run_id)
+    failed = [event for event in events if event.type == "model_attempt_failed"]
+    scheduled = [event for event in events if event.type == "model_retry_scheduled"]
+    assert len(failed) == 3 and len(scheduled) == 2
+    assert all(event.payload["retryable"] is True for event in failed)
+    assert all(event.payload["diagnostics"]["error_code"] == "server_is_overloaded" for event in failed)
+    assert failed[-1].payload["will_retry"] is False
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_server_overloaded_stream_error_shapes_are_retryable_and_sanitized(nested):
+    body = {"code": "server_is_overloaded", "type": "server_error", "message": KEY}
+    event = _event("error", **({"error": body} if nested else {"code": body["code"], "message": body["message"]}))
+    with _server([event]) as (config, captures, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+
+    assert caught.value.retryable is True
+    assert caught.value.reason == "provider_error"
+    assert caught.value.diagnostics == {"error_code": "server_is_overloaded"}
+    assert KEY not in str(caught.value) and KEY not in str(caught.value.diagnostics)
+    assert len(captures) == 1
+
+
 def test_completed_items_and_final_usage_are_observed_once():
     observations = []
     with _server([_stream([REASONING, CALL, TEXT], duplicate=True)]) as (config, *_):
