@@ -99,10 +99,19 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.TOOL_CALLED:
         if payload.get("name") != "provider_usage":
             state.tool_count += 1
+        else:
+            state.token_used += int(payload.get("tokens_charged", 0))
         state.cost += float(payload.get("cost", 0.0))
         state.latency_ms += int(payload.get("latency_ms", 0))
         if event.model:
             state.model = event.model
+        return
+
+    if etype == EventType.ACTIVATION_FINISHED:
+        state.latency_ms += int(payload.get("latency_ms", 0))
+        session = state.sessions.get(event.role or "")
+        if session:
+            session.status = "closed" if state.phase in TERMINAL_PHASES else "idle"
         return
 
     if etype == EventType.PROPOSAL_REJECTED:

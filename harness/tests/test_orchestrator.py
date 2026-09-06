@@ -266,7 +266,8 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
     events = system.store.list_events(projection.run_id)
     assert any(event.type == "proposal_rejected" for event in events)
     assert projection.phase == "DONE"
-    assert events[-1].type == "run_done"
+    assert events[-1].type == "activation_finished"
+    assert events[-1].state_after == "DONE"
 
 
 def test_release_without_quality_evidence_is_rejected(data_dir):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from threading import Event
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from ..context import AssembledContext
 from ..models import Usage
@@ -32,6 +32,17 @@ class Availability:
 
 
 @dataclass
+class AdapterObservation:
+    id: str
+    kind: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    text: str = ""
+    usage: Usage | None = None
+    provider: str | None = None
+    model: str | None = None
+
+
+@dataclass
 class InvokeRequest:
     run_id: str
     department: str
@@ -41,6 +52,11 @@ class InvokeRequest:
     tools: list[str]
     workspace: Workspace
     abort_flag: Event
+    on_observation: Callable[[AdapterObservation], None] | None = None
+
+    def observe(self, observation: AdapterObservation) -> None:
+        if self.on_observation is not None:
+            self.on_observation(observation)
 
 
 @dataclass
@@ -48,7 +64,7 @@ class AdapterResult:
     proposal: dict[str, Any] | None
     transcript: str = ""
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
-    usage: Usage = field(default_factory=Usage)
+    usage: Usage = field(default_factory=lambda: Usage(reported=False))
     finish_reason: str = "completed"
     error: str | None = None
     provider: str = "fake"

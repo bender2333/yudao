@@ -7,13 +7,14 @@ import os
 import shutil
 import time
 from dataclasses import dataclass
+from threading import Event, Lock
 from typing import Any, Iterator
 from uuid import uuid4
 
 from ..models import Usage, estimate_tokens, json_dumps
 from ..redact import redact_text
-from ..tools import SUBMIT_KINDS, ToolRuntime, host_tool_definitions
-from .base import AdapterResult, Availability, InvokeRequest, ProviderError
+from ..tools import SUBMIT_KINDS, ToolResult, ToolRuntime, host_tool_definitions
+from .base import AdapterObservation, AdapterResult, Availability, InvokeRequest, ProviderError
 from .omp_isolation import (
     ISOLATION_FLAGS,
     apply_host_launch_args,
@@ -127,8 +128,10 @@ class OmpRpcAdapter:
     def __init__(self, config: OmpConfig | None = None) -> None:
         self.config = config if config is not None else OmpConfig.from_env()
         self.model = self.config.model or "unconfigured"
-        self._abort = __import__("threading").Event()
+        self._abort = Event()
         self._session: RpcProcess | None = None
+        self._active_session_id: str | None = None
+        self._session_lock = Lock()
 
     def availability(self) -> Availability:
         if not self.config.enabled:
@@ -147,8 +150,11 @@ class OmpRpcAdapter:
         return Availability(True)
 
     def abort(self, session_id: str) -> None:
-        self._abort.set()
-        session = self._session
+        with self._session_lock:
+            if session_id != self._active_session_id:
+                return
+            self._abort.set()
+            session = self._session
         if session is None:
             return
         try:
@@ -160,7 +166,11 @@ class OmpRpcAdapter:
         availability = self.availability()
         if not availability.available:
             raise ProviderError(availability.message, reason=availability.reason or "provider_unavailable")
-        self._abort.clear()
+        with self._session_lock:
+            if self._active_session_id is not None:
+                raise ProviderError("OMP adapter already has an active invocation")
+            self._active_session_id = request.session_id
+            self._abort.clear()
         abort_flag = _combined_flag(request.abort_flag, self._abort)
         try:
             return self._invoke_process(request, abort_flag)
@@ -169,6 +179,9 @@ class OmpRpcAdapter:
         except Exception as exc:
             reason, message = map_omp_failure(exc)
             raise ProviderError(message, reason=reason) from exc
+        finally:
+            with self._session_lock:
+                self._active_session_id = None
 
     def _invoke_process(self, request: InvokeRequest, abort_flag) -> AdapterResult:
         isolation = prepare_invocation_isolation(os.environ.copy(), request.context, request.workspace.root)
@@ -191,29 +204,36 @@ class OmpRpcAdapter:
                 raise
             reason, message = map_omp_failure(exc)
             raise ProviderError(message, reason=reason, diagnostics=diagnostics) from exc
-        self._session = session
+        with self._session_lock:
+            self._session = session
         started = time.monotonic()
         deadline = started + self.config.timeout_sec
         runtime = ToolRuntime(request.workspace)
         reassembler = FrameReassembler()
+        transcript_parts: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+        tool_results: dict[str, ToolResult] = {}
+        usage = Usage(reported=False)
+        usage_seen = False
+        response_ids: set[tuple[str, str, str]] = set()
+        message_count = 0
         try:
+            request.observe(AdapterObservation("host_launch", "host_launch", diagnostics,
+                                               provider=self.name, model=self.model))
             ready = self._wait_ready(session, min(deadline, started + min(self.config.timeout_sec, 15)))
             protocol = 1
             if 2 in (ready.get("supportedProtocolVersions") or []):
                 negotiate_id = _rid("protocol")
                 session.send({"id": negotiate_id, "type": "negotiate_protocol", "protocolVersion": 2})
-                self._wait_command(session, deadline, negotiate_id, "negotiate_protocol", reassembler, runtime, request)
+                self._wait_command(session, deadline, negotiate_id, "negotiate_protocol", reassembler, runtime, request, tool_calls, tool_results)
                 protocol = 2
             tools_id = _rid("tools")
             definitions = host_tool_definitions(request.tools)
             session.send({"id": tools_id, "type": "set_host_tools", "tools": definitions})
-            self._wait_command(session, deadline, tools_id, "set_host_tools", reassembler, runtime, request)
+            self._wait_command(session, deadline, tools_id, "set_host_tools", reassembler, runtime, request, tool_calls, tool_results)
             prompt = _build_prompt(request)
             prompt_id = request.activation_id or _rid("prompt")
             session.send({"id": prompt_id, "type": "prompt", "message": prompt})
-            transcript_parts: list[str] = []
-            tool_calls: list[dict[str, Any]] = []
-            usage = Usage(input_tokens=estimate_tokens(prompt))
             proposal: dict[str, Any] | None = None
             finish: str | None = None
             error = None
@@ -227,7 +247,7 @@ class OmpRpcAdapter:
                     ) from exc
                 last_frames.append(str(frame.get("type") or "unknown"))
                 if frame.get("type") == "host_tool_call":
-                    submitted = self._handle_host_tool(session, frame, runtime, request, tool_calls)
+                    submitted = self._handle_host_tool(session, frame, runtime, request, tool_calls, tool_results)
                     if submitted is not None:
                         proposal = submitted
                     continue
@@ -237,16 +257,36 @@ class OmpRpcAdapter:
                     session.send({"type": "extension_ui_response", "id": frame.get("id"), "cancelled": True})
                     continue
                 mapped = map_omp_frame(frame)
+                if frame.get("type") == "message_end":
+                    message = frame.get("message")
+                    if not isinstance(message, dict) or message.get("role") != "assistant":
+                        continue
+                    provider = str(message.get("provider") or self.name)
+                    model = str(message.get("model") or self.model)
+                    response_id = message.get("responseId")
+                    if response_id:
+                        identity = (provider, model, str(response_id))
+                        if identity in response_ids:
+                            continue
+                        response_ids.add(identity)
+                    message_count += 1
+                    text = mapped.get("text", "")
+                    transcript_parts.append(text)
+                    message_usage = mapped.get("usage")
+                    if message_usage is None:
+                        input_estimate = request.context.manifest.token_estimate
+                        output_estimate = estimate_tokens(json_dumps(message.get("content", [])))
+                        message_usage = Usage(input_tokens=input_estimate, output_tokens=output_estimate,
+                                              total_tokens=input_estimate + output_estimate, reported=False)
+                    usage = usage.plus(message_usage) if usage_seen else message_usage
+                    usage_seen = True
+                    request.observe(AdapterObservation(
+                        f"message-{message_count}", "message", message, text, message_usage, provider, model,
+                    ))
                 if mapped.get("proposal"):
                     if proposal is None or not _is_submit_proposal(proposal):
                         proposal = mapped["proposal"]
-                if mapped.get("text"):
-                    transcript_parts.append(mapped["text"])
-                if mapped.get("tool_call"):
-                    tool_calls.append(mapped["tool_call"])
-                if mapped.get("usage"):
-                    usage = mapped["usage"]
-                if mapped.get("finish_reason"):
+                if frame.get("type") == "agent_end" and frame.get("isTerminal") is not False:
                     finish = mapped["finish_reason"]
                     error = mapped.get("error")
                     break
@@ -264,7 +304,8 @@ class OmpRpcAdapter:
                 )
             elapsed = int((time.monotonic() - started) * 1000)
             usage.latency_ms = elapsed
-            if usage.total_tokens == 0:
+            if not usage_seen:
+                usage.input_tokens = request.context.manifest.token_estimate
                 usage.output_tokens = estimate_tokens("".join(transcript_parts))
                 usage.total_tokens = usage.input_tokens + usage.output_tokens
             return AdapterResult(
@@ -282,6 +323,9 @@ class OmpRpcAdapter:
             session.kill()
             return AdapterResult(
                 None,
+                transcript="\n".join(transcript_parts),
+                tool_calls=tool_calls,
+                usage=usage,
                 finish_reason="aborted",
                 error="aborted",
                 provider=self.name,
@@ -303,7 +347,8 @@ class OmpRpcAdapter:
             raise
         finally:
             session.close()
-            self._session = None
+            with self._session_lock:
+                self._session = None
             cleanup_isolation(isolation)
 
     def _wait_ready(self, session: RpcProcess, deadline: float) -> dict[str, Any]:
@@ -330,11 +375,13 @@ class OmpRpcAdapter:
         reassembler: FrameReassembler,
         runtime: ToolRuntime,
         request: InvokeRequest,
+        tool_calls: list[dict[str, Any]],
+        tool_results: dict[str, ToolResult],
     ) -> dict[str, Any]:
         while True:
             frame = self._next_frame(session, deadline, reassembler)
             if frame.get("type") == "host_tool_call":
-                self._handle_host_tool(session, frame, runtime, request, [])
+                self._handle_host_tool(session, frame, runtime, request, tool_calls, tool_results)
                 continue
             if frame.get("type") == "response" and frame.get("id") == command_id:
                 if frame.get("success") is False:
@@ -358,23 +405,33 @@ class OmpRpcAdapter:
         runtime: ToolRuntime,
         request: InvokeRequest,
         tool_calls: list[dict[str, Any]],
+        tool_results: dict[str, ToolResult],
     ) -> dict[str, Any] | None:
         request_id = str(frame.get("id") or "")
         name = str(frame.get("toolName") or "")
         arguments = frame.get("arguments") if isinstance(frame.get("arguments"), dict) else {}
+        tool_id = str(frame.get("toolCallId") or request_id)
+        if request_id in tool_results:
+            previous = tool_results[request_id]
+            session.send(_host_tool_result_frame(request_id, previous.ok, previous.output, previous.error))
+            return None
         result = runtime.execute(request.department, name, arguments)
+        tool_results[request_id] = result
         recorded = {
             "name": name,
-            "id": frame.get("toolCallId") or request_id,
+            "id": request_id,
+            "tool_call_id": tool_id,
             "ok": result.ok,
             "error": result.error,
             "args": _public_args(name, arguments),
+            "output": result.output,
         }
         if isinstance(result.output, dict) and result.output.get("exit_code") is not None:
             recorded["exit_code"] = result.output.get("exit_code")
             recorded["snapshot_hash"] = result.output.get("snapshot_hash")
             recorded["executor"] = result.output.get("executor")
         tool_calls.append(recorded)
+        request.observe(AdapterObservation(request_id, "tool", recorded, provider=self.name, model=self.model))
         session.send(_host_tool_result_frame(request_id, result.ok, result.output, result.error))
         if result.ok and name in SUBMIT_KINDS and isinstance(result.output, dict) and result.output.get("kind"):
             return result.output
@@ -467,7 +524,9 @@ def map_omp_frame(frame: dict[str, Any]) -> dict[str, Any]:
         if command in {"prompt", "abort", "set_host_tools", "negotiate_protocol"}:
             result["fatal"] = True
         return result
-    if ftype in {"agent_end", "agent_settled"}:
+    if ftype == "agent_end":
+        if frame.get("isTerminal") is False:
+            return result
         result["finish_reason"] = "completed"
         messages = frame.get("messages")
         if isinstance(messages, list):
@@ -475,14 +534,11 @@ def map_omp_frame(frame: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(message, dict) or message.get("role") != "assistant":
                     continue
                 extracted = _extract_message(message)
-                if extracted.get("text"):
-                    result["text"] = extracted["text"]
                 if extracted.get("proposal"):
                     result["proposal"] = extracted["proposal"]
-                if extracted.get("usage"):
-                    result["usage"] = extracted["usage"]
                 if extracted.get("finish_reason"):
                     result["finish_reason"] = extracted["finish_reason"]
+                    result["error"] = extracted.get("error")
                 break
         return result
     if ftype == "agent_start":
@@ -561,20 +617,28 @@ def _extract_message(message: dict[str, Any]) -> dict[str, Any]:
     if isinstance(usage, dict):
         input_tokens = _number(usage.get("input", usage.get("input_tokens")))
         output_tokens = _number(usage.get("output", usage.get("output_tokens")))
-        total_tokens = _number(usage.get("totalTokens", usage.get("total_tokens")))
+        cache_read_tokens = _number(usage.get("cacheRead"))
+        cache_write_tokens = _number(usage.get("cacheWrite"))
+        total = usage.get("totalTokens", usage.get("total_tokens"))
+        total_tokens = _number(total) if total is not None else input_tokens + output_tokens + cache_read_tokens + cache_write_tokens
         cost = usage.get("cost")
         if isinstance(cost, dict):
             cost = cost.get("total", 0)
         result["usage"] = Usage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            total_tokens=total_tokens or input_tokens + output_tokens,
+            total_tokens=total_tokens,
             cost=float(cost or 0),
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
         )
     stop_reason = message.get("stopReason")
     if stop_reason == "error":
         result["finish_reason"] = "error"
         result["error"] = message.get("errorMessage") or "OMP assistant message failed"
+    elif stop_reason == "aborted":
+        result["finish_reason"] = "aborted"
+        result["error"] = message.get("errorMessage") or "OMP assistant message aborted"
     return result
 
 

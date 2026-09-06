@@ -61,7 +61,9 @@ HUMAN_ACTIONS = {
 class EventType:
     RUN_CREATED = "run_created"
     DEPARTMENT_ACTIVATED = "department_activated"
+    ACTIVATION_FINISHED = "activation_finished"
     CONTEXT_ASSEMBLED = "context_assembled"
+    MODEL_MESSAGE = "model_message"
     TOOL_CALLED = "tool_called"
     PROPOSAL_SUBMITTED = "proposal_submitted"
     PROPOSAL_REJECTED = "proposal_rejected"
@@ -335,6 +337,21 @@ class Usage:
     total_tokens: int = 0
     cost: float = 0.0
     latency_ms: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reported: bool = True
+
+    def plus(self, other: Usage) -> Usage:
+        return Usage(
+            input_tokens=self.input_tokens + other.input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+            cost=self.cost + other.cost,
+            latency_ms=self.latency_ms + other.latency_ms,
+            cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
+            cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
+            reported=self.reported and other.reported,
+        )
 
 
 @dataclass

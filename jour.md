@@ -208,3 +208,12 @@
 - 发布版 OMP 18.1.11 与本地 Responses stub 的独立验证通过：五类无关上下文标记均未注入，原 profile 的虚构认证仍可用，宿主 read_file 结果进入第二次模型请求。测试没有调用真实 provider 或保存凭据。
 - OMP、smoke、编排和 replay 的 66 项定向测试通过，其中包括显式指定发布版 OMP 的接入测试。真实主 provider 的最终循环仍在后续统一验收范围内。
 - Grok 完成主要隔离实现；恢复会话时 auth.x.ai 与 cli-chat-proxy.grok.com 连续连接失败，已停止仅本次重试，由实现子 agent 收尾并验收。没有停止用户自己的交互 Grok。
+
+## 2026-09-06 - 取消与执行记录验收
+
+- 控制层以短临界区串行提交提案、取消和预算停止，LLM 调用在临界区之外。取消后的迟到提案和错误不能覆盖终态；只中止对应的活动 session。
+- adapter 即时发布完整模型消息、实际工具执行和宿主启动诊断，由控制层写入原有事件库。invoke 尚未返回时即可观察；随后超时或错误仍保留消息工件、工具输出及用量。
+- 按主对话每条完整 assistant message_end 累计实际 totalTokens 和 cost.total，修正预先计入的估算。缓存分桶保留，reasoning 不重复累加；message_update 和 agent_end 汇总不再次收费。没有 responseId 的两条相同回答仍分别记账。
+- 已知用量达到上限时即时进入 PAUSED 并中止对应会话；后续中止错误不把暂停改成 FAILED。计费范围明确为可观测主对话，不把不可见的独立维护调用声称为完整账单。
+- 工具统计以实际宿主执行为依据。审查修正了原任务的身份假设：同一个 toolCallId 可以对应不同 RPC 请求，按 RPC request id 去重执行，tool_call_id 保留为关联字段；OMP 生命周期通知不重复计数。
+- 实现子 agent 完成本批，另一个子 agent 独立审查并补充启动诊断整合测试。完整测试为 127 passed，包含显式发布版 OMP、本地 stub、取消提交交错、预算暂停、无消息 id、工具重放与失败证据保留。未调用真实 provider，未修改 Web 或部门合同。
