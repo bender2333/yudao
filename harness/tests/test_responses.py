@@ -162,6 +162,17 @@ def test_missing_usage_is_unknown_not_a_provider_estimate():
     assert result.usage.reported is False and result.usage.total_tokens == 0
 
 
+def test_compaction_output_limit_is_sent_to_the_sdk_without_hidden_prompt_changes():
+    with _server([_stream()]) as (config, captures, *_):
+        request = _request()
+        request.purpose = "compaction"
+        request.max_output_tokens = 320
+        request.tools = []
+        ResponsesAdapter(config).complete(request)
+        assert captures[0] == {"model": "local-model", "input": request.input_items, "tools": [],
+                               "store": False, "stream": True, "max_output_tokens": 320}
+
+
 def test_nullable_reasoning_content_is_preserved_through_sdk_and_next_request():
     reasoning = {**REASONING, "content": None, "encrypted_content": None}
     observations = []

@@ -12,6 +12,7 @@ from typing import Any
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
 from .artifacts import ArtifactStore
 from .context import ContextAssembler
+from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
 from .engine import run_department
 from .models import (
@@ -54,6 +55,7 @@ class _Activation:
     raw_usage_ref: dict[str, Any] | None = None
     provider: str | None = None
     model: str | None = None
+    compaction_plan: Any = None
 
 
 class Orchestrator:
@@ -244,6 +246,7 @@ class Orchestrator:
                 record_skipped_tool=lambda call: self._record_observation(activation, ModelObservation(call["id"], "skipped_tool", call)),
                 begin_tool=lambda call: self._begin_tool(activation, call),
                 begin_request=lambda request: self._begin_request(activation, request),
+                finish_compaction=lambda response: self._finish_compaction(activation, response),
                 stopped=lambda: self.project(run_id).phase in TERMINAL_PHASES or request.abort_flag.is_set(),
             )
         except ProviderError as exc:
@@ -284,25 +287,56 @@ class Orchestrator:
             current = self.project(identity.run_id)
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
                 return None
-            assembled = self.assembler.assemble(
+            pinned = self.assembler.assemble(
                 current, department=identity.department, session_id=identity.session_id,
                 activation_id=identity.activation_id, step_id=step_id,
-                history=[record["item"] for record in self._department_history_records(
-                    identity.run_id, identity.department, current_activation_id=identity.activation_id)],
             )
-            request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
-                                   step_id, assembled, assembled.tools, identity.abort_flag)
-            activation.request = request
             if step_id == 1:
                 static = {"intend", "department_rules", "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
-                content = "\n\n".join(f"[{part.source}]\n{part.text}" for part in assembled.parts if part.source not in static)
+                content = "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
                 input_item = {"role": "user", "content": content}
-                received_ref = self.artifacts.put(request.run_id, "department_input", json_dumps(input_item), media_type="application/json")
-                self.store.append(request.run_id, EventType.DEPARTMENT_INPUT, role=request.department,
+                received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
+                self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
                                   parent_event_id=activation.parent_event_id, state_before=current.phase,
-                                  state_after=current.phase, session_id=request.session_id,
+                                  state_after=current.phase, session_id=identity.session_id,
                                   artifact_hashes=[received_ref.content_hash],
-                                  payload={"activation_id": request.activation_id, "step_id": step_id, "input_ref": asdict(received_ref)})
+                                  payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref)})
+            records = self._department_history_records(identity.run_id, identity.department)
+            checkpoint_event = next((item for item in reversed(current.compactions) if item["department"] == identity.department), None)
+            checkpoint = None
+            checkpoint_id = None
+            try:
+                if checkpoint_event is not None:
+                    if checkpoint_event["run_id"] != identity.run_id:
+                        raise CompactionError("Compaction checkpoint belongs to a different run")
+                    checkpoint = CompactionCheckpoint(**checkpoint_event["checkpoint"])
+                    saved_summary = self.artifacts.get_for_run(identity.run_id, ArtifactRef(**checkpoint_event["summary_ref"])).decode("utf-8")
+                    if saved_summary != checkpoint.summary:
+                        raise CompactionError("Compaction summary does not match its original artifact")
+                    checkpoint_id = checkpoint_event["source_event_id"]
+                activation.compaction_plan = plan_compaction(
+                    records, checkpoint, current.context_window, pinned.input_items, pinned.tools,
+                )
+                if activation.compaction_plan is not None:
+                    plan = activation.compaction_plan
+                    assembled = self.assembler.assemble_compaction(
+                        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
+                        max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
+                    )
+                else:
+                    assembled = self.assembler.assemble(
+                        current, department=identity.department, session_id=identity.session_id,
+                        activation_id=identity.activation_id, step_id=step_id,
+                        history=visible_history(records, checkpoint),
+                        compaction_event_id=checkpoint_id,
+                    )
+            except (CompactionError, ValueError, FileNotFoundError) as exc:
+                reason = "context_overflow" if pinned.manifest.token_estimate >= current.context_window * 85 // 100 else "compaction_failed"
+                raise ProviderError(str(exc), reason=reason) from exc
+            request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
+                                   step_id, assembled, assembled.tools, identity.abort_flag,
+                                   purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens)
+            activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
             activation.step_usage = None
@@ -310,9 +344,10 @@ class Orchestrator:
             estimate = assembled.manifest.token_estimate
             overflow = estimate > current.context_window
             admitted = not overflow
-            ref = self.artifacts.put(request.run_id, "model_request",
-                                     json_dumps({"input": request.input_items, "tools": request.tools}),
-                                     media_type="application/json")
+            request_payload = {"input": request.input_items, "tools": request.tools}
+            if request.max_output_tokens is not None:
+                request_payload["max_output_tokens"] = request.max_output_tokens
+            ref = self.artifacts.put(request.run_id, "model_request", json_dumps(request_payload), media_type="application/json")
             payload = asdict(assembled.manifest)
             payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=admitted,
                            tokens_charged=0)
@@ -325,13 +360,13 @@ class Orchestrator:
                 return None
             return request
 
-    def _department_history_records(self, run_id: str, department: str, *, current_activation_id: str | None = None) -> list[dict[str, Any]]:
+    def _department_history_records(self, run_id: str, department: str) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         for event in self.store.list_events(run_id):
             if event.role != department:
                 continue
             if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT}:
-                if event.type == EventType.DEPARTMENT_INPUT and event.payload["activation_id"] == current_activation_id:
+                if event.payload.get("purpose") == "compaction":
                     continue
                 ref = ArtifactRef(**event.payload["message_ref" if event.type == EventType.MODEL_MESSAGE else "input_ref"])
                 item = json.loads(self.artifacts.get_for_run(run_id, ref))
@@ -344,6 +379,33 @@ class Orchestrator:
                             "type": event.type, "item": item, "item_digest": canonical_hash(item)})
         return records
 
+    def _finish_compaction(self, activation: _Activation, response: ModelResponse) -> None:
+        with self._state_lock:
+            request = activation.request
+            current = self.project(activation.run_id)
+            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
+                return
+            plan = activation.compaction_plan
+            try:
+                checkpoint = finish_compaction(plan, response.output)
+            except CompactionError as exc:
+                raise ProviderError(str(exc), reason="compaction_failed") from exc
+            summary_ref = self.artifacts.put(activation.run_id, "department_summary", checkpoint.summary, media_type="text/plain")
+            plan_ref = self.artifacts.put(activation.run_id, "compaction_plan", json_dumps(asdict(plan)), media_type="application/json")
+            self.store.append(activation.run_id, EventType.COMPACTION_RECORDED, role=activation.department,
+                              parent_event_id=activation.parent_event_id, state_before=current.phase,
+                              state_after=current.phase, session_id=activation.session_id,
+                              provider=response.provider, model=response.model,
+                              context_digest=request.context.manifest.digest,
+                              artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
+                              payload={"run_id": activation.run_id, "department": activation.department,
+                                       "activation_id": activation.activation_id, "step_id": request.step_id,
+                                       "purpose": "compaction", "checkpoint": asdict(checkpoint),
+                                       "source_refs": plan.source_refs, "summary_ref": asdict(summary_ref),
+                                       "plan_ref": asdict(plan_ref), "summary_token_limit": plan.summary_token_limit,
+                                       "max_output_tokens": plan.max_output_tokens,
+                                       "previous_compaction_event_id": request.context.manifest.compaction_event_id})
+
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
         with self._state_lock:
             current = self.project(request.run_id)
@@ -354,7 +416,7 @@ class Orchestrator:
                               state_after=current.phase, session_id=request.session_id,
                               context_digest=request.context.manifest.digest,
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
-                                       "attempted": True})
+                                       "attempted": True, "purpose": request.purpose})
             return True
 
     def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> bool:
@@ -418,6 +480,7 @@ class Orchestrator:
                 raise ValueError(f"unknown adapter observation: {observation.kind}")
             payload["activation_id"] = request.activation_id
             payload["step_id"] = request.step_id
+            payload["purpose"] = request.purpose
             self.store.append(
                 request.run_id, event_type, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -449,6 +512,7 @@ class Orchestrator:
                     "name": "provider_usage", "ok": True,
                     "activation_id": request.activation_id,
                     "step_id": request.step_id,
+                    "purpose": request.purpose,
                     "accounting": "activation_total_with_charge_delta",
                     "scope": "observable_main_dialogue",
                     "source": "reported" if usage.reported else "unreported",
@@ -781,6 +845,7 @@ class Orchestrator:
             "provider_error": "模型提供方失败。查看错误事件后新建 run 或更换 provider。",
             "cancelled": "运行已被取消。如需继续，新建 run。",
             "context_overflow": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
+            "compaction_failed": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
         }.get(reason)
         with self._state_lock:
             projection = self.project(run_id)

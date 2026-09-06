@@ -550,13 +550,21 @@ function renderContext(context, events, gen) {
     .map((item) => {
       return `
     <article class="item">
-      <header><span>${t(item.department)} · 第 ${t(item.step_id)} 步</span><span>${t(item.token_estimate)} tok / budget ${t(item.budget)}</span></header>
+      <header><span>${t(item.department)} · 第 ${t(item.step_id)} 步${item.purpose === "compaction" ? " · 压缩" : ""}</span><span>${t(item.token_estimate)} tok / 窗口 ${t(item.budget)}</span></header>
       <p>注入：${t((item.injected || []).map((part) => part.source).join(", "))}</p>
       <p class="muted">排除：${t((item.excluded || []).map((part) => part.source).join(", "))}</p>
       <p class="hash">${t(shortHash(item.digest))}</p>
       ${item.source_event_id && item.request_ref ? `<button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看模型输入</button>` : ""}
+      ${item.compaction_event_id ? `<button type="button" class="event-link" data-event-id="${t(item.compaction_event_id)}">查看使用的摘要</button>` : ""}
     </article>`;
     })
+    .join("");
+  const compactions = (context.compactions || [])
+    .map((item) => `
+    <article class="item">
+      <header><span>${t(item.department)} · 上下文摘要</span><span>第 ${t(item.step_id)} 步</span></header>
+      <button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看摘要与原始记录</button>
+    </article>`)
     .join("");
   const cards = (events || [])
     .slice(-12)
@@ -571,6 +579,7 @@ function renderContext(context, events, gen) {
     .join("");
   node.innerHTML = `
     <div class="list">${manifests}</div>
+    ${compactions ? `<h3>压缩记录</h3><div class="list">${compactions}</div>` : ""}
     <h3>最近事件</h3>
     <div class="list">${cards}</div>
   `;
@@ -595,6 +604,18 @@ async function openEvent(eventId, gen) {
     const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
     if (token !== state.gen || state.runId !== runId) return;
     document.getElementById("event-json").textContent = JSON.stringify(data, null, 2);
+    const sources = document.getElementById("event-sources");
+    if (sources) {
+      sources.replaceChildren();
+      for (const source of data.source_events || []) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "event-link";
+        button.textContent = `${source.seq}. ${source.type}`;
+        button.addEventListener("click", () => openEvent(source.event_id, token));
+        sources.appendChild(button);
+      }
+    }
     document.getElementById("event-dialog").showModal();
   } catch (error) {
     if (token !== state.gen || state.runId !== runId) return;

@@ -10,7 +10,7 @@ from typing import Any
 from .adapters.responses import ResponsesConfig, ResponsesAdapter
 from .artifacts import ArtifactStore
 from .event_store import EventStore
-from .models import ArtifactRef, EventType, canonical_hash
+from .models import ArtifactRef, EventType, canonical_hash, json_dumps
 from .projection import project_run
 from .runtime import LoopSystem
 
@@ -164,14 +164,178 @@ def _read_artifact(artifacts: ArtifactStore, run_id: str, ref: dict[str, Any]) -
     return json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
 
 
+def _history_record(event: Any, item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "event_id": event.event_id, "seq": event.seq, "activation_id": event.payload["activation_id"],
+        "step_id": event.payload["step_id"], "type": event.type, "item": item, "item_digest": canonical_hash(item),
+    }
+
+
+def _summary_material(record: dict[str, Any]) -> dict[str, Any]:
+    material = dict(record["item"])
+    encrypted = material.get("encrypted_content") if material.get("type") == "reasoning" else None
+    if isinstance(encrypted, str) and encrypted:
+        material["encrypted_content"] = {
+            "source_event_id": record["event_id"], "field": "encrypted_content",
+            "length": len(encrypted), "digest": canonical_hash(encrypted),
+        }
+    return material
+
+
+def _coverage(records: list[dict[str, Any]], index: int, offset: int) -> dict[str, Any]:
+    pending: set[str] = set()
+    for record in records[:index]:
+        item = record["item"]
+        if item.get("type") == "function_call":
+            pending.add(item["call_id"])
+        elif item.get("type") == "function_call_output":
+            pending.discard(item["call_id"])
+    same_step = index > 0 and index < len(records) and all(
+        records[index - 1][key] == records[index][key] for key in ("activation_id", "step_id")
+    )
+    partial = None if not offset else {
+        "event_id": records[index]["event_id"], "item_digest": records[index]["item_digest"],
+        "end_offset": offset, "text_digest": canonical_hash(json_dumps(_summary_material(records[index]))[:offset]),
+    }
+    return {
+        "summary": "",
+        "covered_through_event_id": records[index - 1]["event_id"] if index else None,
+        "covered_digest": canonical_hash({
+            "records": [{"event_id": item["event_id"], "item_digest": item["item_digest"]} for item in records[:index]],
+            "partial": partial,
+        }),
+        "partial_event_id": records[index]["event_id"] if offset else None,
+        "partial_offset": offset,
+        "boundary": not offset and not pending and not same_step,
+    }
+
+
+def _checkpoint_cursor(records: list[dict[str, Any]], previous: dict[str, Any] | None) -> tuple[int, int]:
+    if previous is None:
+        return 0, 0
+    checkpoint = previous["checkpoint"]
+    identities = [item["event_id"] for item in records]
+    covered = checkpoint["covered_through_event_id"]
+    index = identities.index(covered) + 1 if covered is not None else 0
+    offset = checkpoint["partial_offset"]
+    if type(offset) is not int or offset < 0:
+        raise ValueError("invalid summary coverage offset")
+    if offset and (index >= len(records) or not offset < len(json_dumps(_summary_material(records[index])))):
+        raise ValueError("summary coverage offset exceeds its source")
+    if {**checkpoint, "summary": ""} != _coverage(records, index, offset):
+        raise ValueError("summary coverage does not match this department's original history")
+    return index, offset
+
+
+def _audited_visible_history(records: list[dict[str, Any]], previous: dict[str, Any] | None) -> list[dict[str, Any]]:
+    index, offset = _checkpoint_cursor(records, previous)
+    result = []
+    if previous is not None:
+        checkpoint = previous["checkpoint"]
+        if offset or not checkpoint["boundary"]:
+            raise ValueError("work resumed inside an incomplete compressed message/tool round")
+        result.append({"role": "user", "content": "[department_memory]\n" + json_dumps({
+            "summary": checkpoint["summary"], "covered_through_event_id": checkpoint["covered_through_event_id"],
+            "covered_digest": checkpoint["covered_digest"],
+        })})
+    result.extend(record["item"] for record in records[index:])
+    return result
+
+
+def _audit_compaction_input(request: dict[str, Any], records: list[dict[str, Any]],
+                            previous: dict[str, Any] | None) -> dict[str, Any]:
+    items = request["input"]
+    if len(items) != 3 or items[1].get("role") != "developer" or items[2].get("role") != "user":
+        raise ValueError("compaction input must contain pinned context, summary instructions and source material")
+    material = json.loads(items[2]["content"])
+    prior_summary = previous["checkpoint"]["summary"] if previous else None
+    if set(material) != {"previous_summary", "source_fragments"} or material["previous_summary"] != prior_summary:
+        raise ValueError("compaction input uses an unrelated previous summary")
+    fragments = material["source_fragments"]
+    if not isinstance(fragments, list) or not fragments:
+        raise ValueError("compaction input has no source fragments")
+    index, offset = _checkpoint_cursor(records, previous)
+    source_refs = []
+    for fragment in fragments:
+        if index >= len(records):
+            raise ValueError("compaction source exceeds this department's recorded history")
+        record = records[index]
+        material_item = _summary_material(record)
+        text = json_dumps(material_item)
+        end = fragment.get("end_offset")
+        if type(end) is not int or not offset < end <= len(text):
+            raise ValueError("compaction source fragment does not advance its coverage")
+        expected = {
+            "event_id": record["event_id"], "seq": record["seq"], "activation_id": record["activation_id"],
+            "step_id": record["step_id"], "item_digest": record["item_digest"], "start_offset": offset,
+            "material_digest": canonical_hash(material_item),
+            "end_offset": end, "total_chars": len(text), "text_digest": canonical_hash(text[offset:end]),
+            "text": text[offset:end],
+        }
+        if fragment != expected:
+            raise ValueError("compaction source fragment differs from this department's original event")
+        source_refs.append({key: value for key, value in expected.items() if key != "text"})
+        offset = end
+        if offset == len(text):
+            index += 1
+            offset = 0
+    return {
+        "request": request, "source_refs": source_refs, "next_checkpoint": _coverage(records, index, offset),
+        "previous_summary_digest": canonical_hash(prior_summary) if prior_summary is not None else None,
+        "outputs": [],
+    }
+
+
+def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[str, Any],
+                             previous: dict[str, Any] | None) -> dict[str, Any]:
+    payload = event.payload
+    if payload.get("run_id") != event.run_id or payload.get("department") != event.role:
+        raise ValueError("summary is not bound to its task and department")
+    if payload.get("previous_compaction_event_id") != (previous or {}).get("event_id"):
+        raise ValueError("summary does not extend the previous department checkpoint")
+    for field in ("summary_ref", "plan_ref"):
+        if payload[field]["content_hash"] not in event.artifact_hashes:
+            raise ValueError("summary or plan artifact is not bound to its event")
+    summary = artifacts.get_for_run(event.run_id, ArtifactRef(**payload["summary_ref"])).decode("utf-8")
+    plan = _read_artifact(artifacts, event.run_id, payload["plan_ref"])
+    limit = plan["summary_token_limit"]
+    if (plan["input_items"] != audit["request"]["input"] or plan["source_refs"] != audit["source_refs"]
+            or payload["source_refs"] != audit["source_refs"] or plan["next_checkpoint"] != audit["next_checkpoint"]
+            or plan["previous_summary_digest"] != audit["previous_summary_digest"]
+            or plan["max_output_tokens"] != audit["request"]["max_output_tokens"]
+            or payload["max_output_tokens"] != plan["max_output_tokens"]
+            or type(limit) is not int or not 0 < limit <= plan["max_output_tokens"]
+            or payload["summary_token_limit"] != limit):
+        raise ValueError("recorded compaction plan differs from its audited input and coverage")
+    paragraphs = []
+    for item in audit["outputs"]:
+        if item.get("type") == "reasoning":
+            continue
+        if item.get("type") != "message" or item.get("role") != "assistant" or item.get("status") not in {None, "completed"}:
+            raise ValueError("compaction output is not a completed assistant summary")
+        for part in item.get("content") or []:
+            if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
+                raise ValueError("compaction output contains non-summary content")
+            paragraphs.append(part["text"])
+    if not summary or summary != "\n".join(paragraphs).strip() or (len(summary) + 3) // 4 > limit:
+        raise ValueError("summary artifact does not match the bounded model output")
+    expected = {**audit["next_checkpoint"], "summary": summary}
+    if payload["checkpoint"] != expected:
+        raise ValueError("summary checkpoint coverage differs from its original sources")
+    return expected
+
+
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
     from .tools import tools_for
 
     notes: list[str] = []
-    histories: dict[str, list[tuple[str, str, dict[str, Any]]]] = {}
+    histories: dict[str, list[dict[str, Any]]] = {}
     activations: dict[str, tuple[str, str, str]] = {}
     steps: dict[str, int] = {}
     digests: dict[str, str] = {}
+    purposes: dict[str, str] = {}
+    compacting: dict[tuple[str, int], dict[str, Any]] = {}
+    checkpoints: dict[str, dict[str, Any]] = {}
     attempted: set[tuple[str, int]] = set()
     intend: str | None = None
     for event in store.list_events(run_id):
@@ -192,7 +356,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             else:
                 activations[activation] = (event.role, event.session_id, event.event_id)
             continue
-        if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE,
+        if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
+                              EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
                               EventType.TOOL_CALLED, EventType.TOOL_SKIPPED}:
             continue
         if event.type == EventType.TOOL_CALLED and payload.get("name") == "provider_usage":
@@ -209,7 +374,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 item = _read_artifact(artifacts, run_id, payload["input_ref"])
                 if item.get("role") != "user":
                     raise ValueError("department input must be a work message")
-                histories.setdefault(event.role, []).append((activation, event.type, item))
+                histories.setdefault(event.role, []).append(_history_record(event, item))
             elif event.type == EventType.CONTEXT_ASSEMBLED:
                 if (payload.get("department") != event.role or payload.get("session_id") != event.session_id
                         or payload.get("run_id") != run_id):
@@ -226,7 +391,17 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if digest != payload.get("digest") or digest != event.context_digest:
                     raise ValueError("actual model input digest mismatch")
                 digests[activation] = digest
-                if set(request) != {"input", "tools"}:
+                purpose = payload.get("purpose")
+                if purpose not in {"work", "compaction"}:
+                    raise ValueError("unknown model request purpose")
+                purposes[activation] = purpose
+                allowed = {"input", "tools"}
+                limit = payload.get("max_output_tokens")
+                if limit is not None:
+                    allowed.add("max_output_tokens")
+                    if type(limit) is not int or limit <= 0 or request.get("max_output_tokens") != limit:
+                        raise ValueError("model output limit does not match its manifest")
+                if set(request) != allowed:
                     raise ValueError("unexpected model input fields")
                 items, schemas = request["input"], request["tools"]
                 if not isinstance(items, list) or not items or items[0].get("role") != "developer":
@@ -235,35 +410,54 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if (intend is None or not isinstance(instructions, str)
                         or not instructions.startswith(f"[intend]\n{intend}\n\n[current_work]\n")):
                     raise ValueError("model input does not start with the verbatim task followed by current work")
-                history = [item for source_activation, kind, item in histories.get(event.role, [])
-                           if not (source_activation == activation and kind == EventType.DEPARTMENT_INPUT)]
-                if items[1:] != history:
-                    raise ValueError("input history differs from this department's recorded outputs")
-                names = [item.get("name") for item in schemas]
-                if len(names) != len(set(names)) or set(names) != set(tools_for(event.role)):
-                    raise ValueError("actual tool schemas do not match the department's tools")
+                previous = checkpoints.get(event.role)
+                if payload.get("compaction_event_id") != (previous or {}).get("event_id"):
+                    raise ValueError("model request uses an unrelated compaction checkpoint")
+                records = histories.get(event.role, [])
+                if purpose == "compaction":
+                    if schemas or limit is None:
+                        raise ValueError("compaction must have no tools and an explicit output limit")
+                    compacting[(activation, step)] = _audit_compaction_input(request, records, previous)
+                else:
+                    if items[1:] != _audited_visible_history(records, previous):
+                        raise ValueError("input history differs from this department's recorded outputs")
+                    names = [item.get("name") for item in schemas]
+                    if len(names) != len(set(names)) or set(names) != set(tools_for(event.role)):
+                        raise ValueError("actual tool schemas do not match the department's tools")
             elif event.type == EventType.MODEL_REQUESTED:
                 key = (activation, payload.get("step_id"))
                 if (activation not in steps or key[1] != steps[activation]
                         or event.context_digest != digests[activation] or key in attempted
-                        or payload.get("attempted") is not True):
+                        or payload.get("attempted") is not True or payload.get("purpose") != purposes[activation]):
                     raise ValueError("model request attempt does not match a unique prepared input")
                 attempted.add(key)
+            elif event.type == EventType.COMPACTION_RECORDED:
+                key = (activation, payload.get("step_id"))
+                if (key not in attempted or key not in compacting or payload.get("purpose") != "compaction"
+                        or event.context_digest != digests[activation]):
+                    raise ValueError("compaction checkpoint does not match its model request")
+                checkpoint = _audit_compaction_output(event, artifacts, compacting.pop(key), checkpoints.get(event.role))
+                checkpoints[event.role] = {"event_id": event.event_id, "checkpoint": checkpoint}
             else:
                 if (activation not in steps or payload.get("step_id") != steps[activation]
-                        or (activation, steps[activation]) not in attempted):
+                        or (activation, steps[activation]) not in attempted or payload.get("purpose") != purposes[activation]):
                     raise ValueError("model/tool output is not bound to its model step")
                 if event.type == EventType.MODEL_MESSAGE:
                     item = _read_artifact(artifacts, run_id, payload["message_ref"])
+                    if purposes[activation] == "compaction":
+                        compacting[(activation, steps[activation])]["outputs"].append(item)
+                        continue
                 else:
+                    if purposes[activation] == "compaction":
+                        raise ValueError("compaction request executed a tool")
                     item = payload["input_item"]
                     if item.get("type") != "function_call_output" or item.get("call_id") != payload.get("id"):
                         raise ValueError("tool input item does not match its call")
                     output = _read_artifact(artifacts, run_id, payload["output_ref"]) if payload.get("output_ref") else None
                     if json.loads(item["output"]) != {"ok": payload.get("ok"), "output": output, "error": payload.get("error")}:
                         raise ValueError("tool input item does not match its recorded result")
-                histories.setdefault(event.role, []).append((activation, event.type, item))
-        except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
+                histories.setdefault(event.role, []).append(_history_record(event, item))
+        except (AttributeError, IndexError, KeyError, TypeError, ValueError, OSError) as exc:
             notes.append(f"event {event.seq}: {exc}")
     if not attempted:
         notes.append("no model request attempts recorded")
@@ -272,6 +466,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         "request_count": len(attempted),
         "prepared_count": sum(steps.values()),
         "activation_count": len(steps),
+        "compaction_count": sum(event.type == EventType.COMPACTION_RECORDED for event in store.list_events(run_id)),
         "notes": notes,
     }
 
@@ -294,9 +489,10 @@ def _manifest_boundary(store: EventStore, run_id: str) -> tuple[bool, list[str]]
             if required not in excluded:
                 ok = False
                 notes.append(f"{department}: missing exclusion {required}")
-        if "proposal_contract" not in injected:
+        required_source = "pinned_work" if event.payload.get("purpose") == "compaction" else "proposal_contract"
+        if required_source not in injected:
             ok = False
-            notes.append(f"{department}: proposal_contract was not injected")
+            notes.append(f"{department}: {required_source} was not injected")
     if seen == 0:
         return False, ["no context_assembled events; manifest boundary not verified"]
     if ok:

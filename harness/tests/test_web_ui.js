@@ -99,6 +99,7 @@ function makeDocument() {
     "evidence-body",
     "context-body",
     "event-json",
+    "event-sources",
     "event-dialog",
     "task-form",
     "task",
@@ -673,6 +674,36 @@ test("context input links remain available outside the recent events window", as
   await button.click();
   assert.equal(document.getElementById("event-dialog")._shown, true);
   assert.match(document.getElementById("event-json").textContent, /early input/);
+});
+
+test("compaction stays visible with source links outside recent events", async () => {
+  const { web, document } = loadApp(async (url) => {
+    if (url.endsWith("/summary-event")) return jsonResponse({
+      compaction_summary: "Department summary <checked>",
+      source_events: [{ seq: 3, event_id: "original-message", type: "model_message" }],
+    });
+    assert.equal(url, "/api/runs/run-a/events/original-message");
+    return jsonResponse({ message: { role: "assistant", content: "original uncompressed content" } });
+  });
+  web.state.runId = "run-a";
+  web.state.gen = 2;
+  web.renderContext({
+    manifests: [{ department: "engineering", step_id: 8, purpose: "compaction", source_event_id: "request-event",
+      request_ref: {}, compaction_event_id: "summary-event" }],
+    compactions: [{ department: "engineering", step_id: 8, source_event_id: "summary-event" }],
+  }, [{ event_id: "latest-event", seq: 99, type: "tool_called" }], 2);
+  const html = document.getElementById("context-body").innerHTML;
+  assert.match(html, /第 8 步 · 压缩/);
+  assert.match(html, /查看摘要与原始记录/);
+  assert.match(html, /data-event-id="summary-event"/);
+  await web.openEvent("summary-event", 2);
+  assert.match(document.getElementById("event-json").textContent, /Department summary <checked>/);
+  const sources = document.getElementById("event-sources");
+  assert.equal(sources.children.length, 1);
+  assert.equal(sources.children[0].textContent, "3. model_message");
+  await sources.children[0].click();
+  assert.match(document.getElementById("event-json").textContent, /original uncompressed content/);
+  assert.equal(sources.children.length, 0);
 });
 
 test("tiny positive cost is not rounded to zero", () => {

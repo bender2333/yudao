@@ -52,6 +52,8 @@ class ModelRequest:
     tools: list[dict[str, Any]]
     abort_flag: Event
     on_observation: Callable[[ModelObservation], None] | None = None
+    purpose: str = "work"
+    max_output_tokens: int | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:

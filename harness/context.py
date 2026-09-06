@@ -140,18 +140,11 @@ class AssembledContext:
 
 class ContextAssembler:
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
-                 step_id: int = 1, history: list[dict[str, Any]] | None = None) -> AssembledContext:
+                 step_id: int = 1, history: list[dict[str, Any]] | None = None,
+                 compaction_event_id: str | None = None) -> AssembledContext:
         parts: list[ContextPart] = [
             ContextPart("intend", None, projection.task),
-            ContextPart("current_work", projection.phase, json_dumps({
-                "department": department,
-                "phase": projection.phase,
-                "work": {"product": "形成和维护当前产品要求，处理待决问题",
-                         "engineering": "依据当前产品要求实现、检查并提交交付",
-                         "quality": "独立验证当前交付，决定放行或返工"}[department],
-                "current_goal": projection.product_spec.goal if projection.product_spec else None,
-                "precedence": "本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。",
-            })),
+            ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
             ContextPart("department_rules", department, DEPARTMENT_RULES[department]),
             ContextPart("proposal_contract", department, json_dumps(PROPOSAL_CONTRACTS[department])),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
@@ -295,9 +288,46 @@ class ContextAssembler:
             digest=digest,
             truncated=False,
             step_id=step_id,
+            compaction_event_id=compaction_event_id,
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
+
+    def assemble_compaction(self, pinned: AssembledContext, *, input_items: list[dict[str, Any]],
+                            source_refs: list[dict[str, Any]], max_output_tokens: int,
+                            compaction_event_id: str | None) -> AssembledContext:
+        parts = [ContextPart("pinned_work", pinned.department, pinned.prompt_text),
+                 ContextPart("compaction_request", compaction_event_id, json_dumps(input_items)),
+                 ContextPart("compaction_sources", pinned.department, json_dumps(source_refs))]
+        request = {"input": input_items, "tools": [], "max_output_tokens": max_output_tokens}
+        manifest = ContextManifest(
+            session_id=pinned.manifest.session_id, department=pinned.department,
+            activation_id=pinned.manifest.activation_id, step_id=pinned.manifest.step_id,
+            injected=[ContextSource(part.source, part.version, estimate_tokens(part.text), canonical_hash(part.text)) for part in parts],
+            excluded=pinned.manifest.excluded, token_estimate=estimate_tokens(json_dumps(request)),
+            budget=pinned.manifest.budget, digest=canonical_hash(request), purpose="compaction",
+            max_output_tokens=max_output_tokens, compaction_event_id=compaction_event_id,
+        )
+        return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
+
+
+def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
+    work = {
+        "product": "形成并提交当前产品要求。",
+        "engineering": "依据当前产品要求实现、运行检查并提交交付。",
+        "quality": "独立验证当前交付，提交放行或返工决定。",
+    }[department]
+    if department == "product" and projection.pending_ask is not None:
+        work = f"当前收到问题 {projection.pending_ask.id}，请回答该问题并使用 submit_reaction 提交决定；此前提交产品要求的工作已经结束。"
+    elif department == "product" and projection.phase == "REWORK_PRODUCT":
+        work = "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。"
+    elif department == "engineering" and projection.effective_decisions:
+        work = "产品回复已经到达。依据 current_product_decisions 中的有效决定继续实现、运行检查并提交交付；已回答的问题无需再次等待回复。"
+    return {
+        "department": department, "phase": projection.phase, "work": work,
+        "current_goal": projection.product_spec.goal if projection.product_spec else None,
+        "precedence": "本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。",
+    }
 
 
 def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:

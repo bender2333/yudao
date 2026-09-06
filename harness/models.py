@@ -49,6 +49,7 @@ FAILED_REASONS = frozenset(
         "provider_unavailable",
         "cancelled",
         "context_overflow",
+        "compaction_failed",
     }
 )
 
@@ -66,6 +67,7 @@ class EventType:
     CONTEXT_ASSEMBLED = "context_assembled"
     MODEL_MESSAGE = "model_message"
     MODEL_REQUESTED = "model_requested"
+    COMPACTION_RECORDED = "compaction_recorded"
     TOOL_CALLED = "tool_called"
     TOOL_STARTED = "tool_started"
     TOOL_SKIPPED = "tool_skipped"
@@ -305,6 +307,9 @@ class ContextManifest:
     request_ref: dict[str, Any] | None = None
     admitted: bool = False
     source_event_id: str | None = None
+    purpose: str = "work"
+    max_output_tokens: int | None = None
+    compaction_event_id: str | None = None
 
 
 @dataclass
@@ -419,6 +424,7 @@ class RunProjection:
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)
     effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)
+    compactions: list[dict[str, Any]] = field(default_factory=list)
     transitions: list[str] = field(default_factory=list)
     rejections: list[dict[str, Any]] = field(default_factory=list)
     pending_feedback: dict[str, dict[str, Any]] = field(default_factory=dict)

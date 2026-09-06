@@ -30,6 +30,7 @@ def run_department(
     record_skipped_tool: Callable[[dict[str, Any]], None],
     begin_tool: Callable[[dict[str, Any]], bool],
     begin_request: Callable[[ModelRequest], bool],
+    finish_compaction: Callable[[ModelResponse], None],
     stopped: Callable[[], bool],
 ) -> DepartmentSubmission | None:
     for step_id in range(1, MAX_MODEL_STEPS + 1):
@@ -46,6 +47,9 @@ def run_department(
             reason = {"aborted": "cancelled", "overflow": "context_overflow",
                       "unavailable": "provider_unavailable"}.get(response.finish_reason, "provider_error")
             raise ProviderError(response.error or f"model response {response.finish_reason}", reason=reason)
+        if request.purpose == "compaction":
+            finish_compaction(response)
+            continue
         call_ids = [item.get("call_id") for item in response.output if item.get("type") == "function_call"]
         if any(not isinstance(identity, str) or not identity for identity in call_ids):
             raise ProviderError("model tool call has no valid call_id")

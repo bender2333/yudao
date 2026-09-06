@@ -95,6 +95,10 @@ def apply_event(state: RunProjection, event: Event) -> None:
             state.model = event.model
         return
 
+    if etype == EventType.COMPACTION_RECORDED:
+        state.compactions.append({**payload, "source_event_id": event.event_id, "department": event.role})
+        return
+
     if etype == EventType.MODEL_REQUESTED:
         return
 
@@ -265,6 +269,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
 def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextManifest:
     return ContextManifest(
         source_event_id=event_id,
+        purpose=payload["purpose"],
+        max_output_tokens=payload["max_output_tokens"],
+        compaction_event_id=payload["compaction_event_id"],
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],

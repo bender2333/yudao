@@ -138,12 +138,14 @@ class ResponsesAdapter:
             timeout=self.config.timeout_sec,
             max_retries=0,
         ) as client:
+            output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
             stream = await client.responses.create(
                 model=self.config.model,
                 input=request.input_items,
                 tools=request.tools,
                 store=False,
                 stream=True,
+                **output_limit,
             )
             async with stream:
                 async for event in stream:

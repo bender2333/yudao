@@ -396,6 +396,23 @@ def test_model_input_detail_rejects_invalid_or_cross_run_artifact(data_dir, monk
         assert "model_input" not in json.loads(body)
 
 
+def test_compaction_details_link_to_complete_original_tool_output(tmp_path):
+    from harness.tests.test_compaction_engine import _runner
+
+    system, _, run_id, _ = _runner(tmp_path)
+    projection = system.activate_once(run_id)
+    compaction = projection.compactions[-1]
+    with running_server(system) as (_server, host, port):
+        payload = get_json(host, port, f"/api/runs/{run_id}")
+        assert payload["context"]["compactions"][-1]["source_event_id"] == compaction["source_event_id"]
+        detail = get_json(host, port, f"/api/runs/{run_id}/events/{compaction['source_event_id']}")
+        assert detail["compaction_summary"] == compaction["checkpoint"]["summary"]
+        source = next(item for item in detail["source_events"] if item["type"] == "tool_called")
+        original = get_json(host, port, f"/api/runs/{run_id}/events/{source['event_id']}")
+        assert original["output"].count("FIRST_TOOL_ORIGINAL") == 2200
+        assert original["role"] == detail["role"]
+
+
 def test_serve_cli_defaults_to_responses_and_accepts_fake(monkeypatch, tmp_path):
     seen = {}
 

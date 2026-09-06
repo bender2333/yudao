@@ -233,6 +233,34 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 detail["model_input"] = json.loads(
                     self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**request_ref))
                 )
+            for key in ("input_ref", "message_ref", "output_ref"):
+                ref = event.payload.get(key)
+                if ref:
+                    detail[key.removesuffix("_ref")] = json.loads(
+                        self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**ref))
+                    )
+            if event.payload.get("summary_ref"):
+                detail["compaction_summary"] = self.server.system.artifacts.get_for_run(
+                    run_id, ArtifactRef(**event.payload["summary_ref"])
+                ).decode("utf-8")
+                sources = []
+                seen = set()
+                for ref in event.payload["source_refs"]:
+                    source = store.get_event(ref["event_id"])
+                    if (source is None or source.run_id != run_id or source.role != event.role
+                            or source.seq != ref["seq"] or source.payload.get("activation_id") != ref["activation_id"]
+                            or source.payload.get("step_id") != ref["step_id"]):
+                        raise ValueError("compaction source does not match its department history")
+                    if source.event_id not in seen:
+                        sources.append(event_card(source))
+                        seen.add(source.event_id)
+                prior = event.payload.get("previous_compaction_event_id")
+                if prior:
+                    source = store.get_event(prior)
+                    if source is None or source.run_id != run_id or source.role != event.role or source.type != "compaction_recorded":
+                        raise ValueError("previous compaction does not match its department")
+                    sources.insert(0, event_card(source))
+                detail["source_events"] = sources
             return self._send_json(detail)
         if rest == ["stream"]:
             project_run(store, run_id)

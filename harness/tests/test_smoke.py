@@ -169,6 +169,83 @@ def test_audit_preserves_department_history_when_ask_returns_to_product(data_dir
     assert fields["model_input_audit"]["activation_count"] == 5
 
 
+def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir, monkeypatch):
+    system, projection = run_scripted(data_dir, [
+        product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
+        delivery_turn(), review_turn("release", "host checks passed"),
+    ])
+    events = _events_for_mutation(system, projection.run_id, monkeypatch)
+    assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.role == "product"][1]
+    request = json.loads(system.artifacts.get_text(assembled.payload["request_ref"]["content_hash"]))
+    assert request["input"][-1]["role"] == "user"
+    request["input"].pop()
+    ref = system.artifacts.put(projection.run_id, "model_request", json_dumps(request), media_type="application/json")
+    assembled.payload["request_ref"] = asdict(ref)
+    assembled.payload["digest"] = canonical_hash(request)
+    assembled.context_digest = canonical_hash(request)
+    assembled.artifact_hashes = [ref.content_hash]
+    attempted = next(event for event in events if event.type == EventType.MODEL_REQUESTED
+                     and event.payload["activation_id"] == assembled.payload["activation_id"]
+                     and event.payload["step_id"] == assembled.payload["step_id"])
+    attempted.context_digest = canonical_hash(request)
+    fields = isolation_fields(system.store, system.artifacts, projection.run_id)
+    assert fields["context_isolated"] is False
+    assert any("department's recorded outputs" in note for note in fields["model_input_audit"]["notes"])
+
+
+@pytest.fixture
+def compacted_run(tmp_path):
+    from harness.tests.test_compaction_engine import _runner
+
+    system, _, run_id, _ = _runner(tmp_path)
+    result = system.activate_once(run_id)
+    assert result.phase == "ENGINEERING"
+    assert len(result.compactions) > 1
+    return system, run_id
+
+
+def test_compaction_audit_checks_partial_sources_and_resumed_input(compacted_run):
+    system, run_id = compacted_run
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
+    assert fields["model_input_audit"]["compaction_count"] > 1
+
+
+@pytest.mark.parametrize("mutation,expected", [
+    ("source_ref", "recorded compaction plan"), ("coverage", "checkpoint coverage"),
+    ("summary", "bounded model output"), ("work_input", "department's recorded outputs"),
+])
+def test_compaction_audit_rejects_invented_sources_summary_or_visible_history(compacted_run, monkeypatch, mutation, expected):
+    system, run_id = compacted_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    compacted = next(event for event in events if event.type == EventType.COMPACTION_RECORDED)
+    if mutation == "source_ref":
+        compacted.payload["source_refs"][0]["event_id"] = "another-department-event"
+    elif mutation == "coverage":
+        compacted.payload["checkpoint"]["covered_digest"] = canonical_hash("unrelated history")
+    elif mutation == "summary":
+        ref = system.artifacts.put(run_id, "department_summary", "An invented summary", media_type="text/plain")
+        compacted.payload["summary_ref"] = asdict(ref)
+        compacted.artifact_hashes.append(ref.content_hash)
+    else:
+        assembled = next(event for event in reversed(events)
+                         if event.type == EventType.CONTEXT_ASSEMBLED and event.payload["purpose"] == "work")
+        request = json.loads(system.artifacts.get_text(assembled.payload["request_ref"]["content_hash"]))
+        request["input"][1]["content"] = "Another department's unrelated summary"
+        ref = system.artifacts.put(run_id, "model_request", json_dumps(request), media_type="application/json")
+        assembled.payload["request_ref"] = asdict(ref)
+        assembled.payload["digest"] = canonical_hash(request)
+        assembled.context_digest = canonical_hash(request)
+        assembled.artifact_hashes = [ref.content_hash]
+        attempted = next(event for event in events if event.type == EventType.MODEL_REQUESTED
+                         and event.payload["activation_id"] == assembled.payload["activation_id"]
+                         and event.payload["step_id"] == assembled.payload["step_id"])
+        attempted.context_digest = canonical_hash(request)
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert any(expected in note for note in fields["model_input_audit"]["notes"])
+
+
 def test_unmatched_host_receipt_does_not_pass(native_run, monkeypatch):
     system, run_id = native_run
     events = _events_for_mutation(system, run_id, monkeypatch)

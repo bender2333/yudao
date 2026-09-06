@@ -103,6 +103,7 @@ def evidence_view(projection: RunProjection) -> dict[str, Any]:
 def context_view(projection: RunProjection) -> dict[str, Any]:
     return {
         "manifests": _plain(projection.manifests),
+        "compactions": _plain(projection.compactions),
         "sessions": _plain(projection.sessions),
         "stop_reason": projection.stop_reason,
         "human_action": projection.human_action,

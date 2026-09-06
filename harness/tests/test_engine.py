@@ -51,14 +51,15 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
     assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1]
-    assert adapter.invocations[1].input_items[1:3] == [reasoning, lookup]
-    tool_input = adapter.invocations[1].input_items[3]
+    assert adapter.invocations[1].input_items[2:4] == [reasoning, lookup]
+    tool_input = adapter.invocations[1].input_items[4]
     assert tool_input["call_id"] == "read-1"
     assert json.loads(tool_input["output"])["output"] == "CAUSAL_TOOL_OUTPUT"
     for request in adapter.invocations[2:]:
         assert "PRIVATE_CHAIN" not in json_dumps(request.input_items)
         assert "CAUSAL_TOOL_OUTPUT" not in json_dumps(request.input_items)
-        assert len(request.input_items) == 1
+        assert len(request.input_items) == 2
+        assert request.input_items[-1]["role"] == "user"
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "after-submit" for event in events)
     contexts = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED]
@@ -73,20 +74,23 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_next_request_checks_full_causal_input_before_calling_model(tmp_path):
+def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
     adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
                                          usage=Usage(total_tokens=100)), product_spec()])
     system = LoopSystem(tmp_path, adapter)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("proof.txt", "x" * 40000)
     result = system.activate_once(run_id)
-    assert len(adapter.invocations) == 1
-    assert result.stop_reason == "context_overflow"
+    assert len(adapter.invocations) == 2
+    assert adapter.invocations[1].purpose == "compaction"
+    assert adapter.invocations[1].tools == []
+    assert result.stop_reason == "compaction_failed"
     assert result.token_used == 100
     assert len(result.manifests) == 2
-    assert not result.manifests[-1].admitted
+    assert result.manifests[-1].admitted
     events = system.store.list_events(run_id)
-    assert sum(event.type == EventType.MODEL_REQUESTED for event in events) == 1
+    assert sum(event.type == EventType.MODEL_REQUESTED for event in events) == 2
+    assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
     tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     assert tool.payload["input_item"]["call_id"] == "read-1"
     assert tool.payload["output_ref"]
@@ -217,6 +221,10 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     assert "current_work" in history[0]["content"]
     assert private in history
     assert "ENGINEERING_PRIVATE" not in json_dumps(history)
+    assert history[-1]["role"] == "user"
+    assert "[pending_ask]" in history[-1]["content"]
+    assert "submit_reaction" in history[-1]["content"]
+    assert history[-2]["type"] == "function_call_output"
     assert any(item.get("call_id") == "submit" and item["type"] == "function_call_output" for item in history)
     skipped_result = next(item for item in history if item.get("call_id") == "skip-read" and item["type"] == "function_call_output")
     assert json.loads(skipped_result["output"])["ok"] is False
@@ -227,6 +235,10 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     engineering = adapter.invocations[3]
     assert "ENGINEERING_PRIVATE" in json_dumps(engineering.input_items)
     assert "PRODUCT_PRIVATE" not in json_dumps(engineering.input_items)
+    assert engineering.input_items[-1]["role"] == "user"
+    assert "[current_product_decisions]" in engineering.input_items[-1]["content"]
+    assert "产品回复已经到达" in engineering.input_items[-1]["content"]
+    assert engineering.input_items[-2]["type"] == "function_call_output"
     events = reloaded.store.list_events(run_id)
     assert any(event.type == EventType.TOOL_SKIPPED and event.payload["id"] == "skip-read" for event in events)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "skip-read" for event in events)
