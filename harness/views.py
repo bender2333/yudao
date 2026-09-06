@@ -96,6 +96,7 @@ def evidence_view(projection: RunProjection) -> dict[str, Any]:
         "reviews": [_plain(item) for item in projection.reviews],
         "evidence": _plain(projection.evidence),
         "rejections": _plain(projection.rejections),
+        "lesson_candidates": _plain(projection.lesson_candidates),
     }
 
 
@@ -147,6 +148,5 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
             "cycles": projection.cycle_count,
         },
     }
-
 
 

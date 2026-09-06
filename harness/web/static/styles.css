@@ -180,6 +180,11 @@ main { padding: 0 16px; display: flex; flex-direction: column; min-width: 0; }
 .hash, .path { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; word-break: break-word; }
 .event { cursor: pointer; }
 .event:hover { color: var(--run); }
+.lesson-heading { margin: 16px 0 4px; font-size: 13px; color: var(--muted); }
+.lesson-candidate { overflow-wrap: anywhere; }
+.lesson-candidate ul { padding-left: 20px; }
+.event-link { border: 0; background: transparent; padding: 4px 0; color: var(--run); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.event-link:hover { color: var(--ink); }
 dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); max-width: min(720px, 90vw); width: 90vw; }
 dialog pre {
   max-height: 60vh;

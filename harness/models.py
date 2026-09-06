@@ -73,6 +73,7 @@ class EventType:
     REACT_SUBMITTED = "react_submitted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
+    LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
     TRANSITION = "transition"
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
@@ -256,6 +257,22 @@ class QAReview:
 
 
 @dataclass(frozen=True)
+class LessonCandidate:
+    id: str
+    run_id: str
+    created_event_id: str
+    source_event_id: str
+    source_type: str
+    observation: dict[str, Any]
+    suggestion: str
+    product_spec_hash: str | None
+    delivery_spec_hash: str | None
+    checks: list[dict[str, Any]]
+    evidence_refs: list[ArtifactRef]
+    status: str
+
+
+@dataclass(frozen=True)
 class ContextSource:
     source: str
     version: str | None
@@ -388,6 +405,7 @@ class RunProjection:
     asks: list[AskRequest] = field(default_factory=list)
     reactions: list[ProductReaction] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    lesson_candidates: list[LessonCandidate] = field(default_factory=list)
     effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)
     transitions: list[str] = field(default_factory=list)

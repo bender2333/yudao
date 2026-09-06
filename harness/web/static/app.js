@@ -311,7 +311,7 @@ async function refreshRun(runId, gen) {
   if (!stillCurrent(runId, gen, seq)) return null;
   renderBoard(data.board, data.aggregates, data.timeline, data.events);
   renderTimeline(data.timeline);
-  renderEvidence(data.evidence);
+  renderEvidence(data.evidence, gen);
   renderContext(data.context, data.events, gen);
   await loadRuns(runId, gen, seq);
   if (!stillCurrent(runId, gen, seq)) return null;
@@ -475,7 +475,7 @@ function renderTimeline(timeline) {
   `;
 }
 
-function renderEvidence(evidence) {
+function renderEvidence(evidence, gen = state.gen) {
   const node = document.getElementById("evidence-body");
   if (!node) return;
   const deliveries = (evidence.deliveries || [])
@@ -508,10 +508,34 @@ function renderEvidence(evidence) {
     </article>`,
     )
     .join("");
+  const candidates = (evidence.lesson_candidates || [])
+    .map((item) => {
+      const observation = item.observation;
+      const isReview = Boolean(observation.verdict);
+      const defects = (observation.defects || [])
+        .map((defect) => `<li>${t(defect.severity)} · ${t(defect.summary)}</li>`)
+        .join("");
+      return `
+    <article class="item lesson-candidate">
+      <header><span>候选 ${t(item.id)}</span><span>待验证</span></header>
+      <p><strong>${isReview ? "质检记录" : "失败记录"}</strong> · ${t(isReview ? observation.verdict : observation.stop_reason)}</p>
+      <p>${t(isReview ? observation.rationale : observation.message)}</p>
+      ${defects ? `<ul>${defects}</ul>` : ""}
+      <p><strong>待验证建议</strong>：${t(item.suggestion)}</p>
+      <div class="actions">
+        <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看候选</button>
+        <button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看来源</button>
+      </div>
+    </article>`;
+    })
+    .join("");
   node.innerHTML =
-    deliveries || reviews || rejections
-      ? `<div class="list">${deliveries}${reviews}${rejections}</div>`
+    deliveries || reviews || rejections || candidates
+      ? `<div class="list">${deliveries}${reviews}${rejections}</div>${candidates ? `<h3 class="lesson-heading">经验候选</h3><div class="list">${candidates}</div>` : ""}`
       : `<p class="muted">尚无交付或质检证据。</p>`;
+  node.querySelectorAll(".event-link").forEach((button) => {
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
+  });
 }
 
 function renderContext(context, events, gen) {
@@ -557,8 +581,9 @@ function renderContext(context, events, gen) {
 async function openEvent(eventId, gen) {
   const runId = state.runId;
   const token = gen === undefined ? state.gen : gen;
+  if (token !== state.gen || !runId) return;
   try {
-    const data = await fetchJSON(`/api/runs/${runId}/events/${eventId}`);
+    const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
     if (token !== state.gen || state.runId !== runId) return;
     document.getElementById("event-json").textContent = JSON.stringify(data, null, 2);
     document.getElementById("event-dialog").showModal();
@@ -723,6 +748,9 @@ globalThis.harnessWeb = {
   applyProviderAlert,
   renderBoard,
   renderCycle,
+  renderEvidence,
+  renderContext,
+  openEvent,
   formatCost,
   latestEventModel,
   openCompose,

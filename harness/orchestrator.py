@@ -13,6 +13,7 @@ from .artifacts import ArtifactStore
 from .context import ContextAssembler
 from .event_store import EventStore
 from .models import (
+    Event as RunEvent,
     EventType,
     HUMAN_ACTIONS,
     TERMINAL_PHASES,
@@ -639,7 +640,7 @@ class Orchestrator:
             artifact["id"] = new_id("qa")
             evidence = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
             artifact["evidence_refs"] = [evidence.__dict__]
-            self.store.append(
+            source_event = self.store.append(
                 run_id,
                 EventType.QA_SUBMITTED,
                 role=department,
@@ -652,6 +653,8 @@ class Orchestrator:
                 artifact_hashes=[artifact["content_hash"], evidence.content_hash],
                 payload=artifact,
             )
+            if artifact["verdict"] in {"rework_product", "rework_engineering"}:
+                self._record_lesson_candidate(source_event, projection)
         else:
             raise RuntimeError(f"unhandled artifact kind {kind}")
 
@@ -681,6 +684,40 @@ class Orchestrator:
                     payload={"stop_reason": "released"},
                 )
                 self.sessions.close_run(run_id)
+
+    def _record_lesson_candidate(self, source: RunEvent, projection: RunProjection) -> None:
+        if source.type == EventType.QA_SUBMITTED:
+            observed = source.payload
+            observation = {key: observed[key] for key in ("verdict", "rationale", "defects")}
+            suggestion = "根据本次质检记录，补充能复现所述问题的检查，验证修复是否满足原验收条件。"
+            spec_hash = observed["product_spec_hash"]
+            delivery_hash = observed["delivery_spec_hash"]
+            checks = observed["checks"]
+            refs = observed["evidence_refs"]
+        else:
+            observation = {"stop_reason": source.stop_reason, "message": source.error}
+            suggestion = "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+            spec = projection.product_spec
+            delivery = projection.delivery_spec
+            if delivery is not None and delivery.status != "active":
+                delivery = None
+            spec_hash = spec.content_hash if spec is not None else None
+            delivery_hash = delivery.content_hash if delivery is not None else None
+            checks = delivery.checks if delivery is not None else []
+            refs = [asdict(ref) for ref in delivery.file_refs] if delivery is not None else []
+        self.store.append(
+            source.run_id, EventType.LESSON_CANDIDATE_RECORDED,
+            role=source.role, parent_event_id=source.event_id,
+            state_before=source.state_after, state_after=source.state_after,
+            session_id=source.session_id,
+            payload={
+                "kind": "lesson_candidate", "id": new_id("lesson"), "status": "unverified",
+                "source_event_id": source.event_id, "source_type": source.type,
+                "observation": observation, "suggestion": suggestion,
+                "product_spec_hash": spec_hash, "delivery_spec_hash": delivery_hash,
+                "checks": checks, "evidence_refs": refs,
+            },
+        )
 
     def _record_host_launch(
         self,
@@ -748,9 +785,11 @@ class Orchestrator:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return
-            self.store.append(
+            source_event = self.store.append(
                 run_id, EventType.RUN_FAILED, role=projection.active_department,
                 state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
                 payload={"stop_reason": reason, "human_action": human, "message": message},
             )
             self.sessions.close_run(run_id)
+            if reason != "cancelled":
+                self._record_lesson_candidate(source_event, projection)

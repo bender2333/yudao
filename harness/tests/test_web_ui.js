@@ -46,6 +46,9 @@ function makeEl(id) {
     addEventListener(type, fn) {
       (listeners[type] ||= []).push(fn);
     },
+    async click() {
+      await Promise.all((listeners.click || []).map((fn) => fn()));
+    },
     replaceChildren() {
       this.children = [];
       this.innerHTML = "";
@@ -60,7 +63,9 @@ function makeEl(id) {
     querySelectorAll() {
       return [];
     },
-    showModal() {},
+    showModal() {
+      el._shown = true;
+    },
     focus() {
       el._focused = true;
       if (el.ownerDocument) el.ownerDocument.activeElement = el;
@@ -158,7 +163,7 @@ function runPayload(runId, extra = {}) {
     },
     aggregates: { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 },
     timeline: { specs: [], asks: [], reactions: [], transitions: [] },
-    evidence: { deliveries: [], reviews: [], rejections: [] },
+    evidence: { deliveries: [], reviews: [], rejections: [], lesson_candidates: [] },
     context: { manifests: [] },
     events: extra.events || [],
     execution_error: extra.execution_error || null,
@@ -415,6 +420,154 @@ function sampleBoard(extra = {}) {
 }
 
 const emptyAgg = { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 };
+
+function sampleLesson(extra = {}) {
+  return {
+    id: "lesson-old",
+    run_id: "run-a",
+    created_event_id: "lesson-event-old",
+    source_event_id: "qa-event-old",
+    source_type: "qa_review",
+    observation: {
+      verdict: "rework_engineering",
+      rationale: "The edge case needs another check.",
+      defects: [{ severity: "major", summary: "Missing empty input case." }],
+    },
+    suggestion: "Check empty input in the next review.",
+    product_spec_hash: "product-hash",
+    delivery_spec_hash: "delivery-hash",
+    checks: [{ name: "smoke", exit_code: 1 }],
+    evidence_refs: [],
+    status: "unverified",
+    ...extra,
+  };
+}
+
+function lessonButtons(document, candidate) {
+  const buttons = [candidate.created_event_id, candidate.source_event_id].map((id) => {
+    const button = makeEl(id);
+    button.dataset.eventId = id;
+    return button;
+  });
+  document.getElementById("evidence-body").querySelectorAll = (selector) => {
+    assert.equal(selector, ".event-link");
+    return buttons;
+  };
+  return buttons;
+}
+
+test("lesson candidates distinguish QA records from unverified suggestions and escape content", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  const injected = '<img src=x onerror="alert(1)">';
+  web.renderEvidence({
+    lesson_candidates: [sampleLesson({
+      id: injected,
+      created_event_id: injected,
+      source_event_id: injected,
+      observation: { verdict: injected, rationale: injected, defects: [{ severity: injected, summary: injected }] },
+      suggestion: injected,
+    })],
+  });
+  const html = document.getElementById("evidence-body").innerHTML;
+  assert.match(html, /经验候选/);
+  assert.match(html, /质检记录/);
+  assert.match(html, /待验证建议/);
+  assert.match(html, /查看候选/);
+  assert.match(html, /查看来源/);
+  assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /已确认|根因|尚无交付/);
+});
+
+test("failure candidates show recorded reason and message", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  web.renderEvidence({ lesson_candidates: [sampleLesson({
+    source_type: "run_failed",
+    observation: { stop_reason: "provider_error", message: "Provider returned <invalid> data." },
+  })] });
+  const html = document.getElementById("evidence-body").innerHTML;
+  assert.match(html, /失败记录/);
+  assert.match(html, /provider_error/);
+  assert.match(html, /Provider returned &lt;invalid&gt; data\./);
+  assert.match(html, /待验证建议/);
+  assert.doesNotMatch(html, /质检记录/);
+});
+
+test("all candidates remain visible when their source is older than the recent event list", async () => {
+  const calls = [];
+  const { web, document } = loadApp(async (url) => {
+    calls.push(url);
+    return jsonResponse({ event_id: url.split("/").at(-1) });
+  });
+  web.state.runId = "run-a";
+  web.state.gen = 1;
+  const old = sampleLesson();
+  const buttons = lessonButtons(document, old);
+  const candidates = [old, ...Array.from({ length: 13 }, (_,i) => sampleLesson({ id: `lesson-${i}` }))];
+  web.renderEvidence({ lesson_candidates: candidates }, 1);
+  const events = [
+    { event_id: old.source_event_id, seq: 1, type: "qa_review" },
+    { event_id: old.created_event_id, seq: 2, type: "lesson_candidate" },
+    ...Array.from({ length: 13 }, (_,i) => ({ event_id: `recent-${i}`, seq: i + 3, type: "tool_result" })),
+  ];
+  web.renderContext({ manifests: [] }, events, 1);
+  const html = document.getElementById("evidence-body").innerHTML;
+  assert.equal((html.match(/class="item lesson-candidate"/g) || []).length, 14);
+  assert.match(html, /data-event-id="lesson-event-old"/);
+  assert.match(html, /data-event-id="qa-event-old"/);
+  assert.doesNotMatch(document.getElementById("context-body").innerHTML, /qa-event-old|lesson-event-old/);
+  await buttons[0].click();
+  assert.equal(JSON.parse(document.getElementById("event-json").textContent).event_id, old.created_event_id);
+  await buttons[1].click();
+  assert.equal(JSON.parse(document.getElementById("event-json").textContent).event_id, old.source_event_id);
+  assert.deepEqual(calls, ["/api/runs/run-a/events/lesson-event-old", "/api/runs/run-a/events/qa-event-old"]);
+  assert.equal(document.getElementById("event-dialog")._shown, true);
+});
+
+test("old candidate buttons do not request events after changing the selected run", async () => {
+  const calls = [];
+  const { web, document } = loadApp(async (url) => {
+    calls.push(url);
+    return jsonResponse({});
+  });
+  web.state.runId = "run-a";
+  web.state.gen = 1;
+  const old = sampleLesson();
+  const buttons = lessonButtons(document, old);
+  web.renderEvidence({ lesson_candidates: [old] }, 1);
+  web.state.runId = "run-b";
+  web.state.gen = 2;
+  await buttons[0].click();
+  await buttons[1].click();
+  assert.deepEqual(calls, []);
+  assert.equal(document.getElementById("event-dialog")._shown, undefined);
+});
+
+test("in-flight candidate source results do not replace the newly selected run's event detail", async () => {
+  for (const status of [200, 500]) {
+    let release;
+    const hold = new Promise((resolve) => { release = resolve; });
+    const { web, document } = loadApp(async () => {
+      await hold;
+      return jsonResponse(status === 200 ? { event_id: "old-source" } : { error: "old-error" }, status);
+    });
+    web.state.runId = "run-a";
+    web.state.gen = 1;
+    const old = sampleLesson();
+    const buttons = lessonButtons(document, old);
+    web.renderEvidence({ lesson_candidates: [old] }, 1);
+    const pending = buttons[1].click();
+    web.state.runId = "run-b";
+    web.state.gen = 2;
+    document.getElementById("event-json").textContent = "selected-event";
+    document.getElementById("status").textContent = "selected-status";
+    release();
+    await pending;
+    assert.equal(document.getElementById("event-json").textContent, "selected-event");
+    assert.equal(document.getElementById("status").textContent, "selected-status");
+    assert.equal(document.getElementById("event-dialog")._shown, undefined);
+  }
+});
 
 test("cycle band shows 产品 工程 质检 and highlights current department", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));

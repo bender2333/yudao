@@ -8,6 +8,7 @@ from typing import Any
 from .event_store import EventStore
 from .models import (
     AskRequest,
+    ArtifactRef,
     ContextExclusion,
     ContextManifest,
     ContextSource,
@@ -15,6 +16,7 @@ from .models import (
     Defect,
     Event,
     EventType,
+    LessonCandidate,
     ProductDecision,
     ProductReaction,
     ProductSpec,
@@ -124,6 +126,17 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.rejections.append(item)
         if event.role:
             state.pending_feedback[event.role] = item
+        return
+
+    if etype == EventType.LESSON_CANDIDATE_RECORDED:
+        state.lesson_candidates.append(LessonCandidate(
+            id=payload["id"], run_id=event.run_id, created_event_id=event.event_id,
+            source_event_id=payload["source_event_id"], source_type=payload["source_type"],
+            observation=payload["observation"], suggestion=payload["suggestion"],
+            product_spec_hash=payload["product_spec_hash"], delivery_spec_hash=payload["delivery_spec_hash"],
+            checks=payload["checks"], evidence_refs=[ArtifactRef(**ref) for ref in payload["evidence_refs"]],
+            status=payload["status"],
+        ))
         return
 
     if etype == EventType.SPEC_ACCEPTED:
