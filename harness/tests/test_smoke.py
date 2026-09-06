@@ -1,6 +1,6 @@
 import copy
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -9,8 +9,8 @@ from harness.adapters.fake import FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import EventType, canonical_hash, json_dumps
-from harness.proposals import product_spec, delivery, review, ask_request, reaction, delivery_turn, review_turn
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown
+from harness.proposals import product_spec, delivery, review, ask_request, reaction, delivery_turn, plan_turn, review_turn
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence
 from harness.tests.helpers import run_scripted
 
 
@@ -41,6 +41,7 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
 def native_run(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         FakeTurn(checks={"smoke": 0}),
         delivery(),
@@ -58,11 +59,25 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert summary["context_isolated"] is True, summary["context_isolation_notes"]
     assert summary["model_input_audit"]["status"] == "verified"
     assert summary["model_input_audit"]["request_count"] > 3
-    assert summary["model_input_audit"]["activation_count"] == 3
+    assert summary["model_input_audit"]["activation_count"] == 4
     assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
     assert summary["replay_consistent"] is True
     assert summary["fake_used"] is True
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
+
+
+@pytest.mark.parametrize("changed", ["effective_contract", "engineering_plan"])
+def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and_tree(native_run, monkeypatch, changed):
+    system, run_id = native_run
+    projection = system.project(run_id)
+    receipts = [asdict(item) for item in system.workspace(run_id).receipts()]
+    changed_item = replace(getattr(projection, changed), content_hash=canonical_hash("new accepted content"))
+    changed_projection = replace(projection, **{changed: changed_item})
+    monkeypatch.setattr(system, "project", lambda _run_id: changed_projection)
+    valid, notes = _receipt_evidence(system, run_id, receipts)
+    assert valid is False
+    assert "engineering: no successful host check bound to the final contract and snapshot" in notes
+    assert "quality: no successful host check bound to the final contract and snapshot" in notes
 
 
 def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
@@ -161,18 +176,18 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
 def test_audit_preserves_department_history_when_ask_returns_to_product(data_dir):
     system, projection = run_scripted(data_dir, [
         product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
-        delivery_turn(), review_turn("release", "host checks passed"),
+        plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
     ])
     assert projection.phase == "DONE"
     fields = isolation_fields(system.store, system.artifacts, projection.run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
-    assert fields["model_input_audit"]["activation_count"] == 5
+    assert fields["model_input_audit"]["activation_count"] == 6
 
 
 def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir, monkeypatch):
     system, projection = run_scripted(data_dir, [
         product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
-        delivery_turn(), review_turn("release", "host checks passed"),
+        plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
     ])
     events = _events_for_mutation(system, projection.run_id, monkeypatch)
     assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.role == "product"][1]

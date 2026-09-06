@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
 
@@ -18,6 +18,7 @@ def run_scripted(data_dir: Path, script, task: str = "build echo", **kwargs):
 def happy_script():
     return [
         product_spec(),
+        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]

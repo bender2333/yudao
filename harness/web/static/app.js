@@ -442,9 +442,54 @@ function renderBoard(board, aggregates, timeline, events) {
   `;
 }
 
-function renderTimeline(timeline) {
+function renderTimeline(timeline, gen = state.gen) {
   const node = document.getElementById("timeline-body");
   if (!node) return;
+  const contract = timeline.effective_contract;
+  const product = timeline.current_product_spec;
+  const plan = timeline.engineering_plan;
+  const currentPlan = plan && contract && plan.status === "active" && plan.effective_contract_hash === contract.content_hash;
+  const current = `
+    <div class="work-document">
+      <h3>当前需求</h3>
+      ${contract ? `
+      <p class="document-heading">PRD.md <span>r${t(contract.revision)} · 当前有效</span></p>
+      <p>${t(product && product.goal, "")}</p>
+      <p class="hash">合同 ${t(shortHash(contract.content_hash))}</p>
+      <button type="button" class="event-link" data-event-id="${t(contract.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
+      ` : '<p class="muted">产品尚未接纳有效需求。</p>'}
+    </div>
+    <div class="work-document">
+      <h3>工程计划</h3>
+      ${plan ? `
+      <p class="document-heading">PLAN.md <span>r${t(plan.revision)} · ${currentPlan ? "当前有效" : "已失效"}</span></p>
+      <p>${t(plan.objective)}</p>
+      <p class="path">范围：${t((plan.scope || []).join(", "))}</p>
+      <ol class="plan-tasks">${(plan.tasks || []).map((task) => `<li>
+        <strong>${t(task.title)}</strong>
+        <p>产出：${t((task.outputs || []).join("；"))}</p>
+        <p class="muted">验证：${t(task.verification)}</p>
+      </li>`).join("")}</ol>
+      ${plan.reason ? `<p>调整原因：${t(plan.reason)}</p>` : ""}
+      ${(plan.assumptions || []).length ? `<details><summary>专业默认与依据</summary><ul>${plan.assumptions.map((item) => `<li>${t(item.decision)}<p class="muted">${t(item.basis)}</p></li>`).join("")}</ul></details>` : ""}
+      <p class="hash">依据合同 ${t(shortHash(plan.effective_contract_hash))}</p>
+      <button type="button" class="event-link" data-event-id="${t(plan.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
+      ` : '<p class="muted">工程尚未接纳实施计划。</p>'}
+    </div>`;
+  const contracts = (timeline.effective_contracts || []).map((item) => `
+    <article class="item">
+      <header><span>PRD r${t(item.revision)}</span><span>${contract && item.content_hash === contract.content_hash ? "当前有效" : "已被替代"}</span></header>
+      <p class="hash">${t(shortHash(item.content_hash))}</p>
+      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
+    </article>`).join("");
+  const plans = (timeline.engineering_plans || []).map((item) => `
+    <article class="item">
+      <header><span>计划 r${t(item.revision)}</span><span>${currentPlan && item.content_hash === plan.content_hash ? "当前有效" : "已失效"}</span></header>
+      <p>${t(item.objective)}</p>
+      ${item.reason ? `<p>调整原因：${t(item.reason)}</p>` : ""}
+      <p class="hash">依据合同 ${t(shortHash(item.effective_contract_hash))}</p>
+      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
+    </article>`).join("");
   const specs = (timeline.specs || [])
     .map(
       (spec) => `
@@ -475,9 +520,14 @@ function renderTimeline(timeline) {
     )
     .join("");
   node.innerHTML = `
+    ${current}
+    <details class="work-history"><summary>需求与计划历史</summary><div class="list">${contracts}${plans}</div></details>
     <p class="muted">transitions: ${t((timeline.transitions || []).join(" · "), "—")}</p>
     <div class="list">${specs}${asks}${reactions || '<p class="muted">尚无 ask/react。</p>'}</div>
   `;
+  node.querySelectorAll(".event-link").forEach((button) => {
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
+  });
 }
 
 function renderEvidence(evidence, gen = state.gen) {
@@ -596,17 +646,36 @@ function renderContext(context, events, gen) {
   });
 }
 
-async function openEvent(eventId, gen) {
+async function openEvent(eventId, gen, documentKind) {
   const runId = state.runId;
   const token = gen === undefined ? state.gen : gen;
   if (token !== state.gen || !runId) return;
   try {
     const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
     if (token !== state.gen || state.runId !== runId) return;
-    document.getElementById("event-json").textContent = JSON.stringify(data, null, 2);
+    const documentText = documentKind === "prd" || documentKind === "plan" ? data[`${documentKind}_markdown`] : null;
+    if (documentKind && typeof documentText !== "string") throw new Error("原文工件不可用");
+    const jsonNode = document.getElementById("event-json");
+    const documentNode = document.getElementById("event-document");
+    const titleNode = document.getElementById("event-title");
+    jsonNode.textContent = JSON.stringify(data, null, 2);
+    jsonNode.hidden = Boolean(documentKind);
+    if (documentNode) {
+      documentNode.textContent = documentText || "";
+      documentNode.hidden = !documentKind;
+    }
+    if (titleNode) titleNode.textContent = documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
     const sources = document.getElementById("event-sources");
     if (sources) {
       sources.replaceChildren();
+      if (documentKind) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "event-link";
+        button.textContent = "查看接纳记录";
+        button.addEventListener("click", () => openEvent(eventId, token));
+        sources.appendChild(button);
+      }
       for (const source of data.source_events || []) {
         const button = document.createElement("button");
         button.type = "button";
@@ -778,6 +847,7 @@ globalThis.harnessWeb = {
   applyProviderAlert,
   renderBoard,
   renderCycle,
+  renderTimeline,
   renderEvidence,
   renderContext,
   openEvent,

@@ -3,7 +3,7 @@ import json
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.models import RunProjection, SessionRecord
-from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review_turn
+from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 
@@ -26,6 +26,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             FakeTurn(proposal=product_spec(), transcript=marker),
             ask_request(),
             reaction("accept", "keep the current spec"),
+            plan_turn(),
             delivery_turn(),
             review_turn("release", "ok"),
         ]
@@ -54,6 +55,7 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
             product_spec(goal=unique),
             ask_request(),
             reaction("reply", "update the contract", spec_update=v2),
+            plan_turn(),
             delivery_turn(),
             review_turn("release", "v2"),
         ]
@@ -112,6 +114,7 @@ def test_validation_feedback_is_injected_after_rejection(data_dir):
         [
             {"kind": "product_spec", "goal": "", "requirements": ["r"], "acceptance_criteria": ["a"]},
             product_spec(),
+            plan_turn(),
             delivery_turn(),
             review_turn("release", "ok"),
         ]
@@ -143,6 +146,7 @@ def test_two_answered_asks_keep_decision_semantics_for_engineering_and_quality(d
                 decide_fields=["second canary"],
             ),
             reaction("accept", "Use option A."),
+            plan_turn(),
             delivery_turn(),
             review_turn("release", "accepted both product decisions"),
         ]
@@ -190,6 +194,7 @@ def test_effective_decision_keeps_ask_background_and_impact(data_dir):
                 decide_fields=["described approach"],
             ),
             reaction("accept", "Use option A."),
+            plan_turn(),
             delivery_turn(),
             review_turn("release", "accepted the described approach"),
         ]
@@ -228,6 +233,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
                 recommendation=stale,
             ),
             reaction("accept", "Use option A."),
+            plan_turn(),
             delivery_turn(summary="OLD_DELIVERY_CANARY"),
             review_turn(
                 "rework_product",
@@ -235,6 +241,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
                 defects=[{"severity": "major", "summary": "contract issue"}],
             ),
             product_spec(acceptance=["new behavior"]),
+            plan_turn(reason="Implement the current replacement contract"),
             delivery_turn(summary="new delivery"),
             review_turn("release", "new contract checked"),
         ]
@@ -256,6 +263,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(acceptance=["old behavior"]),
+            plan_turn(),
             delivery_turn(summary="OLD_DELIVERY_CANARY"),
             review_turn(
                 "rework_product",
@@ -263,6 +271,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
                 defects=[{"severity": "major", "summary": "contract issue"}],
             ),
             product_spec(acceptance=["new behavior"]),
+            plan_turn(reason="Implement the current replacement contract"),
             delivery_turn(summary="NEW_DELIVERY_CANARY"),
             review_turn("release", "new delivery checked"),
         ]
@@ -306,12 +315,14 @@ def test_rework_engineering_keeps_only_one_active_delivery(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
+            plan_turn(),
             delivery_turn(summary="OLD_DELIVERY_CANARY"),
             review_turn(
                 "rework_engineering",
                 "need a fix",
                 defects=[{"severity": "minor", "summary": "naming"}],
             ),
+            plan_turn(reason="Address the quality naming defect"),
             delivery_turn(summary="FIXED_DELIVERY", files={"src/echo.py": "print('v2')\n"}),
             review_turn("release", "ok"),
         ]
@@ -340,6 +351,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
+            plan_turn(),
             {"kind": "delivery_spec", "summary": "", "files": ["src/echo.py"], "check_names": ["smoke"]},
             delivery_turn(summary="first valid delivery"),
             review_turn(
@@ -347,6 +359,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
                 "need a fix",
                 defects=[{"severity": "minor", "summary": "naming"}],
             ),
+            plan_turn(reason="Address the quality naming defect"),
             delivery_turn(summary="fixed", files={"src/echo.py": "print('v2')\n"}),
             review_turn("release", "ok"),
         ]
@@ -356,7 +369,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     engineering = [item for item in adapter.invocations if item.department == "engineering"]
-    assert "validation_feedback" in engineering[1].context.prompt_text
+    assert "validation_feedback" in engineering[2].context.prompt_text
     later = engineering[-1]
     assert "validation_feedback" not in _sources(later)
     assert later.context.prompt_text.count("validation_feedback") == 0

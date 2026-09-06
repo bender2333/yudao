@@ -376,6 +376,41 @@ def test_queries_do_not_mutate_existing_run(data_dir):
         assert request(host, port, "POST", f"/api/runs/{projection.run_id}")[0] == 404
 
 
+def test_effective_prd_and_plan_are_visible_from_their_accepted_materials(data_dir):
+    system, projection = run_scripted(data_dir, happy_script())
+    assert projection.phase == "DONE"
+    with running_server(system) as (_server, host, port):
+        payload = get_json(host, port, f"/api/runs/{projection.run_id}")
+        contract = payload["timeline"]["effective_contract"]
+        plan = payload["timeline"]["engineering_plan"]
+        assert plan["effective_contract_hash"] == contract["content_hash"]
+        assert payload["timeline"]["effective_contracts"] == [contract]
+        assert payload["timeline"]["engineering_plans"] == [plan]
+        for kind, item in (("prd", contract), ("plan", plan)):
+            detail = get_json(host, port, f"/api/runs/{projection.run_id}/events/{item['created_event_id']}")
+            ref = detail["payload"][f"{kind}_ref"]
+            assert ref == item[f"{kind}_ref"]
+            original = (system.artifacts.root / ref["path"]).read_bytes()
+            material = data_dir / "materials" / projection.run_id / f"{kind.upper()}.md"
+            assert detail[f"{kind}_markdown"].encode("utf-8") == original == material.read_bytes()
+        assert system.project(projection.run_id).last_seq == projection.last_seq
+
+
+@pytest.mark.parametrize("kind,event_type", [("prd", "contract_accepted"), ("plan", "plan_accepted")])
+def test_document_detail_rejects_cross_run_material(data_dir, monkeypatch, kind, event_type):
+    system, projection = run_scripted(data_dir, happy_script())
+    event = next(item for item in system.store.list_events(projection.run_id) if item.type == event_type)
+    ref = event.payload[f"{kind}_ref"]
+    original = (system.artifacts.root / ref["path"]).read_bytes()
+    foreign = system.artifacts.put("another-run", kind, original, media_type="text/markdown")
+    event.payload[f"{kind}_ref"] = asdict(foreign)
+    monkeypatch.setattr(system.store, "get_event", lambda _event_id: event)
+    with running_server(system) as (_server, host, port):
+        status, body, _ = request(host, port, "GET", f"/api/runs/{projection.run_id}/events/{event.event_id}")
+        assert status in {400, 500}, body
+        assert f"{kind}_markdown" not in json.loads(body)
+
+
 @pytest.mark.parametrize("failure", ["missing_with_other_run_copy", "modified_bytes", "foreign_reference"])
 def test_model_input_detail_rejects_invalid_or_cross_run_artifact(data_dir, monkeypatch, failure):
     system, projection = run_scripted(data_dir, happy_script())

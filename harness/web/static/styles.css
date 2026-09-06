@@ -185,6 +185,15 @@ main { padding: 0 16px; display: flex; flex-direction: column; min-width: 0; }
 .lesson-candidate ul { padding-left: 20px; }
 .event-link { border: 0; background: transparent; padding: 4px 0; color: var(--run); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
 .event-link:hover { color: var(--ink); }
+.work-document { padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.work-document h3 { font-size: 13px; margin-bottom: 8px; }
+.document-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; font-weight: 600; }
+.document-heading span { color: var(--muted); font-size: 12px; font-weight: 400; }
+.plan-tasks { padding-left: 22px; font-size: 13px; }
+.plan-tasks li { margin: 8px 0; }
+.plan-tasks p { margin: 4px 0; }
+.work-history { margin: 12px 0; }
+summary { cursor: pointer; font-size: 13px; }
 dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); max-width: min(720px, 90vw); width: 90vw; }
 dialog pre {
   max-height: 60vh;

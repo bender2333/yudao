@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
+from .adapters.base import ModelRequest
 from .adapters.fake import FakeTurn
 
 
@@ -67,6 +69,39 @@ def delivery(
         "check_names": check_names or ["smoke"],
         "known_risks": known_risks or [],
     }
+
+
+def engineering_plan(
+    effective_contract_hash: str,
+    objective: str = "Implement and verify the current echo CLI requirements",
+    *,
+    scope: list[str] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    refactoring: list[str] | None = None,
+    assumptions: list[dict[str, str]] | None = None,
+    reason: str = "",
+) -> dict[str, Any]:
+    return {
+        "kind": "engineering_plan",
+        "effective_contract_hash": effective_contract_hash,
+        "objective": objective,
+        "scope": ["src/"] if scope is None else scope,
+        "tasks": [{
+            "title": "Implement the current contract",
+            "outputs": ["src/echo.py"],
+            "verification": "Run the CLI through host checks against the current requirements",
+        }] if tasks is None else tasks,
+        "refactoring": [] if refactoring is None else refactoring,
+        "assumptions": [] if assumptions is None else assumptions,
+        "reason": reason,
+    }
+
+
+def plan_turn(**kwargs: Any) -> Callable[[ModelRequest], dict[str, Any]]:
+    def submit(request: ModelRequest) -> dict[str, Any]:
+        return engineering_plan(request.effective_contract_hash, **kwargs)
+
+    return submit
 
 
 def review(

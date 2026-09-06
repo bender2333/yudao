@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .contracts import current_contract_hash, normalize_scope
 from .models import (
     DEPARTMENTS,
     PROPOSAL_KINDS,
@@ -17,7 +18,7 @@ from .workspace import WorkspaceSnapshot
 
 KIND_BY_DEPARTMENT = {
     "product": {"product_spec", "product_reaction"},
-    "engineering": {"ask_request", "delivery_spec"},
+    "engineering": {"engineering_plan", "ask_request", "delivery_spec"},
     "quality": {"qa_review"},
 }
 
@@ -26,8 +27,8 @@ PHASE_KINDS = {
     "REWORK_PRODUCT": {"product_spec"},
     "PRODUCT_REACT": {"product_reaction"},
     "ASK_PRODUCT": {"product_reaction"},
-    "ENGINEERING": {"ask_request", "delivery_spec"},
-    "REWORK_ENGINEERING": {"ask_request", "delivery_spec"},
+    "ENGINEERING": {"engineering_plan", "ask_request", "delivery_spec"},
+    "REWORK_ENGINEERING": {"engineering_plan", "ask_request", "delivery_spec"},
     "QUALITY": {"qa_review"},
 }
 
@@ -104,6 +105,8 @@ def _evaluate_proposal(
 
     if kind == "product_spec":
         return _accept_product_spec(phase, proposal, projection)
+    if kind == "engineering_plan":
+        return _accept_plan(proposal, projection)
     if kind == "ask_request":
         return _accept_ask(proposal, projection)
     if kind == "product_reaction":
@@ -116,6 +119,8 @@ def _evaluate_proposal(
 
 
 def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
+    if kind == "engineering_plan":
+        return _plan_schema_errors(proposal)
     if kind == "product_spec":
         return _require_text(proposal, "goal") + _require_string_list(proposal, "requirements", min_items=1) + _require_string_list(
             proposal, "acceptance_criteria", min_items=1
@@ -172,6 +177,65 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
     return [FieldError("kind", "unknown kind")]
 
 
+def _plan_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    errors = (_require_text(proposal, "effective_contract_hash") + _require_text(proposal, "objective")
+              + _require_string_list(proposal, "scope", min_items=1)
+              + _optional_string_list(proposal, "refactoring"))
+    tasks = proposal.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        errors.append(FieldError("tasks", "at least one ordered task is required"))
+    else:
+        for index, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                errors.append(FieldError(f"tasks[{index}]", "task must be an object"))
+                continue
+            task_errors = (_require_text(task, "title") + _require_string_list(task, "outputs", min_items=1)
+                           + _require_text(task, "verification"))
+            errors.extend(FieldError(f"tasks[{index}].{item.field}", item.message) for item in task_errors)
+    assumptions = proposal.get("assumptions", [])
+    if not isinstance(assumptions, list):
+        errors.append(FieldError("assumptions", "assumptions must be a list"))
+    else:
+        for index, item in enumerate(assumptions):
+            if not isinstance(item, dict):
+                errors.append(FieldError(f"assumptions[{index}]", "assumption must record a decision and its basis"))
+                continue
+            errors.extend(FieldError(f"assumptions[{index}].{error.field}", error.message)
+                          for error in _require_text(item, "decision") + _require_text(item, "basis"))
+    if not isinstance(proposal.get("reason", ""), str):
+        errors.append(FieldError("reason", "reason must be a string"))
+    return errors
+
+
+def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+    contract_hash = current_contract_hash(projection)
+    if contract_hash is None or proposal["effective_contract_hash"] != contract_hash:
+        return ProposalDecision(False, [FieldError("effective_contract_hash", "plan must reference the current effective contract")])
+    previous = projection.engineering_plans[-1] if projection.engineering_plans else None
+    reason = proposal.get("reason", "").strip()
+    if previous is not None and not reason:
+        return ProposalDecision(False, [FieldError("reason", "an adjusted plan must explain the change from the previous plan")])
+    try:
+        scope = list(dict.fromkeys(normalize_scope(item) for item in proposal["scope"]))
+    except ValueError as exc:
+        return ProposalDecision(False, [FieldError("scope", str(exc))])
+    payload = {
+        "effective_contract_hash": contract_hash, "objective": proposal["objective"].strip(), "scope": scope,
+        "tasks": [{"title": task["title"].strip(), "outputs": [item.strip() for item in task["outputs"]],
+                   "verification": task["verification"].strip()} for task in proposal["tasks"]],
+        "refactoring": [item.strip() for item in proposal.get("refactoring", [])],
+        "assumptions": [{"decision": item["decision"].strip(), "basis": item["basis"].strip()}
+                        for item in proposal.get("assumptions", [])], "reason": reason,
+    }
+    parent = previous.content_hash if previous else None
+    revision = len(projection.engineering_plans) + 1
+    return ProposalDecision(True, artifact={
+        **payload, "kind": "engineering_plan", "issuer": "engineering", "parent_hash": parent,
+        "revision": revision, "status": "active",
+        "content_hash": spec_content_hash("engineering_plan", payload, parent_hash=parent, revision=revision),
+    })
+
+
 def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     parent = projection.product_spec.content_hash if projection.product_spec else None
     revision = (projection.product_spec.revision + 1) if projection.product_spec else 1
@@ -192,8 +256,8 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
 
 
 def _accept_ask(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
-    if projection.product_spec is None:
-        return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
+    if projection.product_spec is None or projection.effective_contract is None:
+        return ProposalDecision(False, [FieldError("effective_contract", "no active effective contract")])
     if projection.pending_ask is not None:
         return ProposalDecision(False, [FieldError("ask", "an AskRequest is already pending")])
     parent = projection.asks[-1].content_hash if projection.asks else None
@@ -206,6 +270,7 @@ def _accept_ask(proposal: dict[str, Any], projection: RunProjection) -> Proposal
         "recommendation": proposal["recommendation"].strip(),
         "decide_fields": [item.strip() for item in proposal["decide_fields"]],
         "product_spec_hash": projection.product_spec.content_hash,
+        "effective_contract_hash": projection.effective_contract.content_hash,
     }
     artifact = {
         **payload,
@@ -227,6 +292,8 @@ def _accept_ask(proposal: dict[str, Any], projection: RunProjection) -> Proposal
 def _accept_reaction(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     if projection.pending_ask is None:
         return ProposalDecision(False, [FieldError("ask", "no pending AskRequest")])
+    if projection.pending_ask.effective_contract_hash != current_contract_hash(projection):
+        return ProposalDecision(False, [FieldError("effective_contract_hash", "the pending request refers to an obsolete effective contract")])
     spec_update = proposal.get("spec_update")
     if spec_update == {}:
         spec_update = None
@@ -266,6 +333,10 @@ def _accept_reaction(proposal: dict[str, Any], projection: RunProjection) -> Pro
 def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapshot: WorkspaceSnapshot) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
+    contract = projection.effective_contract
+    plan = projection.engineering_plan
+    if contract is None or plan is None or plan.effective_contract_hash != contract.content_hash:
+        return ProposalDecision(False, [FieldError("engineering_plan", "delivery requires an accepted plan for the current effective contract")])
     errors: list[FieldError] = []
     files = [item.replace("\\", "/") for item in proposal["files"]]
     for rel in files:
@@ -277,13 +348,15 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
             "engineering",
             name,
             product_spec_hash=projection.product_spec.content_hash,
+            effective_contract_hash=contract.content_hash,
+            engineering_plan_hash=plan.content_hash,
             activation_id=projection.last_activations.get("engineering"),
         )
         if receipt is None:
             errors.append(
                 FieldError(
                     "check_names",
-                    f"no engineering check receipt for {name} bound to the current snapshot, ProductSpec, and activation",
+                    f"no engineering check receipt for {name} bound to the current snapshot, effective contract, plan, and activation",
                 )
             )
             continue
@@ -300,6 +373,8 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
         "checks": checks,
         "known_risks": [item.strip() for item in proposal.get("known_risks", [])],
         "product_spec_hash": projection.product_spec.content_hash,
+        "effective_contract_hash": contract.content_hash,
+        "engineering_plan_hash": plan.content_hash,
         "code_tree_digest": snapshot.digest,
     }
     artifact = {
@@ -325,9 +400,17 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     if projection.delivery_spec is None:
         return ProposalDecision(False, [FieldError("delivery_spec", "no active DeliverySpec")])
+    contract = projection.effective_contract
+    plan = projection.engineering_plan
+    if contract is None or plan is None:
+        return ProposalDecision(False, [FieldError("effective_contract", "quality review requires a current contract and plan")])
     errors: list[FieldError] = []
     if projection.delivery_spec.product_spec_hash != projection.product_spec.content_hash:
         errors.append(FieldError("product_spec_hash", "delivery is not bound to the current ProductSpec"))
+    if projection.delivery_spec.effective_contract_hash != contract.content_hash:
+        errors.append(FieldError("effective_contract_hash", "delivery is not bound to the current effective contract"))
+    if projection.delivery_spec.engineering_plan_hash != plan.content_hash:
+        errors.append(FieldError("engineering_plan_hash", "delivery is not bound to the current engineering plan"))
     if projection.delivery_spec.code_tree_digest != snapshot.digest:
         errors.append(FieldError("code_snapshot_hash", "workspace snapshot no longer matches the current delivery"))
     check_names, name_errors = _qa_check_names(proposal)
@@ -338,6 +421,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
             "quality",
             name,
             product_spec_hash=projection.product_spec.content_hash,
+            effective_contract_hash=contract.content_hash,
+            engineering_plan_hash=plan.content_hash,
             delivery_spec_hash=projection.delivery_spec.content_hash,
             activation_id=projection.last_activations.get("quality"),
         )
@@ -364,6 +449,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
     revision = (projection.last_review.revision + 1) if projection.last_review else 1
     payload = {
         "product_spec_hash": projection.product_spec.content_hash,
+        "effective_contract_hash": contract.content_hash,
+        "engineering_plan_hash": plan.content_hash,
         "delivery_spec_hash": projection.delivery_spec.content_hash,
         "code_snapshot_hash": snapshot.digest,
         "verdict": verdict,
@@ -409,6 +496,8 @@ def _receipt_evidence(receipt: Any) -> dict[str, Any]:
         "exit_code": receipt.exit_code,
         "name": receipt.name,
         "product_spec_hash": receipt.product_spec_hash,
+        "effective_contract_hash": receipt.effective_contract_hash,
+        "engineering_plan_hash": receipt.engineering_plan_hash,
         "snapshot_hash": receipt.snapshot_hash,
         "summary": receipt.summary,
     }

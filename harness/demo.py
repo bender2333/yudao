@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adapters.fake import FakeAdapter
-from .proposals import ask_request, delivery_turn, product_spec, reaction, review_turn
+from .proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
 from .runtime import LoopSystem
 
 DEMO_TASK = "Build a local echo CLI that prints its argument and follows product decisions on flags."
@@ -61,6 +61,7 @@ def demo_script():
             "Unknown flags are part of the public contract and must fail closed.",
             spec_update=V2,
         ),
+        plan_turn(),
         delivery_turn(
             "first delivery with flag rejection",
             files={"src/echo.py": echo_flags},
@@ -73,6 +74,7 @@ def demo_script():
             checks={"smoke": 0},
             defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
         ),
+        plan_turn(reason="Address the quality review by adding the missing usage behavior"),
         delivery_turn(
             "added usage text",
             files={"src/echo.py": echo_help},

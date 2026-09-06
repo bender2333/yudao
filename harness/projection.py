@@ -13,6 +13,8 @@ from .models import (
     ContextManifest,
     ContextSource,
     DeliverySpec,
+    EffectiveContract,
+    EngineeringPlan,
     Defect,
     Event,
     EventType,
@@ -164,6 +166,35 @@ def apply_event(state: RunProjection, event: Event) -> None:
             state.product_spec = replace(state.product_spec, status="superseded")
         return
 
+    if etype == EventType.CONTRACT_ACCEPTED:
+        contract = EffectiveContract(
+            content_hash=payload["content_hash"], revision=payload["revision"],
+            product_spec_hash=payload["product_spec_hash"], decision_hashes=list(payload["decision_hashes"]),
+            created_event_id=event.event_id, prd_ref=ArtifactRef(**payload["prd_ref"]),
+        )
+        if state.effective_contract is None or state.effective_contract.content_hash != contract.content_hash:
+            _supersede_plans(state)
+            _supersede_active_deliveries(state, "effective_contract_changed")
+        state.effective_contracts.append(contract)
+        state.effective_contract = contract
+        return
+
+    if etype == EventType.PLAN_ACCEPTED:
+        _clear_feedback(state, event.role)
+        _supersede_plans(state)
+        _supersede_active_deliveries(state, "engineering_plan_changed")
+        plan = EngineeringPlan(
+            id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"],
+            revision=payload["revision"], parent_hash=payload["parent_hash"], status=payload["status"],
+            created_event_id=event.event_id, effective_contract_hash=payload["effective_contract_hash"],
+            objective=payload["objective"], scope=list(payload["scope"]), tasks=list(payload["tasks"]),
+            refactoring=list(payload["refactoring"]), assumptions=list(payload["assumptions"]),
+            reason=payload["reason"], plan_ref=ArtifactRef(**payload["plan_ref"]),
+        )
+        state.engineering_plans.append(plan)
+        state.engineering_plan = plan
+        return
+
     if etype == EventType.ASK_SUBMITTED:
         _clear_feedback(state, event.role)
         ask = _ask_from_payload(payload, event)
@@ -272,6 +303,8 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         purpose=payload["purpose"],
         max_output_tokens=payload["max_output_tokens"],
         compaction_event_id=payload["compaction_event_id"],
+        effective_contract_hash=payload["effective_contract_hash"],
+        engineering_plan_hash=payload["engineering_plan_hash"],
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],
@@ -318,6 +351,7 @@ def _ask_from_payload(payload: dict[str, Any], event: Event) -> AskRequest:
         status=payload.get("status", "open"),
         created_event_id=event.event_id,
         product_spec_hash=payload["product_spec_hash"],
+        effective_contract_hash=payload["effective_contract_hash"],
         question=payload["question"],
         background=payload.get("background", ""),
         options=list(payload.get("options", [])),
@@ -359,6 +393,8 @@ def _delivery_from_payload(payload: dict[str, Any], event: Event) -> DeliverySpe
         status=payload.get("status", "active"),
         created_event_id=event.event_id,
         product_spec_hash=payload["product_spec_hash"],
+        effective_contract_hash=payload["effective_contract_hash"],
+        engineering_plan_hash=payload["engineering_plan_hash"],
         summary=payload["summary"],
         files=list(payload.get("files", [])),
         check_names=list(payload.get("check_names", [])),
@@ -381,6 +417,12 @@ def _supersede_active_deliveries(state: RunProjection, reason: str) -> None:
             state.delivery_specs[index] = replace(existing, status="superseded", invalidation_reason=reason)
     if state.delivery_spec is not None:
         state.delivery_spec = None
+
+
+def _supersede_plans(state: RunProjection) -> None:
+    state.engineering_plans = [replace(item, status="superseded") if item.status == "active" else item
+                               for item in state.engineering_plans]
+    state.engineering_plan = None
 
 
 def _refresh_effective_decisions(state: RunProjection) -> None:
@@ -429,6 +471,8 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         status=payload.get("status", "active"),
         created_event_id=event.event_id,
         product_spec_hash=payload["product_spec_hash"],
+        effective_contract_hash=payload["effective_contract_hash"],
+        engineering_plan_hash=payload["engineering_plan_hash"],
         delivery_spec_hash=payload["delivery_spec_hash"],
         code_snapshot_hash=payload["code_snapshot_hash"],
         verdict=payload["verdict"],

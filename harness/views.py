@@ -80,6 +80,10 @@ def spec_timeline(projection: RunProjection) -> dict[str, Any]:
         )
     return {
         "current_product_spec": _plain(projection.product_spec),
+        "effective_contract": _plain(projection.effective_contract),
+        "effective_contracts": _plain(projection.effective_contracts),
+        "engineering_plan": _plain(projection.engineering_plan),
+        "engineering_plans": _plain(projection.engineering_plans),
         "current_delivery_spec": _plain(projection.delivery_spec),
         "effective_decisions": _plain(projection.effective_decisions),
         "pending_ask": _plain(projection.pending_ask),

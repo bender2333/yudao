@@ -58,7 +58,7 @@
       <div class="grid">
         <section id="timeline" class="view">
           <h2>规格时间线</h2>
-          <div id="timeline-body" class="muted">等待 spec、ask 与 react。</div>
+          <div id="timeline-body" class="muted">等待产品需求与工程计划。</div>
         </section>
         <section id="evidence" class="view">
           <h2>证据视图</h2>
@@ -73,7 +73,8 @@
   </div>
   <dialog id="event-dialog">
     <form method="dialog">
-      <h3>事件详情</h3>
+      <h3 id="event-title">事件详情</h3>
+      <pre id="event-document" hidden></pre>
       <pre id="event-json"></pre>
       <div id="event-sources" class="actions"></div>
       <button value="close">关闭</button>

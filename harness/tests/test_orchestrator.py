@@ -1,7 +1,7 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import MAX_MODEL_STEPS
-from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review, review_turn
+from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 
@@ -39,6 +39,7 @@ def test_ask_accept_returns_to_engineering(data_dir):
         product_spec(),
         ask_request(),
         reaction("accept", "Use option A as specified."),
+        plan_turn(),
         delivery_turn(),
         review_turn("release", "accepted path is implemented"),
     ]
@@ -58,6 +59,7 @@ def test_ask_reply_can_create_new_spec(data_dir):
         product_spec(),
         ask_request(),
         reaction("reply", "Unknown flags must fail.", spec_update=updated),
+        plan_turn(),
         delivery_turn(),
         review_turn("release", "reply applied"),
     ]
@@ -76,6 +78,7 @@ def test_empty_spec_update_is_not_a_new_contract(data_dir):
         product_spec(),
         ask_request(),
         reaction("accept", "keep the current spec", spec_update={}),
+        plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
     ]
@@ -91,6 +94,7 @@ def test_ask_reject_keeps_engineering_on_current_spec(data_dir):
         product_spec(),
         ask_request(),
         reaction("reject", "Do not ignore flags; keep the current contract."),
+        plan_turn(),
         delivery_turn(),
         review_turn("release", "rejected alternative"),
     ]
@@ -104,12 +108,14 @@ def test_ask_reject_keeps_engineering_on_current_spec(data_dir):
 def test_quality_rework_routes_to_engineering(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         delivery_turn(summary="first delivery"),
         review_turn(
             "rework_engineering",
             "edge case fails",
             defects=[{"severity": "major", "summary": "empty input is unhandled"}],
         ),
+        plan_turn(reason="Address the reported empty input defect"),
         delivery_turn(summary="fixed edge case", files={"src/echo.py": "print('ok')\n"}),
         review_turn("release", "fixed"),
     ]
@@ -123,6 +129,7 @@ def test_quality_rework_routes_to_engineering(data_dir):
 def test_quality_rework_routes_to_product(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         delivery_turn(),
         review_turn(
             "rework_product",
@@ -130,6 +137,7 @@ def test_quality_rework_routes_to_product(data_dir):
             defects=[{"severity": "blocker", "summary": "empty input not in spec"}],
         ),
         product_spec(goal="Build echo including empty input", acceptance=["empty input prints a blank line"]),
+        plan_turn(reason="Apply the revised empty input requirement"),
         delivery_turn(summary="updated implementation", files={"src/echo.py": "print('')\n"}),
         review_turn("release", "spec now covers the case"),
     ]
@@ -166,11 +174,13 @@ def test_illegal_workpiece_stays_in_department(data_dir):
 def test_natural_language_completion_does_not_finish(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         delivery_turn(),
         *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(MAX_MODEL_STEPS)],
     ]
     system = LoopSystem(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
+    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     projection = system.activate_once(run_id)
@@ -222,6 +232,7 @@ def test_context_overflow_is_explicit_failure(data_dir):
 def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
     script = [
         product_spec(acceptance=["old behavior"]),
+        plan_turn(),
         delivery_turn(),
         review_turn(
             "rework_product",
@@ -229,6 +240,7 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
             defects=[{"severity": "major", "summary": "contract issue"}],
         ),
         product_spec(acceptance=["new behavior"]),
+        plan_turn(reason="Apply the revised contract before implementation"),
         delivery_turn(summary="same code under new spec"),
         FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),
         review_turn("release", "checked current contract"),
@@ -248,6 +260,7 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
 def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         delivery_turn(),
         FakeTurn(
             proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": [123], "defects": []},
@@ -275,6 +288,7 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
 def test_release_without_quality_evidence_is_rejected(data_dir):
     script = [
         product_spec(),
+        plan_turn(),
         delivery_turn(),
         FakeTurn(proposal={"kind": "qa_review", "verdict": "release", "rationale": "looks good", "checks": ["smoke"], "defects": []}),
     ]

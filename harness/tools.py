@@ -25,6 +25,7 @@ TOOL_DEFS = {
     "submit_product_spec": {"access": "submit", "departments": ("product",)},
     "submit_reaction": {"access": "submit", "departments": ("product",)},
     "submit_ask": {"access": "submit", "departments": ("engineering",)},
+    "submit_plan": {"access": "submit", "departments": ("engineering",)},
     "submit_delivery": {"access": "submit", "departments": ("engineering",)},
     "submit_review": {"access": "submit", "departments": ("quality",)},
 }
@@ -33,6 +34,7 @@ SUBMIT_KINDS = {
     "submit_product_spec": "product_spec",
     "submit_reaction": "product_reaction",
     "submit_ask": "ask_request",
+    "submit_plan": "engineering_plan",
     "submit_delivery": "delivery_spec",
     "submit_review": "qa_review",
 }
@@ -73,6 +75,7 @@ class ToolRuntime:
             "submit_product_spec": self._submit,
             "submit_reaction": self._submit,
             "submit_ask": self._submit,
+            "submit_plan": self._submit,
             "submit_delivery": self._submit,
             "submit_review": self._submit,
         }
@@ -169,6 +172,8 @@ class ToolRuntime:
                 "product_spec_hash": receipt.product_spec_hash,
                 "delivery_spec_hash": receipt.delivery_spec_hash,
                 "activation_id": receipt.activation_id,
+                "effective_contract_hash": receipt.effective_contract_hash,
+                "engineering_plan_hash": receipt.engineering_plan_hash,
             }
 
 
@@ -360,6 +365,42 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "decide_fields": _string_list_schema("Fields product must decide"),
             },
             ["question", "background", "options", "impact", "recommendation", "decide_fields"],
+        ),
+        "loadMode": "essential",
+    },
+    "submit_plan": {
+        "name": "submit_plan",
+        "label": "submit_plan",
+        "description": "Submit an engineering plan before changing delivery files. Bind the current effective_contract_hash. Plan adjustments require a reason; product requirements must be decided by product.",
+        "parameters": _object_schema(
+            {
+                "effective_contract_hash": {"type": "string", "description": "Current effective contract hash supplied in context"},
+                "objective": {"type": "string"},
+                "scope": _string_list_schema("Relative files or directories ending with /; . means the entire public workspace"),
+                "tasks": {
+                    "type": "array",
+                    "items": _object_schema(
+                        {
+                            "title": {"type": "string"},
+                            "outputs": _string_list_schema("Observable outputs of this task"),
+                            "verification": {"type": "string", "description": "How to verify these outputs"},
+                        },
+                        ["title", "outputs", "verification"],
+                    ),
+                    "description": "Non-empty tasks in execution order",
+                },
+                "refactoring": _string_list_schema("Necessary structural changes, or an empty list"),
+                "assumptions": {
+                    "type": "array",
+                    "items": _object_schema(
+                        {"decision": {"type": "string"}, "basis": {"type": "string"}},
+                        ["decision", "basis"],
+                    ),
+                    "description": "Professional defaults and their basis; do not present defaults as user statements",
+                },
+                "reason": {"type": "string", "description": "Reason for adjusting an existing plan; may be empty for the first plan"},
+            },
+            ["effective_contract_hash", "objective", "scope", "tasks", "refactoring", "assumptions", "reason"],
         ),
         "loadMode": "essential",
     },

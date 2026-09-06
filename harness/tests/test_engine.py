@@ -8,7 +8,7 @@ from harness.adapters.base import ModelRequest, ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.models import EventType, RunProjection, Usage, canonical_hash, estimate_tokens, json_dumps
-from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review_turn
+from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
 from harness.runtime import LoopSystem
 from harness.tools import ToolRuntime
 
@@ -43,14 +43,14 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     adapter = FakeAdapter([
         ModelResponse(output=[reasoning, lookup]),
         ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
-        delivery_turn(), review_turn("release", "valid host evidence"),
+        plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
-    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1]
+    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
     assert adapter.invocations[1].input_items[2:4] == [reasoning, lookup]
     tool_input = adapter.invocations[1].input_items[4]
     assert tool_input["call_id"] == "read-1"
@@ -58,8 +58,9 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     for request in adapter.invocations[2:]:
         assert "PRIVATE_CHAIN" not in json_dumps(request.input_items)
         assert "CAUSAL_TOOL_OUTPUT" not in json_dumps(request.input_items)
-        assert len(request.input_items) == 2
         assert request.input_items[-1]["role"] == "user"
+    assert len(adapter.invocations[2].input_items) == len(adapter.invocations[4].input_items) == 2
+    assert any(item.get("name") == "submit_plan" for item in adapter.invocations[3].input_items)
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "after-submit" for event in events)
     contexts = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED]
@@ -153,9 +154,10 @@ def test_cancel_records_inflight_tool_but_does_not_start_following_tool(tmp_path
     entered, release = Event(), Event()
     first = _call("write-1", "write_file", path="started.txt", content="started")
     second = _call("write-2", "write_file", path="later.txt", content="later")
-    adapter = FakeAdapter([product_spec(), ModelResponse(output=[first, second])])
+    adapter = FakeAdapter([product_spec(), plan_turn(scope=["started.txt", "later.txt"]), ModelResponse(output=[first, second])])
     system = LoopSystem(tmp_path, adapter)
     run_id = system.create_run("echo")
+    system.activate_once(run_id)
     system.activate_once(run_id)
     execute = ToolRuntime.execute
 
@@ -205,7 +207,7 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
         ModelResponse(output=[private, _submit(), skipped]),
         FakeTurn(proposal=ask_request(), transcript="ENGINEERING_PRIVATE"),
         reaction("accept", "Keep current behavior"),
-        delivery_turn(), review_turn("release", "valid host evidence"),
+        plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem(tmp_path, adapter)
     run_id = system.create_run("Original intent")

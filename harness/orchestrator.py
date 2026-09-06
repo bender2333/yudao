@@ -12,9 +12,10 @@ from typing import Any
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
 from .artifacts import ArtifactStore
 from .context import ContextAssembler
+from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
-from .engine import run_department
+from .engine import ToolAdmission, run_department
 from .models import (
     Event as RunEvent,
     ArtifactRef,
@@ -29,6 +30,7 @@ from .models import (
 )
 from .projection import RunProjection, project_run
 from .sessions import SessionFactory
+from .submissions import SubmissionWriter
 from .tools import ToolRuntime
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 from .workspace import Workspace
@@ -56,6 +58,8 @@ class _Activation:
     provider: str | None = None
     model: str | None = None
     compaction_plan: Any = None
+    effective_contract_hash: str | None = None
+    engineering_plan_hash: str | None = None
 
 
 class Orchestrator:
@@ -72,6 +76,7 @@ class Orchestrator:
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
+        self.submissions = SubmissionWriter(store, artifacts, self.materials_root)
         self.adapter = adapter
         self.assembler = assembler or ContextAssembler()
         self.sessions = sessions or SessionFactory()
@@ -222,10 +227,14 @@ class Orchestrator:
             state_before=projection.phase,
             state_after=projection.phase,
             session_id=session.session_id,
-            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1},
+            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
+                     "effective_contract_hash": current_contract_hash(projection),
+                     "engineering_plan_hash": current_plan_hash(projection)},
         )
         abort_flag = self._abort.setdefault(run_id, Event())
-        return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id)
+        return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
+                           effective_contract_hash=current_contract_hash(projection),
+                           engineering_plan_hash=current_plan_hash(projection))
 
     def _invoke_activation(self, activation: _Activation) -> None:
         request = activation
@@ -237,6 +246,8 @@ class Orchestrator:
                 activation_id=request.activation_id,
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
                 delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+                effective_contract_hash=request.effective_contract_hash,
+                engineering_plan_hash=request.engineering_plan_hash,
             )
             submission = run_department(
                 self.adapter, ToolRuntime(workspace),
@@ -263,23 +274,19 @@ class Orchestrator:
         if current.phase in TERMINAL_PHASES or submission is None:
             return
 
-        transcript_ref = None
-        transcript = "\n".join(activation.messages)
-        if transcript:
-            ref = self.artifacts.put(run_id, "transcript", transcript, media_type="text/plain")
-            transcript_ref = ref.__dict__
-
-        self._apply_proposal(
-            run_id,
-            department=department,
-            projection=self.project(run_id),
-            proposal=submission.proposal,
-            transcript_ref=transcript_ref,
-            parent_event_id=activation.parent_event_id,
-            session_id=request.session_id,
-            provider=submission.response.provider,
-            model=submission.response.model,
-        )
+        try:
+            transcript_ref = None
+            transcript = "\n".join(activation.messages)
+            if transcript:
+                ref = self.artifacts.put(run_id, "transcript", transcript, media_type="text/plain")
+                transcript_ref = ref.__dict__
+            self._apply_proposal(
+                run_id, department=department, projection=projection, proposal=submission.proposal,
+                transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
+                session_id=request.session_id, provider=submission.response.provider, model=submission.response.model,
+            )
+        except Exception as exc:
+            self._fail(run_id, self.project(run_id), "host_commit_error", f"{type(exc).__name__}: {exc}")
 
     def _prepare_step(self, activation: _Activation, step_id: int) -> ModelRequest | None:
         with self._state_lock:
@@ -287,12 +294,15 @@ class Orchestrator:
             current = self.project(identity.run_id)
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
                 return None
+            if (current_contract_hash(current) != activation.effective_contract_hash
+                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                return None
             pinned = self.assembler.assemble(
                 current, department=identity.department, session_id=identity.session_id,
                 activation_id=identity.activation_id, step_id=step_id,
             )
             if step_id == 1:
-                static = {"intend", "department_rules", "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
+                static = {"intend", "department_rules", "professional_completion", "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
                 content = "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
                 input_item = {"role": "user", "content": content}
                 received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
@@ -300,9 +310,14 @@ class Orchestrator:
                                   parent_event_id=activation.parent_event_id, state_before=current.phase,
                                   state_after=current.phase, session_id=identity.session_id,
                                   artifact_hashes=[received_ref.content_hash],
-                                  payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref)})
+                                  payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
+                                           "effective_contract_hash": activation.effective_contract_hash,
+                                           "engineering_plan_hash": activation.engineering_plan_hash})
             records = self._department_history_records(identity.run_id, identity.department)
-            checkpoint_event = next((item for item in reversed(current.compactions) if item["department"] == identity.department), None)
+            checkpoint_event = next((item for item in reversed(current.compactions)
+                                     if item["department"] == identity.department
+                                     and item["effective_contract_hash"] == activation.effective_contract_hash
+                                     and item["engineering_plan_hash"] == activation.engineering_plan_hash), None)
             checkpoint = None
             checkpoint_id = None
             try:
@@ -335,7 +350,9 @@ class Orchestrator:
                 raise ProviderError(str(exc), reason=reason) from exc
             request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
                                    step_id, assembled, assembled.tools, identity.abort_flag,
-                                   purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens)
+                                   purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
+                                   effective_contract_hash=activation.effective_contract_hash,
+                                   engineering_plan_hash=activation.engineering_plan_hash)
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
@@ -385,6 +402,9 @@ class Orchestrator:
             current = self.project(activation.run_id)
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return
+            if (current_contract_hash(current) != activation.effective_contract_hash
+                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                return
             plan = activation.compaction_plan
             try:
                 checkpoint = finish_compaction(plan, response.output)
@@ -404,6 +424,8 @@ class Orchestrator:
                                        "source_refs": plan.source_refs, "summary_ref": asdict(summary_ref),
                                        "plan_ref": asdict(plan_ref), "summary_token_limit": plan.summary_token_limit,
                                        "max_output_tokens": plan.max_output_tokens,
+                                       "effective_contract_hash": activation.effective_contract_hash,
+                                       "engineering_plan_hash": activation.engineering_plan_hash,
                                        "previous_compaction_event_id": request.context.manifest.compaction_event_id})
 
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
@@ -411,25 +433,49 @@ class Orchestrator:
             current = self.project(request.run_id)
             if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
                 return False
+            if (current_contract_hash(current) != request.effective_contract_hash
+                    or current_plan_hash(current) != request.engineering_plan_hash):
+                return False
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
                               context_digest=request.context.manifest.digest,
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
-                                       "attempted": True, "purpose": request.purpose})
+                                       "attempted": True, "purpose": request.purpose,
+                                       "effective_contract_hash": request.effective_contract_hash,
+                                       "engineering_plan_hash": request.engineering_plan_hash})
             return True
 
-    def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> bool:
+    def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolAdmission:
         with self._state_lock:
             request = activation.request
             current = self.project(request.run_id)
             if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
-                return False
+                return ToolAdmission(stopped=True)
+            if (current_contract_hash(current) != activation.effective_contract_hash
+                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                return ToolAdmission(stopped=True)
+            if call["name"] == "write_file":
+                plan = current.engineering_plan
+                if plan is None or plan.effective_contract_hash != current_contract_hash(current):
+                    return ToolAdmission(error="Submit an engineering plan for the current effective contract before writing files.")
+                target = call["args"].get("path")
+                if not path_in_scope(target, plan.scope):
+                    return ToolAdmission(error="The file is outside the current engineering plan scope; submit an adjusted plan with a reason first.")
+                workspace = self.workspace(request.run_id)
+                try:
+                    actual = workspace.resolve(target).relative_to(workspace.root.resolve()).as_posix()
+                except (OSError, ValueError) as exc:
+                    return ToolAdmission(error=str(exc))
+                if not path_in_scope(actual, plan.scope):
+                    return ToolAdmission(error="The resolved file is outside the current engineering plan scope.")
             self.store.append(request.run_id, EventType.TOOL_STARTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
-                              payload={**call, "activation_id": request.activation_id})
-            return True
+                              payload={**call, "activation_id": request.activation_id,
+                                       "effective_contract_hash": activation.effective_contract_hash,
+                                       "engineering_plan_hash": activation.engineering_plan_hash})
+            return ToolAdmission()
 
     def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:
         request = activation.request
@@ -481,6 +527,8 @@ class Orchestrator:
             payload["activation_id"] = request.activation_id
             payload["step_id"] = request.step_id
             payload["purpose"] = request.purpose
+            payload["effective_contract_hash"] = activation.effective_contract_hash
+            payload["engineering_plan_hash"] = activation.engineering_plan_hash
             self.store.append(
                 request.run_id, event_type, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -572,9 +620,14 @@ class Orchestrator:
                 [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
             )
         with self._state_lock:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
+            current = self.project(run_id)
+            if current.phase in TERMINAL_PHASES:
                 return
+            if (current.phase != projection.phase
+                    or current_contract_hash(current) != current_contract_hash(projection)
+                    or current_plan_hash(current) != current_plan_hash(projection)):
+                decision = ProposalDecision(False, [FieldError("execution_basis", "The contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
+            projection = current
             if proposal is not None:
                 self.store.append(
                     run_id, EventType.PROPOSAL_SUBMITTED, role=department,
@@ -618,147 +671,13 @@ class Orchestrator:
     ) -> None:
         if self.project(run_id).phase in TERMINAL_PHASES:
             return
-        kind = artifact["kind"]
-        if kind == "product_spec":
-            artifact = dict(artifact)
-            artifact["id"] = new_id("spec")
-            if projection.product_spec:
-                self.store.append(
-                    run_id,
-                    EventType.SPEC_SUPERSEDED,
-                    role=department,
-                    parent_event_id=parent_event_id,
-                    state_before=projection.phase,
-                    state_after=projection.phase,
-                    payload={"content_hash": projection.product_spec.content_hash, "revision": projection.product_spec.revision},
-                )
-            self.store.append(
-                run_id,
-                EventType.SPEC_ACCEPTED,
-                role=department,
-                parent_event_id=parent_event_id,
-                state_before=projection.phase,
-                state_after=projection.phase,
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                artifact_hashes=[artifact["content_hash"]],
-                payload=artifact,
-            )
-        elif kind == "ask_request":
-            artifact = dict(artifact)
-            artifact["id"] = new_id("ask")
-            self.store.append(
-                run_id,
-                EventType.ASK_SUBMITTED,
-                role=department,
-                parent_event_id=parent_event_id,
-                state_before=projection.phase,
-                state_after=projection.phase,
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                artifact_hashes=[artifact["content_hash"]],
-                payload=artifact,
-            )
-        elif kind == "product_reaction":
-            artifact = dict(artifact)
-            artifact["id"] = new_id("react")
-            new_spec = extra.get("new_spec") or artifact.pop("spec_update", None)
-            if new_spec:
-                new_spec = dict(new_spec)
-                new_spec["id"] = new_id("spec")
-                if projection.product_spec:
-                    self.store.append(
-                        run_id,
-                        EventType.SPEC_SUPERSEDED,
-                        role=department,
-                        parent_event_id=parent_event_id,
-                        state_before=projection.phase,
-                        state_after=projection.phase,
-                        payload={"content_hash": projection.product_spec.content_hash, "revision": projection.product_spec.revision},
-                    )
-                self.store.append(
-                    run_id,
-                    EventType.SPEC_ACCEPTED,
-                    role=department,
-                    parent_event_id=parent_event_id,
-                    state_before=projection.phase,
-                    state_after=projection.phase,
-                    session_id=session_id,
-                    artifact_hashes=[new_spec["content_hash"]],
-                    payload=new_spec,
-                )
-                artifact["produces_new_spec"] = True
-                artifact["new_spec_hash"] = new_spec["content_hash"]
-            artifact.pop("spec_update", None)
-            self.store.append(
-                run_id,
-                EventType.REACT_SUBMITTED,
-                role=department,
-                parent_event_id=parent_event_id,
-                state_before=projection.phase,
-                state_after=projection.phase,
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                artifact_hashes=[artifact["content_hash"]],
-                payload=artifact,
-            )
-        elif kind == "delivery_spec":
-            artifact = dict(artifact)
-            artifact["id"] = new_id("del")
-            file_refs = []
-            workspace = self.workspace(run_id)
-            for rel in artifact.get("files", []):
-                content = workspace.read_file(rel)
-                ref = self.artifacts.put(run_id, "source_file", content, media_type="text/plain")
-                file_refs.append(ref.__dict__)
-            snapshot_ref = self.artifacts.put(
-                run_id,
-                "code_snapshot",
-                "\n".join(artifact.get("files", []) + [artifact["code_tree_digest"]]),
-                media_type="text/plain",
-            )
-            artifact["file_refs"] = file_refs
-            artifact["snapshot_ref"] = snapshot_ref.__dict__
-            self.store.append(
-                run_id,
-                EventType.DELIVERY_ACCEPTED,
-                role=department,
-                parent_event_id=parent_event_id,
-                state_before=projection.phase,
-                state_after=projection.phase,
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                artifact_hashes=[artifact["content_hash"], snapshot_ref.content_hash],
-                payload=artifact,
-            )
-        elif kind == "qa_review":
-            artifact = dict(artifact)
-            artifact["id"] = new_id("qa")
-            evidence = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
-            artifact["evidence_refs"] = [evidence.__dict__]
-            source_event = self.store.append(
-                run_id,
-                EventType.QA_SUBMITTED,
-                role=department,
-                parent_event_id=parent_event_id,
-                state_before=projection.phase,
-                state_after=projection.phase,
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                artifact_hashes=[artifact["content_hash"], evidence.content_hash],
-                payload=artifact,
-            )
-            if artifact["verdict"] in {"rework_product", "rework_engineering"}:
-                self._record_lesson_candidate(source_event, projection)
-        else:
-            raise RuntimeError(f"unhandled artifact kind {kind}")
-
-        phase = projection.phase
+        source_event = self.submissions.commit(
+            projection=projection, workspace=self.workspace(run_id), artifact=artifact, extra=extra,
+            department=department, parent_event_id=parent_event_id, session_id=session_id,
+            provider=provider, model=model,
+        )
+        if artifact["kind"] == "qa_review" and artifact["verdict"] in {"rework_product", "rework_engineering"}:
+            self._record_lesson_candidate(source_event, projection)
         for source, target in transitions:
             self.store.append(
                 run_id,
@@ -770,7 +689,6 @@ class Orchestrator:
                 session_id=session_id,
                 payload={"from": source, "to": target, "route": f"{source}->{target}"},
             )
-            phase = target
             if target == "DONE":
                 self.store.append(
                     run_id,
@@ -846,6 +764,7 @@ class Orchestrator:
             "cancelled": "运行已被取消。如需继续，新建 run。",
             "context_overflow": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
             "compaction_failed": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
+            "host_commit_error": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。",
         }.get(reason)
         with self._state_lock:
             projection = self.project(run_id)

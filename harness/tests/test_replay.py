@@ -15,22 +15,24 @@ def test_replay_matches_live_projection(data_dir):
 
 
 def test_replay_survives_ask_and_rework(data_dir):
-    from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review_turn
+    from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
 
     script = [
         product_spec(),
         ask_request(),
         reaction("accept", "go ahead"),
+        plan_turn(),
         delivery_turn(summary="v1"),
         review_turn(
             "rework_engineering",
             "need a fix",
             defects=[{"severity": "minor", "summary": "naming"}],
         ),
+        plan_turn(reason="Address the quality naming defect"),
         delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
         review_turn("release", "ok"),
     ]
-    system, projection = run_scripted(data_dir, script)
+    system, projection = run_scripted(data_dir, script, max_cycles=12)
     replayed = system.replay(projection.run_id)
     assert replayed.canonical_state() == projection.canonical_state()
     assert replayed.ask_count == 1

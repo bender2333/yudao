@@ -36,6 +36,7 @@ REACTION_DECISIONS = ("accept", "reply", "reject")
 QA_VERDICTS = ("rework_product", "rework_engineering", "release")
 PROPOSAL_KINDS = (
     "product_spec",
+    "engineering_plan",
     "ask_request",
     "product_reaction",
     "delivery_spec",
@@ -50,6 +51,7 @@ FAILED_REASONS = frozenset(
         "cancelled",
         "context_overflow",
         "compaction_failed",
+        "host_commit_error",
     }
 )
 
@@ -75,6 +77,8 @@ class EventType:
     PROPOSAL_REJECTED = "proposal_rejected"
     SPEC_ACCEPTED = "spec_accepted"
     SPEC_SUPERSEDED = "spec_superseded"
+    CONTRACT_ACCEPTED = "contract_accepted"
+    PLAN_ACCEPTED = "plan_accepted"
     ASK_SUBMITTED = "ask_submitted"
     REACT_SUBMITTED = "react_submitted"
     DELIVERY_ACCEPTED = "delivery_accepted"
@@ -140,6 +144,8 @@ class CheckReceipt:
     delivery_spec_hash: str | None = None
     activation_id: str | None = None
     tree_changed: bool = False
+    effective_contract_hash: str | None = None
+    engineering_plan_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +178,7 @@ class AskRequest:
     status: str
     created_event_id: str
     product_spec_hash: str
+    effective_contract_hash: str
     question: str
     background: str
     options: list[str]
@@ -216,6 +223,35 @@ class ProductDecision:
 
 
 @dataclass(frozen=True)
+class EffectiveContract:
+    content_hash: str
+    revision: int
+    product_spec_hash: str
+    decision_hashes: list[str]
+    created_event_id: str
+    prd_ref: ArtifactRef
+
+
+@dataclass(frozen=True)
+class EngineeringPlan:
+    id: str
+    run_id: str
+    content_hash: str
+    revision: int
+    parent_hash: str | None
+    status: str
+    created_event_id: str
+    effective_contract_hash: str
+    objective: str
+    scope: list[str]
+    tasks: list[dict[str, Any]]
+    refactoring: list[str]
+    assumptions: list[dict[str, str]]
+    reason: str
+    plan_ref: ArtifactRef
+
+
+@dataclass(frozen=True)
 class DeliverySpec:
     id: str
     run_id: str
@@ -226,6 +262,8 @@ class DeliverySpec:
     status: str
     created_event_id: str
     product_spec_hash: str
+    effective_contract_hash: str
+    engineering_plan_hash: str
     summary: str
     files: list[str]
     check_names: list[str]
@@ -253,6 +291,8 @@ class QAReview:
     status: str
     created_event_id: str
     product_spec_hash: str
+    effective_contract_hash: str
+    engineering_plan_hash: str
     delivery_spec_hash: str
     code_snapshot_hash: str
     verdict: str
@@ -310,6 +350,8 @@ class ContextManifest:
     purpose: str = "work"
     max_output_tokens: int | None = None
     compaction_event_id: str | None = None
+    effective_contract_hash: str | None = None
+    engineering_plan_hash: str | None = None
 
 
 @dataclass
@@ -411,12 +453,16 @@ class RunProjection:
     human_action: str | None = None
     error: str | None = None
     product_spec: ProductSpec | None = None
+    effective_contract: EffectiveContract | None = None
+    engineering_plan: EngineeringPlan | None = None
     delivery_spec: DeliverySpec | None = None
     pending_ask: AskRequest | None = None
     last_reaction: ProductReaction | None = None
     last_review: QAReview | None = None
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
+    effective_contracts: list[EffectiveContract] = field(default_factory=list)
+    engineering_plans: list[EngineeringPlan] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
     asks: list[AskRequest] = field(default_factory=list)
     reactions: list[ProductReaction] = field(default_factory=list)

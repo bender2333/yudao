@@ -20,10 +20,12 @@ def _read(request, path):
                                   "arguments": json_dumps({"path": path})}])
 
 
-def _runner(tmp_path, *, cancelled_summary=None):
+def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False):
     work_counts = {}
+    rejected_spec = False
 
     def respond(request):
+        nonlocal rejected_spec
         if request.purpose == "compaction":
             if cancelled_summary is not None:
                 return cancelled_summary(request)
@@ -34,6 +36,9 @@ def _runner(tmp_path, *, cancelled_summary=None):
             return ask_request()
         if count == 0:
             return _read(request, "large.txt")
+        if reject_first_spec and not rejected_spec:
+            rejected_spec = True
+            return product_spec() | {"acceptance_criteria": []}
         return product_spec() if "[pending_ask]" not in request.context.prompt_text else reaction("accept", "Keep original behavior")
 
     adapter = FakeAdapter([respond] * 100)
@@ -76,9 +81,35 @@ def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path)
 
 
 def test_compaction_checkpoint_survives_reactivation_and_new_controller(tmp_path):
+    system, adapter, run_id, _ = _runner(tmp_path, reject_first_spec=True)
+    first = system.activate_once(run_id)
+    assert first.phase == "PRODUCT_SPEC" and first.effective_contract is None
+    assert first.rejections[-1]["errors"][0]["field"] == "acceptance_criteria"
+    first_checkpoint = first.compactions[-1]["source_event_id"]
+    system.workspace(run_id).write_file("large.txt", "SECOND_TOOL_ORIGINAL " * 2200)
+    reloaded = LoopSystem(tmp_path, adapter)
+    result = reloaded.activate_once(run_id)
+    assert result.phase == "ENGINEERING", result.error
+    later = [record for record in result.compactions if record["source_event_id"] not in {item["source_event_id"] for item in first.compactions}]
+    assert later
+    assert later[0]["previous_compaction_event_id"] == first_checkpoint
+    assert later[0]["effective_contract_hash"] == first.compactions[-1]["effective_contract_hash"] is None
+    assert later[0]["engineering_plan_hash"] == first.compactions[-1]["engineering_plan_hash"] is None
+    assert later[-1]["checkpoint"]["boundary"]
+    assert adapter.invocations[-1].context.manifest.compaction_event_id == later[-1]["source_event_id"]
+    assert "department_memory" in json_dumps(adapter.invocations[-1].input_items)
+    assert result.canonical_state() == reloaded.replay(run_id).canonical_state()
+
+
+def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tmp_path):
     system, adapter, run_id, _ = _runner(tmp_path)
     first = system.activate_once(run_id)
+    assert first.phase == "ENGINEERING" and first.effective_contract is not None
+    assert first.compactions[-1]["effective_contract_hash"] is None
     first_checkpoint = first.compactions[-1]["source_event_id"]
+    source = next(event for event in system.store.list_events(run_id)
+                  if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
+    original = system.artifacts.get_text(source.payload["output_ref"]["content_hash"])
     system.activate_once(run_id)
     engineering = next(request for request in adapter.invocations if request.department == "engineering")
     assert "department_memory" not in json_dumps(engineering.input_items)
@@ -87,12 +118,16 @@ def test_compaction_checkpoint_survives_reactivation_and_new_controller(tmp_path
     reloaded = LoopSystem(tmp_path, adapter)
     result = reloaded.activate_once(run_id)
     assert result.phase == "ENGINEERING", result.error
-    later = [record for record in result.compactions if record["source_event_id"] not in {item["source_event_id"] for item in first.compactions}]
-    assert later
-    assert later[0]["previous_compaction_event_id"] == first_checkpoint
+    previous_ids = {item["source_event_id"] for item in first.compactions}
+    later = [record for record in result.compactions if record["source_event_id"] not in previous_ids]
+    assert later and later[0]["previous_compaction_event_id"] is None
+    assert all(record["effective_contract_hash"] == first.effective_contract.content_hash for record in later)
+    assert source.event_id in {ref["event_id"] for record in later for ref in record["source_refs"]}
+    assert first_checkpoint in {record["source_event_id"] for record in result.compactions}
+    assert system.artifacts.get_text(source.payload["output_ref"]["content_hash"]) == original
+    assert original.count("FIRST_TOOL_ORIGINAL") == 2200
     assert later[-1]["checkpoint"]["boundary"]
     assert adapter.invocations[-1].context.manifest.compaction_event_id == later[-1]["source_event_id"]
-    assert "department_memory" in json_dumps(adapter.invocations[-1].input_items)
     assert result.canonical_state() == reloaded.replay(run_id).canonical_state()
 
 

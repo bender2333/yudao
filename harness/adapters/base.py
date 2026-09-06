@@ -54,6 +54,8 @@ class ModelRequest:
     on_observation: Callable[[ModelObservation], None] | None = None
     purpose: str = "work"
     max_output_tokens: int | None = None
+    effective_contract_hash: str | None = None
+    engineering_plan_hash: str | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:

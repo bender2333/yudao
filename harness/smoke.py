@@ -535,12 +535,18 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
     snapshot = system.workspace(run_id).digest()
     spec = projection.product_spec
     delivery = projection.delivery_spec
+    contract = projection.effective_contract
+    plan = projection.engineering_plan
     for department in ("engineering", "quality"):
         valid = [receipt for receipt in receipts
                  if receipt.get("department") == department and receipt.get("exit_code") == 0
                  and not receipt.get("tree_changed") and receipt.get("activation_id")
                  and receipt.get("snapshot_hash") == snapshot and spec is not None
                  and receipt.get("product_spec_hash") == spec.content_hash
+                 and contract is not None and receipt.get("effective_contract_hash") == contract.content_hash
+                 and plan is not None and plan.status == "active"
+                 and plan.effective_contract_hash == contract.content_hash
+                 and receipt.get("engineering_plan_hash") == plan.content_hash
                  and (department != "quality" or delivery is not None
                       and receipt.get("delivery_spec_hash") == delivery.content_hash)]
         if not valid:

@@ -20,6 +20,12 @@ class DepartmentSubmission:
     response: ModelResponse
 
 
+@dataclass(frozen=True)
+class ToolAdmission:
+    stopped: bool = False
+    error: str | None = None
+
+
 def run_department(
     adapter: ModelAdapter,
     runtime: ToolRuntime,
@@ -28,7 +34,7 @@ def run_department(
     record_response: Callable[[ModelResponse], None],
     record_tool: Callable[[dict[str, Any]], None],
     record_skipped_tool: Callable[[dict[str, Any]], None],
-    begin_tool: Callable[[dict[str, Any]], bool],
+    begin_tool: Callable[[dict[str, Any]], ToolAdmission],
     begin_request: Callable[[ModelRequest], bool],
     finish_compaction: Callable[[ModelResponse], None],
     stopped: Callable[[], bool],
@@ -74,9 +80,13 @@ def run_department(
                 args = {"invalid_arguments": raw_args}
                 result = ToolResult(name, False, None, f"invalid tool arguments: {exc}")
             else:
-                if not begin_tool({"id": identity, "name": name, "args": args, "step_id": step_id}):
+                admission = begin_tool({"id": identity, "name": name, "args": args, "step_id": step_id})
+                if admission.stopped:
+                    _skip_calls(response.output[index:], step_id, record_skipped_tool,
+                                "Not executed because the current activation can no longer start tools.")
                     return None
-                result = runtime.execute(request.department, name, args)
+                result = (ToolResult(name, False, None, admission.error) if admission.error
+                          else runtime.execute(request.department, name, args))
             input_item = {"type": "function_call_output", "call_id": identity,
                           "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
             call = {"id": identity, "name": name, "args": args, "ok": result.ok,
@@ -85,16 +95,18 @@ def run_department(
             if stopped():
                 return None
             if name in SUBMIT_KINDS:
-                for skipped in response.output[index + 1:]:
-                    if skipped.get("type") != "function_call":
-                        continue
-                    error = "Not executed because the department already submitted its proposal."
-                    record_skipped_tool({
-                        "id": skipped["call_id"], "name": skipped["name"], "ok": False, "output": None,
-                        "error": error, "step_id": step_id,
-                        "input_item": {"type": "function_call_output", "call_id": skipped["call_id"],
-                                       "output": json_dumps({"ok": False, "output": None, "error": error})},
-                    })
+                _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,
+                            "Not executed because the department already submitted its proposal.")
                 proposal = result.output if result.ok else {**args, "kind": SUBMIT_KINDS[name]}
                 return DepartmentSubmission(proposal, response)
     raise ProviderError("department reached the model step limit without submitting a proposal", reason="model_steps_exhausted")
+
+
+def _skip_calls(output: list[dict[str, Any]], step_id: int, record: Callable[[dict[str, Any]], None], error: str) -> None:
+    for item in output:
+        if item.get("type") != "function_call":
+            continue
+        record({"id": item["call_id"], "name": item["name"], "ok": False, "output": None,
+                "error": error, "step_id": step_id,
+                "input_item": {"type": "function_call_output", "call_id": item["call_id"],
+                               "output": json_dumps({"ok": False, "output": None, "error": error})}})

@@ -99,6 +99,8 @@ function makeDocument() {
     "evidence-body",
     "context-body",
     "event-json",
+    "event-title",
+    "event-document",
     "event-sources",
     "event-dialog",
     "task-form",
@@ -416,6 +418,65 @@ function sampleBoard(extra = {}) {
     rework_count: extra.rework_count || 0,
   };
 }
+
+test("timeline distinguishes the effective contract from an obsolete engineering plan", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  const text = '<img src=x onerror="alert(1)">';
+  const oldPlan = {
+    content_hash: "plan-old", revision: 1, status: "active", created_event_id: "plan-event",
+    effective_contract_hash: "contract-old", objective: text, scope: ["src/"],
+    tasks: [{ title: text, outputs: [text], verification: text }],
+    assumptions: [{ decision: text, basis: text }], reason: text,
+  };
+  web.renderTimeline({
+    current_product_spec: { goal: "Current product goal" },
+    effective_contract: { content_hash: "contract-new", revision: 2, created_event_id: "contract-event" },
+    effective_contracts: [
+      { content_hash: "contract-old", revision: 1, created_event_id: "old-contract-event" },
+      { content_hash: "contract-new", revision: 2, created_event_id: "contract-event" },
+    ],
+    engineering_plan: oldPlan,
+    engineering_plans: [oldPlan],
+  });
+  const html = document.getElementById("timeline-body").innerHTML;
+  assert.match(html, /PRD\.md <span>r2 · 当前有效/);
+  assert.match(html, /PLAN\.md <span>r1 · 已失效/);
+  assert.match(html, /已被替代/);
+  assert.match(html, /专业默认与依据/);
+  assert.match(html, /data-event-id="old-contract-event" data-document="prd"/);
+  assert.match(html, /data-event-id="plan-event" data-document="plan"/);
+  assert.match(html, /&lt;img/);
+  assert.doesNotMatch(html, /<img/);
+});
+
+test("plan original opens exact text and can return to its accepted event", async () => {
+  const original = "# PLAN.md\n\n  original <content>\n";
+  const { web, document } = loadApp(async () => jsonResponse({
+    event_id: "plan-event", plan_markdown: original, payload: { content_hash: "plan-hash" },
+  }));
+  web.state.runId = "run-a";
+  web.state.gen = 4;
+  await web.openEvent("plan-event", 4, "plan");
+  assert.equal(document.getElementById("event-title").textContent, "PLAN.md");
+  assert.equal(document.getElementById("event-document").textContent, original);
+  assert.equal(document.getElementById("event-document").hidden, false);
+  assert.equal(document.getElementById("event-json").hidden, true);
+  const back = document.getElementById("event-sources").children[0];
+  assert.equal(back.textContent, "查看接纳记录");
+  await back.click();
+  assert.equal(document.getElementById("event-document").hidden, true);
+  assert.equal(document.getElementById("event-json").hidden, false);
+  assert.match(document.getElementById("event-json").textContent, /plan-hash/);
+});
+
+test("missing original material is an error without showing stale document text", async () => {
+  const { web, document } = loadApp(async () => jsonResponse({ event_id: "contract-event" }));
+  web.state.runId = "run-a";
+  web.state.gen = 4;
+  await web.openEvent("contract-event", 4, "prd");
+  assert.equal(document.getElementById("status").textContent, "原文工件不可用");
+  assert.equal(document.getElementById("event-dialog")._shown, undefined);
+});
 
 const emptyAgg = { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 };
 

@@ -228,6 +228,12 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             if event is None or event.run_id != run_id:
                 return self._send_json({"error": "event not found"}, 404)
             detail = event.to_dict()
+            for name in ("prd", "plan"):
+                ref = event.payload.get(f"{name}_ref")
+                if ref:
+                    detail[f"{name}_markdown"] = self.server.system.artifacts.get_for_run(
+                        run_id, ArtifactRef(**ref)
+                    ).decode("utf-8")
             request_ref = event.payload.get("request_ref")
             if request_ref:
                 detail["model_input"] = json.loads(

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from typing import Any
 
+from .contracts import current_contract_hash, current_plan_hash
 from .models import (
     ContextExclusion,
     ContextManifest,
@@ -28,17 +29,18 @@ DEPARTMENT_RULES = {
     "engineering": (
         "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。"
         "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
-        "无法从当前合同推导的取舍必须提交 AskRequest，不能静默代替产品决策。"
+        "写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。"
+        "调整计划先提交原因；影响产品目标、重要承诺或无法推断的重要成本取舍时提交 AskRequest。"
         "必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。"
         "失效交付只作为修复依据，不是当前有效交付。"
-        "使用 submit_ask 或 submit_delivery 提交。不能宣布任务完成。"
+        "使用 submit_plan、submit_ask 或 submit_delivery 提交。不能宣布任务完成。"
     ),
     "quality": (
         "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。"
         "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
         "不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。"
         "使用 collect_evidence 或 run_check 让主机执行检查，再 submit_review。"
-        "只有绑定当前 ProductSpec 和代码快照的 release 才允许结束任务。"
+        "只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。"
         "自然语言中的“完成”不会改变任务状态。"
     ),
 }
@@ -66,8 +68,17 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
         ],
     },
     "engineering": {
-        "submit_tools": ["submit_ask", "submit_delivery"],
+        "submit_tools": ["submit_plan", "submit_ask", "submit_delivery"],
         "kinds": {
+            "engineering_plan": {
+                "when": ["ENGINEERING", "REWORK_ENGINEERING"],
+                "required": ["kind=engineering_plan", "effective_contract_hash", "objective", "scope", "tasks"],
+                "optional": ["refactoring", "assumptions", "reason"],
+                "scope": "relative files, directories ending with /, or . for the full public workspace",
+                "tasks": [{"title": "ordered task", "outputs": ["verifiable output"], "verification": "how to verify"}],
+                "assumptions": [{"decision": "professional default", "basis": "project convention, standard, or maintained component"}],
+                "bind": ["current_contract.content_hash"],
+            },
             "ask_request": {
                 "when": ["ENGINEERING", "REWORK_ENGINEERING"],
                 "required": [
@@ -79,21 +90,22 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
                     "recommendation",
                     "decide_fields",
                 ],
-                "bind": ["current_product_spec.content_hash"],
+                "bind": ["current_contract.content_hash"],
             },
             "delivery_spec": {
                 "when": ["ENGINEERING", "REWORK_ENGINEERING"],
                 "required": ["kind=delivery_spec", "summary", "files", "check_names"],
                 "optional": ["known_risks"],
                 "bind": [
-                    "current_product_spec.content_hash",
+                    "current_contract.content_hash", "current_engineering_plan.content_hash",
                     "workspace files must exist",
                     "engineering host check receipts on the current snapshot",
                 ],
             },
         },
         "notes": [
-            "先 write_file，再 run_check（argv 由主机执行），最后 submit_delivery。",
+            "先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。",
+            "已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。",
             "check_names 必须对应主机回执，模型自报 exit_code 无效。",
         ],
     },
@@ -106,7 +118,7 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
                 "optional": ["defects"],
                 "verdict": ["rework_product", "rework_engineering", "release"],
                 "bind": [
-                    "current_product_spec.content_hash",
+                    "current_contract.content_hash", "current_engineering_plan.content_hash",
                     "current_delivery_spec.content_hash",
                     "current code snapshot",
                     "quality host check receipts; engineering receipts are rejected",
@@ -146,6 +158,10 @@ class ContextAssembler:
             ContextPart("intend", None, projection.task),
             ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
             ContextPart("department_rules", department, DEPARTMENT_RULES[department]),
+            ContextPart("professional_completion", None,
+                        "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。"
+                        "模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。"
+                        "产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。"),
             ContextPart("proposal_contract", department, json_dumps(PROPOSAL_CONTRACTS[department])),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
             ContextPart(
@@ -162,6 +178,12 @@ class ContextAssembler:
         feedback = _validation_feedback(projection, department)
         if feedback:
             parts.append(ContextPart("validation_feedback", feedback.get("event_id"), json_dumps(feedback)))
+        if projection.effective_contract is not None:
+            parts.append(ContextPart("current_contract", projection.effective_contract.content_hash,
+                                     json_dumps(projection.effective_contract)))
+        if projection.engineering_plan is not None:
+            parts.append(ContextPart("current_engineering_plan", projection.engineering_plan.content_hash,
+                                     json_dumps(projection.engineering_plan)))
         if projection.product_spec and projection.product_spec.status == "active":
             spec = projection.product_spec
             parts.append(
@@ -185,7 +207,7 @@ class ContextAssembler:
                     ),
                 )
             )
-        if department in {"engineering", "quality"} and projection.effective_decisions:
+        if projection.effective_decisions:
             parts.append(
                 ContextPart(
                     "current_product_decisions",
@@ -228,6 +250,7 @@ class ContextAssembler:
                             "impact": ask.impact,
                             "options": ask.options,
                             "product_spec_hash": ask.product_spec_hash,
+                            "effective_contract_hash": ask.effective_contract_hash,
                             "question": ask.question,
                             "recommendation": ask.recommendation,
                             "revision": ask.revision,
@@ -289,6 +312,8 @@ class ContextAssembler:
             truncated=False,
             step_id=step_id,
             compaction_event_id=compaction_event_id,
+            effective_contract_hash=current_contract_hash(projection),
+            engineering_plan_hash=current_plan_hash(projection),
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -307,6 +332,8 @@ class ContextAssembler:
             excluded=pinned.manifest.excluded, token_estimate=estimate_tokens(json_dumps(request)),
             budget=pinned.manifest.budget, digest=canonical_hash(request), purpose="compaction",
             max_output_tokens=max_output_tokens, compaction_event_id=compaction_event_id,
+            effective_contract_hash=pinned.manifest.effective_contract_hash,
+            engineering_plan_hash=pinned.manifest.engineering_plan_hash,
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 
@@ -323,6 +350,8 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
         work = "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。"
     elif department == "engineering" and projection.effective_decisions:
         work = "产品回复已经到达。依据 current_product_decisions 中的有效决定继续实现、运行检查并提交交付；已回答的问题无需再次等待回复。"
+    if department == "engineering" and projection.engineering_plan is None:
+        work += " 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。"
     return {
         "department": department, "phase": projection.phase, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
@@ -340,6 +369,8 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "product_spec_id": None if spec is None else spec.id,
         "product_spec_hash": None if spec is None else spec.content_hash,
         "product_spec_revision": None if spec is None else spec.revision,
+        "effective_contract_hash": current_contract_hash(projection),
+        "engineering_plan_hash": current_plan_hash(projection),
         "delivery_spec_id": None if delivery is None else delivery.id,
         "delivery_spec_hash": None if delivery is None else delivery.content_hash,
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,
@@ -416,6 +447,8 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> 
         "invalidation_reason": delivery.invalidation_reason,
         "known_risks": delivery.known_risks,
         "product_spec_hash": delivery.product_spec_hash,
+        "effective_contract_hash": delivery.effective_contract_hash,
+        "engineering_plan_hash": delivery.engineering_plan_hash,
         "revision": delivery.revision,
         "status": delivery.status,
         "summary": delivery.summary,
