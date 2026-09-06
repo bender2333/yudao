@@ -4,7 +4,7 @@
 
 2026-09-06 根据用户确认，循环推进与上下文控制改由 Yudao 原生内核负责。OMP 仅保留代码级参考价值，旧 RPC 运行适配器、启动隔离覆盖文件和相关测试已删除。Provider 层只做一次模型请求，宿主工具执行、部门交接、每步上下文组装和停止判定由内核负责。
 
-默认原生数据目录为 `.yudao/native-loop`，真实 smoke 默认使用 `.yudao/native-validation`。早期原生验收保存在 `.yudao/native-final-validation`；G 最新服务位于 [http://127.0.0.1:8768](http://127.0.0.1:8768)，数据目录 `.yudao/stage1-git-validation`。8766 保留 D 版本，8765 为旧 OMP 服务。旧事件库保留为历史证据，不迁移、不提供兼容读取，不作为最新原生架构验收结果。
+默认原生数据目录为 `.yudao/native-loop`，真实 smoke 默认使用 `.yudao/native-validation`。早期原生验收保存在 `.yudao/native-final-validation`；当前复验服务位于 [http://127.0.0.1:8771](http://127.0.0.1:8771)，数据目录 `.yudao/stage1-real-web-20260906-145135728`。旧数据目录和服务记录保留为历史证据，不迁移、不提供兼容读取，不作为最新原生架构验收结果。
 
 新的输入验收口径包括：每步完整 developer 输入、原始任务、本部门历史视图、工具 schema 与工件摘要绑定；历史逐项对应同一任务内本部门收到的工作消息、模型输出与宿主工具结果，跨激活延续且不混入其它部门私有历史。自动压缩记录完整来源、连续覆盖范围、摘要原文与近期工具回合，原始事件不删除；压缩请求本身可容纳、可取消并计入同一个模型步骤限制。模型调用尝试与上下文准备分别记录；工程和质检的成功检查对应宿主执行、当前合同与最终代码快照。调用尝试不等于网络请求已送达，只有实际返回结果才作为已观察到的模型执行证据。
 
@@ -99,6 +99,28 @@ G 生产代码已提交推送 `0533c90`。两次最终真实运行使用相同�
 真实 Web 同任务方向调整至独立 QA、真实压缩后继续至独立 QA 仍未通过，当前受 provider 连接失败阻塞。此前连接小请求成功、TLS 握手成功、部分真实 Ask/摘要成功和确定性 G 验收均不替代这两项结果。没有降低完成条件或宣布第一阶段整体通过。
 
 本机新服务在 8768、PID 1464，数据目录 `.yudao/stage1-git-validation`，复验结束后健康检查正常、空闲、无 worker error。重启旧 8766 的命令曾被自动审批拒绝，理由仅为 `blocked by policy`；保留旧服务并使用当时空闲的 8768，没有重试被拒操作或混用旧数据。
+
+### F 按当前 provider.md 再次复验
+
+用户再次要求“请使用provider.md中的模型进行测试，优先使用subagent”。本轮在 `079a632` 代码基线上，由两个子 agent 分别执行真实连接/压缩和 Web 测试，另一个子 agent 独立审计，主 agent 审查及记录结果。当前文件仍为 `https://penguinapi.org/v1`、`gpt-5.6-luna`、`openai-Responses`；密钥只用于认证，不写入报告。生产代码、模型配置及系统网络未修改，SDK 自动重试为 0，失败 run 未被恢复或改写。
+
+| 对象 | 本轮证据 | 结论 |
+| --- | --- | --- |
+| 实际模型接入 | `.tmp/provider-connectivity-retest-20260906-145604.json`，流式请求约 4.167 秒收到 `response.completed`；压缩及 Web 正式事件记录实际返回模型 `gpt-5.6-luna` | 配置能够调用并收到真实响应，不能据此认为长流程连接稳定 |
+| Web 首次 | `run_a471b359753c4ac9`，`.tmp/native-f-browser-run_a471b359753c4ac9.json` | 首次完整请求连接失败 |
+| Web 完整方向调整 | `run_e6ccebbdeeae41d8`，`.tmp/native-f-browser-run_e6ccebbdeeae41d8.json` | 11 次激活、16 次模型请求；追加输入 v2 已接纳处理，PRD/PLAN 和交付均形成两版；最后 QA 请求连接失败，未完成 release |
+| 真实小窗 | `run_5e5faeeb8d874e39`，`.yudao/stage1-provider-retest-20260906/compaction-smoke-report.json` | 窗口 9000，完整参考资料读取两次、3 次压缩成功，原文和摘要来源保留；第 7 次模型请求为压缩，连接失败，未进入正式产品接纳或最终 QA |
+| 失败输入的有界诊断 | Web `.tmp/context-replay-run_e6ccebbdeeae41d8-seq173.json`；小窗 `.yudao/stage1-provider-retest-20260906/failed-request-replay-diagnostic.json` | 从失败请求工件取出实际输入分别单次重放，均收到完整响应；小窗返回模型 `gpt-5.6-luna`、3383 tokens。诊断结果没有写回原任务，不算任务恢复或 QA 通过 |
+
+连接诊断捕获到 `APIConnectionError -> ConnectError -> EndOfStream -> SSLEOFError`。相同配置的普通 JSON、流式和应用 adapter 请求均取得过成功响应；无认证 HTTP 请求也在 TLS 层发生 EOF，且 `trust_env=true/false` 都出现该异常。证据支持连接存在间歇中断，尚不能确定故障位于远端网关还是本机网络路径，也没有证据将其归因于模型名称或压缩请求的确定性格式错误。
+
+网络证据为 `.yudao/stage1-provider-retest-20260906/network-diagnostic.json`：IPv4 TLS 1.3 握手成功；IPv6 探针自身返回 `ValueError`，不把它当成已证实的 IPv6 网络故障。未修改 DNS、代理、证书或 provider 配置。
+
+独立结果审计保存在 `.tmp/native-provider-result-audit-run_e6ccebbdeeae41d8-v3-r2.json` 和 `.tmp/native-provider-result-audit-run_5e5faeeb8d874e39-v3-r2.json`，由主 agent 收尾执行，未新增模型调用。Web 共 15 个完整模型响应、29 个输出项、8 个正式 Git 版本；小窗共 6 个完整响应、11 个输出项、1 个正式 Git 版本。两 run 的原文、真实响应模型、Git 对象与正式材料、上下文来源和 replay 均核验通过，审计前后事件不变。
+
+Web 两版交付的 Git 文件与封存字节一致，最终交付从持久封存恢复后，普通/flag/额外/空格参数大写行为以及缺参 usage/退出 2 均通过；仍缺绑定最终合同与代码树的质量检查及 release。小窗的完整参考文本和 3 次摘要来源通过，未形成交付。审计初版因 Git 索引字段、提交元数据及 Windows 文本换行预期不匹配出现误判，修正脚本后另存 v3 报告，旧报告保留；`intend.md` 始终按原始字节核对。参考资料未预存初始物理字节摘要，仅对已记录完整文本和当前物理文件分别说明，未冒称验证不存在的依据。
+
+当前服务在 8771、PID 19972，真实 Responses、空闲且无 worker error。所有真实调用和浏览器测试会话已结束。最后独立 QA 及压缩后完整交付仍是待补验项目，局部成功不改变原任务的 `FAILED / provider_error`。
 
 ## 第一阶段完整目标
 
