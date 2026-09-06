@@ -12,14 +12,16 @@ from .contracts import contract_payload, render_plan, render_prd
 from .event_store import EventStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
-from .workspace import Workspace
+from .public_tree import verify_public_tree
+from .tree_archive import store_tree
+from .workspace import WorkspaceSnapshot
 
 
 class SubmissionWriter:
     def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path) -> None:
         self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
 
-    def commit(self, *, projection: RunProjection, workspace: Workspace, artifact: dict[str, Any],
+    def commit(self, *, projection: RunProjection, snapshot: WorkspaceSnapshot, workspace_root: Path, artifact: dict[str, Any],
                extra: dict[str, Any], department: str, parent_event_id: str, session_id: str,
                provider: str | None, model: str | None) -> Event:
         run_id = projection.run_id
@@ -67,16 +69,17 @@ class SubmissionWriter:
             artifact["id"] = new_id("ask")
             event = append(EventType.ASK_SUBMITTED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":
+            if artifact["code_tree_digest"] != snapshot.digest:
+                raise ValueError("Delivery does not match the validated workspace snapshot")
             artifact["id"] = new_id("del")
-            artifact["file_refs"] = [asdict(self.artifacts.put(run_id, "source_file", workspace.read_file(rel),
-                                                             media_type="text/plain")) for rel in artifact["files"]]
-            ref = self.artifacts.put(run_id, "code_snapshot", "\n".join(artifact["files"] + [artifact["code_tree_digest"]]),
-                                     media_type="text/plain")
-            artifact["snapshot_ref"] = asdict(ref)
+            ref = store_tree(self.artifacts, run_id, snapshot.tree)
+            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            artifact["tree_ref"] = asdict(ref)
             event = append(EventType.DELIVERY_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
         elif kind == "qa_review":
             artifact["id"] = new_id("qa")
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
+            verify_public_tree(workspace_root, snapshot.tree.manifest)
             artifact["evidence_refs"] = [asdict(ref)]
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
         else:

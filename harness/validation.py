@@ -385,7 +385,6 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
         "revision": revision,
         "status": "active",
         "content_hash": spec_content_hash("delivery_spec", payload, parent_hash=parent, revision=revision),
-        "file_refs": [],
     }
     from_phase = projection.phase if projection.phase in {"ENGINEERING", "REWORK_ENGINEERING"} else "ENGINEERING"
     return ProposalDecision(

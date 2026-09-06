@@ -126,7 +126,9 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
         pytest.skip("hard links are not available")
     workspace.write_file("poke.py", "from pathlib import Path\nPath('target.txt').write_text('HACKED')\n")
     result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
-    assert result.ok is True
+    assert result.ok is False
+    assert "hard-linked" in result.error.lower()
+    assert workspace.receipts() == []
     assert outside.read_text(encoding="utf-8") == "EXTERNAL"
     assert target.read_text(encoding="utf-8") != "HACKED"
 
@@ -182,14 +184,11 @@ def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_co
     workspace = Workspace(tmp_path / "workspace")
     runtime = ToolRuntime(workspace)
     workspace.write_file("ok.py", "print('ok')\n")
-    original = Path.write_bytes
+    def fail_copy(tree, target):
+        target.mkdir()
+        raise OSError("copy failed")
 
-    def fail_copy(self: Path, data: bytes) -> int:
-        if check_copy_base in self.parents:
-            raise OSError("copy failed")
-        return original(self, data)
-
-    monkeypatch.setattr(Path, "write_bytes", fail_copy)
+    monkeypatch.setattr("harness.workspace.materialize_tree", fail_copy)
     result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
     assert result.ok is False
     assert "copy failed" in (result.error or "")
@@ -201,8 +200,8 @@ def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_b
     runtime = ToolRuntime(workspace)
     workspace.write_file("ok.py", "print('ok')\n")
     workspace.write_file("fail.py", "raise SystemExit(7)\n")
-    with workspace.check_copy() as copy_root:
-        assert copy_root.parent == check_copy_base
+    with workspace.check_copy(workspace.snapshot().tree) as copy_root:
+        assert copy_root.parent.parent == check_copy_base
         assert not copy_root.is_relative_to(workspace.root)
     ok = runtime.execute("engineering", "run_check", {"name": "ok", "argv": ["python", "ok.py"]})
     failed = runtime.execute("engineering", "run_check", {"name": "fail", "argv": ["python", "fail.py"]})
@@ -220,6 +219,124 @@ def test_product_cannot_write(tmp_path):
     assert result.ok is False
 
 
+def test_module_import_check_preserves_complete_tree(tmp_path):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("helper.py", "VALUE = 42\n")
+    workspace.write_file("main.py", "from helper import VALUE\nprint(VALUE)\nassert VALUE == 42\n")
+    result = ToolRuntime(workspace).execute("engineering", "run_check", {
+        "name": "imports", "argv": ["python", "main.py"],
+    })
+    assert result.ok and result.output["exit_code"] == 0
+    assert result.output["tree_changed"] is False
+    assert "42" in result.output["summary"]
+    assert workspace.snapshot().latest_check("engineering", "imports") is not None
+    assert workspace.list_files() == ["helper.py", "main.py"]
+
+
+def test_check_copy_uses_previously_captured_bytes(tmp_path):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("app.py", "original\n")
+    snapshot = workspace.snapshot()
+    workspace.write_file("app.py", "new\n")
+    workspace.write_file("extra.py", "new\n")
+    with workspace.check_copy(snapshot.tree) as copy_root:
+        assert (copy_root / "app.py").read_text() == "original\n"
+        assert not (copy_root / "extra.py").exists()
+
+
+def test_check_records_source_workspace_change(tmp_path, monkeypatch):
+    import harness.tools as tools
+
+    workspace = Workspace(tmp_path)
+    workspace.write_file("app.py", "print('checked original')\nraise SystemExit(7)\n")
+    run = tools.subprocess.run
+
+    def execute(*args, **kwargs):
+        result = run(*args, **kwargs)
+        workspace.write_file("app.py", "changed after the check\n")
+        return result
+
+    monkeypatch.setattr(tools.subprocess, "run", execute)
+    result = ToolRuntime(workspace).execute("engineering", "run_check", {
+        "name": "source", "argv": ["python", "app.py"],
+    })
+    assert result.ok and result.output["exit_code"] == 7
+    assert result.output["tree_changed"] is True
+    assert "checked original" in result.output["summary"]
+    assert "source workspace changed" in result.output["summary"]
+    assert len(workspace.receipts()) == 1
+    assert workspace.snapshot().latest_check("engineering", "source") is None
+
+
+@pytest.mark.parametrize("failed_root", ["copy", "source"])
+def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, monkeypatch, failed_root):
+    import harness.tools as tools
+
+    workspace = Workspace(tmp_path)
+    workspace.write_file("app.py", "print('observed output')\nraise SystemExit(9)\n")
+    capture = tools.capture_public_tree
+
+    def verify(root):
+        if (root == workspace.root) == (failed_root == "source"):
+            raise OSError("tree read failed")
+        return capture(root)
+
+    monkeypatch.setattr(tools, "capture_public_tree", verify)
+    result = ToolRuntime(workspace).execute("engineering", "run_check", {
+        "name": "unverified", "argv": ["python", "app.py"],
+    })
+    assert result.ok and result.output["exit_code"] == 9
+    assert result.output["tree_changed"] is True
+    assert "observed output" in result.output["summary"]
+    assert "could not be verified: tree read failed" in result.output["summary"]
+    assert len(workspace.receipts()) == 1
+    assert workspace.snapshot().latest_check("engineering", "unverified") is None
+
+
+@pytest.mark.parametrize("department", ["product", "quality"])
+@pytest.mark.parametrize("tool,args", [
+    ("delete_file", {"path": "old.py", "reason": "remove replaced implementation"}),
+    ("move_file", {"source": "old.py", "destination": "new.py", "reason": "organize module"}),
+])
+def test_refactoring_tools_require_engineering(tmp_path, department, tool, args):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("old.py", "original\n")
+    result = ToolRuntime(workspace).execute(department, tool, args)
+    assert result.ok is False
+    assert workspace.read_file("old.py") == "original\n"
+    assert not (workspace.root / "new.py").exists()
+
+
+@pytest.mark.parametrize("reason", [None, "", " ", 2])
+def test_refactoring_tools_require_explained_reason(tmp_path, reason):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("old.py", "original\n")
+    runtime = ToolRuntime(workspace)
+    for tool, args in (("delete_file", {"path": "old.py"}),
+                       ("move_file", {"source": "old.py", "destination": "new.py"})):
+        result = runtime.execute("engineering", tool, {**args, "reason": reason})
+        assert result.ok is False
+        assert "reason" in result.error
+        assert workspace.read_file("old.py") == "original\n"
+
+
+def test_refactoring_tools_move_and_delete_regular_files(tmp_path):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("old.py", "original\n")
+    runtime = ToolRuntime(workspace)
+    moved = runtime.execute("engineering", "move_file", {
+        "source": "old.py", "destination": "src/new.py", "reason": "organize module",
+    })
+    assert moved.ok and moved.output == {"source": "old.py", "destination": "src/new.py"}
+    assert not (workspace.root / "old.py").exists()
+    assert workspace.read_file("src/new.py") == "original\n"
+    deleted = runtime.execute("engineering", "delete_file", {
+        "path": "src/new.py", "reason": "remove replaced module",
+    })
+    assert deleted.ok and deleted.output == "src/new.py"
+    assert workspace.list_files() == []
+
+
 def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
     from harness.smoke import smoke_exit_code
 
@@ -232,6 +349,7 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
         "model_input_audit": {"status": "verified"},
         "check_receipts": [{"name": "smoke"}],
         "check_receipts_verified": True,
+        "delivery_archive": {"status": "verified"},
         "fake_used": False,
         "ask_count": 1,
     }

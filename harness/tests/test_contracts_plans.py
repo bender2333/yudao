@@ -24,7 +24,7 @@ def _accept_new_spec(system, run_id):
                                  proposal=product_spec(requirements=["print the argument in uppercase"]))
     assert decision.accepted
     system.orchestrator._commit_accepted(
-        run_id, department="product", projection=projection, artifact=decision.artifact,
+        run_id, department="product", projection=projection, snapshot=system.workspace(run_id).snapshot(), artifact=decision.artifact,
         transitions=[], extra=decision.extra, parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake-script",
     )
@@ -206,13 +206,15 @@ def test_prd_artifact_failure_does_not_accept_product_or_contract(tmp_path, monk
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-@pytest.mark.parametrize("path", ["../src/", "/src/", "C:/src/", "src/../other/", ".checks/", ".CHECKS/", "src:file", " src/", "src/ ", ".checks /", "src./", "NUL", "src/COM1.py"])
+@pytest.mark.parametrize("path", ["../src/", "/src/", "C:/src/", "src/../other/", ".checks/", ".CHECKS/", "src:file", "src/ ", ".checks /", "src./", "NUL", "src/COM1.py"])
 def test_plan_scope_rejects_paths_outside_public_workspace(path):
     with pytest.raises(ValueError):
         normalize_scope(path)
 
 
 def test_scope_matches_files_and_directory_boundaries():
+    assert normalize_scope(" src/") == " src/"
+    assert path_in_scope(" src/main.py", [" src/"])
     assert path_in_scope("src/main.py", ["src/"])
     assert path_in_scope("src/main.py", ["src/main.py"])
     assert not path_in_scope("src-other/main.py", ["src/"])

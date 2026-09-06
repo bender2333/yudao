@@ -203,6 +203,8 @@ dialog pre {
   word-break: break-word;
 }
 dialog button { background: var(--ink); color: var(--surface); border: 0; padding: 6px 12px; cursor: pointer; }
+#event-sources { max-height: 20vh; overflow: auto; }
+#event-sources .event-link { overflow-wrap: anywhere; max-width: 100%; }
 @media (min-width: 720px) {
   .kv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

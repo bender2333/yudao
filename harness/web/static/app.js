@@ -541,6 +541,7 @@ function renderEvidence(evidence, gen = state.gen) {
       <p>${t(item.summary)}</p>
       <p class="hash">${t(shortHash(item.code_tree_digest))}</p>
       <p class="muted">${t((item.checks || []).map((check) => `${check.name}:${check.exit_code}`).join(" "))}</p>
+      <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="tree">查看完整交付</button>
     </article>`,
     )
     .join("");
@@ -589,7 +590,7 @@ function renderEvidence(evidence, gen = state.gen) {
       ? `<div class="list">${deliveries}${reviews}${rejections}</div>${candidates ? `<h3 class="lesson-heading">经验候选</h3><div class="list">${candidates}</div>` : ""}`
       : `<p class="muted">尚无交付或质检证据。</p>`;
   node.querySelectorAll(".event-link").forEach((button) => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
   });
 }
 
@@ -653,7 +654,10 @@ async function openEvent(eventId, gen, documentKind) {
   try {
     const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
     if (token !== state.gen || state.runId !== runId) return;
-    const documentText = documentKind === "prd" || documentKind === "plan" ? data[`${documentKind}_markdown`] : null;
+    const documentText = documentKind === "tree" && data.tree_archive
+      ? JSON.stringify({ format: data.tree_archive.format, tree_digest: data.tree_archive.tree_digest,
+        tree: data.tree_archive.tree, blobs: data.tree_archive.blobs }, null, 2)
+      : documentKind === "prd" || documentKind === "plan" ? data[`${documentKind}_markdown`] : null;
     if (documentKind && typeof documentText !== "string") throw new Error("原文工件不可用");
     const jsonNode = document.getElementById("event-json");
     const documentNode = document.getElementById("event-document");
@@ -664,7 +668,7 @@ async function openEvent(eventId, gen, documentKind) {
       documentNode.textContent = documentText || "";
       documentNode.hidden = !documentKind;
     }
-    if (titleNode) titleNode.textContent = documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
+    if (titleNode) titleNode.textContent = documentKind === "tree" ? "完整交付清单" : documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
     const sources = document.getElementById("event-sources");
     if (sources) {
       sources.replaceChildren();
@@ -675,6 +679,14 @@ async function openEvent(eventId, gen, documentKind) {
         button.textContent = "查看接纳记录";
         button.addEventListener("click", () => openEvent(eventId, token));
         sources.appendChild(button);
+      }
+      for (const file of data.tree_archive?.tree.files || []) {
+        const link = document.createElement("a");
+        link.className = "event-link";
+        link.textContent = `${file.path} (${file.size} B)`;
+        link.href = `/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}/files?path=${encodeURIComponent(file.path)}`;
+        link.download = file.path.split("/").pop();
+        sources.appendChild(link);
       }
       for (const source of data.source_events || []) {
         const button = document.createElement("button");

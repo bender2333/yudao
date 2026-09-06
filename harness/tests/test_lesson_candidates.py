@@ -112,7 +112,7 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
         assert candidate.product_spec_hash == result.product_spec.content_hash
         assert candidate.delivery_spec_hash == result.delivery_spec.content_hash
         assert candidate.checks == result.delivery_spec.checks
-        assert candidate.evidence_refs == result.delivery_spec.file_refs
+        assert candidate.evidence_refs == [result.delivery_spec.tree_ref]
         assert all(system.artifacts.get(ref) for ref in candidate.evidence_refs)
     else:
         assert candidate.product_spec_hash is None

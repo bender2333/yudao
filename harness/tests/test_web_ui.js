@@ -478,6 +478,27 @@ test("missing original material is an error without showing stale document text"
   assert.equal(document.getElementById("event-dialog")._shown, undefined);
 });
 
+test("delivery view opens complete manifest and persisted file downloads", async () => {
+  const archive = {
+    format: "yudao-tree-archive-v1", tree_digest: "tree-hash",
+    tree: { directories: ["empty"], files: [{ path: "assets/original bytes.bin", size: 3, content_hash: "blob-hash" }] },
+    blobs: [{ path: "assets/original bytes.bin", artifact: { path: "run-a/aa/blob-hash", content_hash: "blob-hash" } }],
+  };
+  const { web, document } = loadApp(async () => jsonResponse({ event_id: "delivery-event", tree_archive: archive }));
+  web.state.runId = "run-a";
+  web.state.gen = 4;
+  web.renderEvidence({ deliveries: [{ revision: 1, created_event_id: "delivery-event", files: ["src/echo.py"] }] }, 4);
+  assert.match(document.getElementById("evidence-body").innerHTML, /data-event-id="delivery-event" data-document="tree"/);
+  await web.openEvent("delivery-event", 4, "tree");
+  assert.equal(document.getElementById("event-title").textContent, "完整交付清单");
+  assert.deepEqual(JSON.parse(document.getElementById("event-document").textContent), archive);
+  const links = document.getElementById("event-sources").children;
+  assert.equal(links.length, 2);
+  assert.equal(links[1].textContent, "assets/original bytes.bin (3 B)");
+  assert.equal(links[1].href, "/api/runs/run-a/events/delivery-event/files?path=assets%2Foriginal%20bytes.bin");
+  assert.equal(links[1].download, "original bytes.bin");
+});
+
 const emptyAgg = { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 };
 
 function sampleLesson(extra = {}) {

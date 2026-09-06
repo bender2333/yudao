@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .models import json_dumps
+from .public_tree import capture_public_tree, is_private_path
 from .redact import redact_text, sanitized_env
-from .workspace import Workspace, is_private_path, tree_digest
+from .workspace import Workspace
 
 CHECK_TIMEOUT_SEC = 30
 CHECK_OUTPUT_LIMIT = 4000
@@ -20,6 +21,8 @@ TOOL_DEFS = {
     "read_file": {"access": "read", "departments": ("product", "engineering", "quality")},
     "list_files": {"access": "read", "departments": ("product", "engineering", "quality")},
     "write_file": {"access": "write", "departments": ("engineering",)},
+    "delete_file": {"access": "write", "departments": ("engineering",)},
+    "move_file": {"access": "write", "departments": ("engineering",)},
     "run_check": {"access": "check", "departments": ("product", "engineering", "quality")},
     "collect_evidence": {"access": "check", "departments": ("quality",)},
     "submit_product_spec": {"access": "submit", "departments": ("product",)},
@@ -70,6 +73,8 @@ class ToolRuntime:
             "read_file": self._read_file,
             "list_files": self._list_files,
             "write_file": self._write_file,
+            "delete_file": self._delete_file,
+            "move_file": self._move_file,
             "run_check": self._run_check,
             "collect_evidence": self._collect_evidence,
             "submit_product_spec": self._submit,
@@ -106,6 +111,14 @@ class ToolRuntime:
     def _write_file(self, department: str, args: dict[str, Any]) -> str:
         return self.workspace.write_file(str(args["path"]), str(args["content"]))
 
+    def _delete_file(self, department: str, args: dict[str, Any]) -> str:
+        _require_reason(args)
+        return self.workspace.delete_file(args["path"])
+
+    def _move_file(self, department: str, args: dict[str, Any]) -> dict[str, str]:
+        _require_reason(args)
+        return self.workspace.move_file(args["source"], args["destination"])
+
     def _run_check(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
         return self._execute_check(department, args)
 
@@ -123,14 +136,15 @@ class ToolRuntime:
         if not name:
             raise ValueError("check name is required")
         argv = _argv_from_args(args)
-        original_digest = self.workspace.digest()
-        with self.workspace.check_copy() as copy_root:
+        snapshot = self.workspace.snapshot()
+        original_digest = snapshot.digest
+        with self.workspace.check_copy(snapshot.tree) as copy_root:
             resolved = _resolve_argv(self.workspace, argv, cwd=copy_root)
             try:
                 completed = subprocess.run(
                     resolved,
                     cwd=str(copy_root),
-                    env=sanitized_env(),
+                    env={**sanitized_env(), "PYTHONDONTWRITEBYTECODE": "1"},
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
@@ -146,11 +160,22 @@ class ToolRuntime:
                     output += "\n" + _decode(exc.stdout)
                 if exc.stderr:
                     output += "\n" + _decode(exc.stderr)
-            observed_digest = tree_digest(copy_root)
-            tree_changed = observed_digest != original_digest
-            snapshot_hash = original_digest if not tree_changed else observed_digest
+            snapshot_hash = original_digest
+            verification_errors = []
+            # A process result remains evidence even when its tested bytes cannot be verified.
+            for label, root in (("tested tree", copy_root), ("source workspace", self.workspace.root)):
+                try:
+                    observed_digest = capture_public_tree(root).digest
+                    if label == "tested tree":
+                        snapshot_hash = observed_digest
+                    if observed_digest != original_digest:
+                        verification_errors.append(f"{label} changed")
+                except Exception as exc:
+                    verification_errors.append(f"{label} could not be verified: {exc}")
+            tree_changed = bool(verification_errors)
             if tree_changed:
-                output = (output + "\n" if output else "") + "tested tree changed; pass is not bound to the original snapshot"
+                output = (output + "\n" if output else "") + "; ".join(verification_errors)
+                output += "; pass is not bound to the original snapshot"
             summary = redact_text(
                 f"host-executed argv={_display_argv(resolved)} exit={exit_code}\n{output}".strip()
             )
@@ -175,6 +200,12 @@ class ToolRuntime:
                 "effective_contract_hash": receipt.effective_contract_hash,
                 "engineering_plan_hash": receipt.engineering_plan_hash,
             }
+
+
+def _require_reason(args: dict[str, Any]) -> None:
+    reason = args.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("a non-empty reason is required for deleting or moving files")
 
 
 def _argv_from_args(args: dict[str, Any]) -> list[str]:
@@ -282,6 +313,27 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "content": {"type": "string", "description": "Full file contents"},
             },
             ["path", "content"],
+        ),
+        "loadMode": "essential",
+    },
+    "delete_file": {
+        "name": "delete_file",
+        "label": "delete_file",
+        "description": "Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+        "parameters": _object_schema(
+            {"path": {"type": "string"}, "reason": {"type": "string", "minLength": 1}},
+            ["path", "reason"],
+        ),
+        "loadMode": "essential",
+    },
+    "move_file": {
+        "name": "move_file",
+        "label": "move_file",
+        "description": "Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+        "parameters": _object_schema(
+            {"source": {"type": "string"}, "destination": {"type": "string"},
+             "reason": {"type": "string", "minLength": 1}},
+            ["source", "destination", "reason"],
         ),
         "loadMode": "essential",
     },

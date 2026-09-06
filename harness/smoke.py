@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,9 @@ from .artifacts import ArtifactStore
 from .event_store import EventStore
 from .models import ArtifactRef, EventType, canonical_hash, json_dumps
 from .projection import project_run
+from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
+from .tree_archive import load_tree
 
 
 DEFAULT_DIR = Path(".yudao") / "native-validation"
@@ -116,6 +119,7 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "check_receipts": receipts,
         "check_receipts_verified": receipts_ok,
         "check_receipt_notes": receipt_notes,
+        "delivery_archive": _archive_evidence(system, run_id),
         "replay_consistent": replayed.canonical_state() == projection.canonical_state(),
         **isolation,
         "fake_used": projection.adapter == "fake",
@@ -162,6 +166,24 @@ def isolation_fields(store: EventStore, artifacts: ArtifactStore, run_id: str) -
 
 def _read_artifact(artifacts: ArtifactStore, run_id: str, ref: dict[str, Any]) -> Any:
     return json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+
+
+def _archive_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
+    delivery = system.project(run_id).delivery_spec
+    if delivery is None:
+        return {"status": "unverified", "notes": ["no accepted delivery archive"]}
+    try:
+        tree = load_tree(system.artifacts, run_id, delivery.tree_ref)
+        if tree.digest != delivery.code_tree_digest:
+            raise ValueError("archived tree does not match its accepted delivery")
+        with tempfile.TemporaryDirectory(prefix="yudao-archive-audit-") as folder:
+            restored = materialize_tree(tree, Path(folder) / "workspace")
+            if capture_public_tree(restored).digest != delivery.code_tree_digest:
+                raise ValueError("restored tree does not match its accepted delivery")
+        return {"status": "verified", "tree_digest": tree.digest, "manifest_ref": asdict(delivery.tree_ref),
+                "files": len(tree.files), "directories": len(tree.directories), "notes": []}
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        return {"status": "unverified", "notes": [str(exc)]}
 
 
 def _history_record(event: Any, item: dict[str, Any]) -> dict[str, Any]:
@@ -532,7 +554,11 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
         else:
             executions.pop(match)
     projection = system.project(run_id)
-    snapshot = system.workspace(run_id).digest()
+    try:
+        snapshot = system.workspace(run_id).digest()
+    except (ValueError, OSError) as exc:
+        snapshot = None
+        notes.append(f"current workspace could not be verified: {exc}")
     spec = projection.product_spec
     delivery = projection.delivery_spec
     contract = projection.effective_contract
@@ -593,6 +619,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- model requests: `{(scenario.get('model_input_audit') or {}).get('request_count', 0)}`",
                 f"- context isolated: `{scenario.get('context_isolated')}`",
                 f"- host receipts verified: `{scenario.get('check_receipts_verified')}`",
+                f"- delivery archive: `{(scenario.get('delivery_archive') or {}).get('status', 'unverified')}`",
                 f"- fake used: `{scenario.get('fake_used')}`",
                 f"- delivery files: `{', '.join(scenario.get('delivery_files') or [])}`",
                 f"- qa verdict: `{scenario.get('qa_verdict')}`",
@@ -608,6 +635,8 @@ def _markdown(report: dict[str, Any]) -> str:
             lines.append("")
         for note in scenario.get("check_receipt_notes") or []:
             lines.append(f"- receipt note: {note}")
+        for note in (scenario.get("delivery_archive") or {}).get("notes", []):
+            lines.append(f"- archive note: {note}")
         receipts = scenario.get("check_receipts") or []
         if receipts:
             lines.append("检查回执：")
@@ -643,6 +672,8 @@ def smoke_exit_code(report: dict[str, Any]) -> int:
         if (scenario.get("model_input_audit") or {}).get("status") != "verified":
             return 1
         if not scenario.get("check_receipts") or not scenario.get("check_receipts_verified"):
+            return 1
+        if (scenario.get("delivery_archive") or {}).get("status") != "verified":
             return 1
     ask = scenarios.get("ask")
     if ask is not None and ask.get("ask_count", 0) < 1:

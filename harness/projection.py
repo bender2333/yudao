@@ -228,6 +228,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 "files": delivery.files,
                 "checks": delivery.checks,
                 "code_tree_digest": delivery.code_tree_digest,
+                "tree_ref": delivery.tree_ref.__dict__,
                 "summary": delivery.summary,
             }
         )
@@ -401,7 +402,7 @@ def _delivery_from_payload(payload: dict[str, Any], event: Event) -> DeliverySpe
         checks=list(payload.get("checks", [])),
         known_risks=list(payload.get("known_risks", [])),
         code_tree_digest=payload["code_tree_digest"],
-        file_refs=[ArtifactRef(**item) if not isinstance(item, ArtifactRef) else item for item in payload.get("file_refs", [])],
+        tree_ref=ArtifactRef(**payload["tree_ref"]),
         invalidation_reason=payload.get("invalidation_reason"),
     )
 

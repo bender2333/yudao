@@ -16,8 +16,8 @@
 | D10 | [上下文窗口、记忆与自动压缩](context-compaction.md) | 已实现，真实运行验收中 |
 | D11 | [三部门循环的整体定义](three-department-loop.md) | 已确认，分工作包落实 |
 | D12 | [部门专业补全](domain-completion.md) | 部门规则与默认依据已实现 |
-| D13 | [完整交付封存与恢复](delivery-archive.md) | 基础已提交；实际检查与交付接入待完成 |
-| D14 | [受控删除与移动](workspace-refactoring.md) | 本轮采纳前移，待实现 |
+| D13 | [完整交付封存与恢复](delivery-archive.md) | 已接入检查与交付，独立恢复及 Web 下载已验证 |
+| D14 | [受控删除与移动](workspace-refactoring.md) | 已实现，E 整体验证通过 |
 | D15 | [有效变化与执行依据](effective-contract-changes.md) | 完整合同绑定已实现；输入和专家请求适用性待 C-D |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

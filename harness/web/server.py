@@ -9,11 +9,12 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
-from ..models import ArtifactRef, json_dumps
+from ..models import ArtifactRef, EventType, json_dumps
 from ..projection import RunNotFoundError, project_run
 from ..runtime import LoopSystem
+from ..tree_archive import load_tree
 from ..views import event_card, run_board, run_payload
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -223,11 +224,25 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             after = self._resume_seq(query, default=0)
             events = store.list_events(run_id, after_seq=after)
             return self._send_json({"events": [event_card(event) for event in events]})
+        if rest[:1] == ["events"] and len(rest) == 3 and rest[2] == "files":
+            event = store.get_event(rest[1])
+            if event is None or event.run_id != run_id or event.type != EventType.DELIVERY_ACCEPTED:
+                return self._send_json({"error": "delivery not found"}, 404)
+            tree, _archive = self._delivery_archive(event)
+            requested = query.get("path", [])
+            if len(requested) != 1:
+                raise ValueError("one archived file path is required")
+            file = next((item for item in tree.files if item.path == requested[0]), None)
+            if file is None:
+                return self._send_json({"error": "archived file not found"}, 404)
+            return self._send_bytes(file.data, "application/octet-stream", download_name=Path(file.path).name)
         if rest[:1] == ["events"] and len(rest) == 2:
             event = store.get_event(rest[1])
             if event is None or event.run_id != run_id:
                 return self._send_json({"error": "event not found"}, 404)
             detail = event.to_dict()
+            if event.type == EventType.DELIVERY_ACCEPTED:
+                _tree, detail["tree_archive"] = self._delivery_archive(event)
             for name in ("prd", "plan"):
                 ref = event.payload.get(f"{name}_ref")
                 if ref:
@@ -283,6 +298,14 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if rest == ["board"]:
             return self._send_json(run_board(project_run(store, run_id)))
         self._send_json({"error": "not found"}, 404)
+
+    def _delivery_archive(self, event):
+        ref = ArtifactRef(**event.payload["tree_ref"])
+        artifacts = self.server.system.artifacts
+        tree = load_tree(artifacts, event.run_id, ref)
+        if tree.digest != event.payload["code_tree_digest"]:
+            raise ValueError("archived tree does not match its accepted delivery")
+        return tree, json.loads(artifacts.get_for_run(event.run_id, ref))
 
     def _resume_seq(self, query: dict[str, list[str]], default: int = 0) -> int:
         header = self.headers.get("Last-Event-ID")
@@ -374,10 +397,14 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self._send_file(path, content_type)
 
     def _send_file(self, path: Path, content_type: str) -> None:
-        data = path.read_bytes()
+        self._send_bytes(path.read_bytes(), content_type)
+
+    def _send_bytes(self, data: bytes, content_type: str, *, download_name: str | None = None) -> None:
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        if download_name is not None:
+            self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{quote(download_name)}")
         self.end_headers()
         self.wfile.write(data)
 

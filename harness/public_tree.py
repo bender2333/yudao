@@ -140,6 +140,21 @@ def verify_public_tree(root: str | Path, manifest: dict[str, Any]) -> None:
         raise TreeError("Public tree does not match the complete recorded manifest")
 
 
+def resolve_public_path(root: str | Path, relative: str) -> Path:
+    """Resolve a public name while checking existing ancestors without following links."""
+    validate_public_path(relative)
+    target = _absolute_path(root) / relative
+    for path in [*reversed(target.parents), target]:
+        try:
+            observed = path.lstat()
+        except FileNotFoundError:
+            break
+        _check_kind(path, observed)
+        if path != target and not stat.S_ISDIR(observed.st_mode):
+            raise TreeError(f"Public path ancestor is not a directory: {path}")
+    return target
+
+
 def materialize_tree(tree: CapturedTree, new_directory: str | Path) -> Path:
     """Write already-validated bytes only into a new directory, then verify its tree."""
     if not isinstance(tree, CapturedTree):

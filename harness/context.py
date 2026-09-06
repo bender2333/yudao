@@ -31,6 +31,7 @@ DEPARTMENT_RULES = {
         "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
         "写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。"
         "调整计划先提交原因；影响产品目标、重要承诺或无法推断的重要成本取舍时提交 AskRequest。"
+        "可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。"
         "必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。"
         "失效交付只作为修复依据，不是当前有效交付。"
         "使用 submit_plan、submit_ask 或 submit_delivery 提交。不能宣布任务完成。"
@@ -40,6 +41,7 @@ DEPARTMENT_RULES = {
         "当前有效产品合同是 ProductSpec 以及绑定在该 spec 上、尚未被新 spec 取代的已回答产品决策。"
         "不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。"
         "使用 collect_evidence 或 run_check 让主机执行检查，再 submit_review。"
+        "交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。"
         "只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。"
         "自然语言中的“完成”不会改变任务状态。"
     ),
@@ -441,6 +443,7 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> 
         "check_names": delivery.check_names,
         "checks": delivery.checks,
         "code_tree_digest": delivery.code_tree_digest,
+        "tree_ref": delivery.tree_ref,
         "content_hash": delivery.content_hash,
         "files": delivery.files,
         "id": delivery.id,

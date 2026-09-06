@@ -2,10 +2,11 @@ import json
 import subprocess
 import threading
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -642,3 +643,106 @@ def test_web_ui_node_behaviors():
     assert "tiny positive cost is not rounded to zero" in output
     assert "missing event model is" in output
     assert "latest event model follows seq" in output
+
+
+@pytest.fixture
+def archived_run(data_dir):
+    system = LoopSystem(data_dir, FakeAdapter(happy_script()))
+    run_id = system.create_run("build echo")
+    workspace = system.workspace(run_id)
+    workspace.write_file(".settings", "hidden configuration\n")
+    (workspace.root / "assets").mkdir()
+    (workspace.root / "assets" / "data.bin").write_bytes(b"\x00\xff\x01")
+    (workspace.root / "empty").mkdir()
+    projection = system.run_until_stop(run_id)
+    assert projection.phase == "DONE"
+    return system, projection
+
+
+def test_delivery_event_exposes_complete_persisted_manifest_and_original_blob(archived_run):
+    system, projection = archived_run
+    delivery = projection.delivery_spec
+    workspace = system.workspace(projection.run_id)
+    workspace.write_file("src/echo.py", "changed after delivery\n")
+    (workspace.root / "assets" / "data.bin").unlink()
+    endpoint = f"/api/runs/{projection.run_id}/events/{delivery.created_event_id}"
+    with running_server(system) as (_server, host, port):
+        detail = get_json(host, port, endpoint)
+        archive = detail["tree_archive"]
+        assert archive["tree_digest"] == delivery.code_tree_digest
+        assert archive["tree"]["directories"] == ["assets", "empty", "src"]
+        assert [file["path"] for file in archive["tree"]["files"]] == [".settings", "assets/data.bin", "src/echo.py"]
+        assert delivery.files == ["src/echo.py"]
+        for blob in archive["blobs"]:
+            assert blob["artifact"]["path"].startswith(projection.run_id + "/")
+            assert (system.artifacts.root / blob["artifact"]["path"]).is_file()
+        conn = HTTPConnection(host, port)
+        try:
+            conn.request("GET", endpoint + "/files?path=" + quote("assets/data.bin", safe=""))
+            response = conn.getresponse()
+            assert response.status == 200
+            assert response.read() == b"\x00\xff\x01"
+            assert response.headers["Content-Type"] == "application/octet-stream"
+            assert response.headers["Content-Disposition"] == "attachment; filename*=UTF-8''data.bin"
+        finally:
+            conn.close()
+        status, body, _ = request(host, port, "GET", endpoint + "/files?path=src%2Fecho.py")
+        assert status == 200
+        assert "changed after delivery" not in body
+        assert "print" in body
+
+
+def test_delivery_download_is_limited_to_the_current_run_and_archived_paths(archived_run):
+    system, projection = archived_run
+    other_run = system.create_run("other task")
+    event_id = projection.delivery_spec.created_event_id
+    endpoint = f"/api/runs/{projection.run_id}/events/{event_id}/files"
+    with running_server(system) as (_server, host, port):
+        for path in (".checks/receipts.jsonl", "../outside", "unarchived.py", "empty"):
+            assert request(host, port, "GET", endpoint + "?path=" + quote(path, safe=""))[0] == 404
+        assert request(host, port, "GET", endpoint)[0] == 400
+        assert request(host, port, "GET", endpoint + "?path=src/echo.py&path=.settings")[0] == 400
+        foreign = f"/api/runs/{other_run}/events/{event_id}"
+        assert request(host, port, "GET", foreign)[0] == 404
+        assert request(host, port, "GET", foreign + "/files?path=.settings")[0] == 404
+
+
+@pytest.mark.parametrize("damage", ["missing", "modified"])
+def test_delivery_web_rejects_incomplete_or_corrupted_archive(archived_run, damage):
+    system, projection = archived_run
+    delivery = projection.delivery_spec
+    archive = json.loads(system.artifacts.get_for_run(projection.run_id, delivery.tree_ref))
+    blob = system.artifacts.root / archive["blobs"][0]["artifact"]["path"]
+    if damage == "missing":
+        blob.unlink()
+    else:
+        blob.write_bytes(b"corrupt archive")
+    endpoint = f"/api/runs/{projection.run_id}/events/{delivery.created_event_id}"
+    with running_server(system) as (_server, host, port):
+        for url in (endpoint, endpoint + "/files?path=src%2Fecho.py"):
+            status, body, _ = request(host, port, "GET", url)
+            assert status in {400, 500}
+            assert json.loads(body)["error"]
+
+
+@pytest.mark.parametrize("mismatch", ["run", "tree_digest"])
+def test_delivery_web_rejects_archive_not_bound_to_its_acceptance(archived_run, monkeypatch, mismatch):
+    system, projection = archived_run
+    delivery = projection.delivery_spec
+    event = system.store.get_event(delivery.created_event_id)
+    payload = dict(event.payload)
+    if mismatch == "run":
+        other_run = system.create_run("unrelated task")
+        data = system.artifacts.get_for_run(projection.run_id, delivery.tree_ref)
+        payload["tree_ref"] = asdict(system.artifacts.put(other_run, "tree_manifest", data, media_type="application/json"))
+    else:
+        payload["code_tree_digest"] = "sha256:" + "0" * 64
+    changed = replace(event, payload=payload)
+    get_event = system.store.get_event
+    monkeypatch.setattr(system.store, "get_event", lambda event_id: changed if event_id == event.event_id else get_event(event_id))
+    endpoint = f"/api/runs/{projection.run_id}/events/{delivery.created_event_id}"
+    with running_server(system) as (_server, host, port):
+        for url in (endpoint, endpoint + "/files?path=src%2Fecho.py"):
+            status, body, _ = request(host, port, "GET", url)
+            assert status == 400
+            assert json.loads(body)["error"]

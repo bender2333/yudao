@@ -270,7 +270,7 @@ class DeliverySpec:
     checks: list[dict[str, Any]]
     known_risks: list[str]
     code_tree_digest: str
-    file_refs: list[ArtifactRef]
+    tree_ref: ArtifactRef
     invalidation_reason: str | None = None
 
 

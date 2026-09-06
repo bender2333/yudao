@@ -31,9 +31,9 @@ from .models import (
 from .projection import RunProjection, project_run
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
-from .tools import ToolRuntime
+from .tools import ToolRuntime, has_tool
 from .validation import FieldError, ProposalDecision, evaluate_proposal
-from .workspace import Workspace
+from .workspace import Workspace, WorkspaceSnapshot
 
 
 @dataclass
@@ -455,20 +455,24 @@ class Orchestrator:
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash):
                 return ToolAdmission(stopped=True)
-            if call["name"] == "write_file":
+            if not has_tool(request.department, call["name"]):
+                return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
+            if call["name"] in {"write_file", "delete_file", "move_file"}:
                 plan = current.engineering_plan
                 if plan is None or plan.effective_contract_hash != current_contract_hash(current):
                     return ToolAdmission(error="Submit an engineering plan for the current effective contract before writing files.")
-                target = call["args"].get("path")
-                if not path_in_scope(target, plan.scope):
-                    return ToolAdmission(error="The file is outside the current engineering plan scope; submit an adjusted plan with a reason first.")
+                targets = ([call["args"].get("source"), call["args"].get("destination")]
+                           if call["name"] == "move_file" else [call["args"].get("path")])
                 workspace = self.workspace(request.run_id)
-                try:
-                    actual = workspace.resolve(target).relative_to(workspace.root.resolve()).as_posix()
-                except (OSError, ValueError) as exc:
-                    return ToolAdmission(error=str(exc))
-                if not path_in_scope(actual, plan.scope):
-                    return ToolAdmission(error="The resolved file is outside the current engineering plan scope.")
+                for target in targets:
+                    if not path_in_scope(target, plan.scope):
+                        return ToolAdmission(error="The file is outside the current engineering plan scope; submit an adjusted plan with a reason first.")
+                    try:
+                        actual = workspace.resolve(target).relative_to(workspace.root.resolve()).as_posix()
+                    except (OSError, ValueError) as exc:
+                        return ToolAdmission(error=str(exc))
+                    if not path_in_scope(actual, plan.scope):
+                        return ToolAdmission(error="The resolved file is outside the current engineering plan scope.")
             self.store.append(request.run_id, EventType.TOOL_STARTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
@@ -650,7 +654,7 @@ class Orchestrator:
                 )
                 return
             self._commit_accepted(
-                run_id, department=department, projection=projection,
+                run_id, department=department, projection=projection, snapshot=snapshot,
                 artifact=decision.artifact or {}, transitions=decision.transitions, extra=decision.extra,
                 parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
             )
@@ -661,6 +665,7 @@ class Orchestrator:
         *,
         department: str,
         projection: RunProjection,
+        snapshot: WorkspaceSnapshot,
         artifact: dict[str, Any],
         transitions: list[tuple[str, str]],
         extra: dict[str, Any],
@@ -672,7 +677,8 @@ class Orchestrator:
         if self.project(run_id).phase in TERMINAL_PHASES:
             return
         source_event = self.submissions.commit(
-            projection=projection, workspace=self.workspace(run_id), artifact=artifact, extra=extra,
+            projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
+            artifact=artifact, extra=extra,
             department=department, parent_event_id=parent_event_id, session_id=session_id,
             provider=provider, model=model,
         )
@@ -722,7 +728,7 @@ class Orchestrator:
             spec_hash = spec.content_hash if spec is not None else None
             delivery_hash = delivery.content_hash if delivery is not None else None
             checks = delivery.checks if delivery is not None else []
-            refs = [asdict(ref) for ref in delivery.file_refs] if delivery is not None else []
+            refs = [asdict(delivery.tree_ref)] if delivery is not None else []
         self.store.append(
             source.run_id, EventType.LESSON_CANDIDATE_RECORDED,
             role=source.role, parent_event_id=source.event_id,

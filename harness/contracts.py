@@ -32,8 +32,6 @@ def current_plan_hash(projection: RunProjection) -> str | None:
 
 def normalize_scope(value: str) -> str:
     relative = value.replace("\\", "/")
-    if relative != relative.strip():
-        raise ValueError("scope paths cannot have leading or trailing whitespace")
     if relative == ".":
         return relative
     validate_public_path(relative[:-1] if relative.endswith("/") else relative)

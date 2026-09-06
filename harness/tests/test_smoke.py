@@ -10,7 +10,7 @@ from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, ask_request, reaction, delivery_turn, plan_turn, review_turn
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence
 from harness.tests.helpers import run_scripted
 
 
@@ -23,6 +23,7 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         "model_input_audit": {"status": "verified"},
         "check_receipts": [{"name": "smoke", "exit_code": 0}],
         "check_receipts_verified": True,
+        "delivery_archive": {"status": "verified"},
         "fake_used": False,
         "ask_count": 1,
     }
@@ -32,6 +33,7 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
     for change in (
         {"check_receipts": []}, {"check_receipts_verified": False}, {"context_isolated": False},
         {"model_input_audit": None}, {"model_input_audit": {"status": "unverified"}},
+        {"delivery_archive": None}, {"delivery_archive": {"status": "unverified"}},
     ):
         assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, **change)}}) == 1
     assert smoke_exit_code({"available": True, "scenarios": {"ask": dict(base, ask_count=0)}}) == 1
@@ -61,6 +63,8 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert summary["model_input_audit"]["request_count"] > 3
     assert summary["model_input_audit"]["activation_count"] == 4
     assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
+    assert summary["delivery_archive"]["status"] == "verified", summary["delivery_archive"]
+    assert summary["delivery_archive"]["tree_digest"] == system.project(run_id).delivery_spec.code_tree_digest
     assert summary["replay_consistent"] is True
     assert summary["fake_used"] is True
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
@@ -78,6 +82,42 @@ def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and
     assert valid is False
     assert "engineering: no successful host check bound to the final contract and snapshot" in notes
     assert "quality: no successful host check bound to the final contract and snapshot" in notes
+
+
+def test_archive_audit_restores_from_persisted_bytes_after_workspace_changes(native_run, monkeypatch):
+    system, run_id = native_run
+    system.workspace(run_id).write_file("src/echo.py", "changed after delivery\n")
+
+    def no_workspace(_run_id):
+        raise AssertionError("archive audit must not read the current workspace")
+
+    monkeypatch.setattr(system, "workspace", no_workspace)
+    result = _archive_evidence(system, run_id)
+    assert result["status"] == "verified", result
+    assert result["files"] == 1
+
+
+@pytest.mark.parametrize("damage", ["missing", "modified"])
+def test_archive_audit_rejects_missing_or_modified_persisted_bytes(native_run, damage):
+    system, run_id = native_run
+    delivery = system.project(run_id).delivery_spec
+    archive = json.loads(system.artifacts.get_for_run(run_id, delivery.tree_ref))
+    blob = system.artifacts.root / archive["blobs"][0]["artifact"]["path"]
+    if damage == "missing":
+        blob.unlink()
+    else:
+        blob.write_bytes(b"changed artifact bytes")
+    result = _archive_evidence(system, run_id)
+    assert result["status"] == "unverified"
+    assert result["notes"]
+
+
+def test_archive_audit_rejects_unrelated_delivery_digest(native_run, monkeypatch):
+    system, run_id = native_run
+    projection = system.project(run_id)
+    delivery = replace(projection.delivery_spec, code_tree_digest=canonical_hash("unrelated tree"))
+    monkeypatch.setattr(system, "project", lambda _run_id: replace(projection, delivery_spec=delivery))
+    assert _archive_evidence(system, run_id)["status"] == "unverified"
 
 
 def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
