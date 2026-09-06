@@ -17,7 +17,7 @@ from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
 from .public_tree import verify_public_tree
-from .tree_archive import store_tree
+from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
 
@@ -91,6 +91,18 @@ class SubmissionWriter:
             updates["specs/delivery.json"] = _json_bytes(prepared[event][1])
             updates["specs/delivery-tree.json"] = _json_bytes(snapshot.tree.manifest)
         elif kind == "qa_review":
+            if artifact["verdict"] == "release":
+                delivery = projection.delivery_spec
+                if delivery is None:
+                    raise ValueError("QA release requires an active delivery")
+                try:
+                    archived_tree = load_tree(self.artifacts, run_id, delivery.tree_ref)
+                except (ValueError, OSError) as exc:
+                    raise ValueError(f"QA release requires an intact persisted delivery tree: {exc}") from exc
+                if archived_tree.digest != delivery.code_tree_digest:
+                    raise ValueError("QA release delivery archive does not match the DeliverySpec tree digest")
+                if archived_tree != snapshot.tree:
+                    raise ValueError("QA release delivery archive does not match the validated workspace snapshot")
             artifact["id"] = new_id("qa")
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
             verify_public_tree(workspace_root, snapshot.tree.manifest)

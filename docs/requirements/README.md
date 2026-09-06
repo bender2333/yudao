@@ -16,7 +16,7 @@
 | D10 | [上下文窗口、记忆与自动压缩](context-compaction.md) | 已实现，真实运行验收中 |
 | D11 | [三部门循环的整体定义](three-department-loop.md) | 已确认，分工作包落实 |
 | D12 | [部门专业补全](domain-completion.md) | 部门规则与默认依据已实现 |
-| D13 | [完整交付封存与恢复](delivery-archive.md) | 已接入检查与交付，独立恢复及 Web 下载已验证 |
+| D13 | [完整交付封存与恢复](delivery-archive.md) | 独立恢复及 Web 下载已验证；QA 最终接纳前复验持久封存，缺失或损坏不放行 |
 | D14 | [受控删除与移动](workspace-refactoring.md) | 已实现，E 整体验证通过 |
 | D15 | [有效变化与执行依据](effective-contract-changes.md) | 合同、专家请求及在途输入适用性已验证 |
 | D16 | [使用 Git 管理任务内变化](git-change-management.md) | 已实现，真实 Git、同任务方向调整及桌面手机差异查看通过确定性验收 |

@@ -124,6 +124,8 @@ Web 两版交付的 Git 文件与封存字节一致，最终交付从持久封�
 
 ### H 模型等待与重试验收
 
+H 功能与设计、验收记录已提交推送 `7c720e1`。
+
 用户新增 D17 后，原生内核新增最多 3 次尝试，默认退避 1 秒、2 秒；有效 Retry-After 最多 60 秒。单次默认等待 600 秒，每个实际尝试计入既有 32 次模型步骤上限，不增加独立逻辑请求总时间预算。Responses adapter 只执行单次请求与错误分类，SDK 自动重试为 0。失败部分输出和用量即时留存，失败步骤从有效历史、摘要和工具执行排除。
 
 本地 SSE 实际延迟 65 秒，默认超时下 67.068 秒成功，仅 1 次请求、0 次重试。报告 `.tmp/native-provider-timeout-boundary-20260906T080150Z.json` 证明超过一分钟仍正常等待，不冒称外部 provider 的慢响应证据。
@@ -144,6 +146,12 @@ Web 两版交付的 Git 文件与封存字节一致，最终交付从持久封�
 确定性浏览器报告 `.tmp/native-h-retry-browser.json` 通过：等待期间在手机取消返回 200，任务 `run_1cecfed1276f440f` 停止；手机追加输入返回 201，任务 `run_e925b1b759944815` 处理 v2 后经独立 QA 到 DONE。桌面/手机等待与终态均无页面错误或溢出，DONE/PAUSED 正文不再保留旧等待状态。主 agent 目检代表截图，并独立运行 `node --test harness/tests/test_web_ui.js`，50/50 通过。
 
 最终源码服务在 8774、PID 13076，数据目录 `.yudao/stage1-retry-final-20260906`，当前 provider.md 配置、单次 600 秒；健康检查正常、空闲且无 worker error。重启本轮旧 8773 服务的操作被自动审批拒绝，理由为 `blocked by policy`；原进程和真实证据保留，改用空闲端口和独立目录，未重试被拒操作。
+
+### E 补验：最终放行时的封存完整性
+
+独立反例在临时任务中损坏当前交付的持久 blob，`load_tree` 已能发现摘要不一致，但旧 QA 接纳仍进入 DONE。修复仅在 `SubmissionWriter` 的 release 分支复用现有 `load_tree`，核对当前交付、持久字节和本次受测完整树；在写入 QA_SUBMITTED、转移 QUALITY 到 DONE 及 RUN_DONE 前拒绝异常，不从 workspace/Git/其他任务补缺。
+
+主 agent 独立执行新增封存测试与 `test_delivery_tree_engine.py`、`test_workspace_delivery.py`，首轮 80 项通过；随后新增的同 run 错误引用、交付摘要和接纳前快照变化 3 项独立复验通过。最终 `test_release_archive_integrity.py` 共 10 项通过，子 agent 另复验 3 项正常交付及既有失败路径通过。覆盖 manifest/blob 缺失和损坏、跨 run 引用、合法完成及原目录删除后仅从持久工件恢复。此确定性修复与 H 分开提交，不改写任何真实失败任务。
 
 ## 第一阶段完整目标
 
