@@ -19,7 +19,7 @@ Event Store 是唯一事实来源。Adapter 只能提交结构化提案；状态
 ## 启动
 
 ```bash
-pip install pytest
+python -m pip install -e ".[dev]"
 python -m harness demo --serve --port 8765
 ```
 
@@ -42,6 +42,7 @@ python -m harness replay <run_id>
 
 ```bash
 python -m pytest harness/tests -q
+node --test harness/tests/test_web_ui.js
 ```
 
 真实主 provider 三部门 smoke（读取环境变量，不读取 `provider.md`，失败时不会改用 fake）：
@@ -76,18 +77,44 @@ python -m harness smoke --scenario ask
 
 真实 LLM 走 `oh-my-pi` RPC/NDJSON。**未配置时不会改用 fake**。Web 返回配置错误并拒绝创建任务；直接调用运行内核时，run 进入 `FAILED / provider_unavailable`。
 
-通过环境变量注入，不要把凭据写进仓库：
+需要 Python 3.11 或更新版本，以及可运行的 OMP。当前接入已用 Bun 和发布版 OMP 18.1.11 验证；源码目录缺少 native addon 时不能直接代替发布包。
 
-```bash
-set YUDAO_OMP_ENABLED=1
-set YUDAO_OMP_COMMAND=<bun-or-omp>
-set YUDAO_OMP_ARGS=<cli.js --mode rpc --no-extensions --no-skills --no-rules --no-session>
-set YUDAO_OMP_PROVIDER=blackrouter
-set YUDAO_OMP_MODEL=gpt-5.6-terra
+PowerShell 配置示例，路径指向本机安装位置。`PI_CODING_AGENT_DIR` 使用已有模型与认证配置的 profile：
+
+```powershell
+$env:PI_CODING_AGENT_DIR = 'C:/path/to/omp-profile/agent'
+$env:YUDAO_OMP_ENABLED = '1'
+$env:YUDAO_OMP_COMMAND = 'C:/path/to/bun.exe'
+$env:YUDAO_OMP_ARGS = 'C:/path/to/pi-coding-agent/dist/cli.js --mode rpc'
+$env:YUDAO_OMP_PROVIDER = 'blackrouter'
+$env:YUDAO_OMP_MODEL = 'gpt-5.6-terra'
+$env:YUDAO_OMP_TIMEOUT = '600'
+python -m harness serve --adapter omp --data-dir .yudao/loop --port 8765
 ```
 
-Adapter 会禁用 OMP 内建工具、LSP 和持久会话，改用 Yudao host tools（`read_file` / `write_file` / `run_check` / `collect_evidence` / `submit_*`）。检查由主机执行并写入 `.checks` 回执；模型自报 `exit_code` 不是证据。Product/Quality 没有写工具。确定性端到端请使用 fake：
+该 profile 的 `models.yml` 可以使用环境变量名引用密钥，实际值通过环境注入，不进入仓库：
 
-```bash
-python -m harness demo --serve
+```yaml
+providers:
+  blackrouter:
+    baseUrl: https://blackrouter.top/v1
+    api: openai-responses
+    apiKey: BLACKROUTER_API_KEY
+    models:
+      - id: gpt-5.6-terra
+        name: Blackrouter Terra
+        contextWindow: 200000
+        maxTokens: 4096
 ```
+
+启动前确保同一终端中的 `BLACKROUTER_API_KEY` 已设置。应用不会读取 `provider.md`，不会自动切换备用 provider。
+
+Adapter 会禁用 OMP 内建工具、LSP 和持久会话，改用 Yudao host tools（`read_file` / `write_file` / `run_check` / `collect_evidence` / `submit_*`）。Product/Quality 没有写工具。检查在可丢弃的普通文件副本执行，由主机签发绑定当前合同、交付和激活的回执；模型自报 `exit_code` 不是证据。该副本机制不提供操作系统沙箱。
+
+上下文隔离的来源与验收方式见 [OMP 上下文隔离](docs/omp-context-isolation.md)。完整模型消息、工具输出与上报用量会在激活期间持久化；用量统计覆盖可观测主对话，缺少上报时明确使用估算。
+
+## 停止与后续范围
+
+只有独立质检 release 才能进入 `DONE`。达到循环或 token 上限进入 `PAUSED`；取消、provider 错误或上下文溢出进入 `FAILED`。停止后仍可查看、导出和重放事件，迟到结果不能继续提交。
+
+首版不提供暂停任务的继续执行，也不自动复用经验、修改规则或模型。知识图谱、长期记忆、异步恢复、部门内部循环及运维部门属于后续阶段，见 [总体路线图](docs/program-roadmap.md)。
