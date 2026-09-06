@@ -1,11 +1,11 @@
-# 给 Grok 的 Yudao 实施计划
+# Yudao 实施计划
 
 ## 执行规则
 
-- 以 `docs/loop-system-mvp-design.md` 为架构基线。
+- 以 `docs/loop-system-mvp-design.md` 与 `docs/native-loop-design.md` 为架构基线；下列 Phase 是第一阶段内部工作包。
 - 直接替换旧的 `requirements` 角色命名为 `product`，不增加兼容层。
-- 先用 fake adapter 跑通完整状态机，再接 OMP RPC；不要先做长期记忆、知识图谱或动态拓扑。
-- 控制层不调用 LLM；LLM 只通过 adapter 提交结构化提案，所有状态提交先经过 schema、权限、版本和前置条件校验。
+- 先用 fake 的单次模型响应跑通原生循环，再接真实 Responses provider；OMP 仅作代码级参考，不作为运行依赖。
+- 循环内核驱动模型与工具，状态提交函数不执行网络调用；所有提交先经过 schema、权限、版本和前置条件校验。
 - 每个阶段结束都必须有可运行的测试和一个可观察的端到端样例。
 
 ## Phase 1：领域合同与确定性循环
@@ -25,24 +25,25 @@
 交付：
 
 - Product、Engineering、Quality 三种角色的 session factory；
-- ContextAssembler：每次激活从 State Projection 重新装配最小上下文；
+- ContextAssembler：每次模型调用从 State Projection 和当前激活的必要局部历史装配上下文；
 - 部门工具白名单；
 - session 生命周期、取消、超时和激活快照；
-- context manifest 和 token 估算事件。
+- 逐次请求的 context manifest、完整输入工件、工具定义、摘要和 token 估算事件。
 
 验收：同一 run 中连续返工不会把完整历史 transcript 注入下一部门；旧 spec 只能通过显式历史查询读取，并带 superseded/invalidated 标记。
 
-## Phase 3：OMP RPC 与真实数据流
+## Phase 3：原生循环与真实数据流
 
 交付：
 
-- OmpRpcAdapter；
-- provider/model 配置映射；
-- NDJSON request/response/event 转换；
-- 流式输出、tool call、tool result、abort 和 provider 错误映射；
+- 基于官方 SDK 的单次 Responses 模型适配器；
+- 显式 provider/model 配置，不提供 OMP 入口或旧配置回退；
+- SDK 响应转换，保留必要的模型输出和工具关联信息；
+- Yudao 原生驱动工具执行与下一步上下文，提交立即交还状态机；
+- 单次请求取消、provider 错误、逐步用量与上下文限额；
 - 真实 workspace 的最小读写工具集。
 
-验收：至少一个本地配置的 OMP provider 完成一次完整三部门 run；所有交接仍由 Yudao Orchestrator 决定；模型无法通过自然语言绕过 QA。
+验收：既有主 provider 完成直达及 Ask/React 三部门 run；每次请求可核对实际输入与装配记录，取消能停止静默连接，模型无法通过自然语言绕过 QA。部门循环由 Yudao 掌握，模型适配器不执行工具或管理历史。
 
 ## Phase 4：可视化与观测
 

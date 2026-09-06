@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-第一阶段交付一个可视化的三部门 Loop System Runtime，让产品、开发、质检三个隔离的 Agent 会话通过结构化 spec 形成真实的数据流循环，并解决两类核心失效：
+第一阶段交付一个可视化的三部门 Loop System Runtime，让产品、开发、质检在原生循环内通过结构化 spec 交接，分别保有职责与上下文边界，并解决两类核心失效：
 
 1. ReAct 模型把局部完成误判为整个任务完成，导致提前停止；
 2. 无关信息、旧版本和长时间局部推理持续堆积，导致上下文容量下降和任务偏离。
@@ -20,7 +20,7 @@
 - 每个部门独立 session，跨部门只传允许的结构化工件；
 - 事件持久化、状态投影、重放和基础实时可视化；
 - 带来源事件和证据的 lesson/经验候选记录，仅供审计与后续评估；
-- 通过 `oh-my-pi` RPC/NDJSON 接入真实 LLM，同时保留确定性 fake provider 做测试。
+- 通过单次模型适配器接入真实 LLM，模型与工具的循环由 Yudao 驱动；保留同边界的确定性 fake provider 做测试。
 
 ### 本阶段不包含
 
@@ -45,13 +45,13 @@
   Event Store / State Projection / Artifact Store / Replay
 
 会话层
-  Context Assembler / Department Session / OMP RPC Adapter
+  Context Assembler / Department Session / Native Loop
 
 执行层
   Model Provider / Tool Registry / Workspace Runtime
 ```
 
-依赖只能从上到下读取权威状态；Agent 会话只能通过结构化提交向控制层请求状态变化。控制层不把 LLM 调用放进状态迁移函数。
+依赖只能从上到下读取权威状态；部门只能通过结构化提交请求状态变化。原生循环每次调用模型前装配上下文，状态提交函数不执行网络调用。具体边界与本轮验收见 [原生三部门循环设计](native-loop-design.md)。
 
 ## 4. 部门边界
 
@@ -114,15 +114,15 @@ Event Store 是唯一事实来源。事件至少记录：`event_id`、`run_id`�
 
 首版采用本地 SQLite 事件库和 run 目录下的 artifact 文件。SQLite 解决追加、查询和并发写入，artifact 文件保存大对象；不接向量数据库。
 
-## 8. Agent 与 OMP 的边界
+## 8. 原生循环与模型适配器的边界
 
-Yudao 控制层拥有任务状态、角色权限、停止条件、spec 校验和最终验收。每个部门启动独立的 OMP RPC session：
+Yudao 控制层拥有任务状态、角色权限、停止条件、spec 校验和最终验收；原生调用驱动管理每一步模型与工具往返。每个部门分别装配上下文和工具权限：
 
 - Product：只读工具和 spec 输出工具；
 - Engineering：读、写和公开检查工具；
 - Quality：只读、检查和证据采集工具，不提供写工具。
 
-NDJSON 输入输出由 `OmpRpcAdapter` 转成 Yudao 的 typed events。provider/model 选择、流式响应、tool schema 校验和 abort 由 OMP 负责；交接、状态改变和 `DONE` 由 Yudao 负责。fake adapter 使用相同协议驱动确定性测试。
+模型适配器只完成一次请求，负责 provider 通信、流式解析、错误和取消，不拥有工具执行或对话历史。Yudao 在每步调用前构造并记录完整上下文，收到部门提交后立即校验和交接。OMP 仅供代码级参考，不作为运行依赖；fake 使用同一模型响应边界。
 
 ## 9. 可视化与可观测性
 
@@ -131,7 +131,7 @@ Dashboard 从状态投影和事件流展示事实。浏览器可以提交新任�
 1. **Run Board**：当前阶段、活动部门、等待原因、预算、循环次数和最终状态；
 2. **Spec Timeline**：当前有效 spec、版本因果链、ask/react 请求与响应、失效版本；
 3. **Evidence View**：交付文件、检查回执、QA 缺陷、返工目标和 release 证据；
-4. **Context/Trace View**：每次激活的 context manifest、注入来源、排除内容、token/耗时/provider、工具调用和停止原因。
+4. **Context/Trace View**：每次模型调用的 context manifest、实际输入工件、注入来源、排除内容、token/耗时/provider、工具调用和停止原因。
 
 后端提供 REST 创建/取消命令、查询和 SSE 实时事件流。首版一次运行一个任务，其他创建请求明确说明已有任务在执行；不引入分布式调度。事件卡片显示结构化摘要，完整 transcript 通过显式查看动作读取，不默认塞入主视图。
 
@@ -145,4 +145,4 @@ Dashboard 从状态投影和事件流展示事实。浏览器可以提交新任�
 - 每次 session 激活都能显示 context manifest，并证明没有注入其他部门完整 transcript；
 - UI 能看到当前阶段、spec 版本、ask/react 链、证据、停止原因和 token/耗时；
 - fake adapter 测试覆盖所有状态迁移、非法工件、预算耗尽、provider 错误和取消；
-- OMP RPC smoke 能完成一次真实 provider 调用并把流式事件映射到事件库。
+- 原生循环 smoke 完成真实 provider 三部门任务，并能核对每次模型输入、工具结果、检查回执与重放状态。
