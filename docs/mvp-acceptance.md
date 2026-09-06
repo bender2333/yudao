@@ -21,6 +21,8 @@
 
 真实报告位于 `.yudao/native-final-validation/native-second-attempt-report.json`、`compaction-first-attempt-report.json` 和 `compaction-smoke-report.json`。浏览器完整原始报告保留为 `.tmp/native-browser-acceptance.json`，favicon 修复后的只读报告为 `.tmp/native-readonly-after-favicon.json`，对应桌面和手机截图保留在 `.tmp/`。首次失败报告不覆盖为成功。
 
+对已有真实摘要任务的只读浏览器复验见 `.tmp/native-compaction-browser-run_3d97dce6adcf4687.json`：1440/390 宽均可查看上下文、摘要正文和原始工具来源，无页面溢出、控制台错误或状态写入。此证据只证明来源展示，任务本身仍保留原来的失败结果。
+
 以下最新失败保留全部事件与工件：`run_8f4767c51abb47b4` 到达 QA 后 provider 连接失败；`run_432c2fbefd5b4d14` 在首步连接失败；`run_29f006d4002549de` 读取资料后，摘要请求连接失败。它们均按 `FAILED / provider_error` 保存，不能记为真实验收通过。早期 Ask 失败 `run_9192f5f76d8b40af` 及对应 `ask-first-attempt-report.json` 也保留，后续成功不改写历史。
 
 A 的代码和确定性验证已具备，真实压缩后继续到独立 QA 的完整链路仍需在 F 验收前补齐。后续 PRD/计划、通用专家协作、持续输入/prompt、完整封存/重构工具尚未完成；本节不宣布第一阶段整体通过。下文旧运行 ID、测试数量、OMP 指纹及费用均属于旧实现历史。
