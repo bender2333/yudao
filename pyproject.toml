@@ -16,7 +16,7 @@ dev = ["pytest>=8"]
 include = ["harness*"]
 
 [tool.setuptools.package-data]
-harness = ["web/static/*"]
+harness = ["web/static/*", "adapters/*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]

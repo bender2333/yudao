@@ -14,6 +14,13 @@ from ..models import Usage, estimate_tokens, json_dumps
 from ..redact import redact_text
 from ..tools import SUBMIT_KINDS, ToolRuntime, host_tool_definitions
 from .base import AdapterResult, Availability, InvokeRequest, ProviderError
+from .omp_isolation import (
+    ISOLATION_FLAGS,
+    apply_host_launch_args,
+    build_launch_diagnostics,
+    cleanup_isolation,
+    prepare_invocation_isolation,
+)
 from .rpc_process import RpcAborted, RpcExited, RpcProcess, RpcTimeout
 
 UNAVAILABLE_MESSAGE = (
@@ -21,8 +28,6 @@ UNAVAILABLE_MESSAGE = (
     "并确保 YUDAO_OMP_COMMAND（默认 omp）可执行；可选 YUDAO_OMP_PROVIDER 与 YUDAO_OMP_MODEL。"
     "系统不会在 OMP 不可用时静默改用 fake adapter。"
 )
-
-ISOLATION_FLAGS = ("--no-tools", "--no-lsp", "--no-session", "--no-extensions", "--no-skills", "--no-rules")
 
 
 @dataclass
@@ -166,13 +171,26 @@ class OmpRpcAdapter:
             raise ProviderError(message, reason=reason) from exc
 
     def _invoke_process(self, request: InvokeRequest, abort_flag) -> AdapterResult:
-        command = _launch_command(self.config)
-        session = RpcProcess.spawn(
-            command,
-            cwd=str(request.workspace.root),
-            env=os.environ.copy(),
-            abort_flag=abort_flag,
-        )
+        isolation = prepare_invocation_isolation(os.environ.copy(), request.context, request.workspace.root)
+        diagnostics = None
+        try:
+            command = _launch_command(self.config, system_prompt_path=str(isolation.system_prompt_path))
+            diagnostics = build_launch_diagnostics(request, command, isolation)
+            session = RpcProcess.spawn(
+                command,
+                cwd=str(request.workspace.root),
+                env=isolation.env,
+                abort_flag=abort_flag,
+            )
+            diagnostics["process_started"] = True
+        except Exception as exc:
+            cleanup_isolation(isolation)
+            if isinstance(exc, ProviderError):
+                if diagnostics is not None and getattr(exc, "diagnostics", None) is None:
+                    exc.diagnostics = diagnostics
+                raise
+            reason, message = map_omp_failure(exc)
+            raise ProviderError(message, reason=reason, diagnostics=diagnostics) from exc
         self._session = session
         started = time.monotonic()
         deadline = started + self.config.timeout_sec
@@ -258,16 +276,35 @@ class OmpRpcAdapter:
                 error=error,
                 provider=self.name,
                 model=self.config.model or f"omp-protocol-v{protocol}",
+                diagnostics=diagnostics,
             )
         except RpcAborted:
             session.kill()
-            return AdapterResult(None, finish_reason="aborted", error="aborted", provider=self.name, model=self.config.model or "omp")
+            return AdapterResult(
+                None,
+                finish_reason="aborted",
+                error="aborted",
+                provider=self.name,
+                model=self.config.model or "omp",
+                diagnostics=diagnostics,
+            )
         except (RpcTimeout, RpcExited) as exc:
             session.kill()
-            raise ProviderError(redact_text(str(exc)), reason=exc.reason) from exc
+            raise ProviderError(redact_text(str(exc)), reason=exc.reason, diagnostics=diagnostics) from exc
+        except ProviderError as exc:
+            exc.diagnostics = diagnostics
+            raise
+        except Exception as exc:
+            reason, message = map_omp_failure(exc)
+            raise ProviderError(message, reason=reason, diagnostics=diagnostics) from exc
+        except ProviderError as exc:
+            if diagnostics is not None and getattr(exc, "diagnostics", None) is None:
+                exc.diagnostics = diagnostics
+            raise
         finally:
             session.close()
             self._session = None
+            cleanup_isolation(isolation)
 
     def _wait_ready(self, session: RpcProcess, deadline: float) -> dict[str, Any]:
         reassembler = FrameReassembler()
@@ -344,16 +381,13 @@ class OmpRpcAdapter:
         return None
 
 
-def _launch_command(config: OmpConfig) -> list[str]:
-    command = list(config.command)
-    if config.provider and "--provider" not in command:
-        command.extend(["--provider", config.provider])
-    if config.model and "--model" not in command:
-        command.extend(["--model", config.model])
-    for flag in ISOLATION_FLAGS:
-        if flag not in command:
-            command.append(flag)
-    return command
+def _launch_command(config: OmpConfig, *, system_prompt_path: str) -> list[str]:
+    return apply_host_launch_args(
+        list(config.command),
+        provider=config.provider,
+        model=config.model,
+        system_prompt_path=system_prompt_path,
+    )
 
 
 def _combined_flag(left, right):
@@ -377,10 +411,9 @@ def _combined_flag(left, right):
 
 def _build_prompt(request: InvokeRequest) -> str:
     return (
-        request.context.prompt_text
-        + "\n\n使用当前部门的 submit_* 工具提交结构化合同，或输出一个含 kind 的 JSON 对象。"
-        + "自然语言不能宣布任务完成。检查必须通过 run_check/collect_evidence 由主机执行。"
-        + "可用工具: "
+        "使用当前部门的 submit_* 工具提交结构化合同，或输出一个含 kind 的 JSON 对象。"
+        "自然语言不能宣布任务完成。检查必须通过 run_check/collect_evidence 由主机执行。"
+        "可用工具: "
         + ", ".join(request.tools)
     )
 

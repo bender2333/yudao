@@ -1,6 +1,11 @@
 import json
+import os
 import sys
+import tempfile
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from threading import Event
 
 import pytest
@@ -14,6 +19,17 @@ from harness.adapters.omp import (
     extract_json_proposal,
     map_omp_failure,
     map_omp_frame,
+)
+from harness.adapters.omp_isolation import (
+    POLICY_ID,
+    ISOLATION_FLAGS,
+    cleanup_isolation,
+    describe_launch_policy,
+    describe_prompt_sources,
+    isolation_overlay_path,
+    prepare_invocation_isolation,
+    runtime_sha256s,
+    write_capture_evidence,
 )
 from harness.context import AssembledContext
 from harness.models import ContextManifest
@@ -115,12 +131,109 @@ def test_extract_json_proposal_and_frame_mapping():
     assert failed["fatal"] is True
 
 
-def test_launch_command_disables_builtins_and_keeps_yudao_host_tools():
-    command = _launch_command(OmpConfig(command=["omp", "--mode", "rpc"], enabled=True, provider="blackrouter", model="gpt-5.6-terra"))
+def test_launch_command_disables_builtins_and_keeps_yudao_host_tools(tmp_path):
+    prompt = tmp_path / "host-system.txt"
+    prompt.write_text("host prompt", encoding="utf-8")
+    command = _launch_command(
+        OmpConfig(command=["omp", "--mode", "rpc"], enabled=True, provider="blackrouter", model="gpt-5.6-terra"),
+        system_prompt_path=str(prompt),
+    )
     assert "--no-tools" in command
     assert "--no-session" in command
+    assert "--no-title" in command
     assert "--tools" not in command
     assert command[command.index("--provider") + 1] == "blackrouter"
+    assert command[command.index("--config") + 1] == str(isolation_overlay_path())
+    assert command[command.index("--system-prompt") + 1] == str(prompt)
+
+
+def test_launch_command_ignores_delivery_config_and_system_prompt(tmp_path):
+    workspace = tmp_path / "delivery"
+    workspace.mkdir()
+    evil_config = workspace / "omp.yml"
+    evil_config.write_text("enabledProviders: [agents-md]\n", encoding="utf-8")
+    evil_prompt = workspace / "AGENTS.md"
+    evil_prompt.write_text("UNRELATED_OMP_CONTEXT_CANARY\n", encoding="utf-8")
+    host_prompt = tmp_path / "host-system.txt"
+    host_prompt.write_text("yudao host prompt", encoding="utf-8")
+    command = _launch_command(
+        OmpConfig(
+            command=[
+                "omp",
+                "--mode",
+                "rpc",
+                "--config",
+                str(evil_config),
+                "--system-prompt",
+                str(evil_prompt),
+            ],
+            enabled=True,
+            provider="blackrouter",
+            model="gpt-5.6-terra",
+        ),
+        system_prompt_path=str(host_prompt),
+    )
+    assert command.count("--config") == 1
+    assert command.count("--system-prompt") == 1
+    config_path = Path(command[command.index("--config") + 1]).resolve()
+    prompt_path = Path(command[command.index("--system-prompt") + 1]).resolve()
+    workspace = workspace.resolve()
+    assert config_path == isolation_overlay_path().resolve()
+    assert prompt_path == host_prompt.resolve()
+    assert workspace not in config_path.parents
+    assert workspace not in prompt_path.parents
+    assert config_path != evil_config.resolve()
+    assert prompt_path != evil_prompt.resolve()
+
+
+def test_isolation_preserves_user_profile_and_auth(tmp_path):
+    source = tmp_path / "src-profile"
+    source.mkdir()
+    (source / "models.yml").write_text('{"providers":{}}', encoding="utf-8")
+    (source / "AGENTS.md").write_text("PROFILE_NATIVE_CANARY\n", encoding="utf-8")
+    (source / "config.yml").write_text('{"enabledProviders":["agents-md"]}', encoding="utf-8")
+    (source / ".env").write_text("LOCAL_DUMMY_KEY=fixture-value\n", encoding="utf-8")
+    env = {"PI_CODING_AGENT_DIR": str(source), "OMP_PROFILE": "selected-profile"}
+    files = prepare_invocation_isolation(env, _context(), tmp_path / "delivery")
+    try:
+        assert files.env == env
+        assert files.retained_profile == str(source)
+        assert not (files.root / "profile").exists()
+        assert (source / ".env").read_text(encoding="utf-8") == "LOCAL_DUMMY_KEY=fixture-value\n"
+    finally:
+        cleanup_isolation(files)
+
+
+def test_prompt_sources_list_manifest_and_omp_footer(tmp_path):
+    context = _context()
+    overlay = isolation_overlay_path()
+    prompt = tmp_path / "system-prompt.txt"
+    prompt.write_text(context.prompt_text, encoding="utf-8")
+    sources = describe_prompt_sources(context, overlay_path=overlay, system_prompt_path=prompt)
+    assert sources["byte_identical_to_manifest"] is False
+    assert sources["host_system_prompt"]["origin"] == "assembled_department_context"
+    assert sources["host_system_prompt"]["controlled_by"] == "yudao"
+    assert {item["section"] for item in sources["omp_generated"]} == {"environment", "footer"}
+    policy = describe_launch_policy()
+    assert policy["policy_id"] == POLICY_ID
+    assert policy["provider_fallback"] is False
+    assert "agents-md" in policy["overlay"]["disabled_providers"]
+
+
+def test_invocation_isolation_stays_outside_delivery_workspace(tmp_path):
+    workspace = tmp_path / "delivery"
+    workspace.mkdir()
+    (workspace / "AGENTS.md").write_text("delivery overlay should not win\n", encoding="utf-8")
+    files = prepare_invocation_isolation(os.environ.copy(), _context(), workspace)
+    try:
+        assert workspace.resolve() not in files.system_prompt_path.resolve().parents
+        assert workspace.resolve() not in files.overlay_path.resolve().parents
+        assert files.env == dict(os.environ)
+        assert files.prompt_sources["byte_identical_to_manifest"] is False
+    finally:
+        from harness.adapters.omp_isolation import cleanup_isolation
+
+        cleanup_isolation(files)
 
 
 def test_omp_message_end_maps_assistant_proposal_and_usage():
@@ -280,3 +393,374 @@ def test_diagnostics_redact_credentials(tmp_path, monkeypatch):
         _invoke(adapter, tmp_path)
     assert secret not in str(caught.value)
     assert "BLACKROUTER_API_KEY" in str(caught.value)
+
+
+HOST_PROMPT = "You are the isolated product department. Use read_file then submit."
+PUBLISHED_BUN = Path(os.environ.get("YUDAO_OMP_TEST_BUN", ""))
+PUBLISHED_OMP = Path(os.environ.get("YUDAO_OMP_TEST_CLI", ""))
+HOST_FILE_TEXT = "host-read-ok-isolation"
+WORKING_CANARY = "UNRELATED_OMP_CONTEXT_CANARY_76c1e9c7d9c9477e"
+SOURCE_CANARIES = {
+    "working_agents": WORKING_CANARY,
+    "user_codex": "USER_CODEX_CANARY_0df621be79b1",
+    "user_claude": "USER_CLAUDE_CANARY_afc21e149b2b",
+    "project_claude": "PROJECT_CLAUDE_CANARY_21727fc5dd87",
+    "profile_native": "PROFILE_NATIVE_CANARY_3490f012abaf",
+}
+
+
+def _encoded(value) -> bytes:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _sse(events: list[dict]) -> bytes:
+    return "".join(
+        f"event: {event['type']}\ndata: {json.dumps({**event, 'sequence_number': index})}\n\n"
+        for index, event in enumerate(events)
+    ).encode()
+
+
+def _text_response(text: str) -> bytes:
+    message = {
+        "id": "msg_canary",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "output_text", "text": text, "annotations": []}],
+    }
+    response = {
+        "id": "resp_canary_text",
+        "object": "response",
+        "created_at": 1,
+        "model": "canary-model",
+        "status": "completed",
+        "output": [message],
+        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+    }
+    return _sse(
+        [
+            {"type": "response.created", "response": {**response, "status": "in_progress", "output": []}},
+            {
+                "type": "response.output_item.added",
+                "output_index": 0,
+                "item": {**message, "status": "in_progress", "content": []},
+            },
+            {
+                "type": "response.content_part.added",
+                "item_id": message["id"],
+                "output_index": 0,
+                "content_index": 0,
+                "part": {"type": "output_text", "text": "", "annotations": []},
+            },
+            {
+                "type": "response.output_text.delta",
+                "item_id": message["id"],
+                "output_index": 0,
+                "content_index": 0,
+                "delta": text,
+            },
+            {
+                "type": "response.output_text.done",
+                "item_id": message["id"],
+                "output_index": 0,
+                "content_index": 0,
+                "text": text,
+            },
+            {
+                "type": "response.content_part.done",
+                "item_id": message["id"],
+                "output_index": 0,
+                "content_index": 0,
+                "part": message["content"][0],
+            },
+            {"type": "response.output_item.done", "output_index": 0, "item": message},
+            {"type": "response.completed", "response": response},
+        ]
+    )
+
+
+def _function_call_response() -> bytes:
+    arguments = json.dumps({"path": "note.txt"})
+    item = {
+        "id": "fc_canary",
+        "type": "function_call",
+        "status": "completed",
+        "name": "read_file",
+        "call_id": "call_read_1",
+        "arguments": arguments,
+    }
+    response = {
+        "id": "resp_canary_tool",
+        "object": "response",
+        "created_at": 1,
+        "model": "canary-model",
+        "status": "completed",
+        "output": [item],
+        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+    }
+    return _sse(
+        [
+            {"type": "response.created", "response": {**response, "status": "in_progress", "output": []}},
+            {
+                "type": "response.output_item.added",
+                "output_index": 0,
+                "item": {**item, "status": "in_progress", "arguments": ""},
+            },
+            {
+                "type": "response.function_call_arguments.delta",
+                "item_id": item["id"],
+                "output_index": 0,
+                "delta": arguments,
+            },
+            {
+                "type": "response.function_call_arguments.done",
+                "item_id": item["id"],
+                "output_index": 0,
+                "arguments": arguments,
+            },
+            {"type": "response.output_item.done", "output_index": 0, "item": item},
+            {"type": "response.completed", "response": response},
+        ]
+    )
+
+
+@pytest.mark.skipif(
+    not PUBLISHED_BUN.is_file() or not PUBLISHED_OMP.is_file(),
+    reason="set YUDAO_OMP_TEST_BUN and YUDAO_OMP_TEST_CLI to the published runtime to verify",
+)
+def test_omp_isolation_policy_registers_host_tools_and_filters_context(tmp_path, monkeypatch):
+    captures: list[dict] = []
+    auth_matches: list[bool] = []
+    lock = threading.Lock()
+    turn = {"n": 0}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_CONNECT(self):
+            self.send_error(403)
+
+        def do_GET(self):
+            self.send_error(404)
+
+        def do_POST(self):
+            raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            request = json.loads(raw)
+            with lock:
+                captures.append(request)
+                auth_matches.append(self.headers.get("Authorization") == "Bearer local-canary-dummy-key")
+                turn["n"] += 1
+                index = turn["n"]
+            body = _function_call_response() if index == 1 else _text_response(
+                json.dumps(
+                    {
+                        "kind": "product_spec",
+                        "goal": "after-host-tool",
+                        "requirements": ["r"],
+                        "acceptance_criteria": ["a"],
+                    }
+                )
+            )
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with tempfile.TemporaryDirectory(prefix="omp-isolation-", dir=tmp_path) as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            profile = root / "profile" / "agent"
+            workspace_dir = tmp_path / "ws"
+            workspace_dir.mkdir()
+            profile.mkdir(parents=True)
+            (workspace_dir / "AGENTS.md").write_text(f"Unrelated project detail: {WORKING_CANARY}\n", encoding="utf-8")
+            (workspace_dir / "note.txt").write_text(HOST_FILE_TEXT, encoding="utf-8")
+            (workspace_dir / "CLAUDE.md").write_text(f"Unrelated context: {SOURCE_CANARIES['project_claude']}\n", encoding="utf-8")
+            (workspace_dir / ".omp").mkdir()
+            (workspace_dir / ".omp" / "config.yml").write_text(
+                json.dumps({"enabledProviders": ["claude", "codex"], "disabledProviders": [], "includeWorkspaceTree": True}),
+                encoding="utf-8",
+            )
+            for path, marker in (
+                (home / ".codex" / "AGENTS.md", SOURCE_CANARIES["user_codex"]),
+                (home / ".claude" / "CLAUDE.md", SOURCE_CANARIES["user_claude"]),
+                (profile / "AGENTS.md", SOURCE_CANARIES["profile_native"]),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"Unrelated context: {marker}\n", encoding="utf-8")
+            models = {
+                "providers": {
+                    "local-canary": {
+                        "api": "openai-responses",
+                        "baseUrl": f"http://127.0.0.1:{server.server_port}/v1",
+                        "apiKey": "YUDAO_LOCAL_CANARY_KEY",
+                        "models": [
+                            {
+                                "id": "canary-model",
+                                "name": "Canary",
+                                "reasoning": False,
+                                "input": ["text"],
+                                "contextWindow": 128000,
+                                "maxTokens": 1000,
+                            }
+                        ],
+                    }
+                }
+            }
+            (profile / "models.yml").write_text(json.dumps(models), encoding="utf-8")
+            (profile / ".env").write_text("YUDAO_LOCAL_CANARY_KEY=local-canary-dummy-key\n", encoding="utf-8")
+            monkeypatch.delenv("YUDAO_LOCAL_CANARY_KEY", raising=False)
+            monkeypatch.setenv("PI_CODING_AGENT_DIR", str(profile))
+            monkeypatch.setenv("PI_CONFIG_FILES", str(workspace_dir / ".omp" / "config.yml"))
+            monkeypatch.setenv("USERPROFILE", str(home))
+            monkeypatch.setenv("HOME", str(home))
+            monkeypatch.setenv("HTTP_PROXY", f"http://127.0.0.1:{server.server_port}")
+            monkeypatch.setenv("HTTPS_PROXY", f"http://127.0.0.1:{server.server_port}")
+            monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+            monkeypatch.setenv("PI_NO_PTY", "1")
+            context = AssembledContext(
+                department="product",
+                prompt_text=HOST_PROMPT,
+                parts=[],
+                manifest=ContextManifest(
+                    session_id="ses",
+                    department="product",
+                    activation_id="act",
+                    injected=[],
+                    excluded=[],
+                    token_estimate=10,
+                    budget=1000,
+                    digest="sha256:isolation",
+                ),
+            )
+            adapter = OmpRpcAdapter(
+                OmpConfig(
+                    command=[str(PUBLISHED_BUN), str(PUBLISHED_OMP), "--mode", "rpc"],
+                    provider="local-canary",
+                    model="canary-model",
+                    enabled=True,
+                    timeout_sec=45,
+                )
+            )
+            result = adapter.invoke(
+                InvokeRequest(
+                    run_id="run",
+                    department="product",
+                    session_id="ses",
+                    activation_id="act",
+                    context=context,
+                    tools=["read_file", "submit_product_spec"],
+                    workspace=Workspace(workspace_dir),
+                    abort_flag=Event(),
+                )
+            )
+            assert captures, "local stub received no model requests"
+            summaries = []
+            for request in captures:
+                inputs = request.get("input", [])
+                system_items = [item for item in inputs if isinstance(item, dict) and item.get("role") in {"system", "developer"}]
+                system = {"instructions": request.get("instructions"), "messages": system_items}
+                encoded_system = _encoded(system)
+                encoded_inputs = _encoded(inputs)
+                encoded_request = _encoded(request)
+                summaries.append(
+                    {
+                        "canary_in_system": WORKING_CANARY.encode() in encoded_system,
+                        "canary_in_input": WORKING_CANARY.encode() in encoded_inputs,
+                        "canary_in_request": WORKING_CANARY.encode() in encoded_request,
+                        "source_canaries": {
+                            name: marker.encode() in encoded_request for name, marker in SOURCE_CANARIES.items()
+                        },
+                        "custom_prompt_in_system": HOST_PROMPT.encode() in encoded_system,
+                        "omp_footer_in_system": b"<workstation>" in encoded_system or b"<critical>" in encoded_system,
+                        "read_file_tool_in_request": b"read_file" in encoded_request,
+                        "host_tool_result_in_request": HOST_FILE_TEXT.encode() in encoded_request,
+                        "system_bytes": len(encoded_system),
+                        "input_bytes": len(encoded_inputs),
+                        "request_bytes": len(encoded_request),
+                    }
+                )
+            first = summaries[0]
+            assert first["custom_prompt_in_system"] is True
+            assert first["omp_footer_in_system"] is True
+            assert first["read_file_tool_in_request"] is True
+            for summary in summaries:
+                assert summary["canary_in_system"] is False
+                assert summary["canary_in_input"] is False
+                assert summary["canary_in_request"] is False
+                assert not any(summary["source_canaries"].values())
+            assert any(call["name"] == "read_file" and call["ok"] is True for call in result.tool_calls)
+            assert len(summaries) == 2 and summaries[1]["host_tool_result_in_request"] is True
+            assert auth_matches and all(auth_matches)
+            diagnostics = result.diagnostics
+            assert diagnostics["retained_profile"] == str(profile)
+            assert diagnostics["process_started"] is True
+            write_capture_evidence(
+                {
+                    "policy_id": POLICY_ID,
+                    "overlay_sha256": diagnostics["overlay_sha256"],
+                    "runtime_sha256": runtime_sha256s(diagnostics),
+                    "launch_args_sha256": diagnostics["launch_args_sha256"],
+                    "flags": list(ISOLATION_FLAGS),
+                    "verified": True,
+                    "test": "harness/tests/test_omp.py::test_omp_isolation_policy_registers_host_tools_and_filters_context",
+                    "canaries_present": False,
+                    "host_tools_registered": True,
+                    "host_tools_roundtrip": True,
+                    "profile_auth_preserved": True,
+                    "custom_prompt_in_system": True,
+                    "omp_footer_in_system": True,
+                    "system_bytes": first["system_bytes"],
+                    "input_bytes": first["input_bytes"],
+                    "request_bytes": first["request_bytes"],
+                    "request_count": len(summaries),
+                    "notes": [
+                        "OMP environment/footer present; not byte-identical to department manifest",
+                        "host overlay disabled nine context discovery providers",
+                        "Yudao host tools remained usable after automatic context was filtered",
+                    ],
+                }
+            )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("failure_stage", ["before_ready", "protocol", "host_tools"])
+def test_failed_launch_persists_host_context_diagnostics(tmp_path, failure_stage):
+    mock = tmp_path / "failed_launch.py"
+    if failure_stage == "before_ready":
+        body = "import sys\nsys.exit(2)\n"
+    else:
+        command = "negotiate_protocol" if failure_stage == "protocol" else "set_host_tools"
+        body = (
+            "import json, sys\n" + READY
+            + "for line in sys.stdin:\n"
+            "    msg = json.loads(line)\n"
+            f"    success = msg.get('type') != {command!r}\n"
+            "    print(json.dumps({'id':msg.get('id'),'type':'response','command':msg.get('type'),'success':success,'error':'local fixture rejection'}), flush=True)\n"
+        )
+    _write_mock(mock, body)
+    system = LoopSystem(tmp_path / "data", OmpRpcAdapter(OmpConfig(command=[sys.executable, str(mock)], enabled=True, model="fixture", timeout_sec=3)))
+    run_id = system.create_run("local launch diagnostics")
+    projection = system.run_until_stop(run_id)
+    assert projection.phase == "FAILED" and projection.stop_reason == "provider_error"
+    diagnostics = [event for event in system.store.list_events(run_id) if event.payload.get("host_launch")]
+    assert len(diagnostics) == 1
+    event = diagnostics[0]
+    assert event.payload["run_id"] == run_id
+    assert event.payload["session_id"] == event.session_id
+    assert event.payload["context_digest"] == event.context_digest
+    assert event.payload["process_started"] is True
+    prompt = event.payload["prompt_sources"]["host_system_prompt"]
+    assert prompt["manifest_digest"] == event.context_digest
+    assert not Path(prompt["path"]).exists()
+    assert len(projection.manifests) == 1
+    assert system.replay(run_id).canonical_state() == projection.canonical_state()

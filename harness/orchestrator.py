@@ -215,6 +215,16 @@ class Orchestrator:
                 )
             )
         except ProviderError as exc:
+            self._record_host_launch(
+                run_id,
+                projection,
+                parent.event_id,
+                session.session_id,
+                department,
+                activation_id,
+                assembled.manifest.digest,
+                getattr(exc, "diagnostics", None),
+            )
             self._fail(run_id, projection, exc.reason, str(exc))
             session.idle()
             return self.project(run_id)
@@ -223,6 +233,16 @@ class Orchestrator:
             session.idle()
             return self.project(run_id)
 
+        self._record_host_launch(
+            run_id,
+            projection,
+            parent.event_id,
+            session.session_id,
+            department,
+            activation_id,
+            assembled.manifest.digest,
+            result.diagnostics,
+        )
         current = self.project(run_id)
         if current.phase in TERMINAL_PHASES:
             session.idle()
@@ -544,6 +564,41 @@ class Orchestrator:
                     payload={"stop_reason": "released"},
                 )
                 self.sessions.close_run(run_id)
+
+    def _record_host_launch(
+        self,
+        run_id: str,
+        projection: RunProjection,
+        parent_event_id: str,
+        session_id: str,
+        department: str,
+        activation_id: str,
+        context_digest: str,
+        diagnostics: dict[str, Any] | None,
+    ) -> None:
+        if not diagnostics:
+            return
+        payload = dict(diagnostics)
+        payload["host_launch"] = True
+        payload["usage_only"] = True
+        payload["tokens_charged"] = 0
+        payload["run_id"] = run_id
+        payload["activation_id"] = activation_id
+        payload["session_id"] = session_id
+        payload["department"] = department
+        payload["digest"] = context_digest
+        payload["context_digest"] = context_digest
+        self.store.append(
+            run_id,
+            EventType.CONTEXT_ASSEMBLED,
+            role=department,
+            parent_event_id=parent_event_id,
+            state_before=projection.phase,
+            state_after=projection.phase,
+            session_id=session_id,
+            context_digest=context_digest,
+            payload=payload,
+        )
 
     def _pause(self, run_id: str, projection: RunProjection, reason: str) -> None:
         self.store.append(

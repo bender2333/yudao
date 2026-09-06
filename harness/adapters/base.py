@@ -12,9 +12,16 @@ from ..workspace import Workspace
 
 
 class ProviderError(Exception):
-    def __init__(self, message: str, *, reason: str = "provider_error") -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str = "provider_error",
+        diagnostics: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
+        self.diagnostics = diagnostics
 
 
 @dataclass(frozen=True)
@@ -46,6 +53,7 @@ class AdapterResult:
     error: str | None = None
     provider: str = "fake"
     model: str = "fake-script"
+    diagnostics: dict[str, Any] | None = None
 
 
 class DepartmentAdapter(Protocol):
