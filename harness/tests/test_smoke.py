@@ -8,9 +8,9 @@ from harness.adapters.responses import ResponsesConfig
 from harness.adapters.fake import FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
-from harness.models import EventType, canonical_hash, json_dumps
-from harness.proposals import product_spec, delivery, review, ask_request, reaction, delivery_turn, plan_turn, review_turn
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence
+from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
+from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence
 from harness.tests.helpers import run_scripted
 
 
@@ -25,9 +25,10 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         "check_receipts_verified": True,
         "delivery_archive": {"status": "verified"},
         "fake_used": False,
-        "ask_count": 1,
+        "request_count": 2,
+        "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
     }
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": base, "ask": base}}) == 0
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": base, "collaboration": base}}) == 0
     assert smoke_exit_code({"available": False, "scenarios": {}}) == 2
     assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, fake_used=True)}}) == 2
     for change in (
@@ -36,7 +37,12 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         {"delivery_archive": None}, {"delivery_archive": {"status": "unverified"}},
     ):
         assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, **change)}}) == 1
-    assert smoke_exit_code({"available": True, "scenarios": {"ask": dict(base, ask_count=0)}}) == 1
+    assert smoke_exit_code({"available": True, "scenarios": {"collaboration": dict(base, request_count=0)}}) == 1
+    for audit in (None, {"status": "unverified"}, {"status": "verified", "pre_spec_consultation": True},
+                  {"status": "verified", "requirements_action": True}):
+        assert smoke_exit_code({"available": True, "scenarios": {
+            "collaboration": dict(base, collaboration_audit=audit),
+        }}) == 1
 
 
 @pytest.fixture
@@ -118,6 +124,94 @@ def test_archive_audit_rejects_unrelated_delivery_digest(native_run, monkeypatch
     delivery = replace(projection.delivery_spec, code_tree_digest=canonical_hash("unrelated tree"))
     monkeypatch.setattr(system, "project", lambda _run_id: replace(projection, delivery_spec=delivery))
     assert _archive_evidence(system, run_id)["status"] == "unverified"
+
+
+@pytest.fixture
+def collaboration_run(data_dir):
+    from harness.demo import run_demo
+
+    return run_demo(data_dir)
+
+
+def test_collaboration_audit_requires_actual_consultation_and_accepted_action_results(collaboration_run):
+    system, run_id = collaboration_run
+    audit = _collaboration_evidence(system, run_id)
+    assert audit["status"] == "verified", audit
+    assert audit["pre_spec_consultation"] is True
+    assert audit["requirements_action"] is True
+    assert audit["directions"] == ["product->engineering", "engineering->product", "quality->engineering"]
+
+
+def test_collaboration_audit_rejects_results_from_another_request(collaboration_run, monkeypatch):
+    system, run_id = collaboration_run
+    projection = system.project(run_id)
+    result_id = projection.responses[1].result_event_ids[0]
+    events = copy.deepcopy(system.store.list_events(run_id))
+    next(event for event in events if event.event_id == result_id).payload["request_id"] = "unrelated-request"
+    monkeypatch.setattr(system, "project", lambda _run_id: projection)
+    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
+    audit = _collaboration_evidence(system, run_id)
+    assert audit["status"] == "unverified"
+    assert audit["requirements_action"] is False
+    assert any("result is not bound" in note for note in audit["notes"])
+
+
+@pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED])
+@pytest.mark.parametrize("field", ["request_id", "effective_contract_hash", "engineering_plan_hash", "all"])
+def test_model_input_audit_rejects_changed_work_basis(collaboration_run, monkeypatch, event_type, field):
+    system, run_id = collaboration_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == event_type and item.payload.get("request_id"))
+    fields = ["request_id", "effective_contract_hash", "engineering_plan_hash"] if field == "all" else [field]
+    for name in fields:
+        event.payload[name] = "wrong-" + name
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "unverified"
+    assert any(any(name in note for name in fields) for note in audit["notes"])
+
+
+def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(collaboration_run, monkeypatch):
+    system, run_id = collaboration_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = [item for item in events if item.type == EventType.CONTEXT_ASSEMBLED and item.role == "quality"][-1]
+    request = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
+    request["input"][0]["content"] += "\n\n[private_engineering_transcript]\nUNRELATED_PRIVATE_HISTORY_CANARY"
+    ref = system.artifacts.put(run_id, "model_request", json_dumps(request), media_type="application/json")
+    event.payload["request_ref"] = asdict(ref)
+    event.payload["digest"] = event.context_digest = canonical_hash(request)
+    event.artifact_hashes = [ref.content_hash]
+    attempted = next(item for item in events if item.type == EventType.MODEL_REQUESTED
+                     and item.payload["activation_id"] == event.payload["activation_id"]
+                     and item.payload["step_id"] == event.payload["step_id"])
+    attempted.context_digest = event.context_digest
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "unverified"
+    assert any("pinned developer input differs" in note for note in audit["notes"])
+
+
+def test_model_input_audit_rejects_forged_injected_source_metadata(native_run, monkeypatch):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
+    event.payload["injected"][0]["digest"] = canonical_hash("different source")
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "unverified"
+    assert any("injected source metadata" in note for note in audit["notes"])
+
+
+def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
+    from harness.tests.test_compaction_engine import _runner
+
+    system, adapter, run_id, _ = _runner(tmp_path)
+    first = system.activate_once(run_id)
+    assert first.compactions[-1]["effective_contract_hash"] is None
+    system.activate_once(run_id)
+    final = system.activate_once(run_id)
+    later = [item for item in final.compactions if item["effective_contract_hash"] is not None]
+    assert later and later[0]["previous_compaction_event_id"] is None
+    assert adapter.invocations[-1].purpose == "work"
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
+    assert audit["status"] == "verified", audit["notes"]
 
 
 def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
@@ -213,9 +307,9 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
     assert fields["model_input_audit"]["status"] == "unverified"
 
 
-def test_audit_preserves_department_history_when_ask_returns_to_product(data_dir):
+def test_audit_preserves_department_history_when_request_returns_to_product(data_dir):
     system, projection = run_scripted(data_dir, [
-        product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
+        product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
         plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
     ])
     assert projection.phase == "DONE"
@@ -226,7 +320,7 @@ def test_audit_preserves_department_history_when_ask_returns_to_product(data_dir
 
 def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir, monkeypatch):
     system, projection = run_scripted(data_dir, [
-        product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
+        product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
         plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
     ])
     events = _events_for_mutation(system, projection.run_id, monkeypatch)

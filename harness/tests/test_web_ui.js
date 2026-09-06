@@ -161,8 +161,8 @@ function runPayload(runId, extra = {}) {
       human_action: "",
       error: extra.error || "",
     },
-    aggregates: { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 },
-    timeline: { specs: [], asks: [], reactions: [], transitions: [] },
+    aggregates: { latency_ms: 0, tool_count: 0, request_count: 0, rework_count: 0 },
+    timeline: { specs: [], requests: [], responses: [], transitions: [] },
     evidence: { deliveries: [], reviews: [], rejections: [], lesson_candidates: [] },
     context: { manifests: [] },
     events: extra.events || [],
@@ -414,7 +414,8 @@ function sampleBoard(extra = {}) {
     task: extra.task || "build echo",
     human_action: "",
     error: "",
-    ask_count: extra.ask_count || 0,
+    request_count: extra.request_count || 0,
+    pending_request: extra.pending_request || null,
     rework_count: extra.rework_count || 0,
   };
 }
@@ -499,7 +500,7 @@ test("delivery view opens complete manifest and persisted file downloads", async
   assert.equal(links[1].download, "original bytes.bin");
 });
 
-const emptyAgg = { latency_ms: 0, tool_count: 0, ask_count: 0, rework_count: 0 };
+const emptyAgg = { latency_ms: 0, tool_count: 0, request_count: 0, rework_count: 0 };
 
 function sampleLesson(extra = {}) {
   return {
@@ -652,9 +653,9 @@ test("in-flight candidate source results do not replace the newly selected run's
 test("cycle band shows 产品 工程 质检 and highlights current department", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   web.renderBoard(
-    sampleBoard({ phase: "ENGINEERING", active_department: "engineering", ask_count: 1, rework_count: 1 }),
+    sampleBoard({ phase: "ENGINEERING", active_department: "engineering", request_count: 1, rework_count: 1 }),
     emptyAgg,
-    { asks: [{ id: "ask_1", status: "open" }] },
+    { requests: [{ id: "request_1", status: "answered" }] },
   );
   const html = document.getElementById("board-body").innerHTML;
   assert.match(html, /产品/);
@@ -662,7 +663,7 @@ test("cycle band shows 产品 工程 质检 and highlights current department", 
   assert.match(html, /质检/);
   assert.match(html, /cycle-node active/);
   assert.match(html, /实现/);
-  assert.match(html, /Ask/);
+  assert.match(html, /协作 1/);
   assert.match(html, /返工 1/);
 });
 
@@ -675,17 +676,60 @@ test("done cycle marks quality and records completion", () => {
   assert.match(html, /产品/);
 });
 
-test("ask phase is visible on the product node and fact line", () => {
+test("consultation shows actual recipient and the work to return to without a special phase", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   web.renderBoard(
-    sampleBoard({ phase: "ASK_PRODUCT", active_department: "product" }),
+    sampleBoard({ phase: "QUALITY", active_department: "product", pending_request: {
+      requester: "quality", recipient: "product", request_type: "consultation", return_phase: "QUALITY",
+    } }),
     emptyAgg,
-    { asks: [{ id: "ask_1" }] },
+    {},
   );
   const html = document.getElementById("board-body").innerHTML;
   assert.match(html, /cycle-node active/);
-  assert.match(html, /处理 Ask/);
-  assert.match(html, /Ask \/ React/);
+  assert.match(html, /咨询/);
+  assert.match(html, /等待回应/);
+  assert.match(html, /质检 → 产品/);
+  assert.match(html, /返回 检查/);
+  assert.doesNotMatch(html, /cycle-link active/);
+});
+
+test("collaboration history separates answers from formal decisions and links action results", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  web.renderTimeline({
+    requests: [{ id: "request-1", created_event_id: "request-event", requester: "engineering", recipient: "product",
+      request_type: "action", action: "revise_requirements", status: "completed", question: "Required behavior?",
+      background: "Current task", expected_result: "Publish the requirement" }],
+    responses: [{ request_id: "request-1", created_event_id: "response-event", status: "completed", text: "Published <decision>",
+      result_event_ids: ["decision-event"], return_phase: "ENGINEERING", return_work_valid: false }],
+    effective_decisions: [{ content_hash: "decision-hash" }],
+    product_decisions: [{ created_event_id: "decision-event", content_hash: "decision-hash", statement: "Reject invalid flags",
+      rationale: "The public behavior requires this" }],
+  });
+  const html = document.getElementById("timeline-body").innerHTML;
+  assert.match(html, /工程 → 产品 · 修订需求/);
+  assert.match(html, /产品正式决定/);
+  assert.match(html, /Published &lt;decision&gt;/);
+  assert.match(html, /原工作已失效，转到 实现/);
+  assert.match(html, /data-event-id="request-event"/);
+  assert.match(html, /data-event-id="response-event"/);
+  assert.match(html, /data-event-id="decision-event">结果 1/);
+});
+
+test("terminated collaboration shows its reason and original closure record", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  web.renderTimeline({
+    requests: [{ id: "request-1", created_event_id: "request-event", requester: "product", recipient: "quality",
+      request_type: "consultation", status: "cancelled", question: "Review the acceptance approach?" }],
+    request_closures: [{ request_id: "request-1", created_event_id: "closed-event", status: "cancelled",
+      reason: "The run was cancelled.", return_phase: "PRODUCT_SPEC", return_work_valid: false }],
+  });
+  const html = document.getElementById("timeline-body").innerHTML;
+  assert.match(html, /已取消/);
+  assert.match(html, /The run was cancelled\./);
+  assert.match(html, /原工作未继续 写规格/);
+  assert.match(html, /data-event-id="closed-event">查看关闭记录/);
+  assert.doesNotMatch(html, /查看回应/);
 });
 
 test("board distinguishes actual provider from adapter and shows reported cost", () => {

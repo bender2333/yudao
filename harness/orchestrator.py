@@ -11,8 +11,9 @@ from typing import Any
 
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
 from .artifacts import ArtifactStore
-from .context import ContextAssembler
+from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
+from .collaboration import request_basis, request_still_applicable, resume_phase, tool_error
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
 from .engine import ToolAdmission, run_department
@@ -60,6 +61,7 @@ class _Activation:
     compaction_plan: Any = None
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
+    request_id: str | None = None
 
 
 class Orchestrator:
@@ -141,6 +143,35 @@ class Orchestrator:
     def workspace(self, run_id: str) -> Workspace:
         return Workspace(self.workspace_root / run_id)
 
+    @staticmethod
+    def _request_id(projection: RunProjection) -> str | None:
+        return None if projection.pending_request is None else projection.pending_request.id
+
+    def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
+                       return_phase: str, return_work_valid: bool) -> RunProjection:
+        request = projection.pending_request
+        if request is None:
+            return projection
+        self.store.append(
+            run_id, EventType.COLLABORATION_CLOSED, role=request.recipient,
+            parent_event_id=request.created_event_id, state_before=projection.phase, state_after=return_phase,
+            session_id=projection.sessions[request.recipient].session_id,
+            payload={"request_id": request.id, "status": status, "reason": reason,
+                     "return_phase": return_phase, "return_work_valid": return_work_valid},
+        )
+        return self.project(run_id)
+
+    def _close_obsolete_request(self, run_id: str, projection: RunProjection) -> RunProjection:
+        request = projection.pending_request
+        if request is None or projection.phase in TERMINAL_PHASES:
+            return projection
+        events = self.store.list_events(run_id)
+        if request_still_applicable(request, projection, events):
+            return projection
+        phase, _valid = resume_phase(request, projection, events, snapshot_hash=self.workspace(run_id).digest())
+        return self._close_request(run_id, projection, status="superseded", reason="The request basis changed outside its authorized work.",
+                                   return_phase=phase, return_work_valid=False)
+
     def cancel(self, run_id: str) -> RunProjection:
         with self._state_lock:
             projection = self.project(run_id)
@@ -197,12 +228,13 @@ class Orchestrator:
 
     def _prepare_activation(self, run_id: str) -> _Activation | None:
         projection = self.project(run_id)
+        projection = self._close_obsolete_request(run_id, projection)
         if projection.phase in TERMINAL_PHASES:
             return None
         if projection.cycle_count >= projection.max_cycles:
             self._pause(run_id, projection, "max_cycles")
             return None
-        department = department_for_phase(projection.phase)
+        department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
         if department is None:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
@@ -229,12 +261,12 @@ class Orchestrator:
             session_id=session.session_id,
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": current_contract_hash(projection),
-                     "engineering_plan_hash": current_plan_hash(projection)},
+                     "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection)},
         )
         abort_flag = self._abort.setdefault(run_id, Event())
         return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
                            effective_contract_hash=current_contract_hash(projection),
-                           engineering_plan_hash=current_plan_hash(projection))
+                           engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection))
 
     def _invoke_activation(self, activation: _Activation) -> None:
         request = activation
@@ -292,18 +324,19 @@ class Orchestrator:
         with self._state_lock:
             identity = activation
             current = self.project(identity.run_id)
+            current = self._close_obsolete_request(identity.run_id, current)
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
                 return None
             if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                    or current_plan_hash(current) != activation.engineering_plan_hash
+                    or self._request_id(current) != activation.request_id):
                 return None
             pinned = self.assembler.assemble(
                 current, department=identity.department, session_id=identity.session_id,
                 activation_id=identity.activation_id, step_id=step_id,
             )
             if step_id == 1:
-                static = {"intend", "department_rules", "professional_completion", "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
-                content = "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
+                content = department_work_text(pinned)
                 input_item = {"role": "user", "content": content}
                 received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
                 self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
@@ -312,7 +345,7 @@ class Orchestrator:
                                   artifact_hashes=[received_ref.content_hash],
                                   payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
                                            "effective_contract_hash": activation.effective_contract_hash,
-                                           "engineering_plan_hash": activation.engineering_plan_hash})
+                                           "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
             records = self._department_history_records(identity.run_id, identity.department)
             checkpoint_event = next((item for item in reversed(current.compactions)
                                      if item["department"] == identity.department
@@ -352,7 +385,7 @@ class Orchestrator:
                                    step_id, assembled, assembled.tools, identity.abort_flag,
                                    purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
                                    effective_contract_hash=activation.effective_contract_hash,
-                                   engineering_plan_hash=activation.engineering_plan_hash)
+                                   engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id)
             activation.request = request
             request.on_observation = lambda observation: self._record_observation(activation, observation)
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
@@ -403,7 +436,8 @@ class Orchestrator:
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return
             if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                    or current_plan_hash(current) != activation.engineering_plan_hash
+                    or self._request_id(current) != activation.request_id):
                 return
             plan = activation.compaction_plan
             try:
@@ -426,15 +460,18 @@ class Orchestrator:
                                        "max_output_tokens": plan.max_output_tokens,
                                        "effective_contract_hash": activation.effective_contract_hash,
                                        "engineering_plan_hash": activation.engineering_plan_hash,
+                                       "request_id": activation.request_id,
                                        "previous_compaction_event_id": request.context.manifest.compaction_event_id})
 
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
         with self._state_lock:
             current = self.project(request.run_id)
+            current = self._close_obsolete_request(request.run_id, current)
             if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
                 return False
             if (current_contract_hash(current) != request.effective_contract_hash
-                    or current_plan_hash(current) != request.engineering_plan_hash):
+                    or current_plan_hash(current) != request.engineering_plan_hash
+                    or self._request_id(current) != activation.request_id):
                 return False
             self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
@@ -443,20 +480,25 @@ class Orchestrator:
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
                                        "attempted": True, "purpose": request.purpose,
                                        "effective_contract_hash": request.effective_contract_hash,
-                                       "engineering_plan_hash": request.engineering_plan_hash})
+                                       "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id})
             return True
 
     def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolAdmission:
         with self._state_lock:
             request = activation.request
             current = self.project(request.run_id)
+            current = self._close_obsolete_request(request.run_id, current)
             if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
                 return ToolAdmission(stopped=True)
             if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash):
+                    or current_plan_hash(current) != activation.engineering_plan_hash
+                    or self._request_id(current) != activation.request_id):
                 return ToolAdmission(stopped=True)
             if not has_tool(request.department, call["name"]):
                 return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
+            error = tool_error(current, request.department, call["name"], call["args"])
+            if error:
+                return ToolAdmission(error=error)
             if call["name"] in {"write_file", "delete_file", "move_file"}:
                 plan = current.engineering_plan
                 if plan is None or plan.effective_contract_hash != current_contract_hash(current):
@@ -478,7 +520,7 @@ class Orchestrator:
                               state_after=current.phase, session_id=request.session_id,
                               payload={**call, "activation_id": request.activation_id,
                                        "effective_contract_hash": activation.effective_contract_hash,
-                                       "engineering_plan_hash": activation.engineering_plan_hash})
+                                       "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
             return ToolAdmission()
 
     def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:
@@ -533,6 +575,7 @@ class Orchestrator:
             payload["purpose"] = request.purpose
             payload["effective_contract_hash"] = activation.effective_contract_hash
             payload["engineering_plan_hash"] = activation.engineering_plan_hash
+            payload["request_id"] = activation.request_id
             self.store.append(
                 request.run_id, event_type, role=request.department,
                 parent_event_id=activation.parent_event_id,
@@ -609,14 +652,16 @@ class Orchestrator:
         provider: str | None,
         model: str | None,
     ) -> None:
+        evaluated = self.project(run_id)
         snapshot = self.workspace(run_id).snapshot()
         try:
             decision = evaluate_proposal(
-                phase=projection.phase,
+                phase=evaluated.phase,
                 department=department,
                 proposal=proposal,
-                projection=projection,
+                projection=evaluated,
                 snapshot=snapshot,
+                events=self.store.list_events(run_id),
             )
         except Exception as exc:
             decision = ProposalDecision(
@@ -625,11 +670,14 @@ class Orchestrator:
             )
         with self._state_lock:
             current = self.project(run_id)
+            current = self._close_obsolete_request(run_id, current)
             if current.phase in TERMINAL_PHASES:
                 return
             if (current.phase != projection.phase
                     or current_contract_hash(current) != current_contract_hash(projection)
-                    or current_plan_hash(current) != current_plan_hash(projection)):
+                    or current_plan_hash(current) != current_plan_hash(projection)
+                    or self._request_id(current) != self._request_id(projection)
+                    or request_basis(current) != request_basis(evaluated)):
                 decision = ProposalDecision(False, [FieldError("execution_basis", "The contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
             projection = current
             if proposal is not None:
@@ -655,7 +703,7 @@ class Orchestrator:
                 return
             self._commit_accepted(
                 run_id, department=department, projection=projection, snapshot=snapshot,
-                artifact=decision.artifact or {}, transitions=decision.transitions, extra=decision.extra,
+                artifact=decision.artifact or {}, transitions=decision.transitions,
                 parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
             )
 
@@ -668,7 +716,6 @@ class Orchestrator:
         snapshot: WorkspaceSnapshot,
         artifact: dict[str, Any],
         transitions: list[tuple[str, str]],
-        extra: dict[str, Any],
         parent_event_id: str,
         session_id: str,
         provider: str | None,
@@ -678,7 +725,7 @@ class Orchestrator:
             return
         source_event = self.submissions.commit(
             projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
-            artifact=artifact, extra=extra,
+            artifact=artifact,
             department=department, parent_event_id=parent_event_id, session_id=session_id,
             provider=provider, model=model,
         )
@@ -748,8 +795,11 @@ class Orchestrator:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return
+            department = projection.active_department
+            projection = self._close_request(run_id, projection, status="stopped", reason=reason,
+                                             return_phase=projection.phase, return_work_valid=False)
             self.store.append(
-                run_id, EventType.RUN_PAUSED, role=projection.active_department,
+                run_id, EventType.RUN_PAUSED, role=department,
                 state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
                 provider=projection.provider, model=projection.model,
                 payload={
@@ -767,6 +817,7 @@ class Orchestrator:
         human = {
             "provider_unavailable": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。",
             "provider_error": "模型提供方失败。查看错误事件后新建 run 或更换 provider。",
+            "provider_timeout": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。",
             "cancelled": "运行已被取消。如需继续，新建 run。",
             "context_overflow": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
             "compaction_failed": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
@@ -776,8 +827,12 @@ class Orchestrator:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return
+            department = projection.active_department
+            status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
+            projection = self._close_request(run_id, projection, status=status, reason=reason,
+                                             return_phase=projection.phase, return_work_valid=False)
             source_event = self.store.append(
-                run_id, EventType.RUN_FAILED, role=projection.active_department,
+                run_id, EventType.RUN_FAILED, role=department,
                 state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
                 provider=projection.provider, model=projection.model,
                 payload={"stop_reason": reason, "human_action": human, "message": message},

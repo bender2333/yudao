@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument("--data-dir", default=str(DEFAULT_DIR))
     smoke = sub.add_parser("smoke", help="run a real-provider three-department smoke test")
     smoke.add_argument("--data-dir", default=str(SMOKE_DIR))
-    smoke.add_argument("--scenario", choices=("happy", "ask", "all"), default="all")
+    smoke.add_argument("--scenario", choices=("happy", "collaboration", "all"), default="all")
     args = parser.parse_args(argv)
 
     if args.command == "demo":
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"demo run: {run_id}")
         print(f"phase={projection.phase} outcome={projection.outcome} stop={projection.stop_reason}")
         print(f"transitions: {' | '.join(projection.transitions)}")
-        print(f"asks={projection.ask_count} reworks={projection.rework_count} events={projection.last_seq}")
+        print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.last_seq}")
         if args.serve:
             return _serve(system, args.host, args.port)
         print(f"console: python -m harness serve --adapter fake --data-dir {args.data_dir}")
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(projection.canonical_state(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "smoke":
-        scenarios = ["happy", "ask"] if args.scenario == "all" else [args.scenario]
+        scenarios = ["happy", "collaboration"] if args.scenario == "all" else [args.scenario]
         report = run_smoke(args.data_dir, scenarios=scenarios)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         print(f"report: {Path(args.data_dir) / 'smoke-report.md'}")

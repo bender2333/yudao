@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -24,36 +25,61 @@ def product_spec(
         "acceptance_criteria": acceptance or ["running the program with a word prints that word"],
         "fatal_conditions": extra.get("fatal_conditions", ["non-zero exit on valid input"]),
         "non_goals": extra.get("non_goals", ["network access"]),
+        "decision_changes": extra.get("decision_changes", []),
     }
     payload.update({key: value for key, value in extra.items() if key in payload})
     return payload
 
 
-def ask_request(
+def collaboration_request(
+    recipient: str = "product",
     question: str = "How should unknown flags be handled?",
-    options: list[str] | None = None,
-    **extra: Any,
+    *,
+    request_type: str = "consultation",
+    background: str = "The current work needs another department's expertise.",
+    expected_result: str = "Explain the appropriate behavior and its basis.",
+    action: str | None = None,
 ) -> dict[str, Any]:
     return {
-        "kind": "ask_request",
+        "kind": "collaboration_request",
+        "recipient": recipient,
+        "request_type": request_type,
         "question": question,
-        "background": extra.get("background", "The current spec does not mention flags."),
-        "options": options or ["exit 2 with an error", "ignore unknown flags"],
-        "impact": extra.get("impact", "Error handling changes the public contract."),
-        "recommendation": extra.get("recommendation", "exit 2 with an error"),
-        "decide_fields": extra.get("decide_fields", ["unknown flag behavior"]),
+        "background": background,
+        "expected_result": expected_result,
+        "action": action,
     }
 
 
-def reaction(decision: str, rationale: str, spec_update: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "kind": "product_reaction",
-        "decision": decision,
-        "rationale": rationale,
+def collaboration_response(request_id: str, status: str, text: str,
+                           result_event_ids: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "kind": "collaboration_response", "request_id": request_id, "status": status,
+        "text": text, "result_event_ids": [] if result_event_ids is None else result_event_ids,
     }
-    if spec_update is not None:
-        payload["spec_update"] = spec_update
-    return payload
+
+
+def product_decision(statement: str, rationale: str) -> dict[str, Any]:
+    return {"kind": "product_decision", "statement": statement, "rationale": rationale}
+
+
+def response_turn(status: str = "answered", text: str = "The existing contract already defines this behavior.",
+                  *, result_event_ids: list[str] | None = None,
+                  result_types: list[str] | None = None) -> Callable[[ModelRequest], dict[str, Any]]:
+    def submit(request: ModelRequest) -> dict[str, Any]:
+        if request.request_id is None:
+            raise ValueError("response_turn requires an actual pending request")
+        references = list(result_event_ids or [])
+        if result_types:
+            results = next(json.loads(part.text) for part in request.context.parts if part.source == "request_results")
+            for event_type in result_types:
+                matches = [item["event_id"] for item in results if item["type"] == event_type]
+                if not matches:
+                    raise ValueError(f"response_turn has no accepted result of type {event_type}")
+                references.extend(matches)
+        return collaboration_response(request.request_id, status, text, references)
+
+    return submit
 
 
 def delivery(
@@ -123,7 +149,7 @@ def delivery_turn(
     summary: str = "implemented echo CLI",
     *,
     files: dict[str, str] | None = None,
-    checks: dict[str, int] | None = None,
+    checks: dict[str, int | dict[str, Any]] | None = None,
     transcript: str = "",
 ) -> FakeTurn:
     files = files or {"src/echo.py": "import sys\nprint(sys.argv[1])\n"}
@@ -140,7 +166,7 @@ def review_turn(
     verdict: str,
     rationale: str,
     *,
-    checks: dict[str, int] | None = None,
+    checks: dict[str, int | dict[str, Any]] | None = None,
     defects: list[dict[str, str]] | None = None,
     transcript: str = "",
 ) -> FakeTurn:

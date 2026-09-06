@@ -294,8 +294,9 @@ def test_silent_network_times_out_and_keeps_completed_output(headers_sent):
 
     try:
         with _server([silence]) as (config, captures, *_):
-            with pytest.raises(ProviderError, match="timed out"):
+            with pytest.raises(ProviderError, match="timed out") as caught:
                 ResponsesAdapter(replace(config, timeout_sec=0.8)).complete(_request(observations=observations.append))
+            assert caught.value.reason == "provider_timeout"
             assert len(captures) == 1
         assert len(observations) == int(headers_sent)
     finally:

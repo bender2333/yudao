@@ -56,6 +56,7 @@ class ModelRequest:
     max_output_tokens: int | None = None
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
+    request_id: str | None = None
 
     @property
     def input_items(self) -> list[dict[str, Any]]:

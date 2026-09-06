@@ -5,7 +5,7 @@ from threading import Event
 from harness.adapters.base import ModelObservation, ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, canonical_hash, json_dumps
-from harness.proposals import ask_request, product_spec, reaction
+from harness.proposals import collaboration_request, product_spec, response_turn
 from harness.runtime import LoopSystem
 
 
@@ -33,13 +33,13 @@ def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False):
         count = work_counts.get(request.activation_id, 0)
         work_counts[request.activation_id] = count + 1
         if request.department == "engineering":
-            return ask_request()
+            return collaboration_request()
         if count == 0:
             return _read(request, "large.txt")
         if reject_first_spec and not rejected_spec:
             rejected_spec = True
             return product_spec() | {"acceptance_criteria": []}
-        return product_spec() if "[pending_ask]" not in request.context.prompt_text else reaction("accept", "Keep original behavior")
+        return product_spec() if request.request_id is None else response_turn("answered", "The original requirements remain applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem(tmp_path, adapter)

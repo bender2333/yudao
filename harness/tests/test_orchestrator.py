@@ -1,7 +1,7 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import MAX_MODEL_STEPS
-from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review, review_turn
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 
@@ -34,75 +34,77 @@ def test_happy_path_requires_quality_release(data_dir):
     assert projection.last_review.code_snapshot_hash == projection.delivery_spec.code_tree_digest
 
 
-def test_ask_accept_returns_to_engineering(data_dir):
+def test_consultation_response_returns_to_engineering(data_dir):
     script = [
         product_spec(),
-        ask_request(),
-        reaction("accept", "Use option A as specified."),
+        collaboration_request(),
+        response_turn("answered", "The existing requirements already define ordinary input."),
         plan_turn(),
         delivery_turn(),
         review_turn("release", "accepted path is implemented"),
     ]
     _, projection = run_scripted(data_dir, script)
     assert projection.phase == "DONE"
-    assert "ENGINEERING->ASK_PRODUCT" in projection.transitions
-    assert "ASK_PRODUCT->PRODUCT_REACT" in projection.transitions
-    assert "PRODUCT_REACT->ENGINEERING" in projection.transitions
-    assert projection.last_reaction.decision == "accept"
-    assert projection.last_reaction.produces_new_spec is False
+    assert projection.request_count == 1
+    assert projection.requests[0].requester == "engineering"
+    assert projection.requests[0].recipient == "product"
+    assert projection.responses[0].status == "answered"
+    assert projection.responses[0].return_phase == "ENGINEERING"
+    assert projection.effective_decisions == []
     assert projection.product_spec.revision == 1
 
 
-def test_ask_reply_can_create_new_spec(data_dir):
+def test_requested_requirements_revision_creates_normal_spec_before_response(data_dir):
     updated = product_spec(goal="Build echo with strict flags", acceptance=["unknown flags exit 2"])
     script = [
         product_spec(),
-        ask_request(),
-        reaction("reply", "Unknown flags must fail.", spec_update=updated),
+        collaboration_request(request_type="action", action="revise_requirements"),
+        updated,
+        response_turn("completed", "Unknown flags must fail.", result_types=["spec_accepted"]),
         plan_turn(),
         delivery_turn(),
         review_turn("release", "reply applied"),
     ]
     _, projection = run_scripted(data_dir, script)
     assert projection.phase == "DONE"
-    assert projection.last_reaction.decision == "reply"
-    assert projection.last_reaction.produces_new_spec is True
+    assert projection.responses[0].status == "completed"
+    assert projection.responses[0].result_event_ids == [projection.product_spec.created_event_id]
     assert projection.product_spec.revision == 2
     assert projection.product_spec.goal == "Build echo with strict flags"
     assert projection.product_specs[0].status == "superseded"
     assert projection.delivery_spec.product_spec_hash == projection.product_spec.content_hash
 
 
-def test_empty_spec_update_is_not_a_new_contract(data_dir):
+def test_consultation_answer_is_not_a_product_decision(data_dir):
     script = [
         product_spec(),
-        ask_request(),
-        reaction("accept", "keep the current spec", spec_update={}),
+        collaboration_request(),
+        response_turn("answered", "A possible future requirement would reject unknown flags."),
         plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
     ]
     _, projection = run_scripted(data_dir, script)
     assert projection.phase == "DONE"
-    assert projection.last_reaction.decision == "accept"
-    assert projection.last_reaction.produces_new_spec is False
+    assert projection.effective_decisions == []
+    assert len(projection.effective_contracts) == 1
     assert projection.product_spec.revision == 1
 
 
-def test_ask_reject_keeps_engineering_on_current_spec(data_dir):
+def test_declined_request_keeps_engineering_on_current_spec(data_dir):
     script = [
         product_spec(),
-        ask_request(),
-        reaction("reject", "Do not ignore flags; keep the current contract."),
+        collaboration_request(),
+        response_turn("declined", "No requirements revision is needed for the current task."),
         plan_turn(),
         delivery_turn(),
         review_turn("release", "rejected alternative"),
     ]
     _, projection = run_scripted(data_dir, script)
     assert projection.phase == "DONE"
-    assert projection.last_reaction.decision == "reject"
+    assert projection.responses[0].status == "declined"
     assert projection.product_spec.revision == 1
-    assert "PRODUCT_REACT->ENGINEERING" in projection.transitions
+    assert projection.responses[0].return_phase == "ENGINEERING"
 
 
 def test_quality_rework_routes_to_engineering(data_dir):
@@ -191,7 +193,7 @@ def test_natural_language_completion_does_not_finish(data_dir):
 
 
 def test_max_cycles_pauses_with_human_action(data_dir):
-    script = [product_spec(), ask_request(), product_spec()]
+    script = [product_spec(), collaboration_request(), response_turn()]
     _, projection = run_scripted(data_dir, script, max_cycles=2)
     assert projection.phase == "PAUSED"
     assert projection.stop_reason == "max_cycles"

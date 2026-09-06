@@ -15,7 +15,7 @@ def contract_payload(projection: RunProjection) -> dict[str, Any]:
         raise ValueError("an active ProductSpec is required")
     basis = {
         "product_spec_hash": spec.content_hash,
-        "decision_hashes": [item.reaction_hash for item in projection.effective_decisions],
+        "decision_hashes": [item.content_hash for item in projection.effective_decisions],
     }
     return {**basis, "content_hash": canonical_hash(basis)}
 
@@ -67,15 +67,13 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
             lines.append("None.")
     lines.extend(["", "## Effective Product Decisions", ""])
     for index, decision in enumerate(projection.effective_decisions, 1):
-        lines.extend([f"### {index}. {decision.question}", "", f"Decision: {decision.decision}",
-                      "", f"Background: {decision.background}", "", "Options:"])
-        lines.extend(f"- {item}" for item in decision.options)
-        lines.extend(["", f"Recommendation: {decision.recommendation}", "", f"Impact: {decision.impact}",
-                      "", "Decision fields:"])
-        lines.extend(f"- {item}" for item in decision.decide_fields)
-        lines.extend(["", f"Rationale: {decision.rationale}", "", f"Source: {decision.reaction_hash}", ""])
+        lines.extend([f"### {index}. {decision.statement}", "", f"Rationale: {decision.rationale}",
+                      "", f"Source: {decision.content_hash}", f"Original ProductSpec: {decision.product_spec_hash}", ""])
     if not projection.effective_decisions:
         lines.append("None.")
+    if spec.decision_changes:
+        lines.extend(["", "## Treatment of Earlier Decisions", ""])
+        lines.extend(f"- {item['decision_hash']}: {item['disposition']}. {item['rationale']}" for item in spec.decision_changes)
     return "\n".join(lines).rstrip() + "\n"
 
 

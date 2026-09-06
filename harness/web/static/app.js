@@ -352,8 +352,6 @@ const CYCLE_NODES = [
 
 const PHASE_LABEL = {
   PRODUCT_SPEC: "写规格",
-  PRODUCT_REACT: "响应 Ask",
-  ASK_PRODUCT: "处理 Ask",
   ENGINEERING: "实现",
   REWORK_ENGINEERING: "返工开发",
   DELIVERY: "提交交付",
@@ -365,7 +363,7 @@ const PHASE_LABEL = {
 };
 
 function stopLabel(reason) {
-  return reason === "model_steps_exhausted" ? "模型步骤已达上限" : reason;
+  return { model_steps_exhausted: "模型步骤已达上限", provider_timeout: "模型请求超时" }[reason] || reason;
 }
 
 function cycleNodeClass(nodeId, board) {
@@ -377,9 +375,10 @@ function cycleNodeClass(nodeId, board) {
 }
 
 function cycleLinkClass(index, board) {
+  if (board.pending_request) return "";
   const phase = board.phase || "";
   if (index === 0) {
-    return ["ENGINEERING", "DELIVERY", "ASK_PRODUCT", "PRODUCT_REACT", "REWORK_ENGINEERING"].includes(phase)
+    return ["ENGINEERING", "DELIVERY", "REWORK_ENGINEERING"].includes(phase)
       ? " active"
       : "";
   }
@@ -388,12 +387,14 @@ function cycleLinkClass(index, board) {
 
 function renderCycle(board, timeline) {
   const phase = board.phase || "";
+  const pending = board.pending_request;
   const nodes = CYCLE_NODES.map((node, index) => {
     const on = (board.active_department || "") === node.id || (phase === "DONE" && node.id === "quality");
-    const phaseText = on ? PHASE_LABEL[phase] || phase : "";
+    const phaseText = pending && node.id === pending.requester ? "等待回应"
+      : on ? pending ? collaborationType(pending) : PHASE_LABEL[phase] || phase : "";
     const link =
       index < CYCLE_NODES.length - 1
-        ? `<div class="cycle-link${cycleLinkClass(index, board)}" aria-hidden="true">→</div>`
+        ? `<div class="cycle-link${cycleLinkClass(index, board)}" aria-hidden="true">${pending ? "·" : "→"}</div>`
         : "";
     return `<div class="cycle-node${cycleNodeClass(node.id, board)}" title="${t(phase, "")}">
         <div class="cycle-name">${node.name}</div>
@@ -401,9 +402,11 @@ function renderCycle(board, timeline) {
       </div>${link}`;
   }).join("");
   const facts = [];
-  if (phase === "ASK_PRODUCT" || phase === "PRODUCT_REACT") facts.push("Ask / React");
-  else if ((timeline && (timeline.asks || []).length) || board.ask_count) {
-    facts.push(`Ask ${board.ask_count || (timeline.asks || []).length}`);
+  if (pending) {
+    facts.push(`${departmentLabel(pending.requester)} → ${departmentLabel(pending.recipient)} · ${collaborationType(pending)}`);
+    facts.push(`返回 ${PHASE_LABEL[pending.return_phase] || pending.return_phase}`);
+  } else if (board.request_count) {
+    facts.push(`协作 ${board.request_count}`);
   }
   if (board.rework_count) facts.push(`返工 ${board.rework_count}`);
   if (phase === "DONE") facts.push("已完成");
@@ -429,7 +432,7 @@ function renderBoard(board, aggregates, timeline, events) {
       ["Token", board.token_used || "未上报"],
       ["耗时 ms", agg.latency_ms],
       ["工具次数", agg.tool_count],
-      ["Ask", agg.ask_count],
+      ["协作请求", agg.request_count],
       ["返工", agg.rework_count],
       ["费用", formatCost(agg.cost)],
       ["模型", latestEventModel(events), "kv-model"],
@@ -500,34 +503,62 @@ function renderTimeline(timeline, gen = state.gen) {
     </article>`,
     )
     .join("");
-  const asks = (timeline.asks || [])
-    .map(
-      (ask) => `
-    <article class="item">
-      <header><span>Ask ${t(ask.id)}</span><span>${t(ask.status)}</span></header>
-      <p>${t(ask.question)}</p>
-      <p class="hash">spec ${t(shortHash(ask.product_spec_hash))}</p>
-    </article>`,
-    )
-    .join("");
-  const reactions = (timeline.reactions || [])
-    .map(
-      (item) => `
-    <article class="item">
-      <header><span>React ${t(item.decision)}</span><span>${item.produces_new_spec ? "new spec" : "same spec"}</span></header>
-      <p class="hash">ask ${t(item.ask_id)} → spec ${t(shortHash(item.new_spec_hash))}</p>
-    </article>`,
-    )
-    .join("");
+  const requests = (timeline.requests || []).map((request) => {
+    const responses = (timeline.responses || []).filter(item => item.request_id === request.id).map((response) => `
+      <div class="collaboration-response">
+        <p><strong>${t(collaborationStatus(response.status))}</strong> · ${t(response.text)}</p>
+        <p class="muted">${response.return_work_valid === false ? "原工作已失效，转到" : "返回"} ${t(PHASE_LABEL[response.return_phase] || response.return_phase)}</p>
+        <div class="actions">
+          <button type="button" class="event-link" data-event-id="${t(response.created_event_id)}">查看回应</button>
+          ${(response.result_event_ids || []).map((eventId, index) => `<button type="button" class="event-link" data-event-id="${t(eventId)}">结果 ${index + 1}</button>`).join("")}
+        </div>
+      </div>`).join("");
+    const closures = (timeline.request_closures || []).filter(item => item.request_id === request.id).map((closure) => `
+      <div class="collaboration-response">
+        <p><strong>${t(collaborationStatus(closure.status))}</strong> · ${t(closure.reason)}</p>
+        <p class="muted">${closure.return_work_valid ? "返回" : "原工作未继续"} ${t(PHASE_LABEL[closure.return_phase] || closure.return_phase)}</p>
+        <button type="button" class="event-link" data-event-id="${t(closure.created_event_id)}">查看关闭记录</button>
+      </div>`).join("");
+    return `<article class="item collaboration-request">
+      <header><span>${t(departmentLabel(request.requester))} → ${t(departmentLabel(request.recipient))} · ${t(collaborationType(request))}</span><span>${t(collaborationStatus(request.status))}</span></header>
+      <p>${t(request.question)}</p>
+      <p class="muted">${t(request.background)}</p>
+      <p>期望结果：${t(request.expected_result)}</p>
+      <button type="button" class="event-link" data-event-id="${t(request.created_event_id)}">查看请求</button>
+      ${responses}${closures}
+    </article>`;
+  }).join("");
+  const effective = new Set((timeline.effective_decisions || []).map(item => item.content_hash));
+  const decisions = (timeline.product_decisions || []).map((decision) => `<article class="item">
+    <header><span>产品正式决定</span><span>${effective.has(decision.content_hash) ? "当前有效" : "已处理"}</span></header>
+    <p>${t(decision.statement)}</p><p class="muted">${t(decision.rationale)}</p>
+    <button type="button" class="event-link" data-event-id="${t(decision.created_event_id)}">查看决定</button>
+  </article>`).join("");
   node.innerHTML = `
     ${current}
     <details class="work-history"><summary>需求与计划历史</summary><div class="list">${contracts}${plans}</div></details>
     <p class="muted">transitions: ${t((timeline.transitions || []).join(" · "), "—")}</p>
-    <div class="list">${specs}${asks}${reactions || '<p class="muted">尚无 ask/react。</p>'}</div>
+    <div class="list">${specs}${decisions}</div>
+    <h3>部门协作</h3>
+    <div class="list">${requests || '<p class="muted">尚无协作请求。</p>'}</div>
   `;
   node.querySelectorAll(".event-link").forEach((button) => {
     button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
   });
+}
+
+function departmentLabel(department) {
+  return CYCLE_NODES.find(node => node.id === department)?.name || department;
+}
+
+function collaborationType(request) {
+  if (request.request_type === "consultation") return "咨询";
+  return { inspect: "查看", check: "检查", revise_requirements: "修订需求", revise_delivery: "修订交付" }[request.action] || "动作";
+}
+
+function collaborationStatus(status) {
+  return { open: "待回应", answered: "已回答", completed: "已完成", declined: "未接受", needs_work: "仍需处理",
+    cancelled: "已取消", superseded: "已失效", stopped: "已停止" }[status] || status;
 }
 
 function renderEvidence(evidence, gen = state.gen) {

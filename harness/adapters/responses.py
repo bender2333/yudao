@@ -88,7 +88,7 @@ class ResponsesAdapter:
         except ProviderError:
             raise
         except (TimeoutError, APITimeoutError) as exc:
-            raise ProviderError("Model request timed out") from exc
+            raise ProviderError("Model request timed out", reason="provider_timeout") from exc
         except APIStatusError as exc:
             code = _error_code(exc.body)
             reason = "context_overflow" if code == "context_length_exceeded" else "provider_error"

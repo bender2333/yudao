@@ -355,7 +355,7 @@ def test_queries_do_not_mutate_existing_run(data_dir):
     with running_server(system) as (_server, host, port):
         payload = get_json(host, port, f"/api/runs/{projection.run_id}")
         assert payload["board"]["phase"] == "DONE"
-        assert payload["timeline"]["asks"] == []
+        assert payload["timeline"]["requests"] == []
         assert payload["evidence"]["reviews"][0]["verdict"] == "release"
         assert payload["context"]["manifests"]
         manifests = payload["context"]["manifests"]

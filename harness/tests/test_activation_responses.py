@@ -126,7 +126,7 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_current_partial_mes
                 run_id = system.create_run("later timeout")
                 system.workspace(run_id).write_file("proof.txt", "survives-timeout")
                 result = system.activate_once(run_id)
-                assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+                assert result.phase == "FAILED" and result.stop_reason == "provider_timeout"
                 assert "timed out" in result.error
                 assert result.token_used >= 130
                 events = system.store.list_events(run_id)

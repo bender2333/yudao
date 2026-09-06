@@ -22,7 +22,7 @@ class SubmissionWriter:
         self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
 
     def commit(self, *, projection: RunProjection, snapshot: WorkspaceSnapshot, workspace_root: Path, artifact: dict[str, Any],
-               extra: dict[str, Any], department: str, parent_event_id: str, session_id: str,
+               department: str, parent_event_id: str, session_id: str,
                provider: str | None, model: str | None) -> Event:
         run_id = projection.run_id
         artifact = dict(artifact)
@@ -30,8 +30,11 @@ class SubmissionWriter:
                         state_after=projection.phase, session_id=session_id, provider=provider, model=model)
         prepared: list[tuple[str, dict[str, Any], list[str]]] = []
         current = deepcopy(projection)
+        request_id = None if projection.pending_request is None else projection.pending_request.id
 
         def append(event_type: str, payload: dict[str, Any], hashes: list[str] | None = None) -> int:
+            if event_type not in {EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED}:
+                payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
             event = Event(event_id="uncommitted", run_id=run_id, seq=projection.last_seq + len(prepared),
                           type=event_type, **metadata, payload=payload, artifact_hashes=hashes or [],
@@ -49,15 +52,9 @@ class SubmissionWriter:
         kind = artifact["kind"]
         if kind == "product_spec":
             event = product_spec(artifact)
-        elif kind == "product_reaction":
-            new_spec = extra.get("new_spec") or artifact.pop("spec_update", None)
-            if new_spec:
-                product_spec(new_spec)
-                artifact["produces_new_spec"] = True
-                artifact["new_spec_hash"] = new_spec["content_hash"]
-            artifact.pop("spec_update", None)
-            artifact["id"] = new_id("react")
-            event = append(EventType.REACT_SUBMITTED, artifact, [artifact["content_hash"]])
+        elif kind == "product_decision":
+            artifact["id"] = new_id("decision")
+            event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
         elif kind == "engineering_plan":
             artifact["id"] = new_id("plan")
             markdown = render_plan(artifact)
@@ -65,9 +62,14 @@ class SubmissionWriter:
             artifact["plan_ref"] = asdict(ref)
             event = append(EventType.PLAN_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
             self._write_material(run_id, "PLAN.md", markdown)
-        elif kind == "ask_request":
-            artifact["id"] = new_id("ask")
-            event = append(EventType.ASK_SUBMITTED, artifact, [artifact["content_hash"]])
+        elif kind == "collaboration_request":
+            artifact["id"] = new_id("request")
+            event = append(EventType.COLLABORATION_REQUESTED, artifact, [artifact["content_hash"]])
+        elif kind == "collaboration_response":
+            artifact["id"] = new_id("response")
+            metadata["state_after"] = artifact["return_phase"]
+            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            event = append(EventType.COLLABORATION_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":
             if artifact["code_tree_digest"] != snapshot.digest:
                 raise ValueError("Delivery does not match the validated workspace snapshot")
@@ -85,7 +87,7 @@ class SubmissionWriter:
         else:
             raise ValueError(f"unhandled artifact kind {kind}")
 
-        if kind in {"product_spec", "product_reaction"}:
+        if kind in {"product_spec", "product_decision"}:
             contract = contract_payload(current)
             if current.effective_contract is None or contract["content_hash"] != current.effective_contract.content_hash:
                 contract["revision"] = len(current.effective_contracts) + 1

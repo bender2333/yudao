@@ -7,7 +7,8 @@ from typing import Any
 
 from .event_store import EventStore
 from .models import (
-    AskRequest,
+    CollaborationRequest,
+    CollaborationResponse,
     ArtifactRef,
     ContextExclusion,
     ContextManifest,
@@ -20,12 +21,12 @@ from .models import (
     EventType,
     LessonCandidate,
     ProductDecision,
-    ProductReaction,
     ProductSpec,
     QAReview,
     RunProjection,
     SessionRecord,
     TERMINAL_PHASES,
+    department_for_phase,
     waiting_reason_for,
 )
 
@@ -46,6 +47,8 @@ def project_events(events: list[Event]) -> RunProjection:
     for event in events:
         apply_event(state, event)
     state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
+    if state.pending_request is not None:
+        state.waiting_reason = f"{state.pending_request.recipient} is handling a request from {state.pending_request.requester}"
     if state.phase in TERMINAL_PHASES:
         state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
         state.active_department = None
@@ -57,6 +60,13 @@ def apply_event(state: RunProjection, event: Event) -> None:
     state.last_seq = event.seq
     payload = event.payload
     etype = event.type
+    if payload.get("request_id") and etype in {
+        EventType.TOOL_CALLED, EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
+        EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.CONTRACT_ACCEPTED,
+    } and payload.get("name") != "provider_usage":
+        state.request_results.append({"event_id": event.event_id, "type": etype, "request_id": payload["request_id"],
+                                      "role": event.role, "name": payload.get("name"), "ok": payload.get("ok"),
+                                      "content_hash": payload.get("content_hash")})
     if event.provider:
         state.provider = event.provider
     if event.model:
@@ -107,6 +117,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.TOOL_CALLED:
         if payload.get("name") != "provider_usage":
             state.tool_count += 1
+            if payload.get("ok") and payload.get("name") in {"write_file", "delete_file", "move_file"}:
+                _supersede_active_deliveries(state, "workspace_changed")
         else:
             state.token_used += int(payload.get("tokens_charged", 0))
         state.cost += float(payload.get("cost", 0.0))
@@ -195,24 +207,44 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.engineering_plan = plan
         return
 
-    if etype == EventType.ASK_SUBMITTED:
+    if etype == EventType.COLLABORATION_REQUESTED:
         _clear_feedback(state, event.role)
-        ask = _ask_from_payload(payload, event)
-        state.asks.append(ask)
-        state.pending_ask = ask
-        state.ask_count += 1
+        request = CollaborationRequest(
+            id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
+            requester=payload["requester"], recipient=payload["recipient"], request_type=payload["request_type"],
+            action=payload["action"], question=payload["question"], background=payload["background"],
+            expected_result=payload["expected_result"], basis=payload["basis"], return_phase=payload["return_phase"], status="open",
+        )
+        state.requests.append(request)
+        state.pending_request = request
+        state.active_department = request.recipient
+        state.request_count += 1
         return
 
-    if etype == EventType.REACT_SUBMITTED:
+    if etype in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}:
         _clear_feedback(state, event.role)
-        reaction = _reaction_from_payload(payload, event)
-        state.reactions.append(reaction)
-        state.last_reaction = reaction
-        if state.pending_ask and state.pending_ask.id == reaction.ask_id:
-            state.pending_ask = None
-        for index, ask in enumerate(state.asks):
-            if ask.id == reaction.ask_id:
-                state.asks[index] = replace(ask, status="answered")
+        if etype == EventType.COLLABORATION_RESPONDED:
+            state.responses.append(CollaborationResponse(
+                id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
+                request_id=payload["request_id"], status=payload["status"], text=payload["text"],
+                result_event_ids=list(payload["result_event_ids"]), return_phase=payload["return_phase"],
+                return_work_valid=payload["return_work_valid"],
+            ))
+        state.requests = [replace(item, status=payload["status"]) if item.id == payload["request_id"] else item
+                          for item in state.requests]
+        if state.pending_request and state.pending_request.id == payload["request_id"]:
+            state.pending_request = None
+        state.phase = payload["return_phase"]
+        state.active_department = department_for_phase(state.phase)
+        return
+
+    if etype == EventType.PRODUCT_DECISION_ACCEPTED:
+        _clear_feedback(state, event.role)
+        state.product_decisions.append(ProductDecision(
+            id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
+            product_spec_hash=payload["product_spec_hash"], statement=payload["statement"],
+            rationale=payload["rationale"], request_id=payload["request_id"],
+        ))
         _refresh_effective_decisions(state)
         return
 
@@ -260,16 +292,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         route = payload.get("route") or f"{event.state_before}->{event.state_after}"
         state.transitions.append(route)
         if event.state_after not in TERMINAL_PHASES:
-            state.active_department = {
-                "PRODUCT_SPEC": "product",
-                "PRODUCT_REACT": "product",
-                "REWORK_PRODUCT": "product",
-                "ASK_PRODUCT": "product",
-                "ENGINEERING": "engineering",
-                "REWORK_ENGINEERING": "engineering",
-                "QUALITY": "quality",
-                "DELIVERY": "quality",
-            }.get(event.state_after)
+            state.active_department = state.pending_request.recipient if state.pending_request else department_for_phase(event.state_after)
         return
 
     if etype == EventType.RUN_DONE:
@@ -306,6 +329,7 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         compaction_event_id=payload["compaction_event_id"],
         effective_contract_hash=payload["effective_contract_hash"],
         engineering_plan_hash=payload["engineering_plan_hash"],
+        request_id=payload["request_id"],
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],
@@ -338,46 +362,7 @@ def _product_spec_from_payload(payload: dict[str, Any], event: Event) -> Product
         acceptance_criteria=list(payload.get("acceptance_criteria", [])),
         fatal_conditions=list(payload.get("fatal_conditions", [])),
         non_goals=list(payload.get("non_goals", [])),
-    )
-
-
-def _ask_from_payload(payload: dict[str, Any], event: Event) -> AskRequest:
-    return AskRequest(
-        id=payload["id"],
-        run_id=event.run_id,
-        revision=int(payload["revision"]),
-        parent_hash=payload.get("parent_hash"),
-        content_hash=payload["content_hash"],
-        issuer=payload.get("issuer", "engineering"),
-        status=payload.get("status", "open"),
-        created_event_id=event.event_id,
-        product_spec_hash=payload["product_spec_hash"],
-        effective_contract_hash=payload["effective_contract_hash"],
-        question=payload["question"],
-        background=payload.get("background", ""),
-        options=list(payload.get("options", [])),
-        impact=payload.get("impact", ""),
-        recommendation=payload.get("recommendation", ""),
-        decide_fields=list(payload.get("decide_fields", [])),
-    )
-
-
-def _reaction_from_payload(payload: dict[str, Any], event: Event) -> ProductReaction:
-    return ProductReaction(
-        id=payload["id"],
-        run_id=event.run_id,
-        revision=int(payload["revision"]),
-        parent_hash=payload.get("parent_hash"),
-        content_hash=payload["content_hash"],
-        issuer=payload.get("issuer", "product"),
-        status=payload.get("status", "active"),
-        created_event_id=event.event_id,
-        ask_id=payload["ask_id"],
-        ask_hash=payload["ask_hash"],
-        decision=payload["decision"],
-        rationale=payload["rationale"],
-        produces_new_spec=bool(payload.get("produces_new_spec", False)),
-        new_spec_hash=payload.get("new_spec_hash"),
+        decision_changes=list(payload["decision_changes"]),
     )
 
 
@@ -431,32 +416,9 @@ def _refresh_effective_decisions(state: RunProjection) -> None:
     if spec is None or spec.status != "active":
         state.effective_decisions = []
         return
-    asks = {ask.id: ask for ask in state.asks}
-    decisions: list[ProductDecision] = []
-    for reaction in state.reactions:
-        if reaction.produces_new_spec:
-            continue
-        ask = asks.get(reaction.ask_id)
-        if ask is None or ask.product_spec_hash != spec.content_hash:
-            continue
-        decisions.append(
-            ProductDecision(
-                ask_id=ask.id,
-                ask_hash=ask.content_hash,
-                reaction_id=reaction.id,
-                reaction_hash=reaction.content_hash,
-                product_spec_hash=ask.product_spec_hash,
-                question=ask.question,
-                background=ask.background,
-                options=list(ask.options),
-                impact=ask.impact,
-                recommendation=ask.recommendation,
-                decide_fields=list(ask.decide_fields),
-                decision=reaction.decision,
-                rationale=reaction.rationale,
-            )
-        )
-    state.effective_decisions = decisions
+    retained = {item["decision_hash"] for item in spec.decision_changes if item["disposition"] == "retain"}
+    state.effective_decisions = [item for item in state.product_decisions
+                                 if item.product_spec_hash == spec.content_hash or item.content_hash in retained]
 
 
 def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:

@@ -6,32 +6,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import current_contract_hash, normalize_scope
+from .collaboration import allowed_proposal_kinds, request_basis, request_errors, response_errors, resume_phase
 from .models import (
     DEPARTMENTS,
     PROPOSAL_KINDS,
     QA_VERDICTS,
-    REACTION_DECISIONS,
+    Event,
+    canonical_hash,
     spec_content_hash,
 )
 from .projection import RunProjection
 from .workspace import WorkspaceSnapshot
-
-KIND_BY_DEPARTMENT = {
-    "product": {"product_spec", "product_reaction"},
-    "engineering": {"engineering_plan", "ask_request", "delivery_spec"},
-    "quality": {"qa_review"},
-}
-
-PHASE_KINDS = {
-    "PRODUCT_SPEC": {"product_spec"},
-    "REWORK_PRODUCT": {"product_spec"},
-    "PRODUCT_REACT": {"product_reaction"},
-    "ASK_PRODUCT": {"product_reaction"},
-    "ENGINEERING": {"engineering_plan", "ask_request", "delivery_spec"},
-    "REWORK_ENGINEERING": {"engineering_plan", "ask_request", "delivery_spec"},
-    "QUALITY": {"qa_review"},
-}
-
 
 @dataclass
 class FieldError:
@@ -48,7 +33,6 @@ class ProposalDecision:
     errors: list[FieldError] = field(default_factory=list)
     artifact: dict[str, Any] | None = None
     transitions: list[tuple[str, str]] = field(default_factory=list)
-    extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def error_dicts(self) -> list[dict[str, str]]:
@@ -62,6 +46,7 @@ def evaluate_proposal(
     proposal: dict[str, Any] | None,
     projection: RunProjection,
     snapshot: WorkspaceSnapshot,
+    events: list[Event] | None = None,
 ) -> ProposalDecision:
     try:
         return _evaluate_proposal(
@@ -70,6 +55,7 @@ def evaluate_proposal(
             proposal=proposal,
             projection=projection,
             snapshot=snapshot,
+            events=events or [],
         )
     except Exception as exc:
         return ProposalDecision(
@@ -85,6 +71,7 @@ def _evaluate_proposal(
     proposal: dict[str, Any] | None,
     projection: RunProjection,
     snapshot: WorkspaceSnapshot,
+    events: list[Event],
 ) -> ProposalDecision:
     if not proposal or not isinstance(proposal, dict):
         return ProposalDecision(False, [FieldError("proposal", "structured proposal is required; natural language cannot change state")])
@@ -93,11 +80,9 @@ def _evaluate_proposal(
         return ProposalDecision(False, [FieldError("kind", f"unknown proposal kind: {kind!r}")])
     if department not in DEPARTMENTS:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
-    if kind not in KIND_BY_DEPARTMENT[department]:
-        return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind}")])
-    allowed = PHASE_KINDS.get(phase, set())
+    allowed = allowed_proposal_kinds(projection, department)
     if kind not in allowed:
-        return ProposalDecision(False, [FieldError("kind", f"{kind} is not valid in phase {phase}")])
+        return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind} in the current work")])
 
     errors = _validate_schema(kind, proposal)
     if errors:
@@ -107,10 +92,12 @@ def _evaluate_proposal(
         return _accept_product_spec(phase, proposal, projection)
     if kind == "engineering_plan":
         return _accept_plan(proposal, projection)
-    if kind == "ask_request":
-        return _accept_ask(proposal, projection)
-    if kind == "product_reaction":
-        return _accept_reaction(proposal, projection)
+    if kind == "collaboration_request":
+        return _accept_request(proposal, projection, department)
+    if kind == "collaboration_response":
+        return _accept_response(proposal, projection, department, events, snapshot)
+    if kind == "product_decision":
+        return _accept_product_decision(proposal, projection)
     if kind == "delivery_spec":
         return _accept_delivery(proposal, projection, snapshot)
     if kind == "qa_review":
@@ -119,6 +106,10 @@ def _evaluate_proposal(
 
 
 def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
+    if kind in {"collaboration_request", "collaboration_response"}:
+        return []
+    if kind == "product_decision":
+        return _require_text(proposal, "statement") + _require_text(proposal, "rationale")
     if kind == "engineering_plan":
         return _plan_schema_errors(proposal)
     if kind == "product_spec":
@@ -126,34 +117,7 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
             proposal, "acceptance_criteria", min_items=1
         ) + _optional_string_list(proposal, "boundaries") + _optional_string_list(proposal, "constraints") + _optional_string_list(
             proposal, "fatal_conditions"
-        ) + _optional_string_list(proposal, "non_goals")
-    if kind == "ask_request":
-        errors = (
-            _require_text(proposal, "question")
-            + _require_text(proposal, "background")
-            + _require_text(proposal, "impact")
-            + _require_text(proposal, "recommendation")
-            + _require_string_list(proposal, "options", min_items=1)
-            + _require_string_list(proposal, "decide_fields", min_items=1)
-        )
-        return errors
-    if kind == "product_reaction":
-        errors = _require_text(proposal, "rationale")
-        decision = proposal.get("decision")
-        if decision not in REACTION_DECISIONS:
-            errors.append(FieldError("decision", "decision must be accept, reply, or reject"))
-        spec_update = proposal.get("spec_update")
-        if spec_update == {}:
-            spec_update = None
-            proposal["spec_update"] = None
-        if spec_update is not None:
-            if not isinstance(spec_update, dict):
-                errors.append(FieldError("spec_update", "spec_update must be an object"))
-            else:
-                nested = dict(spec_update)
-                nested.setdefault("kind", "product_spec")
-                errors.extend(_validate_schema("product_spec", nested))
-        return errors
+        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal)
     if kind == "delivery_spec":
         return (
             _require_text(proposal, "summary")
@@ -237,6 +201,11 @@ def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> Proposa
 
 
 def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+    active_hashes = {item.content_hash for item in projection.effective_decisions}
+    changes = proposal.get("decision_changes", [])
+    declared = [item["decision_hash"] for item in changes]
+    if set(declared) != active_hashes or len(declared) != len(active_hashes):
+        return ProposalDecision(False, [FieldError("decision_changes", "explicitly retain, integrate, or retire every current product decision exactly once")])
     parent = projection.product_spec.content_hash if projection.product_spec else None
     revision = (projection.product_spec.revision + 1) if projection.product_spec else 1
     payload = _product_payload(proposal)
@@ -249,85 +218,47 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         "status": "active",
         "content_hash": spec_content_hash("product_spec", payload, parent_hash=parent, revision=revision),
     }
+    if projection.pending_request is not None:
+        return ProposalDecision(True, artifact=artifact)
     if phase in {"PRODUCT_SPEC", "REWORK_PRODUCT"}:
         transitions = [(phase, "ENGINEERING")]
         return ProposalDecision(True, artifact=artifact, transitions=transitions)
     return ProposalDecision(False, [FieldError("kind", "product_spec not expected")])
 
 
-def _accept_ask(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
-    if projection.product_spec is None or projection.effective_contract is None:
-        return ProposalDecision(False, [FieldError("effective_contract", "no active effective contract")])
-    if projection.pending_ask is not None:
-        return ProposalDecision(False, [FieldError("ask", "an AskRequest is already pending")])
-    parent = projection.asks[-1].content_hash if projection.asks else None
-    revision = len(projection.asks) + 1
-    payload = {
-        "question": proposal["question"].strip(),
-        "background": proposal["background"].strip(),
-        "options": [item.strip() for item in proposal["options"]],
-        "impact": proposal["impact"].strip(),
-        "recommendation": proposal["recommendation"].strip(),
-        "decide_fields": [item.strip() for item in proposal["decide_fields"]],
-        "product_spec_hash": projection.product_spec.content_hash,
-        "effective_contract_hash": projection.effective_contract.content_hash,
-    }
-    artifact = {
-        **payload,
-        "kind": "ask_request",
-        "issuer": "engineering",
-        "parent_hash": parent,
-        "revision": revision,
-        "status": "open",
-        "content_hash": spec_content_hash("ask_request", payload, parent_hash=parent, revision=revision),
-    }
-    from_phase = projection.phase if projection.phase in {"ENGINEERING", "REWORK_ENGINEERING"} else "ENGINEERING"
-    return ProposalDecision(
-        True,
-        artifact=artifact,
-        transitions=[(from_phase, "ASK_PRODUCT"), ("ASK_PRODUCT", "PRODUCT_REACT")],
-    )
+def _accept_request(proposal: dict[str, Any], projection: RunProjection, department: str) -> ProposalDecision:
+    errors = request_errors(proposal, projection, department)
+    if errors:
+        return ProposalDecision(False, [FieldError(**item) for item in errors])
+    payload = {"requester": department, "recipient": proposal["recipient"], "request_type": proposal["request_type"],
+               "action": proposal.get("action"), "question": proposal["question"].strip(),
+               "background": proposal["background"].strip(), "expected_result": proposal["expected_result"].strip(),
+               "basis": request_basis(projection), "return_phase": projection.phase, "status": "open"}
+    return ProposalDecision(True, artifact={**payload, "kind": "collaboration_request", "content_hash": canonical_hash(payload)})
 
 
-def _accept_reaction(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
-    if projection.pending_ask is None:
-        return ProposalDecision(False, [FieldError("ask", "no pending AskRequest")])
-    if projection.pending_ask.effective_contract_hash != current_contract_hash(projection):
-        return ProposalDecision(False, [FieldError("effective_contract_hash", "the pending request refers to an obsolete effective contract")])
-    spec_update = proposal.get("spec_update")
-    if spec_update == {}:
-        spec_update = None
-    new_spec = None
-    if spec_update:
-        nested = dict(spec_update)
-        nested["kind"] = "product_spec"
-        new_spec = _accept_product_spec("PRODUCT_SPEC", nested, projection).artifact
-    payload = {
-        "ask_id": projection.pending_ask.id,
-        "ask_hash": projection.pending_ask.content_hash,
-        "decision": proposal["decision"],
-        "rationale": proposal["rationale"].strip(),
-        "produces_new_spec": new_spec is not None,
-        "new_spec_hash": None if new_spec is None else new_spec["content_hash"],
-    }
-    parent = projection.reactions[-1].content_hash if projection.reactions else None
-    revision = len(projection.reactions) + 1
-    artifact = {
-        **payload,
-        "kind": "product_reaction",
-        "issuer": "product",
-        "parent_hash": parent,
-        "revision": revision,
-        "status": "active",
-        "content_hash": spec_content_hash("product_reaction", payload, parent_hash=parent, revision=revision),
-        "spec_update": new_spec,
-    }
-    return ProposalDecision(
-        True,
-        artifact=artifact,
-        transitions=[("PRODUCT_REACT", "ENGINEERING")],
-        extra={"new_spec": new_spec},
-    )
+def _accept_response(proposal: dict[str, Any], projection: RunProjection, department: str,
+                     events: list[Event], snapshot: WorkspaceSnapshot) -> ProposalDecision:
+    errors = response_errors(proposal, projection, department, events, snapshot_hash=snapshot.digest)
+    if errors:
+        return ProposalDecision(False, [FieldError(**item) for item in errors])
+    phase, valid = resume_phase(projection.pending_request, projection, events, snapshot_hash=snapshot.digest)
+    payload = {"request_id": projection.pending_request.id, "status": proposal["status"], "text": proposal["text"].strip(),
+               "result_event_ids": list(proposal.get("result_event_ids", [])), "return_phase": phase, "return_work_valid": valid}
+    return ProposalDecision(True, artifact={**payload, "kind": "collaboration_response", "content_hash": canonical_hash(payload)})
+
+
+def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+    if projection.product_spec is None:
+        return ProposalDecision(False, [FieldError("product_spec", "a product decision requires an active ProductSpec")])
+    payload = {"statement": proposal["statement"].strip(), "rationale": proposal["rationale"].strip(),
+               "product_spec_hash": projection.product_spec.content_hash,
+               "request_id": None if projection.pending_request is None else projection.pending_request.id}
+    content_hash = canonical_hash(payload)
+    if any(item.content_hash == content_hash for item in projection.product_decisions):
+        return ProposalDecision(False, [FieldError("statement", "this product decision has already been accepted")])
+    transitions = [] if projection.pending_request else [(projection.phase, "ENGINEERING")]
+    return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash}, transitions=transitions)
 
 
 def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapshot: WorkspaceSnapshot) -> ProposalDecision:
@@ -390,7 +321,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
     return ProposalDecision(
         True,
         artifact=artifact,
-        transitions=[(from_phase, "DELIVERY"), ("DELIVERY", "QUALITY")],
+        transitions=[] if projection.pending_request else [(from_phase, "DELIVERY"), ("DELIVERY", "QUALITY")],
     )
 
 
@@ -485,7 +416,25 @@ def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:
         "acceptance_criteria": [item.strip() for item in proposal["acceptance_criteria"]],
         "fatal_conditions": [item.strip() for item in proposal.get("fatal_conditions", [])],
         "non_goals": [item.strip() for item in proposal.get("non_goals", [])],
+        "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"],
+                              "rationale": item["rationale"].strip()} for item in proposal.get("decision_changes", [])],
     }
+
+
+def _decision_change_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    changes = proposal.get("decision_changes", [])
+    if not isinstance(changes, list):
+        return [FieldError("decision_changes", "decision_changes must be a list")]
+    errors = []
+    for index, item in enumerate(changes):
+        if not isinstance(item, dict):
+            errors.append(FieldError(f"decision_changes[{index}]", "each earlier decision requires a disposition and rationale"))
+            continue
+        errors.extend(FieldError(f"decision_changes[{index}].{error.field}", error.message)
+                      for error in _require_text(item, "decision_hash") + _require_text(item, "rationale"))
+        if item.get("disposition") not in {"retain", "integrate", "retire"}:
+            errors.append(FieldError(f"decision_changes[{index}].disposition", "disposition must be retain, integrate, or retire"))
+    return errors
 
 
 def _receipt_evidence(receipt: Any) -> dict[str, Any]:

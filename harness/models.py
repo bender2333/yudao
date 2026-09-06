@@ -15,8 +15,6 @@ PHASES = (
     "CREATED",
     "PRODUCT_SPEC",
     "ENGINEERING",
-    "ASK_PRODUCT",
-    "PRODUCT_REACT",
     "DELIVERY",
     "QUALITY",
     "REWORK_PRODUCT",
@@ -28,17 +26,17 @@ PHASES = (
 
 TERMINAL_PHASES = frozenset({"DONE", "PAUSED", "FAILED"})
 
-PRODUCT_ACTIVE = frozenset({"PRODUCT_SPEC", "PRODUCT_REACT", "REWORK_PRODUCT", "ASK_PRODUCT"})
+PRODUCT_ACTIVE = frozenset({"PRODUCT_SPEC", "REWORK_PRODUCT"})
 ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
 QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
 
-REACTION_DECISIONS = ("accept", "reply", "reject")
 QA_VERDICTS = ("rework_product", "rework_engineering", "release")
 PROPOSAL_KINDS = (
     "product_spec",
     "engineering_plan",
-    "ask_request",
-    "product_reaction",
+    "collaboration_request",
+    "collaboration_response",
+    "product_decision",
     "delivery_spec",
     "qa_review",
 )
@@ -47,6 +45,7 @@ PAUSED_REASONS = frozenset({"max_cycles", "model_steps_exhausted"})
 FAILED_REASONS = frozenset(
     {
         "provider_error",
+        "provider_timeout",
         "provider_unavailable",
         "cancelled",
         "context_overflow",
@@ -79,8 +78,10 @@ class EventType:
     SPEC_SUPERSEDED = "spec_superseded"
     CONTRACT_ACCEPTED = "contract_accepted"
     PLAN_ACCEPTED = "plan_accepted"
-    ASK_SUBMITTED = "ask_submitted"
-    REACT_SUBMITTED = "react_submitted"
+    COLLABORATION_REQUESTED = "collaboration_requested"
+    COLLABORATION_RESPONDED = "collaboration_responded"
+    COLLABORATION_CLOSED = "collaboration_closed"
+    PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
@@ -165,61 +166,51 @@ class ProductSpec:
     acceptance_criteria: list[str]
     fatal_conditions: list[str]
     non_goals: list[str]
+    decision_changes: list[dict[str, str]]
 
 
 @dataclass(frozen=True)
-class AskRequest:
+class CollaborationRequest:
     id: str
     run_id: str
-    revision: int
-    parent_hash: str | None
     content_hash: str
-    issuer: str
-    status: str
     created_event_id: str
-    product_spec_hash: str
-    effective_contract_hash: str
+    requester: str
+    recipient: str
+    request_type: str
+    action: str | None
     question: str
     background: str
-    options: list[str]
-    impact: str
-    recommendation: str
-    decide_fields: list[str]
+    expected_result: str
+    basis: dict[str, Any]
+    return_phase: str
+    status: str
 
 
 @dataclass(frozen=True)
-class ProductReaction:
+class CollaborationResponse:
     id: str
     run_id: str
-    revision: int
-    parent_hash: str | None
     content_hash: str
-    issuer: str
-    status: str
     created_event_id: str
-    ask_id: str
-    ask_hash: str
-    decision: str
-    rationale: str
-    produces_new_spec: bool
-    new_spec_hash: str | None
+    request_id: str
+    status: str
+    text: str
+    result_event_ids: list[str]
+    return_phase: str
+    return_work_valid: bool
 
 
 @dataclass(frozen=True)
 class ProductDecision:
-    ask_id: str
-    ask_hash: str
-    reaction_id: str
-    reaction_hash: str
+    id: str
+    run_id: str
+    content_hash: str
+    created_event_id: str
     product_spec_hash: str
-    question: str
-    background: str
-    options: list[str]
-    impact: str
-    recommendation: str
-    decide_fields: list[str]
-    decision: str
+    statement: str
     rationale: str
+    request_id: str | None
 
 
 @dataclass(frozen=True)
@@ -352,6 +343,7 @@ class ContextManifest:
     compaction_event_id: str | None = None
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
+    request_id: str | None = None
 
 
 @dataclass
@@ -444,7 +436,7 @@ class RunProjection:
     latency_ms: int = 0
     tool_count: int = 0
     rework_count: int = 0
-    ask_count: int = 0
+    request_count: int = 0
     provider: str = "fake"
     adapter: str = "fake"
     model: str | None = None
@@ -456,16 +448,17 @@ class RunProjection:
     effective_contract: EffectiveContract | None = None
     engineering_plan: EngineeringPlan | None = None
     delivery_spec: DeliverySpec | None = None
-    pending_ask: AskRequest | None = None
-    last_reaction: ProductReaction | None = None
+    pending_request: CollaborationRequest | None = None
     last_review: QAReview | None = None
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
     engineering_plans: list[EngineeringPlan] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
-    asks: list[AskRequest] = field(default_factory=list)
-    reactions: list[ProductReaction] = field(default_factory=list)
+    requests: list[CollaborationRequest] = field(default_factory=list)
+    responses: list[CollaborationResponse] = field(default_factory=list)
+    request_results: list[dict[str, Any]] = field(default_factory=list)
+    product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)
     effective_decisions: list[ProductDecision] = field(default_factory=list)
@@ -509,8 +502,6 @@ def waiting_reason_for(phase: str, stop_reason: str | None = None) -> str | None
         "CREATED": "waiting to start product spec",
         "PRODUCT_SPEC": "product is drafting ProductSpec",
         "ENGINEERING": "engineering is implementing against the current ProductSpec",
-        "ASK_PRODUCT": "ask submitted; routing to product",
-        "PRODUCT_REACT": "product is reacting to an AskRequest",
         "DELIVERY": "delivery accepted; routing to quality",
         "QUALITY": "quality is independently reviewing delivery",
         "REWORK_PRODUCT": "quality returned work to product",

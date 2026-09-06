@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from .event_store import EventStore
-from .models import Event, json_dumps
+from .models import Event, EventType, json_dumps
 from .projection import RunProjection, project_run
 
 
@@ -32,14 +32,15 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "latency_ms": projection.latency_ms,
         "tool_count": projection.tool_count,
         "rework_count": projection.rework_count,
-        "ask_count": projection.ask_count,
+        "request_count": projection.request_count,
+        "pending_request": _plain(projection.pending_request),
         "provider": projection.provider,
         "adapter": projection.adapter,
         "model": projection.model,
     }
 
 
-def spec_timeline(projection: RunProjection) -> dict[str, Any]:
+def spec_timeline(projection: RunProjection, events: list[Event]) -> dict[str, Any]:
     specs = []
     for spec in projection.product_specs:
         specs.append(
@@ -53,31 +54,6 @@ def spec_timeline(projection: RunProjection) -> dict[str, Any]:
                 "goal": spec.goal,
             }
         )
-    asks = []
-    for ask in projection.asks:
-        asks.append(
-            {
-                "kind": "ask_request",
-                "id": ask.id,
-                "status": ask.status,
-                "content_hash": ask.content_hash,
-                "product_spec_hash": ask.product_spec_hash,
-                "question": ask.question,
-            }
-        )
-    reactions = []
-    for reaction in projection.reactions:
-        reactions.append(
-            {
-                "kind": "product_reaction",
-                "id": reaction.id,
-                "decision": reaction.decision,
-                "ask_id": reaction.ask_id,
-                "produces_new_spec": reaction.produces_new_spec,
-                "new_spec_hash": reaction.new_spec_hash,
-                "content_hash": reaction.content_hash,
-            }
-        )
     return {
         "current_product_spec": _plain(projection.product_spec),
         "effective_contract": _plain(projection.effective_contract),
@@ -86,10 +62,15 @@ def spec_timeline(projection: RunProjection) -> dict[str, Any]:
         "engineering_plans": _plain(projection.engineering_plans),
         "current_delivery_spec": _plain(projection.delivery_spec),
         "effective_decisions": _plain(projection.effective_decisions),
-        "pending_ask": _plain(projection.pending_ask),
+        "pending_request": _plain(projection.pending_request),
+        "product_decisions": _plain(projection.product_decisions),
         "specs": specs,
-        "asks": asks,
-        "reactions": reactions,
+        "requests": _plain(projection.requests),
+        "responses": _plain(projection.responses),
+        "request_closures": [
+            {**event.payload, "created_event_id": event.event_id}
+            for event in events if event.type == EventType.COLLABORATION_CLOSED
+        ],
         "transitions": projection.transitions,
     }
 
@@ -139,7 +120,7 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
     events = store.list_events(run_id)
     return {
         "board": run_board(projection),
-        "timeline": spec_timeline(projection),
+        "timeline": spec_timeline(projection, events),
         "evidence": evidence_view(projection),
         "context": context_view(projection),
         "events": [event_card(event) for event in events],
@@ -149,7 +130,7 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
             "latency_ms": projection.latency_ms,
             "tool_count": projection.tool_count,
             "rework_count": projection.rework_count,
-            "ask_count": projection.ask_count,
+            "request_count": projection.request_count,
             "cycles": projection.cycle_count,
         },
     }

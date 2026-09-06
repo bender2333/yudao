@@ -8,7 +8,7 @@ from harness.adapters.base import ModelRequest, ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.models import EventType, RunProjection, Usage, canonical_hash, estimate_tokens, json_dumps
-from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.tools import ToolRuntime
 
@@ -205,8 +205,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     skipped = _call("skip-read", "read_file", path="never-read.txt")
     adapter = FakeAdapter([
         ModelResponse(output=[private, _submit(), skipped]),
-        FakeTurn(proposal=ask_request(), transcript="ENGINEERING_PRIVATE"),
-        reaction("accept", "Keep current behavior"),
+        FakeTurn(proposal=collaboration_request(), transcript="ENGINEERING_PRIVATE"),
+        response_turn("answered", "The existing requirements define the current behavior."),
         plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem(tmp_path, adapter)
@@ -224,8 +224,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     assert private in history
     assert "ENGINEERING_PRIVATE" not in json_dumps(history)
     assert history[-1]["role"] == "user"
-    assert "[pending_ask]" in history[-1]["content"]
-    assert "submit_reaction" in history[-1]["content"]
+    assert "[pending_request]" in history[-1]["content"]
+    assert "submit_response" in history[-1]["content"]
     assert history[-2]["type"] == "function_call_output"
     assert any(item.get("call_id") == "submit" and item["type"] == "function_call_output" for item in history)
     skipped_result = next(item for item in history if item.get("call_id") == "skip-read" and item["type"] == "function_call_output")
@@ -238,8 +238,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     assert "ENGINEERING_PRIVATE" in json_dumps(engineering.input_items)
     assert "PRODUCT_PRIVATE" not in json_dumps(engineering.input_items)
     assert engineering.input_items[-1]["role"] == "user"
-    assert "[current_product_decisions]" in engineering.input_items[-1]["content"]
-    assert "产品回复已经到达" in engineering.input_items[-1]["content"]
+    assert "[current_product_decisions]" not in engineering.input_items[-1]["content"]
+    assert "The existing requirements define the current behavior." in engineering.input_items[-1]["content"]
     assert engineering.input_items[-2]["type"] == "function_call_output"
     events = reloaded.store.list_events(run_id)
     assert any(event.type == EventType.TOOL_SKIPPED and event.payload["id"] == "skip-read" for event in events)

@@ -1,10 +1,10 @@
 # Yudao Loop System
 
-面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前 ProductSpec 和代码快照的 QA release 才能进入 `DONE`。
+面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、计划、交付和完整代码树的 QA release 才能进入 `DONE`。
 
 OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构的运行证据与本次原生循环的验证分开记录，见 [MVP 验收记录](docs/mvp-acceptance.md)。
 
-第一阶段正在按 [A-F 工作包](docs/stage-1-alignment.md) 推进。A 已实现原生循环、同部门跨激活历史、自动压缩、逐步输入审计和 Web 观察，完整回归为 187 项 Python、26 项 JavaScript 通过；修复后的真实 Ask 已完成独立 QA。真实压缩后的完整交付仍待补验，近期重测因 provider 连接失败停止。持续输入、PRD/计划、通用专家协作、prompt 编辑及完整封存尚在后续工作包，不能据此称第一阶段整体完成。
+第一阶段正在按 [A-F 工作包](docs/stage-1-alignment.md) 推进。已实现并验证原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动及通用专家协作。持续输入、prompt 编辑及最终完整验收待后续批次。真实压缩后的完整交付仍待补验，近期外部连接检查失败，不能据此称第一阶段整体完成。
 
 本机当前原生控制台为 [http://127.0.0.1:8766](http://127.0.0.1:8766)，使用 `.yudao/native-final-validation`；8765 的旧 OMP 服务不代表本次实现。
 
@@ -52,7 +52,7 @@ node --test harness/tests/test_web_ui.js
 ```bash
 python -m harness smoke --data-dir .yudao/native-validation
 python -m harness smoke --scenario happy
-python -m harness smoke --scenario ask
+python -m harness smoke --scenario collaboration
 ```
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性和逐步模型输入审计。每次只记录本次选择的场景，不继承上次报告中的验收结果。
@@ -94,7 +94,9 @@ python -m harness serve --adapter responses --data-dir .yudao/native-loop --port
 
 `YUDAO_MODEL_API_KEY` 与 `YUDAO_MODEL_NAME` 必填；其余配置的默认值与示例相同。兼容 Responses 协议的服务可以修改 `YUDAO_MODEL_BASE_URL` 和 provider 标识。
 
-工具由 Yudao 内核执行（`read_file` / `write_file` / `run_check` / `collect_evidence` / `submit_*`）。Product/Quality 没有写工具。检查在可丢弃的普通文件副本执行，由主机签发绑定当前合同、交付和激活的回执；模型自报 `exit_code` 不是证据。该副本机制不提供操作系统沙箱。
+工具由 Yudao 内核执行（读取、写入、删除、移动、检查和结构化提交）。Product/Quality 没有写工具，工程修改受有效合同及事前计划范围约束。检查在可丢弃的完整公开树副本执行，由主机签发绑定当前合同、计划、交付和激活的回执；模型自报 `exit_code` 不是证据。交付保存完整文件字节、二进制与空目录，原工作区不可用后仍可独立恢复。该副本机制不提供操作系统沙箱。
+
+三个部门均可通过 `submit_request` 咨询或请求职责内动作，经 `submit_response` 回应。一次只有一个未结请求，保留原工作，使用同一个部门循环。普通意见不改变需求，正式产品决定单独接纳；动作回复引用真实结果，最后仍须独立 QA。
 
 部门指令作为显式 developer 输入发送；原始任务逐字保留，本部门完整历史跨激活延续，部门交接时重新装配当前合同，不携带其它部门的私有历史。接近窗口上限时自动压缩部门历史视图，保留摘要来源、原始事件与近期完整工具回合；摘要调用同样可取消并计入模型步数。上下文视图可按步骤打开实际输入、摘要及原始来源。调用尝试事件表示内核已开始调用 provider，不承诺网络请求已经送达。SDK 返回的用量仅作只读记录，不估算、不用于暂停任务；未上报用量或费用显示为“未上报”。
 

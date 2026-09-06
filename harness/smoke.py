@@ -10,9 +10,13 @@ from typing import Any
 
 from .adapters.responses import ResponsesConfig, ResponsesAdapter
 from .artifacts import ArtifactStore
+from .collaboration import tool_error
+from .compaction import CompactionCheckpoint, plan_compaction
+from .context import ContextAssembler, department_work_text
+from .contracts import current_contract_hash, current_plan_hash
 from .event_store import EventStore
-from .models import ArtifactRef, EventType, canonical_hash, json_dumps
-from .projection import project_run
+from .models import ArtifactRef, EventType, RunProjection, canonical_hash, json_dumps
+from .projection import apply_event, project_run
 from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
 from .tree_archive import load_tree
@@ -28,12 +32,14 @@ HAPPY_TASK = (
     "Quality must independently have the host run a check before release."
 )
 
-ASK_TASK = (
+COLLABORATION_TASK = (
     "Implement a local Python CLI at src/echo.py that prints its first argument. "
     "The product spec must leave unspecified whether arguments starting with '-' "
     "are unknown flags or ordinary text. "
-    "Engineering must submit an AskRequest for that decision and wait for a "
-    "ProductReaction before delivering. Product must accept, reply, or reject. "
+    "Before the initial product spec, Product must consult Engineering about feasibility using submit_request. "
+    "Engineering must answer with submit_response and return to Product's initial requirements work. "
+    "Later Engineering must request a revise_requirements action from Product for the flag decision. "
+    "Product must publish a product decision or a revised product spec, then submit a completed response citing its accepted event. "
     "Quality independently checks the delivered CLI."
 )
 
@@ -45,8 +51,8 @@ def run_smoke(
 ) -> dict[str, Any]:
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    selected = scenarios or ["happy", "ask"]
-    if any(name not in {"happy", "ask"} for name in selected):
+    selected = scenarios or ["happy", "collaboration"]
+    if any(name not in {"happy", "collaboration"} for name in selected):
         raise ValueError("unknown smoke scenario")
     config = ResponsesConfig.from_env()
     adapter = ResponsesAdapter(config)
@@ -71,8 +77,8 @@ def run_smoke(
 
 
 def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
-    task = HAPPY_TASK if name == "happy" else ASK_TASK
-    max_cycles = 12 if name == "happy" else 16
+    task = HAPPY_TASK if name == "happy" else COLLABORATION_TASK
+    max_cycles = 12 if name == "happy" else 20
     run_id = system.create_run(
         task,
         max_cycles=max_cycles,
@@ -111,7 +117,10 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "provider": projection.provider,
         "model": projection.model,
         "route": list(projection.transitions),
-        "ask_count": projection.ask_count,
+        "request_count": projection.request_count,
+        "collaboration_requests": [asdict(item) for item in projection.requests],
+        "collaboration_responses": [asdict(item) for item in projection.responses],
+        "collaboration_audit": _collaboration_evidence(system, run_id),
         "rework_count": projection.rework_count,
         "cycle_count": projection.cycle_count,
         "token_used": projection.token_used,
@@ -166,6 +175,44 @@ def isolation_fields(store: EventStore, artifacts: ArtifactStore, run_id: str) -
 
 def _read_artifact(artifacts: ArtifactStore, run_id: str, ref: dict[str, Any]) -> Any:
     return json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+
+
+def _collaboration_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
+    projection = system.project(run_id)
+    events = {event.event_id: event for event in system.store.list_events(run_id)}
+    responses = {item.request_id: item for item in projection.responses}
+    notes, directions = [], []
+    pre_spec_consultation = requirements_action = False
+    for request in projection.requests:
+        source = events.get(request.created_event_id)
+        response = responses.get(request.id)
+        result = events.get(response.created_event_id) if response else None
+        if (source is None or source.type != EventType.COLLABORATION_REQUESTED
+                or source.role != request.requester or source.run_id != run_id
+                or response is None or result is None or result.type != EventType.COLLABORATION_RESPONDED
+                or result.role != request.recipient or result.run_id != run_id or result.seq <= source.seq
+                or result.payload.get("request_id") != request.id):
+            notes.append(f"request {request.id}: missing or unrelated recipient response")
+            continue
+        directions.append(f"{request.requester}->{request.recipient}")
+        results = [events.get(event_id) for event_id in response.result_event_ids]
+        if any(event is None or event.run_id != run_id or event.role != request.recipient
+               or event.payload.get("request_id") != request.id or not source.seq < event.seq < result.seq
+               for event in results):
+            notes.append(f"request {request.id}: result is not bound to its recipient work")
+            continue
+        if (request.requester == "product" and request.recipient == "engineering"
+                and request.request_type == "consultation" and response.status == "answered"
+                and not any(event.type == EventType.SPEC_ACCEPTED and event.seq < source.seq for event in events.values())):
+            pre_spec_consultation = True
+        if (request.requester == "engineering" and request.recipient == "product"
+                and request.action == "revise_requirements" and response.status == "completed"
+                and any(event.type in {EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED} for event in results)):
+            requirements_action = True
+    if projection.pending_request is not None:
+        notes.append("a collaboration request is still pending")
+    return {"status": "unverified" if notes else "verified", "directions": directions,
+            "pre_spec_consultation": pre_spec_consultation, "requirements_action": requirements_action, "notes": notes}
 
 
 def _archive_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
@@ -353,16 +400,29 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     notes: list[str] = []
     histories: dict[str, list[dict[str, Any]]] = {}
     activations: dict[str, tuple[str, str, str]] = {}
+    activation_bases: dict[str, dict[str, Any]] = {}
     steps: dict[str, int] = {}
     digests: dict[str, str] = {}
     purposes: dict[str, str] = {}
     compacting: dict[tuple[str, int], dict[str, Any]] = {}
-    checkpoints: dict[str, dict[str, Any]] = {}
+    checkpoints: dict[tuple[str, str | None, str | None], dict[str, Any]] = {}
     attempted: set[tuple[str, int]] = set()
     intend: str | None = None
+    current_work = RunProjection()
+    assembler = ContextAssembler()
     for event in store.list_events(run_id):
+        try:
+            apply_event(current_work, event)
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            notes.append(f"event {event.seq}: could not rebuild current work: {exc}")
+            continue
         payload = event.payload or {}
         activation = payload.get("activation_id")
+        work_basis = {
+            "effective_contract_hash": current_contract_hash(current_work),
+            "engineering_plan_hash": current_plan_hash(current_work),
+            "request_id": None if current_work.pending_request is None else current_work.pending_request.id,
+        }
         if event.type == EventType.RUN_CREATED:
             intend = payload.get("task")
             try:
@@ -377,6 +437,10 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 notes.append(f"event {event.seq}: missing or duplicate department activation")
             else:
                 activations[activation] = (event.role, event.session_id, event.event_id)
+                activation_bases[activation] = work_basis
+                for field, value in work_basis.items():
+                    if field not in payload or payload[field] != value:
+                        notes.append(f"event {event.seq}: activation {field} does not match current work")
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
@@ -390,12 +454,24 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             binding = (event.role, event.session_id, event.parent_event_id)
             if activations.get(activation) != binding:
                 raise ValueError("input or output does not match its department activation")
+            basis = activation_bases[activation]
+            if event.type in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED,
+                              EventType.MODEL_REQUESTED, EventType.COMPACTION_RECORDED}:
+                for field, value in basis.items():
+                    if field not in payload or payload[field] != value or work_basis[field] != value:
+                        raise ValueError(f"{field} does not match the activation and current work")
+            checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"])
+            pinned = assembler.assemble(current_work, department=event.role, session_id=event.session_id,
+                                         activation_id=activation, step_id=payload.get("step_id", 1))
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:
                     raise ValueError("department input does not belong to its activation start")
                 item = _read_artifact(artifacts, run_id, payload["input_ref"])
                 if item.get("role") != "user":
                     raise ValueError("department input must be a work message")
+                expected_work = department_work_text(pinned)
+                if item.get("content") != expected_work:
+                    raise ValueError("department input differs from the current allowed work materials")
                 histories.setdefault(event.role, []).append(_history_record(event, item))
             elif event.type == EventType.CONTEXT_ASSEMBLED:
                 if (payload.get("department") != event.role or payload.get("session_id") != event.session_id
@@ -432,7 +508,9 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if (intend is None or not isinstance(instructions, str)
                         or not instructions.startswith(f"[intend]\n{intend}\n\n[current_work]\n")):
                     raise ValueError("model input does not start with the verbatim task followed by current work")
-                previous = checkpoints.get(event.role)
+                if items[0] != pinned.input_items[0]:
+                    raise ValueError("pinned developer input differs from current allowed materials")
+                previous = checkpoints.get(checkpoint_key)
                 if payload.get("compaction_event_id") != (previous or {}).get("event_id"):
                     raise ValueError("model request uses an unrelated compaction checkpoint")
                 records = histories.get(event.role, [])
@@ -440,12 +518,32 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if schemas or limit is None:
                         raise ValueError("compaction must have no tools and an explicit output limit")
                     compacting[(activation, step)] = _audit_compaction_input(request, records, previous)
+                    checkpoint = CompactionCheckpoint(**previous["checkpoint"]) if previous else None
+                    plan = plan_compaction(records, checkpoint, current_work.context_window, pinned.input_items, pinned.tools)
+                    if plan is None or request["input"] != plan.input_items or limit != plan.max_output_tokens:
+                        raise ValueError("compaction input differs from its allowed source assembly")
+                    expected_context = assembler.assemble_compaction(
+                        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
+                        max_output_tokens=plan.max_output_tokens, compaction_event_id=(previous or {}).get("event_id"),
+                    )
                 else:
-                    if items[1:] != _audited_visible_history(records, previous):
+                    visible = _audited_visible_history(records, previous)
+                    if items[1:] != visible:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    if len(names) != len(set(names)) or set(names) != set(tools_for(event.role)):
+                    expected = {name for name in tools_for(event.role) if tool_error(current_work, event.role, name, {}) is None}
+                    if len(names) != len(set(names)) or set(names) != expected:
                         raise ValueError("actual tool schemas do not match the department's tools")
+                    expected_context = assembler.assemble(
+                        current_work, department=event.role, session_id=event.session_id, activation_id=activation,
+                        step_id=step, history=visible, compaction_event_id=(previous or {}).get("event_id"),
+                    )
+                    if schemas != expected_context.tools:
+                        raise ValueError("actual tool schemas differ from the allowed definitions")
+                if payload.get("injected") != [asdict(item) for item in expected_context.manifest.injected]:
+                    raise ValueError("injected source metadata differs from current allowed materials")
+                if payload.get("excluded") != [asdict(item) for item in expected_context.manifest.excluded]:
+                    raise ValueError("excluded source metadata differs from current allowed materials")
             elif event.type == EventType.MODEL_REQUESTED:
                 key = (activation, payload.get("step_id"))
                 if (activation not in steps or key[1] != steps[activation]
@@ -458,8 +556,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if (key not in attempted or key not in compacting or payload.get("purpose") != "compaction"
                         or event.context_digest != digests[activation]):
                     raise ValueError("compaction checkpoint does not match its model request")
-                checkpoint = _audit_compaction_output(event, artifacts, compacting.pop(key), checkpoints.get(event.role))
-                checkpoints[event.role] = {"event_id": event.event_id, "checkpoint": checkpoint}
+                checkpoint = _audit_compaction_output(event, artifacts, compacting.pop(key), checkpoints.get(checkpoint_key))
+                checkpoints[checkpoint_key] = {"event_id": event.event_id, "checkpoint": checkpoint}
             else:
                 if (activation not in steps or payload.get("step_id") != steps[activation]
                         or (activation, steps[activation]) not in attempted or payload.get("purpose") != purposes[activation]):
@@ -612,7 +710,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- adapter: `{scenario.get('adapter')}`",
                 f"- provider/model: `{scenario.get('provider')}` / `{scenario.get('model')}`",
                 f"- route: `{' | '.join(scenario.get('route') or [])}`",
-                f"- asks: `{scenario.get('ask_count')}` reworks: `{scenario.get('rework_count')}`",
+                f"- requests: `{scenario.get('request_count')}` reworks: `{scenario.get('rework_count')}`",
                 f"- replay consistent: `{scenario.get('replay_consistent')}`",
                 f"- manifest boundary: `{scenario.get('manifest_boundary')}`",
                 f"- model input audit: `{(scenario.get('model_input_audit') or {}).get('status', 'unverified')}`",
@@ -620,6 +718,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- context isolated: `{scenario.get('context_isolated')}`",
                 f"- host receipts verified: `{scenario.get('check_receipts_verified')}`",
                 f"- delivery archive: `{(scenario.get('delivery_archive') or {}).get('status', 'unverified')}`",
+                f"- collaboration audit: `{(scenario.get('collaboration_audit') or {}).get('status', 'unverified')}`",
                 f"- fake used: `{scenario.get('fake_used')}`",
                 f"- delivery files: `{', '.join(scenario.get('delivery_files') or [])}`",
                 f"- qa verdict: `{scenario.get('qa_verdict')}`",
@@ -637,6 +736,8 @@ def _markdown(report: dict[str, Any]) -> str:
             lines.append(f"- receipt note: {note}")
         for note in (scenario.get("delivery_archive") or {}).get("notes", []):
             lines.append(f"- archive note: {note}")
+        for note in (scenario.get("collaboration_audit") or {}).get("notes", []):
+            lines.append(f"- collaboration note: {note}")
         receipts = scenario.get("check_receipts") or []
         if receipts:
             lines.append("检查回执：")
@@ -675,7 +776,10 @@ def smoke_exit_code(report: dict[str, Any]) -> int:
             return 1
         if (scenario.get("delivery_archive") or {}).get("status") != "verified":
             return 1
-    ask = scenarios.get("ask")
-    if ask is not None and ask.get("ask_count", 0) < 1:
-        return 1
+    collaboration = scenarios.get("collaboration")
+    if collaboration is not None:
+        audit = collaboration.get("collaboration_audit") or {}
+        if (collaboration.get("request_count", 0) < 2 or audit.get("status") != "verified"
+                or not audit.get("pre_spec_consultation") or not audit.get("requirements_action")):
+            return 1
     return 0

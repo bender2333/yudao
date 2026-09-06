@@ -3,7 +3,7 @@ import json
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.models import RunProjection, SessionRecord
-from harness.proposals import ask_request, delivery_turn, plan_turn, product_spec, reaction, review_turn
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
 
@@ -24,8 +24,8 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
     adapter = FakeAdapter(
         [
             FakeTurn(proposal=product_spec(), transcript=marker),
-            ask_request(),
-            reaction("accept", "keep the current spec"),
+            collaboration_request(),
+            response_turn("answered", "The existing contract covers this input."),
             plan_turn(),
             delivery_turn(),
             review_turn("release", "ok"),
@@ -53,8 +53,9 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(goal=unique),
-            ask_request(),
-            reaction("reply", "update the contract", spec_update=v2),
+            collaboration_request(request_type="action", action="revise_requirements"),
+            v2,
+            response_turn("completed", "Updated the contract.", result_types=["spec_accepted"]),
             plan_turn(),
             delivery_turn(),
             review_turn("release", "v2"),
@@ -128,24 +129,16 @@ def test_validation_feedback_is_injected_after_rejection(data_dir):
     assert "goal" in product_calls[1].context.prompt_text
 
 
-def test_two_answered_asks_keep_decision_semantics_for_engineering_and_quality(data_dir):
+def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
-            ask_request(
-                question="First canary choice?",
-                options=["ASK_CHOICE_CANARY_A", "ASK_CHOICE_CANARY_B"],
-                recommendation="ASK_CHOICE_CANARY_A",
-                decide_fields=["first canary"],
-            ),
-            reaction("accept", "Use option A."),
-            ask_request(
-                question="Second canary choice?",
-                options=["ASK_CHOICE_CANARY_C", "ASK_CHOICE_CANARY_D"],
-                recommendation="ASK_CHOICE_CANARY_C",
-                decide_fields=["second canary"],
-            ),
-            reaction("accept", "Use option A."),
+            collaboration_request(question="First canary choice?", request_type="action", action="revise_requirements"),
+            product_decision("Use DECISION_CANARY_A.", "The first requirement needs this exact output."),
+            response_turn("completed", "Published the first decision.", result_types=["product_decision_accepted"]),
+            collaboration_request(question="Second canary choice?", request_type="action", action="revise_requirements"),
+            product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
+            response_turn("completed", "Published the second decision.", result_types=["product_decision_accepted"]),
             plan_turn(),
             delivery_turn(),
             review_turn("release", "accepted both product decisions"),
@@ -156,44 +149,38 @@ def test_two_answered_asks_keep_decision_semantics_for_engineering_and_quality(d
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     assert len(projection.effective_decisions) == 2
-    assert [item.question for item in projection.effective_decisions] == [
-        "First canary choice?",
-        "Second canary choice?",
+    assert [item.statement for item in projection.effective_decisions] == [
+        "Use DECISION_CANARY_A.",
+        "Use DECISION_CANARY_C.",
     ]
     engineering = [item for item in adapter.invocations if item.department == "engineering"][-1]
     quality = [item for item in adapter.invocations if item.department == "quality"][-1]
     for request in (engineering, quality):
         sources = _sources(request)
         assert "current_product_decisions" in sources
-        assert "last_reaction" not in sources
         decisions = _part(request, "current_product_decisions")
         assert decisions is not None
         assert len(decisions) == 2
         texts = json.dumps(decisions)
-        assert "ASK_CHOICE_CANARY_A" in texts
-        assert "ASK_CHOICE_CANARY_B" in texts
-        assert "ASK_CHOICE_CANARY_C" in texts
-        assert "ASK_CHOICE_CANARY_D" in texts
-        assert "First canary choice?" in texts
-        assert "Second canary choice?" in texts
-        assert texts.count("Use option A.") == 2
-        assert "ASK_CHOICE_CANARY_A" in request.context.prompt_text
-        assert "ASK_CHOICE_CANARY_C" in request.context.prompt_text
+        assert "DECISION_CANARY_A" in texts
+        assert "DECISION_CANARY_C" in texts
+        assert "first requirement" in texts
+        assert "second requirement" in texts
+        assert "DECISION_CANARY_A" in request.context.prompt_text
+        assert "DECISION_CANARY_C" in request.context.prompt_text
 
 
-def test_effective_decision_keeps_ask_background_and_impact(data_dir):
+def test_effective_decision_keeps_explicit_requirement_and_request_source(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
-            ask_request(
+            collaboration_request(
                 question="采用背景中描述的方案吗？",
                 background="Actual required output token is BACKGROUND_CANARY",
-                options=["A: use the described approach", "B: defer"],
-                impact="The required public contract token is IMPACT_CANARY",
-                recommendation="A: use the described approach",
-                decide_fields=["described approach"],
+                request_type="action", action="revise_requirements",
             ),
-            reaction("accept", "Use option A."),
+            product_decision("Print BACKGROUND_CANARY for the selected mode.", "IMPACT_CANARY identifies the required public behavior."),
+            response_turn("completed", "The behavior has been published.", result_types=["product_decision_accepted"]),
             plan_turn(),
             delivery_turn(),
             review_turn("release", "accepted the described approach"),
@@ -205,34 +192,37 @@ def test_effective_decision_keeps_ask_background_and_impact(data_dir):
     assert projection.phase == "DONE"
     assert len(projection.effective_decisions) == 1
     decision = projection.effective_decisions[0]
-    assert decision.background == "Actual required output token is BACKGROUND_CANARY"
-    assert decision.impact == "The required public contract token is IMPACT_CANARY"
-    assert "BACKGROUND_CANARY" not in decision.rationale
-    assert "IMPACT_CANARY" not in decision.rationale
+    assert decision.statement == "Print BACKGROUND_CANARY for the selected mode."
+    assert decision.rationale == "IMPACT_CANARY identifies the required public behavior."
+    assert decision.request_id == projection.requests[0].id
     engineering = [item for item in adapter.invocations if item.department == "engineering"][-1]
     quality = [item for item in adapter.invocations if item.department == "quality"][-1]
     for request in (engineering, quality):
         decisions = _part(request, "current_product_decisions")
         assert decisions is not None
         assert len(decisions) == 1
-        assert decisions[0]["background"] == "Actual required output token is BACKGROUND_CANARY"
-        assert decisions[0]["impact"] == "The required public contract token is IMPACT_CANARY"
+        assert decisions[0]["statement"] == decision.statement
+        assert decisions[0]["request_id"] == decision.request_id
         assert "BACKGROUND_CANARY" in request.context.prompt_text
         assert "IMPACT_CANARY" in request.context.prompt_text
-        assert "采用背景中描述的方案吗？" in request.context.prompt_text
 
 
 def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
-    stale = "ASK_CHOICE_STALE_SHOULD_NOT_LEAK"
+    stale = "RETIRED_DECISION_SHOULD_NOT_LEAK"
+
+    def retire_decisions(request):
+        decisions = _part(request, "current_product_decisions")
+        return product_spec(acceptance=["new behavior"], decision_changes=[
+            {"decision_hash": item["content_hash"], "disposition": "retire", "rationale": "The new behavior replaces this requirement."}
+            for item in decisions
+        ])
+
     adapter = FakeAdapter(
         [
             product_spec(acceptance=["old behavior"]),
-            ask_request(
-                question="Keep the stale canary?",
-                options=[stale, "ASK_CHOICE_OTHER"],
-                recommendation=stale,
-            ),
-            reaction("accept", "Use option A."),
+            collaboration_request(question="Publish the canary requirement?", request_type="action", action="revise_requirements"),
+            product_decision(stale, "This is the initial product requirement."),
+            response_turn("completed", "Published the requirement.", result_types=["product_decision_accepted"]),
             plan_turn(),
             delivery_turn(summary="OLD_DELIVERY_CANARY"),
             review_turn(
@@ -240,7 +230,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
                 "contract is wrong",
                 defects=[{"severity": "major", "summary": "contract issue"}],
             ),
-            product_spec(acceptance=["new behavior"]),
+            retire_decisions,
             plan_turn(reason="Implement the current replacement contract"),
             delivery_turn(summary="new delivery"),
             review_turn("release", "new contract checked"),

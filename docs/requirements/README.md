@@ -10,7 +10,7 @@
 | D04 | [产品维护 PRD.md](product-prd.md) | 同源文件及历史已实现；持续变更流程待 D |
 | D05 | [研发先分解与计划](engineering-plan.md) | 已实现并通过 B 回归与浏览器验证 |
 | D06 | [运行中输入的处理时机](in-flight-input.md) | 已确认，待实现 |
-| D07 | [三部门相互专家问答](expert-ask-react.md) | 已确认，现有单向基础需扩展 |
+| D07 | [三部门相互专家问答](expert-ask-react.md) | C 通用请求已替换单向路径，六方向及动作接续已验证 |
 | D08 | [部门完整历史与逐次上下文](department-history.md) | 已实现，自动压缩的真实运行验收中 |
 | D09 | [循环次数与超时限制](execution-limits.md) | 已实现 |
 | D10 | [上下文窗口、记忆与自动压缩](context-compaction.md) | 已实现，真实运行验收中 |
@@ -18,6 +18,6 @@
 | D12 | [部门专业补全](domain-completion.md) | 部门规则与默认依据已实现 |
 | D13 | [完整交付封存与恢复](delivery-archive.md) | 已接入检查与交付，独立恢复及 Web 下载已验证 |
 | D14 | [受控删除与移动](workspace-refactoring.md) | 已实现，E 整体验证通过 |
-| D15 | [有效变化与执行依据](effective-contract-changes.md) | 完整合同绑定已实现；输入和专家请求适用性待 C-D |
+| D15 | [有效变化与执行依据](effective-contract-changes.md) | 完整合同及专家请求适用性已验证；在途输入待 D |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

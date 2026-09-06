@@ -7,7 +7,8 @@ from harness.adapters.base import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.contracts import contract_payload, normalize_scope, path_in_scope, render_plan, render_prd
 from harness.models import EventType, json_dumps
-from harness.proposals import ask_request, delivery, delivery_turn, engineering_plan, plan_turn, product_spec, reaction, review_turn
+from harness.proposals import (collaboration_request, delivery, delivery_turn, engineering_plan, plan_turn,
+                               product_decision, product_spec, response_turn, review_turn)
 from harness.runtime import LoopSystem
 from harness.validation import evaluate_proposal
 
@@ -19,20 +20,22 @@ def _call(identity, name, **arguments):
 
 def _accept_new_spec(system, run_id):
     projection = system.project(run_id)
-    decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=projection,
+    decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=replace(projection, phase="PRODUCT_SPEC"),
                                  snapshot=system.workspace(run_id).snapshot(),
                                  proposal=product_spec(requirements=["print the argument in uppercase"]))
     assert decision.accepted
     system.orchestrator._commit_accepted(
         run_id, department="product", projection=projection, snapshot=system.workspace(run_id).snapshot(), artifact=decision.artifact,
-        transitions=[], extra=decision.extra, parent_event_id=projection.last_event_id,
+        transitions=[], parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake-script",
     )
 
 
 def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
     adapter = FakeAdapter([
-        product_spec(), ask_request(), reaction("accept", "Treat unknown flags as an error."),
+        product_spec(), collaboration_request(request_type="action", action="revise_requirements"),
+        product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
+        response_turn("completed", result_types=[EventType.PRODUCT_DECISION_ACCEPTED]),
         plan_turn(assumptions=[{"decision": "Use the standard argument parser", "basis": "Python standard library"}]),
         delivery_turn(), review_turn("release", "Verified the current requirements"),
     ])
@@ -44,12 +47,12 @@ def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
     assert len(result.effective_contracts) == 2
     contract = result.effective_contract
     assert result.effective_contracts[0].content_hash != contract.content_hash
-    assert contract.decision_hashes == [result.last_reaction.content_hash]
+    assert contract.decision_hashes == [result.product_decisions[-1].content_hash]
     assert contract_payload(result)["content_hash"] == contract.content_hash
     expected_prd = render_prd(result, asdict(contract))
     assert system.artifacts.get_for_run(run_id, contract.prd_ref).decode("utf-8") == expected_prd
     assert (tmp_path / "materials" / run_id / "PRD.md").read_bytes() == expected_prd.encode("utf-8")
-    for content in (result.effective_decisions[0].recommendation, result.effective_decisions[0].rationale):
+    for content in (result.effective_decisions[0].statement, result.effective_decisions[0].rationale):
         assert content in expected_prd
     plan = result.engineering_plan
     expected_plan = render_plan(asdict(plan))
@@ -100,13 +103,17 @@ def test_unplanned_and_out_of_scope_writes_have_repairable_tool_results(tmp_path
 def test_supplementary_decision_invalidates_plan_and_old_receipts_without_new_spec(tmp_path):
     system = LoopSystem(tmp_path, FakeAdapter([
         product_spec(), plan_turn(),
-        FakeTurn(proposal=ask_request(), writes={"src/echo.py": "print('echo')"}, checks={"smoke": 0}),
-        reaction("accept", "Use exit code 2 for unknown flags"), plan_turn(reason="Implement the newly accepted flag decision"),
+        FakeTurn(proposal=collaboration_request(request_type="action", action="revise_requirements"),
+                 writes={"src/echo.py": "print('echo')"}, checks={"smoke": 0}),
+        product_decision("Use exit code 2 for unknown flags", "Keep invalid arguments distinguishable from normal output."),
+        response_turn("completed", result_types=[EventType.PRODUCT_DECISION_ACCEPTED]),
+        plan_turn(reason="Implement the newly accepted flag decision"),
     ]))
     run_id = system.create_run("echo")
     for _ in range(3):
         old = system.activate_once(run_id)
     receipt = system.workspace(run_id).snapshot().checks[-1]
+    system.activate_once(run_id)
     new = system.activate_once(run_id)
     assert new.product_spec.content_hash == old.product_spec.content_hash
     assert new.effective_contract.content_hash != old.effective_contract.content_hash
