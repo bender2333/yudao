@@ -364,6 +364,10 @@ const PHASE_LABEL = {
   PAUSED: "暂停",
 };
 
+function stopLabel(reason) {
+  return reason === "model_steps_exhausted" ? "模型步骤已达上限" : reason;
+}
+
 function cycleNodeClass(nodeId, board) {
   const phase = board.phase || "";
   const active = board.active_department || "";
@@ -404,7 +408,7 @@ function renderCycle(board, timeline) {
   if (board.rework_count) facts.push(`返工 ${board.rework_count}`);
   if (phase === "DONE") facts.push("已完成");
   else if (phase === "FAILED") facts.push(board.stop_reason || "失败");
-  else if (phase === "PAUSED") facts.push(board.stop_reason || "已暂停");
+  else if (phase === "PAUSED") facts.push(stopLabel(board.stop_reason) || "已暂停");
   const factLine = facts.length ? `<p class="cycle-fact">${facts.map((item) => t(item)).join(" · ")}</p>` : "";
   return `<div class="cycle" role="list">${nodes}</div>${factLine}`;
 }
@@ -420,16 +424,17 @@ function renderBoard(board, aggregates, timeline, events) {
       ["阶段", board.phase],
       ["活动部门", board.active_department],
       ["等待原因", board.waiting_reason],
-      ["停止原因", board.stop_reason],
+      ["停止原因", stopLabel(board.stop_reason)],
       ["循环", `${board.cycle_count} / ${board.max_cycles}`],
-      ["Token", `${board.token_used} / ${board.token_budget}`],
+      ["Token", board.token_used || "未上报"],
       ["耗时 ms", agg.latency_ms],
       ["工具次数", agg.tool_count],
       ["Ask", agg.ask_count],
       ["返工", agg.rework_count],
       ["费用", formatCost(agg.cost)],
       ["模型", latestEventModel(events), "kv-model"],
-      ["适配器", board.provider],
+      ["适配器", board.adapter],
+      ["供应商", board.provider === board.adapter ? "未上报" : board.provider],
     ])}
     <p class="task-text">${t(board.task)}</p>
     ${board.human_action ? `<p class="note">${t(board.human_action)}</p>` : ""}
@@ -542,15 +547,16 @@ function renderContext(context, events, gen) {
   const node = document.getElementById("context-body");
   if (!node) return;
   const manifests = (context.manifests || [])
-    .map(
-      (item) => `
+    .map((item) => {
+      return `
     <article class="item">
-      <header><span>${t(item.department)}</span><span>${t(item.token_estimate)} tok / budget ${t(item.budget)}</span></header>
+      <header><span>${t(item.department)} · 第 ${t(item.step_id)} 步</span><span>${t(item.token_estimate)} tok / budget ${t(item.budget)}</span></header>
       <p>注入：${t((item.injected || []).map((part) => part.source).join(", "))}</p>
       <p class="muted">排除：${t((item.excluded || []).map((part) => part.source).join(", "))}</p>
       <p class="hash">${t(shortHash(item.digest))}</p>
-    </article>`,
-    )
+      ${item.source_event_id && item.request_ref ? `<button type="button" class="event-link" data-event-id="${t(item.source_event_id)}">查看模型输入</button>` : ""}
+    </article>`;
+    })
     .join("");
   const cards = (events || [])
     .slice(-12)
@@ -575,6 +581,9 @@ function renderContext(context, events, gen) {
         setStatus("error", error.message);
       });
     });
+  });
+  node.querySelectorAll(".event-link").forEach((button) => {
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
   });
 }
 
@@ -646,9 +655,9 @@ function scrollBoardIntoView() {
   if (board && typeof board.scrollIntoView === "function") board.scrollIntoView({ block: "start" });
 }
 
-function readBudget() {
+function readLimits() {
   const options = {};
-  for (const key of ["max_cycles", "token_budget", "context_window"]) {
+  for (const key of ["max_cycles", "context_window"]) {
     const raw = document.getElementById(key).value;
     if (raw === "") continue;
     if (!/^[0-9]+$/.test(raw)) throw new Error(`${key} 必须是正整数`);
@@ -665,7 +674,7 @@ async function startRun(event) {
   const task = document.getElementById("task").value;
   let options;
   try {
-    options = readBudget();
+    options = readLimits();
   } catch (error) {
     setStatus("error", error.message);
     openCompose();

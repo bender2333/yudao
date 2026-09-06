@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+from copy import deepcopy
 from typing import Any
 
 from .models import (
@@ -133,24 +134,33 @@ class AssembledContext:
     prompt_text: str
     parts: list[ContextPart]
     manifest: ContextManifest
+    input_items: list[dict[str, Any]]
+    tools: list[dict[str, Any]]
 
 
 class ContextAssembler:
-    def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str) -> AssembledContext:
+    def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
+                 step_id: int = 1, history: list[dict[str, Any]] | None = None) -> AssembledContext:
         parts: list[ContextPart] = [
+            ContextPart("intend", None, projection.task),
+            ContextPart("current_work", projection.phase, json_dumps({
+                "department": department,
+                "phase": projection.phase,
+                "work": {"product": "形成和维护当前产品要求，处理待决问题",
+                         "engineering": "依据当前产品要求实现、检查并提交交付",
+                         "quality": "独立验证当前交付，决定放行或返工"}[department],
+                "current_goal": projection.product_spec.goal if projection.product_spec else None,
+                "precedence": "本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。",
+            })),
             ContextPart("department_rules", department, DEPARTMENT_RULES[department]),
-            ContextPart("task_summary", None, projection.task),
             ContextPart("proposal_contract", department, json_dumps(PROPOSAL_CONTRACTS[department])),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
             ContextPart(
-                "remaining_budget",
+                "loop_limits",
                 None,
                 json_dumps(
                     {
                         "cycles_remaining": max(0, projection.max_cycles - projection.cycle_count),
-                        "token_budget": projection.token_budget,
-                        "token_used": projection.token_used,
-                        "token_remaining": max(0, projection.token_budget - projection.token_used),
                     }
                 ),
             ),
@@ -249,30 +259,31 @@ class ContextAssembler:
             )
         parts.append(ContextPart("causal_chain", None, json_dumps(_causal_chain(projection))))
 
+        prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
+        input_items = [{"role": "developer", "content": prompt_text}, *deepcopy(history or [])]
+        from .tools import host_tool_definitions
+
+        tools = [
+            {"type": "function", "name": item["name"], "description": item["description"],
+             "parameters": item["parameters"], "strict": False}
+            for item in host_tool_definitions(_tools_for(department))
+        ]
+        if history:
+            parts.append(ContextPart("department_history", department, json_dumps(history)))
+        parts.append(ContextPart("tool_schemas", department, json_dumps(tools)))
         injected = [
             ContextSource(source=part.source, version=part.version, tokens=estimate_tokens(part.text), digest=canonical_hash(part.text))
             for part in parts
         ]
         excluded = [
             ContextExclusion("other_department_transcript", "cross-department transcripts are never injected"),
-            ContextExclusion("superseded_spec_fulltext", "old spec bodies are not injected; only current spec and thin causal markers"),
+            ContextExclusion("superseded_spec_as_current", "older specs remain in department history but are never presented as current requirements"),
             ContextExclusion("expired_product_decisions", "decisions bound to a superseded ProductSpec are not in the current contract"),
             ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
-            ContextExclusion("historical_transcript", "department history is not passed; context is rebuilt from the projection"),
-            ContextExclusion("private_reasoning", "private model reasoning is stored as an artifact and not shared"),
-            ContextExclusion("omp_autodiscovery", "OMP skills, extensions, rules, builtins, LSP, and persistent sessions are disabled"),
         ]
-        token_estimate = sum(item.tokens for item in injected)
-        digest = canonical_hash(
-            {
-                "budget": projection.context_window,
-                "department": department,
-                "excluded": [asdict(item) for item in excluded],
-                "injected": [{"source": item.source, "version": item.version} for item in injected],
-                "token_estimate": token_estimate,
-            }
-        )
-        prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
+        actual_request = {"input": input_items, "tools": tools}
+        token_estimate = estimate_tokens(json_dumps(actual_request))
+        digest = canonical_hash(actual_request)
         manifest = ContextManifest(
             session_id=session_id,
             department=department,
@@ -283,8 +294,10 @@ class ContextAssembler:
             budget=projection.context_window,
             digest=digest,
             truncated=False,
+            step_id=step_id,
         )
-        return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest)
+        return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
+                                input_items=input_items, tools=tools)
 
 
 def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:

@@ -2,6 +2,7 @@ import json
 import subprocess
 import threading
 import time
+from dataclasses import asdict
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from pathlib import Path
@@ -10,7 +11,7 @@ import pytest
 
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
-from harness.adapters.omp import UNAVAILABLE_MESSAGE, OmpConfig, OmpRpcAdapter
+from harness.adapters.responses import ResponsesAdapter, ResponsesConfig
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
@@ -196,7 +197,7 @@ def test_create_run_goes_through_engine_and_replays(data_dir):
             port,
             "POST",
             "/api/runs",
-            {"task": "build echo", "max_cycles": 6, "token_budget": 80000, "context_window": 16000},
+            {"task": "build echo", "max_cycles": 6, "context_window": 16000},
         )
         assert status == 201, body
         created = json.loads(body)
@@ -283,10 +284,10 @@ def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
             {"task": "   "},
             {},
             {"task": "x", "max_cycles": 0},
-            {"task": "x", "token_budget": -1},
+            {"task": "x", "token_budget": 80000},
             {"task": "x", "context_window": True},
             {"task": "x", "max_cycles": 1.5},
-            {"task": "x", "token_budget": 8.0},
+            {"task": "x", "context_window": 8.0},
             {"task": "x", "max_cycles": "8"},
         ]
         for body in bad_bodies:
@@ -307,21 +308,20 @@ def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
 
 
 def test_unconfigured_provider_is_clear_error_and_does_not_create(data_dir):
-    adapter = OmpRpcAdapter(OmpConfig(command=["omp"], enabled=False))
+    adapter = ResponsesAdapter(ResponsesConfig(api_key="", model=""))
     system = LoopSystem(data_dir, adapter)
     before = system.list_run_ids()
     with running_server(system) as (_server, host, port):
         health = get_json(host, port, "/api/health")
-        assert health["adapter"] == "omp"
+        assert health["adapter"] == "responses"
         assert health["provider_available"] is False
         status, body, _ = request(host, port, "POST", "/api/runs", {"task": "build echo"})
         assert status == 503, body
         payload = json.loads(body)
         assert payload.get("reason") == "provider_unavailable"
-        assert "fake" in payload["error"].lower() or "不会" in payload["error"]
-        assert UNAVAILABLE_MESSAGE[:12] in payload["error"] or "OMP" in payload["error"]
+        assert "YUDAO_MODEL_API_KEY" in payload["error"]
         assert system.list_run_ids() == before
-        assert system.adapter.name == "omp"
+        assert system.adapter.name == "responses"
 
 
 def test_sse_resumes_from_after_seq_and_last_event_id(data_dir):
@@ -357,6 +357,14 @@ def test_queries_do_not_mutate_existing_run(data_dir):
         assert payload["timeline"]["asks"] == []
         assert payload["evidence"]["reviews"][0]["verdict"] == "release"
         assert payload["context"]["manifests"]
+        manifests = payload["context"]["manifests"]
+        assert all(item["step_id"] >= 1 and item["request_ref"] for item in manifests)
+        assembled = next(event for event in system.store.list_events(projection.run_id)
+                         if event.type == "context_assembled")
+        detail = get_json(host, port, f"/api/runs/{projection.run_id}/events/{assembled.event_id}")
+        assert manifests[0]["source_event_id"] == assembled.event_id
+        assert detail["model_input"]["input"][0]["role"] == "developer"
+        assert detail["model_input"]["tools"]
         events = get_json(host, port, f"/api/runs/{projection.run_id}/events")
         assert events["events"]
         replay = json.loads(request(host, port, "POST", f"/api/runs/{projection.run_id}/replay")[1])
@@ -368,7 +376,27 @@ def test_queries_do_not_mutate_existing_run(data_dir):
         assert request(host, port, "POST", f"/api/runs/{projection.run_id}")[0] == 404
 
 
-def test_serve_cli_defaults_to_omp_and_accepts_fake(monkeypatch, tmp_path):
+@pytest.mark.parametrize("failure", ["missing_with_other_run_copy", "modified_bytes", "foreign_reference"])
+def test_model_input_detail_rejects_invalid_or_cross_run_artifact(data_dir, monkeypatch, failure):
+    system, projection = run_scripted(data_dir, happy_script())
+    event = next(item for item in system.store.list_events(projection.run_id) if item.type == "context_assembled")
+    ref = event.payload["request_ref"]
+    original = system.artifacts.root / ref["path"]
+    foreign = system.artifacts.put("another-run", "model_request", original.read_bytes(), media_type="application/json")
+    if failure == "missing_with_other_run_copy":
+        original.unlink()
+    elif failure == "modified_bytes":
+        original.write_text('{"input": "modified"}', encoding="utf-8")
+    else:
+        event.payload["request_ref"] = asdict(foreign)
+        monkeypatch.setattr(system.store, "get_event", lambda _event_id: event)
+    with running_server(system) as (_server, host, port):
+        status, body, _ = request(host, port, "GET", f"/api/runs/{projection.run_id}/events/{event.event_id}")
+        assert status in {400, 500}, body
+        assert "model_input" not in json.loads(body)
+
+
+def test_serve_cli_defaults_to_responses_and_accepts_fake(monkeypatch, tmp_path):
     seen = {}
 
     def fake_serve(system, host, port):
@@ -379,14 +407,15 @@ def test_serve_cli_defaults_to_omp_and_accepts_fake(monkeypatch, tmp_path):
 
     monkeypatch.setattr("harness.__main__._serve", fake_serve)
     assert main(["serve", "--data-dir", str(tmp_path)]) == 0
-    assert seen["name"] == "omp"
+    assert seen["name"] == "responses"
     assert main(["serve", "--adapter", "fake", "--data-dir", str(tmp_path), "--host", "127.0.0.1", "--port", "0"]) == 0
     assert seen["name"] == "fake"
     assert seen["port"] == 0
 
 
-def test_serve_cli_unconfigured_omp_prints_error_but_starts(monkeypatch, tmp_path, capsys):
-    monkeypatch.delenv("YUDAO_OMP_ENABLED", raising=False)
+def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("YUDAO_MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("YUDAO_MODEL_NAME", raising=False)
     started = {}
 
     class Dummy:
@@ -403,8 +432,7 @@ def test_serve_cli_unconfigured_omp_prints_error_but_starts(monkeypatch, tmp_pat
     code = main(["serve", "--data-dir", str(tmp_path), "--port", "0"])
     assert code == 0
     err = capsys.readouterr().err
-    assert "OMP" in err
-    assert "fake" in err.lower()
+    assert "YUDAO_MODEL_API_KEY" in err
     assert started["ok"] is True
     assert started["closed"] is True
 
@@ -412,6 +440,8 @@ def test_serve_cli_unconfigured_omp_prints_error_but_starts(monkeypatch, tmp_pat
 def test_serve_cli_rejects_unknown_adapter(tmp_path):
     with pytest.raises(SystemExit):
         main(["serve", "--adapter", "openai", "--data-dir", str(tmp_path)])
+    with pytest.raises(SystemExit):
+        main(["serve", "--adapter", "omp", "--data-dir", str(tmp_path)])
 
 
 def test_worker_exception_is_visible_and_does_not_complete(data_dir):
@@ -448,7 +478,7 @@ def test_worker_exception_is_visible_and_does_not_complete(data_dir):
 
 
 def test_unconfigured_provider_stays_on_health_after_listing_runs(data_dir):
-    adapter = OmpRpcAdapter(OmpConfig(command=["omp"], enabled=False))
+    adapter = ResponsesAdapter(ResponsesConfig(api_key="", model=""))
     system, projection = run_scripted(data_dir, happy_script())
     system.adapter = adapter
     with running_server(system) as (_server, host, port):
@@ -555,7 +585,7 @@ def test_web_ui_node_behaviors():
     assert "failed start stays on compose" in output
     assert "scrollBoardIntoView only moves the board on mobile" in output
     assert "desktop successful start does not force-scroll" in output
-    assert "board shows reported cost and event model" in output
+    assert "board distinguishes actual provider from adapter" in output
     assert "zero missing and invalid cost" in output
     assert "tiny positive cost is not rounded to zero" in output
     assert "missing event model is" in output

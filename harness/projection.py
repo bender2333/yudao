@@ -55,15 +55,20 @@ def apply_event(state: RunProjection, event: Event) -> None:
     state.last_seq = event.seq
     payload = event.payload
     etype = event.type
+    if event.provider:
+        state.provider = event.provider
+    if event.model:
+        state.model = event.model
 
     if etype == EventType.RUN_CREATED:
         state.run_id = event.run_id
         state.task = payload["task"]
+        state.intend_ref = payload["intend_ref"]
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
-        state.token_budget = int(payload["token_budget"])
         state.context_window = int(payload.get("context_window", 32_000))
         state.provider = payload.get("provider", "fake")
+        state.adapter = payload["adapter"]
         state.sessions = {
             department: SessionRecord(session_id=session_id, department=department, status="idle")
             for department, session_id in payload.get("sessions", {}).items()
@@ -84,18 +89,13 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.CONTEXT_ASSEMBLED:
-        if payload.get("usage_only"):
-            state.token_used += int(payload.get("tokens_charged", 0))
-            state.cost += float(payload.get("cost", 0.0))
-            state.latency_ms += int(payload.get("latency_ms", 0))
-            return
-        manifest = _manifest_from_payload(payload)
+        manifest = _manifest_from_payload(payload, event.event_id)
         state.manifests.append(manifest)
-        state.token_used += int(payload.get("tokens_charged", manifest.token_estimate))
-        state.cost += float(payload.get("cost", 0.0))
-        state.latency_ms += int(payload.get("latency_ms", 0))
         if event.model:
             state.model = event.model
+        return
+
+    if etype == EventType.MODEL_REQUESTED:
         return
 
     if etype == EventType.TOOL_CALLED:
@@ -262,8 +262,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
 
-def _manifest_from_payload(payload: dict[str, Any]) -> ContextManifest:
+def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextManifest:
     return ContextManifest(
+        source_event_id=event_id,
+        step_id=payload["step_id"],
+        request_ref=payload["request_ref"],
+        admitted=payload["admitted"],
         session_id=payload["session_id"],
         department=payload["department"],
         activation_id=payload["activation_id"],

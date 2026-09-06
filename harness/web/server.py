@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from ..models import json_dumps
+from ..models import ArtifactRef, json_dumps
 from ..projection import RunNotFoundError, project_run
 from ..runtime import LoopSystem
 from ..views import event_card, run_board, run_payload
@@ -168,11 +168,14 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
 
     def _create_run(self) -> None:
         body = self._read_json_body()
+        unknown = set(body) - {"task", "max_cycles", "context_window"}
+        if unknown:
+            raise ValueError("unsupported task fields: " + ", ".join(sorted(unknown)))
         task = body.get("task")
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be a non-empty string")
         options: dict[str, int] = {}
-        for key in ("max_cycles", "token_budget", "context_window"):
+        for key in ("max_cycles", "context_window"):
             if key not in body or body[key] is None:
                 continue
             options[key] = _positive_int(key, body[key])
@@ -224,7 +227,13 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             event = store.get_event(rest[1])
             if event is None or event.run_id != run_id:
                 return self._send_json({"error": "event not found"}, 404)
-            return self._send_json(event.to_dict())
+            detail = event.to_dict()
+            request_ref = event.payload.get("request_ref")
+            if request_ref:
+                detail["model_input"] = json.loads(
+                    self.server.system.artifacts.get_for_run(run_id, ArtifactRef(**request_ref))
+                )
+            return self._send_json(detail)
         if rest == ["stream"]:
             project_run(store, run_id)
             after = self._resume_seq(query, default=0)

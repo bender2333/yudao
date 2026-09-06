@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .models import ArtifactRef, hash_bytes
@@ -35,3 +36,20 @@ class ArtifactStore:
 
     def get_text(self, ref: ArtifactRef | str) -> str:
         return self.get(ref).decode("utf-8")
+
+    def get_for_run(self, run_id: str, ref: ArtifactRef) -> bytes:
+        if not isinstance(run_id, str) or run_id in {"", ".", ".."} or Path(run_id).name != run_id:
+            raise ValueError("invalid artifact run id")
+        if not isinstance(ref.content_hash, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", ref.content_hash):
+            raise ValueError("invalid artifact content hash")
+        digest = ref.content_hash.split(":", 1)[1]
+        relative = Path(run_id) / digest[:2] / digest
+        if ref.path != relative.as_posix():
+            raise ValueError("artifact reference does not belong to this run")
+        path = self.root.resolve() / relative
+        if path.resolve() != path:
+            raise ValueError("artifact path resolves outside its recorded location")
+        raw = path.read_bytes()
+        if hash_bytes(raw) != ref.content_hash:
+            raise ValueError("artifact content hash mismatch")
+        return raw

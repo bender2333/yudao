@@ -1,5 +1,6 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.engine import MAX_MODEL_STEPS
 from harness.proposals import ask_request, delivery_turn, product_spec, reaction, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
@@ -166,17 +167,17 @@ def test_natural_language_completion_does_not_finish(data_dir):
     script = [
         product_spec(),
         delivery_turn(),
-        FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。"),
+        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(MAX_MODEL_STEPS)],
     ]
     system = LoopSystem(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
     projection = system.activate_once(run_id)
-    assert projection.phase == "QUALITY"
+    assert projection.phase == "PAUSED"
     assert projection.outcome != "done"
-    assert projection.stop_reason is None
-    assert any("structured proposal is required" in error["message"] for item in projection.rejections for error in item["errors"])
+    assert projection.stop_reason == "model_steps_exhausted"
+    assert projection.last_review is None
 
 
 def test_max_cycles_pauses_with_human_action(data_dir):
@@ -188,11 +189,12 @@ def test_max_cycles_pauses_with_human_action(data_dir):
     assert "max_cycles" in projection.waiting_reason
 
 
-def test_budget_exhausted_pauses(data_dir):
-    _, projection = run_scripted(data_dir, happy_script(), token_budget=20)
+def test_cycle_limit_pauses_after_work_without_provider_usage(data_dir):
+    _, projection = run_scripted(data_dir, happy_script(), max_cycles=1)
     assert projection.phase == "PAUSED"
-    assert projection.stop_reason == "budget_exhausted"
-    assert "token" in projection.human_action.lower() or "预算" in projection.human_action
+    assert projection.stop_reason == "max_cycles"
+    assert projection.product_spec is not None
+    assert projection.token_used == 0
 
 
 def test_cancel_is_explicit_failure(data_dir):

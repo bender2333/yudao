@@ -28,13 +28,13 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "cycle_count": projection.cycle_count,
         "max_cycles": projection.max_cycles,
         "token_used": projection.token_used,
-        "token_budget": projection.token_budget,
         "cost": projection.cost,
         "latency_ms": projection.latency_ms,
         "tool_count": projection.tool_count,
         "rework_count": projection.rework_count,
         "ask_count": projection.ask_count,
         "provider": projection.provider,
+        "adapter": projection.adapter,
         "model": projection.model,
     }
 
@@ -148,5 +148,3 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
             "cycles": projection.cycle_count,
         },
     }
-
-

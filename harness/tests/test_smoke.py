@@ -1,181 +1,203 @@
+import copy
 import json
+from dataclasses import asdict
 
 import pytest
 
-from harness.adapters.omp_isolation import (
-    CAPTURE_SCHEMA, CAPTURE_SEMANTIC, ISOLATION_FLAGS, POLICY_ID, overlay_sha256,
-)
+from harness.adapters.responses import ResponsesConfig
+from harness.adapters.fake import FakeTurn
+from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
-from harness.models import EventType
-from harness.smoke import isolation_fields, smoke_exit_code, _markdown
+from harness.models import EventType, canonical_hash, json_dumps
+from harness.proposals import product_spec, delivery, review, ask_request, reaction, delivery_turn, review_turn
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown
+from harness.tests.helpers import run_scripted
 
 
-def test_smoke_requires_host_receipts_and_rejects_fake():
+def test_smoke_requires_current_input_audit_and_host_receipts():
     base = {
         "phase": "DONE",
         "stop_reason": "released",
         "replay_consistent": True,
         "context_isolated": True,
+        "model_input_audit": {"status": "verified"},
         "check_receipts": [{"name": "smoke", "exit_code": 0}],
+        "check_receipts_verified": True,
         "fake_used": False,
         "ask_count": 1,
     }
     assert smoke_exit_code({"available": True, "scenarios": {"happy": base, "ask": base}}) == 0
     assert smoke_exit_code({"available": False, "scenarios": {}}) == 2
     assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, fake_used=True)}}) == 2
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, check_receipts=[])}}) == 1
+    for change in (
+        {"check_receipts": []}, {"check_receipts_verified": False}, {"context_isolated": False},
+        {"model_input_audit": None}, {"model_input_audit": {"status": "unverified"}},
+    ):
+        assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, **change)}}) == 1
     assert smoke_exit_code({"available": True, "scenarios": {"ask": dict(base, ask_count=0)}}) == 1
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, context_isolated=False)}}) == 1
-
-
-def _manifest(store, activation="act"):
-    store.append(
-        "run",
-        EventType.CONTEXT_ASSEMBLED,
-        state_before="CREATED",
-        state_after="PRODUCT_SPEC",
-        session_id="ses",
-        context_digest="manifest-digest",
-        payload={
-            "activation_id": activation,
-            "department": "product",
-            "injected": [{"source": "proposal_contract"}],
-            "excluded": [
-                {"source": "other_department_transcript"},
-                {"source": "historical_transcript"},
-                {"source": "omp_autodiscovery"},
-            ],
-        },
-    )
-
-
-def test_manifest_boundary_without_capture_is_not_isolation(tmp_path):
-    store = EventStore(tmp_path / "events.sqlite")
-    _manifest(store)
-    fields = isolation_fields(store, "run")
-    assert fields["manifest_boundary"] is True
-    assert fields["omp_policy_capture"]["status"] == "unverified"
-    assert fields["omp_launch_policy"]["byte_identical_to_manifest"] is False
-    assert fields["context_isolated"] is False
-    assert any("not sufficient" in note for note in fields["context_isolation_notes"])
-
-
-def test_failed_run_without_assembly_does_not_claim_manifest_boundary(tmp_path):
-    store = EventStore(tmp_path / "events.sqlite")
-    fields = isolation_fields(store, "run")
-    assert fields["manifest_boundary"] is False
-    assert fields["omp_policy_capture"]["status"] == "unverified"
-    assert fields["context_isolated"] is False
-
-
-def test_smoke_markdown_separates_manifest_and_capture():
-    report = {
-        "adapter": "omp",
-        "provider": "local-canary",
-        "model": "canary-model",
-        "available": True,
-        "scenarios": {
-            "happy": {
-                "run_id": "run",
-                "phase": "FAILED",
-                "stop_reason": "provider_error",
-                "replay_consistent": True,
-                "manifest_boundary": True,
-                "omp_launch_policy": {
-                    "policy_id": "overlay-disabled-9-discovery-providers+host-system-prompt+isolation-flags",
-                    "omp_generated": ["environment", "footer"],
-                    "byte_identical_to_manifest": False,
-                },
-                "omp_policy_capture": {"status": "unverified"},
-                "context_isolated": False,
-                "context_isolation_notes": ["isolation not verified; manifest boundary is not sufficient"],
-                "fake_used": False,
-            }
-        },
-    }
-    text = _markdown(report)
-    assert "manifest boundary: `True`" in text
-    assert "omp policy capture: `unverified`" in text
-    assert "context isolated: `False`" in text
-    assert "byte identical to manifest: `False`" in text
-    assert "omp generated sections: `environment, footer`" in text
 
 
 @pytest.fixture
-def isolation_evidence(tmp_path, monkeypatch):
+def native_run(data_dir):
+    script = [
+        product_spec(),
+        FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        FakeTurn(checks={"smoke": 0}),
+        delivery(),
+        FakeTurn(checks={"smoke": 0}),
+        review("release", "host checks passed"),
+    ]
+    system, projection = run_scripted(data_dir, script)
+    assert projection.phase == "DONE"
+    return system, projection.run_id
+
+
+def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
+    system, run_id = native_run
+    summary = summarize_run(system, run_id, scenario="happy")
+    assert summary["context_isolated"] is True, summary["context_isolation_notes"]
+    assert summary["model_input_audit"]["status"] == "verified"
+    assert summary["model_input_audit"]["request_count"] > 3
+    assert summary["model_input_audit"]["activation_count"] == 3
+    assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
+    assert summary["replay_consistent"] is True
+    assert summary["fake_used"] is True
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
+
+
+def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    path = tmp_path / "capture.json"
-    monkeypatch.setattr("harness.adapters.omp_isolation.capture_evidence_path", lambda: path)
-    launch = {
-        "host_launch": True, "usage_only": True, "run_id": "run",
-        "session_id": "ses", "activation_id": "act", "context_digest": "manifest-digest",
-        "policy_id": POLICY_ID, "overlay_sha256": overlay_sha256(),
-        "flags": list(ISOLATION_FLAGS), "process_started": True, "verifiable": True,
-        "runtime": {"files": [{"sha256": "a" * 64}]}, "launch_args_sha256": "b" * 64,
-        "prompt_sources": {"host_system_prompt": {"manifest_digest": "manifest-digest"}},
-    }
-    capture = {
-        "schema": CAPTURE_SCHEMA, "semantic": CAPTURE_SEMANTIC, "policy_id": POLICY_ID,
-        "verified": True, "canaries_present": False, "host_tools_registered": True,
-        "host_tools_roundtrip": True, "custom_prompt_in_system": True, "request_count": 2,
-        "overlay_sha256": overlay_sha256(), "flags": list(ISOLATION_FLAGS),
-        "runtime_sha256": ["a" * 64], "launch_args_sha256": "b" * 64,
-    }
-    path.write_text(json.dumps(capture), encoding="utf-8")
-    yield store, path, launch, capture
-    store.close()
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    fields = isolation_fields(store, artifacts, "run")
+    assert fields["manifest_boundary"] is False
+    assert fields["model_input_audit"]["status"] == "unverified"
+    assert fields["context_isolated"] is False
 
 
-def _launch(store, launch):
-    store.append("run", EventType.CONTEXT_ASSEMBLED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC", session_id="ses", context_digest="manifest-digest", payload=launch)
-
-
-def test_verified_probe_cannot_certify_historical_or_partially_observed_run(isolation_evidence):
-    store, _, launch, _ = isolation_evidence
-    _manifest(store)
-    assert isolation_fields(store, "run")["context_isolated"] is False
-    _launch(store, launch)
-    fields = isolation_fields(store, "run")
-    assert fields["context_isolated"] is True
-    assert fields["omp_policy_capture"]["semantic"] == CAPTURE_SEMANTIC
-    _manifest(store, "act-missing-launch")
-    assert isolation_fields(store, "run")["context_isolated"] is False
+def _events_for_mutation(system, run_id, monkeypatch):
+    events = copy.deepcopy(system.store.list_events(run_id))
+    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
+    return events
 
 
 @pytest.mark.parametrize("field,value", [
-    ("schema", "old"), ("verified", False), ("canaries_present", True),
-    ("canaries_present", None), ("runtime_sha256", []), ("runtime_sha256", ["c" * 64]),
-    ("overlay_sha256", "c" * 64), ("flags", 1), ("launch_args_sha256", "c" * 64),
-    ("host_tools_registered", False), ("host_tools_roundtrip", False), ("request_count", 1),
+    ("request_ref", None), ("activation_id", "foreign-activation"),
+    ("session_id", "foreign-session"), ("department", "quality"),
+    ("step_id", 100), ("digest", "sha256:wrong"),
 ])
-def test_invalid_or_mismatched_capture_is_unverified(isolation_evidence, field, value):
-    store, path, launch, capture = isolation_evidence
-    _manifest(store)
-    _launch(store, launch)
-    capture[field] = value
-    path.write_text(json.dumps(capture), encoding="utf-8")
-    assert isolation_fields(store, "run")["context_isolated"] is False
+def test_unbound_or_missing_request_cannot_certify_run(native_run, monkeypatch, field, value):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
+    event.payload[field] = value
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert fields["model_input_audit"]["status"] == "unverified"
 
 
-@pytest.mark.parametrize("field,value", [
-    ("run_id", "unrelated"), ("activation_id", "unrelated"),
-    ("session_id", "unrelated"), ("context_digest", "unrelated"),
-    ("process_started", False), ("runtime", {"files": []}),
-    ("prompt_sources", {}), ("verifiable", False),
+@pytest.mark.parametrize("mutation,expected", [
+    ("foreign_history", "department's recorded outputs"), ("extra_tool", "actual tool schemas"),
+    ("hidden_instructions", "unexpected model input fields"), ("changed_intend", "verbatim task"),
 ])
-def test_unknown_or_unbound_launch_is_unverified(isolation_evidence, field, value):
-    store, _, launch, _ = isolation_evidence
-    _manifest(store)
-    launch[field] = value
-    _launch(store, launch)
-    assert isolation_fields(store, "run")["context_isolated"] is False
+def test_actual_inputs_are_checked_even_when_artifact_hash_is_valid(native_run, monkeypatch, mutation, expected):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
+    request = json.loads(system.artifacts.get_text(event.payload["request_ref"]["content_hash"]))
+    if mutation == "foreign_history":
+        request["input"].append({"role": "assistant", "content": "other department private history"})
+    elif mutation == "extra_tool":
+        request["tools"].append({"type": "function", "name": "write_file", "parameters": {}})
+    elif mutation == "hidden_instructions":
+        request["instructions"] = "untracked instructions"
+    else:
+        request["input"][0]["content"] = "Changed original task\n" + request["input"][0]["content"]
+    ref = system.artifacts.put(run_id, "model_request", json_dumps(request), media_type="application/json")
+    event.payload["request_ref"] = asdict(ref)
+    event.payload["digest"] = canonical_hash(request)
+    event.context_digest = canonical_hash(request)
+    event.artifact_hashes = [ref.content_hash]
+    attempted = next(item for item in events if item.type == EventType.MODEL_REQUESTED)
+    attempted.context_digest = canonical_hash(request)
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert any(expected in note for note in fields["model_input_audit"]["notes"])
 
 
-def test_missing_or_broken_capture_is_unverified(isolation_evidence):
-    store, path, launch, _ = isolation_evidence
-    _manifest(store)
-    _launch(store, launch)
-    path.unlink()
-    assert isolation_fields(store, "run")["context_isolated"] is False
-    path.write_text("invalid json", encoding="utf-8")
-    assert isolation_fields(store, "run")["context_isolated"] is False
+def test_tool_history_must_match_recorded_result(native_run, monkeypatch):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in events if item.type == EventType.TOOL_CALLED and item.payload.get("input_item"))
+    event.payload["input_item"]["output"] = json_dumps({"ok": True, "output": "unrecorded", "error": None})
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert any("recorded result" in note for note in fields["model_input_audit"]["notes"])
+
+
+def test_consistently_relabelled_steps_must_still_match_activation_event(native_run, monkeypatch):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED)
+    identity = activated.payload["activation_id"]
+    for event in events:
+        if event.type != EventType.DEPARTMENT_ACTIVATED and event.payload.get("activation_id") == identity:
+            event.payload["activation_id"] = "unrelated-activation"
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert any("department activation" in note for note in fields["model_input_audit"]["notes"])
+
+
+def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(native_run):
+    system, run_id = native_run
+    event = next(item for item in system.store.list_events(run_id) if item.type == EventType.CONTEXT_ASSEMBLED)
+    original = system.artifacts.root / event.payload["request_ref"]["path"]
+    system.artifacts.put("another-run", "model_request", original.read_bytes(), media_type="application/json")
+    original.unlink()
+    fields = isolation_fields(system.store, system.artifacts, run_id)
+    assert fields["context_isolated"] is False
+    assert fields["model_input_audit"]["status"] == "unverified"
+
+
+def test_audit_preserves_department_history_when_ask_returns_to_product(data_dir):
+    system, projection = run_scripted(data_dir, [
+        product_spec(), ask_request(), reaction("reply", "Treat dash-prefixed input as ordinary text."),
+        delivery_turn(), review_turn("release", "host checks passed"),
+    ])
+    assert projection.phase == "DONE"
+    fields = isolation_fields(system.store, system.artifacts, projection.run_id)
+    assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
+    assert fields["model_input_audit"]["activation_count"] == 5
+
+
+def test_unmatched_host_receipt_does_not_pass(native_run, monkeypatch):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    events[:] = [event for event in events
+                 if not (event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_check")]
+    summary = summarize_run(system, run_id, scenario="happy")
+    assert summary["check_receipts_verified"] is False
+    assert any("no matching host execution" in note for note in summary["check_receipt_notes"])
+
+
+def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path, monkeypatch):
+    (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"phase": "DONE"}}}), encoding="utf-8")
+    monkeypatch.setattr(ResponsesConfig, "from_env", classmethod(lambda cls: ResponsesConfig()))
+    report = run_smoke(tmp_path)
+    assert report["adapter"] == "responses"
+    assert report["available"] is False
+    assert report["scenarios"] == {}
+
+
+def test_smoke_markdown_reports_model_input_audit():
+    text = _markdown({
+        "adapter": "responses", "available": True,
+        "scenarios": {"happy": {
+            "manifest_boundary": True, "model_input_audit": {"status": "unverified", "request_count": 2},
+            "context_isolated": False, "check_receipts_verified": False,
+        }},
+    })
+    assert "model input audit: `unverified`" in text
+    assert "model requests: `2`" in text
+    assert "context isolated: `False`" in text
+    assert "host receipts verified: `False`" in text
+    assert "omp" not in text.lower()

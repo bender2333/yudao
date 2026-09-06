@@ -104,7 +104,6 @@ function makeDocument() {
     "task",
     "btn-new",
     "max_cycles",
-    "token_budget",
     "context_window",
   ]) {
     nodes.set(id, makeEl(id));
@@ -127,7 +126,6 @@ function makeDocument() {
   for (const node of nodes.values()) node.ownerDocument = doc;
   body.ownerDocument = doc;
   nodes.get("max_cycles").value = "8";
-  nodes.get("token_budget").value = "100000";
   nodes.get("context_window").value = "32000";
   return doc;
 }
@@ -155,7 +153,6 @@ function runPayload(runId, extra = {}) {
       cycle_count: 0,
       max_cycles: 8,
       token_used: 0,
-      token_budget: 100000,
       provider: "fake",
       task: extra.task || "task",
       human_action: "",
@@ -409,8 +406,8 @@ function sampleBoard(extra = {}) {
     cycle_count: 1,
     max_cycles: 8,
     token_used: 10,
-    token_budget: 100000,
     provider: extra.provider || "fake",
+    adapter: extra.adapter || "fake",
     task: extra.task || "build echo",
     human_action: "",
     error: "",
@@ -608,10 +605,10 @@ test("ask phase is visible on the product node and fact line", () => {
   assert.match(html, /Ask \/ React/);
 });
 
-test("board shows reported cost and event model, not adapter as vendor", () => {
+test("board distinguishes actual provider from adapter and shows reported cost", () => {
   const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
   web.renderBoard(
-    sampleBoard({ provider: "omp" }),
+    sampleBoard({ adapter: "responses", provider: "blackrouter" }),
     { ...emptyAgg, cost: 0.0123 },
     {},
     [
@@ -625,7 +622,8 @@ test("board shows reported cost and event model, not adapter as vendor", () => {
   assert.doesNotMatch(html, /\$/);
   assert.match(html, /<dt>模型<\/dt><dd>acctual-model-v1<\/dd>/);
   assert.doesNotMatch(html, /should-not-use/);
-  assert.match(html, /<dt>适配器<\/dt><dd>omp<\/dd>/);
+  assert.match(html, /<dt>适配器<\/dt><dd>responses<\/dd>/);
+  assert.match(html, /<dt>供应商<\/dt><dd>blackrouter<\/dd>/);
   assert.doesNotMatch(html, /<dt>Provider<\/dt>/);
 });
 
@@ -636,6 +634,45 @@ test("zero missing and invalid cost display as 未上报", () => {
     const html = document.getElementById("board-body").innerHTML;
     assert.match(html, /<dt>费用<\/dt><dd>未上报<\/dd>/, String(cost));
   }
+});
+
+test("context links each model step by its stable source event despite identical hashes", () => {
+  const { web, document } = loadApp(async () => jsonResponse({ ok: true }));
+  web.renderContext({ manifests: [
+    { department: "engineering", step_id: 2, session_id: "session-b", digest: "sha256:second", source_event_id: "model-step-b",
+      token_estimate: 900, budget: 32000, request_ref: { content_hash: "sha256:request" },
+      injected: [{ source: "department_history" }], excluded: [{ source: "other_department_transcript" }] },
+  ] }, [
+    { type: "context_assembled", context_digest: "sha256:second", session_id: "session-b", event_id: "wrong-step" },
+    { type: "context_assembled", context_digest: "sha256:second", session_id: "session-b", event_id: "model-step-b" },
+  ], 0);
+  const html = document.getElementById("context-body").innerHTML;
+  assert.match(html, /engineering · 第 2 步/);
+  assert.match(html, /data-event-id="model-step-b">查看模型输入/);
+  assert.doesNotMatch(html, /data-event-id="wrong-step"/);
+  assert.match(html, /department_history/);
+});
+
+test("context input links remain available outside the recent events window", async () => {
+  const { web, document } = loadApp(async (url) => {
+    assert.equal(url, "/api/runs/run-a/events/early-model-step");
+    return jsonResponse({ model_input: { input: [{ role: "developer", content: "early input" }], tools: [] } });
+  });
+  web.state.runId = "run-a";
+  web.state.gen = 4;
+  const button = makeEl("early-input-button");
+  button.dataset.eventId = "early-model-step";
+  document.getElementById("context-body").querySelectorAll = () => [button];
+  web.renderContext({ manifests: [
+    { department: "product", step_id: 1, digest: "sha256:early", source_event_id: "early-model-step",
+      request_ref: { content_hash: "sha256:input" } },
+  ] }, Array.from({ length: 20 }, (_, index) => ({
+    seq: index + 100, event_id: `later-${index}`, type: "model_message", role: "quality",
+  })), 4);
+  assert.match(document.getElementById("context-body").innerHTML, /data-event-id="early-model-step"/);
+  await button.click();
+  assert.equal(document.getElementById("event-dialog")._shown, true);
+  assert.match(document.getElementById("event-json").textContent, /early input/);
 });
 
 test("tiny positive cost is not rounded to zero", () => {

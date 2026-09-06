@@ -1,17 +1,15 @@
-"""部门适配器：fake 与 OMP 共用同一调用接口。"""
+"""Single-call model adapters."""
 
-from .base import AdapterResult, Availability, DepartmentAdapter, InvokeRequest, ProviderError
+from .base import ModelResponse, Availability, ModelAdapter, ModelRequest, ModelObservation, ProviderError
 from .fake import FakeAdapter, FakeTurn
-from .omp import OmpConfig, OmpRpcAdapter
 
 __all__ = [
-    "AdapterResult",
+    "ModelResponse",
     "Availability",
-    "DepartmentAdapter",
+    "ModelAdapter",
     "FakeAdapter",
     "FakeTurn",
-    "InvokeRequest",
-    "OmpConfig",
-    "OmpRpcAdapter",
+    "ModelRequest",
+    "ModelObservation",
     "ProviderError",
 ]

@@ -68,7 +68,7 @@ main { padding: 0 16px; display: flex; flex-direction: column; min-width: 0; }
   font: inherit;
 }
 .task-form textarea { min-height: 72px; resize: vertical; overflow-wrap: anywhere; }
-.budget { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.budget { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
 .budget label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .budget input { padding: 6px; font-family: var(--mono); font-size: 12px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -1,4 +1,4 @@
-"""Adapter 协议。控制层只接受结构化提案；adapter 不能改任务状态。"""
+"""Single model-call contract. Adapters cannot execute tools or advance departments."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from typing import Any, Callable, Protocol
 
 from ..context import AssembledContext
 from ..models import Usage
-from ..workspace import Workspace
 
 
 class ProviderError(Exception):
@@ -32,7 +31,7 @@ class Availability:
 
 
 @dataclass
-class AdapterObservation:
+class ModelObservation:
     id: str
     kind: str
     payload: dict[str, Any] = field(default_factory=dict)
@@ -43,41 +42,43 @@ class AdapterObservation:
 
 
 @dataclass
-class InvokeRequest:
+class ModelRequest:
     run_id: str
     department: str
     session_id: str
     activation_id: str
+    step_id: int
     context: AssembledContext
-    tools: list[str]
-    workspace: Workspace
+    tools: list[dict[str, Any]]
     abort_flag: Event
-    on_observation: Callable[[AdapterObservation], None] | None = None
+    on_observation: Callable[[ModelObservation], None] | None = None
 
-    def observe(self, observation: AdapterObservation) -> None:
+    @property
+    def input_items(self) -> list[dict[str, Any]]:
+        return self.context.input_items
+
+    def observe(self, observation: ModelObservation) -> None:
         if self.on_observation is not None:
             self.on_observation(observation)
 
 
 @dataclass
-class AdapterResult:
-    proposal: dict[str, Any] | None
-    transcript: str = ""
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+class ModelResponse:
+    output: list[dict[str, Any]] = field(default_factory=list)
     usage: Usage = field(default_factory=lambda: Usage(reported=False))
     finish_reason: str = "completed"
     error: str | None = None
     provider: str = "fake"
     model: str = "fake-script"
-    diagnostics: dict[str, Any] | None = None
+    response_id: str | None = None
 
 
-class DepartmentAdapter(Protocol):
+class ModelAdapter(Protocol):
     name: str
     model: str
 
     def availability(self) -> Availability: ...
 
-    def invoke(self, request: InvokeRequest) -> AdapterResult: ...
+    def complete(self, request: ModelRequest) -> ModelResponse: ...
 
     def abort(self, session_id: str) -> None: ...

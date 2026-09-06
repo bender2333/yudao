@@ -42,7 +42,7 @@ PROPOSAL_KINDS = (
     "qa_review",
 )
 
-PAUSED_REASONS = frozenset({"max_cycles", "budget_exhausted"})
+PAUSED_REASONS = frozenset({"max_cycles", "model_steps_exhausted"})
 FAILED_REASONS = frozenset(
     {
         "provider_error",
@@ -53,18 +53,22 @@ FAILED_REASONS = frozenset(
 )
 
 HUMAN_ACTIONS = {
+    "model_steps_exhausted": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。",
     "max_cycles": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。",
-    "budget_exhausted": "token 预算已耗尽。检查 Context/Trace 中的消耗后，提高 token_budget 并新建 run。",
 }
 
 
 class EventType:
     RUN_CREATED = "run_created"
     DEPARTMENT_ACTIVATED = "department_activated"
+    DEPARTMENT_INPUT = "department_input"
     ACTIVATION_FINISHED = "activation_finished"
     CONTEXT_ASSEMBLED = "context_assembled"
     MODEL_MESSAGE = "model_message"
+    MODEL_REQUESTED = "model_requested"
     TOOL_CALLED = "tool_called"
+    TOOL_STARTED = "tool_started"
+    TOOL_SKIPPED = "tool_skipped"
     PROPOSAL_SUBMITTED = "proposal_submitted"
     PROPOSAL_REJECTED = "proposal_rejected"
     SPEC_ACCEPTED = "spec_accepted"
@@ -297,6 +301,10 @@ class ContextManifest:
     budget: int
     digest: str
     truncated: bool = False
+    step_id: int = 1
+    request_ref: dict[str, Any] | None = None
+    admitted: bool = False
+    source_event_id: str | None = None
 
 
 @dataclass
@@ -357,6 +365,7 @@ class Usage:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     reported: bool = True
+    cost_reported: bool = False
 
     def plus(self, other: Usage) -> Usage:
         return Usage(
@@ -368,6 +377,7 @@ class Usage:
             cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
             cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
             reported=self.reported and other.reported,
+            cost_reported=self.cost_reported and other.cost_reported,
         )
 
 
@@ -375,11 +385,11 @@ class Usage:
 class RunProjection:
     run_id: str = ""
     task: str = ""
+    intend_ref: dict[str, Any] | None = None
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None
     max_cycles: int = 8
-    token_budget: int = 100_000
     context_window: int = 32_000
     cycle_count: int = 0
     token_used: int = 0
@@ -389,6 +399,7 @@ class RunProjection:
     rework_count: int = 0
     ask_count: int = 0
     provider: str = "fake"
+    adapter: str = "fake"
     model: str | None = None
     outcome: str = "running"
     stop_reason: str | None = None

@@ -13,7 +13,7 @@ from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
 from .web.server import serve
 
-DEFAULT_DIR = Path(".yudao") / "loop"
+DEFAULT_DIR = Path(".yudao") / "native-loop"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--data-dir", default=str(DEFAULT_DIR))
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
-    web.add_argument("--adapter", choices=("omp", "fake"), default="omp")
+    web.add_argument("--adapter", choices=("responses", "fake"), default="responses")
     replay = sub.add_parser("replay", help="rebuild projection from the event store")
     replay.add_argument("run_id")
     replay.add_argument("--data-dir", default=str(DEFAULT_DIR))

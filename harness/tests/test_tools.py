@@ -229,7 +229,9 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
         "stop_reason": "released",
         "replay_consistent": True,
         "context_isolated": True,
+        "model_input_audit": {"status": "verified"},
         "check_receipts": [{"name": "smoke"}],
+        "check_receipts_verified": True,
         "fake_used": False,
         "ask_count": 1,
     }

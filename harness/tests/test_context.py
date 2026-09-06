@@ -43,7 +43,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
         assert "historical_transcript" not in sources
         excluded = {part.source for part in item.context.manifest.excluded}
         assert "other_department_transcript" in excluded
-        assert "superseded_spec_fulltext" in excluded
+        assert "superseded_spec_as_current" in excluded
 
 
 def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
@@ -86,7 +86,7 @@ def test_product_and_quality_do_not_receive_write_tools(data_dir):
     system = LoopSystem(data_dir, adapter)
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
-    by_dept = {item.department: item.tools for item in adapter.invocations}
+    by_dept = {item.department: [tool["name"] for tool in item.tools] for item in adapter.invocations}
     assert "write_file" not in by_dept["product"]
     assert "write_file" in by_dept["engineering"]
     assert "write_file" not in by_dept["quality"]
@@ -103,7 +103,7 @@ def test_proposal_contract_and_binding_refs_are_injected(data_dir):
         assert "binding_refs" in sources
         assert "proposal_contract" in item.context.prompt_text
         excluded = {part.source for part in item.context.manifest.excluded}
-        assert "omp_autodiscovery" in excluded
+        assert "other_department_transcript" in excluded
         assert "internal JSON 实现协议" not in item.context.prompt_text
 
 
@@ -367,7 +367,6 @@ def test_assembler_records_budget_and_digest():
         run_id="run_x",
         task="task",
         phase="ENGINEERING",
-        token_budget=1000,
         context_window=8000,
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
     )

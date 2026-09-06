@@ -89,7 +89,7 @@ def demo_script():
 
 def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
     system = LoopSystem(data_dir, FakeAdapter(demo_script()))
-    run_id = system.create_run(DEMO_TASK, max_cycles=12, token_budget=100_000)
+    run_id = system.create_run(DEMO_TASK, max_cycles=12)
     projection = system.run_until_stop(run_id)
     if projection.phase != "DONE":
         raise RuntimeError(f"demo did not finish: {projection.phase} {projection.stop_reason} {projection.error}")

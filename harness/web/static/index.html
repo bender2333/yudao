@@ -30,7 +30,6 @@
         <textarea id="task" name="task" required placeholder="描述要完成的任务"></textarea>
         <div class="budget">
           <label>循环 <input id="max_cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label>
-          <label>Token <input id="token_budget" name="token_budget" type="number" min="1" step="1" value="100000"></label>
           <label>窗口 <input id="context_window" name="context_window" type="number" min="1" step="1" value="32000"></label>
         </div>
         <div class="actions">
@@ -67,7 +66,7 @@
       </div>
       <section id="context" class="view">
         <h2>上下文 / 追踪视图</h2>
-        <div id="context-body" class="muted">等待每次激活的上下文清单。</div>
+        <div id="context-body" class="muted">等待每一步的上下文清单。</div>
       </section>
     </main>
   </div>

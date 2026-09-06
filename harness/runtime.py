@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .adapters.base import DepartmentAdapter
+from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
-from .adapters.omp import OmpConfig, OmpRpcAdapter
 from .artifacts import ArtifactStore
 from .event_store import EventStore
 from .orchestrator import Orchestrator
@@ -14,7 +13,7 @@ from .projection import RunProjection, project_run
 
 
 class LoopSystem:
-    def __init__(self, data_dir: str | Path, adapter: DepartmentAdapter | None = None) -> None:
+    def __init__(self, data_dir: str | Path, adapter: ModelAdapter | None = None) -> None:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
@@ -52,12 +51,14 @@ class LoopSystem:
         return self.store.list_run_ids()
 
 
-def build_adapter(name: str, **kwargs) -> DepartmentAdapter:
+def build_adapter(name: str, **kwargs) -> ModelAdapter:
     if name == "fake":
         return FakeAdapter(kwargs.get("script"))
-    if name == "omp":
+    if name == "responses":
+        from .adapters.responses import ResponsesAdapter, ResponsesConfig
+
         config = kwargs.get("config")
         if config is None:
-            config = OmpConfig.from_env()
-        return OmpRpcAdapter(config)
+            config = ResponsesConfig.from_env()
+        return ResponsesAdapter(config)
     raise ValueError(f"unknown adapter: {name}")
