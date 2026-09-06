@@ -39,7 +39,7 @@
   Dashboard / REST 命令与查询 / SSE 事件流
 
 控制层
-  Orchestrator / 状态机 / 停止判定 / spec 校验 / 权限与预算
+  Orchestrator / 状态机 / 停止判定 / spec 校验 / 权限与循环上限
 
 状态层
   Event Store / State Projection / Artifact Store / Replay
@@ -88,7 +88,7 @@ CREATED
 - Agent 自然语言中的“完成”不改变状态；
 - 只有合法的 `QAReview.release` 且证据与当前 spec、代码快照绑定，才允许 `DONE`；
 - 非法工件留在当前部门并返回字段级错误；
-- 预算或循环次数耗尽进入 PAUSED，保留事件和工件并要求研发者介入；
+- 部门循环或模型步骤次数耗尽进入 PAUSED，保留事件和工件并要求研发者介入；provider 用量只作只读记录；
 - provider 错误、上下文超限和取消进入 FAILED，并记录具体停止原因；
 - 触及上限不能自动猜测继续，更不能被解释为任务完成。
 
@@ -104,7 +104,9 @@ CREATED
 - `ArtifactRef`：代码快照、测试回执、日志、报告等外部对象的内容哈希和路径引用。
 - `ContextManifest`：本次模型调用实际注入的段落来源、版本、token 估算、截断和排除原因。
 
-上下文只允许包含：固定部门规则、原始任务摘要、当前有效 spec、当前局部状态、有限因果链、必要证据、允许工具和剩余预算。旧 spec 全文、完整历史 transcript 和其他部门私有推理不进入默认上下文。
+每次上下文先带用户 intend 原文和当前工作，再呈现有效 spec、部门规则、工具定义及本部门历史。部门历史跨激活延续，保留过去收到的工作、模型输出和工具结果。当前有效合同优先于旧历史；其他部门的完整私有历史不共享。
+
+参考 OMP 在临近窗口上限时自动压缩该部门的模型输入，摘要保存来源与覆盖范围，原始历史不删除。模型使用摘要和近期完整回合继续工作；固定 intend 原文与当前工作本身无法容纳时明确停止。具体规则见 [D08](requirements/department-history.md)、[D09](requirements/execution-limits.md)和 [D10](requirements/context-compaction.md)。
 
 ## 7. 事件与状态主权
 
@@ -128,7 +130,7 @@ Yudao 控制层拥有任务状态、角色权限、停止条件、spec 校验和
 
 Dashboard 从状态投影和事件流展示事实。浏览器可以提交新任务和取消请求，由控制层处理；界面不能直接修改 spec、投影或最终状态。这与用户确认的“本地 Web 控制台作为首个入口”一致。MVP 需要四个视图：
 
-1. **Run Board**：当前阶段、活动部门、等待原因、预算、循环次数和最终状态；
+1. **Run Board**：当前阶段、活动部门、等待原因、循环次数和最终状态；
 2. **Spec Timeline**：当前有效 spec、版本因果链、ask/react 请求与响应、失效版本；
 3. **Evidence View**：交付文件、检查回执、QA 缺陷、返工目标和 release 证据；
 4. **Context/Trace View**：每次模型调用的 context manifest、实际输入工件、注入来源、排除内容、token/耗时/provider、工具调用和停止原因。
@@ -144,5 +146,5 @@ Dashboard 从状态投影和事件流展示事实。浏览器可以提交新任�
 - 任意事件落盘后，重启并 replay 能恢复相同状态；
 - 每次 session 激活都能显示 context manifest，并证明没有注入其他部门完整 transcript；
 - UI 能看到当前阶段、spec 版本、ask/react 链、证据、停止原因和 token/耗时；
-- fake adapter 测试覆盖所有状态迁移、非法工件、预算耗尽、provider 错误和取消；
+- fake adapter 测试覆盖所有状态迁移、非法工件、循环与步骤上限、provider 错误和取消；
 - 原生循环 smoke 完成真实 provider 三部门任务，并能核对每次模型输入、工具结果、检查回执与重放状态。

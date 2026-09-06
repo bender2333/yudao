@@ -25,12 +25,12 @@
 交付：
 
 - Product、Engineering、Quality 三种角色的 session factory；
-- ContextAssembler：每次模型调用从 State Projection 和当前激活的必要局部历史装配上下文；
+- ContextAssembler：每次模型调用从 State Projection、intend 原文和本部门完整历史重建模型视图，窗口压缩采用有来源摘要；
 - 部门工具白名单；
 - session 生命周期、取消、超时和激活快照；
 - 逐次请求的 context manifest、完整输入工件、工具定义、摘要和 token 估算事件。
 
-验收：同一 run 中连续返工不会把完整历史 transcript 注入下一部门；旧 spec 只能通过显式历史查询读取，并带 superseded/invalidated 标记。
+验收：同一 run 中本部门历史跨激活保留，包含收到的工作消息；跨部门不注入完整私有历史。当前合同明确优先，旧历史不使失效要求重新生效；压缩后仍可回查完整原始历史及摘要来源。
 
 ## Phase 3：原生循环与真实数据流
 

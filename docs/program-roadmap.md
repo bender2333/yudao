@@ -27,7 +27,7 @@
 
 ### 范围与完成条件
 
-沿用 [MVP 总设计](loop-system-mvp-design.md)、[原生循环设计](native-loop-design.md)及 [MVP 验收记录](mvp-acceptance.md)，完成真实直达和 Ask/React、工程与质检独立检查、预算、取消与迟到结果、受测快照绑定、逐次模型请求上下文审计及浏览器行为验收。
+沿用 [MVP 总设计](loop-system-mvp-design.md)、[原生循环设计](native-loop-design.md)及 [MVP 验收记录](mvp-acceptance.md)，完成真实直达和 Ask/React、工程与质检独立检查、循环与步骤上限、取消与迟到结果、受测快照绑定、逐次模型请求上下文审计及浏览器行为验收。部门历史与自动压缩按最新 [细节清单](requirements/README.md) 实施；provider 用量不参与当前阶段停止判定。
 
 原实施计划 Phase 1-5 都属于这里的内部步骤。最新 Phase 5 只要求从结构化事实记录可审计经验候选，并支持停止后的查询、导出和重放。候选评价、自动采用、独立蒸馏和暂停后继续执行均安排在后续能力中。
 
