@@ -34,6 +34,37 @@ class ResponsesConfig:
     base_url: str = "https://api.openai.com/v1"
     timeout_sec: float = 600.0
 
+
+class _TransportTrace:
+    """Keep only safe transport phase facts for one model request."""
+
+    def __init__(self) -> None:
+        self._last_event: dict[str, str | None] | None = None
+        self._failure_event: dict[str, str | None] | None = None
+
+    async def __call__(self, name: str, info: dict[str, Any]) -> None:
+        failure_type = None
+        if name.endswith(".failed") and isinstance(info, dict):
+            exception = info.get("exception")
+            if exception is not None:
+                failure_type = type(exception).__name__
+        event = {"name": str(name)[:120], "failure_type": failure_type}
+        self._last_event = event
+        if name.endswith(".failed"):
+            self._failure_event = event
+
+    def snapshot(self) -> dict[str, Any]:
+        failure = self._failure_event
+        selected = failure or self._last_event
+        event_name = selected["name"] if selected is not None else "unknown"
+        return {
+            "trace_available": self._last_event is not None,
+            "transport_phase": _trace_phase(event_name),
+            "transport_event": event_name,
+            "trace_cause_type": failure["failure_type"] if failure is not None else None,
+        }
+
+
 class ResponsesAdapter:
     name = "responses"
 
@@ -82,7 +113,7 @@ class ResponsesAdapter:
             raise
         except (TimeoutError, APITimeoutError) as exc:
             raise ProviderError("Model request timed out", reason="provider_timeout", retryable=True,
-                                diagnostics={"error_type": "timeout"}) from exc
+                                diagnostics=_transport_diagnostics("timeout", exc)) from exc
         except APIStatusError as exc:
             code = _error_code(exc.body)
             reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
@@ -103,7 +134,7 @@ class ResponsesAdapter:
             if _has_nonretryable_connection_cause(exc):
                 raise _nonretryable_http_error() from exc
             raise ProviderError("Model provider connection failed", retryable=True,
-                                diagnostics={"error_type": "connection"}) from exc
+                                diagnostics=_transport_diagnostics("connection", exc)) from exc
         except APIError as exc:
             code = _error_code(exc.body)
             reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
@@ -116,10 +147,11 @@ class ResponsesAdapter:
 
     async def _complete(self, request: ModelRequest) -> ModelResponse:
         loop = asyncio.get_running_loop()
+        trace = _TransportTrace()
         with self._lock:
             if self._active is not None:
                 raise ProviderError("Responses adapter already has an active model request")
-            task = asyncio.create_task(self._stream_once(request))
+            task = asyncio.create_task(self._stream_once(request, trace))
             self._active = (request.session_id, loop, task)
         watcher = asyncio.create_task(self._watch_abort(request, task))
         try:
@@ -127,6 +159,9 @@ class ResponsesAdapter:
                 return await task
         except asyncio.CancelledError as exc:
             raise ProviderError("Model request cancelled", reason="cancelled") from exc
+        except Exception as exc:
+            _attach_transport_trace(exc, trace.snapshot())
+            raise
         finally:
             with self._lock:
                 self._active = None
@@ -141,11 +176,12 @@ class ResponsesAdapter:
                 return
             await asyncio.sleep(0.02)
 
-    async def _stream_once(self, request: ModelRequest) -> ModelResponse:
+    async def _stream_once(self, request: ModelRequest, trace: _TransportTrace) -> ModelResponse:
         started = time.monotonic()
         seen_items: set[str] = set()
         observation_errors: list[BaseException] = []
         async def observe_request(http_request: httpx.Request) -> None:
+            http_request.extensions["trace"] = trace
             try:
                 body = _request_body(http_request)
                 request.observe(ModelObservation(
@@ -184,14 +220,14 @@ class ResponsesAdapter:
                 if observation_errors:
                     raise observation_errors[0]
                 if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
-                    raise _transport_provider_error(exc) from exc
+                    raise _transport_provider_error(exc, trace=trace) from exc
                 if isinstance(exc, httpx.HTTPError):
                     raise _nonretryable_http_error() from exc
                 raise
             if observation_errors:
                 raise observation_errors[0]
             async with stream:
-                async for event in _provider_events(stream):
+                async for event in _provider_events(stream, trace):
                     if request.abort_flag.is_set():
                         raise ProviderError("Model request cancelled", reason="cancelled")
                     if event.type == "response.output_item.done":
@@ -241,8 +277,11 @@ class ResponsesAdapter:
                             retryable=reason != "context_overflow" and _retryable_code(event.code),
                             diagnostics=_diagnostic_code(event.code, "stream_error"),
                         )
-        raise ProviderError("Model response stream ended before a terminal response", retryable=True,
-                            diagnostics={"error_type": "stream_incomplete"})
+        raise ProviderError(
+            "Model response stream ended before a terminal response",
+            retryable=True,
+            diagnostics=_transport_diagnostics("stream_incomplete", None, trace),
+        )
 
     def _observe_item(
         self,
@@ -357,13 +396,58 @@ def _diagnostic_code(code: Any, fallback: str) -> dict[str, str]:
     return {"error_code": safe_code} if safe_code is not None else {"error_type": fallback}
 
 
-def _transport_provider_error(exc: BaseException) -> ProviderError:
+def _trace_phase(event_name: str) -> str:
+    known_phases = {
+        "connect_tcp",
+        "start_tls",
+        "send_request_headers",
+        "send_request_body",
+        "receive_response_headers",
+        "receive_response_body",
+        "response_closed",
+    }
+    return next((part for part in str(event_name).split(".") if part in known_phases), "unknown")
+
+
+def _attach_transport_trace(exc: BaseException, snapshot: dict[str, Any]) -> None:
+    try:
+        setattr(exc, "_yudao_transport_trace", snapshot)
+    except Exception:
+        pass
+
+
+def _transport_diagnostics(
+    error_type: str,
+    exc: BaseException | None,
+    trace: _TransportTrace | None = None,
+) -> dict[str, Any]:
+    snapshot = trace.snapshot() if trace is not None else getattr(exc, "_yudao_transport_trace", None)
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    cause_type = snapshot.get("trace_cause_type") or (_safe_cause_type(exc) if exc is not None else None)
+    return {
+        "error_type": error_type,
+        "trace_available": bool(snapshot.get("trace_available", False)),
+        "transport_phase": snapshot.get("transport_phase", "unknown"),
+        "transport_event": snapshot.get("transport_event", "unknown"),
+        "cause_type": cause_type or "unknown",
+    }
+
+
+def _safe_cause_type(exc: BaseException) -> str | None:
+    cause = exc.__cause__
+    if cause is not None:
+        return type(cause).__name__
+    return type(exc).__name__
+
+
+def _transport_provider_error(exc: BaseException, *, trace: _TransportTrace | None = None) -> ProviderError:
     error_type = "timeout" if isinstance(exc, httpx.TimeoutException) else "connection"
     return ProviderError(
         "Model request timed out" if error_type == "timeout" else "Model provider connection failed",
         reason="provider_timeout" if error_type == "timeout" else "provider_error",
         retryable=True,
-        diagnostics={"error_type": error_type},
+        diagnostics=_transport_diagnostics(error_type, exc, trace),
     )
 
 
@@ -379,7 +463,7 @@ def _has_nonretryable_connection_cause(exc: BaseException) -> bool:
     return isinstance(exc.__cause__, _NONRETRYABLE_CONNECTION_ERRORS)
 
 
-async def _provider_events(stream: Any):
+async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
     iterator = stream.__aiter__()
     while True:
         try:
@@ -387,7 +471,7 @@ async def _provider_events(stream: Any):
         except StopAsyncIteration:
             return
         except _RETRYABLE_HTTP_ERRORS as exc:
-            raise _transport_provider_error(exc) from exc
+            raise _transport_provider_error(exc, trace=trace) from exc
         except httpx.HTTPError as exc:
             raise _nonretryable_http_error() from exc
         yield event

@@ -2,6 +2,7 @@
 
 import json
 import socket
+import ssl
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -138,6 +139,20 @@ def _server(replies):
         worker.join(timeout=2)
 
 
+def _mock_transport(monkeypatch, handler):
+    def client_factory(**kwargs):
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr("harness.adapters.responses.DefaultAsyncHttpxClient", client_factory)
+
+
+async def _trace_failure(request, event_name, error):
+    trace = request.extensions.get("trace")
+    assert trace is not None
+    await trace(f"{event_name}.started", {})
+    await trace(f"{event_name}.failed", {"exception": error})
+
+
 def test_sdk_sends_exact_host_context_and_preserves_stateless_tool_protocol(tmp_path, monkeypatch):
     canary = "UNRELATED_AGENT_CONTEXT_682947"
     for name in ["AGENTS.md", "CLAUDE.md", ".env", "models.yml"]:
@@ -244,6 +259,105 @@ def test_request_observation_failure_stops_before_network_send():
         with pytest.raises(OSError, match="request evidence could not be persisted"):
             ResponsesAdapter(config).complete(_request(observations=reject))
     assert captures == []
+
+
+@pytest.mark.parametrize(
+    "kind,event_name,expected_phase,expected_cause",
+    [
+        ("connection", "connection.connect_tcp", "connect_tcp", "ConnectError"),
+        ("tls", "connection.start_tls", "start_tls", "SSLCertVerificationError"),
+        ("read", "http11.receive_response_body", "receive_response_body", "ReadError"),
+        ("timeout", "http11.receive_response_headers", "receive_response_headers", "ReadTimeout"),
+    ],
+)
+def test_transport_failure_diagnostics_capture_safe_trace_boundary(
+    monkeypatch, kind, event_name, expected_phase, expected_cause,
+):
+    secret = "transport-diagnostic-secret"
+    calls = []
+
+    async def failure(request):
+        calls.append(request)
+        if kind == "tls":
+            error = httpx.ConnectError(secret, request=request)
+            trace_error = ssl.SSLCertVerificationError(secret)
+        elif kind == "read":
+            error = httpx.ReadError(secret, request=request)
+            trace_error = error
+        elif kind == "timeout":
+            error = httpx.ReadTimeout(secret, request=request)
+            trace_error = error
+        else:
+            error = httpx.ConnectError(secret, request=request)
+            trace_error = error
+        await _trace_failure(request, event_name, trace_error)
+        raise error
+
+    _mock_transport(monkeypatch, failure)
+    config = ResponsesConfig(model="local-model", api_key=KEY,
+                             base_url="http://mock.test/v1", timeout_sec=5)
+    with pytest.raises(ProviderError) as caught:
+        ResponsesAdapter(config).complete(_request())
+
+    diagnostics = caught.value.diagnostics
+    assert len(calls) == 1
+    assert caught.value.retryable is True
+    assert diagnostics == {
+        "error_type": "timeout" if kind == "timeout" else "connection",
+        "trace_available": True,
+        "transport_phase": expected_phase,
+        "transport_event": f"{event_name}.failed",
+        "cause_type": expected_cause,
+    }
+    assert secret not in repr(diagnostics)
+
+
+def test_transport_failure_without_trace_keeps_boundary_unknown_and_makes_one_call(monkeypatch):
+    secret = "untraced-transport-secret"
+    calls = []
+
+    async def failure(request):
+        calls.append(request)
+        raise httpx.ConnectError(secret, request=request)
+
+    _mock_transport(monkeypatch, failure)
+    config = ResponsesConfig(model="local-model", api_key=KEY,
+                             base_url="http://mock.test/v1", timeout_sec=5)
+    with pytest.raises(ProviderError) as caught:
+        ResponsesAdapter(config).complete(_request())
+
+    diagnostics = caught.value.diagnostics
+    assert len(calls) == 1
+    assert caught.value.retryable is True
+    assert diagnostics["trace_available"] is False
+    assert diagnostics["transport_phase"] == "unknown"
+    assert diagnostics["transport_event"] == "unknown"
+    assert diagnostics["cause_type"] == "ConnectError"
+    assert secret not in repr(diagnostics)
+
+
+def test_transport_trace_state_is_isolated_between_adapter_calls(monkeypatch):
+    calls = []
+
+    async def fail_once_then_succeed(request):
+        calls.append(request)
+        if len(calls) == 1:
+            error = httpx.ConnectError("first failure", request=request)
+            await _trace_failure(request, "connection.connect_tcp", error)
+            raise error
+        return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, content=_stream([TEXT]))
+
+    _mock_transport(monkeypatch, fail_once_then_succeed)
+    config = ResponsesConfig(model="local-model", api_key=KEY,
+                             base_url="http://mock.test/v1", timeout_sec=5)
+    adapter = ResponsesAdapter(config)
+    with pytest.raises(ProviderError) as caught:
+        adapter.complete(_request(session_id="first"))
+    result = adapter.complete(_request(session_id="second"))
+
+    assert len(calls) == 2
+    assert caught.value.diagnostics["transport_phase"] == "connect_tcp"
+    assert result.output == [TEXT]
 
 
 def test_stream_item_observation_does_not_invent_the_returned_model():
@@ -414,9 +528,12 @@ def test_noncompleted_terminal_response_keeps_observations_but_cannot_complete(s
 def test_stream_disconnect_does_not_turn_partial_output_into_success():
     observations = []
     with _server([_stream(terminal=False)]) as (config, captures, *_):
-        with pytest.raises(ProviderError, match="ended before"):
+        with pytest.raises(ProviderError, match="ended before") as caught:
             ResponsesAdapter(config).complete(_request(observations=observations.append))
         assert len(captures) == 1
+        assert caught.value.diagnostics["error_type"] == "stream_incomplete"
+        assert caught.value.diagnostics["transport_phase"] == "response_closed"
+        assert caught.value.diagnostics["trace_available"] is True
     assert [event.id for event in observations if event.kind != "request"] == ["msg-one"]
 
 
@@ -514,6 +631,7 @@ def test_cancel_interrupts_silent_network_only_for_the_active_request(via_flag, 
                 with pytest.raises(ProviderError) as caught:
                     future.result(timeout=2)
                 assert caught.value.reason == "cancelled"
+                assert caught.value.diagnostics is None
                 assert time.monotonic() - started < 1.5
             release.set()
             assert adapter.complete(_request(session_id="next-session")).output == [TEXT]
