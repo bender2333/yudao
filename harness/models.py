@@ -94,6 +94,13 @@ class EventType:
     RUN_FAILED = "run_failed"
 
 
+GIT_VERSION_EVENTS = frozenset({
+    EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
+    EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
+    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+})
+
+
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:16]}"
 
@@ -457,6 +464,8 @@ class RunProjection:
     run_id: str = ""
     task: str = ""
     intend_ref: dict[str, Any] | None = None
+    git_version: dict[str, str | None] | None = None
+    git_versions: list[dict[str, Any]] = field(default_factory=list)
     input_version: int = 0
     product_work_input_version: int = 0
     processed_input_version: int = 0

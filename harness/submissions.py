@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from copy import deepcopy
+import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
 from .event_store import EventStore
+from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
 from .public_tree import verify_public_tree
@@ -18,8 +22,10 @@ from .workspace import WorkspaceSnapshot
 
 
 class SubmissionWriter:
-    def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path) -> None:
+    def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path,
+                 git_versions: GitVersionStore) -> None:
         self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
+        self.git_versions = git_versions
 
     def commit(self, *, projection: RunProjection, snapshot: WorkspaceSnapshot, workspace_root: Path, artifact: dict[str, Any],
                department: str, parent_event_id: str, session_id: str,
@@ -29,6 +35,8 @@ class SubmissionWriter:
         metadata = dict(role=department, parent_event_id=parent_event_id, state_before=projection.phase,
                         state_after=projection.phase, session_id=session_id, provider=provider, model=model)
         prepared: list[tuple[str, dict[str, Any], list[str]]] = []
+        updates: dict[str, bytes | None] = {}
+        materials: dict[str, bytes] = {}
         current = deepcopy(projection)
         request_id = None if projection.pending_request is None else projection.pending_request.id
 
@@ -52,6 +60,7 @@ class SubmissionWriter:
         kind = artifact["kind"]
         if kind == "product_spec":
             event = product_spec(artifact)
+            updates["specs/product.json"] = _json_bytes(prepared[event][1])
         elif kind == "product_decision":
             artifact["id"] = new_id("decision")
             event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
@@ -61,7 +70,8 @@ class SubmissionWriter:
             ref = self.artifacts.put(run_id, "engineering_plan", markdown, media_type="text/markdown")
             artifact["plan_ref"] = asdict(ref)
             event = append(EventType.PLAN_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
-            self._write_material(run_id, "PLAN.md", markdown)
+            updates["specs/plan.json"] = _json_bytes(prepared[event][1])
+            updates["PLAN.md"] = materials["PLAN.md"] = self.artifacts.get_for_run(run_id, ref)
         elif kind == "collaboration_request":
             artifact["id"] = new_id("request")
             event = append(EventType.COLLABORATION_REQUESTED, artifact, [artifact["content_hash"]])
@@ -78,12 +88,15 @@ class SubmissionWriter:
             verify_public_tree(workspace_root, snapshot.tree.manifest)
             artifact["tree_ref"] = asdict(ref)
             event = append(EventType.DELIVERY_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
+            updates["specs/delivery.json"] = _json_bytes(prepared[event][1])
+            updates["specs/delivery-tree.json"] = _json_bytes(snapshot.tree.manifest)
         elif kind == "qa_review":
             artifact["id"] = new_id("qa")
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
             verify_public_tree(workspace_root, snapshot.tree.manifest)
             artifact["evidence_refs"] = [asdict(ref)]
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
+            updates["specs/qa.json"] = _json_bytes(prepared[event][1])
         else:
             raise ValueError(f"unhandled artifact kind {kind}")
 
@@ -95,15 +108,61 @@ class SubmissionWriter:
                 ref = self.artifacts.put(run_id, "prd", markdown, media_type="text/markdown")
                 contract["prd_ref"] = asdict(ref)
                 append(EventType.CONTRACT_ACCEPTED, contract, [contract["content_hash"], ref.content_hash])
-                self._write_material(run_id, "PRD.md", markdown)
-        # All required artifacts and Markdown must exist before any acceptance is recorded.
-        committed = [self.store.append(run_id, event_type, **metadata, payload=payload, artifact_hashes=hashes)
-                     for event_type, payload, hashes in prepared]
+                decisions = [{key: value for key, value in asdict(item).items()
+                              if key not in {"run_id", "created_event_id"}} for item in current.effective_decisions]
+                updates["specs/contract.json"] = _json_bytes({**prepared[-1][1], "decisions": decisions})
+                updates["PRD.md"] = materials["PRD.md"] = self.artifacts.get_for_run(run_id, ref)
+        if updates:
+            revision = self.git_versions.prepare(
+                run_id, parent_commit=projection.git_version["commit"], updates=updates,
+                message=f"Accept {kind} {artifact['content_hash']}",
+                code_tree=snapshot.tree if kind == "delivery_spec" else None,
+            )
+            for event_type, payload, _hashes in prepared:
+                if event_type != EventType.SPEC_SUPERSEDED:
+                    payload["git_version"] = revision
+        if kind in {"delivery_spec", "qa_review"}:
+            verify_public_tree(workspace_root, snapshot.tree.manifest)
+        previous_materials: dict[str, bytes | None] = {}
+        try:
+            for name, raw in materials.items():
+                if name == "PRD.md":
+                    ref = projection.effective_contract.prd_ref if projection.effective_contract else None
+                else:
+                    ref = projection.engineering_plans[-1].plan_ref if projection.engineering_plans else None
+                previous_materials[name] = None if ref is None else self.artifacts.get_for_run(run_id, ref)
+                self._write_material(run_id, name, raw)
+            # Git objects and materials are ready; the complete formal event set is accepted atomically.
+            committed = self.store.append_batch(run_id, [
+                {"type": event_type, **metadata, "payload": payload, "artifact_hashes": hashes}
+                for event_type, payload, hashes in prepared
+            ])
+        except Exception:
+            for name, raw in previous_materials.items():
+                if raw is None:
+                    (self.materials_root / run_id / name).unlink(missing_ok=True)
+                else:
+                    self._write_material(run_id, name, raw)
+            raise
         return committed[event]
 
-    def _write_material(self, run_id: str, name: str, markdown: str) -> None:
+    def _write_material(self, run_id: str, name: str, raw: bytes) -> None:
         folder = (self.materials_root / run_id).resolve()
         if not folder.is_relative_to(self.materials_root.resolve()) or folder == self.materials_root.resolve():
             raise ValueError("run materials must stay within their root")
         folder.mkdir(parents=True, exist_ok=True)
-        (folder / name).write_bytes(markdown.encode("utf-8"))
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="wb", dir=folder, prefix=f".{name}-", suffix=".tmp", delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, folder / name)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
+
+def _json_bytes(value: dict[str, Any]) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")

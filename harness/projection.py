@@ -20,6 +20,7 @@ from .models import (
     Defect,
     Event,
     EventType,
+    GIT_VERSION_EVENTS,
     LessonCandidate,
     ProductDecision,
     ProductSpec,
@@ -62,6 +63,11 @@ def apply_event(state: RunProjection, event: Event) -> None:
     state.last_seq = event.seq
     payload = event.payload
     etype = event.type
+    if etype in GIT_VERSION_EVENTS and payload.get("git_version") is not None:
+        revision = dict(payload["git_version"])
+        if state.git_version is None or revision["commit"] != state.git_version["commit"]:
+            state.git_versions.append({"event_id": event.event_id, "type": etype, **revision})
+        state.git_version = revision
     if payload.get("request_id") and etype in {
         EventType.TOOL_CALLED, EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
         EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.CONTRACT_ACCEPTED,

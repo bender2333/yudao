@@ -15,6 +15,7 @@ from .compaction import CompactionCheckpoint, plan_compaction
 from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
 from .event_store import EventStore
+from .git_audit import verify_git_history
 from .models import ArtifactRef, EventType, RunProjection, canonical_hash, json_dumps
 from .projection import apply_event, project_run
 from .public_tree import capture_public_tree, materialize_tree
@@ -129,6 +130,7 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "check_receipts_verified": receipts_ok,
         "check_receipt_notes": receipt_notes,
         "delivery_archive": _archive_evidence(system, run_id),
+        "git_audit": _git_evidence(system, run_id),
         "replay_consistent": replayed.canonical_state() == projection.canonical_state(),
         **isolation,
         "fake_used": projection.adapter == "fake",
@@ -136,6 +138,15 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "delivery_files": [] if projection.delivery_spec is None else list(projection.delivery_spec.files),
         "qa_verdict": None if projection.last_review is None else projection.last_review.verdict,
     }
+
+
+def _git_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
+    try:
+        history = verify_git_history(system.git_versions, system.artifacts, system.store.list_events(run_id))
+        return {"status": "verified", "version_count": len(history), "versions": history, "notes": []}
+    except (ValueError, OSError, KeyError, TypeError, AttributeError):
+        return {"status": "unverified", "version_count": 0,
+                "notes": ["Git history or its accepted event materials could not be verified"]}
 
 
 def _tool_events(store: EventStore, run_id: str) -> list[dict[str, Any]]:
@@ -757,6 +768,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- context isolated: `{scenario.get('context_isolated')}`",
                 f"- host receipts verified: `{scenario.get('check_receipts_verified')}`",
                 f"- delivery archive: `{(scenario.get('delivery_archive') or {}).get('status', 'unverified')}`",
+                f"- Git versions: `{(scenario.get('git_audit') or {}).get('status', 'unverified')}`",
                 f"- collaboration audit: `{(scenario.get('collaboration_audit') or {}).get('status', 'unverified')}`",
                 f"- fake used: `{scenario.get('fake_used')}`",
                 f"- delivery files: `{', '.join(scenario.get('delivery_files') or [])}`",
@@ -814,6 +826,8 @@ def smoke_exit_code(report: dict[str, Any]) -> int:
         if not scenario.get("check_receipts") or not scenario.get("check_receipts_verified"):
             return 1
         if (scenario.get("delivery_archive") or {}).get("status") != "verified":
+            return 1
+        if (scenario.get("git_audit") or {}).get("status") != "verified":
             return 1
     collaboration = scenarios.get("collaboration")
     if collaboration is not None:

@@ -66,6 +66,9 @@ function makeEl(id) {
     showModal() {
       el._shown = true;
     },
+    close() {
+      el._shown = false;
+    },
     focus() {
       el._focused = true;
       if (el.ownerDocument) el.ownerDocument.activeElement = el;
@@ -101,6 +104,8 @@ function makeDocument() {
     "event-json",
     "event-title",
     "event-document",
+    "event-version",
+    "event-files",
     "event-sources",
     "event-dialog",
     "task-form",
@@ -1066,6 +1071,81 @@ test("terminal race keeps raw input and targets a new task without automatic ret
   assert.equal(document.getElementById("btn-new").title, "新任务");
 });
 
+for (const recorded of [true, false]) {
+  test(`cancelled input save failure keeps the draft and stopped status (recorded=${recorded})`, async () => {
+    const posts = [];
+    const message = "执行已取消，但命令原文未形成正式 Git 版本。" + (recorded ? "" : "取消事实也未能保存。");
+    const { web, document } = loadApp(async (url, options) => {
+      if (options?.method === "POST") {
+        posts.push([url, JSON.parse(options.body)]);
+        return jsonResponse({ error: message, code: "cancelled_input_not_saved", run_id: "running",
+          cancelled: true, cancellation_recorded: recorded }, 503);
+      }
+      if (url === "/api/runs/running") return jsonResponse(runPayload("running", {
+        phase: recorded ? "FAILED" : "PRODUCT_SPEC", stop_reason: recorded ? "cancelled" : "",
+        outcome: recorded ? "failed" : "running",
+        events: recorded ? [{ type: "run_failed", stop_reason: "cancelled", input_save_failure: { text: " /stop\r\n" } }] : [],
+        worker_active: true,
+      }));
+      if (url === "/api/runs") return jsonResponse({ runs: [] });
+      return jsonResponse({ busy: true, active_run_id: "running", provider_available: true });
+    });
+    Object.assign(web.state, { runId: "running", selectedPhase: "PRODUCT_SPEC", busy: true, activeRunId: "running" });
+    const raw = " /stop\r\n";
+    document.getElementById("task").value = raw;
+    await web.startRun({ preventDefault() {} });
+    assert.deepEqual(posts, [["/api/runs/running/inputs", { text: raw }]]);
+    assert.equal(document.getElementById("task").value, raw);
+    assert.equal(document.body.classList.contains("compose"), true);
+    assert.equal(document.getElementById("input-target").textContent, "新任务");
+    assert.equal(document.getElementById("btn-cancel").disabled, true);
+    assert.equal(web.inputRunId(), null);
+    assert.doesNotMatch(document.getElementById("board-body").innerHTML, /class="pill running"/);
+    assert.match(document.getElementById("board-body").innerHTML, /class="pill failed"/);
+    await web.pollWorkerHealth();
+    await web.refreshRun("running", web.state.gen);
+    assert.match(document.getElementById("status").textContent, /执行已取消.*未形成正式 Git 版本/);
+    assert.match(document.getElementById("exec-alert").textContent, /执行已取消.*未形成正式 Git 版本/);
+    if (!recorded) assert.match(document.getElementById("exec-alert").textContent, /取消事实也未能保存/);
+    assert.equal(document.getElementById("task").value, raw);
+    assert.equal(document.getElementById("btn-cancel").disabled, true);
+    assert.equal(posts.length, 1);
+    web.stopWorkerWatch();
+  });
+}
+
+test("cancelled input save failure remains explicit when the status refresh also fails", async () => {
+  const { web, document } = loadApp(async (url, options) => {
+    if (options?.method === "POST") return jsonResponse({ error: "执行已取消，但命令原文未形成正式 Git 版本。",
+      code: "cancelled_input_not_saved", run_id: "running", cancelled: true, cancellation_recorded: false }, 503);
+    throw new Error("status storage unavailable");
+  });
+  Object.assign(web.state, { runId: "running", selectedPhase: "QUALITY", busy: true, activeRunId: "running" });
+  document.getElementById("task").value = " /cancel\r\n";
+  await web.startRun({ preventDefault() {} });
+  assert.equal(document.getElementById("task").value, " /cancel\r\n");
+  assert.match(document.getElementById("status").textContent, /执行已取消.*状态刷新失败/);
+  assert.match(document.getElementById("exec-alert").textContent, /执行已取消.*未形成正式 Git 版本/);
+  assert.equal(document.getElementById("btn-cancel").disabled, true);
+  assert.equal(web.inputRunId(), null);
+  web.stopWorkerWatch();
+});
+
+test("reloading a cancelled task restores its input save failure from the event", async () => {
+  const { web, document } = loadApp(async url => {
+    if (url === "/api/runs/stopped") return jsonResponse(runPayload("stopped", { phase: "FAILED", stop_reason: "cancelled",
+      events: [{ type: "run_failed", stop_reason: "cancelled", input_save_failure: { text: " /cancel\r\n" } }],
+    }));
+    if (url === "/api/runs") return jsonResponse({ runs: [] });
+    return jsonResponse({ busy: false, provider_available: true });
+  });
+  await web.selectRun("stopped");
+  assert.match(document.getElementById("status").textContent, /执行已取消.*未形成正式 Git 版本/);
+  assert.match(document.getElementById("exec-alert").textContent, /执行已取消.*未形成正式 Git 版本/);
+  assert.equal(document.getElementById("btn-cancel").disabled, true);
+  assert.equal(web.inputRunId(), null);
+});
+
 test("selected terminal task sends ordinary input as a distinct new task", async () => {
   const posts = [];
   const { web, document } = loadApp(async (url, options) => {
@@ -1130,4 +1210,67 @@ test("prompt editor shows adopted versions and preserves unsaved drafts through 
   assert.deepEqual(submitted, ["/api/runs/running/prompts/product", { text: raw }]);
   assert.equal(document.getElementById("prompt-text").value, raw);
   assert.equal(web.state.promptDrafts["running/product"], raw);
+});
+
+test("formal input requirement plan and delivery versions link their own accepted Git changes", () => {
+  const { web, document } = loadApp(async () => jsonResponse({}));
+  const first = { commit: "a".repeat(40), parent_commit: null, tree: "b".repeat(40) };
+  const later = { commit: "c".repeat(40), parent_commit: first.commit, tree: "d".repeat(40) };
+  web.renderInputs([{ version: 1, kind: "text", text: "original", created_event_id: "input", git_version: first }], { processed_input_version: 1 }, 0);
+  const input = document.getElementById("inputs-body").innerHTML;
+  assert.match(input, /data-event-id="input" data-document="git"/);
+  assert.match(input, /初始版本/);
+  const contract = { revision: 2, content_hash: "contract", created_event_id: "prd", git_version: later };
+  const plan = { revision: 2, status: "active", effective_contract_hash: "contract", created_event_id: "plan", git_version: later };
+  web.renderTimeline({ current_product_spec: { goal: "echo", git_version: later, created_event_id: "spec" },
+    effective_contract: contract, effective_contracts: [contract], engineering_plan: plan, engineering_plans: [plan] });
+  const timeline = document.getElementById("timeline-body").innerHTML;
+  assert.match(timeline, /data-event-id="prd" data-document="git"/);
+  assert.match(timeline, /data-event-id="plan" data-document="git"/);
+  assert.match(timeline, /父提交 aaaaaaaaaaaa/);
+  web.renderEvidence({ deliveries: [{ created_event_id: "delivery", git_version: later }] });
+  assert.match(document.getElementById("evidence-body").innerHTML, /data-event-id="delivery" data-document="git"/);
+});
+
+test("Git details display the exact diff as text with binary files and archived downloads", async () => {
+  const diff = "diff --git a/specs/PRD.md b/specs/PRD.md\n-old\n+<script>alert(1)</script>\n";
+  const version = { commit: "c".repeat(40), parent_commit: "a".repeat(40), tree: "d".repeat(40), diff,
+    files: [{ path: "specs/PRD.md", status: "M", binary: false }, { path: "code/assets/image.bin", status: "A", binary: true }] };
+  const { web, document } = loadApp(async () => jsonResponse({ event_id: "accepted", git_version_detail: version,
+    tree_archive: { tree: { files: [{ path: "assets/image.bin", size: 3 }] } } }));
+  web.state.runId = "run";
+  await web.openEvent("accepted", 0, "git");
+  assert.equal(document.getElementById("event-title").textContent, "Git 变更");
+  assert.equal(document.getElementById("event-document").textContent, diff);
+  assert.equal(document.getElementById("event-document").innerHTML, "");
+  assert.match(document.getElementById("event-version").textContent, /父提交 aaaaaaaaaa/);
+  const files = document.getElementById("event-files").children;
+  assert.deepEqual(files.map(item => item.textContent), ["修改 specs/PRD.md", "新增 code/assets/image.bin（二进制）"]);
+  const archive = document.getElementById("event-sources").children.at(-1);
+  assert.equal(archive.href, "/api/runs/run/events/accepted/files?path=assets%2Fimage.bin");
+});
+
+test("missing Git versions report an error and close previously displayed diff", async () => {
+  const { web, document } = loadApp(async () => jsonResponse({ error: "Git version cannot be verified" }, 400));
+  web.state.runId = "run";
+  document.getElementById("event-document").textContent = "stale diff";
+  document.getElementById("event-dialog").showModal();
+  await web.openEvent("missing", 0, "git");
+  assert.equal(document.getElementById("status").textContent, "Git version cannot be verified");
+  assert.equal(document.getElementById("event-document").textContent, "");
+  assert.equal(document.getElementById("event-dialog")._shown, false);
+});
+
+test("an older Git lookup cannot replace a newer selected event", async () => {
+  let first;
+  const version = { commit: "c", parent_commit: null, tree: "t", files: [], diff: "newest" };
+  const { web, document } = loadApp(async (url) => url.endsWith("old")
+    ? new Promise(resolve => { first = resolve; }) : jsonResponse({ git_version_detail: version }));
+  web.state.runId = "run";
+  const old = web.openEvent("old", 0, "git");
+  await web.openEvent("new", 0, "git");
+  first(jsonResponse({ git_version_detail: { ...version, diff: "stale" } }));
+  await old;
+  assert.equal(document.getElementById("event-document").textContent, "newest");
+  assert.equal(document.getElementById("event-files").children[0].textContent, "无文件变化");
 });

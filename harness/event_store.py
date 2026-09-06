@@ -66,58 +66,59 @@ class EventStore:
         stop_reason: str | None = None,
         error: str | None = None,
     ) -> Event:
-        event = Event(
-            event_id=new_id("evt"),
-            run_id=run_id,
-            seq=0,
-            type=type,
-            role=role,
-            parent_event_id=parent_event_id,
-            state_before=state_before,
-            state_after=state_after,
-            payload=payload or {},
-            artifact_hashes=list(artifact_hashes or []),
-            session_id=session_id,
-            provider=provider,
-            model=model,
-            context_digest=context_digest,
-            stop_reason=stop_reason,
-            error=error,
-            created_at=utc_now(),
-        )
-        with self._lock:
+        return self.append_batch(run_id, [{
+            "type": type, "role": role, "parent_event_id": parent_event_id,
+            "state_before": state_before, "state_after": state_after, "payload": payload,
+            "artifact_hashes": artifact_hashes, "session_id": session_id, "provider": provider,
+            "model": model, "context_digest": context_digest, "stop_reason": stop_reason, "error": error,
+        }])[0]
+
+    def append_batch(self, run_id: str, entries: list[dict[str, Any]]) -> list[Event]:
+        events = []
+        for entry in entries:
+            values = {
+                "role": None, "parent_event_id": None, "session_id": None,
+                "provider": None, "model": None, "context_digest": None, "stop_reason": None, "error": None,
+                **entry,
+                "payload": entry.get("payload") or {}, "artifact_hashes": list(entry.get("artifact_hashes") or []),
+            }
+            events.append(Event(event_id=new_id("evt"), run_id=run_id, seq=0, created_at=utc_now(), **values))
+        with self._lock, self._conn:
             seq = self._next_seq(run_id)
-            event.seq = seq
-            self._conn.execute(
-                """
-                INSERT INTO events (
-                    event_id, run_id, seq, type, role, parent_event_id,
-                    state_before, state_after, payload_json, artifact_hashes_json,
-                    session_id, provider, model, context_digest, stop_reason, error, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event.event_id,
-                    event.run_id,
-                    event.seq,
-                    event.type,
-                    event.role,
-                    event.parent_event_id,
-                    event.state_before,
-                    event.state_after,
-                    json_dumps(event.payload),
-                    json_dumps(event.artifact_hashes),
-                    event.session_id,
-                    event.provider,
-                    event.model,
-                    event.context_digest,
-                    event.stop_reason,
-                    event.error,
-                    event.created_at,
-                ),
-            )
-            self._conn.commit()
-        return event
+            for offset, event in enumerate(events):
+                event.seq = seq + offset
+                self._insert(event)
+        return events
+
+    def _insert(self, event: Event) -> None:
+        self._conn.execute(
+            """
+            INSERT INTO events (
+                event_id, run_id, seq, type, role, parent_event_id,
+                state_before, state_after, payload_json, artifact_hashes_json,
+                session_id, provider, model, context_digest, stop_reason, error, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.event_id,
+                event.run_id,
+                event.seq,
+                event.type,
+                event.role,
+                event.parent_event_id,
+                event.state_before,
+                event.state_after,
+                json_dumps(event.payload),
+                json_dumps(event.artifact_hashes),
+                event.session_id,
+                event.provider,
+                event.model,
+                event.context_digest,
+                event.stop_reason,
+                event.error,
+                event.created_at,
+            ),
+        )
 
     def list_events(self, run_id: str, *, after_seq: int = 0) -> list[Event]:
         with self._lock:

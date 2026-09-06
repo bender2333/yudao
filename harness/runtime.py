@@ -8,7 +8,7 @@ from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
 from .event_store import EventStore
-from .orchestrator import Orchestrator, RunTerminalError
+from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .projection import RunProjection, project_run
 
 
@@ -25,6 +25,7 @@ class LoopSystem:
             self.data_dir / "workspaces",
             self.adapter,
         )
+        self.git_versions = self.orchestrator.git_versions
 
     def create_run(self, task: str, **kwargs) -> str:
         return self.orchestrator.create_run(task, **kwargs)

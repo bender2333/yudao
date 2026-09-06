@@ -10,7 +10,7 @@ from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence, _git_evidence
 from harness.tests.helpers import run_scripted
 
 
@@ -24,6 +24,7 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         "check_receipts": [{"name": "smoke", "exit_code": 0}],
         "check_receipts_verified": True,
         "delivery_archive": {"status": "verified"},
+        "git_audit": {"status": "verified"},
         "fake_used": False,
         "request_count": 2,
         "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
@@ -35,6 +36,7 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         {"check_receipts": []}, {"check_receipts_verified": False}, {"context_isolated": False},
         {"model_input_audit": None}, {"model_input_audit": {"status": "unverified"}},
         {"delivery_archive": None}, {"delivery_archive": {"status": "unverified"}},
+        {"git_audit": None}, {"git_audit": {"status": "unverified"}},
     ):
         assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, **change)}}) == 1
     assert smoke_exit_code({"available": True, "scenarios": {"collaboration": dict(base, request_count=0)}}) == 1
@@ -71,9 +73,27 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
     assert summary["delivery_archive"]["status"] == "verified", summary["delivery_archive"]
     assert summary["delivery_archive"]["tree_digest"] == system.project(run_id).delivery_spec.code_tree_digest
+    assert summary["git_audit"]["status"] == "verified", summary["git_audit"]
+    assert summary["git_audit"]["version_count"] == 5
     assert summary["replay_consistent"] is True
     assert summary["fake_used"] is True
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
+
+
+def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(native_run, monkeypatch):
+    system, run_id = native_run
+    events = _events_for_mutation(system, run_id, monkeypatch)
+    event = next(item for item in reversed(events) if item.type == EventType.QA_SUBMITTED)
+    original = event.payload["git_version"]
+    accepted_files = system.git_versions.read_files(run_id, original)
+    wrong = system.git_versions.prepare(
+        run_id, parent_commit=original["parent_commit"],
+        updates={"specs/qa.json": accepted_files["specs/qa.json"], "PRD.md": b"Unrelated requirements\n"},
+        message="A valid Git object that does not reproduce the accepted requirements",
+    )
+    system.git_versions.verify(run_id, wrong)
+    event.payload["git_version"] = wrong
+    assert _git_evidence(system, run_id)["status"] == "unverified"
 
 
 @pytest.mark.parametrize("changed", ["effective_contract", "engineering_plan"])

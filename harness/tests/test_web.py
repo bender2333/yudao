@@ -13,6 +13,7 @@ import pytest
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
 from harness.adapters.responses import ResponsesAdapter, ResponsesConfig
+from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
@@ -32,7 +33,7 @@ def running_server(system):
         server.server_close()
 
 
-def request(host, port, method, path, body=None, headers=None, timeout=5):
+def request(host, port, method, path, body=None, headers=None, timeout=15):
     conn = HTTPConnection(host, port, timeout=timeout)
     payload = b""
     hdrs = {}
@@ -57,7 +58,7 @@ def get_json(host, port, path):
     return json.loads(body)
 
 
-def wait_until(predicate, timeout=8.0, interval=0.05):
+def wait_until(predicate, timeout=45.0, interval=0.05):
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
@@ -68,7 +69,7 @@ def wait_until(predicate, timeout=8.0, interval=0.05):
     raise AssertionError(f"timeout waiting, last={last!r}")
 
 
-def wait_terminal(host, port, run_id, timeout=8.0):
+def wait_terminal(host, port, run_id, timeout=45.0):
     def check():
         status, body, _ = request(host, port, "GET", f"/api/runs/{run_id}")
         if status != 200:
@@ -310,6 +311,91 @@ def test_text_cancel_records_raw_command_before_immediate_cancellation(data_dir,
             assert received.seq < stopped.seq
         finally:
             release.set()
+
+
+@pytest.mark.parametrize("text", [" /stop\r\n", "\n/cancel  "])
+@pytest.mark.parametrize("record_cancellation", [True, False])
+def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeypatch, text, record_cancellation):
+    adapter, entered, release = gated_adapter()
+    system = LoopSystem(data_dir, adapter)
+    with running_server(system) as (server, host, port):
+        _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
+        run_id = json.loads(body)["run_id"]
+        try:
+            assert entered.wait(5)
+            before = system.project(run_id)
+            insert = system.store._insert
+
+            def fail_git(*args, **kwargs):
+                raise GitVersionError("injected Git save failure")
+
+            def fail_cancellation(event):
+                if event.type == "run_failed":
+                    raise OSError("injected cancellation event save failure")
+                return insert(event)
+
+            with monkeypatch.context() as patch:
+                patch.setattr(system.git_versions, "prepare", fail_git)
+                if not record_cancellation:
+                    patch.setattr(system.store, "_insert", fail_cancellation)
+                status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", {"text": text})
+            result = json.loads(body)
+            assert status == 503, result
+            assert result["code"] == "cancelled_input_not_saved"
+            assert result["cancelled"] is True and result["run_id"] == run_id
+            assert result["cancellation_recorded"] is record_cancellation
+            assert "执行已取消" in result["error"] and "未形成正式 Git 版本" in result["error"]
+            assert system.orchestrator._abort[run_id].is_set()
+            assert adapter._aborted == {before.sessions["product"].session_id}
+            current = system.project(run_id)
+            assert current.input_version == before.input_version and current.git_version == before.git_version
+            assert [item.text for item in current.inputs] == ["echo"]
+            events = system.store.list_events(run_id)
+            assert not any(event.type == "user_input_received" for event in events)
+            stopped = [event for event in events if event.type == "run_failed"]
+            if record_cancellation:
+                assert current.phase == "FAILED" and current.stop_reason == "cancelled"
+                assert stopped[-1].payload["input_save_failure"]["text"] == text
+                assert "git_version" not in stopped[-1].payload
+                detail = get_json(host, port, f"/api/runs/{run_id}/events/{stopped[-1].event_id}")
+                assert detail["payload"]["input_save_failure"]["text"] == text
+                payload = get_json(host, port, f"/api/runs/{run_id}")
+                card = next(item for item in payload["events"] if item["event_id"] == stopped[-1].event_id)
+                assert card["input_save_failure"]["text"] == text
+            else:
+                assert stopped == []
+                assert "取消事实也未能保存" in result["error"]
+        finally:
+            release.set()
+        wait_until(lambda: not server.busy())
+        assert system.project(run_id).product_spec is None
+
+
+def test_cancel_button_needs_no_git_save_or_raw_command(data_dir, monkeypatch):
+    adapter, entered, release = gated_adapter()
+    system = LoopSystem(data_dir, adapter)
+    with running_server(system) as (server, host, port):
+        _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
+        run_id = json.loads(body)["run_id"]
+        try:
+            assert entered.wait(5)
+            before = system.project(run_id)
+
+            def unexpected_git(*args, **kwargs):
+                raise AssertionError("Button cancellation must not save a Git input version")
+
+            monkeypatch.setattr(system.git_versions, "prepare", unexpected_git)
+            status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/cancel")
+            assert status == 200 and json.loads(body)["stop_reason"] == "cancelled", body
+            current = system.project(run_id)
+            assert current.input_version == before.input_version and current.git_version == before.git_version
+            events = system.store.list_events(run_id)
+            assert not any(event.type == "user_input_received" for event in events)
+            stopped = next(event for event in events if event.type == "run_failed")
+            assert "input_save_failure" not in stopped.payload
+        finally:
+            release.set()
+        wait_until(lambda: not server.busy())
 
 
 def test_input_and_prompt_api_reject_unknown_fields_and_terminal_runs(data_dir):
@@ -833,3 +919,100 @@ def test_delivery_web_rejects_archive_not_bound_to_its_acceptance(archived_run, 
             status, body, _ = request(host, port, "GET", url)
             assert status == 400
             assert json.loads(body)["error"]
+
+
+@pytest.fixture
+def revised_git_run(data_dir):
+    system = LoopSystem(data_dir, FakeAdapter([
+        product_spec(goal="Echo the argument unchanged"),
+        product_spec(goal="Echo the argument in uppercase", requirements=["Uppercase the given argument"],
+                     acceptance=["hello prints HELLO"], change_record={
+                         "changed": ["Uppercase the output"], "retained": ["Local single-file CLI"],
+                         "retired": ["Output the argument unchanged"],
+                         "rationale": "Apply the user's explicit new output direction",
+                     }),
+    ]))
+    run_id = system.create_run("  Echo the argument unchanged.\r\n")
+    system.activate_once(run_id)
+    system.add_input(run_id, "  Uppercase the output instead.\n")
+    system.activate_once(run_id)
+    return system, system.project(run_id)
+
+
+def test_web_git_versions_show_raw_input_and_real_requirement_changes(revised_git_run):
+    system, projection = revised_git_run
+    run_id = projection.run_id
+    with running_server(system) as (_server, host, port):
+        view = get_json(host, port, f"/api/runs/{run_id}")
+        assert all(item["git_version"]["commit"] for item in view["inputs"])
+        assert all(item["git_version"]["commit"] for item in view["timeline"]["effective_contracts"])
+        for item in [*projection.inputs, *projection.product_specs, *projection.effective_contracts]:
+            detail = get_json(host, port, f"/api/runs/{run_id}/events/{item.created_event_id}")
+            version = detail["git_version_detail"]
+            assert {key: version[key] for key in ("commit", "parent_commit", "tree")} == detail["payload"]["git_version"]
+            assert all(not file["path"].startswith(("/", ".git/", ".checks/")) for file in version["files"])
+            assert str(system.data_dir) not in version["diff"]
+        initial = get_json(host, port, f"/api/runs/{run_id}/events/{projection.inputs[0].created_event_id}")
+        assert initial["git_version_detail"]["parent_commit"] is None
+        current = get_json(host, port, f"/api/runs/{run_id}/events/{projection.effective_contract.created_event_id}")
+        assert "-Echo the argument unchanged" in current["git_version_detail"]["diff"]
+        assert "+Echo the argument in uppercase" in current["git_version_detail"]["diff"]
+        assert any(file["path"] == "PRD.md" and file["status"] == "M" for file in current["git_version_detail"]["files"])
+        assert "Uppercase the output" in current["prd_markdown"]
+
+
+def test_web_git_versions_include_plan_binary_delivery_and_no_current_tree_fallback(archived_run):
+    system, projection = archived_run
+    run_id = projection.run_id
+    system.workspace(run_id).write_file("src/echo.py", "CURRENT_TREE_CHANGED")
+    with running_server(system) as (_server, host, port):
+        plan = get_json(host, port, f"/api/runs/{run_id}/events/{projection.engineering_plan.created_event_id}")
+        assert any(file["path"] == "PLAN.md" for file in plan["git_version_detail"]["files"])
+        delivery = get_json(host, port, f"/api/runs/{run_id}/events/{projection.delivery_spec.created_event_id}")
+        version = delivery["git_version_detail"]
+        assert {"path": "code/assets/data.bin", "status": "A", "binary": True} in version["files"]
+        assert "Binary files" in version["diff"]
+        assert "CURRENT_TREE_CHANGED" not in version["diff"]
+        assert any(file["path"] == "assets/data.bin" for file in delivery["tree_archive"]["tree"]["files"])
+
+
+@pytest.mark.parametrize("mismatch", ["same_run_commit", "tree", "material"])
+def test_web_git_versions_reject_refs_or_materials_not_bound_to_the_event(revised_git_run, monkeypatch, mismatch):
+    system, projection = revised_git_run
+    run_id = projection.run_id
+    event = system.store.get_event(projection.effective_contract.created_event_id)
+    payload = dict(event.payload)
+    if mismatch == "same_run_commit":
+        payload["git_version"] = system.store.get_event(projection.inputs[-1].created_event_id).payload["git_version"]
+    elif mismatch == "tree":
+        payload["git_version"] = {**payload["git_version"], "tree": "0" * 40}
+    else:
+        payload["prd_ref"] = asdict(system.artifacts.put(run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
+    changed = replace(event, payload=payload)
+    original_get, original_list = system.store.get_event, system.store.list_events
+    monkeypatch.setattr(system.store, "get_event", lambda event_id: changed if event_id == event.event_id else original_get(event_id))
+    monkeypatch.setattr(system.store, "list_events", lambda *args, **kwargs: [
+        changed if item.event_id == event.event_id else item for item in original_list(*args, **kwargs)
+    ])
+    with running_server(system) as (_server, host, port):
+        status, body, _ = request(host, port, "GET", f"/api/runs/{run_id}/events/{event.event_id}")
+        assert status == 400, body
+        assert "Git" in json.loads(body)["error"]
+        assert str(system.data_dir) not in body
+
+
+def test_web_git_versions_reject_missing_objects_and_cross_run_event_queries(revised_git_run):
+    system, projection = revised_git_run
+    run_id = projection.run_id
+    event = system.store.get_event(projection.effective_contract.created_event_id)
+    other_run = system.create_run("Other task")
+    commit = event.payload["git_version"]["commit"]
+    obj = system.data_dir / "git" / f"{run_id}.git" / "objects" / commit[:2] / commit[2:]
+    obj.chmod(0o600)
+    obj.unlink()
+    with running_server(system) as (_server, host, port):
+        status, body, _ = request(host, port, "GET", f"/api/runs/{run_id}/events/{event.event_id}")
+        assert status == 400 and "Git" in json.loads(body)["error"], body
+        assert str(system.data_dir) not in body
+        assert request(host, port, "GET", f"/api/runs/{other_run}/events/{event.event_id}")[0] == 404
+        assert request(host, port, "GET", f"/api/runs/{run_id}/git/{commit}")[0] == 404

@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
-from ..models import ArtifactRef, EventType, json_dumps
+from ..git_audit import git_version_detail
+from ..models import ArtifactRef, EventType, GIT_VERSION_EVENTS, json_dumps
 from ..projection import RunNotFoundError, project_run
-from ..runtime import LoopSystem, RunTerminalError
+from ..runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from ..tree_archive import load_tree
 from ..views import event_card, run_board, run_payload
 
@@ -151,6 +152,13 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc), "reason": "busy"}, 409)
         except RunTerminalError as exc:
             self._send_json({"error": str(exc), "reason": "run_terminal"}, 409)
+        except CancelledInputSaveError as exc:
+            message = "执行已取消，但命令原文未形成正式 Git 版本；输入框保留原文。"
+            if not exc.cancellation_recorded:
+                message += "取消事实也未能保存。"
+            self._send_json({"error": message, "code": "cancelled_input_not_saved",
+                             "run_id": exc.run_id, "cancelled": exc.cancelled,
+                             "cancellation_recorded": exc.cancellation_recorded}, 503)
         except ProviderUnavailableError as exc:
             self._send_json({"error": str(exc), "reason": exc.reason}, 503)
         except RunNotFoundError as exc:
@@ -269,6 +277,16 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             if event is None or event.run_id != run_id:
                 return self._send_json({"error": "event not found"}, 404)
             detail = event.to_dict()
+            if event.type in GIT_VERSION_EVENTS:
+                version = event.payload.get("git_version")
+                if version is None:
+                    raise ValueError("该正式事件缺少 Git 版本记录")
+                detail["git_version_detail"] = git_version_detail(
+                    self.server.system.git_versions, self.server.system.artifacts,
+                    store.list_events(run_id), event,
+                )
+            elif event.payload.get("git_version") is not None:
+                raise ValueError("Git 版本未绑定正式事件")
             if event.type == EventType.DELIVERY_ACCEPTED:
                 _tree, detail["tree_archive"] = self._delivery_archive(event)
             for name in ("prd", "plan"):

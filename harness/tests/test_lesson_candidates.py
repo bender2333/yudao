@@ -172,7 +172,10 @@ def test_web_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path)
         assert source["payload"]["rationale"] == candidate.observation["rationale"]
         exported = get_json(host, port, f"{path}/export")
         assert exported["projection"]["lesson_candidates"] == payload["evidence"]["lesson_candidates"]
-        assert detail in exported["events"] and source in exported["events"]
+        source_event = dict(source)
+        git_detail = source_event.pop("git_version_detail")
+        assert git_detail["commit"] == source_event["payload"]["git_version"]["commit"]
+        assert detail in exported["events"] and source_event in exported["events"]
         assert json_dumps(exported["projection"]["lesson_candidates"]) == json_dumps(system.replay(result.run_id).lesson_candidates)
         assert request(host, port, "POST", f"{path}/replay")[0] == 200
     assert system.project(result.run_id).last_seq == before

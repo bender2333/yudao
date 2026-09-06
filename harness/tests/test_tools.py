@@ -350,6 +350,7 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
         "check_receipts": [{"name": "smoke"}],
         "check_receipts_verified": True,
         "delivery_archive": {"status": "verified"},
+        "git_audit": {"status": "verified"},
         "fake_used": False,
         "request_count": 2,
         "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
@@ -359,3 +360,7 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
     assert smoke_exit_code({"available": True, "scenarios": {"happy": fake}}) == 2
     no_receipts = dict(done, check_receipts=[])
     assert smoke_exit_code({"available": True, "scenarios": {"happy": no_receipts}}) == 1
+    no_git_audit = {key: value for key, value in done.items() if key != "git_audit"}
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": no_git_audit}}) == 1
+    unverified_git = dict(done, git_audit={"status": "unverified"})
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": unverified_git}}) == 1

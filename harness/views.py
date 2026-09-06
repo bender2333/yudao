@@ -6,12 +6,24 @@ import json
 from typing import Any
 
 from .event_store import EventStore
-from .models import Event, EventType, json_dumps
+from .models import Event, EventType, GIT_VERSION_EVENTS, json_dumps
 from .projection import RunProjection, project_run
 
 
 def _plain(value: Any) -> Any:
     return json.loads(json_dumps(value))
+
+
+def _with_git(value: Any, events: list[Event]) -> Any:
+    item = _plain(value)
+    if item is None:
+        return None
+    if isinstance(item, list):
+        return [_with_git(child, events) for child in item]
+    event = next((event for event in events if event.event_id == item.get("created_event_id")), None)
+    if event is not None and event.type in GIT_VERSION_EVENTS and event.payload.get("git_version"):
+        item["git_version"] = _plain(event.payload["git_version"])
+    return item
 
 
 def run_board(projection: RunProjection) -> dict[str, Any]:
@@ -61,16 +73,16 @@ def spec_timeline(projection: RunProjection, events: list[Event]) -> dict[str, A
             }
         )
     return {
-        "current_product_spec": _plain(projection.product_spec),
-        "effective_contract": _plain(projection.effective_contract),
-        "effective_contracts": _plain(projection.effective_contracts),
-        "engineering_plan": _plain(projection.engineering_plan),
-        "engineering_plans": _plain(projection.engineering_plans),
-        "current_delivery_spec": _plain(projection.delivery_spec),
+        "current_product_spec": _with_git(projection.product_spec, events),
+        "effective_contract": _with_git(projection.effective_contract, events),
+        "effective_contracts": _with_git(projection.effective_contracts, events),
+        "engineering_plan": _with_git(projection.engineering_plan, events),
+        "engineering_plans": _with_git(projection.engineering_plans, events),
+        "current_delivery_spec": _with_git(projection.delivery_spec, events),
         "effective_decisions": _plain(projection.effective_decisions),
         "pending_request": _plain(projection.pending_request),
-        "product_decisions": _plain(projection.product_decisions),
-        "specs": specs,
+        "product_decisions": _with_git(projection.product_decisions, events),
+        "specs": _with_git(specs, events),
         "requests": _plain(projection.requests),
         "responses": _plain(projection.responses),
         "request_closures": [
@@ -81,10 +93,10 @@ def spec_timeline(projection: RunProjection, events: list[Event]) -> dict[str, A
     }
 
 
-def evidence_view(projection: RunProjection) -> dict[str, Any]:
+def evidence_view(projection: RunProjection, events: list[Event]) -> dict[str, Any]:
     return {
-        "deliveries": [_plain(item) for item in projection.delivery_specs],
-        "reviews": [_plain(item) for item in projection.reviews],
+        "deliveries": _with_git(projection.delivery_specs, events),
+        "reviews": _with_git(projection.reviews, events),
         "evidence": _plain(projection.evidence),
         "rejections": _plain(projection.rejections),
         "lesson_candidates": _plain(projection.lesson_candidates),
@@ -118,6 +130,9 @@ def event_card(event: Event) -> dict[str, Any]:
         "created_at": event.created_at,
         "summary": event.summary(),
         "artifact_hashes": event.artifact_hashes,
+        "git_version": _plain(event.payload.get("git_version")) if event.type in GIT_VERSION_EVENTS else None,
+        "input_save_failure": _plain(event.payload.get("input_save_failure"))
+        if event.type == EventType.RUN_FAILED and event.stop_reason == "cancelled" else None,
     }
 
 
@@ -127,9 +142,9 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
     return {
         "board": run_board(projection),
         "timeline": spec_timeline(projection, events),
-        "evidence": evidence_view(projection),
+        "evidence": evidence_view(projection, events),
         "context": context_view(projection),
-        "inputs": _plain(projection.inputs),
+        "inputs": _with_git(projection.inputs, events),
         "prompts": {
             "current": _plain(projection.department_prompts),
             "versions": _plain(projection.prompt_versions),

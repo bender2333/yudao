@@ -17,6 +17,8 @@ const state = {
   submittingPrompt: false,
   promptData: null,
   promptDrafts: {},
+  eventRequestSeq: 0,
+  cancelledInputFailures: {},
 };
 
 let workerWatchTimer = null;
@@ -82,11 +84,13 @@ function syncButtons() {
   if (!cancel) return;
   const selectedLive = Boolean(state.runId) && state.runId === state.activeRunId;
   const selectedRunning = Boolean(state.runId) && state.selectedPhase && !TERMINAL.has(state.selectedPhase);
-  cancel.disabled = state.submittingCancel || !state.runId || !(selectedLive || selectedRunning);
+  cancel.disabled = state.submittingCancel || !state.runId || Boolean(state.cancelledInputFailures[state.runId])
+    || !(selectedLive || selectedRunning);
 }
 
 function inputRunId() {
-  return !state.forceNewTask && state.runId && state.selectedPhase && !TERMINAL.has(state.selectedPhase)
+  return !state.forceNewTask && state.runId && !state.cancelledInputFailures[state.runId]
+    && state.selectedPhase && !TERMINAL.has(state.selectedPhase)
     ? state.runId : null;
 }
 
@@ -103,6 +107,10 @@ function applyExecAlert(runPayload, health) {
   const selected = state.runId;
   if (!selected) {
     setAlert("exec-alert", "");
+    return;
+  }
+  if (state.cancelledInputFailures[selected]) {
+    setAlert("exec-alert", state.cancelledInputFailures[selected]);
     return;
   }
   if (runPayload && runPayload.board && runPayload.board.run_id === selected) {
@@ -174,6 +182,13 @@ function latestEventModel(events) {
 function shortHash(value) {
   if (!value) return "—";
   return String(value).replace(/^sha256:/, "").slice(0, 12);
+}
+
+function gitVersionLink(item) {
+  const version = item?.git_version;
+  if (!version) return "";
+  return `<div class="git-version"><p class="hash">Git ${t(shortHash(version.commit))} · 父提交 ${version.parent_commit ? t(shortHash(version.parent_commit)) : "初始版本"}</p>
+    <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="git">查看本次变更</button></div>`;
 }
 
 function closeSource() {
@@ -353,6 +368,9 @@ async function refreshRun(runId, gen) {
 
 function applyRunStatus(data, health) {
   const board = data.board;
+  if (data.events?.some(event => event.type === "run_failed" && event.stop_reason === "cancelled" && event.input_save_failure)) {
+    state.cancelledInputFailures[board.run_id] = "执行已取消，但命令原文未形成正式 Git 版本。";
+  }
   state.selectedPhase = board.phase;
   if (health) {
     state.busy = Boolean(health.busy);
@@ -363,6 +381,10 @@ function applyRunStatus(data, health) {
   }
   applyExecAlert(data, health);
   syncWorkerWatch();
+  if (state.cancelledInputFailures[board.run_id]) {
+    setStatus("error", state.cancelledInputFailures[board.run_id]);
+    return;
+  }
   if (data.execution_error) {
     setStatus("error", "执行中断");
     return;
@@ -448,6 +470,10 @@ function renderCycle(board, timeline) {
 function renderBoard(board, aggregates, timeline, events) {
   const node = document.getElementById("board-body");
   if (!node) return;
+  if (state.cancelledInputFailures[board.run_id] && !TERMINAL.has(board.phase)) {
+    board = { ...board, phase: "FAILED", outcome: "failed", stop_reason: "cancelled",
+      waiting_reason: "", pending_request: null };
+  }
   const agg = aggregates || {};
   node.innerHTML = `
     ${renderCycle(board, timeline || {})}
@@ -489,6 +515,7 @@ function renderTimeline(timeline, gen = state.gen) {
       <p>${t(product && product.goal, "")}</p>
       <p class="hash">合同 ${t(shortHash(contract.content_hash))}</p>
       <button type="button" class="event-link" data-event-id="${t(contract.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
+      ${gitVersionLink(contract)}
       ` : '<p class="muted">产品尚未接纳有效需求。</p>'}
     </div>
     <div class="work-document">
@@ -506,6 +533,7 @@ function renderTimeline(timeline, gen = state.gen) {
       ${(plan.assumptions || []).length ? `<details><summary>专业默认与依据</summary><ul>${plan.assumptions.map((item) => `<li>${t(item.decision)}<p class="muted">${t(item.basis)}</p></li>`).join("")}</ul></details>` : ""}
       <p class="hash">依据合同 ${t(shortHash(plan.effective_contract_hash))}</p>
       <button type="button" class="event-link" data-event-id="${t(plan.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
+      ${gitVersionLink(plan)}
       ` : '<p class="muted">工程尚未接纳实施计划。</p>'}
     </div>`;
   const contracts = (timeline.effective_contracts || []).map((item) => `
@@ -513,6 +541,7 @@ function renderTimeline(timeline, gen = state.gen) {
       <header><span>PRD r${t(item.revision)}</span><span>${contract && item.content_hash === contract.content_hash ? "当前有效" : "已被替代"}</span></header>
       <p class="hash">${t(shortHash(item.content_hash))}</p>
       <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="prd">查看 PRD.md 原文</button>
+      ${gitVersionLink(item)}
     </article>`).join("");
   const plans = (timeline.engineering_plans || []).map((item) => `
     <article class="item">
@@ -521,6 +550,7 @@ function renderTimeline(timeline, gen = state.gen) {
       ${item.reason ? `<p>调整原因：${t(item.reason)}</p>` : ""}
       <p class="hash">依据合同 ${t(shortHash(item.effective_contract_hash))}</p>
       <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="plan">查看 PLAN.md 原文</button>
+      ${gitVersionLink(item)}
     </article>`).join("");
   const specs = (timeline.specs || [])
     .map(
@@ -531,6 +561,7 @@ function renderTimeline(timeline, gen = state.gen) {
       <p class="muted">已处理输入 v${t(spec.input_version)}</p>
       ${renderChangeRecord(spec.change_record)}
       <p class="hash">${t(shortHash(spec.content_hash))} ← ${t(shortHash(spec.parent_hash))}</p>
+      ${(timeline.effective_contracts || []).some(item => item.git_version?.commit === spec.git_version?.commit) ? "" : gitVersionLink(spec)}
     </article>`,
     )
     .join("");
@@ -564,6 +595,7 @@ function renderTimeline(timeline, gen = state.gen) {
     <header><span>产品正式决定</span><span>${effective.has(decision.content_hash) ? "当前有效" : "已处理"}</span></header>
     <p>${t(decision.statement)}</p><p class="muted">${t(decision.rationale)}</p>
     <button type="button" class="event-link" data-event-id="${t(decision.created_event_id)}">查看决定</button>
+    ${gitVersionLink(decision)}
   </article>`).join("");
   node.innerHTML = `
     ${current}
@@ -604,6 +636,7 @@ function renderEvidence(evidence, gen = state.gen) {
       <p class="hash">${t(shortHash(item.code_tree_digest))}</p>
       <p class="muted">${t((item.checks || []).map((check) => `${check.name}:${check.exit_code}`).join(" "))}</p>
       <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}" data-document="tree">查看完整交付</button>
+      ${gitVersionLink(item)}
     </article>`,
     )
     .join("");
@@ -614,6 +647,7 @@ function renderEvidence(evidence, gen = state.gen) {
       <header><span>QA ${t(item.verdict)}</span><span>${t((item.defects || []).length)} defects</span></header>
       <p>${t(item.rationale)}</p>
       <p class="hash">spec ${t(shortHash(item.product_spec_hash))} snapshot ${t(shortHash(item.code_snapshot_hash))}</p>
+      ${gitVersionLink(item)}
     </article>`,
     )
     .join("");
@@ -676,10 +710,11 @@ function renderInputs(inputs, board, gen) {
       <pre class="raw-text">${escapeHtml(item.text)}</pre>
       <p class="hash">UTF-8 字节 [${t(item.byte_start)}, ${t(item.byte_end)}) · ${t(shortHash(item.input_ref?.content_hash))}</p>
       <button type="button" class="event-link" data-event-id="${t(item.created_event_id)}">查看接收记录</button>
+      ${gitVersionLink(item)}
     </article>`;
   }).join("") : '<p class="muted">尚无输入。</p>';
   node.querySelectorAll(".event-link").forEach(button => {
-    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen));
+    button.addEventListener("click", () => openEvent(button.dataset.eventId, gen, button.dataset.document));
   });
 }
 
@@ -815,14 +850,16 @@ async function openEvent(eventId, gen, documentKind) {
   const runId = state.runId;
   const token = gen === undefined ? state.gen : gen;
   if (token !== state.gen || !runId) return;
+  const lookup = ++state.eventRequestSeq;
   try {
     const data = await fetchJSON(`/api/runs/${encodeURIComponent(runId)}/events/${encodeURIComponent(eventId)}`);
-    if (token !== state.gen || state.runId !== runId) return;
+    if (token !== state.gen || state.runId !== runId || lookup !== state.eventRequestSeq) return;
     const documentText = documentKind === "tree" && data.tree_archive
       ? JSON.stringify({ format: data.tree_archive.format, tree_digest: data.tree_archive.tree_digest,
         tree: data.tree_archive.tree, blobs: data.tree_archive.blobs }, null, 2)
+      : documentKind === "git" ? data.git_version_detail?.diff
       : documentKind === "prd" || documentKind === "plan" ? data[`${documentKind}_markdown`] : null;
-    if (documentKind && typeof documentText !== "string") throw new Error("原文工件不可用");
+    if (documentKind && typeof documentText !== "string") throw new Error(documentKind === "git" ? "Git 版本不可用" : "原文工件不可用");
     const jsonNode = document.getElementById("event-json");
     const documentNode = document.getElementById("event-document");
     const titleNode = document.getElementById("event-title");
@@ -832,7 +869,29 @@ async function openEvent(eventId, gen, documentKind) {
       documentNode.textContent = documentText || "";
       documentNode.hidden = !documentKind;
     }
-    if (titleNode) titleNode.textContent = documentKind === "tree" ? "完整交付清单" : documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
+    if (titleNode) titleNode.textContent = documentKind === "git" ? "Git 变更" : documentKind === "tree" ? "完整交付清单" : documentKind ? `${documentKind.toUpperCase()}.md` : "事件详情";
+    const versionNode = document.getElementById("event-version");
+    const filesNode = document.getElementById("event-files");
+    const version = data.git_version_detail;
+    if (versionNode) {
+      versionNode.hidden = !version;
+      versionNode.textContent = version ? `提交 ${version.commit}\n父提交 ${version.parent_commit || "初始版本"}\n树 ${version.tree}` : "";
+    }
+    if (filesNode) {
+      filesNode.replaceChildren();
+      filesNode.hidden = !version;
+      for (const file of version?.files || []) {
+        const item = document.createElement("li");
+        const status = { A: "新增", M: "修改", D: "删除", R: "移动", C: "复制", T: "类型变化" }[file.status] || file.status;
+        item.textContent = `${status} ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}${file.binary ? "（二进制）" : ""}`;
+        filesNode.appendChild(item);
+      }
+      if (version && !version.files.length) {
+        const item = document.createElement("li");
+        item.textContent = "无文件变化";
+        filesNode.appendChild(item);
+      }
+    }
     const sources = document.getElementById("event-sources");
     if (sources) {
       sources.replaceChildren();
@@ -842,6 +901,14 @@ async function openEvent(eventId, gen, documentKind) {
         button.className = "event-link";
         button.textContent = "查看接纳记录";
         button.addEventListener("click", () => openEvent(eventId, token));
+        sources.appendChild(button);
+      }
+      if (version && documentKind !== "git") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "event-link";
+        button.textContent = "查看本次变更";
+        button.addEventListener("click", () => openEvent(eventId, token, "git"));
         sources.appendChild(button);
       }
       for (const file of data.tree_archive?.tree.files || []) {
@@ -863,7 +930,11 @@ async function openEvent(eventId, gen, documentKind) {
     }
     document.getElementById("event-dialog").showModal();
   } catch (error) {
-    if (token !== state.gen || state.runId !== runId) return;
+    if (token !== state.gen || state.runId !== runId || lookup !== state.eventRequestSeq) return;
+    if (documentKind === "git") {
+      document.getElementById("event-dialog").close?.();
+      document.getElementById("event-document").textContent = "";
+    }
     setStatus("error", error.message);
   }
 }
@@ -975,6 +1046,26 @@ async function startRun(event) {
     await selectRun(created.run_id);
     scrollBoardIntoView();
   } catch (error) {
+    if (error.payload?.code === "cancelled_input_not_saved" && error.payload.cancelled === true
+        && error.payload.run_id === targetRun) {
+      state.cancelledInputFailures[targetRun] = error.message;
+      if (targetRun === state.runId) {
+        const gen = state.gen;
+        state.forceNewTask = true;
+        let refreshFailure = "";
+        try {
+          await refreshRun(targetRun, gen);
+        } catch (refreshError) {
+          refreshFailure = ` 状态刷新失败：${refreshError.message}`;
+        }
+        if (gen === state.gen) {
+          applyExecAlert(null, null);
+          setStatus("error", state.cancelledInputFailures[targetRun] + refreshFailure);
+          openCompose();
+        }
+      }
+      return;
+    }
     if (error.payload?.reason === "run_terminal") setStatus("conflict", "任务已经结束，输入尚未提交。新任务");
     else if (error.status === 409) setStatus("conflict", error.message);
     else setStatus("error", error.message);

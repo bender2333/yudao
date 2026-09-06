@@ -17,7 +17,8 @@ from .collaboration import request_basis, request_still_applicable, resume_phase
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
 from .engine import ToolAdmission, run_department
-from .interactions import InteractionWriter, RunTerminalError
+from .git_versions import GitVersionStore
+from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
     Event as RunEvent,
     ArtifactRef,
@@ -87,8 +88,9 @@ class Orchestrator:
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
-        self.submissions = SubmissionWriter(store, artifacts, self.materials_root)
-        self.interactions = InteractionWriter(store, artifacts, self.materials_root)
+        self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
+        self.submissions = SubmissionWriter(store, artifacts, self.materials_root, self.git_versions)
+        self.interactions = InteractionWriter(store, artifacts, self.materials_root, self.git_versions)
         self.adapter = adapter
         self.assembler = assembler or ContextAssembler()
         self.sessions = sessions or SessionFactory()
@@ -155,17 +157,49 @@ class Orchestrator:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("input must be a non-empty string")
         command = text.strip() in {"/stop", "/cancel"}
-        with self._state_lock:
-            current = self.project(run_id)
-            if current.phase in TERMINAL_PHASES:
-                raise RunTerminalError("This run has ended; create a new task for this input.")
-            self.interactions.receive(current, text, command=command)
-            if command:
-                self._abort.setdefault(run_id, Event()).set()
-                self._fail(run_id, self.project(run_id), "cancelled", "run cancelled by user command")
-            activation = self._active.get(run_id)
-        if command and activation is not None:
-            self.adapter.abort(activation.session_id)
+        activation = None
+        abort_notified = False
+        save_error = stop_error = None
+        cancellation_recorded = False
+        try:
+            with self._state_lock:
+                current = self.project(run_id)
+                if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+                    raise RunTerminalError("This run has ended; create a new task for this input.")
+                if not command:
+                    self.interactions.receive(current, text, command=False)
+                else:
+                    activation = self._active.get(run_id)
+                    self._abort.setdefault(run_id, Event()).set()
+                    if activation is not None:
+                        try:
+                            self.adapter.abort(activation.session_id)
+                            abort_notified = True
+                        except Exception as exc:
+                            stop_error = exc
+                    try:
+                        self.interactions.receive(current, text, command=True)
+                    except Exception as exc:
+                        save_error = exc
+                    failure = None if save_error is None else {
+                        "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
+                    }
+                    try:
+                        self._fail(run_id, self.project(run_id), "cancelled", "run cancelled by user command",
+                                   input_save_failure=failure)
+                        cancellation_recorded = True
+                    except Exception as exc:
+                        stop_error = exc
+        finally:
+            if command and activation is not None and not abort_notified:
+                try:
+                    self.adapter.abort(activation.session_id)
+                except Exception as exc:
+                    stop_error = stop_error or exc
+        if save_error is not None:
+            raise CancelledInputSaveError(run_id, cancellation_recorded=cancellation_recorded) from save_error
+        if stop_error is not None:
+            raise stop_error
         return self.project(run_id)
 
     def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
@@ -175,7 +209,7 @@ class Orchestrator:
             raise ValueError("prompt must be a non-empty string")
         with self._state_lock:
             current = self.project(run_id)
-            if current.phase in TERMINAL_PHASES:
+            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 raise RunTerminalError("This run has ended; prompts can be edited in a new task.")
             self.interactions.update_prompt(current, department, text)
             return self.project(run_id)
@@ -195,6 +229,8 @@ class Orchestrator:
 
     def _activation_stopped(self, activation: _Activation) -> bool:
         with self._state_lock:
+            if activation.abort_flag.is_set():
+                return True
             current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
             return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
                     or current.input_version != activation.input_version)
@@ -230,15 +266,22 @@ class Orchestrator:
                                    return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str) -> RunProjection:
-        with self._state_lock:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
-                return projection
-            self._abort.setdefault(run_id, Event()).set()
-            activation = self._active.get(run_id)
-            self._fail(run_id, projection, "cancelled", "run cancelled")
-        if activation is not None:
-            self.adapter.abort(activation.session_id)
+        activation = None
+        abort_notified = False
+        try:
+            with self._state_lock:
+                projection = self.project(run_id)
+                if projection.phase in TERMINAL_PHASES:
+                    return projection
+                self._abort.setdefault(run_id, Event()).set()
+                activation = self._active.get(run_id)
+                if activation is not None:
+                    self.adapter.abort(activation.session_id)
+                    abort_notified = True
+                self._fail(run_id, projection, "cancelled", "run cancelled")
+        finally:
+            if activation is not None and not abort_notified:
+                self.adapter.abort(activation.session_id)
         return self.project(run_id)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
@@ -286,6 +329,8 @@ class Orchestrator:
 
     def _prepare_activation(self, run_id: str) -> _Activation | None:
         projection = self.project(run_id)
+        if self._abort.get(run_id) and self._abort[run_id].is_set():
+            return None
         projection = self._close_obsolete_request(run_id, projection)
         if projection.phase in TERMINAL_PHASES:
             return None
@@ -387,9 +432,9 @@ class Orchestrator:
         with self._state_lock:
             identity = activation
             current = self.project(identity.run_id)
-            current = self._close_obsolete_request(identity.run_id, current)
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
                 return None
+            current = self._close_obsolete_request(identity.run_id, current)
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
@@ -749,9 +794,9 @@ class Orchestrator:
             )
         with self._state_lock:
             current = self.project(run_id)
-            current = self._close_obsolete_request(run_id, current)
-            if current.phase in TERMINAL_PHASES:
+            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 return
+            current = self._close_obsolete_request(run_id, current)
             if (current.phase != projection.phase
                     or current.input_version != input_version
                     or current_contract_hash(current) != current_contract_hash(projection)
@@ -803,7 +848,7 @@ class Orchestrator:
         provider: str | None,
         model: str | None,
     ) -> None:
-        if self.project(run_id).phase in TERMINAL_PHASES:
+        if self.project(run_id).phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
         source_event = self.submissions.commit(
             projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
@@ -895,7 +940,8 @@ class Orchestrator:
             )
             self.sessions.close_run(run_id)
 
-    def _fail(self, run_id: str, projection: RunProjection, reason: str, message: str) -> None:
+    def _fail(self, run_id: str, projection: RunProjection, reason: str, message: str,
+              *, input_save_failure: dict[str, str] | None = None) -> None:
         human = {
             "provider_unavailable": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。",
             "provider_error": "模型提供方失败。查看错误事件后新建 run 或更换 provider。",
@@ -917,7 +963,8 @@ class Orchestrator:
                 run_id, EventType.RUN_FAILED, role=department,
                 state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
                 provider=projection.provider, model=projection.model,
-                payload={"stop_reason": reason, "human_action": human, "message": message},
+                payload={"stop_reason": reason, "human_action": human, "message": message,
+                         **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
             )
             self.sessions.close_run(run_id)
             if reason != "cancelled":

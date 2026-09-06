@@ -58,7 +58,8 @@ class CapturedTree:
 
 
 def is_private_path(relative: str) -> bool:
-    return relative.replace("\\", "/").split("/", 1)[0].casefold() == ".checks"
+    parts = relative.replace("\\", "/").casefold().split("/")
+    return parts[0] == ".checks" or ".git" in parts
 
 
 def validate_public_path(relative: str) -> None:

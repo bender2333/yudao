@@ -4,9 +4,9 @@
 
 OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构的运行证据与本次原生循环的验证分开记录，见 [MVP 验收记录](docs/mvp-acceptance.md)。
 
-第一阶段正在按 [A-F 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。确定性 Web 同任务方向调整与独立交付验证通过；真实完整方向调整和压缩后最终放行仍在补验，结果见 [验收记录](docs/mvp-acceptance.md)。
+第一阶段正在按 [A-G 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。任务内 Git 版本和差异已实现并通过确定性验收。真实完整方向调整和压缩后最终放行仍有连接失败导致的验收缺口，结果见 [验收记录](docs/mvp-acceptance.md)。
 
-本机当前原生控制台为 [http://127.0.0.1:8766](http://127.0.0.1:8766)，使用 `.yudao/native-final-validation`；8765 的旧 OMP 服务不代表本次实现。
+本机最新原生控制台地址为 [http://127.0.0.1:8768](http://127.0.0.1:8768)，数据目录为 `.yudao/stage1-git-validation`；8766 保留原生 D 版本，8765 为旧 OMP 服务。当前运行基线见 [验收记录](docs/mvp-acceptance.md)。
 
 ## 分层
 
@@ -19,6 +19,8 @@ OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构�
 Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。
 
 ## 启动
+
+需要 Python 3.11 或更新版本，以及可从 `PATH` 调用的 Git CLI。Git 用于每个任务的本地版本存储，无需配置远程仓库。
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -55,7 +57,7 @@ python -m harness smoke --scenario happy
 python -m harness smoke --scenario collaboration
 ```
 
-报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性和逐步模型输入审计。每次只记录本次选择的场景，不继承上次报告中的验收结果。
+报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
 
 ## HTTP 接口
 
@@ -77,7 +79,15 @@ python -m harness smoke --scenario collaboration
 | POST | `/api/runs/{id}/inputs` | 按原文补充当前任务，正文 `{ "text": "..." }` |
 | POST | `/api/runs/{id}/prompts/{department}` | 修改当前任务的部门 prompt，正文 `{ "text": "..." }` |
 
-活动任务中可持续提交原文；当前已开始工具结束后回产品维护需求，尚未开始的工具跳过。输入接收、交给产品与有效需求处理分别展示。`/stop`、`/cancel` 先保存原文再立即取消；按钮取消不生成文本。终态任务不恢复，新的工作明确创建新任务。prompt 可折叠和编辑，一次激活固定版本，下一次目标部门激活采用更新，实际输入与采用历史可查。
+活动任务中可持续提交原文；当前已开始工具结束后回产品维护需求，尚未开始的工具跳过。输入接收、交给产品与有效需求处理分别展示。`/stop`、`/cancel` 立即发出停止信号并保存原文；Git 或材料保存失败也会停止，界面保留草稿并说明保存失败，不生成虚假的输入版本。按钮取消不生成文本。终态任务不恢复，新的工作明确创建新任务。prompt 可折叠和编辑，一次激活固定版本，下一次目标部门激活采用更新，实际输入与采用历史可查。
+
+## 任务内 Git 版本
+
+原文、需求/spec 与 PRD、计划与 PLAN、交付代码和公开验收记录在正式接纳时形成 Git 提交。新需求引起的 spec 变化可以在 Web 对应事件详情中查看提交、父提交及真实 diff。查询核验当前和父版本与正式材料一致，缺失或篡改会明确报错。
+
+每个任务的仓库保存在 `<data-dir>/git/<run_id>.git`，由主机调用 Git CLI 管理。事件决定哪些版本已经接纳；`refs/snapshots/` 仅保留不可变对象。新输入或需求提交保留上次正式交付代码，工作目录中的修改到交付接纳时才进入代码版本。部门私有历史与 Git 元数据不进入公开交付或跨部门上下文。
+
+Git 与完整交付封存使用同一次采集的文件字节，空目录和独立恢复继续由封存保证。第一阶段提供任务内版本与差异，不提供任意 Git 命令、历史 reset、跨任务合并、项目导入或远程推送配置；详见单独记录的 [D16](docs/requirements/git-change-management.md)。
 
 ## 模型配置
 
