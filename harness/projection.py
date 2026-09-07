@@ -183,6 +183,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
         activation_id = payload.get("activation_id")
         if event.role and activation_id:
             state.last_activations[event.role] = str(activation_id)
+        incoming = payload.get("yielded_work")
+        if incoming:
+            if state.yielded_work is None:
+                state.yielded_work = dict(incoming)
+        else:
+            state.yielded_work = None
         return
 
     if etype == EventType.CONTEXT_ASSEMBLED:
@@ -457,6 +463,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.phase = event.state_after
         route = payload.get("route") or f"{event.state_before}->{event.state_after}"
         state.transitions.append(route)
+        if payload.get("yielded_work_resolved"):
+            state.yielded_work = None
         if event.state_after not in TERMINAL_PHASES:
             state.active_department = state.pending_request.recipient if state.pending_request else department_for_phase(event.state_after)
         return

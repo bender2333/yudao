@@ -269,8 +269,7 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         for item in projection.department_guidance
     )
     if has_product_guidance:
-        transitions = [] if phase == "ENGINEERING" else [(phase, "ENGINEERING")]
-        return ProposalDecision(True, artifact=artifact, transitions=transitions)
+        return ProposalDecision(True, artifact=artifact)
     return ProposalDecision(False, [FieldError("kind", "product_spec not expected")])
 
 

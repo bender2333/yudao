@@ -260,15 +260,21 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
             "rationale": "Guidance requires uppercase output.",
         },
     ))
+    first_yield = {
+        "phase": "QUALITY",
+        "effective_contract_hash": before.effective_contract.content_hash,
+        "engineering_plan_hash": before.engineering_plan.content_hash,
+        "delivery_spec_hash": old_delivery,
+    }
     revised = system.activate_once(run_id)
     assert revised.delivery_spec is None
     assert revised.delivery_specs[-1].status == "superseded"
     assert revised.delivery_specs[-1].content_hash == old_delivery
-    assert revised.phase == "ENGINEERING"
+    assert revised.phase == "QUALITY"
     assert revised.department_guidance[0].status in {"received", "in_input"}
-    yielded = _last_activation(system, run_id).payload["yielded_work"]
-    assert yielded["phase"] == "QUALITY"
-    assert yielded["delivery_spec_hash"] == old_delivery
+    spec_activation = _last_activation(system, run_id)
+    assert spec_activation.payload["yielded_work"] == first_yield
+    assert revised.yielded_work == first_yield
 
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), text="已把大写输出写入产品要求。",
@@ -277,6 +283,16 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert responded.department_guidance[0].status == "completed"
     assert responded.phase == "ENGINEERING"
     assert responded.delivery_spec is None
+    assert _last_activation(system, run_id).payload["yielded_work"] == first_yield
+    responded_event = next(event for event in system.store.list_events(run_id)
+                           if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    resume = next(event for event in system.store.list_events(run_id)
+                  if event.type == EventType.TRANSITION and event.seq > responded_event.seq)
+    assert resume.payload["from"] == "QUALITY"
+    assert resume.payload["to"] == "ENGINEERING"
+    assert resume.payload["yielded_work_resolved"] is True
+    assert resume.payload["yielded_work"] == first_yield
+    assert responded.yielded_work is None
 
     adapter.script.append(plan_turn(reason="Rebuild after product guidance changed the contract."))
     next_work = system.activate_once(run_id)
@@ -313,6 +329,37 @@ def test_guidance_only_engineering_can_request_product(tmp_path):
     assert result.pending_request is not None
     assert result.pending_request.recipient == "product"
     assert result.department_guidance[0].status in {"received", "in_input"}
+
+
+def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    original = system.workspace(run_id).read_file("src/echo.py")
+    assert original
+
+    system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
+    adapter.script.append(lambda request: FakeTurn(
+        writes={"src/echo.py": "import sys\nprint('hijacked')\n"},
+        proposal=guidance_response(_guidance_id(request), text="指导不能授权修改交付，已拒绝写文件。"),
+    ))
+    result = system.activate_once(run_id)
+    request = adapter.invocations[-1]
+    assert request.department == "engineering"
+    assert request.guidance_only is True
+    activation_id = request.activation_id
+    write = next(event for event in system.store.list_events(run_id)
+                 if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
+                 and event.payload.get("activation_id") == activation_id)
+    assert write.payload["ok"] is False
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "write_file"
+                   and event.payload.get("activation_id") == activation_id
+                   for event in system.store.list_events(run_id))
+    assert system.workspace(run_id).read_file("src/echo.py") == original
+    assert result.phase == "QUALITY"
 
 
 def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
@@ -368,6 +415,49 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     done = system.activate_once(run_id)
     assert done.phase == "DONE"
     assert done.last_review.verdict == "release"
+
+
+def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    assert system.project(run_id).phase == "QUALITY"
+
+    system.add_guidance(run_id, "quality", "返工后仍需独立复检，不能把旧放行当作完成。")
+    adapter.script.append(review_turn(
+        "rework_engineering",
+        "Empty input still prints nothing.",
+        defects=[{"severity": "major", "summary": "Empty input is not rejected."}],
+    ))
+    rejected = system.activate_once(run_id)
+    assert rejected.phase == "ENGINEERING"
+    assert rejected.delivery_spec is None
+    assert rejected.last_review.verdict == "rework_engineering"
+    assert rejected.department_guidance[0].status in {"received", "in_input"}
+    rework_activation = rejected.last_activations["quality"]
+    assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
+
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="已记录返工原因；需要工程修复后再做独立质检。",
+    )))
+    responded = system.activate_once(run_id)
+    assert responded.department_guidance[0].status == "completed"
+    assert responded.phase == "ENGINEERING"
+    assert responded.last_review.verdict == "rework_engineering"
+    assert responded.last_activations["quality"] != rework_activation
+    assert adapter.invocations[-1].department == "quality"
+    assert adapter.invocations[-1].guidance_only is True
+    assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
+
+    adapter.script.append(plan_turn(reason="Fix empty-input handling after QA rework."))
+    next_work = system.activate_once(run_id)
+    assert next_work.phase == "ENGINEERING"
+    assert next_work.active_department == "engineering"
+    assert adapter.invocations[-1].department == "engineering"
+    assert next_work.last_review.verdict == "rework_engineering"
 
 
 def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):

@@ -505,6 +505,7 @@ class RunProjection:
     department_prompts: dict[str, DepartmentPrompt] = field(default_factory=dict)
     prompt_versions: list[DepartmentPrompt] = field(default_factory=list)
     department_guidance: list[DepartmentGuidance] = field(default_factory=list)
+    yielded_work: dict[str, Any] | None = None
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None

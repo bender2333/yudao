@@ -13,7 +13,7 @@ from typing import Any
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
 from .adapters.responses import ResponsesExecutionScope
 from .artifacts import ArtifactStore
-from .context import ContextAssembler, department_work_text
+from .context import ContextAssembler, GUIDANCE_ONLY_TOOLS, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase, tool_error
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
@@ -510,12 +510,7 @@ class Orchestrator:
             if normal_department is None or pending_guidance[0].department != normal_department:
                 department = pending_guidance[0].department
                 guidance_only = department != "product"
-                yielded_work = {
-                    "phase": projection.phase,
-                    "effective_contract_hash": current_contract_hash(projection),
-                    "engineering_plan_hash": current_plan_hash(projection),
-                    "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-                }
+                yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
         if department is None:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
@@ -605,6 +600,15 @@ class Orchestrator:
                            guidance_version=self._guidance_version(projection, department),
                            guidance_ids=tuple(item.id for item in self._pending_guidance(projection, department)),
                            guidance_only=guidance_only, yielded_work=yielded_work)
+
+    @staticmethod
+    def _work_basis(projection: RunProjection) -> dict[str, Any]:
+        return {
+            "phase": projection.phase,
+            "effective_contract_hash": current_contract_hash(projection),
+            "engineering_plan_hash": current_plan_hash(projection),
+            "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+        }
 
     @staticmethod
     def _configured_provider(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
@@ -1364,6 +1368,8 @@ class Orchestrator:
                 return ToolAdmission(stopped=True)
             if not has_tool(request.department, call["name"]):
                 return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
+            if activation.guidance_only and call["name"] not in GUIDANCE_ONLY_TOOLS:
+                return ToolAdmission(error="This guidance activation cannot change files or submit normal department work.")
             error = tool_error(current, request.department, call["name"], call["args"])
             if error:
                 return ToolAdmission(error=error)
@@ -1800,12 +1806,13 @@ class Orchestrator:
         session_id: str,
         department: str,
     ) -> None:
-        if artifact.get("kind") != "department_guidance_response" or not yielded_work:
-            return
         current = self.project(run_id)
+        basis = current.yielded_work or yielded_work
+        if artifact.get("kind") != "department_guidance_response" or not basis:
+            return
         if current.phase in TERMINAL_PHASES:
             return
-        target = guidance_resume_phase(yielded_work, current)
+        target = guidance_resume_phase(basis, current)
         if target == current.phase:
             return
         self.store.append(
@@ -1816,7 +1823,8 @@ class Orchestrator:
             state_before=current.phase,
             state_after=target,
             session_id=session_id,
-            payload={"from": current.phase, "to": target, "route": f"{current.phase}->{target}"},
+            payload={"from": current.phase, "to": target, "route": f"{current.phase}->{target}",
+                     "yielded_work_resolved": True, "yielded_work": dict(basis)},
         )
 
     def _record_lesson_candidate(self, source: RunEvent, projection: RunProjection) -> None:

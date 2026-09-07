@@ -527,12 +527,15 @@ def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None
     return None
 
 
+GUIDANCE_ONLY_TOOLS = frozenset({
+    "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
+})
+
+
 def _tools_for(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
     from .tools import tools_for
 
     available = tools_for(department)
     if guidance_only:
-        available = [name for name in available if name in {
-            "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
-        }]
+        available = [name for name in available if name in GUIDANCE_ONLY_TOOLS]
     return [name for name in available if tool_error(projection, department, name, {}) is None]
