@@ -7,7 +7,8 @@ from typing import Any
 
 from .contracts import current_contract_hash, normalize_scope
 from .collaboration import (
-    allowed_proposal_kinds, guidance_response_errors, request_basis, request_errors, response_errors, resume_phase,
+    allowed_proposal_kinds, guidance_bound_result_ids, guidance_response_errors, request_basis,
+    request_errors, response_errors, resume_phase,
 )
 from .models import (
     DEPARTMENTS,
@@ -233,7 +234,9 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
         "department": department,
         "status": proposal["status"],
         "text": text.strip(),
-        "result_event_ids": list(proposal.get("result_event_ids", [])),
+        "result_event_ids": guidance_bound_result_ids(
+            proposal, projection, department, events, snapshot_hash=snapshot.digest, guidance=guidance,
+        ),
     }
     return ProposalDecision(True, artifact={
         **payload,

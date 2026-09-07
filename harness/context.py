@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from .contracts import current_contract_hash, current_plan_hash
-from .collaboration import tool_error
+from .collaboration import guidance_result_summaries, tool_error
 from .models import (
     ContextExclusion,
     ContextManifest,
@@ -113,8 +113,8 @@ for _contract in PROPOSAL_CONTRACTS.values():
         "department_guidance_response": {
             "required": ["guidance_id", "status", "text", "result_event_ids"],
             "status": ["completed", "declined", "needs_work"],
-            "result_event_ids": "actual host event ids from this department's current work, never model call ids",
-            "bind": ["the target department guidance id and the current activation"],
+            "result_event_ids": "optional; host binds current host results from guidance_results on completed",
+            "bind": ["the target department guidance id and current host results"],
         },
     })
 
@@ -148,7 +148,9 @@ class ContextAssembler:
                  compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
                  context_window: int | None = None, max_output_tokens: int | None = None,
                  guidance: list[DepartmentGuidance] | None = None,
-                 guidance_only: bool = False) -> AssembledContext:
+                 guidance_only: bool = False,
+                 events: list[Any] | None = None,
+                 snapshot_hash: str | None = None) -> AssembledContext:
         effective_window = projection.context_window if context_window is None else context_window
         if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
                 or effective_window < 1):
@@ -238,6 +240,14 @@ class ContextAssembler:
             parts.append(ContextPart("request_results", request.id, json_dumps([
                 item for item in projection.request_results if item["request_id"] == request.id
             ])))
+        pending_for_results = [item for item in projection.department_guidance
+                               if item.department == department and item.status in {"received", "in_input"}]
+        if pending_for_results and events:
+            parts.append(ContextPart(
+                "guidance_results",
+                None,
+                json_dumps(guidance_result_summaries(projection, department, events, snapshot_hash or "")),
+            ))
         prior_request = next((item for item in reversed(projection.requests) if item.requester == department and item.status != "open"), None)
         if prior_request is not None:
             response = next((item for item in reversed(projection.responses) if item.request_id == prior_request.id), None)
@@ -424,7 +434,9 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                         if item.department == department and item.status in {"received", "in_input"}]
     if pending_guidance:
         work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文，"
-                 "完成可核对的处理后必须用 submit_guidance_response 逐条回应；指导不能替代产品要求、工程计划或质检放行。")
+                 "完成可核对的处理后必须用 submit_guidance_response 逐条回应。"
+                 "guidance_results 中的主机结果由宿主在 completed 时绑定，不必手抄事件 id；"
+                 "指导不能替代产品要求、工程计划或质检放行。")
     return {
         "department": department, "phase": projection.phase, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,

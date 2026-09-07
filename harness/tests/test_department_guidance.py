@@ -31,6 +31,11 @@ def _last_activation(system, run_id):
                 if event.type == EventType.DEPARTMENT_ACTIVATED)
 
 
+def _guidance_results(request):
+    part = next(part for part in request.context.parts if part.source == "guidance_results")
+    return json.loads(part.text)
+
+
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -497,7 +502,7 @@ def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     assert responded.payload["result_event_ids"] == []
 
 
-def test_engineering_write_then_completed_without_tool_id_is_rejected(tmp_path):
+def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path):
     adapter = FakeAdapter([product_spec(), plan_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
@@ -518,11 +523,10 @@ def test_engineering_write_then_completed_without_tool_id_is_rejected(tmp_path):
                  if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
                  and event.payload.get("activation_id") == request.activation_id)
     assert write.payload["ok"] is True
-    assert result.department_guidance[0].status in {"received", "in_input"}
-    assert result.rejections
-    assert any(error["field"] == "result_event_ids" for error in result.rejections[-1]["errors"])
-    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
-                   for event in system.store.list_events(run_id))
+    assert result.department_guidance[0].status == "completed", result.rejections
+    responded = next(event for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    assert write.event_id in responded.payload["result_event_ids"]
 
 
 def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
@@ -557,6 +561,34 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
     write = system.store.get_event(responded.payload["result_event_ids"][0])
     assert write.type == EventType.TOOL_CALLED and write.payload["name"] == "write_file"
     assert write.payload["ok"] is True
+
+
+def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
+    adapter.script.append(lambda request: FakeTurn(
+        writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+        proposal=guidance_response(_guidance_id(request), text=""),
+    ))
+    first = system.activate_once(run_id)
+    assert first.department_guidance[0].status in {"received", "in_input"}
+    write = next(event for event in system.store.list_events(run_id)
+                 if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
+                 and event.payload.get("ok"))
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="已按先前写入处理。", result_event_ids=[],
+    )))
+    done = system.activate_once(run_id)
+    assert done.department_guidance[0].status == "completed", done.rejections
+    request = adapter.invocations[-1]
+    assert any(item["event_id"] == write.event_id for item in _guidance_results(request))
+    responded = next(event for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    assert write.event_id in responded.payload["result_event_ids"]
 
 
 @pytest.mark.parametrize("result_event_ids", [["unknown-event-id"], None])

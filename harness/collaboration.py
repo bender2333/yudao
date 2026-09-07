@@ -240,12 +240,61 @@ def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection
             continue
         if status == "completed" and not _current_guidance_result(event, projection, snapshot_hash):
             errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
-    if status == "completed":
-        required = {event.event_id for event in _activation_claimable_results(
-            projection, department, events, snapshot_hash)}
-        if not required <= set(references):
-            errors.append(_error("result_event_ids", "completed requires a current host result for the claimed action"))
     return errors
+
+
+def guidance_claimable_results(projection: RunProjection, department: str, events: list[Event],
+                               snapshot_hash: str, *, guidance: Any | None = None) -> list[Event]:
+    items = [guidance] if guidance is not None else [
+        item for item in projection.department_guidance
+        if item.department == department and item.status in {"received", "in_input"}
+    ]
+    activation_ids: set[str] = set()
+    current = projection.last_activations.get(department)
+    if current:
+        activation_ids.add(current)
+    for item in items:
+        if item is None:
+            continue
+        if item.applied_activation_id:
+            activation_ids.add(item.applied_activation_id)
+        activation_ids.update(_applied_activation_ids(item.id, projection, events))
+    return _claimable_results_for_activations(projection, department, events, snapshot_hash, activation_ids)
+
+
+def guidance_bound_result_ids(proposal: dict[str, Any], projection: RunProjection, department: str,
+                              events: list[Event], *, snapshot_hash: str, guidance: Any) -> list[str]:
+    provided = [item for item in proposal.get("result_event_ids", []) if isinstance(item, str) and item]
+    if proposal.get("status") != "completed":
+        return list(dict.fromkeys(provided))
+    bound: list[str] = []
+    seen: set[str] = set()
+    for event in guidance_claimable_results(
+            projection, department, events, snapshot_hash, guidance=guidance):
+        if event.event_id not in seen:
+            bound.append(event.event_id)
+            seen.add(event.event_id)
+    for reference in provided:
+        if reference not in seen:
+            bound.append(reference)
+            seen.add(reference)
+    return bound
+
+
+def guidance_result_summaries(projection: RunProjection, department: str, events: list[Event],
+                              snapshot_hash: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "event_id": event.event_id,
+            "type": event.type,
+            "role": event.role,
+            "name": event.payload.get("name"),
+            "ok": event.payload.get("ok"),
+            "content_hash": event.payload.get("content_hash"),
+            "activation_id": event.payload.get("activation_id"),
+        }
+        for event in guidance_claimable_results(projection, department, events, snapshot_hash)
+    ]
 
 
 def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
@@ -408,30 +457,55 @@ def _current_guidance_result(event: Event, projection: RunProjection, snapshot_h
                 and pending.created_event_id == event.event_id and pending.requester == event.role)
 
 
-def _activation_claimable_results(projection: RunProjection, department: str, events: list[Event],
-                                  snapshot_hash: str) -> list[Event]:
-    activation_id = projection.last_activations.get(department)
-    started = next((event for event in reversed(events)
-                    if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
-                    and event.role == department and event.payload.get("activation_id") == activation_id), None)
-    if started is None or not activation_id:
+def _applied_activation_ids(guidance_id: str, projection: RunProjection, events: list[Event]) -> set[str]:
+    return {
+        str(event.payload.get("activation_id"))
+        for event in events
+        if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED and event.run_id == projection.run_id
+        and guidance_id in event.payload.get("guidance_ids", []) and event.payload.get("activation_id")
+    }
+
+
+def _claimable_results_for_activations(projection: RunProjection, department: str, events: list[Event],
+                                       snapshot_hash: str, activation_ids: set[str]) -> list[Event]:
+    activation_ids = {item for item in activation_ids if item}
+    starts = [event for event in events
+              if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
+              and event.role == department and event.payload.get("activation_id") in activation_ids]
+    if not starts:
         return []
-    owned = lambda item: _guidance_owned(item, projection, department) and item.seq > started.seq
+    windows: list[tuple[Event, int | None]] = []
+    for start in starts:
+        nxt = next((event for event in events
+                    if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
+                    and event.role == department and event.seq > start.seq), None)
+        windows.append((start, None if nxt is None else nxt.seq))
+    owned = lambda item: _guidance_owned(item, projection, department)
     found: list[Event] = []
+    seen: set[str] = set()
     for event in events:
-        if not owned(event):
+        if not owned(event) or event.event_id in seen:
+            continue
+        start = next((item for item, end in windows
+                      if item.seq < event.seq and (end is None or event.seq < end)), None)
+        if start is None:
             continue
         if event.type == EventType.TOOL_CALLED:
-            if event.payload.get("activation_id") != activation_id or event.payload.get("name") not in _CLAIMABLE_TOOLS:
+            if (event.payload.get("activation_id") != start.payload.get("activation_id")
+                    or event.payload.get("name") not in _CLAIMABLE_TOOLS):
                 continue
-            result = _host_tool_result(event, events, owned=owned, after_seq=started.seq)
+            result = _host_tool_result(event, events, owned=owned, after_seq=start.seq)
             if result is None or not result["ok"]:
+                continue
+            if event.payload.get("name") in _MUTATIONS and not _guidance_tool_current(event, projection):
                 continue
             if event.payload.get("name") in _CHECKS and not _usable_tool_result(event, result, projection, snapshot_hash):
                 continue
             found.append(event)
+            seen.add(event.event_id)
         elif event.type in _GUIDANCE_ACCEPTED and _current_guidance_result(event, projection, snapshot_hash):
             found.append(event)
+            seen.add(event.event_id)
     return found
 
 

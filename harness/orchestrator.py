@@ -768,12 +768,15 @@ class Orchestrator:
             try:
                 effective_window, output_limit = self._effective_limits(current, identity.target)
                 guidance_items = self._pending_guidance(current, identity.department) if step_id == 1 else []
+                events = self.store.list_events(identity.run_id)
+                snapshot_hash = self.workspace(identity.run_id).snapshot().digest
                 pinned = self.assembler.assemble(
                     current, department=identity.department, session_id=identity.session_id,
                     activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
                     context_window=effective_window, max_output_tokens=output_limit,
                     guidance=guidance_items,
                     guidance_only=identity.guidance_only,
+                    events=events, snapshot_hash=snapshot_hash,
                 )
             except ValueError as exc:
                 raise ProviderError(str(exc), reason="context_overflow") from exc
@@ -827,6 +830,7 @@ class Orchestrator:
                         compaction_event_id=checkpoint_id,
                         context_window=effective_window, max_output_tokens=output_limit,
                         guidance=guidance_items, guidance_only=identity.guidance_only,
+                        events=events, snapshot_hash=snapshot_hash,
                     )
             except (CompactionError, ValueError, FileNotFoundError) as exc:
                 reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window * 85 // 100 else "compaction_failed"
