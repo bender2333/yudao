@@ -217,13 +217,16 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
         return ProposalDecision(False, [FieldError("guidance_id", "guidance must belong to the current department and run")])
     if guidance.status not in {"received", "in_input"}:
         return ProposalDecision(False, [FieldError("guidance_id", "guidance has already been responded to")])
+    text = proposal.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return ProposalDecision(False, [FieldError("text", "text must be a non-empty string")])
     payload = {
         "guidance_id": guidance.id,
         "guidance_version": guidance.version,
         "guidance_created_event_id": guidance.created_event_id,
         "department": department,
         "status": proposal["status"],
-        "text": proposal["text"].strip(),
+        "text": text.strip(),
     }
     return ProposalDecision(True, artifact={
         **payload,
@@ -260,6 +263,13 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         return ProposalDecision(True, artifact=artifact)
     if phase in {"PRODUCT_SPEC", "REWORK_PRODUCT"}:
         transitions = [(phase, "ENGINEERING")]
+        return ProposalDecision(True, artifact=artifact, transitions=transitions)
+    has_product_guidance = any(
+        item.department == "product" and item.status in {"received", "in_input"}
+        for item in projection.department_guidance
+    )
+    if has_product_guidance:
+        transitions = [] if phase == "ENGINEERING" else [(phase, "ENGINEERING")]
         return ProposalDecision(True, artifact=artifact, transitions=transitions)
     return ProposalDecision(False, [FieldError("kind", "product_spec not expected")])
 

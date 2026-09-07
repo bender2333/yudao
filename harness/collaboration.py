@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from .models import (
-    DEPARTMENTS, PRODUCT_ACTIVE, TERMINAL_PHASES, CollaborationRequest, Event,
+    DEPARTMENTS, PRODUCT_ACTIVE, QUALITY_ACTIVE, TERMINAL_PHASES, CollaborationRequest, Event,
     EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
 )
 from .tools import SUBMIT_KINDS, TOOL_DEFS
@@ -35,8 +35,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
     if projection.phase in TERMINAL_PHASES or department not in DEPARTMENTS:
         return set()
     request = projection.pending_request
-    has_guidance = any(item.department == department and item.status in {"received", "in_input"}
-                       for item in projection.department_guidance)
+    has_guidance = _has_pending_guidance(projection, department)
     if request is not None:
         if request.status != "open" or department != request.recipient:
             return set()
@@ -49,7 +48,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
             allowed.add("department_guidance_response")
         return allowed
     if department != department_for_phase(projection.phase):
-        return {"department_guidance_response"} if has_guidance else set()
+        return _diverted_guidance_kinds(department, projection) if has_guidance else set()
     allowed = {"collaboration_request"} | {
         "product": {"product_spec", "product_decision"},
         "engineering": {"engineering_plan", "delivery_spec"},
@@ -67,7 +66,10 @@ def request_errors(proposal: dict[str, Any], projection: RunProjection,
     errors = []
     if projection.pending_request is not None:
         errors.append(_error("request", "finish the pending request before starting another request"))
-    if department not in DEPARTMENTS or department != department_for_phase(projection.phase):
+    if department not in DEPARTMENTS:
+        errors.append(_error("requester", "only the current working department can start a request"))
+    elif (department != department_for_phase(projection.phase)
+          and not _has_pending_guidance(projection, department)):
         errors.append(_error("requester", "only the current working department can start a request"))
     recipient = proposal.get("recipient")
     if recipient not in DEPARTMENTS or recipient == department:
@@ -197,6 +199,28 @@ def response_errors(proposal: dict[str, Any], projection: RunProjection, departm
     return errors
 
 
+def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
+    current = {
+        "effective_contract_hash": _content_hash(projection.effective_contract),
+        "engineering_plan_hash": _content_hash(projection.engineering_plan),
+        "delivery_spec_hash": _content_hash(projection.delivery_spec),
+    }
+    yielded_hashes = {key: yielded.get(key) for key in current}
+    if current == yielded_hashes:
+        phase = yielded.get("phase") or projection.phase
+        if phase in QUALITY_ACTIVE and projection.delivery_spec is None:
+            return "ENGINEERING"
+        return phase
+    if projection.effective_contract is None:
+        return "PRODUCT_SPEC"
+    delivery = projection.delivery_spec
+    if (delivery is not None
+            and delivery.effective_contract_hash == current["effective_contract_hash"]
+            and delivery.engineering_plan_hash == current["engineering_plan_hash"]):
+        return "QUALITY"
+    return "ENGINEERING"
+
+
 def resume_phase(request: CollaborationRequest, projection: RunProjection, events: list[Event],
                  *, snapshot_hash: str) -> tuple[str, bool]:
     if projection.phase in TERMINAL_PHASES:
@@ -298,6 +322,20 @@ def _creation(request: CollaborationRequest, events: list[Event]) -> Event | Non
 def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool:
     return (event.run_id == request.run_id and event.seq > creation.seq
             and event.role == request.recipient and event.payload.get("request_id") == request.id)
+
+
+def _has_pending_guidance(projection: RunProjection, department: str) -> bool:
+    return any(item.department == department and item.status in {"received", "in_input"}
+               for item in projection.department_guidance)
+
+
+def _diverted_guidance_kinds(department: str, projection: RunProjection) -> set[str]:
+    if department == "product":
+        allowed = {"collaboration_request", "product_spec", "product_decision", "department_guidance_response"}
+        if projection.input_version > projection.processed_input_version:
+            return allowed - {"product_decision"}
+        return allowed
+    return {"department_guidance_response", "collaboration_request"}
 
 
 def _content_hash(value: Any) -> str | None:

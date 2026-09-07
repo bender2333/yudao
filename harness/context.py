@@ -532,5 +532,7 @@ def _tools_for(projection: RunProjection, department: str, *, guidance_only: boo
 
     available = tools_for(department)
     if guidance_only:
-        available = [name for name in available if name in {"read_file", "list_files", "run_check", "submit_guidance_response"}]
+        available = [name for name in available if name in {
+            "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
+        }]
     return [name for name in available if tool_error(projection, department, name, {}) is None]

@@ -15,7 +15,7 @@ from .adapters.responses import ResponsesExecutionScope
 from .artifacts import ArtifactStore
 from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
-from .collaboration import request_basis, request_still_applicable, resume_phase, tool_error
+from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase, tool_error
 from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
 from .event_store import EventStore
 from .engine import MAX_PROVIDER_ATTEMPTS, ToolAdmission, run_department
@@ -81,6 +81,7 @@ class _Activation:
     guidance_ids: tuple[str, ...] = ()
     guidance_only: bool = False
     guidance_applied: bool = False
+    yielded_work: dict[str, Any] | None = None
     attempt_captures: dict[str, "_AttemptCapture"] = field(default_factory=dict)
 
     def versions(self) -> dict[str, Any]:
@@ -504,10 +505,17 @@ class Orchestrator:
                             if item.status in {"received", "in_input"}]
         guidance_only = False
         department = normal_department
+        yielded_work = None
         if projection.pending_request is None and pending_guidance:
             if normal_department is None or pending_guidance[0].department != normal_department:
                 department = pending_guidance[0].department
-                guidance_only = True
+                guidance_only = department != "product"
+                yielded_work = {
+                    "phase": projection.phase,
+                    "effective_contract_hash": current_contract_hash(projection),
+                    "engineering_plan_hash": current_plan_hash(projection),
+                    "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+                }
         if department is None:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
@@ -582,6 +590,7 @@ class Orchestrator:
                      "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection),
                      "guidance_ids": [item.id for item in self._pending_guidance(projection, department)],
                      "guidance_only": guidance_only,
+                     "yielded_work": yielded_work,
                      "guidance_version": self._guidance_version(projection, department),
                      "input_version": projection.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash,
@@ -595,7 +604,7 @@ class Orchestrator:
                            engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection),
                            guidance_version=self._guidance_version(projection, department),
                            guidance_ids=tuple(item.id for item in self._pending_guidance(projection, department)),
-                           guidance_only=guidance_only)
+                           guidance_only=guidance_only, yielded_work=yielded_work)
 
     @staticmethod
     def _configured_provider(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
@@ -725,6 +734,7 @@ class Orchestrator:
                 transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
                 session_id=request.session_id,
                 guidance_version=activation.guidance_version,
+                yielded_work=activation.yielded_work,
                 provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
                 model=submission.response.model,
             )
@@ -1664,6 +1674,7 @@ class Orchestrator:
         guidance_version: int,
         provider: str | None,
         model: str | None,
+        yielded_work: dict[str, Any] | None = None,
     ) -> None:
         evaluated = self.project(run_id)
         snapshot = self.workspace(run_id).snapshot()
@@ -1722,6 +1733,7 @@ class Orchestrator:
                 run_id, department=department, projection=projection, snapshot=snapshot,
                 artifact=decision.artifact or {}, transitions=decision.transitions,
                 parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
+                yielded_work=yielded_work,
             )
 
     def _commit_accepted(
@@ -1737,6 +1749,7 @@ class Orchestrator:
         session_id: str,
         provider: str | None,
         model: str | None,
+        yielded_work: dict[str, Any] | None = None,
     ) -> None:
         if self.project(run_id).phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
@@ -1772,6 +1785,39 @@ class Orchestrator:
                     payload={"stop_reason": "released"},
                 )
                 self.sessions.close_run(run_id)
+        self._resume_yielded_work(
+            run_id, artifact=artifact, yielded_work=yielded_work,
+            parent_event_id=parent_event_id, session_id=session_id, department=department,
+        )
+
+    def _resume_yielded_work(
+        self,
+        run_id: str,
+        *,
+        artifact: dict[str, Any],
+        yielded_work: dict[str, Any] | None,
+        parent_event_id: str,
+        session_id: str,
+        department: str,
+    ) -> None:
+        if artifact.get("kind") != "department_guidance_response" or not yielded_work:
+            return
+        current = self.project(run_id)
+        if current.phase in TERMINAL_PHASES:
+            return
+        target = guidance_resume_phase(yielded_work, current)
+        if target == current.phase:
+            return
+        self.store.append(
+            run_id,
+            EventType.TRANSITION,
+            role=department_for_phase(target) or department,
+            parent_event_id=parent_event_id,
+            state_before=current.phase,
+            state_after=target,
+            session_id=session_id,
+            payload={"from": current.phase, "to": target, "route": f"{current.phase}->{target}"},
+        )
 
     def _record_lesson_candidate(self, source: RunEvent, projection: RunProjection) -> None:
         if source.type == EventType.QA_SUBMITTED:

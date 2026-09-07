@@ -4,10 +4,15 @@ import json
 import threading
 from http.client import HTTPConnection
 
+import pytest
+
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType
 from harness.observability import ObservabilityQuery
-from harness.proposals import delivery_turn, guidance_response, plan_turn, product_spec
+from harness.proposals import (
+    collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec,
+    response_turn, review_turn,
+)
 from harness.runtime import LoopSystem
 from harness.web.server import serve
 
@@ -15,6 +20,15 @@ from harness.web.server import serve
 def _guidance_id(request):
     part = next(part for part in request.context.parts if part.source == "department_guidance")
     return json.loads(part.text)[0]["id"]
+
+
+def _tool_names(request):
+    return [item["name"] for item in request.tools]
+
+
+def _last_activation(system, run_id):
+    return next(event for event in reversed(system.store.list_events(run_id))
+                if event.type == EventType.DEPARTMENT_ACTIVATED)
 
 
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
@@ -66,7 +80,9 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     assert result.active_department == "engineering"
     assert result.department_guidance[0].status == "completed"
     request = adapter.invocations[-1]
-    assert [item["name"] for item in request.tools] == ["read_file", "list_files", "run_check", "submit_guidance_response"]
+    assert _tool_names(request) == [
+        "read_file", "list_files", "run_check", "submit_request", "submit_guidance_response",
+    ]
 
 
 def test_guidance_received_during_model_request_invalidates_old_submission(tmp_path):
@@ -123,3 +139,253 @@ def test_guidance_http_command_returns_persisted_target_record(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_guidance_not_completed_by_activation_or_rejection(tmp_path):
+    adapter = FakeAdapter([product_spec(goal="   ")])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.add_guidance(run_id, "product", "请补充输入校验的处理说明。")
+    result = system.activate_once(run_id)
+
+    guidance = result.department_guidance[0]
+    assert guidance.status in {"received", "in_input"}
+    assert guidance.status != "completed"
+    assert result.rejections
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+    assert any(event.type == EventType.PROPOSAL_REJECTED for event in system.store.list_events(run_id))
+    assert any(event.type == EventType.CONTEXT_ASSEMBLED for event in system.store.list_events(run_id))
+    assert any(event.type == EventType.ACTIVATION_FINISHED for event in system.store.list_events(run_id))
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n\t"])
+@pytest.mark.parametrize("status", ["completed", "declined", "needs_work"])
+def test_guidance_completed_requires_nonempty_response_text(tmp_path, text, status):
+    adapter = FakeAdapter([])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.add_guidance(run_id, "product", "请说明当前验收边界。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), status=status, text=text,
+    )))
+    result = system.activate_once(run_id)
+
+    assert result.department_guidance[0].status != "completed"
+    assert result.department_guidance[0].status in {"received", "in_input"}
+    assert result.rejections
+    assert any(error["field"] == "text" for error in result.rejections[-1]["errors"])
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+
+
+def test_guidance_response_binds_that_guidance_id(tmp_path):
+    adapter = FakeAdapter([product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        "guidance-not-this-id", text="不能绑定到其他指导。",
+    )))
+    rejected = system.activate_once(run_id)
+    assert rejected.department_guidance[0].status != "completed"
+    assert rejected.department_guidance[0].status in {"received", "in_input"}
+    assert any(error["field"] == "guidance_id" for error in rejected.rejections[-1]["errors"])
+
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="已检查边界行为，当前指导不改变产品合同。",
+    )))
+    done = system.activate_once(run_id)
+    assert done.department_guidance[0].status == "completed"
+    assert done.department_guidance[0].response_text == "已检查边界行为，当前指导不改变产品合同。"
+    responded = next(event for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    assert responded.payload["guidance_id"] == done.department_guidance[0].id
+
+
+def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    assert system.project(run_id).phase == "ENGINEERING"
+
+    system.add_guidance(run_id, "product", "请确认未知参数是否需要写入验收。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="当前合同已覆盖该行为，无需改需求。",
+    )))
+    result = system.activate_once(run_id)
+    request = adapter.invocations[-1]
+    names = _tool_names(request)
+    assert request.department == "product"
+    assert request.guidance_only is False
+    assert "submit_product_spec" in names
+    assert "submit_guidance_response" in names
+    assert names != ["read_file", "list_files", "run_check", "submit_guidance_response"]
+    yielded = _last_activation(system, run_id).payload["yielded_work"]
+    assert yielded["phase"] == "ENGINEERING"
+    assert yielded["effective_contract_hash"] == result.effective_contract.content_hash
+    assert yielded["engineering_plan_hash"] == result.engineering_plan.content_hash
+    assert result.department_guidance[0].status == "completed"
+    assert result.phase == "ENGINEERING"
+
+    adapter.script.append(plan_turn(reason="Continue engineering after product guidance."))
+    resumed = system.activate_once(run_id)
+    assert adapter.invocations[-1].department == "engineering"
+    assert resumed.phase == "ENGINEERING"
+    assert resumed.active_department == "engineering"
+
+
+def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    before = system.project(run_id)
+    assert before.phase == "QUALITY"
+    old_delivery = before.delivery_spec.content_hash
+
+    system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
+    adapter.script.append(product_spec(
+        requirements=["print the given argument in uppercase"],
+        acceptance=["running the program with a word prints that word in uppercase"],
+        change_record={
+            "changed": ["Output casing"],
+            "retained": ["Echo CLI"],
+            "retired": [],
+            "rationale": "Guidance requires uppercase output.",
+        },
+    ))
+    revised = system.activate_once(run_id)
+    assert revised.delivery_spec is None
+    assert revised.delivery_specs[-1].status == "superseded"
+    assert revised.delivery_specs[-1].content_hash == old_delivery
+    assert revised.phase == "ENGINEERING"
+    assert revised.department_guidance[0].status in {"received", "in_input"}
+    yielded = _last_activation(system, run_id).payload["yielded_work"]
+    assert yielded["phase"] == "QUALITY"
+    assert yielded["delivery_spec_hash"] == old_delivery
+
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="已把大写输出写入产品要求。",
+    )))
+    responded = system.activate_once(run_id)
+    assert responded.department_guidance[0].status == "completed"
+    assert responded.phase == "ENGINEERING"
+    assert responded.delivery_spec is None
+
+    adapter.script.append(plan_turn(reason="Rebuild after product guidance changed the contract."))
+    next_work = system.activate_once(run_id)
+    assert next_work.phase == "ENGINEERING"
+    assert next_work.active_department == "engineering"
+    assert adapter.invocations[-1].department == "engineering"
+    assert next_work.delivery_spec is None
+
+
+def test_guidance_only_engineering_can_request_product(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    assert system.project(run_id).phase == "QUALITY"
+
+    system.add_guidance(run_id, "engineering", "验收需要产品确认未知参数的处理。")
+    adapter.script.append(collaboration_request(
+        "product", "未知参数应如何写入验收？",
+        request_type="action", action="revise_requirements",
+        background="Quality-phase engineering guidance cannot change the product contract.",
+        expected_result="Product updates the effective requirements if needed.",
+    ))
+    result = system.activate_once(run_id)
+    request = adapter.invocations[-1]
+    names = _tool_names(request)
+    assert request.department == "engineering"
+    assert request.guidance_only is True
+    assert "submit_request" in names
+    assert "write_file" not in names
+    assert "submit_delivery" not in names
+    assert result.pending_request is not None
+    assert result.pending_request.recipient == "product"
+    assert result.department_guidance[0].status in {"received", "in_input"}
+
+
+def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
+    holder = {}
+
+    def cancel_during(request):
+        holder["system"].cancel(request.run_id)
+        return FakeTurn(proposal=guidance_response(
+            _guidance_id(request), text="迟到的指导回应不能在取消后生效。",
+        ))
+
+    adapter = FakeAdapter([])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("echo")
+    system.add_guidance(run_id, "product", "请补充输入校验的处理说明。")
+    adapter.script.append(cancel_during)
+    result = system.activate_once(run_id)
+
+    assert result.stop_reason == "cancelled"
+    assert result.phase == "FAILED"
+    assert result.department_guidance[0].status in {"received", "in_input"}
+    assert result.department_guidance[0].status != "completed"
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+
+
+def test_qa_release_blocked_until_guidance_response(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    assert system.project(run_id).phase == "QUALITY"
+
+    system.add_guidance(run_id, "quality", "放行前请核对错误输出边界。")
+    adapter.script.append(review_turn("release", "Attempt release before the guidance has a recorded response."))
+    blocked = system.activate_once(run_id)
+    assert blocked.phase == "QUALITY"
+    assert blocked.last_review is None
+    assert any(error["field"] == "guidance" for error in blocked.rejections[-1]["errors"])
+    assert blocked.department_guidance[0].status in {"received", "in_input"}
+
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request), text="已核对错误输出边界，可以按当前交付独立复检。",
+    )))
+    responded = system.activate_once(run_id)
+    assert responded.department_guidance[0].status == "completed"
+    assert responded.phase == "QUALITY"
+
+    adapter.script.append(review_turn("release", "Independent quality check after the guidance response."))
+    done = system.activate_once(run_id)
+    assert done.phase == "DONE"
+    assert done.last_review.verdict == "release"
+
+
+def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):
+    adapter = FakeAdapter([collaboration_request("engineering")])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    pending = system.activate_once(run_id)
+    assert pending.pending_request.recipient == "engineering"
+
+    system.add_guidance(run_id, "quality", "请先核对此次交付的验收边界。")
+    adapter.script.append(response_turn("answered", "Keep the original acceptance as written."))
+    result = system.activate_once(run_id)
+    assert adapter.invocations[-1].department == "engineering"
+    activated = [event for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_ACTIVATED]
+    assert activated[-1].role == "engineering"
+    assert not any(event.role == "quality" for event in activated)
+    assert result.department_guidance[0].department == "quality"
+    assert result.department_guidance[0].status == "received"
+    assert result.pending_request is None
+    assert result.responses[-1].status == "answered"
