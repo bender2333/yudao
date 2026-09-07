@@ -12,8 +12,8 @@
 | 项 | 事实 |
 | --- | --- |
 | 原始起点 | `239c3b1` `stagecommit` |
-| 当前 HEAD | `d52d7d6` `fix: address review feedback for guidance completion` |
-| 本轮主线增量 | `a875fa5` 证据账；`20c7e42` O/U 界面；`0b076f6`/`d52d7d6` 指导完成与准入；用户 `32a0568` 续编完成计划 |
+| 当前 HEAD | `ca14283` `fix: host-bind guidance results instead of copying ids` |
+| 本轮主线增量 | `a875fa5` 证据账；`20c7e42` O/U 界面；`0b076f6`/`d52d7d6` 指导调度准入；`36ab84f`/`ca14283` 指导结果宿主绑定；用户 `32a0568` 续编完成计划 |
 | 分支 | `harness_1` = `origin/harness_1` |
 | 工作树 | 已修改 `jour.md`（含既有 A/B/C/D 笔记，不代为提交）；未跟踪 `.serena/project.yml` |
 | 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
@@ -48,7 +48,7 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | W3 Context/详情 | 已在主线 `20c7e42` | 隔离 SHA 过时 | Raw CSS 选择器已测 | 64KB/320px 真机仍待 W7 | 详情行为已修，真机未验 | PARTIAL |
 | W4 列表/用量 | 已在主线 `20c7e42` | — | O3 取消筛选、O6 总计费用/不可合计已测 | 未作为真实验收关闭项 | 查询与 UI 口径已对齐，联调未关 | 主线局部完成 |
 | W5 总览/全局输入 | 骨架已有 | — | 终态草稿/新建入口已测（U6） | 连续输入真实验收未通过 | 待 P3 | PARTIAL |
-| W6 部门指导 | `0b076f6`/`d52d7d6` | 旧 auto-processed 已不在主线 | G2/G3 调度、准入、QA 竞态已测 | 无真实指导闭环 | 续编计划要求“声称修改须绑定结果”，此项仍缺 | PARTIAL |
+| W6 部门指导 | `ca14283` | 旧 auto-processed 已不在主线 | G1 宿主绑定结果、G2/G3 调度准入与 QA 竞态已测 | 无真实指导闭环 | 真实验收未做 | 主线局部完成 |
 | W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | 未开始 | 研究资料已导入 | — | — | 依赖 P0–P6 | 未开始 |
