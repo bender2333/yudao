@@ -314,6 +314,8 @@ body { overflow-x: hidden; }
     #department-workspace-prototype .dw-json-heading h3 { font-size: .86rem; }
     #department-workspace-prototype .dw-json-heading span { color: var(--dw-muted); font-size: .71rem; }
     #department-workspace-prototype .dw-json { margin: 0; padding: 12px; border: 1px solid var(--dw-border); border-radius: 6px; background: var(--dw-surface); color: var(--dw-foreground); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #department-workspace-prototype .dw-detail-panel .dw-json,
+    #department-workspace-prototype .dw-event-raw .dw-json { max-height: min(50vh, 24rem); overflow: auto; }
     #department-workspace-prototype .dw-observation-note { margin: 0 0 15px; color: var(--dw-muted); font-size: .75rem; }
     #department-workspace-prototype .dw-response-empty { padding: 16px 12px; border-left: 2px solid var(--dw-amber); background: var(--dw-amber-soft); color: var(--dw-amber); font-size: .78rem; }
     #department-workspace-prototype .dw-event-list { border-top: 1px solid var(--dw-border); }
@@ -343,7 +345,7 @@ body { overflow-x: hidden; }
     #department-workspace-prototype .dw-usage-value { min-width: 0; }
     #department-workspace-prototype .dw-usage-value span { display: block; color: var(--dw-muted); font-size: .68rem; }
     #department-workspace-prototype .dw-usage-value strong { display: block; margin-top: 2px; font-size: .76rem; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-    #department-workspace-prototype .dw-usage-total-strip { display: grid; grid-template-columns: minmax(130px, .8fr) repeat(4, minmax(0, 1fr)); gap: 17px; align-items: center; margin-top: 18px; padding: 12px 2px; border-top: 1px solid var(--dw-border-strong); border-bottom: 1px solid var(--dw-border-strong); }
+    #department-workspace-prototype .dw-usage-total-strip { display: grid; grid-template-columns: minmax(130px, .8fr) repeat(5, minmax(0, 1fr)); gap: 17px; align-items: center; margin-top: 18px; padding: 12px 2px; border-top: 1px solid var(--dw-border-strong); border-bottom: 1px solid var(--dw-border-strong); }
     #department-workspace-prototype .dw-usage-total-label { min-width: 0; }
     #department-workspace-prototype .dw-usage-total-label strong { display: block; font-size: .83rem; font-weight: 500; }
     #department-workspace-prototype .dw-usage-total-label span { display: block; margin-top: 3px; color: var(--dw-muted); font-size: .7rem; }
@@ -383,7 +385,7 @@ body { overflow-x: hidden; }
       #department-workspace-prototype .dw-request-row { grid-template-columns: 82px minmax(0, 1fr); gap: 11px; }
       #department-workspace-prototype .dw-request-metrics { grid-column: 2; display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 8px 13px; justify-items: start; }
       #department-workspace-prototype .dw-detail-grid { grid-template-columns: minmax(0, 1fr); }
-      #department-workspace-prototype .dw-usage-total-strip { grid-template-columns: minmax(110px, .9fr) repeat(4, minmax(0, 1fr)); gap: 10px; }
+      #department-workspace-prototype .dw-usage-total-strip { grid-template-columns: minmax(110px, .9fr) repeat(5, minmax(0, 1fr)); gap: 10px; }
     }
     @media (max-width: 430px) {
       #department-workspace-prototype .dw-filter-select,
@@ -418,6 +420,10 @@ body { overflow-x: hidden; }
       #department-workspace-prototype .dw-event-row p { grid-column: 2; }
       #department-workspace-prototype .dw-event-expand { grid-column: 3; grid-row: 1; }
       #department-workspace-prototype .dw-event-raw { margin-left: 62px; }
+    }
+    @media (max-width: 320px) {
+      #department-workspace-prototype .dw-detail-panel .dw-json,
+      #department-workspace-prototype .dw-event-raw .dw-json { max-height: min(50vh, 24rem); overflow: auto; }
     }
     #department-workspace-prototype .dw-task-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 13px; }
     #department-workspace-prototype .dw-tool-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 9px; border: 1px solid var(--dw-border); border-radius: 6px; background: var(--dw-surface); color: var(--dw-muted); cursor: pointer; font-size: .74rem; }

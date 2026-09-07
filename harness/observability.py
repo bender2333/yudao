@@ -211,6 +211,7 @@ class ObservabilityQuery:
                 **identity,
                 **{field: summary[field] for field in USAGE_FIELDS},
                 "currency": summary.get("currency"),
+                "cost_status": summary.get("cost_status"),
                 "estimated_totals": {field: estimated_summary[field] for field in USAGE_FIELDS},
                 "estimated_currency": estimated_summary.get("currency"),
                 "coverage": group_coverage,
@@ -242,6 +243,7 @@ class ObservabilityQuery:
             "version": SCHEMA_VERSION,
             "totals": {field: total[field] for field in USAGE_FIELDS},
             "currency": total.get("currency"),
+            "cost_status": total.get("cost_status"),
             "estimated_totals": {field: estimated_total[field] for field in USAGE_FIELDS},
             "estimated_currency": estimated_total.get("currency"),
             "coverage": coverage,
@@ -1150,21 +1152,29 @@ def _usage_totals(
     values: dict[str, Any] = {}
     coverage: dict[str, dict[str, Any]] = {}
     currency: str | None = None
+    cost_status = "missing"
     for field in USAGE_FIELDS:
         candidates = [] if source == "estimated" and field == "latency_ms" else (
             items if field == "latency_ms" else selected
         )
         known = [item.get("usage", {}).get(field) for item in candidates if item.get("usage", {}).get(field) is not None]
-        if field == "cost" and known:
-            currencies = {
-                item.get("usage", {}).get("currency")
-                for item in candidates if item.get("usage", {}).get(field) is not None
-            }
-            if len(currencies) == 1 and None not in currencies:
-                currency = next(iter(currencies))
-                values[field] = sum(known)
-            else:
+        if field == "cost":
+            if not known:
                 values[field] = None
+                cost_status = "missing"
+            else:
+                currencies = {
+                    item.get("usage", {}).get("currency")
+                    for item in candidates if item.get("usage", {}).get(field) is not None
+                }
+                if len(currencies) == 1 and None not in currencies:
+                    currency = next(iter(currencies))
+                    values[field] = sum(known)
+                    cost_status = "reported"
+                else:
+                    values[field] = None
+                    currency = None
+                    cost_status = "mixed_currency"
         else:
             values[field] = sum(known) if known else None
         total = len(items)
@@ -1178,6 +1188,7 @@ def _usage_totals(
     return {
         **values,
         "currency": currency,
+        "cost_status": cost_status,
         "coverage": coverage,
         "attempt_count": len(items),
         "in_progress_count": sum(status in {"prepared", "requesting"} for status in statuses),

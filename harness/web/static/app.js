@@ -41,7 +41,7 @@
     pending_request: "待处理协作",
     provider_binding: "Provider 绑定",
   };
-  const STATUS_LABELS = { success: "成功", failed: "失败", running: "进行中" };
+  const STATUS_LABELS = { success: "成功", failed: "失败", running: "进行中", cancelled: "已取消" };
   const PHASE_LABELS = {
     PRODUCT_SPEC: "产品处理中",
     ENGINEERING_PLAN: "工程计划中",
@@ -244,6 +244,19 @@
     else restore();
   }
 
+  function jsonScrollNode() {
+    return main?.querySelector?.(".dw-detail-panel .dw-json, .dw-event-raw .dw-json");
+  }
+
+  function captureJsonScroll() {
+    return jsonScrollNode()?.scrollTop || 0;
+  }
+
+  function restoreJsonScroll(value) {
+    const node = jsonScrollNode();
+    if (node) node.scrollTop = value;
+  }
+
   function setStatus(message, kind = "") {
     state.error = message || "";
     const node = root?.querySelector?.(".dw-action-error");
@@ -315,7 +328,7 @@
     if (contextId && contextPart && state.runId) state.selectedContextPart[`${state.runId}/${contextId}`] = contextPart;
     state.observationFilters = {
       department: ["product", "engineering", "quality"].includes(search.get("departmentFilter")) ? search.get("departmentFilter") : "all",
-      status: ["success", "failed", "running"].includes(search.get("status")) ? search.get("status") : "all",
+      status: ["success", "failed", "running", "cancelled"].includes(search.get("status")) ? search.get("status") : "all",
       q: search.get("q") || "",
     };
   }
@@ -440,6 +453,37 @@
     if (key === "product") return history.effective_contract?.goal || history.current_product_spec?.goal || data?.task || board?.task || "产品工作区";
     if (key === "engineering") return history.engineering_plan?.objective || data?.task || board?.task || "工程工作区";
     return materials.reviews?.at(-1)?.rationale || history.current_delivery_spec?.summary || data?.task || board?.task || "质检工作区";
+  }
+
+  function shortDepartmentTarget(department) {
+    const data = currentDepartmentData(department);
+    const history = data?.history || data?.overview?.timeline || state.runPayload?.timeline || {};
+    const materials = data?.materials || data?.overview?.evidence || state.runPayload?.evidence || {};
+    if (department === "product") return history.effective_contract?.goal || history.current_product_spec?.goal || null;
+    if (department === "engineering") return history.engineering_plan?.objective || null;
+    return materials.reviews?.at(-1)?.rationale || history.current_delivery_spec?.summary || null;
+  }
+
+  function observationTaskText(department) {
+    if (department && DEPARTMENTS[department]) {
+      return shortDepartmentTarget(department) || { product: "等待产品需求", engineering: "等待工程计划", quality: "等待工程交付" }[department];
+    }
+    for (const key of DEPARTMENT_ORDER) {
+      const value = shortDepartmentTarget(key);
+      if (value) return value;
+    }
+    return "当前任务";
+  }
+
+  function attemptRequestedText(item) {
+    return `${item?.requested_provider || "未知"} / ${item?.requested_model || "未知"}`;
+  }
+
+  function attemptActualText(item) {
+    const provider = item?.actual_provider;
+    const model = item?.actual_model;
+    if ((provider == null || provider === "") && (model == null || model === "")) return "未知";
+    return `${provider || "未知"} / ${model || "未知"}`;
   }
 
   function nodeMarkup(key, data) {
@@ -707,20 +751,18 @@
   }
 
   function attemptRowMarkup(item) {
-    const provider = item.provider || "未知提供方";
-    const model = item.model || "未知模型";
     const logical = item.logical_call_id || "未知调用";
     const attemptText = `${number(item.attempt, "?")}/${number(item.attempt_count, "?")}`;
-    return `<button class="dw-request-row" type="button" data-obs-request="${escapeHtml(item.id)}" aria-label="查看 ${escapeHtml(logical)} 第 ${escapeHtml(item.attempt ?? "?")} 次尝试"><span class="dw-request-time">${text(formatTime(item.created_at))}${requestStateMarkup(item)}<span>尝试 ${escapeHtml(attemptText)}</span></span><span class="dw-request-main"><strong>${text(departmentName(item.department))} · ${text(model)}</strong><span>${text(provider)} · ${text(item.provider_response_id)} · ${text(item.work_round)} · ${text(item.step)}</span></span><span class="dw-request-metrics"><span>Input <strong>${usageValue(item, "input_tokens")}</strong> · Output <strong>${usageValue(item, "output_tokens", "等待响应")}</strong></span><span>耗时 <strong>${duration(usageRawValue(item, "latency_ms"), item.status)}</strong></span></span></button>`;
+    return `<button class="dw-request-row" type="button" data-obs-request="${escapeHtml(item.id)}" aria-label="查看 ${escapeHtml(logical)} 第 ${escapeHtml(item.attempt ?? "?")} 次尝试"><span class="dw-request-time">${text(formatTime(item.created_at))}${requestStateMarkup(item)}<span>尝试 ${escapeHtml(attemptText)}</span></span><span class="dw-request-main"><strong>${text(departmentName(item.department))}</strong><span>请求：${text(attemptRequestedText(item))}</span><span>返回：${text(attemptActualText(item))} · ${text(item.provider_response_id)} · ${text(item.work_round)} · ${text(item.step)}</span></span><span class="dw-request-metrics"><span>Input <strong>${usageValue(item, "input_tokens")}</strong> · Output <strong>${usageValue(item, "output_tokens", "等待响应")}</strong></span><span>耗时 <strong>${duration(usageRawValue(item, "latency_ms"), item.status)}</strong></span></span></button>`;
   }
 
   function observationShellMarkup() {
     const filters = state.observationFilters;
     const items = state.observationData?.items || [];
     const current = state.observationData ? count(state.observationData.running_attempts) : "未知";
-    const task = state.runPayload?.board?.task;
+    const task = observationTaskText(state.observationFilters.department);
     const scope = state.observationData?.scope || {};
-    return `<div class="dw-observation-page" role="region" aria-label="任务模型请求观测"><header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>任务</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span>${taskToolsMarkup()}</div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>任务范围</span><strong>${text(task)}</strong><span>·</span><span>${text(scope.time_range || "真实查询结果")}</span><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出 · ${count(state.observationData?.prepared_attempts)} 条准备未发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    return `<div class="dw-observation-page" role="region" aria-label="任务模型请求观测"><header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>任务</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span>${taskToolsMarkup()}</div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>任务范围</span><strong>${text(task)}</strong><span>·</span><span>${text(scope.time_range || "真实查询结果")}</span><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出 · ${count(state.observationData?.prepared_attempts)} 条准备未发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option><option value="cancelled" ${filters.status === "cancelled" ? "selected" : ""}>取消</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
   }
 
   function requestListMarkup() {
@@ -744,7 +786,9 @@
     return running ? "等待响应" : "未上报";
   }
 
-  function usageCostValue(value, currency) {
+  function usageCostValue(value, currency, costStatus) {
+    if (costStatus === "mixed_currency") return "不可合计";
+    if (costStatus === "missing") return "未上报";
     if (typeof value !== "number" || !Number.isFinite(value) || typeof currency !== "string" || !currency) return "未上报";
     return `${value.toLocaleString("zh-CN", { maximumFractionDigits: 12 })} ${escapeHtml(currency)}`;
   }
@@ -770,7 +814,7 @@
     const runningCount = typeof group?.running_attempts === "number" ? group.running_attempts : null;
     const running = runningCount !== null && runningCount > 0;
     const label = group?.department ? departmentName(group.department) : group?.label || group?.key;
-    return `<div class="dw-usage-row"><div class="dw-usage-label"><strong>${text(label)}</strong><span>${text(coverageLabel(group))}${running ? ` · ${number(runningCount)} 进行中` : ""}</span><span class="dw-usage-track" aria-hidden="true"><i style="width:${width}%"></i></span>${fieldCoverageMarkup(group?.coverage?.fields)}</div><div class="dw-usage-values">${usageValueMarkup("输入（含缓存）", usageStatValue(group?.input_tokens))}${usageValueMarkup("输出", usageStatValue(group?.output_tokens, running))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(group?.cache_read_tokens))}${usageValueMarkup("总 Token", usageStatValue(group?.total_tokens))}${usageValueMarkup("成本", usageCostValue(group?.cost, group?.currency))}</div></div>`;
+    return `<div class="dw-usage-row"><div class="dw-usage-label"><strong>${text(label)}</strong><span>${text(coverageLabel(group))}${running ? ` · ${number(runningCount)} 进行中` : ""}</span><span class="dw-usage-track" aria-hidden="true"><i style="width:${width}%"></i></span>${fieldCoverageMarkup(group?.coverage?.fields)}</div><div class="dw-usage-values">${usageValueMarkup("输入（含缓存）", usageStatValue(group?.input_tokens))}${usageValueMarkup("输出", usageStatValue(group?.output_tokens, running))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(group?.cache_read_tokens))}${usageValueMarkup("总 Token", usageStatValue(group?.total_tokens))}${usageValueMarkup("成本", usageCostValue(group?.cost, group?.currency, group?.cost_status))}</div></div>`;
   }
 
   function usageSection(title, groups) {
@@ -788,7 +832,7 @@
     const reported = coverage.reported_attempts ?? data.reported_attempts;
     const attempts = coverage.attempts ?? data.total_attempts;
     const prepared = data.prepared_attempts;
-    return `<div class="dw-observation-results-head"><h2>用量统计</h2><p>覆盖率 ${text(coverage.percent == null ? null : `${coverage.percent}%`)}</p></div><div class="dw-usage-coverage"><strong>${count(reported)} / ${count(attempts)}</strong><span>次尝试已上报 usage</span>${prepared == null ? "" : `<span>${count(prepared)} 条准备记录未发出</span>`}<span>输入（含缓存）与缓存读取（输入子集）不重复相加</span>${fieldCoverageMarkup(coverage.fields)}</div><div class="dw-usage-total-strip"><div class="dw-usage-total-label"><strong>筛选总计</strong><span>${count(reported)}/${count(attempts)} 次尝试已上报</span></div>${usageValueMarkup("输入（含缓存）", usageStatValue(totals.input_tokens))}${usageValueMarkup("输出", usageStatValue(totals.output_tokens))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(totals.cache_read_tokens))}${usageValueMarkup("总 Token", usageStatValue(totals.total_tokens))}</div>${usageSection("按部门", data.groups?.departments)}${usageSection("按模型", data.groups?.models)}`;
+    return `<div class="dw-observation-results-head"><h2>用量统计</h2><p>覆盖率 ${text(coverage.percent == null ? null : `${coverage.percent}%`)}</p></div><div class="dw-usage-coverage"><strong>${count(reported)} / ${count(attempts)}</strong><span>次尝试已上报 usage</span>${prepared == null ? "" : `<span>${count(prepared)} 条准备记录未发出</span>`}<span>输入（含缓存）与缓存读取（输入子集）不重复相加</span>${fieldCoverageMarkup(coverage.fields)}</div><div class="dw-usage-total-strip"><div class="dw-usage-total-label"><strong>筛选总计</strong><span>${count(reported)}/${count(attempts)} 次尝试已上报</span></div>${usageValueMarkup("输入（含缓存）", usageStatValue(totals.input_tokens))}${usageValueMarkup("输出", usageStatValue(totals.output_tokens))}${usageValueMarkup("缓存读取（输入子集）", usageStatValue(totals.cache_read_tokens))}${usageValueMarkup("总 Token", usageStatValue(totals.total_tokens))}${usageValueMarkup("成本", usageCostValue(totals.cost, data.currency, data.cost_status))}</div>${usageSection("按部门", data.groups?.departments)}${usageSection("按模型", data.groups?.models)}`;
   }
 
   function updateObservationContent() {
@@ -817,7 +861,7 @@
   function detailOverviewMarkup(detail) {
     const item = detail.attempt || {};
     const usage = usageOf(item);
-    const fields = [["Provider", item.provider], ["Model", item.model], ["耗时", duration(usageRawValue(item, "latency_ms"), item.status)], ["成本", usageCostValue(usage?.cost, usage?.currency)], ["本轮工作", item.work_round], ["步骤", item.step], ["Context 快照", item.context_event_id], ["Prompt 版本", item.prompt_version], ["协作请求", item.collaboration_request_id], ["采集范围", item.observed_scope]];
+    const fields = [["请求", attemptRequestedText(item)], ["返回", attemptActualText(item)], ["耗时", duration(usageRawValue(item, "latency_ms"), item.status)], ["成本", usageCostValue(usage?.cost, usage?.currency)], ["本轮工作", item.work_round], ["步骤", item.step], ["Context 快照", item.context_event_id], ["Prompt 版本", item.prompt_version], ["协作请求", item.collaboration_request_id], ["采集范围", item.observed_scope]];
     const tools = detail.tools?.length ? `<details class="dw-detail-extra"><summary>工具调用 <span>${count(detail.tools.length)} 条</span></summary><pre class="dw-json">${json(detail.tools)}</pre></details>` : "";
     return `<div class="dw-detail-panel"><div class="dw-detail-usage">${usageValueMarkup("输入（含缓存）", usageValue(item, "input_tokens"))}${usageValueMarkup("输出", usageValue(item, "output_tokens", "等待响应"))}${usageValueMarkup("缓存读取（输入子集）", usageValue(item, "cache_read_tokens"))}${usageValueMarkup("总 Token", usageValue(item, "total_tokens"))}</div><dl class="dw-detail-grid">${fields.map(([key, value]) => `<div class="dw-detail-field"><dt>${escapeHtml(key)}</dt><dd>${displayValue(value)}</dd></div>`).join("")}</dl>${tools}</div>`;
   }
@@ -834,7 +878,7 @@
   }
 
   function detailEventsMarkup(detail) {
-    const rows = (detail.events || []).map(event => `<details class="dw-event-item"><summary class="dw-event-row"><time>${text(formatTime(event.time || event.created_at))}</time><span class="dw-event-kind ${event.tone === "error" ? "error" : event.tone === "waiting" ? "waiting" : ""}">${text(event.type)}</span><p>${text(event.summary)}</p><span class="dw-event-expand">查看原文</span></summary><pre class="dw-json dw-event-raw">${json(event.raw ?? event)}</pre></details>`).join("");
+    const rows = (detail.events || []).map(event => `<details class="dw-event-item"><summary class="dw-event-row"><time>${text(formatTime(event.time || event.created_at))}</time><span class="dw-event-kind ${event.tone === "error" ? "error" : event.tone === "waiting" ? "waiting" : ""}">${text(event.type)}</span><p>${text(event.summary)}</p><span class="dw-event-expand">查看原文</span></summary><div class="dw-event-raw"><pre class="dw-json">${json(event.raw ?? event)}</pre></div></details>`).join("");
     return `<div class="dw-detail-panel"><div class="dw-event-list">${rows || '<div class="dw-empty-results">暂无事件记录</div>'}</div></div>`;
   }
 
@@ -857,7 +901,7 @@
     state.view = "observability";
     state.observationScreen = "detail";
     state.selectedAttemptId = item.id;
-    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-department="${escapeHtml(item.department)}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(item.department))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>任务</span><strong>${text(state.runPayload?.board?.task)}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-department="${escapeHtml(item.department)}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(item.department))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>任务</span><strong>${text(observationTaskText(item.department))}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
     updateNav(); icons();
     restoreScroll(scrollY);
   }
@@ -890,6 +934,11 @@
     }
   }
 
+  function handleLoopEvent(runId = state.runId, token = state.routeToken) {
+    if (!runId || token !== state.routeToken || runId !== state.runId) return;
+    return loadRunPayload(runId, token, true);
+  }
+
   function openStream(runId, token) {
     closeStream();
     if (typeof EventSource !== "function" || !runId) return;
@@ -897,12 +946,12 @@
       stream = new EventSource(apiPath(runId, "/stream"));
       stream.addEventListener("loop", () => {
         if (token !== state.routeToken || runId !== state.runId) return;
-        loadRunPayload(runId, token, true);
+        handleLoopEvent(runId, token);
       });
       stream.onerror = () => {};
     } catch { stream = null; }
     refreshTimer = setInterval(() => {
-      if (token === state.routeToken && runId === state.runId) loadRunPayload(runId, token, true);
+      if (token === state.routeToken && runId === state.runId) handleLoopEvent(runId, token);
     }, 5000);
   }
 
@@ -914,10 +963,14 @@
       state.runPayload = data;
       state.busy = Boolean(data.worker_active);
       state.error = data.execution_error || "";
-      if (!silent || !main?.innerHTML) renderCurrent();
+      if (!silent) renderCurrent();
       else if (state.view === "overview") renderOverview();
-      else if (state.view === "department" && currentDepartmentData(state.department)) renderDepartment(state.department);
-      else if (state.view === "observability" && state.observationScreen === "list") loadObservationData();
+      else if (state.view === "department") await loadDepartment(state.department, token);
+      else if (state.view === "observability" && state.observationScreen === "list") await loadObservationData();
+      else if (state.view === "observability" && state.observationScreen === "detail" && state.selectedAttemptId) {
+        await loadAttemptDetail(state.selectedAttemptId, { push: false });
+      }
+      else if (!main?.innerHTML) renderCurrent();
       return data;
     } catch (error) {
       if (token !== state.routeToken || runId !== state.runId || seq !== runRequestSeq) return null;
@@ -1005,23 +1058,65 @@
   async function loadAttemptDetail(attemptId, { push = true } = {}) {
     if (!state.runId || !attemptId) return;
     const runId = state.runId;
+    const alreadyShowing = state.observationScreen === "detail" && state.observationDetail?.attempt?.id === attemptId;
     state.selectedAttemptId = attemptId;
     state.observationScreen = "detail";
-    state.observationDetail = null;
     state.view = "observability";
-    const token = ++state.routeToken;
+    const token = state.routeToken;
+    const seq = ++state.detailSeq;
     if (push) updateRoute({ push: true });
-    closeStream();
-    renderLoading("正在读取模型请求详情");
+    if (!alreadyShowing) {
+      state.observationDetail = null;
+      renderLoading("正在读取模型请求详情");
+    }
+    const jsonScroll = alreadyShowing ? captureJsonScroll() : 0;
     try {
       const detail = await fetchJSON(apiPath(runId, `/model-attempts/${encodeURIComponent(attemptId)}`));
-      if (token !== state.routeToken || runId !== state.runId || attemptId !== state.selectedAttemptId) return;
+      if (token !== state.routeToken || runId !== state.runId || attemptId !== state.selectedAttemptId || seq !== state.detailSeq) return;
       state.observationDetail = detail;
       renderObservationDetail();
+      if (alreadyShowing) restoreJsonScroll(jsonScroll);
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId) return;
-      renderError(error);
+      if (token !== state.routeToken || runId !== state.runId || seq !== state.detailSeq) return;
+      if (!alreadyShowing) renderError(error);
     }
+  }
+
+  async function handlePopState() {
+    const previousRunId = state.runId;
+    routeFromLocation();
+    if (state.runId !== previousRunId) {
+      if (state.runId && state.runs.some(item => item.run_id === state.runId)) {
+        await activateRun(state.runId, { push: false, preserveRoute: true });
+        return;
+      }
+      closeStream();
+      state.runPayload = null;
+      state.observationData = null;
+      state.usageData = null;
+      state.observationDetail = null;
+      const token = ++state.routeToken;
+      if (!state.runId) {
+        renderCurrent();
+        return;
+      }
+      renderLoading("正在读取任务");
+      await loadRunPayload(state.runId, token);
+      if (token === state.routeToken && state.runId) openStream(state.runId, token);
+      if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
+      if (token === state.routeToken && state.view === "observability") {
+        if (state.observationScreen === "detail" && state.selectedAttemptId) await loadAttemptDetail(state.selectedAttemptId, { push: false });
+        else await loadObservationData();
+      }
+      return;
+    }
+    const token = ++state.routeToken;
+    if (state.observationScreen !== "detail") state.observationDetail = null;
+    renderCurrent();
+    if (state.view === "department" && state.runId) loadDepartment(state.department, token);
+    if (state.view === "observability" && state.runId && state.observationScreen === "list") loadObservationData();
+    if (state.view === "observability" && state.selectedAttemptId && state.runId) loadAttemptDetail(state.selectedAttemptId, { push: false });
+    if (state.runId) openStream(state.runId, token);
   }
 
   async function activateRun(runId, { push = true, preserveRoute = false } = {}) {
@@ -1471,17 +1566,7 @@
     root.addEventListener("input", inputHandler);
     root.addEventListener("change", changeHandler);
     root.addEventListener("submit", submitHandler);
-    globalThis.addEventListener?.("popstate", () => {
-      routeFromLocation();
-      const token = ++state.routeToken;
-      state.observationDetail = null;
-      renderCurrent();
-      if (state.runId && !state.runPayload) loadRunPayload(state.runId, token);
-      if (state.view === "department" && state.runId) loadDepartment(state.department, token);
-      if (state.view === "observability" && state.runId && state.observationScreen === "list") loadObservationData();
-      if (state.view === "observability" && state.selectedAttemptId && state.runId) loadAttemptDetail(state.selectedAttemptId, { push: false });
-      if (state.runId && !(state.view === "observability" && state.observationScreen === "detail")) openStream(state.runId, token);
-    });
+    globalThis.addEventListener?.("popstate", () => { handlePopState(); });
     bootDialogs();
     loadRuns();
   }
@@ -1516,6 +1601,10 @@
     savePrompt,
     refreshCurrent,
     updateRoute,
+    handlePopState,
+    handleLoopEvent,
+    openStream,
+    changeHandler,
   };
   globalThis.harnessWeb = api;
   if (!root || !main || globalThis.__HARNESS_SKIP_BOOT__) return;

@@ -83,6 +83,8 @@ def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path
     assert usage["coverage"]["attempts"] == 4
     assert usage["coverage"]["reported_attempts"] == 0
     assert usage["totals"]["total_tokens"] is None
+    assert usage["totals"]["cost"] is None
+    assert usage["cost_status"] == "missing"
     assert usage["groups"]["departments"]
     assert system.project(run_id).last_seq == before
 
@@ -233,6 +235,35 @@ def test_unreported_normalized_usage_keeps_unknown_source_and_is_excluded_from_p
     assert estimated["total_tokens"] == 9
     estimated_totals = _usage_totals([{"status": "completed", "usage": estimated}], source="estimated")
     assert estimated_totals["total_tokens"] == 9
+
+
+def test_usage_totals_reported_cost_sums_same_currency():
+    total = _usage_totals([
+        {"status": "completed", "usage": {"source": "reported", "cost": 1.25, "currency": "CNY"}},
+        {"status": "completed", "usage": {"source": "reported", "cost": 2.75, "currency": "CNY"}},
+    ], source="reported")
+    assert total["cost"] == 4.0
+    assert total["currency"] == "CNY"
+    assert total["cost_status"] == "reported"
+
+
+def test_usage_totals_mixed_currency_leaves_cost_null():
+    total = _usage_totals([
+        {"status": "completed", "usage": {"source": "reported", "cost": 1, "currency": "CNY"}},
+        {"status": "completed", "usage": {"source": "reported", "cost": 2, "currency": "USD"}},
+    ], source="reported")
+    assert total["cost"] is None
+    assert total["currency"] is None
+    assert total["cost_status"] == "mixed_currency"
+
+
+def test_usage_totals_missing_cost_is_not_zero():
+    total = _usage_totals([
+        {"status": "completed", "usage": {"source": "reported", "input_tokens": 4}},
+        {"status": "completed", "usage": {"source": "reported", "output_tokens": 2}},
+    ], source="reported")
+    assert total["cost"] is None
+    assert total["cost_status"] == "missing"
 
 
 def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):

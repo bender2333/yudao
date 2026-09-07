@@ -9,7 +9,20 @@ const APP_JS = fs.readFileSync(path.join(staticDir, "app.js"), "utf8");
 const INDEX_HTML = fs.readFileSync(path.join(staticDir, "index.html"), "utf8");
 const STYLES_CSS = fs.readFileSync(path.join(staticDir, "styles.css"), "utf8");
 
+function applyLocation(location, url) {
+  const parsed = new URL(String(url || "/"), "http://local");
+  location.pathname = parsed.pathname;
+  location.search = parsed.search;
+  location.hash = parsed.hash;
+  location.href = parsed.href;
+}
+
 function loadApp(fetchImpl = async () => ({ ok: true, status: 200, statusText: "OK", async text() { return "{}"; } }), document = { getElementById() { return null; } }) {
+  const location = { pathname: "/", search: "", hash: "", href: "http://local/" };
+  const history = {
+    pushState(_state, _title, url) { applyLocation(location, url); },
+    replaceState(_state, _title, url) { applyLocation(location, url); },
+  };
   const sandbox = {
     console,
     document,
@@ -32,12 +45,15 @@ function loadApp(fetchImpl = async () => ({ ok: true, status: 200, statusText: "
     clearTimeout,
     setInterval,
     clearInterval,
+    location,
+    history,
     EventSource: undefined,
     __HARNESS_SKIP_BOOT__: true,
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(APP_JS, sandbox);
+  sandbox.harnessWeb.location = location;
   return sandbox.harnessWeb;
 }
 
@@ -79,7 +95,13 @@ function uiDocument() {
   const ids = ["department-workspace-prototype", "dw-main", "dw-task-dialog", "dw-task-dialog-form", "dw-task-text", "dw-max-cycles", "dw-context-window", "dw-task-submit", "dw-task-error", "dw-prompt-dialog", "dw-prompt-dialog-form", "dw-prompt-text", "dw-prompt-error", "dw-event-dialog", "dw-event-title", "dw-event-version", "dw-event-files", "dw-event-document", "dw-event-json", "dw-event-sources"];
   const nodes = new Map(ids.map(id => [id, node(id)]));
   const root = nodes.get("department-workspace-prototype");
-  root.querySelector = selector => selector === ".dw-action-error" ? node("dw-action-error") : null;
+  const observationContent = node("dw-observation-content");
+  nodes.set("dw-observation-content", observationContent);
+  root.querySelector = selector => {
+    if (selector === ".dw-action-error") return node("dw-action-error");
+    if (selector === "#dw-observation-content") return observationContent;
+    return null;
+  };
   const taskForm = nodes.get("dw-task-dialog-form");
   taskForm.elements = { task: nodes.get("dw-task-text"), max_cycles: nodes.get("dw-max-cycles"), context_window: nodes.get("dw-context-window") };
   taskForm.elements.task.value = "";
@@ -98,6 +120,10 @@ function uiDocument() {
     createElement(tag) { return node(tag, { tagName: tag, href: "", download: "" }); },
   };
   return { document, nodes };
+}
+
+function pageHtml(nodes) {
+  return `${nodes.get("dw-main").innerHTML}${nodes.get("dw-observation-content")?.innerHTML || ""}`;
 }
 
 function response(payload, status = 200) {
@@ -537,4 +563,243 @@ test("older event detail cannot replace a newer event selection", async () => {
   release();
   await old;
   assert.equal(nodes.get("dw-event-document").textContent, "newest");
+});
+
+test("cancelled attempts are labeled and remain filterable in the observation route", async () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async url => {
+    if (url.includes("/model-attempts")) {
+      return response({ items: [{ id: "c1", status: "cancelled", department: "product" }], total: 1, total_attempts: 1, running_attempts: 0, prepared_attempts: 0, next_cursor: null });
+    }
+    return response({ total_attempts: 1, totals: {}, groups: { departments: [], models: [] } });
+  }, document);
+  web.state.runId = "run-1";
+  web.state.view = "observability";
+  web.state.observationData = {
+    items: [{ id: "c1", status: "cancelled", department: "product" }],
+    total: 1,
+    total_attempts: 1,
+    running_attempts: 0,
+    prepared_attempts: 0,
+    next_cursor: null,
+  };
+  web.renderObservability();
+  const html = pageHtml(nodes);
+  assert.match(html, /已取消/);
+  assert.doesNotMatch(html, />cancelled</);
+  assert.match(html, /<option value="cancelled"[^>]*>取消<\/option>/);
+  await web.changeHandler({
+    target: {
+      value: "cancelled",
+      matches(selector) { return selector.includes("data-obs-status"); },
+    },
+  });
+  assert.equal(web.state.observationFilters.status, "cancelled");
+  assert.match(web.location.search, /status=cancelled/);
+});
+
+test("usage totals show sourced cost and do not zero mixed or missing currency", () => {
+  const web = loadApp();
+  web.state.usageData = {
+    cost_status: "reported",
+    currency: "CNY",
+    coverage: { attempts: 1, reported_attempts: 1, percent: 100, fields: {} },
+    totals: { input_tokens: 12, output_tokens: 3, cache_read_tokens: null, total_tokens: 15, cost: 1 },
+    groups: { departments: [], models: [] },
+  };
+  assert.match(web.usageMarkup(), /成本<\/span><strong>1 CNY/);
+
+  web.state.usageData = {
+    cost_status: "mixed_currency",
+    currency: null,
+    coverage: { attempts: 2, reported_attempts: 2, percent: 100, fields: {} },
+    totals: { input_tokens: 12, output_tokens: 3, cache_read_tokens: null, total_tokens: 15, cost: null },
+    groups: {
+      departments: [{
+        key: "engineering",
+        label: "工程部",
+        cost: null,
+        currency: null,
+        cost_status: "mixed_currency",
+        coverage: { reported_attempts: 2, attempts: 2, fields: {} },
+      }],
+      models: [],
+    },
+  };
+  const mixed = web.usageMarkup();
+  assert.equal((mixed.match(/成本<\/span><strong>不可合计/g) || []).length, 2);
+  assert.doesNotMatch(mixed, /成本<\/span><strong>0/);
+  assert.doesNotMatch(mixed, /成本<\/span><strong>未上报/);
+
+  web.state.usageData = {
+    cost_status: "missing",
+    currency: null,
+    coverage: { attempts: 1, reported_attempts: 0, percent: 0, fields: {} },
+    totals: { input_tokens: null, output_tokens: null, cache_read_tokens: null, total_tokens: null, cost: null },
+    groups: { departments: [], models: [] },
+  };
+  const missing = web.usageMarkup();
+  assert.match(missing, /成本<\/span><strong>未上报/);
+  assert.doesNotMatch(missing, /成本<\/span><strong>0/);
+  assert.doesNotMatch(missing, /不可合计/);
+});
+
+test("popstate reloads the URL run and keeps drafts keyed by run", async () => {
+  const { document, nodes } = uiDocument();
+  const calls = [];
+  const web = loadApp(async url => {
+    calls.push(url);
+    if (url === "/api/runs/run-a") {
+      return response({ board: { run_id: "run-a", task: "alpha task", phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] });
+    }
+    if (url === "/api/runs/run-b") {
+      return response({ board: { run_id: "run-b", task: "beta task", phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] });
+    }
+    return response({});
+  }, document);
+  web.state.runs = [
+    { run_id: "run-a", task: "alpha task" },
+    { run_id: "run-b", task: "beta task" },
+  ];
+  web.state.runId = "run-b";
+  web.state.routeToken = 6;
+  web.state.runPayload = { board: { run_id: "run-b", task: "beta task", phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] };
+  web.state.globalDrafts = { "run-a": "draft-a-only", "run-b": "draft-b-only" };
+  web.renderOverview();
+  assert.match(nodes.get("dw-main").innerHTML, /beta task/);
+  assert.match(nodes.get("dw-main").innerHTML, /draft-b-only/);
+  web.location.search = "?run=run-a";
+  await web.handlePopState();
+  const html = nodes.get("dw-main").innerHTML;
+  assert.equal(web.state.runId, "run-a");
+  assert.equal(calls.includes("/api/runs/run-a"), true);
+  assert.match(html, /<h1>alpha task<\/h1>/);
+  assert.doesNotMatch(html, /<h1>beta task<\/h1>/);
+  assert.match(html, /draft-a-only/);
+  assert.doesNotMatch(html, /draft-b-only/);
+});
+
+test("silent run refresh refetches the visible department and open attempt", async () => {
+  const { document } = uiDocument();
+  const calls = [];
+  const web = loadApp(async url => {
+    calls.push(url);
+    if (url === "/api/runs/run-a") {
+      return response({ board: { run_id: "run-a", task: "task", phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] });
+    }
+    if (url.includes("/departments/engineering")) {
+      return response({ run_id: "run-a", department: "engineering", history: { engineering_plan: { objective: "short objective" } }, contexts: [], messages: [], provider: {}, prompt: null });
+    }
+    if (url.includes("/model-attempts/attempt-1")) {
+      return response({ attempt: { id: "attempt-1", status: "running", department: "engineering" }, request: { n: 1 }, response: { n: 2 } });
+    }
+    return response({});
+  }, document);
+  web.state.runId = "run-a";
+  web.state.routeToken = 4;
+  web.state.view = "department";
+  web.state.department = "engineering";
+  web.state.runPayload = { board: { run_id: "run-a", task: "task", phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] };
+  web.state.departmentData.set("run-a/engineering", { department: "engineering", history: { engineering_plan: { objective: "cached" } }, contexts: [], messages: [] });
+  await web.loadRunPayload("run-a", 4, true);
+  assert.equal(calls.some(url => url.includes("/departments/engineering")), true);
+
+  calls.length = 0;
+  web.state.view = "observability";
+  web.state.observationScreen = "detail";
+  web.state.selectedAttemptId = "attempt-1";
+  web.state.observationDetail = { attempt: { id: "attempt-1", status: "running", department: "engineering" }, request: {}, response: null };
+  await web.handleLoopEvent("run-a", 4);
+  assert.equal(calls.some(url => url.includes("/model-attempts/attempt-1")), true);
+});
+
+test("observation chrome uses the short department target instead of the intend blob", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  const blob = `intend-blob-${"x".repeat(188)}`;
+  web.state.runId = "run-a";
+  web.state.view = "observability";
+  web.state.runPayload = { board: { run_id: "run-a", task: blob, phase: "ENGINEERING", active_department: "engineering" }, timeline: {}, evidence: {}, inputs: [], events: [] };
+  web.state.departmentData.set("run-a/engineering", { department: "engineering", history: { engineering_plan: { objective: "short objective" } } });
+  web.state.observationData = { items: [], total: 0, total_attempts: 0, running_attempts: 0, prepared_attempts: 0 };
+  web.renderObservability();
+  let html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /<strong>short objective<\/strong>/);
+  assert.doesNotMatch(html, new RegExp(blob));
+
+  web.state.observationDetail = {
+    attempt: { id: "attempt-1", department: "engineering", logical_call_id: "call-1", attempt: 1, attempt_count: 1, status: "success" },
+    siblings: [],
+  };
+  web.renderObservationDetail();
+  html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /<strong>short objective<\/strong>/);
+  assert.doesNotMatch(html, new RegExp(blob));
+});
+
+test("request response and event raw json stay in a viewport scroller", () => {
+  assert.match(STYLES_CSS, /#department-workspace-prototype \.dw-detail-panel \.dw-json,\s*#department-workspace-prototype \.dw-event-raw \.dw-json \{ max-height: min\(50vh, 24rem\); overflow: auto; \}/);
+  assert.match(STYLES_CSS, /@media \(max-width: 320px\) \{[^}]*#department-workspace-prototype \.dw-detail-panel \.dw-json,\s*#department-workspace-prototype \.dw-event-raw \.dw-json \{ max-height: min\(50vh, 24rem\); overflow: auto; \}/);
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.runId = "run-a";
+  web.state.observationDetail = {
+    attempt: { id: "attempt-1", status: "success", department: "engineering", logical_call_id: "call-1", attempt: 1, attempt_count: 1 },
+    request: { blob: "r".repeat(64 * 1024) },
+    response: { blob: "s".repeat(1024) },
+    events: [{ type: "model_message", summary: "raw", raw: { blob: "e".repeat(1024) } }],
+  };
+  web.state.observationDetailTab = "events";
+  web.renderObservationDetail();
+  assert.match(nodes.get("dw-main").innerHTML, /class="dw-event-raw"/);
+  assert.match(nodes.get("dw-main").innerHTML, /class="dw-json"/);
+});
+
+test("observation list and detail show requested and actual identity separately", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.runId = "run-a";
+  web.state.observationData = {
+    items: [
+      {
+        id: "in-flight",
+        status: "failed",
+        department: "product",
+        requested_provider: "penguin",
+        requested_model: "gpt-5.6-luna",
+        actual_provider: null,
+        actual_model: null,
+      },
+      {
+        id: "done",
+        status: "success",
+        department: "product",
+        requested_provider: "penguin",
+        requested_model: "gpt-5.6-luna",
+        actual_provider: "penguin",
+        actual_model: "gpt-5.6-actual",
+      },
+    ],
+    total: 2,
+    total_attempts: 2,
+    running_attempts: 0,
+    prepared_attempts: 0,
+  };
+  web.renderObservability();
+  const list = pageHtml(nodes);
+  assert.match(list, /请求：penguin \/ gpt-5\.6-luna/);
+  assert.match(list, /返回：未知/);
+  assert.match(list, /返回：penguin \/ gpt-5\.6-actual/);
+
+  web.state.observationDetail = { attempt: web.state.observationData.items[0], siblings: [] };
+  web.renderObservationDetail();
+  const pending = nodes.get("dw-main").innerHTML;
+  assert.match(pending, /<dt>请求<\/dt><dd>penguin \/ gpt-5\.6-luna<\/dd>/);
+  assert.match(pending, /<dt>返回<\/dt><dd>未知<\/dd>/);
+
+  web.state.observationDetail = { attempt: web.state.observationData.items[1], siblings: [] };
+  web.renderObservationDetail();
+  const completed = nodes.get("dw-main").innerHTML;
+  assert.match(completed, /<dt>请求<\/dt><dd>penguin \/ gpt-5\.6-luna<\/dd>/);
+  assert.match(completed, /<dt>返回<\/dt><dd>penguin \/ gpt-5\.6-actual<\/dd>/);
 });
