@@ -1,7 +1,8 @@
 # Stage2 工作包证据账
 
 日期：2026-09-07。  
-冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`（`harness_1`，`origin/harness_1`）。  
+原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
+当前主线：`d52d7d6`（`harness_1` = `origin/harness_1`）。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 
 阶段状态：**PARTIAL**。局部代码、局部测试或一次真实成功请求都不能关闭阶段。
@@ -10,10 +11,12 @@
 
 | 项 | 事实 |
 | --- | --- |
-| HEAD | `239c3b1` `stagecommit` |
+| 原始起点 | `239c3b1` `stagecommit` |
+| 当前 HEAD | `d52d7d6` `fix: address review feedback for guidance completion` |
+| 本轮主线增量 | `a875fa5` 证据账；`20c7e42` O/U 界面；`0b076f6`/`d52d7d6` 指导完成与准入；用户 `32a0568` 续编完成计划 |
 | 分支 | `harness_1` = `origin/harness_1` |
-| 工作树（P0 记录时） | 已修改 `jour.md`（既有 A/B/C/D 设计笔记，不代为提交）；未跟踪 `.serena/project.yml`（不提交）；未跟踪后纳入本账的 `docs/grok-stage2-completion-plan.md` |
-| 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d` |
+| 工作树 | 已修改 `jour.md`（含既有 A/B/C/D 笔记，不代为提交）；未跟踪 `.serena/project.yml` |
+| 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
 
 ## 2. 候选提交拓扑
 
@@ -41,11 +44,11 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | 第一阶段真实验收 | 运行时已具备持续输入、压缩、QA、封存 | — | 确定性回归存在 | 基础交付曾 release；连续输入/小窗缺最终 QA | 未关闭 | PARTIAL |
 | OMP 系统审查 | 审查文档已有 | — | 采用项已部分落到 W1/W3 | 不单独算运行验收 | 采用项尚未按固定清单逐项独立验证 | PARTIAL |
 | W1 采集查询 | 已在主线 | 隔离 SHA 过时 | `test_observability.py` 等已覆盖 O1/O2/O4/O5 | 真实记录可打开过载原文 | 未与完整 UI 联调 | 主线局部完成 |
-| W2 工作台骨架 | 已在主线 | 隔离 SHA 过时 | Node UI 部分覆盖；U1/U2/U4 无测试 | 旧 UI 曾误建任务；新工作台未做完整浏览器矩阵 | 未关闭 | 主线局部完成 |
-| W3 Context/详情 | 已在主线 | 隔离 SHA 过时 | Context parts 测试存在 | 64KB Request 在 320px 曾形成超高页面 | U4 未修，不能称详情完成 | PARTIAL |
-| W4 列表/用量 | 已在主线 | — | 分组费用有 UI 测试；总计条缺费用 | 未作为真实验收关闭项 | O3 UI 筛选、O6 总计未闭合 | PARTIAL |
+| W2 工作台骨架 | 已在主线 | 隔离 SHA 过时 | Node UI 含 U1/U2/U6；真实 320px 矩阵未做 | 旧 UI 曾误建任务 | W7 浏览器矩阵未关闭 | 主线局部完成 |
+| W3 Context/详情 | 已在主线 `20c7e42` | 隔离 SHA 过时 | Raw CSS 选择器已测 | 64KB/320px 真机仍待 W7 | 详情行为已修，真机未验 | PARTIAL |
+| W4 列表/用量 | 已在主线 `20c7e42` | — | O3 取消筛选、O6 总计费用/不可合计已测 | 未作为真实验收关闭项 | 查询与 UI 口径已对齐，联调未关 | 主线局部完成 |
 | W5 总览/全局输入 | 骨架已有 | — | 终态草稿/新建入口已测（U6） | 连续输入真实验收未通过 | 待 P3 | PARTIAL |
-| W6 部门指导 | `fe78667` 已在主线 | 旧 `4c684b4` 的 auto-processed 已不在主线 | 接收/注入/非活动部门只读激活已测 | 无真实指导闭环 | G1/G2/G3 仍 PARTIAL | PARTIAL |
+| W6 部门指导 | `0b076f6`/`d52d7d6` | 旧 auto-processed 已不在主线 | G2/G3 调度、准入、QA 竞态已测 | 无真实指导闭环 | 续编计划要求“声称修改须绑定结果”，此项仍缺 | PARTIAL |
 | W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | 未开始 | 研究资料已导入 | — | — | 依赖 P0–P6 | 未开始 |
