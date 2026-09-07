@@ -458,14 +458,15 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "submit_guidance_response": {
         "name": "submit_guidance_response",
         "label": "submit_guidance_response",
-        "description": "Respond to one persisted department guidance item. State the concrete handling, the reason it needs product or engineering work, or why it cannot be applied. This response does not change the contract, plan, files, or QA result by itself.",
+        "description": "Respond to one persisted department guidance item. State the concrete handling, the reason it needs product or engineering work, or why it cannot be applied. For completed mutations, accepted artifacts, host checks, or transferred work, cite the actual host event IDs. Explain-only completed may use an empty list. This response does not change the contract, plan, files, or QA result by itself.",
         "parameters": _object_schema(
             {
                 "guidance_id": {"type": "string"},
                 "status": {"type": "string", "enum": ["completed", "declined", "needs_work"]},
                 "text": {"type": "string"},
+                "result_event_ids": _string_list_schema("Actual accepted result or host tool event IDs for this guidance; empty when explaining with no claimed mutation"),
             },
-            ["guidance_id", "status", "text"],
+            ["guidance_id", "status", "text", "result_event_ids"],
         ),
         "loadMode": "essential",
     },

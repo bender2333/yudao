@@ -111,8 +111,9 @@ for _contract in PROPOSAL_CONTRACTS.values():
             "result_event_ids": "actual host event ids from request_results, never model call ids",
         },
         "department_guidance_response": {
-            "required": ["guidance_id", "status", "text"],
+            "required": ["guidance_id", "status", "text", "result_event_ids"],
             "status": ["completed", "declined", "needs_work"],
+            "result_event_ids": "actual host event ids from this department's current work, never model call ids",
             "bind": ["the target department guidance id and the current activation"],
         },
     })

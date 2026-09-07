@@ -6,7 +6,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import current_contract_hash, normalize_scope
-from .collaboration import allowed_proposal_kinds, request_basis, request_errors, response_errors, resume_phase
+from .collaboration import (
+    allowed_proposal_kinds, guidance_response_errors, request_basis, request_errors, response_errors, resume_phase,
+)
 from .models import (
     DEPARTMENTS,
     PROPOSAL_KINDS,
@@ -97,7 +99,7 @@ def _evaluate_proposal(
     if kind == "collaboration_response":
         return _accept_response(proposal, projection, department, events, snapshot)
     if kind == "department_guidance_response":
-        return _accept_guidance_response(proposal, projection, department)
+        return _accept_guidance_response(proposal, projection, department, events, snapshot)
     if kind == "product_decision":
         return _accept_product_decision(proposal, projection)
     if kind == "delivery_spec":
@@ -210,7 +212,8 @@ def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> Proposa
 
 
 def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjection,
-                              department: str) -> ProposalDecision:
+                              department: str, events: list[Event],
+                              snapshot: WorkspaceSnapshot) -> ProposalDecision:
     guidance = next((item for item in projection.department_guidance
                      if item.id == proposal.get("guidance_id")), None)
     if guidance is None or guidance.department != department:
@@ -220,6 +223,9 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
     text = proposal.get("text")
     if not isinstance(text, str) or not text.strip():
         return ProposalDecision(False, [FieldError("text", "text must be a non-empty string")])
+    errors = guidance_response_errors(proposal, projection, department, events, snapshot_hash=snapshot.digest)
+    if errors:
+        return ProposalDecision(False, [FieldError(**item) for item in errors])
     payload = {
         "guidance_id": guidance.id,
         "guidance_version": guidance.version,
@@ -227,6 +233,7 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
         "department": department,
         "status": proposal["status"],
         "text": text.strip(),
+        "result_event_ids": list(proposal.get("result_event_ids", [])),
     }
     return ProposalDecision(True, artifact={
         **payload,

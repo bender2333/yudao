@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from .models import (
@@ -15,10 +16,13 @@ from .tools import SUBMIT_KINDS, TOOL_DEFS
 _MUTATIONS = {"write_file", "delete_file", "move_file"}
 _READS = {"read_file", "list_files"}
 _CHECKS = {"run_check", "collect_evidence"}
+_CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
+_GUIDANCE_TOOLS = _CLAIMABLE_TOOLS | _READS
 _ACCEPTED_RESULTS = {
     EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
     EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED,
 }
+_GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS | {EventType.COLLABORATION_REQUESTED}
 
 
 def request_basis(projection: RunProjection) -> dict[str, Any]:
@@ -199,6 +203,51 @@ def response_errors(proposal: dict[str, Any], projection: RunProjection, departm
     return errors
 
 
+def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection, department: str,
+                             events: list[Event], *, snapshot_hash: str) -> list[dict[str, str]]:
+    errors: list[dict[str, str]] = []
+    if not isinstance(proposal.get("text"), str) or not proposal["text"].strip():
+        errors.append(_error("text", "a response explanation is required"))
+    references = proposal.get("result_event_ids")
+    if not isinstance(references, list) or any(not isinstance(item, str) or not item for item in references):
+        return errors + [_error("result_event_ids", "result_event_ids must be a list of event IDs")]
+    if len(references) != len(set(references)):
+        errors.append(_error("result_event_ids", "result event IDs must be unique"))
+    status = proposal.get("status")
+    indexed = {event.event_id: event for event in events}
+    owned = lambda item: _guidance_owned(item, projection, department)
+    for reference in references:
+        event = indexed.get(reference)
+        if event is None or not owned(event):
+            errors.append(_error("result_event_ids", f"{reference} is not a result of this department's current work"))
+            continue
+        if event.type == EventType.PROPOSAL_REJECTED:
+            errors.append(_error("result_event_ids", f"{reference} is not an accepted result allowed by this guidance"))
+            continue
+        if event.type == EventType.TOOL_CALLED:
+            result = _host_tool_result(event, events, owned=owned, after_seq=0)
+            if result is None or event.payload.get("name") not in _GUIDANCE_TOOLS:
+                errors.append(_error("result_event_ids", f"{reference} has no matching host tool execution"))
+                continue
+            if status == "completed" and (
+                not _usable_tool_result(event, result, projection, snapshot_hash)
+                or not _guidance_tool_current(event, projection)
+            ):
+                errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
+            continue
+        if event.type not in _GUIDANCE_ACCEPTED:
+            errors.append(_error("result_event_ids", f"{reference} is not an accepted result allowed by this guidance"))
+            continue
+        if status == "completed" and not _current_guidance_result(event, projection, snapshot_hash):
+            errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
+    if status == "completed":
+        required = {event.event_id for event in _activation_claimable_results(
+            projection, department, events, snapshot_hash)}
+        if not required <= set(references):
+            errors.append(_error("result_event_ids", "completed requires a current host result for the claimed action"))
+    return errors
+
+
 def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
     current = {
         "effective_contract_hash": _content_hash(projection.effective_contract),
@@ -262,11 +311,17 @@ def _has_completed_action(request: CollaborationRequest, projection: RunProjecti
 
 def _tool_result(event: Event, request: CollaborationRequest, creation: Event,
                  events: list[Event]) -> dict[str, Any] | None:
+    return _host_tool_result(
+        event, events, owned=lambda item: _owned(item, request, creation), after_seq=creation.seq)
+
+
+def _host_tool_result(event: Event, events: list[Event], *, owned: Callable[[Event], bool],
+                      after_seq: int) -> dict[str, Any] | None:
     payload = event.payload
-    if not _owned(event, request, creation) or not all(payload.get(key) is not None for key in ("id", "name", "step_id", "activation_id")):
+    if not owned(event) or not all(payload.get(key) is not None for key in ("id", "name", "step_id", "activation_id")):
         return None
     started = [item for item in events if item.type == EventType.TOOL_STARTED
-               and creation.seq < item.seq < event.seq and _owned(item, request, creation)
+               and after_seq < item.seq < event.seq and owned(item)
                and all(item.payload.get(key) == payload.get(key) for key in ("id", "name", "activation_id", "step_id"))]
     if len(started) != 1:
         return None
@@ -322,6 +377,62 @@ def _creation(request: CollaborationRequest, events: list[Event]) -> Event | Non
 def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool:
     return (event.run_id == request.run_id and event.seq > creation.seq
             and event.role == request.recipient and event.payload.get("request_id") == request.id)
+
+
+def _guidance_owned(event: Event, projection: RunProjection, department: str) -> bool:
+    return event.run_id == projection.run_id and event.role == department
+
+
+def _guidance_tool_current(event: Event, projection: RunProjection) -> bool:
+    return (event.payload.get("effective_contract_hash") == _content_hash(projection.effective_contract)
+            and event.payload.get("engineering_plan_hash") == _content_hash(projection.engineering_plan))
+
+
+def _current_guidance_result(event: Event, projection: RunProjection, snapshot_hash: str) -> bool:
+    payload = event.payload
+    if event.type == EventType.SPEC_ACCEPTED:
+        return projection.product_spec is not None and payload.get("content_hash") == projection.product_spec.content_hash
+    if event.type == EventType.PRODUCT_DECISION_ACCEPTED:
+        return any(item.content_hash == payload.get("content_hash") for item in projection.effective_decisions)
+    if event.type == EventType.PLAN_ACCEPTED:
+        return projection.engineering_plan is not None and payload.get("content_hash") == projection.engineering_plan.content_hash
+    if event.type == EventType.DELIVERY_ACCEPTED:
+        delivery = projection.delivery_spec
+        return bool(delivery and delivery.status == "active"
+                    and payload.get("content_hash") == delivery.content_hash
+                    and delivery.code_tree_digest == snapshot_hash
+                    and delivery.effective_contract_hash == _content_hash(projection.effective_contract)
+                    and delivery.engineering_plan_hash == _content_hash(projection.engineering_plan))
+    pending = projection.pending_request
+    return bool(event.type == EventType.COLLABORATION_REQUESTED and pending is not None
+                and pending.created_event_id == event.event_id and pending.requester == event.role)
+
+
+def _activation_claimable_results(projection: RunProjection, department: str, events: list[Event],
+                                  snapshot_hash: str) -> list[Event]:
+    activation_id = projection.last_activations.get(department)
+    started = next((event for event in reversed(events)
+                    if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
+                    and event.role == department and event.payload.get("activation_id") == activation_id), None)
+    if started is None or not activation_id:
+        return []
+    owned = lambda item: _guidance_owned(item, projection, department) and item.seq > started.seq
+    found: list[Event] = []
+    for event in events:
+        if not owned(event):
+            continue
+        if event.type == EventType.TOOL_CALLED:
+            if event.payload.get("activation_id") != activation_id or event.payload.get("name") not in _CLAIMABLE_TOOLS:
+                continue
+            result = _host_tool_result(event, events, owned=owned, after_seq=started.seq)
+            if result is None or not result["ok"]:
+                continue
+            if event.payload.get("name") in _CHECKS and not _usable_tool_result(event, result, projection, snapshot_hash):
+                continue
+            found.append(event)
+        elif event.type in _GUIDANCE_ACCEPTED and _current_guidance_result(event, projection, snapshot_hash):
+            found.append(event)
+    return found
 
 
 def _has_pending_guidance(projection: RunProjection, department: str) -> bool:
