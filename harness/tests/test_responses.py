@@ -22,6 +22,7 @@ from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tools import host_tool_definitions, tools_for
 
 
 KEY = "local-sdk-test-key"
@@ -894,6 +895,45 @@ def test_http_400_keeps_bounded_redacted_error_identity():
     assert request_obs.id == "activation:1:attempt-1"
     assert secret not in str(caught.value) and secret not in str(diagnostics)
     assert KEY not in str(diagnostics)
+
+
+def test_product_spec_change_record_schema_has_object_type_for_responses():
+    tools = [
+        {"type": "function", "name": item["name"], "description": item["description"],
+         "parameters": item["parameters"], "strict": False}
+        for item in host_tool_definitions(tools_for("product"))
+    ]
+
+    def inspect(handler, body):
+        spec = next(item for item in body["tools"] if item["name"] == "submit_product_spec")
+        change_record = spec["parameters"]["properties"]["change_record"]
+        if "anyOf" in change_record or not isinstance(change_record.get("type"), str):
+            _send(
+                handler,
+                json.dumps({
+                    "error": {
+                        "type": "invalid_request_error",
+                        "status": "INVALID_ARGUMENT",
+                        "message": "submit_product_spec parameters.change_record schema didn't specify the schema type field",
+                    }
+                }).encode(),
+                status=400,
+                content_type="application/json",
+            )
+            return
+        _send(handler, _stream())
+
+    with _server([inspect]) as (config, captures, *_):
+        request = _request()
+        request.tools = tools
+        result = ResponsesAdapter(config).complete(request)
+    assert result.output
+    spec = next(item for item in captures[0]["tools"] if item["name"] == "submit_product_spec")
+    change_record = spec["parameters"]["properties"]["change_record"]
+    assert change_record["type"] == "object"
+    assert "anyOf" not in change_record
+    assert "goal" in spec["parameters"]["required"]
+    assert "change_record" not in spec["parameters"]["required"]
 
 
 def test_http_400_gemini_status_keeps_sanitized_type_without_message():
