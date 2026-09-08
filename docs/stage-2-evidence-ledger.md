@@ -1,8 +1,9 @@
 # Stage2 工作包证据账
 
-日期：2026-09-07。  
+日期：2026-09-08。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前主线：`d52d7d6`（`harness_1` = `origin/harness_1`）。  
+当前被测应用提交：`fcb06ab` `fix: bind guidance completed to adopted host results`。  
+文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 
 阶段状态：**PARTIAL**。局部代码、局部测试或一次真实成功请求都不能关闭阶段。
@@ -12,8 +13,8 @@
 | 项 | 事实 |
 | --- | --- |
 | 原始起点 | `239c3b1` `stagecommit` |
-| 当前 HEAD | `ca14283` `fix: host-bind guidance results instead of copying ids` |
-| 本轮主线增量 | `a875fa5` 证据账；`20c7e42` O/U 界面；`0b076f6`/`d52d7d6` 指导调度准入；`36ab84f`/`ca14283` 指导结果宿主绑定；用户 `32a0568` 续编完成计划 |
+| 当前 HEAD | `fcb06ab` `fix: bind guidance completed to adopted host results` |
+| 本轮主线增量 | `a875fa5` 证据账；`20c7e42` O/U 界面；`0b076f6`/`d52d7d6` 指导调度准入；`36ab84f`/`ca14283` 指导结果宿主绑定；`fcb06ab` 解释/动作完成合同；用户 `32a0568` 续编完成计划、`855658f` 补充计划 |
 | 分支 | `harness_1` = `origin/harness_1` |
 | 工作树 | 已修改 `jour.md`（含既有 A/B/C/D 笔记，不代为提交）；未跟踪 `.serena/project.yml` |
 | 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
@@ -48,14 +49,16 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | W3 Context/详情 | 已在主线 `20c7e42` | 隔离 SHA 过时 | Raw CSS 选择器已测 | 64KB/320px 真机仍待 W7 | 详情行为已修，真机未验 | PARTIAL |
 | W4 列表/用量 | 已在主线 `20c7e42` | — | O3 取消筛选、O6 总计费用/不可合计已测 | 未作为真实验收关闭项 | 查询与 UI 口径已对齐，联调未关 | 主线局部完成 |
 | W5 总览/全局输入 | 骨架已有 | — | 终态草稿/新建入口已测（U6） | 连续输入真实验收未通过 | 待 P3 | PARTIAL |
-| W6 部门指导 | `ca14283` | 旧 auto-processed 已不在主线 | G1 宿主绑定结果、G2/G3 调度准入与 QA 竞态已测 | 无真实指导闭环 | 真实验收未做 | 主线局部完成 |
+| W6 部门指导 | `fcb06ab` | 旧 auto-processed 已不在主线 | G1 解释/动作合同、空结果与旧写入反例、G2/G3 调度准入与 QA 竞态已测；浏览器待验 | 无真实指导闭环 | 真实验收未做 | 主线局部完成 |
 | W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | 未开始 | 研究资料已导入 | — | — | 依赖 P0–P6 | 未开始 |
 
-## 4. 当前 HEAD 的 O/U/G 缺口（P2）
+## 4. O/U/G 状态
 
-只读审计日期 2026-09-07，对象为 `239c3b1`。
+### 4.1 历史审计（2026-09-07，对象 `239c3b1`）
+
+下表保留原时点结论，不能当作 `fcb06ab` 的当前状态。
 
 | ID | 状态 | 证据口径 |
 | --- | --- | --- |
@@ -75,6 +78,20 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | G2 | PARTIAL | 非活动部门可被 `guidance_only` 安排；被让出工作依据未单独保存 |
 | G3 | PARTIAL | 取消、在途指导、QA 待处理有片段；缺竞态矩阵测试 |
 
+### 4.2 当前被测提交 `fcb06ab`（2026-09-08）
+
+| ID | 状态 | 证据口径 |
+| --- | --- | --- |
+| O1-O6 | 代码及局部回归通过、浏览器待验 | `20c7e42` 已补取消筛选、费用总计、Raw 滚动、请求/返回身份 |
+| U1-U6 | 代码及局部回归通过、浏览器待验 | `20c7e42` 已补 popstate、SSE 刷新、短目标、终态草稿 |
+| G1 | 代码及局部回归通过、浏览器/真实指导待验 | `fcb06ab`：`explained` 与 `completed` 分开；空结果和指导前旧写入不能标动作完成；宿主只绑定本指导被采用后的结果 |
+| G2 | 代码及局部回归通过 | `0b076f6`/`d52d7d6` 被让出工作恢复与只读准入 |
+| G3 | 代码及局部回归通过 | 取消优先、QA 放行前待处理指导、拒收回应不消耗指导 |
+
+S1 局部验证：`python -m pytest -q harness/tests/test_department_guidance.py harness/tests/test_collaboration_rules.py harness/tests/test_collaboration_engine.py harness/tests/test_context.py harness/tests/test_observability.py harness/tests/test_web.py harness/tests/test_tools.py` 233 通过、0 失败、374.48 秒；`node --test harness/tests/test_web_ui.js` 34 通过。未调用真实模型。F1/F2 正式回归已纳入 `test_department_guidance.py`。
+
+S2 真实 400：`run_506da3ee67304de7` 仍为未知 HTTP 400，报告 `.yudao/p4-smoke-20260907a/smoke-report.md`。摘要已纳入版本管理；临时报告路径不等于已归档诊断结论。
+
 ## 5. 真实运行保留入口
 
 失败与部分成功均保留，不改写：
@@ -83,6 +100,7 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 - `.tmp/stage2-real-acceptance-browser2/`
 - `.tmp/stage2-real-acceptance-compaction/`
 - `.tmp/stage2-observed-real-acceptance/`
+- `.yudao/p4-smoke-20260907a/`：`run_506da3ee67304de7` 首次 happy 请求 HTTP 400，无交付/QA；诊断正文当时只有 status_code
 
 指定配置仍是 `provider.md` 的服务与模型；能力值为试验限制，不是服务商标称上限。
 
