@@ -832,7 +832,11 @@ def test_http_429_insufficient_quota_is_permanent_and_keeps_only_safe_diagnostic
         with pytest.raises(ProviderError) as caught:
             ResponsesAdapter(config).complete(_request())
     assert caught.value.retryable is False
-    assert caught.value.diagnostics == {"status_code": 429, "error_code": "insufficient_quota"}
+    assert caught.value.diagnostics == {
+        "status_code": 429,
+        "error_code": "insufficient_quota",
+        "request_observation_id": "activation:1:attempt-1",
+    }
     assert leaked_code not in str(caught.value.diagnostics)
 
 
@@ -847,8 +851,80 @@ def test_unknown_provider_error_code_is_not_persisted():
         with pytest.raises(ProviderError) as caught:
             ResponsesAdapter(config).complete(_request())
     assert caught.value.retryable is True
-    assert caught.value.diagnostics == {"status_code": 500}
+    assert caught.value.diagnostics == {
+        "status_code": 500,
+        "request_observation_id": "activation:1:attempt-1",
+    }
     assert leaked_code not in str(caught.value)
+
+
+def test_http_400_keeps_bounded_redacted_error_identity():
+    secret = "credential-that-provider-echoed"
+    observations = []
+
+    def failure(handler, _body):
+        _send(
+            handler,
+            json.dumps({
+                "error": {
+                    "code": "unknown_parameter",
+                    "type": "invalid_request_error",
+                    "param": "store",
+                    "message": secret,
+                }
+            }).encode(),
+            status=400,
+            content_type="application/json",
+        )
+
+    with _server([failure]) as (config, *_):
+        request = _request(observations=observations.append)
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(request)
+    diagnostics = caught.value.diagnostics
+    request_obs = next(event for event in observations if event.kind == "request")
+    assert caught.value.retryable is False
+    assert diagnostics == {
+        "status_code": 400,
+        "error_code": "unknown_parameter",
+        "error_type": "invalid_request_error",
+        "param": "store",
+        "request_observation_id": request_obs.id,
+    }
+    assert request_obs.id == "activation:1:attempt-1"
+    assert secret not in str(caught.value) and secret not in str(diagnostics)
+    assert KEY not in str(diagnostics)
+
+
+def test_http_400_gemini_status_keeps_sanitized_type_without_message():
+    secret = "Invalid JSON payload received. Unknown name store echoed " + KEY
+
+    def failure(handler, _body):
+        _send(
+            handler,
+            json.dumps({
+                "error": {
+                    "code": 400,
+                    "message": secret,
+                    "status": "INVALID_ARGUMENT",
+                    "param": "tools[0].parameters",
+                }
+            }).encode(),
+            status=400,
+            content_type="application/json",
+        )
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    diagnostics = caught.value.diagnostics
+    assert diagnostics["status_code"] == 400
+    assert diagnostics["error_type"] == "invalid_argument"
+    assert diagnostics["param"] == "tools[0].parameters"
+    assert diagnostics["request_observation_id"] == "activation:1:attempt-1"
+    assert "error_code" not in diagnostics
+    assert secret not in str(caught.value) and KEY not in str(diagnostics)
+    assert "message" not in diagnostics
 
 
 def test_observation_host_io_error_is_not_reclassified_as_retryable_connection():

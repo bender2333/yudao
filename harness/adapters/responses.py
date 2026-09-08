@@ -6,6 +6,7 @@ import asyncio
 import email.utils
 import json
 import math
+import re
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -231,11 +232,8 @@ class ResponsesAdapter:
         except APIStatusError as exc:
             code = _error_code(exc.body)
             reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
-            # Provider error bodies may echo input or credentials; retain only status.
-            diagnostics: dict[str, Any] = {"status_code": exc.status_code}
-            safe_code = _safe_error_code(code)
-            if safe_code is not None:
-                diagnostics["error_code"] = safe_code
+            # Provider error bodies may echo input or credentials; keep only bounded identity.
+            diagnostics = _http_status_diagnostics(exc, request, secrets=(self.config.api_key,))
             retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
             if retry_after is not None:
                 diagnostics["retry_after_sec"] = retry_after
@@ -510,12 +508,57 @@ class ResponsesAdapter:
         ))
 
 
-def _error_code(body: Any) -> str | None:
+_SAFE_ERROR_TOKEN = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+_SAFE_ERROR_PARAM = re.compile(r"^[a-z][a-z0-9_.\[\]]{0,63}$")
+
+
+def _error_object(body: Any) -> dict[str, Any]:
     if not isinstance(body, dict):
-        return None
+        return {}
     error = body.get("error", body)
-    code = error.get("code") if isinstance(error, dict) else None
+    return error if isinstance(error, dict) else {}
+
+
+def _error_code(body: Any) -> str | None:
+    code = _error_object(body).get("code")
     return code if isinstance(code, str) else None
+
+
+def _sanitized_error_token(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().casefold()
+    return normalized if _SAFE_ERROR_TOKEN.fullmatch(normalized) else None
+
+
+def _sanitized_error_param(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().casefold()
+    return normalized if _SAFE_ERROR_PARAM.fullmatch(normalized) else None
+
+
+def _http_status_diagnostics(
+    exc: APIStatusError,
+    request: ModelRequest,
+    *,
+    secrets: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    error = _error_object(exc.body)
+    diagnostics: dict[str, Any] = {
+        "status_code": exc.status_code,
+        "request_observation_id": _request_observation_id(request),
+    }
+    code = _safe_error_code(_error_code(exc.body)) or _sanitized_error_token(error.get("code"))
+    if code is not None:
+        diagnostics["error_code"] = code
+    error_type = _sanitized_error_token(error.get("type")) or _sanitized_error_token(error.get("status"))
+    if error_type is not None:
+        diagnostics["error_type"] = error_type
+    param = _sanitized_error_param(error.get("param"))
+    if param is not None:
+        diagnostics["param"] = param
+    return _redact_sdk_json(diagnostics, secrets=secrets)
 
 
 def _actual_model(value: Any) -> str | None:
