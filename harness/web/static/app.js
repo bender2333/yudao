@@ -167,7 +167,8 @@
     return ({
       received: "已接收",
       in_input: "已进入模型输入",
-      completed: "已处理",
+      explained: "已解释",
+      completed: "动作已核实",
       declined: "已说明边界",
       needs_work: "需要后续处理",
     }[status] || status || "未知状态");

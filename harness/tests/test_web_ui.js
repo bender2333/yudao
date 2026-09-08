@@ -429,6 +429,14 @@ test("late run projection cannot overwrite a newer selected task", async () => {
   assert.equal(web.state.runPayload, null);
 });
 
+test("department guidance labels distinguish explanation from verified action", () => {
+  assert.match(APP_JS, /explained: "已解释"/);
+  assert.match(APP_JS, /completed: "动作已核实"/);
+  assert.match(APP_JS, /received: "已接收"/);
+  assert.match(APP_JS, /in_input: "已进入模型输入"/);
+  assert.doesNotMatch(APP_JS, /completed: "已处理"/);
+});
+
 test("department context renders its own attempt id and exposes guidance controls", () => {
   const { document, nodes } = uiDocument();
   const web = loadApp(async () => response({}), document);

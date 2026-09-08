@@ -115,8 +115,8 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
         return []
     if kind == "department_guidance_response":
         errors = _require_text(proposal, "guidance_id") + _require_text(proposal, "text")
-        if proposal.get("status") not in {"completed", "declined", "needs_work"}:
-            errors.append(FieldError("status", "status must be completed, declined, or needs_work"))
+        if proposal.get("status") not in {"explained", "completed", "declined", "needs_work"}:
+            errors.append(FieldError("status", "status must be explained, completed, declined, or needs_work"))
         return errors
     if kind == "product_decision":
         return _require_text(proposal, "statement") + _require_text(proposal, "rationale")

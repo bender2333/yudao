@@ -112,8 +112,8 @@ for _contract in PROPOSAL_CONTRACTS.values():
         },
         "department_guidance_response": {
             "required": ["guidance_id", "status", "text", "result_event_ids"],
-            "status": ["completed", "declined", "needs_work"],
-            "result_event_ids": "optional; host binds current host results from guidance_results on completed",
+            "status": ["explained", "completed", "declined", "needs_work"],
+            "result_event_ids": "optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action",
             "bind": ["the target department guidance id and current host results"],
         },
     })
@@ -434,8 +434,9 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                         if item.department == department and item.status in {"received", "in_input"}]
     if pending_guidance:
         work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文，"
-                 "完成可核对的处理后必须用 submit_guidance_response 逐条回应。"
-                 "guidance_results 中的主机结果由宿主在 completed 时绑定，不必手抄事件 id；"
+                 "然后用 submit_guidance_response 逐条回应：explained 表示已解释或无需新动作，"
+                 "completed 表示本指导被采用后的动作已有主机结果。"
+                 "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
                  "指导不能替代产品要求、工程计划或质检放行。")
     return {
         "department": department, "phase": projection.phase, "work": work,

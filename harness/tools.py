@@ -458,13 +458,13 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "submit_guidance_response": {
         "name": "submit_guidance_response",
         "label": "submit_guidance_response",
-        "description": "Respond to one persisted department guidance item. State the concrete handling, the reason it needs product or engineering work, or why it cannot be applied. On completed, the host binds current host results from guidance_results; result_event_ids may be empty. This response does not change the contract, plan, files, or QA result by itself.",
+        "description": "Respond to one persisted department guidance item. Use explained when the handling is an explanation, no change is required, or this department cannot apply it. Use completed only when host-verified actions after this guidance was adopted are listed in guidance_results; the host binds those results and result_event_ids cannot enlarge that set. Empty, rejected, failed, or earlier-unrelated results cannot complete an action. This response does not change the contract, plan, files, or QA result by itself.",
         "parameters": _object_schema(
             {
                 "guidance_id": {"type": "string"},
-                "status": {"type": "string", "enum": ["completed", "declined", "needs_work"]},
+                "status": {"type": "string", "enum": ["explained", "completed", "declined", "needs_work"]},
                 "text": {"type": "string"},
-                "result_event_ids": _string_list_schema("Optional host event ids from guidance_results; empty is allowed, the host binds current results on completed"),
+                "result_event_ids": _string_list_schema("Optional. completed must be a subset of guidance_results; the host binds those results. explained, declined, and needs_work do not require results."),
             },
             ["guidance_id", "status", "text", "result_event_ids"],
         ),

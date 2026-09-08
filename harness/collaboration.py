@@ -17,12 +17,12 @@ _MUTATIONS = {"write_file", "delete_file", "move_file"}
 _READS = {"read_file", "list_files"}
 _CHECKS = {"run_check", "collect_evidence"}
 _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
-_GUIDANCE_TOOLS = _CLAIMABLE_TOOLS | _READS
 _ACCEPTED_RESULTS = {
     EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
     EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED,
 }
 _GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS | {EventType.COLLABORATION_REQUESTED}
+_GUIDANCE_RESPONSE_STATUSES = {"explained", "completed", "declined", "needs_work"}
 
 
 def request_basis(projection: RunProjection) -> dict[str, Any]:
@@ -208,12 +208,35 @@ def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection
     errors: list[dict[str, str]] = []
     if not isinstance(proposal.get("text"), str) or not proposal["text"].strip():
         errors.append(_error("text", "a response explanation is required"))
+    status = proposal.get("status")
+    if status not in _GUIDANCE_RESPONSE_STATUSES:
+        errors.append(_error("status", "status must be explained, completed, declined, or needs_work"))
     references = proposal.get("result_event_ids")
     if not isinstance(references, list) or any(not isinstance(item, str) or not item for item in references):
         return errors + [_error("result_event_ids", "result_event_ids must be a list of event IDs")]
     if len(references) != len(set(references)):
         errors.append(_error("result_event_ids", "result event IDs must be unique"))
-    status = proposal.get("status")
+    guidance = next((item for item in projection.department_guidance
+                     if item.id == proposal.get("guidance_id")), None)
+    claimable_ids = {
+        event.event_id
+        for event in guidance_claimable_results(
+            projection, department, events, snapshot_hash, guidance=guidance,
+        )
+    } if guidance is not None else set()
+    if status == "completed":
+        for reference in references:
+            if reference not in claimable_ids:
+                errors.append(_error(
+                    "result_event_ids",
+                    f"{reference} is not a result of this guidance's adopted work",
+                ))
+        if not claimable_ids:
+            errors.append(_error(
+                "result_event_ids",
+                "completed requires a current host result produced after this guidance was adopted",
+            ))
+        return errors
     indexed = {event.event_id: event for event in events}
     owned = lambda item: _guidance_owned(item, projection, department)
     for reference in references:
@@ -223,23 +246,6 @@ def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection
             continue
         if event.type == EventType.PROPOSAL_REJECTED:
             errors.append(_error("result_event_ids", f"{reference} is not an accepted result allowed by this guidance"))
-            continue
-        if event.type == EventType.TOOL_CALLED:
-            result = _host_tool_result(event, events, owned=owned, after_seq=0)
-            if result is None or event.payload.get("name") not in _GUIDANCE_TOOLS:
-                errors.append(_error("result_event_ids", f"{reference} has no matching host tool execution"))
-                continue
-            if status == "completed" and (
-                not _usable_tool_result(event, result, projection, snapshot_hash)
-                or not _guidance_tool_current(event, projection)
-            ):
-                errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
-            continue
-        if event.type not in _GUIDANCE_ACCEPTED:
-            errors.append(_error("result_event_ids", f"{reference} is not an accepted result allowed by this guidance"))
-            continue
-        if status == "completed" and not _current_guidance_result(event, projection, snapshot_hash):
-            errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
     return errors
 
 
@@ -249,17 +255,29 @@ def guidance_claimable_results(projection: RunProjection, department: str, event
         item for item in projection.department_guidance
         if item.department == department and item.status in {"received", "in_input"}
     ]
-    activation_ids: set[str] = set()
-    current = projection.last_activations.get(department)
-    if current:
-        activation_ids.add(current)
+    consumed = _consumed_guidance_result_ids(events, projection.run_id)
+    found: list[Event] = []
+    seen: set[str] = set()
     for item in items:
         if item is None:
             continue
+        after_seq = _event_seq(events, item.created_event_id)
+        if after_seq is None:
+            continue
+        activation_ids: set[str] = set()
+        current = projection.last_activations.get(department)
+        if current:
+            activation_ids.add(current)
         if item.applied_activation_id:
             activation_ids.add(item.applied_activation_id)
         activation_ids.update(_applied_activation_ids(item.id, projection, events))
-    return _claimable_results_for_activations(projection, department, events, snapshot_hash, activation_ids)
+        for event in _claimable_results_for_activations(
+                projection, department, events, snapshot_hash, activation_ids):
+            if event.seq <= after_seq or event.event_id in consumed or event.event_id in seen:
+                continue
+            found.append(event)
+            seen.add(event.event_id)
+    return found
 
 
 def guidance_bound_result_ids(proposal: dict[str, Any], projection: RunProjection, department: str,
@@ -267,18 +285,12 @@ def guidance_bound_result_ids(proposal: dict[str, Any], projection: RunProjectio
     provided = [item for item in proposal.get("result_event_ids", []) if isinstance(item, str) and item]
     if proposal.get("status") != "completed":
         return list(dict.fromkeys(provided))
-    bound: list[str] = []
-    seen: set[str] = set()
-    for event in guidance_claimable_results(
-            projection, department, events, snapshot_hash, guidance=guidance):
-        if event.event_id not in seen:
-            bound.append(event.event_id)
-            seen.add(event.event_id)
-    for reference in provided:
-        if reference not in seen:
-            bound.append(reference)
-            seen.add(reference)
-    return bound
+    return [
+        event.event_id
+        for event in guidance_claimable_results(
+            projection, department, events, snapshot_hash, guidance=guidance,
+        )
+    ]
 
 
 def guidance_result_summaries(projection: RunProjection, department: str, events: list[Event],
@@ -430,6 +442,24 @@ def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool
 
 def _guidance_owned(event: Event, projection: RunProjection, department: str) -> bool:
     return event.run_id == projection.run_id and event.role == department
+
+
+def _event_seq(events: list[Event], event_id: str | None) -> int | None:
+    if not event_id:
+        return None
+    event = next((item for item in events if item.event_id == event_id), None)
+    return None if event is None else event.seq
+
+
+def _consumed_guidance_result_ids(events: list[Event], run_id: str) -> set[str]:
+    consumed: set[str] = set()
+    for event in events:
+        if event.run_id != run_id or event.type != EventType.DEPARTMENT_GUIDANCE_RESPONDED:
+            continue
+        for item in event.payload.get("result_event_ids") or []:
+            if isinstance(item, str) and item:
+                consumed.add(item)
+    return consumed
 
 
 def _guidance_tool_current(event: Event, projection: RunProjection) -> bool:

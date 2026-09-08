@@ -10,8 +10,8 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType
 from harness.observability import ObservabilityQuery
 from harness.proposals import (
-    collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec,
-    response_turn, review_turn,
+    collaboration_request, delivery_turn, engineering_plan, guidance_response, plan_turn,
+    product_spec, response_turn, review_turn,
 )
 from harness.runtime import LoopSystem
 from harness.web.server import serve
@@ -32,8 +32,8 @@ def _last_activation(system, run_id):
 
 
 def _guidance_results(request):
-    part = next(part for part in request.context.parts if part.source == "guidance_results")
-    return json.loads(part.text)
+    part = next((part for part in request.context.parts if part.source == "guidance_results"), None)
+    return [] if part is None else json.loads(part.text)
 
 
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
@@ -44,13 +44,13 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
 
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已检查边界行为，当前指导不改变产品合同。"
+        _guidance_id(request), status="explained", text="已检查边界行为，当前指导不改变产品合同。"
     )))
     result = system.activate_once(run_id)
 
     guidance = result.department_guidance[0]
     assert guidance.department == "engineering"
-    assert guidance.status == "completed"
+    assert guidance.status == "explained"
     assert guidance.response_text == "已检查边界行为，当前指导不改变产品合同。"
     assert any(part.source == "department_guidance" and guidance.text in part.text
                for part in adapter.invocations[-1].context.parts)
@@ -77,13 +77,13 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
 
     system.add_guidance(run_id, "engineering", "请说明本次交付的错误处理边界。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已说明错误处理边界；该指导不授权修改交付。"
+        _guidance_id(request), status="explained", text="已说明错误处理边界；该指导不授权修改交付。"
     )))
     result = system.activate_once(run_id)
 
     assert result.phase == "QUALITY"
     assert result.active_department == "engineering"
-    assert result.department_guidance[0].status == "completed"
+    assert result.department_guidance[0].status == "explained"
     request = adapter.invocations[-1]
     assert _tool_names(request) == [
         "read_file", "list_files", "run_check", "submit_request", "submit_guidance_response",
@@ -165,7 +165,7 @@ def test_guidance_not_completed_by_activation_or_rejection(tmp_path):
 
 
 @pytest.mark.parametrize("text", ["", "   ", "\n\t"])
-@pytest.mark.parametrize("status", ["completed", "declined", "needs_work"])
+@pytest.mark.parametrize("status", ["explained", "completed", "declined", "needs_work"])
 def test_guidance_completed_requires_nonempty_response_text(tmp_path, text, status):
     adapter = FakeAdapter([])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -199,10 +199,10 @@ def test_guidance_response_binds_that_guidance_id(tmp_path):
     assert any(error["field"] == "guidance_id" for error in rejected.rejections[-1]["errors"])
 
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已检查边界行为，当前指导不改变产品合同。",
+        _guidance_id(request), status="explained", text="已检查边界行为，当前指导不改变产品合同。",
     )))
     done = system.activate_once(run_id)
-    assert done.department_guidance[0].status == "completed"
+    assert done.department_guidance[0].status == "explained"
     assert done.department_guidance[0].response_text == "已检查边界行为，当前指导不改变产品合同。"
     responded = next(event for event in system.store.list_events(run_id)
                      if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
@@ -219,7 +219,7 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
 
     system.add_guidance(run_id, "product", "请确认未知参数是否需要写入验收。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="当前合同已覆盖该行为，无需改需求。",
+        _guidance_id(request), status="explained", text="当前合同已覆盖该行为，无需改需求。",
     )))
     result = system.activate_once(run_id)
     request = adapter.invocations[-1]
@@ -233,7 +233,7 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     assert yielded["phase"] == "ENGINEERING"
     assert yielded["effective_contract_hash"] == result.effective_contract.content_hash
     assert yielded["engineering_plan_hash"] == result.engineering_plan.content_hash
-    assert result.department_guidance[0].status == "completed"
+    assert result.department_guidance[0].status == "explained"
     assert result.phase == "ENGINEERING"
 
     adapter.script.append(plan_turn(reason="Continue engineering after product guidance."))
@@ -349,7 +349,9 @@ def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
     adapter.script.append(lambda request: FakeTurn(
         writes={"src/echo.py": "import sys\nprint('hijacked')\n"},
-        proposal=guidance_response(_guidance_id(request), text="指导不能授权修改交付，已拒绝写文件。"),
+        proposal=guidance_response(
+            _guidance_id(request), status="explained", text="指导不能授权修改交付，已拒绝写文件。",
+        ),
     ))
     result = system.activate_once(run_id)
     request = adapter.invocations[-1]
@@ -410,10 +412,10 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     assert blocked.department_guidance[0].status in {"received", "in_input"}
 
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已核对错误输出边界，可以按当前交付独立复检。",
+        _guidance_id(request), status="explained", text="已核对错误输出边界，可以按当前交付独立复检。",
     )))
     responded = system.activate_once(run_id)
-    assert responded.department_guidance[0].status == "completed"
+    assert responded.department_guidance[0].status == "explained"
     assert responded.phase == "QUALITY"
 
     adapter.script.append(review_turn("release", "Independent quality check after the guidance response."))
@@ -446,10 +448,10 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
 
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已记录返工原因；需要工程修复后再做独立质检。",
+        _guidance_id(request), status="explained", text="已记录返工原因；需要工程修复后再做独立质检。",
     )))
     responded = system.activate_once(run_id)
-    assert responded.department_guidance[0].status == "completed"
+    assert responded.department_guidance[0].status == "explained"
     assert responded.phase == "ENGINEERING"
     assert responded.last_review.verdict == "rework_engineering"
     assert responded.last_activations["quality"] != rework_activation
@@ -493,12 +495,13 @@ def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="当前合同已覆盖该边界，无需变更。", result_event_ids=[],
+        _guidance_id(request), status="explained", text="当前合同已覆盖该边界，无需变更。", result_event_ids=[],
     )))
     result = system.activate_once(run_id)
-    assert result.department_guidance[0].status == "completed"
+    assert result.department_guidance[0].status == "explained"
     responded = next(event for event in system.store.list_events(run_id)
                      if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    assert responded.payload["status"] == "explained"
     assert responded.payload["result_event_ids"] == []
 
 
@@ -688,3 +691,145 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
         event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED and event.payload.get("guidance_id") == guidance.id
         for event in system.store.list_events(run_id)
     )
+
+
+def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请创建 src/guidance-proof.txt，内容为 VERIFIED。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request),
+        text="已创建 src/guidance-proof.txt，内容为 VERIFIED。",
+        result_event_ids=[],
+    )))
+    result = system.activate_once(run_id)
+
+    assert result.department_guidance[0].status in {"received", "in_input"}
+    assert result.rejections
+    assert any(error["field"] == "result_event_ids" for error in result.rejections[-1]["errors"])
+    assert "src/guidance-proof.txt" not in system.workspace(run_id).list_files()
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+    assert not any(
+        event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
+        and event.payload.get("ok")
+        for event in system.store.list_events(run_id)
+    )
+
+
+def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
+    adapter = FakeAdapter([
+        product_spec(),
+        plan_turn(),
+        FakeTurn(
+            writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+            proposal=engineering_plan(reason="Continue after writing the current echo CLI."),
+        ),
+    ])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    written = system.activate_once(run_id)
+    assert written.phase == "ENGINEERING", written.stop_reason
+    old_write = next(
+        event for event in system.store.list_events(run_id)
+        if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
+        and event.payload.get("ok")
+    )
+    system.add_guidance(run_id, "engineering", "请创建 src/guidance-proof.txt，内容为 VERIFIED。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request),
+        text="已按先前写入完成新文件。",
+        result_event_ids=[old_write.event_id],
+    )))
+    result = system.activate_once(run_id)
+
+    assert result.department_guidance[0].status in {"received", "in_input"}
+    assert result.rejections
+    assert any(error["field"] == "result_event_ids" for error in result.rejections[-1]["errors"])
+    assert "src/guidance-proof.txt" not in system.workspace(run_id).list_files()
+    request = adapter.invocations[-1]
+    assert all(item["event_id"] != old_write.event_id for item in _guidance_results(request))
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+
+
+def test_explained_without_tools_is_recorded_as_explained(tmp_path):
+    adapter = FakeAdapter([product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request),
+        status="explained",
+        text="当前合同已覆盖该边界，无需变更。",
+        result_event_ids=[],
+    )))
+    result = system.activate_once(run_id)
+    assert result.department_guidance[0].status == "explained"
+    responded = next(event for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
+    assert responded.payload["status"] == "explained"
+    assert responded.payload["result_event_ids"] == []
+
+
+def test_one_write_cannot_complete_two_guidance_items(tmp_path):
+    adapter = FakeAdapter([product_spec(), plan_turn()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请创建 src/guidance-a.txt，内容为 A。")
+    system.add_guidance(run_id, "engineering", "请创建 src/guidance-b.txt，内容为 B。")
+    adapter.script.append(lambda request: FakeTurn(
+        writes={"src/guidance-a.txt": "A\n"},
+        proposal=guidance_response(
+            json.loads(next(part.text for part in request.context.parts
+                            if part.source == "department_guidance"))[0]["id"],
+            text="已创建 src/guidance-a.txt。",
+        ),
+    ))
+    first = system.activate_once(run_id)
+    first_item = next(item for item in first.department_guidance if item.text.endswith("A。"))
+    second_item = next(item for item in first.department_guidance if item.text.endswith("B。"))
+    assert first_item.status == "completed"
+    assert second_item.status in {"received", "in_input"}
+    write = next(
+        event for event in system.store.list_events(run_id)
+        if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
+        and event.payload.get("ok")
+    )
+    assert "src/guidance-a.txt" in system.workspace(run_id).list_files()
+    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+        _guidance_id(request),
+        text="同一写入也完成了第二条指导。",
+        result_event_ids=[],
+    )))
+    second = system.activate_once(run_id)
+    remaining = next(item for item in second.department_guidance if item.id == second_item.id)
+    assert remaining.status in {"received", "in_input"}
+    assert second.rejections
+    assert any(error["field"] == "result_event_ids" for error in second.rejections[-1]["errors"])
+    assert write.event_id in next(
+        event.payload["result_event_ids"]
+        for event in system.store.list_events(run_id)
+        if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+        and event.payload.get("guidance_id") == first_item.id
+    )
+
+
+def test_guidance_tool_contract_lists_explained_and_requires_host_results_for_completed():
+    from harness.tools import HOST_TOOL_SCHEMAS
+    from harness.context import PROPOSAL_CONTRACTS
+
+    tool = HOST_TOOL_SCHEMAS["submit_guidance_response"]
+    status = tool["parameters"]["properties"]["status"]["enum"]
+    assert status == ["explained", "completed", "declined", "needs_work"]
+    assert "empty is allowed" not in tool["description"]
+    contract = PROPOSAL_CONTRACTS["product"]["kinds"]["department_guidance_response"]
+    assert contract["status"] == ["explained", "completed", "declined", "needs_work"]
