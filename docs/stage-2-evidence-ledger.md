@@ -2,7 +2,7 @@
 
 日期：2026-09-08。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`cdcdce5` `fix: send object-typed change_record schema on Responses tools`。  
+当前被测应用提交：`cdcdce5` `fix: send object-typed change_record schema on Responses tools`。S3 报告提交 `6b41e43` 不改变应用身份。  
 文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 
@@ -90,7 +90,9 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 
 S1 局部验证：相关 Python 233 通过、0 失败、374.48 秒；Node 34 通过。未调用真实模型。F1/F2 正式回归已纳入 `test_department_guidance.py`。
 
-S2：HTTP 400 根因是 `submit_product_spec.change_record` 的 anyOf schema。诊断结论 [s2-http400-2026-09-08.md](s2-http400-2026-09-08.md)。新 happy smoke `run_7c4ea172110841cc` DONE/release。旧失败 `run_506da3ee67304de7` 保留。本机 `test_responses.py::...[timeout]` 仍有既有超时 flake，与本次 schema 修正无关。
+S2：HTTP 400 根因是 `submit_product_spec.change_record` 的 anyOf schema。诊断结论 [s2-http400-2026-09-08.md](s2-http400-2026-09-08.md)。新 happy smoke `run_7c4ea172110841cc` DONE/release。旧失败 `run_506da3ee67304de7` 保留。
+
+S3：联合验收 [s3-acceptance-2026-09-08.md](s3-acceptance-2026-09-08.md) 为 PARTIAL。浏览器主 run `run_cb69cec4c1f74100` DONE/release；连续输入与部门指导已取得。小窗压缩 `run_2268b511fece4392` 触发摘要后因 Gemini 返回 function_call 被宿主拒绝，未到 QA。本机 `test_responses.py::...[timeout]` 仍有既有超时 flake。
 
 ## 5. 真实运行保留入口
 
