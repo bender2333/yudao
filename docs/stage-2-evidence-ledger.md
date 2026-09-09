@@ -1,8 +1,8 @@
 # Stage2 工作包证据账
 
-日期：2026-09-08。  
+日期：2026-09-08，2026-09-09 补记 HEAD。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`cdcdce5` `fix: send object-typed change_record schema on Responses tools`。S3 报告提交 `6b41e43` 不改变应用身份。  
+当前被测应用提交：`cdcdce5` `fix: send object-typed change_record schema on Responses tools`。S3 报告提交 `6b41e43` 不改变应用身份。2026-09-09 HEAD `c1b26d6` 相对 `cdcdce5` 在 `harness/` 下只新增浏览器验收脚本 `test_s3_acceptance_browser.spec.js`，被测应用身份不变；后续排布见 [重新排布](stage-2-replan-2026-09-09.md)。  
 文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 

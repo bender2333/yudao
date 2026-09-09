@@ -1,6 +1,8 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-08。用户最新明确要完成整个 [stage-2-plan.md](stage-2-plan.md)，并严格按照已冻结原型的样式实施 Web。单个工作包通过不表示第二阶段完成。当前执行入口是 [补充计划](grok-stage2-supplement-2026-09-08.md)、[收尾计划](grok-stage2-completion-plan.md) 与 [证据账](stage-2-evidence-ledger.md)；冻结起点 `239c3b1`，当前被测应用提交 `cdcdce5`，阶段状态 PARTIAL。
+更新日期：2026-09-09。用户最新明确要完成整个 [stage-2-plan.md](stage-2-plan.md)，并按最新原型实施 Web。单个工作包通过不表示第二阶段完成。当前执行入口是 [重新排布](stage-2-replan-2026-09-09.md)（轨道 A 运行内核收尾、轨道 B 项目级工作台），其上位为 [补充计划](grok-stage2-supplement-2026-09-08.md)、[收尾计划](grok-stage2-completion-plan.md) 与 [证据账](stage-2-evidence-ledger.md)；冻结起点 `239c3b1`，当前被测应用提交 `cdcdce5`（HEAD `c1b26d6` 只多文档、原型与浏览器验收脚本），阶段状态 PARTIAL。
+
+2026-09-09 起 Web 外壳的视觉基线改为 [第三版原型](prototypes/2026-09-09/README.md)，第一版原型继续作为部门页内部与观测详情的基线；下文"原型约束"一节中"唯一视觉来源是冻结原型"记录的是 2026-09-08 之前的状态。
 
 ## 范围与顺序
 
