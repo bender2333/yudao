@@ -5,7 +5,8 @@ from dataclasses import asdict, replace
 import pytest
 
 from harness.compaction import (
-    CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, summary_material, visible_history,
+    SUMMARY_PREFACE, SUMMARY_RULES, CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction,
+    summary_material, visible_history,
 )
 from harness.models import canonical_hash, estimate_tokens, json_dumps
 
@@ -61,12 +62,26 @@ def test_compaction_reserves_response_room_and_retains_recent_complete_steps():
     assert shown[-1] == records[-1]["item"]
     assert records == original
     for plan in plans:
-        assert plan.input_items[0] == PINNED[0]
+        assert plan.input_items[1] == PINNED[0]
         assert plan.input_token_estimate <= 3400
         assert plan.summary_token_limit == 400
         assert plan.max_output_tokens == 600
         assert plan.input_token_estimate + plan.max_output_tokens <= 4000
     assert estimate_tokens(json_dumps({"input": [*PINNED, *shown], "tools": TOOLS})) <= 3400
+
+
+def test_summary_request_opens_as_summarizer_then_pins_department_material_then_sources():
+    plan = plan_compaction(_history(), None, 4000, PINNED, TOOLS)
+    rules, pinned, material = plan.input_items
+    assert rules["role"] == "developer"
+    assert rules["content"].startswith(SUMMARY_PREFACE + SUMMARY_RULES)
+    assert f"within {plan.summary_token_limit} tokens" in rules["content"]
+    assert pinned == PINNED[0]
+    assert material["role"] == "user"
+    assert set(json.loads(material["content"])) == {"previous_summary", "source_fragments"}
+    assert plan.input_token_estimate == estimate_tokens(json_dumps({
+        "input": plan.input_items, "tools": [], "max_output_tokens": plan.max_output_tokens,
+    }))
 
 
 def test_summary_source_fragments_match_exact_original_bytes_and_hashes():

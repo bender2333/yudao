@@ -61,6 +61,18 @@ def run_department(
             response = adapter.complete(request)
             _validate_response(response)
             request.attempt_finished_monotonic = time.monotonic()
+            undeclared = _undeclared_tool_calls(request, response)
+            if undeclared:
+                # Provider-side corruption: tool calls arrived although the request declared no
+                # tools. Keep the output as audit evidence (failed steps never enter effective
+                # history) and treat the attempt as a retryable failure; nothing executes.
+                record_response(response)
+                raise ProviderError(
+                    "model returned tool calls although the request declared no tools",
+                    reason="compaction_failed" if request.purpose == "compaction" else "provider_error",
+                    retryable=True,
+                    diagnostics={"error_type": "undeclared_tool_call", "tool_names": undeclared},
+                )
         except Exception as exc:
             if not isinstance(exc, ProviderError):
                 exc = ProviderError(
@@ -237,6 +249,13 @@ def _validate_response(response: ModelResponse) -> None:
     if len(call_ids) != len(set(call_ids)):
         raise ProviderError("model response contains duplicate tool call_id values",
                             diagnostics={"error_type": "protocol"})
+
+
+def _undeclared_tool_calls(request: ModelRequest, response: ModelResponse) -> list[str]:
+    """Tool call names in a response whose request offered no tools at all."""
+    if request.tools:
+        return []
+    return [str(item.get("name")) for item in response.output if item.get("type") == "function_call"]
 
 
 def _wait_for_retry(delay: float, stopped: Callable[[], bool]) -> bool:

@@ -63,7 +63,8 @@ def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path)
     raw_tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == 2200
     for request, manifest in zip(adapter.invocations, result.manifests):
-        assert request.input_items[0]["content"].startswith(f"[intend]\n{original}\n\n[current_work]\n")
+        pinned_index = 1 if request.purpose == "compaction" else 0
+        assert request.input_items[pinned_index]["content"].startswith(f"[intend]\n{original}\n\n[current_work]\n")
         saved = json.loads(system.artifacts.get_text(manifest.request_ref["content_hash"]))
         assert canonical_hash(saved) == manifest.digest
         assert saved["input"] == request.input_items and saved["tools"] == request.tools
@@ -155,6 +156,94 @@ def test_cancelled_compaction_keeps_observed_summary_without_adopting_it(tmp_pat
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.MODEL_MESSAGE and event.payload.get("purpose") == "compaction" for event in events)
     assert "LATE_SUMMARY_MUST_NOT_BE_ADOPTED" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+
+
+CORRUPT_TOOL_NAME = "thought\n<ctrl95><ctrl42>call:list_files"
+
+
+def _undeclared_tool_call(request):
+    identity = f"corrupt-{request.activation_id}-{request.step_id}"
+    return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
+                                  "name": CORRUPT_TOOL_NAME, "arguments": "{}"}])
+
+
+def _fast_retries(monkeypatch):
+    import harness.engine as engine
+
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+
+
+def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_executes(tmp_path, monkeypatch):
+    _fast_retries(monkeypatch)
+    compaction_count = 0
+
+    def summary(request):
+        nonlocal compaction_count
+        compaction_count += 1
+        return _undeclared_tool_call(request) if compaction_count == 1 else ModelResponse(output=[_message(request)])
+
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=summary)
+    result = system.activate_once(run_id)
+
+    assert result.phase == "ENGINEERING", result.error
+    assert result.compactions
+    attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
+    assert attempts[0].tools == attempts[1].tools == []
+    assert attempts[0].input_items == attempts[1].input_items
+    assert (attempts[0].attempt, attempts[1].attempt) == (1, 2)
+    assert attempts[0].root_step_id == attempts[1].root_step_id and attempts[1].retry_of_step_id == attempts[0].step_id
+    events = system.store.list_events(run_id)
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert len(failed) == 1
+    assert failed[0].payload["purpose"] == "compaction"
+    assert failed[0].payload["reason"] == "compaction_failed"
+    assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
+    assert failed[0].payload["diagnostics"] == {"error_type": "undeclared_tool_call", "tool_names": [CORRUPT_TOOL_NAME]}
+    assert len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]) == 1
+    # Nothing executed: no tool admission, no tool result, only the token accounting record.
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == CORRUPT_TOOL_NAME for event in events)
+    assert all(event.payload.get("name") == "provider_usage" for event in events
+               if event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and event.payload.get("purpose") == "compaction")
+    # The corrupt output stays as evidence but never becomes department history or summary source.
+    evidence = [event for event in events if event.type == EventType.MODEL_MESSAGE
+                and event.payload.get("response_id", "").startswith("corrupt-")]
+    assert len(evidence) == 1
+    saved = json.loads(system.artifacts.get_text(evidence[0].payload["message_ref"]["content_hash"]))
+    assert saved["type"] == "function_call" and saved["name"] == CORRUPT_TOOL_NAME
+    assert "corrupt-" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert "corrupt-" not in json_dumps([record["source_refs"] for record in result.compactions])
+    assert "corrupt-" not in json_dumps(adapter.invocations[-1].input_items)
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_evidence(tmp_path, monkeypatch):
+    _fast_retries(monkeypatch)
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=_undeclared_tool_call)
+    result = system.activate_once(run_id)
+
+    assert result.phase == "FAILED" and result.stop_reason == "compaction_failed"
+    assert not result.compactions
+    attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
+    assert [request.attempt for request in attempts] == [1, 2, 3]
+    assert len({request.root_step_id for request in attempts}) == 1
+    events = system.store.list_events(run_id)
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert [event.payload["will_retry"] for event in failed] == [True, True, False]
+    assert all(event.payload["reason"] == "compaction_failed" and event.payload["retryable"] is True for event in failed)
+    assert len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]) == 2
+    evidence = [event for event in events if event.type == EventType.MODEL_MESSAGE
+                and event.payload.get("response_id", "").startswith("corrupt-")]
+    assert len(evidence) == 3
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == CORRUPT_TOOL_NAME for event in events)
+    assert all(event.payload.get("name") == "provider_usage" for event in events
+               if event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and event.payload.get("purpose") == "compaction")
+    raw_tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
+    assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == 2200
+    history = system.orchestrator._department_history_records(run_id, "product")
+    assert raw_tool.event_id in {record["event_id"] for record in history}
+    assert "corrupt-" not in json_dumps(history)
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_path, monkeypatch):
