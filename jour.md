@@ -751,3 +751,19 @@
 - 视觉基线：第三版原型是外壳基线，第一版仍是部门页内部与观测详情基线，冲突以第三版为准并记入视觉契约。已更新 `stage-2-progress.md` 入口与 `stage-2-evidence-ledger.md` 的 HEAD 说明。
 - 待用户决定：A/B 是否并行；旧 `.yudao/*` 运行数据是否随新作用域直接弃用；无活跃事项时部门输入首批不对话是否接受；实施者用子代理还是 Grok。B0 可先写，B1 需前两项回答。
 - 本轮未修改应用代码、未调用真实模型。另注意到仓库里大量 `mission/*` 分支与 `.yudao/worktrees/` 是 5-6 月旧阶段遗留，建议单独清理，不在本轮处理。
+
+## 2026-09-09 - 用户决定落地：A/B 并行、旧数据弃用、D-H 接受、子代理实施；B0 合同一页
+
+- 用户回答四个问题：A/B 并行按建议；旧 `.yudao/*` 运行数据随新作用域直接弃用，不迁移、不留读入口；D-H 接受（无活跃事项时部门输入只“作为新事项开始 / 记录原文”）；实施交给子代理。我负责架构、B0、审查、提交与推送。
+- 先并行派出轨道 A 三个包（A1 压缩请求定位与畸形输出重试；A2 组合 run 输入审计口径；A3 64KB 详情容器与 timeout flake），文件范围互不重叠，都不做 git 提交、不调真实模型。B1 与 A1/A2 在 `orchestrator.py`、`smoke.py` 上有重叠，B1 等 A1/A2 落地后再派。
+- 写完 B0 合同 `docs/project-workbench-contract.md`。关键取舍：
+  - 项目事件放独立表 `project_events`，不进 `events` 表，避免项目记录伪装成 run 污染 `project_run`、`iter_all`、smoke 审计（2.E §7 的要求）。
+  - 内核 `create_run` 只“携带归属”（`project_id`/`work_item_id`/`baseline`/`initial_tree`/`project_context`/`department_prompts`），不知道项目当前成果；bare run 仍允许给内核测试与 smoke 用，产品入口（Web）只经项目层创建，`POST /api/runs` 删除。这是“内核不知道项目、只带归属”的分层，不是兼容层。
+  - 事项状态、承接部门、最近交接、返工来源全部从 run 投影派生，不另存可拖动状态（D-G）。
+  - 采纳结算 `settle(run_id)` 幂等，由 Web 工作进程在 run 停止后调用，读取项目和创建新事项时补跑，覆盖进程在 RUN_DONE 与结算之间中断的情形；不在内核里加钩子。
+  - 继承复用 D13 的 `load_tree` + `materialize_tree`，内核在建 `Workspace` 之前落盘，digest 不等直接抛错。
+  - 跨 run 上下文只注入一个确定性钉住部件 `project`（项目名、长期目标、当前采用成果摘要、已采纳事项、本事项），放在 `current_work` 之后；不带历史对话（2.E §6）。
+  - 部门 Prompt 项目配置版本 `config_version` 与 run 内 `prompt_version` 分开命名；run 创建时把配置文本作为 run 初始 Prompt，`prompt_config_versions` 记来源版本。
+  - 事项创建先写 `work_item_created`（含预生成 run_id）再 `create_run`，失败写 `work_item_start_failed`，不留孤儿 run；两张表不做跨表事务。
+  - B2 后端并入 B1（同一模块、同一批事件），B2 不再单列；B3 前端、B4 验收不变。
+- 核对到 `ArtifactStore` 只要求单一路径分量，`proj_…` 直接可用；CLI 现有子命令只有 demo/serve/replay/smoke，run 创建只在 Web 与 smoke，所以删 `POST /api/runs` 影响面小。
