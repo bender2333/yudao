@@ -1,6 +1,14 @@
 <!-- Yudao 项目协作原型 · 项目级三部门工作区与跨部门流转总览。所有数据均为内存示例，不读取目录、不调用模型、不写入真实项目。 -->
 <div id="yudao-project-prototype" aria-label="Yudao 项目协作原型">
 <style>
+#yudao-project-prototype .yp-prompt-editor{max-width:700px}
+#yudao-project-prototype .yp-prompt-editor textarea{min-height:260px;font:13px/1.7 "Microsoft YaHei UI",system-ui,sans-serif}
+#yudao-project-prototype .yp-prompt-current{margin-top:14px;padding:12px;border:1px solid var(--yp-line);border-radius:7px;background:var(--yp-soft)}
+#yudao-project-prototype .yp-prompt-current p{margin-top:8px}
+#yudao-project-prototype .yp-prompt-editor .yp-form-actions{flex-wrap:wrap}
+@media(max-width:470px){#yudao-project-prototype .yp-prompt-editor textarea{font-size:16px}#yudao-project-prototype .yp-prompt-editor .yp-form-actions>.yp-row{width:100%;justify-content:flex-end}}
+</style>
+<style>
 #yudao-project-prototype{--yp-bg:light-dark(#f7f8f7,#171918);--yp-side:light-dark(#eef1ef,#1c201d);--yp-surface:light-dark(#fff,#212522);--yp-soft:light-dark(#f1f4f2,#292e2a);--yp-text:light-dark(#29312d,#e7eee9);--yp-muted:light-dark(#68766e,#a4b1a8);--yp-line:light-dark(#dce4de,#37443b);--yp-green:light-dark(#087f69,#6bd8ba);--yp-tint:light-dark(#e4f2eb,#243e32);--yp-amber:light-dark(#96680e,#e2be71);--yp-amber-bg:light-dark(#faf1dc,#3a3223);--yp-red:light-dark(#b44338,#ee9e92);--yp-blue:light-dark(#39658c,#95bde3);font:14px/1.6 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;color:var(--yp-text);background:var(--yp-bg);color-scheme:light dark;position:relative;min-width:0;text-align:left}
 #yudao-project-prototype *{box-sizing:border-box}#yudao-project-prototype [hidden]{display:none!important}#yudao-project-prototype button,#yudao-project-prototype input,#yudao-project-prototype textarea,#yudao-project-prototype select{font:inherit;color:inherit}#yudao-project-prototype button{cursor:pointer}#yudao-project-prototype button:disabled{cursor:default;opacity:.55}#yudao-project-prototype h1,#yudao-project-prototype h2,#yudao-project-prototype h3,#yudao-project-prototype p{margin:0}#yudao-project-prototype h1{font-size:26px;font-weight:500;line-height:1.4;letter-spacing:-.4px}#yudao-project-prototype h2{font-size:16px;font-weight:500}#yudao-project-prototype h3{font-size:14px;font-weight:500}#yudao-project-prototype strong{font-weight:500}#yudao-project-prototype svg{width:17px;height:17px;flex-shrink:0}
 #yudao-project-prototype .yp-shell{display:grid;grid-template-columns:218px minmax(0,1fr);min-height:920px}#yudao-project-prototype .yp-sidebar{background:var(--yp-side);border-right:1px solid var(--yp-line);padding:22px 13px;display:flex;flex-direction:column;gap:20px;min-width:0}#yudao-project-prototype .yp-brand{display:flex;align-items:center;gap:9px;padding:0 8px;font-size:17px;font-weight:500;letter-spacing:.3px}#yudao-project-prototype .yp-brand svg{color:var(--yp-green);width:21px;height:21px}#yudao-project-prototype .yp-proto{font-size:10px;color:var(--yp-muted);border:1px solid var(--yp-line);border-radius:4px;padding:1px 4px;letter-spacing:1px;margin-left:auto}#yudao-project-prototype .yp-muted{color:var(--yp-muted)}#yudao-project-prototype .yp-small{font-size:12px;color:var(--yp-muted)}#yudao-project-prototype .yp-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}#yudao-project-prototype .yp-between{justify-content:space-between}#yudao-project-prototype .yp-side-label{display:flex;align-items:center;justify-content:space-between;padding:0 9px;margin:0 0 8px;font-size:11px;letter-spacing:1px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon{display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;border-radius:6px;padding:7px;min-width:30px;min-height:30px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon:hover{background:var(--yp-soft);color:var(--yp-text)}#yudao-project-prototype .yp-search{display:flex;align-items:center;gap:7px;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:7px 9px;margin-top:14px}#yudao-project-prototype .yp-search input{width:100%;min-width:0;border:0;background:transparent;font-size:12px;padding:0;outline:none}#yudao-project-prototype .yp-project-list{display:grid;gap:3px}#yudao-project-prototype .yp-project{width:100%;border:1px solid transparent;background:transparent;border-radius:7px;display:flex;gap:8px;text-align:left;align-items:center;padding:9px 8px;margin-top:2px}#yudao-project-prototype .yp-project:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-project.is-selected{background:var(--yp-tint);color:var(--yp-green);border-color:color-mix(in srgb,var(--yp-green) 15%,transparent)}#yudao-project-prototype .yp-project span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}#yudao-project-prototype .yp-project .yp-project-mark{width:7px;height:7px;border-radius:50%;background:var(--yp-muted);flex:none}#yudao-project-prototype .yp-project.is-selected .yp-project-mark{background:var(--yp-green)}#yudao-project-prototype .yp-side-bottom{margin-top:auto;display:grid;gap:8px;border-top:1px solid var(--yp-line);padding-top:16px}#yudao-project-prototype .yp-sidebar-link{width:100%;display:flex;align-items:center;gap:8px;text-align:left;border:0;background:transparent;padding:8px 9px;border-radius:6px;color:var(--yp-muted);font-size:12px}#yudao-project-prototype .yp-sidebar-link:hover{background:var(--yp-soft);color:var(--yp-text)}#yudao-project-prototype .yp-sidebar-link .yp-count{margin-left:auto;font-size:11px}#yudao-project-prototype .yp-footnote{padding:0 9px;font-size:11px;color:var(--yp-muted)}
@@ -994,8 +1002,8 @@ function inspector(p,dept,scope,snapshots){
  let body='';
  if(state.inspect==='context')body=data?`<div class="yp-small" style="margin-top:12px">${esc(data.context.version)} · ${esc(data.context.capturedAt)}</div><details open><summary>当次输入正文</summary><p>${esc(data.context.body)}</p></details><details open><summary>来源与版本</summary>${data.context.sources.map(s=>`<p><strong>${esc(s.name)}</strong><br>${esc(s.version)} · ${esc(s.scope)}</p>`).join('')}</details><details><summary>未纳入内容</summary><p>${esc(data.context.omitted)}</p></details>`:`<details open><summary>项目工作依据</summary><p>${esc(p.goal)}</p><p>当前成果：${esc(p.baseline)}</p></details><p class="yp-small">这是项目当前资料，尚无对应的请求输入快照。</p>`;
  if(state.inspect==='provider')body=data?`<div class="yp-detail"><h3>${esc(data.provider.name)}</h3><p>请求模型：${esc(data.provider.requestedModel)}<br>返回模型：${esc(data.provider.responseModel||'未返回')}<br>协议：${esc(data.provider.protocol)}<br>温度：${esc(data.provider.temperature)}<br>最大输出：${esc(data.provider.maxOutputTokens)}<br>配置版本：${esc(data.provider.version)}</p></div><p class="yp-small">所选请求的配置快照 · 示例</p>`:'<p>还没有请求配置快照。Provider 配置将在后续设计中补充。</p>';
- if(state.inspect==='prompt')body=`<div class="yp-small" style="margin-top:12px">${esc(data?.prompt.version||'项目部门规则')} · ${data?'当次采用':'尚未用于请求'}</div><div class="yp-code">${esc(data?.prompt.body||rules[dept])}</div>`;
- return `<aside class="yp-inspector" aria-label="部门检查区"><div class="yp-row yp-between"><h3>工作依据检查</h3><span class="yp-tag outline">${roles[dept].name}</span></div><nav class="yp-tabs" aria-label="检查内容">${[['context','Context'],['provider','Provider'],['prompt','Prompt']].map(([key,label])=>`<button class="yp-tab ${state.inspect===key?'is-selected':''}" type="button" data-inspect="${key}" aria-pressed="${state.inspect===key}">${label}</button>`).join('')}</nav>${chooser}${body}${data?`<button class="yp-link" style="margin-top:16px" type="button" data-attempt="${esc(data.id)}" data-return-dept="${dept}" data-return-scope="${esc(scope)}">查看模型请求 ${icon('arrow-up-right')}</button>`:''}<button class="yp-link" type="button" data-page="sources" style="margin-top:16px">查看项目当前资料 ${icon('folder-open')}</button></aside>`;
+ if(state.inspect==='prompt')body=`${promptConfigurationSummary(p,dept)}${data?`<h3 style="margin-top:18px">所选请求实际使用</h3><div class="yp-small" style="margin-top:12px">${esc(data.prompt.version)} · 当次采用</div><div class="yp-code">${esc(data.prompt.body)}</div>`:'<p class="yp-small">尚无请求采用记录。保存配置不会生成模型请求。</p>'}`;
+ return `<aside class="yp-inspector" aria-label="部门检查区"><div class="yp-row yp-between"><h3>工作依据检查</h3><span class="yp-tag outline">${roles[dept].name}</span></div><nav class="yp-tabs" aria-label="检查内容">${[['context','Context'],['provider','Provider'],['prompt','Prompt']].map(([key,label])=>`<button class="yp-tab ${state.inspect===key?'is-selected':''}" type="button" data-inspect="${key}" aria-pressed="${state.inspect===key}">${label}</button>`).join('')}</nav>${chooser}${body}${data?`<button class="yp-link" style="margin-top:16px" type="button" data-attempt="${esc(data.id)}" data-return-dept="${dept}" data-return-scope="${esc(scope)}">查看模型请求 ${icon('arrow-up-right')}</button>`:''}</aside>`;
 }
 function sourcesPage(){const p=current();return `${commonHeader('资料与依据','项目长期保留的资料说明、三部门依据与待验证项。',`<button class="yp-btn" type="button" data-action="add-source">${icon('plus')}登记资料</button>`)}<section class="yp-section"><div class="yp-info-strip">${icon('info')}<span><strong>本原型只登记位置和说明。</strong> 不读取真实目录，资料支持、推断和待验证项分开保存。</span></div><div class="yp-report">${(p.sources||[]).map(s=>`<div class="yp-source-row">${icon(s.type==='待验证'?'circle-help':'file-text')}<div><strong>${esc(s.name)}</strong><small>${esc(s.text)}</small></div>${tag(s.type,s.type==='待验证'?'amber':'green')}</div>`).join('')}</div></section><section class="yp-section"><div class="yp-section-title"><h2>三部门当前依据</h2><span class="yp-small">项目级长期范围</span></div><div class="yp-report">${Object.entries(roles).map(([k,r])=>`<div class="yp-fact"><span>${esc(r.name)}</span><div><strong>${esc(r.text)}</strong><small>${k==='product'?'维护目标、需求和重要取舍。':k==='engineering'?'维护架构、代码现状和实施决定。':'维护验收依据、缺陷与验证记录。'}</small></div></div>`).join('')}</div></section>`}
 function settingsPage(){const p=current();return `${commonHeader('项目设置','调整项目名称、目标和关联位置。三部门仍共享项目级依据。')}<section class="yp-section"><form class="yp-form" data-form="settings"><div class="yp-form-two"><label class="yp-field">项目名称<input name="name" value="${esc(p.name)}" required maxlength="60"></label><label class="yp-field">项目类型<select name="kind"><option value="existing" ${p.kind==='existing'?'selected':''}>已有项目</option><option value="idea" ${p.kind==='idea'?'selected':''}>从想法开始</option></select></label></div><label class="yp-field">项目目标<textarea name="goal" required>${esc(p.goal)}</textarea></label><label class="yp-field">项目目录或资料位置<input name="path" value="${esc(p.path)}"><small>仅登记位置，原型不会读取文件。</small></label><div class="yp-form-actions"><span class="yp-small">修改会作用于当前项目的长期依据。</span><button class="yp-btn primary" type="submit">保存设置</button></div></form></section>`}
@@ -1045,10 +1053,108 @@ root.addEventListener('submit',e=>{const form=e.target.closest('form');if(!form)
 root.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.modal){e.preventDefault();closeModal()}});
 let inspectorOpen=true;
 const layoutOptions={overviewMode:'flow'};
+const defaultDepartmentPrompts={
+ product:`你是本项目的产品部门。
+
+理解用户希望解决的问题，维护项目目标、使用场景、需求边界与优先级。用户原话与产品解释分别保留。
+
+结合已有项目资料和当前成果，明确本次变化、需要保持的行为以及验收期望。重要且无法合理推断的取舍向用户提出；常规专业补全直接记录依据。
+
+把可实施的要求交给工程部门，回答工程与质检的需求问题。涉及项目方向的变更形成明确决定，保留原因和来源。`,
+ engineering:`你是本项目的工程部门。
+
+依据有效需求与项目当前成果工作，维护整体架构、实现方案和技术决定。优先复用项目已有能力与成熟组件。
+
+实施前形成与工作规模相称的计划，明确影响范围、保留行为和检查方式。完成修改后自检，并向质检提交可核对的成果与验证记录。
+
+质检反馈问题时，依据复现材料修复并重新交付；涉及需求取舍的问题交产品明确。记录尚未解决的问题，不把计划或口头承诺当作已完成结果。`,
+ quality:`你是本项目的质检部门。
+
+依据当前有效需求和项目质量约定独立检查交付。区分历史验证记录、本轮检查和未覆盖的范围。
+
+验证本次变化及仍然有效的既有行为。发现问题时给出复现条件、预期与实际结果，并将工程问题交回修复。
+
+需求或验收存在重要歧义时向产品提出，不自行改变产品目标。只有实际证据支持时才记录通过；没有执行或无法验证的部分明确保留。`
+};
+const promptConfigurations=new Map(),promptDrafts=new Map();
+let promptEditor=null,promptFocusReturn=null;
+const promptKey=(projectId,department)=>`${projectId}|${department}`;
+const promptConfigurationApi={
+ read({projectId,department}){
+  if(!projects.some(p=>p.id===projectId)||!roles[department])throw new Error('项目或部门不存在');
+  const key=promptKey(projectId,department);
+  if(!promptConfigurations.has(key))promptConfigurations.set(key,{projectId,department,text:defaultDepartmentPrompts[department],version:1,source:'default',updatedAt:null,pending:false});
+  return {...promptConfigurations.get(key),defaultText:defaultDepartmentPrompts[department]};
+ },
+ save({projectId,department,text,expectedVersion}){
+  const current=this.read({projectId,department});
+  if(typeof text!=='string'||!text.trim())throw new Error('请填写 Prompt 内容，不能只包含空格。');
+  if(expectedVersion!==current.version)throw new Error('配置已被更新。你的草稿已保留，请重新打开配置后核对。');
+  if(text===current.text)return current;
+  const next={projectId,department,text,version:current.version+1,source:text===current.defaultText?'default':'custom',updatedAt:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),pending:true};
+  promptConfigurations.set(promptKey(projectId,department),next);
+  return {...next,defaultText:current.defaultText};
+ }
+};
+function promptConfigurationSummary(p,dept){
+ const config=promptConfigurationApi.read({projectId:p.id,department:dept});
+ return `<div class="yp-prompt-current"><div class="yp-row yp-between"><h3>项目当前配置</h3>${tag(config.source==='custom'?'自定义':'默认',config.source==='custom'?'green':'')}</div><p class="yp-small">配置 v${config.version}${config.updatedAt?' · '+esc(config.updatedAt)+' 保存':''}<br>${config.pending?'已保存 · 供本部门下次工作使用':'用于本项目后续部门工作'}</p><details><summary>查看已保存内容</summary><pre class="yp-code" data-saved-prompt>${esc(config.text)}</pre></details><button type="button" class="yp-link" data-prompt-config="${dept}" style="margin-top:12px">${icon('sliders-horizontal')}配置 Prompt</button></div>`;
+}
+function openPromptConfiguration(department){
+ const p=current(),config=promptConfigurationApi.read({projectId:p.id,department});
+ const key=promptKey(p.id,department);
+ promptFocusReturn=document.activeElement;
+ promptEditor={projectId:p.id,department,expectedVersion:config.version};
+ if(!promptDrafts.has(key))promptDrafts.set(key,config.text);
+ state.modal='prompt-config';state.menu=false;
+ overlay.innerHTML=`<section class="yp-modal yp-prompt-editor" role="dialog" aria-modal="true" aria-labelledby="yp-prompt-title"><div class="yp-row yp-between"><div><div class="yp-eyebrow">${esc(p.name)} · ${roles[department].name}</div><h2 id="yp-prompt-title">配置 ${roles[department].name} Prompt</h2></div><button class="yp-icon" type="button" data-prompt-close aria-label="关闭 Prompt 配置">${icon('x')}</button></div><p>自定义这个部门的职责、工作方式和输出要求。</p><div class="yp-info-strip"><span>作用范围：<strong>${esc(p.name)} / ${roles[department].name}</strong><br>保存后供本部门下次工作使用，已发出的请求仍保留原版本。</span></div><form class="yp-form" data-form="prompt-config"><div class="yp-row yp-between"><span class="yp-small" data-prompt-version>已保存配置 v${config.version} · ${config.source==='custom'?'自定义':'默认'}</span><span class="yp-small" data-prompt-dirty>${promptDrafts.get(key)===config.text?'与已保存内容一致':'有未保存草稿'}</span></div><label class="yp-field">部门 Prompt<textarea name="promptText" rows="12" data-prompt-text spellcheck="false" aria-label="${roles[department].name}自定义 Prompt">${esc(promptDrafts.get(key))}</textarea></label><details><summary>查看默认 Prompt</summary><pre class="yp-code">${esc(config.defaultText)}</pre></details><p class="yp-error" role="alert" data-prompt-error hidden></p><div class="yp-form-actions"><button class="yp-btn" type="button" data-prompt-default>${icon('rotate-ccw')}恢复默认</button><div class="yp-row"><button class="yp-btn" type="button" data-prompt-close>取消</button><button class="yp-btn primary" type="submit">${icon('save')}保存 Prompt</button></div></div><span class="yp-small">恢复默认先填入编辑区，保存后才更新配置。</span></form></section>`;
+ overlay.hidden=false;root.querySelector('.yp-shell').inert=true;initIcons();overlay.querySelector('[data-prompt-text]').focus();
+}
+function closePromptConfiguration(){
+ if(promptEditor)promptDrafts.delete(promptKey(promptEditor.projectId,promptEditor.department));
+ promptEditor=null;closeModal();
+ if(promptFocusReturn?.isConnected)promptFocusReturn.focus();
+}
+function updatePromptDraft(){
+ if(!promptEditor)return;
+ const text=overlay.querySelector('[data-prompt-text]').value;
+ promptDrafts.set(promptKey(promptEditor.projectId,promptEditor.department),text);
+ const saved=promptConfigurationApi.read(promptEditor);
+ overlay.querySelector('[data-prompt-dirty]').textContent=text===saved.text?'与已保存内容一致':'未保存';
+ overlay.querySelector('[data-prompt-error]').hidden=true;
+}
+root.addEventListener('click',event=>{
+ const el=event.target.closest('[data-prompt-config],[data-prompt-close],[data-prompt-default]');
+ if(!el||!root.contains(el))return;
+ if(el.dataset.promptConfig){openPromptConfiguration(el.dataset.promptConfig);return}
+ if(el.hasAttribute('data-prompt-close')){closePromptConfiguration();return}
+ if(el.hasAttribute('data-prompt-default')&&promptEditor){overlay.querySelector('[data-prompt-text]').value=promptConfigurationApi.read(promptEditor).defaultText;updatePromptDraft();overlay.querySelector('[data-prompt-dirty]').textContent='已填入默认内容 · 等待保存'}
+});
+root.addEventListener('input',event=>{if(event.target.matches('[data-prompt-text]'))updatePromptDraft()});
+root.addEventListener('submit',event=>{
+ if(!event.target.matches('[data-form="prompt-config"]')||!promptEditor)return;
+ event.preventDefault();
+ try{
+  const {projectId,department,expectedVersion}=promptEditor;
+  const next=promptConfigurationApi.save({projectId,department,expectedVersion,text:overlay.querySelector('[data-prompt-text]').value});
+  closePromptConfiguration();state.inspect='prompt';render();
+  toast(next.version===expectedVersion?'内容未变，已保留原配置':`${roles[department].name} Prompt 配置 v${next.version} 已保存`);
+ }catch(error){const box=overlay.querySelector('[data-prompt-error]');box.hidden=false;box.textContent=error.message}
+});
+root.addEventListener('keydown',event=>{
+ if(state.modal!=='prompt-config')return;
+ if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePromptConfiguration();return}
+ if(event.key==='Tab'){
+  const focusable=[...overlay.querySelectorAll('button,input,textarea,select,summary')].filter(el=>!el.disabled&&!el.closest('[hidden]'));
+  const first=focusable[0],last=focusable.at(-1);
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+ }
+},true);
+
 projects.forEach(p=>p.workItems.forEach(item=>{for(const key of Object.keys(roles)){if(!Array.isArray(item.snapshots?.[key]))item.snapshots[key]=[];if(!Array.isArray(item.messages?.[key]))item.messages[key]=[]}}));
-function departmentPage(dept){const p=current(),r=roles[dept],scope=state.deptScope[dept]||'all',item=scope==='all'?null:itemById(scope,p),messages=[];const projectMessages=(p.departmentMessages?.[dept]||[]).filter(m=>scope==='all'||m.scope==='all'||m.scope===scope);projectMessages.forEach(m=>messages.push({...m,scopeLabel:m.scope==='all'?'整个项目':itemById(m.scope,p)?.title||m.scope}));if(item)(item.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:item.title}));else activeItems(p).forEach(it=>(it.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:it.title})));const snapshots=scope==='all'?activeItems(p).flatMap(it=>(Array.isArray(it.snapshots?.[dept])?it.snapshots[dept]:[]).map(s=>({...s,itemId:it.id}))):(Array.isArray(item?.snapshots?.[dept])?item.snapshots[dept]:[]).map(s=>({...s,itemId:item.id}));return `${commonHeader(`${r.name}工作区`,`${r.text} · 围绕整个项目持续工作`)}<div class="yp-dept-layout"><section><div class="yp-dept-toolbar"><div><h2>部门消息</h2><p class="yp-small" style="margin-top:3px">${scope==='all'?'当前查看整个项目':`当前聚焦：${esc(item?.title||scope)}`}</p></div><label class="yp-small">查看范围 <select class="yp-scope-select" data-dept-scope="${dept}" aria-label="部门消息查看范围"><option value="all" ${scope==='all'?'selected':''}>整个项目</option>${activeItems(p).map(it=>`<option value="${it.id}" ${scope===it.id?'selected':''}>${esc(it.title)}</option>`).join('')}</select></label></div><div class="yp-timeline"><article class="yp-message"><div class="yp-row yp-between"><strong>${r.name}</strong><span class="yp-small">项目依据已载入 · 示例</span></div><p>${dept==='product'?`当前项目目标：${esc(p.goal)} 产品部持续维护需求、优先级和取舍。`:dept==='engineering'?`从「${esc(p.baseline)}」和已登记资料开始，工程部维护整体实现与技术决定。`:`质检部维护项目验收依据，区分已有证据、本轮检查和仍未验证项。`}</p><p class="yp-message-context">范围：整个项目 · 来源：项目工作依据</p></article>${messages.map(messageView).join('')||`<div class="yp-empty-col" style="margin:12px 0 20px">${r.name}还没有该范围的消息。可以直接输入指导。</div>`}</div>${composeDepartment(p,dept,scope)}</section>${inspector(p,dept,scope,snapshots)}</div>`}
+function departmentPage(dept){const p=current(),r=roles[dept],scope=state.deptScope[dept]||'all',item=scope==='all'?null:itemById(scope,p),messages=[];const projectMessages=(p.departmentMessages?.[dept]||[]).filter(m=>scope==='all'||m.scope==='all'||m.scope===scope);projectMessages.forEach(m=>messages.push({...m,scopeLabel:m.scope==='all'?'整个项目':itemById(m.scope,p)?.title||m.scope}));if(item)(item.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:item.title}));else activeItems(p).forEach(it=>(it.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:it.title})));const snapshots=scope==='all'?activeItems(p).flatMap(it=>(Array.isArray(it.snapshots?.[dept])?it.snapshots[dept]:[]).map(s=>({...s,itemId:it.id}))):(Array.isArray(item?.snapshots?.[dept])?item.snapshots[dept]:[]).map(s=>({...s,itemId:item.id}));return `${commonHeader(`${r.name}工作区`,`${r.text} · 围绕整个项目持续工作`,`<button class="yp-btn" type="button" data-prompt-config="${dept}">${icon('sliders-horizontal')}配置 Prompt</button>`)}<div class="yp-dept-layout"><section><div class="yp-dept-toolbar"><div><h2>部门消息</h2><p class="yp-small" style="margin-top:3px">${scope==='all'?'当前查看整个项目':`当前聚焦：${esc(item?.title||scope)}`}</p></div><label class="yp-small">查看范围 <select class="yp-scope-select" data-dept-scope="${dept}" aria-label="部门消息查看范围"><option value="all" ${scope==='all'?'selected':''}>整个项目</option>${activeItems(p).map(it=>`<option value="${it.id}" ${scope===it.id?'selected':''}>${esc(it.title)}</option>`).join('')}</select></label></div><div class="yp-timeline"><article class="yp-message"><div class="yp-row yp-between"><strong>${r.name}</strong><span class="yp-small">项目依据已载入 · 示例</span></div><p>${dept==='product'?`当前项目目标：${esc(p.goal)} 产品部持续维护需求、优先级和取舍。`:dept==='engineering'?`从「${esc(p.baseline)}」和已登记资料开始，工程部维护整体实现与技术决定。`:`质检部维护项目验收依据，区分已有证据、本轮检查和仍未验证项。`}</p><p class="yp-message-context">范围：整个项目 · 来源：项目工作依据</p></article>${messages.map(messageView).join('')||`<div class="yp-empty-col" style="margin:12px 0 20px">${r.name}还没有该范围的消息。可以直接输入指导。</div>`}</div>${composeDepartment(p,dept,scope)}</section>${inspector(p,dept,scope,snapshots)}</div>`}
 function enhanceInspector(){const panel=content.querySelector('.yp-inspector');if(!panel)return;const head=panel.firstElementChild;if(head&&!head.querySelector('[data-action="toggle-inspector"]')){const button=document.createElement('button');button.type='button';button.className='yp-icon';button.dataset.action='toggle-inspector';button.setAttribute('aria-label','收起工作依据检查');head.appendChild(button)}if(head){const button=head.querySelector('[data-action="toggle-inspector"]');if(button){button.innerHTML=icon(inspectorOpen?'chevron-up':'chevron-down');button.setAttribute('aria-expanded',String(inspectorOpen));button.setAttribute('aria-label',inspectorOpen?'收起工作依据检查':'展开工作依据检查')}}Array.from(panel.children).slice(1).forEach(child=>{child.hidden=!inspectorOpen})}
-const enhanceInspectorWithNavigationBoundary=enhanceInspector;enhanceInspector=function(){enhanceInspectorWithNavigationBoundary();content.querySelectorAll('.yp-inspector [data-page="sources"]').forEach(node=>node.remove())};
 function render(){const p=current();if(state.page==='observation')ensureObservation()?.setProject?.(state.projectId);root.querySelector('.yp-shell').classList.toggle('show-nav',state.nav);renderSide();renderBar();content.innerHTML=state.page==='archives'?archivesPage():state.page==='wizard'?wizardPage():!p?archivesPage():state.page==='sources'?sourcesPage():state.page==='settings'?settingsPage():state.page==='department'?departmentPage(state.department):state.page==='observation'?observationPage():overviewPage();enhanceInspector();initIcons()}
 const renderPage=render;render=function(){renderPage();root.querySelector('.yp-shell').classList.toggle('nav-collapsed',state.navCollapsed);syncSidebarToggle()};
 root.addEventListener('click',e=>{const el=e.target.closest('[data-action="toggle-inspector"]');if(el){inspectorOpen=!inspectorOpen;render()}});
