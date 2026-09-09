@@ -323,3 +323,47 @@ def test_release_without_quality_evidence_is_rejected(data_dir):
     projection = system.run_until_stop(run_id)
     assert projection.phase != "DONE"
     assert any("quality must run" in error["message"] for item in projection.rejections for error in item["errors"])
+
+
+def test_effective_limits_keep_the_wide_window_and_reserve_half_of_a_narrow_one():
+    from harness.models import RunProjection
+    from harness.orchestrator import Orchestrator
+    from harness.provider_catalog import ResolvedProviderTarget
+
+    def target(context_window, max_output_tokens):
+        return ResolvedProviderTarget(department="product", provider_id="fake", provider_name="Fake", model_id="model",
+                                      protocol="fake", base_url="", model="model", context_window=context_window,
+                                      max_output_tokens=max_output_tokens, timeout_sec=1.0)
+
+    projection = RunProjection(run_id="run_x", task="task", phase="PRODUCT_SPEC", context_window=32000)
+    # (effective window, declared output cap, response reserve). Wide windows keep the 15% reserve
+    # and the 4096 request limit they had before; the narrow window now reserves half of itself.
+    assert Orchestrator._effective_limits(projection, target(32000, 4096)) == (32000, 4096, 4800)
+    assert Orchestrator._effective_limits(projection, target(8000, 4096)) == (8000, 4096, 4000)
+    assert Orchestrator._effective_limits(projection, target(6000, 1000)) == (6000, 1000, 1000)
+    assert Orchestrator._effective_limits(projection, None) == (32000, None, 4800)
+
+
+def test_truncated_work_response_is_terminal_without_retry(data_dir):
+    from harness.adapters.base import ModelResponse
+    from harness.models import EventType, json_dumps
+
+    truncated = ModelResponse(
+        output=[{"id": "cut", "type": "message", "role": "assistant", "status": "incomplete",
+                 "content": [{"type": "output_text", "text": "TRUNCATED_WORK the product spec should"}]}],
+        finish_reason="incomplete", error="max_output_tokens",
+    )
+    adapter = FakeAdapter([truncated, product_spec()])
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build echo")
+    result = system.activate_once(run_id)
+
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert len(adapter.invocations) == 1
+    events = system.store.list_events(run_id)
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert len(failed) == 1 and failed[0].payload["purpose"] == "work"
+    assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
+    assert not any(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events)
+    assert "TRUNCATED_WORK" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert result.canonical_state() == system.replay(run_id).canonical_state()

@@ -346,11 +346,17 @@ class ContextAssembler:
             ContextExclusion("expired_product_decisions", "earlier decisions enter the current contract only when the current ProductSpec explicitly retains them"),
             ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
         ]
+        input_token_estimate = estimate_tokens(json_dumps({"input": input_items, "tools": tools}))
+        if max_output_tokens is not None:
+            # The request may spend whatever the window leaves after its input, up to the
+            # model's declared limit; compaction keeps the input below the response reserve.
+            max_output_tokens = min(max_output_tokens, effective_window - input_token_estimate)
+            if max_output_tokens < 1:
+                raise ValueError("the model request leaves no room for model output")
         actual_request = {"input": input_items, "tools": tools}
         if max_output_tokens is not None:
             actual_request["max_output_tokens"] = max_output_tokens
         token_estimate = estimate_tokens(json_dumps(actual_request))
-        input_token_estimate = estimate_tokens(json_dumps({"input": input_items, "tools": tools}))
         digest = canonical_hash(actual_request)
         manifest = ContextManifest(
             session_id=session_id,

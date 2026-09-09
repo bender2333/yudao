@@ -6,7 +6,7 @@ import pytest
 
 from harness.compaction import (
     SUMMARY_PREFACE, SUMMARY_RULES, CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction,
-    summary_material, visible_history,
+    response_reserve, summary_material, visible_history,
 )
 from harness.models import canonical_hash, estimate_tokens, json_dumps
 
@@ -177,16 +177,17 @@ def test_partial_offset_cannot_skip_unseen_original_text():
 
 
 def _small_window_case():
-    """8000-token window: ~1.2k pinned tokens, ~2.5k of work-turn tool schemas, ~4.5k summary input."""
-    pinned = [{"role": "developer", "content": "[intend]\nKeep the original request.\n[current_work]\n" + "w" * 4700}]
-    tools = [{"type": "function", "name": f"tool_{index}", "description": "d" * 1250, "parameters": {"type": "object"}}
+    """8000-token window: ~0.7k pinned tokens plus ~1.7k of work-turn tool schemas (the ~2.5k seen in real runs)."""
+    pinned = [{"role": "developer", "content": "[intend]\nKeep the original request.\n[current_work]\n" + "w" * 2700}]
+    tools = [{"type": "function", "name": f"tool_{index}", "description": "d" * 750, "parameters": {"type": "object"}}
              for index in range(8)]
-    return _history(10, 1200), pinned, tools
+    return _history(16, 1200), pinned, tools
 
 
 def test_narrow_window_keeps_half_of_itself_for_the_summary_response():
     records, pinned, tools = _small_window_case()
-    # output_limit 4096 on an 8000 window: the slicing reserve is 4000, so the input stays at or below 4000.
+    # output_limit 4096 on an 8000 window: the response reserve is 4000, so compaction triggers once the
+    # input passes 4000 and every summary request keeps its input at or below 4000.
     plan = plan_compaction(records, None, 8000, pinned, tools, output_limit=4096)
     assert plan.summary_token_limit == 800
     assert plan.input_token_estimate <= 4000
@@ -243,6 +244,59 @@ def test_wide_window_slicing_is_unchanged_by_the_narrow_window_reserve():
     assert plan.max_output_tokens == 4096
     unbounded = plan_compaction(records, None, 32000, PINNED, TOOLS)
     assert unbounded.input_items == plan.input_items and unbounded.source_refs == plan.source_refs
+
+
+def test_response_reserve_is_15_percent_for_wide_windows_and_up_to_half_of_a_narrow_window():
+    assert response_reserve(32000, None) == response_reserve(32000, 4096) == 4800
+    assert response_reserve(8000, None) == 1200
+    assert response_reserve(8000, 4096) == 4000
+    assert response_reserve(8000, 2000) == 2000
+    assert response_reserve(6000, 1000) == 1000
+
+
+def _work_request_tokens(records, pinned, tools, output_limit):
+    payload = {"input": [*pinned, *(record["item"] for record in records)], "tools": tools}
+    if output_limit is not None:
+        payload["max_output_tokens"] = output_limit
+    return estimate_tokens(json_dumps(payload))
+
+
+def _widest_history_within(count, budget, output_limit):
+    """The widest ``count``-record history whose work request estimate stays within ``budget``."""
+    low, high = 1, 8000
+    while low < high:
+        middle = (low + high + 1) // 2
+        if _work_request_tokens(_history(count, middle), PINNED, TOOLS, output_limit) <= budget:
+            low = middle
+        else:
+            high = middle - 1
+    return low
+
+
+def test_narrow_window_compacts_once_the_input_reaches_the_response_reserve():
+    width = _widest_history_within(4, 4200, 4096)
+    records = _history(4, width)
+    assert 4000 < _work_request_tokens(records, PINNED, TOOLS, 4096) <= 4200
+    # 8000 window, 4096 declared limit: the input may only use what the 4000-token reserve leaves,
+    # so compaction starts here instead of at the old 6800-token (85%) mark.
+    plan = plan_compaction(records, None, 8000, PINNED, TOOLS, output_limit=4096)
+    assert plan is not None
+    assert plan.input_token_estimate <= 4000
+    assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) >= 4000
+    # Without a declared limit the trigger stays at 85% of the window, so the same history still fits.
+    assert plan_compaction(records, None, 8000, PINNED, TOOLS) is None
+
+
+def test_wide_window_compaction_trigger_stays_at_85_percent():
+    width = _widest_history_within(28, 27200, 4096)
+    fitting = _history(28, width)
+    assert 27000 < _work_request_tokens(fitting, PINNED, TOOLS, 4096) <= 27200
+    assert plan_compaction(fitting, None, 32000, PINNED, TOOLS, output_limit=4096) is None
+    assert plan_compaction(fitting, None, 32000, PINNED, TOOLS) is None
+    crossing = _history(28, width + 4)
+    assert 27200 < _work_request_tokens(crossing, PINNED, TOOLS, 4096) < 27400
+    assert plan_compaction(crossing, None, 32000, PINNED, TOOLS, output_limit=4096) is not None
+    assert plan_compaction(crossing, None, 32000, PINNED, TOOLS) is not None
 
 
 @pytest.mark.parametrize("pinned, output_limit, message", [

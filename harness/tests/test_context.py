@@ -4,9 +4,10 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
-from harness.models import DepartmentPrompt, RunProjection, SessionRecord
+from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
 from harness.runtime import LoopSystem
+from harness.smoke import summarize_run
 from harness.tests.helpers import happy_script, run_scripted
 
 
@@ -428,3 +429,54 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     assert manifest.output_reserve_tokens == manifest.max_output_tokens == plan.max_output_tokens
     # Admission is input estimate plus the output limit within the effective window.
     assert manifest.input_token_estimate + manifest.output_reserve_tokens <= manifest.budget == 8000
+
+
+def _bound_system(tmp_path, monkeypatch, script, *, context_window, max_output_tokens):
+    """A run frozen to a fake-protocol model with the given limits, answered by one scripted adapter."""
+    from harness.provider_catalog import ModelDefinition, ProviderCatalog, ProviderDefinition, ResolvedProviderTarget
+
+    adapter = FakeAdapter(script)
+    monkeypatch.setattr(ResolvedProviderTarget, "create_adapter", lambda self, **_kwargs: adapter)
+    catalog = ProviderCatalog(
+        [ProviderDefinition(id="fake", name="Fake", protocol="fake")],
+        [ModelDefinition("model", "fake", "model", context_window, max_output_tokens)],
+        {department: {"provider_id": "fake", "model_id": "model"} for department in ("product", "engineering", "quality")},
+    )
+    return LoopSystem(tmp_path, provider_catalog=catalog), adapter
+
+
+def _work_assemblies(system, run_id):
+    return [event.payload for event in system.store.list_events(run_id)
+            if event.type == EventType.CONTEXT_ASSEMBLED and event.payload["purpose"] == "work"]
+
+
+def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_path, monkeypatch):
+    system, adapter = _bound_system(tmp_path, monkeypatch, [product_spec()], context_window=8000, max_output_tokens=4096)
+    run_id = system.create_run("build echo")
+    result = system.activate_once(run_id)
+
+    assert result.phase == "ENGINEERING", result.error
+    [payload] = _work_assemblies(system, run_id)
+    assert payload["effective_context_window"] == 8000 and payload["configured_max_output_tokens"] == 4096
+    assert 2000 <= payload["input_token_estimate"] <= 3000  # pinned department material plus tool schemas
+    # The request keeps whatever the window leaves after its input, up to the declared limit:
+    # the old fixed 15% reserve would have allowed only 1200 tokens here.
+    assert payload["max_output_tokens"] == min(4096, 8000 - payload["input_token_estimate"]) >= 4000
+    assert payload["output_reserve_tokens"] == payload["max_output_tokens"]
+    assert payload["admitted"] is True
+    assert adapter.invocations[0].max_output_tokens == payload["max_output_tokens"]
+    assert summarize_run(system, run_id, scenario="narrow")["model_input_audit"]["status"] == "verified"
+
+
+def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path, monkeypatch):
+    system, adapter = _bound_system(tmp_path, monkeypatch, happy_script(), context_window=32000, max_output_tokens=4096)
+    run_id = system.create_run("build echo")
+    result = system.run_until_stop(run_id)
+
+    assert result.phase == "DONE", result.error
+    payloads = _work_assemblies(system, run_id)
+    assert len(payloads) == len(adapter.invocations) == 4
+    # Baseline before the narrow-window reserve: every 32000/4096 work request asked for 4096 tokens.
+    assert all(item["max_output_tokens"] == item["output_reserve_tokens"] == 4096 for item in payloads)
+    assert all(item["admitted"] is True and item["effective_context_window"] == 32000 for item in payloads)
+    assert summarize_run(system, run_id, scenario="wide")["model_input_audit"]["status"] == "verified"

@@ -16,7 +16,8 @@ from .artifacts import ArtifactStore
 from .context import ContextAssembler, GUIDANCE_ONLY_TOOLS, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase, tool_error
-from .compaction import CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, visible_history
+from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
+                         visible_history)
 from .event_store import EventStore
 from .engine import MAX_PROVIDER_ATTEMPTS, ToolAdmission, run_department
 from .git_versions import GitVersionStore
@@ -666,16 +667,20 @@ class Orchestrator:
         }
 
     @staticmethod
-    def _effective_limits(projection: RunProjection, target: ResolvedProviderTarget | None) -> tuple[int, int | None]:
+    def _effective_limits(projection: RunProjection, target: ResolvedProviderTarget | None) -> tuple[int, int | None, int]:
+        """(effective window, model output cap, response reserve).
+
+        The reserve drives compaction and overflow decisions; each request's actual
+        max_output_tokens is settled at assembly as min(cap, window - input estimate).
+        """
         if target is None:
-            return projection.context_window, None
+            window = projection.context_window
+            return window, None, response_reserve(window, None)
         effective_window = min(projection.context_window, target.context_window)
-        reserve = max(1, effective_window * 85 // 100)
-        output_budget = effective_window - reserve
-        if output_budget < 1:
+        reserve = response_reserve(effective_window, target.max_output_tokens)
+        if reserve < 1:
             raise ValueError("the effective context window leaves no room for model output")
-        output_limit = min(target.max_output_tokens, output_budget)
-        return effective_window, output_limit
+        return effective_window, target.max_output_tokens, reserve
 
     def _invoke_activation(self, activation: _Activation) -> None:
         request = activation
@@ -766,7 +771,7 @@ class Orchestrator:
                     or self._guidance_version(current, activation.department) > activation.guidance_version):
                 return None
             try:
-                effective_window, output_limit = self._effective_limits(current, identity.target)
+                effective_window, output_limit, output_reserve = self._effective_limits(current, identity.target)
                 guidance_items = self._pending_guidance(current, identity.department) if step_id == 1 else []
                 events = self.store.list_events(identity.run_id)
                 snapshot_hash = self.workspace(identity.run_id).snapshot().digest
@@ -811,11 +816,9 @@ class Orchestrator:
                     if saved_summary != checkpoint.summary:
                         raise CompactionError("Compaction summary does not match its original artifact")
                     checkpoint_id = checkpoint_event["source_event_id"]
-                # The summary request is bounded by the model's declared output limit, not by the
-                # work-turn output budget: the plan hands it the remaining window for reasoning.
                 activation.compaction_plan = plan_compaction(
                     records, checkpoint, effective_window, pinned.input_items, pinned.tools,
-                    output_limit=None if identity.target is None else identity.target.max_output_tokens,
+                    output_limit=output_limit,
                 )
                 if activation.compaction_plan is not None:
                     plan = activation.compaction_plan
@@ -835,7 +838,7 @@ class Orchestrator:
                         events=events, snapshot_hash=snapshot_hash,
                     )
             except (CompactionError, ValueError, FileNotFoundError) as exc:
-                reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window * 85 // 100 else "compaction_failed"
+                reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window - output_reserve else "compaction_failed"
                 raise ProviderError(str(exc), reason=reason) from exc
             logical_call_id = self._logical_call_id(
                 identity.activation_id, root_step_id, assembled.manifest.purpose,

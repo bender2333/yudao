@@ -427,7 +427,7 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     summary = artifacts.get_for_run(event.run_id, ArtifactRef(**payload["summary_ref"])).decode("utf-8")
     plan = _read_artifact(artifacts, event.run_id, payload["plan_ref"])
     limit = plan["summary_token_limit"]
-    expected_effective = _compaction_output_limit(
+    expected_effective = _response_output_limit(
         audit["effective_context_window"], audit["configured_max_output_tokens"], plan["input_token_estimate"],
     )
     if ((payload.get("effective_context_window") is not None
@@ -465,16 +465,9 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     return expected
 
 
-def _effective_output_limit(effective_window: int, configured_output_limit: int | None) -> int | None:
-    if configured_output_limit is None:
-        return None
-    available = effective_window - max(1, (effective_window * 85) // 100)
-    return min(configured_output_limit, available)
-
-
-def _compaction_output_limit(effective_window: int, configured_output_limit: int | None,
-                             input_token_estimate: int) -> int:
-    """摘要请求把窗口内输入之外的全部余量留给输出（含思考），再受模型声明的输出上限约束。"""
+def _response_output_limit(effective_window: int, configured_output_limit: int | None,
+                           input_token_estimate: int) -> int:
+    """每个模型请求把窗口内输入之外的全部余量留给输出（含思考），再受模型声明的输出上限约束。"""
     available = effective_window - input_token_estimate
     return available if configured_output_limit is None else min(configured_output_limit, available)
 
@@ -716,7 +709,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             effective_window = current_work.context_window
             if isinstance(target_window, int) and target_window > 0:
                 effective_window = min(effective_window, target_window)
-            effective_output_limit = _effective_output_limit(effective_window, configured_output_limit)
+            # 装配器按"模型声明上限 与 窗口减输入估算 取小"决定每个请求的 max_output_tokens。
+            effective_output_limit = configured_output_limit
             # 指导原文只在该激活的第一步注入目标部门；guidance_results 依赖装配时已有的事件与记录下来的工作区快照。
             guidance_context = {
                 "guidance": _pending_guidance(current_work, event.role) if payload.get("step_id", 1) == 1 else [],
@@ -783,8 +777,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if purpose not in {"work", "compaction"}:
                     raise ValueError("unknown model request purpose")
                 purposes[activation] = purpose
-                # A compaction request's output limit depends on its own input size and is
-                # settled below once its plan has been rebuilt from the recorded history.
+                # Every request's output limit depends on its own input size; it is settled
+                # below once the request has been rebuilt from the recorded history.
                 expected_output_limit = effective_output_limit
                 allowed = {"input", "tools"}
                 limit = payload.get("max_output_tokens")
@@ -815,8 +809,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError("effective context window does not match the frozen department model")
                     if payload.get("configured_max_output_tokens") != configured_output_limit:
                         raise ValueError("configured output limit does not match the frozen department model")
-                    if purpose == "work" and payload.get("max_output_tokens") != expected_output_limit:
-                        raise ValueError("effective output limit does not match the frozen department model")
                 records = histories.get(event.role, [])
                 if purpose == "compaction":
                     if schemas or limit is None:
@@ -828,7 +820,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     )
                     if plan is None or request["input"] != plan.input_items or limit != plan.max_output_tokens:
                         raise ValueError("compaction input differs from its allowed source assembly")
-                    if limit != _compaction_output_limit(effective_window, configured_output_limit, plan.input_token_estimate):
+                    if limit != _response_output_limit(effective_window, configured_output_limit, plan.input_token_estimate):
                         raise ValueError("compaction output limit does not match the window left after its input")
                     expected_output_limit = plan.max_output_tokens
                     compacting[(activation, step)] = _audit_compaction_input(request, records, previous)
@@ -861,6 +853,12 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     )
                     if schemas != expected_context.tools:
                         raise ValueError("actual tool schemas differ from the allowed definitions")
+                    expected_output_limit = expected_context.manifest.max_output_tokens
+                    if event.type == EventType.CONTEXT_ASSEMBLED and limit != expected_output_limit:
+                        raise ValueError("effective output limit does not match the frozen department model")
+                    if limit is not None and limit != _response_output_limit(
+                            effective_window, configured_output_limit, expected_context.manifest.input_token_estimate):
+                        raise ValueError("work request output limit does not match the window left after its input")
                 if event.type == EventType.CONTEXT_ASSEMBLED:
                     input_estimate = estimate_tokens(json_dumps({"input": items, "tools": schemas}))
                     request_estimate = estimate_tokens(json_dumps(request))

@@ -77,23 +77,31 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
+def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path, monkeypatch):
+    import harness.engine as engine
+
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    # A tool call in a tool-less summary request is malformed provider output: it is retried
+    # within the attempt limit and never executed, so three of them fail the compaction.
     adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
-                                         usage=Usage(total_tokens=100)), product_spec()])
+                                         usage=Usage(total_tokens=100)), product_spec(), product_spec(), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("proof.txt", "x" * 40000)
     result = system.activate_once(run_id)
-    assert len(adapter.invocations) == 2
-    assert adapter.invocations[1].purpose == "compaction"
-    assert adapter.invocations[1].tools == []
+    assert len(adapter.invocations) == 4
+    assert all(request.purpose == "compaction" and request.tools == [] for request in adapter.invocations[1:])
+    assert [request.attempt for request in adapter.invocations[1:]] == [1, 2, 3]
     assert result.stop_reason == "compaction_failed"
     assert result.token_used == 100
-    assert len(result.manifests) == 2
+    assert len(result.manifests) == 4
     assert result.manifests[-1].admitted
     events = system.store.list_events(run_id)
-    assert sum(event.type == EventType.MODEL_REQUESTED for event in events) == 2
+    assert sum(event.type == EventType.MODEL_REQUESTED for event in events) == 4
     assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "submit_product_spec"
+                   for event in events)
     tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     assert tool.payload["input_item"]["call_id"] == "read-1"
     assert tool.payload["output_ref"]

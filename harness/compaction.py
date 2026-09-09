@@ -65,6 +65,19 @@ SUMMARY_RULES = (
 )
 
 
+def response_reserve(context_window: int, output_limit: int | None) -> int:
+    """Window tokens kept for the model response (reasoning included).
+
+    Wide windows keep the usual 15%. When the model declares an output limit, a narrow
+    window keeps up to half of itself instead, because thinking models spend most of a
+    small 15% reserve on reasoning before any summary or tool call text appears.
+    """
+    reserve = context_window - max(1, context_window * 85 // 100)
+    if output_limit is not None:
+        reserve = max(reserve, min(output_limit, context_window // 2))
+    return reserve
+
+
 def visible_history(
     records: list[dict[str, Any]],
     checkpoint: CompactionCheckpoint | None = None,
@@ -95,7 +108,12 @@ def plan_compaction(
         raise CompactionError("output_limit must be a positive integer")
     texts, boundaries = _validate_records(records)
     start, offset = _cursor(records, texts, boundaries, checkpoint)
-    threshold = max(1, context_window * 85 // 100)
+    # One reserve rule for the whole run: history is compacted once the input would eat
+    # into the response room, and each summary request carries at most that much material.
+    output_reserve = response_reserve(context_window, output_limit)
+    if output_reserve < 1:
+        raise CompactionError("The model output limit leaves no room for a compaction summary")
+    threshold = context_window - output_reserve
     pinned_tokens = _request_tokens(pinned_input, tools, output_limit)
     if pinned_tokens >= threshold:
         raise CompactionError("Pinned intend/current work and tool schemas leave no room for history and a response")
@@ -109,14 +127,6 @@ def plan_compaction(
     if start >= len(records):
         raise CompactionError("History is already summarized and still does not fit the model window")
 
-    # The slicing reserve bounds how much source material one request may carry. Thinking
-    # models spend reasoning tokens inside the output limit, so a narrow window keeps up to
-    # half of itself for the response; wide windows keep the usual 15%.
-    output_reserve = context_window - threshold
-    if output_limit is not None:
-        output_reserve = max(output_reserve, min(output_limit, context_window // 2))
-    if output_reserve < 1:
-        raise CompactionError("The model output limit leaves no room for a compaction summary")
     summary_limit = min(
         4096,
         max(1, context_window // 10),
@@ -128,7 +138,7 @@ def plan_compaction(
     end = _choose_prefix_end(records, texts, boundaries, start, context_window, threshold - pinned_tokens - summary_limit)
     previous_summary = None if checkpoint is None else checkpoint.summary
     parts: list[dict[str, Any]] = []
-    material_budget = context_window - output_reserve
+    material_budget = threshold
 
     def inputs(candidate: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # The summarizer role comes first so the model reads the pinned department
