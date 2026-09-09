@@ -480,8 +480,6 @@ def _compaction_output_limit(effective_window: int, configured_output_limit: int
 
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
-_WORKSPACE_MUTATIONS = frozenset({"write_file", "delete_file", "move_file"})
-_HOST_CHECKS = frozenset({"run_check", "collect_evidence"})
 
 
 def _pending_guidance(projection: RunProjection, department: str) -> list[Any]:
@@ -498,23 +496,24 @@ def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
     return bool(pending) and pending[0].department == department and department != department_for_phase(projection.phase)
 
 
-def _recorded_snapshot_hash(events: list[Any]) -> str:
-    """装配时的工作区快照没有单独记录；最近一次主机检查回执带有当时的快照，其后没有成功写操作时它仍是当前快照。"""
+def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
+    """装配所用的工作区快照记录在 context_assembled；同一模型步骤的其他事件与它共用同一份快照。"""
 
-    for event in reversed(events):
+    event = events[index]
+    if event.type == EventType.CONTEXT_ASSEMBLED:
+        source = event
+    else:
         payload = event.payload or {}
-        if event.type != EventType.TOOL_CALLED or payload.get("ok") is not True:
-            continue
-        name = payload.get("name")
-        if name in _WORKSPACE_MUTATIONS:
-            return ""
-        if name in _HOST_CHECKS:
-            output = json.loads((payload.get("input_item") or {}).get("output") or "{}").get("output")
-            if (isinstance(output, dict) and output.get("executor") == "host"
-                    and output.get("tree_changed") is False and isinstance(output.get("snapshot_hash"), str)):
-                return output["snapshot_hash"]
-            return ""
-    return ""
+        source = next((item for item in events
+                       if item.type == EventType.CONTEXT_ASSEMBLED
+                       and item.payload.get("activation_id") == payload.get("activation_id")
+                       and item.payload.get("step_id") == payload.get("step_id")), None)
+        if source is None:
+            raise ValueError("model step has no assembled context recording its workspace snapshot")
+    snapshot = source.payload.get("snapshot_hash")
+    if not isinstance(snapshot, str):
+        raise ValueError("context_assembled does not record the workspace snapshot used for assembly")
+    return snapshot
 
 
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
@@ -718,13 +717,12 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if isinstance(target_window, int) and target_window > 0:
                 effective_window = min(effective_window, target_window)
             effective_output_limit = _effective_output_limit(effective_window, configured_output_limit)
-            # 指导原文只在该激活的第一步注入目标部门；guidance_results 依赖装配时已有的事件与工作区快照。
-            prior_events = events[:index]
+            # 指导原文只在该激活的第一步注入目标部门；guidance_results 依赖装配时已有的事件与记录下来的工作区快照。
             guidance_context = {
                 "guidance": _pending_guidance(current_work, event.role) if payload.get("step_id", 1) == 1 else [],
                 "guidance_only": activation_guidance_only[activation],
-                "events": prior_events,
-                "snapshot_hash": _recorded_snapshot_hash(prior_events),
+                "events": events[:index],
+                "snapshot_hash": _assembly_snapshot_hash(events, index),
             }
             pinned = assembler.assemble(
                 current_work, department=event.role, session_id=event.session_id,

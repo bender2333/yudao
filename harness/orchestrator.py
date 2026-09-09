@@ -882,7 +882,8 @@ class Orchestrator:
                            effective_context_window=effective_window,
                            input_token_estimate=input_estimate,
                            output_reserve_tokens=output_reserve,
-                           parts_ref=asdict(parts_ref))
+                           parts_ref=asdict(parts_ref),
+                           snapshot_hash=snapshot_hash)
             payload.update(attempt_id=attempt_id, logical_call_id=logical_call_id,
                            collaboration_request_id=activation.request_id)
             context_event = self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
