@@ -75,7 +75,7 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 - `project_id`/`work_item_id`/`baseline`/`project_context`/`department_prompts` 要么全给（项目层调用），要么全不给（bare run）；混给抛 `ValueError`。
 - `initial_tree` 给出时，内核在 `Workspace(...)` 之前调用 `materialize_tree(tree, workspace_root / run_id)`；目标目录已存在则抛错，不覆盖。`materialize_tree` 已自带落盘后核验。
 - `baseline.code_tree_digest` 必须等于 `initial_tree.digest`，否则 `ValueError`（项目层传错不能静默）。
-- POST `/api/runs` 删除。`GET /api/runs`、`/api/runs/{run_id}/…` 保留为 run 级只读查询与 run 级命令（inputs / prompts / guidance / cancel），供部门页与观测使用。
+- POST `/api/runs` 在 B3 外壳切换时删除（B1 期间保留，避免旧外壳在 B1 与 B3 之间不可用；规则 3）。`GET /api/runs`、`/api/runs/{run_id}/…` 保留为 run 级只读查询与 run 级命令（inputs / prompts / guidance / cancel），供部门页与观测使用。
 
 ## 5. 项目上下文材料（钉住部件 `project`）
 
@@ -184,7 +184,7 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 | `GET /api/projects/{id}/model-attempts` | 现有 `department/status/q/cursor/limit` + `work_item` | `{items: [...现有摘要 + run_id + work_item_id + title], next_cursor}`；跨该项目所有 run 合并、按时间倒序；`cursor` 不透明 | — |
 | `GET /api/projects/{id}/model-usage` | 同上 | 现有用量体 + `by_work_item`；未上报用量保持未知 | — |
 | `GET /api/projects/{id}/stream` | `after_seq` / `Last-Event-ID` | SSE：`event: project`（项目事件卡）与 `event: loop`（所属 run 的事件卡，data 含 `run_id`、`work_item_id`）；`id` 用 `"<project_seq>:<run_id>:<run_seq>"` 形式的游标或等价不透明串 | — |
-| `POST /api/runs`（删除） | — | 404 | — |
+| `POST /api/runs` | 保留至 B3 外壳切换时删除 | — | 内核 `RUN_CREATED`（bare run） |
 
 现有 `GET /api/runs/{run_id}/...`、`POST /api/runs/{run_id}/{inputs,prompts,guidance,cancel}` 不变。`GET /api/health` 增加 `active_project_id`、`active_work_item_id`。
 
@@ -212,7 +212,7 @@ CLI（只读）：`python -m harness project list`、`python -m harness project 
 - Prompt 配置：保存 v1 → 同文本再保存不加版本 → 空白 400 → `base_version` 过期 409 且响应含当前配置 → 保存 v2 后新事项 run 的 `department_prompts[dept].text == v2 文本`、`prompt_config_versions[dept] == 2`，而 v1 期间创建的 run 请求正文不变。
 - 归档项目：`work-items`、`prompts` PUT、`materials` 均 409；`restore` 后恢复可写。
 - D-H：无活跃事项时 `materials` 写入 `material_recorded`，不产生任何 run 事件。
-- `POST /api/runs` 返回 404；`GET /api/runs` 仍列出 run。
+- `GET /api/runs` 仍列出 run（含项目 run 与 bare run）；`POST /api/runs` 的删除与其反例放到 B3。
 
 ## 14. 首批不做
 
@@ -220,6 +220,6 @@ CLI（只读）：`python -m harness project list`、`python -m harness project 
 
 ## 15. 实施切分（对排布文档的修正）
 
-- **B1（后端一次交付）**：`event_store.py` 项目表；`harness/projects.py`（`ProjectEventType`、`ProjectService`、`ProjectProjection`、`project_projection(store, artifacts, project_id)`）；`create_run` 归属参数与 `initial_tree`/`project_context`/`department_prompts`；`context.py` 的 `project` 部件；`models.py`/`projection.py` 的 run 归属字段；`smoke.py` 审计接受 `project` 部件；`web/server.py` 全部 `/api/projects…` 路由与删除 `POST /api/runs`；`__main__.py` 只读 CLI；§13 全部反例。原排布中的 B2 后端并入 B1（同一模块、同一批事件），B2 不再单列。
+- **B1（后端一次交付）**：`event_store.py` 项目表；`harness/projects.py`（`ProjectEventType`、`ProjectService`、`ProjectProjection`、`project_projection(store, artifacts, project_id)`）；`create_run` 归属参数与 `initial_tree`/`project_context`/`department_prompts`；`context.py` 的 `project` 部件；`models.py`/`projection.py` 的 run 归属字段；`smoke.py` 审计接受 `project` 部件；`web/server.py` 全部 `/api/projects…` 路由（`POST /api/runs` 保留到 B3）；`__main__.py` 只读 CLI；§13 全部反例。原排布中的 B2 后端并入 B1（同一模块、同一批事件），B2 不再单列。
 - **B3（前端）**：第三版外壳，消费 §11 接口；Prompt 检查区按 §9 分开展示；D-H 两项入口。
 - **B4（联调与真实验收）**：不变。
