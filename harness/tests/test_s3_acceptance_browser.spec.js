@@ -476,38 +476,15 @@ async function main() {
     await page.click('button[data-view="observability"]');
     await page.waitForTimeout(500);
     if (attempts.json?.items?.[0]?.id) {
-      await page.evaluate(async (attemptId) => {
-        const blob = "R".repeat(64 * 1024);
-        const detail = {
-          attempt: {
-            id: attemptId,
-            status: "failed",
-            department: "engineering",
-            logical_call_id: "call-long-identity-abcdefghijklmnopqrstuvwxyz",
-            attempt: 1,
-            attempt_count: 3,
-            requested_provider: "p4-primary-with-a-very-long-provider-identity-name",
-            requested_model: "gemini-2.5-flash-long-identity-xxxxxxxxxxxxxxxxxxxx",
-            actual_provider: null,
-            actual_model: null,
-            error: `long-error-${"X".repeat(400)}`,
-          },
-          request: { blob },
-          response: { error: `long-error-${"Y".repeat(400)}` },
-          events: [{ type: "model_attempt_failed", summary: "raw", raw: { blob: "E".repeat(2048) } }],
-          siblings: [],
-        };
-        const web = globalThis.harnessWeb;
-        if (!web) return { ok: false, reason: "harnessWeb missing" };
-        return { ok: true, bytes: blob.length };
-      }, attempts.json.items[0].id);
-      await page.route(`**/model-attempts/${attempts.json.items[0].id}`, async (route) => {
+      const injectedId = attempts.json.items[0].id;
+      const injectedRoute = `**/model-attempts/${encodeURIComponent(injectedId)}`;
+      await page.route(injectedRoute, async (route) => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
             attempt: {
-              id: attempts.json.items[0].id,
+              id: injectedId,
               status: "failed",
               department: "engineering",
               logical_call_id: "call-long-identity-abcdefghijklmnopqrstuvwxyz",
@@ -526,20 +503,39 @@ async function main() {
           }),
         });
       });
-      await page.click(`[data-obs-request="${attempts.json.items[0].id}"]`).catch(() => {});
-      await page.waitForTimeout(500);
-      await page.click('[data-ob-detail-tab="request"]').catch(() => {});
-      await page.setViewportSize({ width: 320, height: 720 });
-      await shot(page, "injected-64k-raw-320");
-      const injectedLayout = await layout(page);
-      await page.click('[data-ob-detail-tab="events"]').catch(() => {});
-      await shot(page, "injected-long-error-320");
-      await page.unroute(`**/model-attempts/${attempts.json.items[0].id}`);
-      evidence.scenarios.visual_64k_long = {
-        status: injectedLayout.jsonScrollHeight > injectedLayout.jsonClientHeight ? "PASS" : "PARTIAL",
-        labeled: "scripted 64KB request payload in live UI, not a real provider 64KB request",
-        layout: injectedLayout,
-      };
+      // 详情由异步 fetch 渲染:等到页签真的出现再点,等到 64KB 原文真的进入 .dw-json 再量,不用固定 sleep。
+      const injected = { status: "PARTIAL", labeled: "scripted 64KB request payload in live UI, not a real provider 64KB request" };
+      try {
+        await page.click(`[data-obs-request="${injectedId}"]`, { timeout: 10000 });
+        await page.click('[data-ob-detail-tab="request"]', { timeout: 10000 });
+        await page.waitForFunction(
+          () => (document.querySelector(".dw-detail-panel .dw-json")?.textContent || "").includes("R".repeat(64 * 1024)),
+          null,
+          { timeout: 10000 },
+        );
+        await page.setViewportSize({ width: 320, height: 720 });
+        await shot(page, "injected-64k-raw-320");
+        const injectedLayout = await layout(page);
+        const container = await page.evaluate(() => {
+          const json = document.querySelector(".dw-detail-panel .dw-json");
+          return {
+            blob_in_dw_json: (json?.textContent || "").includes("R".repeat(64 * 1024)),
+            dw_json_count: document.querySelectorAll(".dw-json").length,
+            document_scroll_width: document.documentElement.scrollWidth,
+          };
+        });
+        injected.layout = injectedLayout;
+        injected.container = container;
+        injected.status = container.blob_in_dw_json
+          && injectedLayout.jsonScrollHeight > injectedLayout.jsonClientHeight
+          && container.document_scroll_width <= 320 ? "PASS" : "FAIL";
+        await page.click('[data-ob-detail-tab="events"]', { timeout: 10000 });
+        await shot(page, "injected-long-error-320");
+      } catch (error) {
+        injected.error = String(error?.message || error);
+      }
+      await page.unroute(injectedRoute);
+      evidence.scenarios.visual_64k_long = injected;
     }
 
     await page.setViewportSize({ width: 1440, height: 1024 });

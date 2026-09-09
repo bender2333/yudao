@@ -763,6 +763,43 @@ test("request response and event raw json stay in a viewport scroller", () => {
   assert.match(nodes.get("dw-main").innerHTML, /class="dw-json"/);
 });
 
+test("64KB request and response JSON land whole inside the dw-json scroller with no size branch", () => {
+  const padTo = (size, fill) => ({ blob: fill.repeat(size - JSON.stringify({ blob: "" }, null, 2).length) });
+  const request = padTo(65536, "R");
+  const responsePayload = padTo(65536, "S");
+  const expectedRequest = JSON.stringify(request, null, 2);
+  const expectedResponse = JSON.stringify(responsePayload, null, 2);
+  assert.equal(Buffer.byteLength(expectedRequest, "utf8"), 65536);
+  assert.equal(Buffer.byteLength(expectedResponse, "utf8"), 65536);
+  const escaped = value => value.replace(/"/g, "&quot;");
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.runId = "run-a";
+  web.state.observationDetail = {
+    attempt: { id: "attempt-1", status: "success", department: "engineering", logical_call_id: "call-1", attempt: 1, attempt_count: 1 },
+    request,
+    response: responsePayload,
+    events: [],
+    siblings: [],
+  };
+  for (const [tab, expected, heading] of [["request", expectedRequest, "Request JSON"], ["response", expectedResponse, "Response JSON"]]) {
+    web.state.observationDetailTab = tab;
+    web.renderObservationDetail();
+    const html = nodes.get("dw-main").innerHTML;
+    const panelStart = html.indexOf('<div class="dw-detail-panel">');
+    const panel = html.slice(panelStart, html.indexOf("</div>", html.indexOf("</pre>", panelStart)) + 6);
+    assert.ok(panelStart >= 0, `${tab} tab renders a detail panel`);
+    assert.match(panel, new RegExp(`^<div class="dw-detail-panel"><div class="dw-json-heading"><h3>${heading}</h3>`));
+    assert.ok(panel.endsWith(`<pre class="dw-json">${escaped(expected)}</pre></div>`), `${tab} JSON is rendered whole inside pre.dw-json`);
+    assert.equal(panel.split('class="dw-json"').length - 1, 1, `${tab} tab has exactly one dw-json container`);
+    assert.equal(html.split('class="dw-json"').length - 1, 1, `${tab} page has no second JSON container`);
+    assert.doesNotMatch(html, /…|截断|下载原文|展开全部|dw-json-truncated|dw-json-download/, `${tab} tab has no truncation or download branch`);
+  }
+  assert.match(STYLES_CSS, /#department-workspace-prototype \.dw-json \{[^}]*white-space: pre-wrap; overflow-wrap: anywhere; \}/);
+  assert.match(STYLES_CSS, /#department-workspace-prototype \.dw-detail-panel \{[^}]*min-width: 0; \}/);
+  assert.match(STYLES_CSS, /#department-workspace-prototype \.dw-detail-panel \.dw-json,\s*#department-workspace-prototype \.dw-event-raw \.dw-json \{ max-height: min\(50vh, 24rem\); overflow: auto; \}/);
+});
+
 test("observation list and detail show requested and actual identity separately", () => {
   const { document, nodes } = uiDocument();
   const web = loadApp(async () => response({}), document);

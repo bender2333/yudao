@@ -13,7 +13,7 @@ from threading import Event, Thread
 
 import pytest
 import httpx
-from openai import APIConnectionError, AsyncOpenAI
+from openai import APIConnectionError, AsyncOpenAI, DefaultAsyncHttpxClient
 
 from harness.adapters.base import ModelRequest, ProviderError
 from harness.adapters.responses import ResponsesAdapter, ResponsesConfig, ResponsesExecutionScope
@@ -327,13 +327,17 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
 
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
     monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    adapters, retry_seen = [], Event()
 
     def failure(handler, _body):
         if failure_kind == "connection":
             handler.connection.shutdown(socket.SHUT_RDWR)
             handler.connection.close()
         elif failure_kind == "timeout":
-            time.sleep(0.8)
+            # 首次尝试已带着 0.3 秒超时发出;服务端不应答直到重试到达,由服务端决定"首次超时"。
+            # 重试拿回 5 秒常规预算,成功与否不再取决于机器速度。
+            adapters[0].config = replace(adapters[0].config, timeout_sec=5)
+            retry_seen.wait(5)
         elif failure_kind == "partial_stream":
             _send(handler, _stream([CALL], terminal=False))
         else:
@@ -341,10 +345,19 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
             _send(handler, json.dumps({"error": {"code": "rate_limit_exceeded" if status == 429 else "server_error"}}).encode(),
                   status=status, content_type="application/json")
 
-    with _server([failure, _submit_stream()]) as (config, captures, *_):
+    def success(handler, _body):
+        retry_seen.set()
+        _send(handler, _submit_stream())
+
+    with _server([failure, success]) as (config, captures, *_):
         if failure_kind == "timeout":
+            # 每次尝试都在超时窗口内新建 httpx 客户端;加载 certifi 证书链在 Windows 上可达数百毫秒,
+            # 会把 0.3 秒吃光、请求根本到不了服务端。本地明文 HTTP 不需要证书校验。
+            monkeypatch.setattr("harness.adapters.responses.DefaultAsyncHttpxClient",
+                                lambda **kwargs: DefaultAsyncHttpxClient(verify=False, **kwargs))
             config = replace(config, timeout_sec=0.3)
-        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        adapters.append(ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path, adapters[0])
         run_id = system.create_run("local retry")
         result = system.activate_once(run_id)
 
