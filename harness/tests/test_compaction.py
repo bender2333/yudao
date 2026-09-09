@@ -184,24 +184,65 @@ def _small_window_case():
     return _history(10, 1200), pinned, tools
 
 
-def test_thinking_room_widens_the_summary_output_limit_without_moving_the_slicing_reserve():
+def test_narrow_window_keeps_half_of_itself_for_the_summary_response():
     records, pinned, tools = _small_window_case()
+    # output_limit 4096 on an 8000 window: the slicing reserve is 4000, so the input stays at or below 4000.
     plan = plan_compaction(records, None, 8000, pinned, tools, output_limit=4096)
     assert plan.summary_token_limit == 800
-    assert 4300 <= plan.input_token_estimate <= 4700
+    assert plan.input_token_estimate <= 4000
     assert plan.input_token_estimate == estimate_tokens(json_dumps({"input": plan.input_items, "tools": []}))
-    assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) >= 3000
+    assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) >= 4000
     assert plan.input_token_estimate + plan.max_output_tokens <= 8000
-    # The declared model limit still caps the request; the slicing reserve (15%) never shrinks it.
+    # A smaller declared limit reserves only that much and caps the request at it.
     capped = plan_compaction(records, None, 8000, pinned, tools, output_limit=2000)
-    assert capped.input_items == plan.input_items and capped.summary_token_limit == 800
+    assert capped.summary_token_limit == 800
+    assert capped.input_token_estimate <= 6000 and len(capped.source_refs) > len(plan.source_refs)
     assert capped.max_output_tokens == 2000
+    # Without a declared limit (test adapters) the reserve stays at 15% of the window.
     unbounded = plan_compaction(records, None, 8000, pinned, tools)
-    assert unbounded.input_items == plan.input_items
-    assert unbounded.max_output_tokens == 8000 - unbounded.input_token_estimate
+    assert unbounded.input_token_estimate <= 6800 and len(unbounded.source_refs) >= len(capped.source_refs)
+    assert unbounded.max_output_tokens == 8000 - unbounded.input_token_estimate >= 1200
     for candidate in (plan, capped, unbounded):
-        assert candidate.max_output_tokens >= 8000 - 8000 * 85 // 100
         assert candidate.summary_token_limit <= candidate.max_output_tokens
+
+
+def test_long_tool_result_is_summarized_in_rounds_that_each_leave_half_the_narrow_window_for_output():
+    pinned = [{"role": "developer", "content": "[intend]\nKeep the original request.\n[current_work]\n" + "w" * 4700}]
+    call = {"id": "call-item", "type": "function_call", "name": "read_file", "call_id": "call-1",
+            "arguments": json_dumps({"path": "large.txt"})}
+    result = {"type": "function_call_output", "call_id": "call-1", "output": "BEGIN-" + "LARGE_FILE " * 4000 + "-END"}
+    records = [_record(1, call, step=1), _record(2, result, step=1)]
+    summary = "Decisions: the file was read in slices; progress continues. " * 12
+    assert len(summary) <= 800
+    checkpoint = None
+    rounds = 0
+    for _ in range(64):
+        plan = plan_compaction(records, checkpoint, 8000, pinned, TOOLS, output_limit=4096)
+        if plan is None:
+            break
+        rounds += 1
+        assert plan.summary_token_limit == 800
+        assert plan.input_token_estimate <= 8000 - 4000
+        assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) >= 4000
+        checkpoint = finish_compaction(plan, _output(summary))
+    else:
+        raise AssertionError("compaction did not cover the tool result")
+    assert rounds > 1 and checkpoint.boundary
+    assert checkpoint.covered_through_event_id == "event-2"
+    assert visible_history(records, checkpoint)[0]["content"].startswith("[department_memory]\n")
+
+
+def test_wide_window_slicing_is_unchanged_by_the_narrow_window_reserve():
+    records = _history(60, 2300)
+    plan = plan_compaction(records, None, 32000, PINNED, TOOLS, output_limit=4096)
+    # Baseline captured before the narrow-window reserve was introduced (32000 window, 4096 limit).
+    assert len(plan.source_refs) == 36
+    assert plan.next_checkpoint.covered_through_event_id == "event-36" and plan.next_checkpoint.partial_offset == 0
+    assert plan.next_checkpoint.covered_digest == "sha256:2a7fd041ead224608af5f60ba7768a18a9f46bb6473d79d1ae559b847cd74284"
+    assert plan.input_token_estimate == 26916 and plan.summary_token_limit == 3200
+    assert plan.max_output_tokens == 4096
+    unbounded = plan_compaction(records, None, 32000, PINNED, TOOLS)
+    assert unbounded.input_items == plan.input_items and unbounded.source_refs == plan.source_refs
 
 
 @pytest.mark.parametrize("pinned, output_limit, message", [

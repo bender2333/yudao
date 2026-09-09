@@ -109,25 +109,26 @@ def plan_compaction(
     if start >= len(records):
         raise CompactionError("History is already summarized and still does not fit the model window")
 
-    # The slicing reserve bounds how much source material one request may carry; the
-    # request's actual output limit is widened below to whatever the window leaves over.
+    # The slicing reserve bounds how much source material one request may carry. Thinking
+    # models spend reasoning tokens inside the output limit, so a narrow window keeps up to
+    # half of itself for the response; wide windows keep the usual 15%.
     output_reserve = context_window - threshold
     if output_limit is not None:
-        output_reserve = min(output_reserve, output_limit)
+        output_reserve = max(output_reserve, min(output_limit, context_window // 2))
     if output_reserve < 1:
         raise CompactionError("The model output limit leaves no room for a compaction summary")
     summary_limit = min(
         4096,
         max(1, context_window // 10),
         max(1, (threshold - pinned_tokens) // 2),
-        output_reserve,
+        output_reserve if output_limit is None else min(output_reserve, output_limit),
     )
     if summary_limit < 32:
         raise CompactionError("Pinned context leaves insufficient room for a useful history summary")
     end = _choose_prefix_end(records, texts, boundaries, start, context_window, threshold - pinned_tokens - summary_limit)
     previous_summary = None if checkpoint is None else checkpoint.summary
     parts: list[dict[str, Any]] = []
-    material_budget = threshold
+    material_budget = context_window - output_reserve
 
     def inputs(candidate: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # The summarizer role comes first so the model reads the pinned department
