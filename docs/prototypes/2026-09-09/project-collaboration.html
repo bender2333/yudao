@@ -599,6 +599,25 @@
       return requestById(state.selectedId);
     }
 
+    function copyReturnContext(context) {
+      if (!context) return null;
+      return Object.assign({}, context, {
+        deptScope: context.deptScope ? Object.assign({}, context.deptScope) : undefined,
+        drafts: context.drafts ? Object.assign({}, context.drafts) : undefined,
+        scrollTop: context.scrollTop ? Object.assign({}, context.scrollTop) : context.scrollTop
+      });
+    }
+
+    function returnSourceButton() {
+      const context = state.returnContext || { page: 'overview' };
+      const label = context.sourceLabel || (context.page === 'department'
+        ? '返回' + (DEPARTMENTS[context.department] || '部门') + '工作区' + (context.scopeLabel ? ' · ' + context.scopeLabel : '')
+        : context.page === 'sources' ? '返回资料与依据'
+          : context.page === 'settings' ? '返回项目设置'
+            : '返回项目概览');
+      return '<button class="yo-btn quiet" type="button" data-ob-back-department>' + icon('corner-up-left') + esc(label) + '</button>';
+    }
+
     function filteredRequests() {
       const filters = state.filters;
       const query = String(filters.search || '').trim().toLowerCase();
@@ -739,17 +758,16 @@
         return listShellMarkup();
       }
       const attempts = attemptsFor(item);
-      const returnLabel = state.returnContext && state.returnContext.department ? '返回' + (DEPARTMENTS[state.returnContext.department] || '部门') + '工作区' : '';
       let panel = overviewMarkup(item);
       if (state.detailTab === 'request') panel = requestMarkup(item);
       if (state.detailTab === 'response') panel = responseMarkup(item);
       if (state.detailTab === 'events') panel = eventsMarkup(item);
-      return '<div class="yo-detail-top"><button class="yo-btn quiet" type="button" data-ob-back-list>' + icon('arrow-left') + '返回请求记录</button><div class="yo-header-actions">' + (returnLabel ? '<button class="yo-btn quiet" type="button" data-ob-back-department>' + icon('corner-up-left') + esc(returnLabel) + '</button>' : '') + '</div></div><header class="yo-detail-title"><div class="yo-eyebrow">' + esc(PROJECT_NAMES[projectId] || projectId) + ' · ' + esc(DEPARTMENTS[item.department]) + '</div><h1>模型请求详情</h1><p>' + esc(item.id) + ' · ' + esc(item.workItemTitle) + ' · ' + statusTag(item.status) + '</p></header><div class="yo-crumbs"><span>项目</span><strong>' + esc(PROJECT_NAMES[projectId] || projectId) + '</strong><span>›</span><span>部门</span><strong>' + esc(DEPARTMENTS[item.department]) + '</strong><span>›</span><span>事项</span><strong>' + esc(item.workItemTitle) + '</strong><span>›</span><span>调用</span><strong>' + esc(item.callId) + '</strong></div><div class="yo-attempt-bar"><span class="yo-attempt-label">同一逻辑调用 · ' + esc(item.callId) + '</span>' + attempts.map(function (attempt) { return '<button class="yo-attempt ' + (attempt.status === 'failed' ? 'failed' : '') + ' ' + (attempt.id === item.id ? 'is-active' : '') + '" type="button" data-ob-attempt="' + esc(attempt.id) + '">第 ' + attempt.attempt + ' 次 · ' + esc(STATUS[attempt.status]) + '</button>'; }).join('') + '</div><nav class="yo-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="yo-detail-tab ' + (state.detailTab === 'overview' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="' + (state.detailTab === 'overview') + '">概览</button><button class="yo-detail-tab ' + (state.detailTab === 'request' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="request" role="tab" aria-selected="' + (state.detailTab === 'request') + '">Request</button><button class="yo-detail-tab ' + (state.detailTab === 'response' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="response" role="tab" aria-selected="' + (state.detailTab === 'response') + '">Response</button><button class="yo-detail-tab ' + (state.detailTab === 'events' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="events" role="tab" aria-selected="' + (state.detailTab === 'events') + '">事件</button></nav><section class="yo-detail-panel" role="tabpanel">' + panel + '</section>';
+      return '<div class="yo-detail-top"><button class="yo-btn quiet" type="button" data-ob-back-list>' + icon('arrow-left') + '返回请求记录</button><div class="yo-header-actions">' + returnSourceButton() + '</div></div><header class="yo-detail-title"><div class="yo-eyebrow">' + esc(PROJECT_NAMES[projectId] || projectId) + ' · ' + esc(DEPARTMENTS[item.department]) + '</div><h1>模型请求详情</h1><p>' + esc(item.id) + ' · ' + esc(item.workItemTitle) + ' · ' + statusTag(item.status) + '</p></header><div class="yo-crumbs"><span>项目</span><strong>' + esc(PROJECT_NAMES[projectId] || projectId) + '</strong><span>›</span><span>部门</span><strong>' + esc(DEPARTMENTS[item.department]) + '</strong><span>›</span><span>事项</span><strong>' + esc(item.workItemTitle) + '</strong><span>›</span><span>调用</span><strong>' + esc(item.callId) + '</strong></div><div class="yo-attempt-bar"><span class="yo-attempt-label">同一逻辑调用 · ' + esc(item.callId) + '</span>' + attempts.map(function (attempt) { return '<button class="yo-attempt ' + (attempt.status === 'failed' ? 'failed' : '') + ' ' + (attempt.id === item.id ? 'is-active' : '') + '" type="button" data-ob-attempt="' + esc(attempt.id) + '">第 ' + attempt.attempt + ' 次 · ' + esc(STATUS[attempt.status]) + '</button>'; }).join('') + '</div><nav class="yo-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="yo-detail-tab ' + (state.detailTab === 'overview' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="' + (state.detailTab === 'overview') + '">概览</button><button class="yo-detail-tab ' + (state.detailTab === 'request' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="request" role="tab" aria-selected="' + (state.detailTab === 'request') + '">Request</button><button class="yo-detail-tab ' + (state.detailTab === 'response' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="response" role="tab" aria-selected="' + (state.detailTab === 'response') + '">Response</button><button class="yo-detail-tab ' + (state.detailTab === 'events' ? 'is-active' : '') + '" type="button" data-ob-detail-tab="events" role="tab" aria-selected="' + (state.detailTab === 'events') + '">事件</button></nav><section class="yo-detail-panel" role="tabpanel">' + panel + '</section>';
     }
 
     function listShellMarkup() {
       const items = filteredRequests();
-      return '<header class="yo-header"><div><div class="yo-eyebrow">项目级观测 · ' + esc(PROJECT_NAMES[projectId] || projectId) + '</div><h1>模型请求</h1><p class="yo-subtitle">查看三部门实际模型尝试、原始 Request / Response、事件和用量；观测独立于部门工作区。</p></div><div class="yo-header-actions"><span class="yo-status ' + (items.some(function (item) { return item.status === 'running'; }) ? 'running' : 'success') + '"><span class="yo-dot"></span>' + (items.some(function (item) { return item.status === 'running'; }) ? '1 个请求进行中' : '历史请求') + '</span></div></header><div class="yo-scope"><span class="yo-dot"></span><strong>当前项目</strong><span>' + esc(PROJECT_NAMES[projectId] || projectId) + '</span><span>·</span><span>' + allRequests().length + ' 次物理尝试</span><span>·</span><span>项目级入口</span></div><nav class="yo-tabs" role="tablist" aria-label="观测视图"><button class="yo-tab ' + (state.tab === 'requests' ? 'is-active' : '') + '" type="button" data-ob-tab="requests" role="tab" aria-selected="' + (state.tab === 'requests') + '">请求记录</button><button class="yo-tab ' + (state.tab === 'usage' ? 'is-active' : '') + '" type="button" data-ob-tab="usage" role="tab" aria-selected="' + (state.tab === 'usage') + '">用量统计</button></nav>' + filterMarkup() + (state.tab === 'requests' ? listMarkup() : usageMarkup());
+      return '<div class="yo-detail-top"><div class="yo-header-actions">' + returnSourceButton() + '</div></div><header class="yo-header"><div><div class="yo-eyebrow">项目级观测 · ' + esc(PROJECT_NAMES[projectId] || projectId) + '</div><h1>模型请求</h1><p class="yo-subtitle">查看三部门实际模型尝试、原始 Request / Response、事件和用量；观测独立于部门工作区。</p></div><div class="yo-header-actions"><span class="yo-status ' + (items.some(function (item) { return item.status === 'running'; }) ? 'running' : 'success') + '"><span class="yo-dot"></span>' + (items.some(function (item) { return item.status === 'running'; }) ? '1 个请求进行中' : '历史请求') + '</span></div></header><div class="yo-scope"><span class="yo-dot"></span><strong>当前项目</strong><span>' + esc(PROJECT_NAMES[projectId] || projectId) + '</span><span>·</span><span>' + allRequests().length + ' 次物理尝试</span><span>·</span><span>项目级入口</span></div><nav class="yo-tabs" role="tablist" aria-label="观测视图"><button class="yo-tab ' + (state.tab === 'requests' ? 'is-active' : '') + '" type="button" data-ob-tab="requests" role="tab" aria-selected="' + (state.tab === 'requests') + '">请求记录</button><button class="yo-tab ' + (state.tab === 'usage' ? 'is-active' : '') + '" type="button" data-ob-tab="usage" role="tab" aria-selected="' + (state.tab === 'usage') + '">用量统计</button></nav>' + filterMarkup() + (state.tab === 'requests' ? listMarkup() : usageMarkup());
     }
 
     function viewMarkup() {
@@ -775,10 +793,15 @@
       state.screen = 'detail';
       state.selectedId = item.id;
       state.detailTab = 'overview';
-      state.returnContext = returnContext ? Object.assign({}, returnContext) : null;
+      if (arguments.length > 1) state.returnContext = copyReturnContext(returnContext);
       emitSnapshot(item);
       refresh();
       return item;
+    }
+
+    function setReturnContext(context) {
+      state.returnContext = copyReturnContext(context);
+      return api;
     }
 
     function snapshot(id) {
@@ -847,14 +870,13 @@
       if (target.dataset.obBackList !== undefined) {
         state.screen = 'list';
         state.selectedId = null;
-        state.returnContext = null;
         refresh();
         return;
       }
       if (target.dataset.obBackDepartment !== undefined) {
-        const context = state.returnContext ? Object.assign({}, state.returnContext, { snapshotId: state.selectedId }) : null;
+        const context = copyReturnContext(state.returnContext) || { page: 'overview' };
         state.screen = 'list';
-        notify('已返回部门工作区');
+        notify(context.page === 'department' ? '已返回来源工作区' : '已返回来源页面');
         onBackToDepartment(context);
       }
     }
@@ -887,6 +909,7 @@
       render: function () { return '<style>' + CSS + '</style><div class="yp-ob-host">' + viewMarkup() + '</div>'; },
       mount: mount,
       openRequest: openRequest,
+      setReturnContext: setReturnContext,
       snapshot: snapshot
     };
     return api;
@@ -915,7 +938,7 @@ const projects=[
  {id:'lab',name:'实验记录助手',kind:'idea',pinned:false,archived:false,goal:'帮助实验人员快速记录过程，让样品、参数和结果能够对应查询。',path:'尚未关联目录',material:'初始想法与用户场景',status:'从想法开始',baseline:'尚无交付',question:'',answer:'',sources:[{name:'初始想法',type:'资料支持',text:'记录实验过程、样品与参数，并支持查询。'}],handoffs:[],departmentMessages:{product:[{id:'lab-p1',author:'产品',kind:'部门记录',time:'今天 09:10',text:'首轮先聚焦记录和查找两个核心场景。',scope:'all',status:'示例已记录'}],engineering:[],quality:[]},workItems:[{id:'lab-1',title:'明确最小可用版本',type:'阶段目标',stage:'product',status:'running',summary:'产品正在整理核心场景，首轮聚焦记录与查找。',handoff:'产品处理中',material:'初始想法与用户场景',updated:'今天 09:10',events:[],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[],quality:{}}}]},
  {id:'archive-demo',name:'个人读书清单',kind:'idea',pinned:false,archived:true,goal:'记录阅读进度和读书笔记。',path:'尚未关联目录',material:'需求记录',status:'已归档',baseline:'首版交付',question:'',answer:'',sources:[{name:'需求记录',type:'资料支持',text:'历史需求记录已保留。'}],handoffs:[],departmentMessages:{product:[],engineering:[],quality:[]},workItems:[]}
 ];
-const state={projectId:'cargo',page:'overview',department:'product',overviewMode:'flow',deptScope:{product:'all',engineering:'all',quality:'all'},inspect:'context',query:'',menu:false,nav:false,modal:null,drafts:{},wizard:null,toastTimer:null,detailItem:null,snapshotId:null};
+const state={projectId:'cargo',page:'overview',department:'product',overviewMode:'flow',deptScope:{product:'all',engineering:'all',quality:'all'},inspect:'context',query:'',menu:false,nav:false,navCollapsed:false,modal:null,drafts:{},wizard:null,toastTimer:null,detailItem:null,snapshotId:null};
 let observation=null;
 const tag=(s,tone='')=>`<span class="yp-tag ${tone}">${esc(s)}</span>`;
 const statusTag=item=>tag({waiting:'待你决定',running:'进行中',rework:'返工中',qa:'待质检',adopted:'已采纳',done:'已采纳'}[item.status]||item.status,item.status==='waiting'||item.status==='rework'?'amber':item.status==='qa'?'blue':item.status==='adopted'||item.status==='done'?'green':'');
@@ -925,13 +948,18 @@ const activeItems=(p=current())=>p?.workItems||[];
 const stageItems=(stage,p=current())=>activeItems(p).filter(item=>item.stage===stage);
 const initIcons=()=>{if(globalThis.lucide)lucide.createIcons({attrs:{width:17,height:17}})};
 function toast(text){toastBox.textContent=text;toastBox.hidden=false;clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>toastBox.hidden=true,3300)}
+function readScrollPosition(){const view=globalThis.window;return {window:Number(view?.scrollY??view?.pageYOffset??0),root:Number(root?.scrollTop||0)}}
+function restoreScrollPosition(position){if(!position)return;if(root&&typeof position.root==='number')root.scrollTop=position.root;const view=globalThis.window;if(view&&typeof view.scrollTo==='function'&&typeof position.window==='number'&&position.window>0){try{view.scrollTo(0,position.window)}catch{}}}
+function captureObservationSource(overrides={}){const page=overrides.page||state.page,department=overrides.department||state.department,hasScope=Object.prototype.hasOwnProperty.call(overrides,'scope'),scope=hasScope?overrides.scope:(state.deptScope[department]||'all'),item=scope==='all'?null:itemById(scope);return {page,department,scope,scopeLabel:scope==='all'?'整个项目':item?.title||scope,sourceLabel:overrides.sourceLabel,deptScope:{...state.deptScope},inspect:state.inspect,snapshotId:state.snapshotId,inspectorOpen, drafts:{...state.drafts},overviewMode:state.overviewMode,scrollTop:readScrollPosition(),mobileNav:state.nav}}
+function restoreObservationSource(context){const source=context||{page:'overview'};const page=['overview','department','sources','settings'].includes(source.page)?source.page:'overview';state.page=page;state.department=source.department||'product';state.deptScope={product:'all',engineering:'all',quality:'all',...(source.deptScope||{})};if(page==='department')state.deptScope[state.department]=source.scope||state.deptScope[state.department]||'all';state.inspect=source.inspect||'context';state.snapshotId=source.snapshotId||null;state.overviewMode=source.overviewMode||state.overviewMode;state.drafts={...(source.drafts||{})};state.nav=Boolean(source.mobileNav);state.menu=false;observation?.setReturnContext?.(null);render();restoreScrollPosition(source.scrollTop)}
 function ensureObservation(){
  if(observation||!globalThis.YudaoObservation?.create)return observation;
- observation=globalThis.YudaoObservation.create({root,esc,icon,getProjectId:()=>state.projectId,onBackToDepartment:context=>{state.page='department';state.department=context?.department||'product';state.deptScope[state.department]=context?.scope||'all';state.snapshotId=context?.snapshotId||null;render()},notify:toast});
+ observation=globalThis.YudaoObservation.create({root,esc,icon,getProjectId:()=>state.projectId,onBackToDepartment:restoreObservationSource,notify:toast});
  observation.setProject(state.projectId);
  observation.mount();
  return observation;
 }
+function enterObservation(requestId,overrides={}){const source=captureObservationSource(overrides),o=ensureObservation();state.page='observation';state.nav=false;if(o){o.setProject?.(state.projectId);if(requestId)o.openRequest(requestId,source);else o.setReturnContext?.(source)}render()}
 function visibleProjects(){return projects.filter(p=>!p.archived&&p.name.toLowerCase().includes(state.query.toLowerCase())).sort((a,b)=>Number(b.pinned)-Number(a.pinned))}
 function renderSide(){
  const matches=visibleProjects();
@@ -942,9 +970,9 @@ function renderBar(){
  bar.innerHTML=`<div class="yp-breadcrumb"><button type="button" class="yp-mobile-toggle yp-icon" data-action="nav" aria-label="打开项目导航">${icon('menu')}</button><button type="button" data-page="overview">项目</button><span>/</span><strong>${esc(p?.name||'项目管理')}</strong>${state.page==='department'?`<span>/</span><span>${roles[state.department].name}</span>`:state.page==='observation'?'<span>/</span><span>观测</span>':state.page==='sources'?'<span>/</span><span>资料与依据</span>':state.page==='settings'?'<span>/</span><span>项目设置</span>':''}</div><div class="yp-row"><span class="yp-auto"><span class="yp-dot"></span><span>自动推进 · 关键问题再介入</span></span>${p?`<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="menu" aria-label="项目操作">${icon('more-horizontal')}</button>${state.menu?`<div class="yp-menu"><button type="button" data-action="pin">${icon('pin')}${p.pinned?'取消置顶':'置顶项目'}</button><button type="button" data-action="rename">${icon('pencil')}重命名</button><button type="button" data-action="archive">${icon('archive')}归档项目</button></div>`:''}</div>`:''}</div>`;
 }
 function mainTabs(){return `<nav class="yp-tabs" role="tablist" aria-label="项目工作区">${[['overview','项目概览'],['product','产品'],['engineering','工程'],['quality','质检'],['observation','观测']].map(([k,l])=>{const selected=state.page==='overview'&&k==='overview'||state.page==='department'&&state.department===k||state.page==='observation'&&k==='observation';return `<button class="yp-tab ${selected?'is-selected':''}" type="button" role="tab" aria-selected="${selected}" data-tab="${k}">${l}</button>`}).join('')}</nav>`}
-function secondaryTabs(){return `<div class="yp-secondary-tabs" aria-label="项目辅助入口"><button class="yp-tab ${state.page==='sources'?'is-selected':''}" type="button" data-page="sources">${icon('folder-open')}资料与依据</button><button class="yp-tab ${state.page==='settings'?'is-selected':''}" type="button" data-page="settings">${icon('settings-2')}项目设置</button></div>`}
+function secondaryTabs(){if(state.page!=='overview')return '';return `<div class="yp-secondary-tabs" aria-label="项目辅助入口"><button class="yp-tab" type="button" data-page="sources">${icon('folder-open')}资料与依据</button><button class="yp-tab" type="button" data-page="settings">${icon('settings-2')}项目设置</button></div>`}
 function commonHeader(title,subtitle,actions=''){
- const p=current();return `${mainTabs()}${secondaryTabs()}<header class="yp-heading" style="margin-top:24px"><div><div class="yp-eyebrow">${esc(p?.name||'项目')}</div><h1>${title}</h1><p class="yp-subtitle">${subtitle}</p></div><div class="yp-heading-actions">${actions}</div></header>`;
+ const p=current(),back=state.page==='sources'||state.page==='settings'?`<button class="yp-btn quiet" type="button" data-page="overview">${icon('arrow-left')}返回项目概览</button>`:'';return `${mainTabs()}${secondaryTabs()}<header class="yp-heading" style="margin-top:24px"><div><div class="yp-eyebrow">${esc(p?.name||'项目')}</div><h1>${title}</h1><p class="yp-subtitle">${subtitle}</p></div><div class="yp-heading-actions">${back}${actions}</div></header>`;
 }
 function composeProject(p){const key=`${p.id}|project|all`;return `<form class="yp-composer" data-form="project-input"><textarea data-draft="${esc(key)}" aria-label="项目输入" placeholder="补充项目目标、约束、资料线索或下一步想法…">${esc(state.drafts[key]||'')}</textarea><div class="yp-composer-footer"><span class="yp-small">原文保留；接收、回应和采用状态在记录中区分。</span><button class="yp-btn primary" type="submit">发送到项目 ${icon('send')}</button></div></form>`}
 function workCard(item){return `<button type="button" class="yp-work-card" data-item="${item.id}" aria-label="查看工作项 ${esc(item.title)}"><span class="yp-work-card-title">${esc(item.title)}</span><span class="yp-work-card-meta">${tag(item.type)}${statusTag(item)}</span><p>${esc(item.summary)}</p><span class="yp-card-foot">${icon(item.status==='rework'?'corner-up-left':item.stage==='done'?'check-circle-2':'arrow-right')}<span>${esc(item.handoff)}</span></span><span class="yp-card-foot">${icon('paperclip')}<span>${esc(item.material)}</span></span></button>`}
@@ -982,7 +1010,9 @@ function startWizard(){state.page='wizard';state.menu=false;state.nav=false;stat
 function createProject(w){const id=`project-${Date.now()}`,idea=w.kind==='idea',p={id,name:w.name,kind:w.kind,pinned:false,archived:false,goal:w.goal||(idea?'逐步明确首轮目标':'依据现有项目资料继续演化'),path:w.path||'尚未关联目录',material:w.material||'用户原始想法',status:idea?'从想法开始':'已建档 · 示例',baseline:idea?'尚无交付':'导入起点 · 待验证',question:'',answer:'',sources:[{name:idea?'初始想法':'已有项目资料',type:'资料支持',text:w.material||'项目起点已登记。'}],handoffs:[],departmentMessages:{product:[],engineering:[],quality:[]},workItems:[{id:`${id}-1`,title:idea?'明确首轮目标':'建立项目现状与三部门依据',type:'阶段目标',stage:'product',status:'running',summary:idea?'产品开始明确目标和最小范围。':'先根据已登记资料整理项目现状。',handoff:'产品处理中',material:w.material||'项目起点',updated:'刚刚',events:[],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[],quality:[]}}]};projects.unshift(p);state.wizard=null;goProject(id);toast(idea?'示例项目已创建，产品部开始整理':'示例项目已建立，可以查看三部门建档结果')}
 function recordMove(id,to){const p=current(),item=itemById(id,p);if(!item)return;const from=stageLabels[item.stage],target=stageLabels[to],kind=to==='engineering'&&item.stage==='quality'?'返工':to==='done'?'采纳成果':'提交'+target;item.stage=to;item.status=to==='done'?'adopted':to==='quality'?'qa':to==='engineering'&&from==='质检'?'rework':to==='product'?'waiting':'running';item.handoff=`${from} → ${target} · ${kind}`;item.updated='刚刚';item.events=item.events||[];item.events.unshift({time:'刚刚（示例）',from,to:target,kind,text:to==='done'?'检查通过，结果已纳入当前项目成果。':kind==='返工'?'质检记录已退回工程，等待修复后重新提交。':`已将材料交给${target}继续处理。`});p.handoffs=p.handoffs||[];p.handoffs.unshift({time:'刚刚（示例）',item:item.id,from,to:target,kind,text:item.events[0].text});if(to==='done')p.baseline=`${item.title} · 已采纳`;closeModal();render();toast(`示例交接已记录：${from} → ${target}`)}
 function observationPage(){const o=ensureObservation();if(o){o.setProject?.(state.projectId);try{return o.render()}catch(e){return `<div class="yp-empty-col" style="margin-top:25px">观测模块暂时无法渲染：${esc(e.message)}</div>`}}return `<section class="yp-section"><div class="yp-empty-col" style="padding:42px">${icon('activity')}<h3 style="margin-top:10px">观测模块待装配</h3><p style="margin-top:6px">观测模块会在装配后显示请求、事件、Token 和原始数据；当前项目交互不受影响。</p></div></section>`}
-function goProject(id){state.projectId=id;state.page='overview';state.department='product';state.deptScope={product:'all',engineering:'all',quality:'all'};state.detailItem=null;state.menu=false;state.nav=false;state.snapshotId=null;observation?.setProject?.(id);render()}
+function goProject(id){state.projectId=id;state.page='overview';state.department='product';state.deptScope={product:'all',engineering:'all',quality:'all'};state.detailItem=null;state.menu=false;state.nav=false;state.snapshotId=null;observation?.setProject?.(id);observation?.setReturnContext?.(null);render()}
+function syncSidebarToggle(){const brand=side.querySelector('.yp-brand');if(!brand)return;let button=brand.querySelector('[data-action="toggle-sidebar"]');if(!button){button=document.createElement('button');button.type='button';button.className='yp-icon yp-sidebar-toggle';button.dataset.action='toggle-sidebar';brand.appendChild(button)}button.innerHTML=icon(state.navCollapsed?'chevrons-right':'chevrons-left');button.setAttribute('aria-label',state.navCollapsed?'展开项目导航':'折叠项目导航');button.title=state.navCollapsed?'展开项目导航':'折叠项目导航';initIcons()}
+root.addEventListener('click',e=>{const el=e.target.closest('[data-action="toggle-sidebar"],[data-tab="observation"],[data-attempt]');if(!el||!root.contains(el))return;if(el.dataset.action==='toggle-sidebar'){state.navCollapsed=!state.navCollapsed;render();e.stopImmediatePropagation();return}if(el.dataset.attempt){const department=el.dataset.returnDept||state.department,scope=el.dataset.returnScope??(state.deptScope[department]||'all');enterObservation(el.dataset.attempt,{page:'department',department,scope});e.stopImmediatePropagation();return}if(el.dataset.tab==='observation'){if(state.page!=='observation')enterObservation();e.stopImmediatePropagation()}});
 root.addEventListener('click',e=>{
  const el=e.target.closest('button,a,[data-attempt],[data-observation-action]');if(!el||!root.contains(el))return;
  
@@ -1018,11 +1048,44 @@ const layoutOptions={overviewMode:'flow'};
 projects.forEach(p=>p.workItems.forEach(item=>{for(const key of Object.keys(roles)){if(!Array.isArray(item.snapshots?.[key]))item.snapshots[key]=[];if(!Array.isArray(item.messages?.[key]))item.messages[key]=[]}}));
 function departmentPage(dept){const p=current(),r=roles[dept],scope=state.deptScope[dept]||'all',item=scope==='all'?null:itemById(scope,p),messages=[];const projectMessages=(p.departmentMessages?.[dept]||[]).filter(m=>scope==='all'||m.scope==='all'||m.scope===scope);projectMessages.forEach(m=>messages.push({...m,scopeLabel:m.scope==='all'?'整个项目':itemById(m.scope,p)?.title||m.scope}));if(item)(item.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:item.title}));else activeItems(p).forEach(it=>(it.messages?.[dept]||[]).forEach(m=>messages.push({...m,scopeLabel:it.title})));const snapshots=scope==='all'?activeItems(p).flatMap(it=>(Array.isArray(it.snapshots?.[dept])?it.snapshots[dept]:[]).map(s=>({...s,itemId:it.id}))):(Array.isArray(item?.snapshots?.[dept])?item.snapshots[dept]:[]).map(s=>({...s,itemId:item.id}));return `${commonHeader(`${r.name}工作区`,`${r.text} · 围绕整个项目持续工作`)}<div class="yp-dept-layout"><section><div class="yp-dept-toolbar"><div><h2>部门消息</h2><p class="yp-small" style="margin-top:3px">${scope==='all'?'当前查看整个项目':`当前聚焦：${esc(item?.title||scope)}`}</p></div><label class="yp-small">查看范围 <select class="yp-scope-select" data-dept-scope="${dept}" aria-label="部门消息查看范围"><option value="all" ${scope==='all'?'selected':''}>整个项目</option>${activeItems(p).map(it=>`<option value="${it.id}" ${scope===it.id?'selected':''}>${esc(it.title)}</option>`).join('')}</select></label></div><div class="yp-timeline"><article class="yp-message"><div class="yp-row yp-between"><strong>${r.name}</strong><span class="yp-small">项目依据已载入 · 示例</span></div><p>${dept==='product'?`当前项目目标：${esc(p.goal)} 产品部持续维护需求、优先级和取舍。`:dept==='engineering'?`从「${esc(p.baseline)}」和已登记资料开始，工程部维护整体实现与技术决定。`:`质检部维护项目验收依据，区分已有证据、本轮检查和仍未验证项。`}</p><p class="yp-message-context">范围：整个项目 · 来源：项目工作依据</p></article>${messages.map(messageView).join('')||`<div class="yp-empty-col" style="margin:12px 0 20px">${r.name}还没有该范围的消息。可以直接输入指导。</div>`}</div>${composeDepartment(p,dept,scope)}</section>${inspector(p,dept,scope,snapshots)}</div>`}
 function enhanceInspector(){const panel=content.querySelector('.yp-inspector');if(!panel)return;const head=panel.firstElementChild;if(head&&!head.querySelector('[data-action="toggle-inspector"]')){const button=document.createElement('button');button.type='button';button.className='yp-icon';button.dataset.action='toggle-inspector';button.setAttribute('aria-label','收起工作依据检查');head.appendChild(button)}if(head){const button=head.querySelector('[data-action="toggle-inspector"]');if(button){button.innerHTML=icon(inspectorOpen?'chevron-up':'chevron-down');button.setAttribute('aria-expanded',String(inspectorOpen));button.setAttribute('aria-label',inspectorOpen?'收起工作依据检查':'展开工作依据检查')}}Array.from(panel.children).slice(1).forEach(child=>{child.hidden=!inspectorOpen})}
+const enhanceInspectorWithNavigationBoundary=enhanceInspector;enhanceInspector=function(){enhanceInspectorWithNavigationBoundary();content.querySelectorAll('.yp-inspector [data-page="sources"]').forEach(node=>node.remove())};
 function render(){const p=current();if(state.page==='observation')ensureObservation()?.setProject?.(state.projectId);root.querySelector('.yp-shell').classList.toggle('show-nav',state.nav);renderSide();renderBar();content.innerHTML=state.page==='archives'?archivesPage():state.page==='wizard'?wizardPage():!p?archivesPage():state.page==='sources'?sourcesPage():state.page==='settings'?settingsPage():state.page==='department'?departmentPage(state.department):state.page==='observation'?observationPage():overviewPage();enhanceInspector();initIcons()}
+const renderPage=render;render=function(){renderPage();root.querySelector('.yp-shell').classList.toggle('nav-collapsed',state.navCollapsed);syncSidebarToggle()};
 root.addEventListener('click',e=>{const el=e.target.closest('[data-action="toggle-inspector"]');if(el){inspectorOpen=!inspectorOpen;render()}});
 render();
 if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=>{state.overviewMode=layoutOptions.overviewMode;render()}});tweak.addSelect(layoutOptions,'overviewMode',{label:'总览默认视图',options:[{label:'三部门流程',value:'flow'},{label:'跨部门看板',value:'board'}]})}
 })();
 </script>
-<style>@media(max-width:470px){#yudao-project-prototype .yp-board{grid-template-columns:1fr}}</style>
+<style>
+#yudao-project-prototype .yp-shell.nav-collapsed{grid-template-columns:58px minmax(0,1fr)}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar{padding:18px 9px;gap:14px}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-brand{padding:0;justify-content:center;gap:0;flex-wrap:wrap}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-brand>span{display:none}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-brand .yp-sidebar-toggle{display:inline-flex;margin:4px 0 0}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-btn.primary{font-size:0;padding:7px 4px}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-search,#yudao-project-prototype .yp-shell.nav-collapsed .yp-side-label,#yudao-project-prototype .yp-shell.nav-collapsed .yp-footnote{display:none}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-project{justify-content:center;padding:9px 4px}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-project span:not(.yp-project-mark),#yudao-project-prototype .yp-shell.nav-collapsed .yp-project svg{display:none}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-project .yp-project-mark{width:11px;height:11px}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar-link{justify-content:center;padding:8px 4px}
+#yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar-link span{display:none}
+@media(max-width:740px){
+ #yudao-project-prototype .yp-shell.nav-collapsed{grid-template-columns:1fr}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar{padding:18px;gap:15px}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-brand{padding:0 8px;justify-content:flex-start;gap:9px;flex-wrap:nowrap}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-brand>span{display:inline}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-brand .yp-sidebar-toggle{margin-left:auto;margin-top:0}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-btn.primary{font-size:12px;padding:7px 11px}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-search{display:flex}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-side-label{display:flex}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-footnote{display:block}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-project{justify-content:flex-start;padding:9px 8px}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-project span:not(.yp-project-mark){display:inline;flex:1}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-project svg{display:inline-flex}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-project .yp-project-mark{width:7px;height:7px}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar-link{justify-content:flex-start;padding:8px 9px}
+ #yudao-project-prototype .yp-shell.nav-collapsed .yp-sidebar-link span{display:inline}
+}
+@media(max-width:470px){#yudao-project-prototype .yp-board{grid-template-columns:1fr}}
+</style>
 </div>
