@@ -1,0 +1,2421 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Yudao 项目协作融合原型</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Yudao 项目协作融合原型" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Yudao 项目协作融合原型&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;!-- Yudao 项目协作原型 · 项目级三部门工作区与跨部门流转总览。所有数据均为内存示例，不读取目录、不调用模型、不写入真实项目。 --&gt;
+&lt;div id=&quot;yudao-project-prototype&quot; aria-label=&quot;Yudao 项目协作原型&quot;&gt;
+&lt;style&gt;
+#yudao-project-prototype{--yp-bg:light-dark(#f7f8f7,#171918);--yp-side:light-dark(#eef1ef,#1c201d);--yp-surface:light-dark(#fff,#212522);--yp-soft:light-dark(#f1f4f2,#292e2a);--yp-text:light-dark(#29312d,#e7eee9);--yp-muted:light-dark(#68766e,#a4b1a8);--yp-line:light-dark(#dce4de,#37443b);--yp-green:light-dark(#087f69,#6bd8ba);--yp-tint:light-dark(#e4f2eb,#243e32);--yp-amber:light-dark(#96680e,#e2be71);--yp-amber-bg:light-dark(#faf1dc,#3a3223);--yp-red:light-dark(#b44338,#ee9e92);--yp-blue:light-dark(#39658c,#95bde3);font:14px/1.6 &quot;Microsoft YaHei UI&quot;,&quot;Microsoft YaHei&quot;,system-ui,sans-serif;color:var(--yp-text);background:var(--yp-bg);color-scheme:light dark;position:relative;min-width:0;text-align:left}
+#yudao-project-prototype *{box-sizing:border-box}#yudao-project-prototype [hidden]{display:none!important}#yudao-project-prototype button,#yudao-project-prototype input,#yudao-project-prototype textarea,#yudao-project-prototype select{font:inherit;color:inherit}#yudao-project-prototype button{cursor:pointer}#yudao-project-prototype button:disabled{cursor:default;opacity:.55}#yudao-project-prototype h1,#yudao-project-prototype h2,#yudao-project-prototype h3,#yudao-project-prototype p{margin:0}#yudao-project-prototype h1{font-size:26px;font-weight:500;line-height:1.4;letter-spacing:-.4px}#yudao-project-prototype h2{font-size:16px;font-weight:500}#yudao-project-prototype h3{font-size:14px;font-weight:500}#yudao-project-prototype strong{font-weight:500}#yudao-project-prototype svg{width:17px;height:17px;flex-shrink:0}
+#yudao-project-prototype .yp-shell{display:grid;grid-template-columns:218px minmax(0,1fr);min-height:920px}#yudao-project-prototype .yp-sidebar{background:var(--yp-side);border-right:1px solid var(--yp-line);padding:22px 13px;display:flex;flex-direction:column;gap:20px;min-width:0}#yudao-project-prototype .yp-brand{display:flex;align-items:center;gap:9px;padding:0 8px;font-size:17px;font-weight:500;letter-spacing:.3px}#yudao-project-prototype .yp-brand svg{color:var(--yp-green);width:21px;height:21px}#yudao-project-prototype .yp-proto{font-size:10px;color:var(--yp-muted);border:1px solid var(--yp-line);border-radius:4px;padding:1px 4px;letter-spacing:1px;margin-left:auto}#yudao-project-prototype .yp-muted{color:var(--yp-muted)}#yudao-project-prototype .yp-small{font-size:12px;color:var(--yp-muted)}#yudao-project-prototype .yp-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}#yudao-project-prototype .yp-between{justify-content:space-between}#yudao-project-prototype .yp-side-label{display:flex;align-items:center;justify-content:space-between;padding:0 9px;margin:0 0 8px;font-size:11px;letter-spacing:1px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon{display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;border-radius:6px;padding:7px;min-width:30px;min-height:30px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon:hover{background:var(--yp-soft);color:var(--yp-text)}#yudao-project-prototype .yp-search{display:flex;align-items:center;gap:7px;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:7px 9px;margin-top:14px}#yudao-project-prototype .yp-search input{width:100%;min-width:0;border:0;background:transparent;font-size:12px;padding:0;outline:none}#yudao-project-prototype .yp-project-list{display:grid;gap:3px}#yudao-project-prototype .yp-project{width:100%;border:1px solid transparent;background:transparent;border-radius:7px;display:flex;gap:8px;text-align:left;align-items:center;padding:9px 8px;margin-top:2px}#yudao-project-prototype .yp-project:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-project.is-selected{background:var(--yp-tint);color:var(--yp-green);border-color:color-mix(in srgb,var(--yp-green) 15%,transparent)}#yudao-project-prototype .yp-project span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}#yudao-project-prototype .yp-project .yp-project-mark{width:7px;height:7px;border-radius:50%;background:var(--yp-muted);flex:none}#yudao-project-prototype .yp-project.is-selected .yp-project-mark{background:var(--yp-green)}#yudao-project-prototype .yp-side-bottom{margin-top:auto;display:grid;gap:8px;border-top:1px solid var(--yp-line);padding-top:16px}#yudao-project-prototype .yp-sidebar-link{width:100%;display:flex;align-items:center;gap:8px;text-align:left;border:0;background:transparent;padding:8px 9px;border-radius:6px;color:var(--yp-muted);font-size:12px}#yudao-project-prototype .yp-sidebar-link:hover{background:var(--yp-soft);color:var(--yp-text)}#yudao-project-prototype .yp-sidebar-link .yp-count{margin-left:auto;font-size:11px}#yudao-project-prototype .yp-footnote{padding:0 9px;font-size:11px;color:var(--yp-muted)}
+#yudao-project-prototype .yp-main{min-width:0}#yudao-project-prototype .yp-topbar{padding:14px 29px;min-height:59px;border-bottom:1px solid var(--yp-line);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--yp-surface)}#yudao-project-prototype .yp-breadcrumb{display:flex;gap:8px;align-items:center;min-width:0;font-size:12px;color:var(--yp-muted);flex-wrap:wrap}#yudao-project-prototype .yp-breadcrumb button{padding:0;border:0;background:none;color:var(--yp-muted)}#yudao-project-prototype .yp-breadcrumb strong{color:var(--yp-text)}#yudao-project-prototype .yp-auto{font-size:11px;display:flex;align-items:center;gap:6px;color:var(--yp-muted);white-space:nowrap}#yudao-project-prototype .yp-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--yp-green);flex-shrink:0}#yudao-project-prototype .yp-dot.waiting{background:var(--yp-amber)}#yudao-project-prototype .yp-dot.muted{background:var(--yp-muted)}#yudao-project-prototype .yp-content{padding:29px 30px 38px;max-width:1240px;margin:auto;min-width:0}#yudao-project-prototype .yp-eyebrow{font-size:11px;letter-spacing:1.3px;color:var(--yp-muted);margin-bottom:6px}#yudao-project-prototype .yp-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}#yudao-project-prototype .yp-heading-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}#yudao-project-prototype .yp-subtitle{font-size:13px;color:var(--yp-muted);margin-top:8px;max-width:70ch;overflow-wrap:anywhere}#yudao-project-prototype .yp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;border:1px solid var(--yp-line);border-radius:6px;background:var(--yp-surface);font-size:12px;min-height:34px;white-space:nowrap}#yudao-project-prototype .yp-btn:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-btn.primary{background:var(--yp-green);color:light-dark(#fff,#102b20);border-color:var(--yp-green)}#yudao-project-prototype .yp-btn.primary:hover{filter:brightness(1.07)}#yudao-project-prototype .yp-btn.quiet{background:transparent}#yudao-project-prototype .yp-link{display:inline-flex;gap:5px;align-items:center;padding:0;border:0;background:transparent;color:var(--yp-green);font-size:12px;text-align:left}#yudao-project-prototype .yp-link:hover{text-decoration:underline}#yudao-project-prototype .yp-mobile-toggle{display:none}
+#yudao-project-prototype .yp-tabs{display:flex;gap:23px;border-bottom:1px solid var(--yp-line);margin-top:24px;flex-wrap:wrap}#yudao-project-prototype .yp-tab{padding:10px 0;border:0;border-bottom:2px solid transparent;background:none;color:var(--yp-muted);font-size:12px;min-height:35px}#yudao-project-prototype .yp-tab:hover{color:var(--yp-text)}#yudao-project-prototype .yp-tab.is-selected{color:var(--yp-green);border-bottom-color:var(--yp-green)}#yudao-project-prototype .yp-secondary-tabs{display:flex;gap:18px;margin-top:13px}#yudao-project-prototype .yp-secondary-tabs .yp-tab{font-size:11px;min-height:28px;padding:5px 0}#yudao-project-prototype .yp-section{margin-top:26px}#yudao-project-prototype .yp-section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:13px}#yudao-project-prototype .yp-notice{padding:14px 16px;background:var(--yp-amber-bg);border-left:3px solid var(--yp-amber);border-radius:0 7px 7px 0;display:flex;gap:12px;align-items:flex-start}#yudao-project-prototype .yp-notice&gt;svg{color:var(--yp-amber);margin-top:3px}#yudao-project-prototype .yp-notice p{font-size:12px;margin-top:4px;color:var(--yp-muted)}#yudao-project-prototype .yp-notice .yp-link{margin-top:8px;color:var(--yp-amber)}#yudao-project-prototype .yp-notice-copy{flex:1;min-width:0}#yudao-project-prototype .yp-tag{display:inline-flex;align-items:center;gap:5px;border-radius:4px;background:var(--yp-soft);color:var(--yp-muted);padding:2px 6px;font-size:11px;white-space:nowrap}#yudao-project-prototype .yp-tag.green{color:var(--yp-green);background:var(--yp-tint)}#yudao-project-prototype .yp-tag.amber{color:var(--yp-amber);background:var(--yp-amber-bg)}#yudao-project-prototype .yp-tag.blue{color:var(--yp-blue);background:color-mix(in srgb,var(--yp-blue) 12%,transparent)}#yudao-project-prototype .yp-tag.red{color:var(--yp-red);background:color-mix(in srgb,var(--yp-red) 12%,transparent)}#yudao-project-prototype .yp-tag.outline{background:transparent;border:1px solid var(--yp-line)}
+#yudao-project-prototype .yp-project-summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:25px;padding:20px 0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yp-project-summary p{font-size:13px;margin-top:8px}#yudao-project-prototype .yp-summary-side{border-left:1px solid var(--yp-line);padding-left:22px;display:grid;gap:13px}#yudao-project-prototype .yp-summary-item{display:grid;gap:2px}#yudao-project-prototype .yp-summary-item strong{font-size:13px}#yudao-project-prototype .yp-summary-item span{font-size:12px;color:var(--yp-muted)}#yudao-project-prototype .yp-composer{background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:9px;padding:13px 14px;box-shadow:0 2px 5px light-dark(#24372b05,#00000015)}#yudao-project-prototype .yp-composer:focus-within{border-color:var(--yp-green)}#yudao-project-prototype .yp-composer textarea{display:block;width:100%;min-height:65px;border:0;background:transparent;resize:vertical;padding:0;font-size:13px;line-height:1.7;outline:none}#yudao-project-prototype .yp-composer-footer{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:7px}#yudao-project-prototype .yp-composer-footer .yp-small{max-width:70%;overflow-wrap:anywhere}#yudao-project-prototype .yp-form{display:grid;gap:17px}#yudao-project-prototype .yp-field{display:grid;gap:6px;font-size:12px}#yudao-project-prototype .yp-field input,#yudao-project-prototype .yp-field textarea,#yudao-project-prototype .yp-field select{width:100%;min-width:0;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:6px;padding:9px 11px;font-size:13px;outline:none}#yudao-project-prototype .yp-field input:focus,#yudao-project-prototype .yp-field textarea:focus,#yudao-project-prototype .yp-field select:focus{border-color:var(--yp-green)}#yudao-project-prototype .yp-field textarea{resize:vertical;line-height:1.7;min-height:82px}#yudao-project-prototype .yp-field small{font-size:11px;color:var(--yp-muted)}#yudao-project-prototype .yp-form-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}#yudao-project-prototype .yp-form-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--yp-line);padding-top:18px;margin-top:24px}#yudao-project-prototype .yp-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}#yudao-project-prototype .yp-choice{padding:19px 16px;border:1px solid var(--yp-line);border-radius:8px;background:var(--yp-surface);text-align:left;color:var(--yp-text)}#yudao-project-prototype .yp-choice:hover{border-color:var(--yp-green);background:var(--yp-tint)}#yudao-project-prototype .yp-choice svg{color:var(--yp-green);margin-bottom:14px;width:24px;height:24px}#yudao-project-prototype .yp-choice strong{display:block;font-size:15px}#yudao-project-prototype .yp-choice p{font-size:12px;color:var(--yp-muted);margin-top:8px}#yudao-project-prototype .yp-wizard{max-width:650px;margin:0 auto}#yudao-project-prototype .yp-steps{display:flex;gap:9px;align-items:center;margin:18px 0 24px;font-size:11px;color:var(--yp-muted);flex-wrap:wrap}#yudao-project-prototype .yp-step-current{color:var(--yp-green)}#yudao-project-prototype .yp-step-line{width:20px;height:1px;background:var(--yp-line)}
+#yudao-project-prototype .yp-board-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px;flex-wrap:wrap}#yudao-project-prototype .yp-view-toggle{display:inline-flex;gap:2px;border:1px solid var(--yp-line);border-radius:6px;padding:2px;background:var(--yp-soft)}#yudao-project-prototype .yp-view-toggle button{border:0;background:transparent;border-radius:4px;color:var(--yp-muted);font-size:11px;padding:5px 9px}#yudao-project-prototype .yp-view-toggle button.is-selected{background:var(--yp-surface);color:var(--yp-green);box-shadow:0 1px 2px light-dark(#00000012,#00000040)}#yudao-project-prototype .yp-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;overflow:auto;padding-bottom:3px}#yudao-project-prototype .yp-board-col{min-width:205px;border-top:2px solid var(--yp-line);padding-top:10px}#yudao-project-prototype .yp-board-col.product{border-top-color:var(--yp-blue)}#yudao-project-prototype .yp-board-col.engineering{border-top-color:var(--yp-green)}#yudao-project-prototype .yp-board-col.quality{border-top-color:var(--yp-amber)}#yudao-project-prototype .yp-board-col.done{border-top-color:var(--yp-muted)}#yudao-project-prototype .yp-col-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:10px}#yudao-project-prototype .yp-col-head strong{font-size:13px}#yudao-project-prototype .yp-col-head p{font-size:11px;color:var(--yp-muted);margin-top:2px}#yudao-project-prototype .yp-col-count{font-size:11px;color:var(--yp-muted);background:var(--yp-soft);border-radius:4px;padding:1px 5px}#yudao-project-prototype .yp-card-stack{display:grid;gap:9px}#yudao-project-prototype .yp-work-card{display:block;width:100%;text-align:left;border:1px solid var(--yp-line);border-radius:7px;background:var(--yp-surface);padding:12px;color:var(--yp-text);box-shadow:0 1px 2px light-dark(#263a2e08,#00000018)}#yudao-project-prototype .yp-work-card:hover,#yudao-project-prototype .yp-work-card:focus{border-color:var(--yp-green);outline:none}#yudao-project-prototype .yp-work-card-title{font-size:13px;line-height:1.5}#yudao-project-prototype .yp-work-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}#yudao-project-prototype .yp-work-card p{font-size:11px;color:var(--yp-muted);margin-top:8px;line-height:1.55;overflow-wrap:anywhere}#yudao-project-prototype .yp-card-foot{display:flex;align-items:center;gap:6px;margin-top:10px;color:var(--yp-muted);font-size:11px}#yudao-project-prototype .yp-card-foot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#yudao-project-prototype .yp-empty-col{border:1px dashed var(--yp-line);border-radius:7px;padding:16px 10px;color:var(--yp-muted);font-size:11px;text-align:center}#yudao-project-prototype .yp-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;position:relative}#yudao-project-prototype .yp-flow:before{content:&quot;&quot;;position:absolute;top:31px;left:7%;right:7%;border-top:1px solid var(--yp-line);z-index:0}#yudao-project-prototype .yp-flow-step{position:relative;z-index:1;background:var(--yp-bg);padding-right:8px}#yudao-project-prototype .yp-flow-head{display:flex;align-items:center;gap:8px;margin-bottom:11px}#yudao-project-prototype .yp-flow-marker{width:25px;height:25px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--yp-surface);border:1px solid var(--yp-line);color:var(--yp-muted);font-size:11px}#yudao-project-prototype .yp-flow-step.current .yp-flow-marker{background:var(--yp-tint);border-color:var(--yp-green);color:var(--yp-green)}#yudao-project-prototype .yp-flow-head strong{font-size:13px}#yudao-project-prototype .yp-flow-items{display:grid;gap:8px}#yudao-project-prototype .yp-flow-item{width:100%;text-align:left;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:6px;padding:10px}#yudao-project-prototype .yp-flow-item:hover{border-color:var(--yp-green)}#yudao-project-prototype .yp-flow-item strong{font-size:12px;font-weight:500;display:block}#yudao-project-prototype .yp-flow-item p{font-size:11px;color:var(--yp-muted);margin-top:4px}#yudao-project-prototype .yp-handoff-list{border-top:1px solid var(--yp-line)}#yudao-project-prototype .yp-handoff{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--yp-line);font-size:12px}#yudao-project-prototype .yp-handoff-time{font-size:11px;color:var(--yp-muted)}#yudao-project-prototype .yp-handoff p{font-size:11px;color:var(--yp-muted);margin-top:3px;overflow-wrap:anywhere}#yudao-project-prototype .yp-handoff-status{font-size:11px;color:var(--yp-green);white-space:nowrap}#yudao-project-prototype .yp-handoff-status.rework{color:var(--yp-amber)}
+#yudao-project-prototype .yp-dept-layout{display:grid;grid-template-columns:minmax(0,1fr) 258px;gap:26px;margin-top:22px}#yudao-project-prototype .yp-dept-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:15px}#yudao-project-prototype .yp-scope-select{border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:6px;padding:7px 9px;font-size:12px;max-width:260px}#yudao-project-prototype .yp-timeline{margin-top:17px}#yudao-project-prototype .yp-message{border-left:1px solid var(--yp-line);padding:0 0 24px 17px;position:relative}#yudao-project-prototype .yp-message:before{content:&quot;&quot;;position:absolute;left:-4px;top:6px;width:7px;height:7px;background:var(--yp-green);border-radius:50%}#yudao-project-prototype .yp-message.user:before{background:var(--yp-blue)}#yudao-project-prototype .yp-message.notice:before{background:var(--yp-amber)}#yudao-project-prototype .yp-message p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:7px}#yudao-project-prototype .yp-message .yp-row{font-size:12px}#yudao-project-prototype .yp-message-context{font-size:11px;color:var(--yp-muted);margin-top:6px}#yudao-project-prototype .yp-inspector{background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:7px;padding:14px;align-self:start;min-width:0}#yudao-project-prototype .yp-inspector h3{font-size:13px}#yudao-project-prototype .yp-inspector p{font-size:12px;color:var(--yp-muted);margin-top:12px;overflow-wrap:anywhere}#yudao-project-prototype .yp-inspector .yp-tabs{gap:13px;margin-top:8px}#yudao-project-prototype .yp-inspector .yp-tab{font-size:11px}#yudao-project-prototype .yp-inspector details{margin-top:13px;font-size:12px;border-top:1px solid var(--yp-line);padding-top:10px}#yudao-project-prototype .yp-inspector summary{cursor:pointer}#yudao-project-prototype .yp-inspector details p{margin-top:7px}#yudao-project-prototype .yp-snapshot{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--yp-line);background:transparent;border-radius:5px;padding:8px;margin-top:9px;font-size:11px}#yudao-project-prototype .yp-snapshot:hover{background:var(--yp-soft);border-color:var(--yp-green)}#yudao-project-prototype .yp-snapshot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#yudao-project-prototype .yp-snapshot small{color:var(--yp-muted);white-space:nowrap}#yudao-project-prototype .yp-detail{padding:16px 0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yp-detail p{font-size:13px;color:var(--yp-muted);margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere}#yudao-project-prototype .yp-code{font:12px/1.7 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--yp-line);background:var(--yp-surface);padding:14px;border-radius:7px;margin-top:14px}#yudao-project-prototype .yp-source-row{display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--yp-line);font-size:12px}#yudao-project-prototype .yp-source-row&gt;div{flex:1;min-width:0;overflow-wrap:anywhere}#yudao-project-prototype .yp-source-row svg{color:var(--yp-muted)}#yudao-project-prototype .yp-source-row small{display:block;font-size:11px;color:var(--yp-muted);margin-top:3px}#yudao-project-prototype .yp-fact{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--yp-line);font-size:12px;align-items:start}#yudao-project-prototype .yp-fact:last-child{border:0;padding-bottom:0}#yudao-project-prototype .yp-fact small{display:block;color:var(--yp-muted);margin-top:3px;overflow-wrap:anywhere}#yudao-project-prototype .yp-report{margin-top:17px;padding:16px;background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:7px}#yudao-project-prototype .yp-report h3{margin-bottom:7px}#yudao-project-prototype .yp-report p{font-size:12px;color:var(--yp-muted)}
+#yudao-project-prototype .yp-archive-list{border-top:1px solid var(--yp-line)}#yudao-project-prototype .yp-archive-row{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yp-archive-row p{font-size:12px;color:var(--yp-muted);margin-top:3px}#yudao-project-prototype .yp-menu-wrap{position:relative}#yudao-project-prototype .yp-menu{position:absolute;right:0;top:40px;z-index:5;min-width:175px;background:var(--yp-surface);border:1px solid var(--yp-line);box-shadow:0 10px 30px light-dark(#1c33231f,#00000060);border-radius:7px;padding:5px}#yudao-project-prototype .yp-menu button{width:100%;display:flex;gap:8px;align-items:center;text-align:left;padding:8px;border:0;border-radius:4px;background:transparent;font-size:12px}#yudao-project-prototype .yp-menu button:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-modal-layer{position:absolute;inset:0;z-index:10;background:light-dark(#10201860,#00000078);padding:65px 20px 30px;display:flex;align-items:flex-start;justify-content:center}#yudao-project-prototype .yp-modal{width:100%;max-width:560px;border:1px solid var(--yp-line);border-radius:10px;background:var(--yp-surface);box-shadow:0 20px 70px light-dark(#00000030,#00000075);padding:22px}#yudao-project-prototype .yp-modal p{font-size:13px;color:var(--yp-muted);margin-top:10px}#yudao-project-prototype .yp-modal .yp-form{margin-top:20px}#yudao-project-prototype .yp-modal .yp-handoff-list{margin-top:17px}#yudao-project-prototype .yp-toast{position:absolute;right:20px;top:66px;z-index:15;background:var(--yp-text);color:var(--yp-surface);padding:9px 14px;border-radius:7px;box-shadow:0 5px 20px light-dark(#00000020,#00000055);font-size:12px;max-width:calc(100% - 40px)}#yudao-project-prototype .yp-error{color:var(--yp-red);font-size:12px;margin-top:7px}#yudao-project-prototype .yp-info-strip{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid var(--yp-line);border-radius:7px;color:var(--yp-muted);font-size:12px;margin-top:14px}#yudao-project-prototype .yp-info-strip svg{color:var(--yp-green);margin-top:2px}#yudao-project-prototype .yp-info-strip strong{color:var(--yp-text)}
+@media(max-width:1040px){#yudao-project-prototype .yp-shell{grid-template-columns:190px minmax(0,1fr)}#yudao-project-prototype .yp-content{padding:26px 23px}#yudao-project-prototype .yp-topbar{padding:14px 23px}#yudao-project-prototype .yp-dept-layout{grid-template-columns:minmax(0,1fr)}#yudao-project-prototype .yp-inspector{max-width:none}#yudao-project-prototype .yp-board{grid-template-columns:repeat(2,minmax(205px,1fr));overflow:visible}#yudao-project-prototype .yp-board-col{min-width:0}}
+@media(max-width:740px){#yudao-project-prototype .yp-shell{grid-template-columns:1fr;min-height:840px}#yudao-project-prototype .yp-sidebar{display:none;border-right:0;border-bottom:1px solid var(--yp-line);padding:18px;gap:15px}#yudao-project-prototype .yp-shell.show-nav .yp-sidebar{display:flex}#yudao-project-prototype .yp-side-bottom{margin-top:6px}#yudao-project-prototype .yp-mobile-toggle{display:inline-flex}#yudao-project-prototype .yp-content{padding:24px 18px}#yudao-project-prototype .yp-topbar{padding:10px 16px}#yudao-project-prototype .yp-auto span:last-child{display:none}#yudao-project-prototype .yp-heading{gap:10px}#yudao-project-prototype h1{font-size:23px}#yudao-project-prototype .yp-project-summary{gap:16px}#yudao-project-prototype .yp-summary-side{padding-left:0;border-left:0;border-top:1px solid var(--yp-line);padding-top:14px}#yudao-project-prototype .yp-board{grid-template-columns:1fr 1fr;gap:8px}#yudao-project-prototype .yp-board-col{min-width:0}#yudao-project-prototype .yp-flow{grid-template-columns:1fr 1fr;gap:16px}#yudao-project-prototype .yp-flow:before{display:none}#yudao-project-prototype .yp-flow-step{padding-right:0}#yudao-project-prototype .yp-dept-toolbar{align-items:flex-start}#yudao-project-prototype .yp-modal-layer{padding:35px 13px}#yudao-project-prototype .yp-modal{padding:18px}}
+@media(max-width:470px){#yudao-project-prototype .yp-project-summary,#yudao-project-prototype .yp-choice-grid,#yudao-project-prototype .yp-form-two{grid-template-columns:1fr}#yudao-project-prototype .yp-content{padding:22px 14px}#yudao-project-prototype .yp-heading{flex-wrap:wrap}#yudao-project-prototype .yp-btn,#yudao-project-prototype .yp-icon,#yudao-project-prototype .yp-tab{min-height:44px}#yudao-project-prototype .yp-field input,#yudao-project-prototype .yp-field textarea,#yudao-project-prototype .yp-field select,#yudao-project-prototype .yp-composer textarea,#yudao-project-prototype .yp-search input{font-size:16px}#yudao-project-prototype .yp-tabs{gap:16px}#yudao-project-prototype .yp-board{grid-template-columns:1fr}#yudao-project-prototype .yp-flow{grid-template-columns:1fr}#yudao-project-prototype .yp-handoff{grid-template-columns:1fr;gap:3px}#yudao-project-prototype .yp-handoff-status{justify-self:start}#yudao-project-prototype .yp-composer-footer{align-items:flex-end}#yudao-project-prototype .yp-composer-footer .yp-small{max-width:58%}}
+&lt;/style&gt;
+&lt;div class=&quot;yp-shell&quot;&gt;&lt;aside class=&quot;yp-sidebar&quot; aria-label=&quot;项目导航&quot;&gt;&lt;/aside&gt;&lt;main class=&quot;yp-main&quot;&gt;&lt;header class=&quot;yp-topbar&quot;&gt;&lt;/header&gt;&lt;div class=&quot;yp-content&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;&lt;/main&gt;&lt;/div&gt;
+&lt;div class=&quot;yp-modal-layer&quot; hidden&gt;&lt;/div&gt;&lt;div class=&quot;yp-toast&quot; role=&quot;status&quot; aria-live=&quot;polite&quot; hidden&gt;&lt;/div&gt;
+&lt;script&gt;
+(function (global) {
+  &#x27;use strict&#x27;;
+
+  /* Prototype data stays here so the shell only owns project navigation. */
+  const STATUS = {
+    success: &#x27;成功&#x27;,
+    failed: &#x27;失败&#x27;,
+    running: &#x27;进行中&#x27;,
+    cancelled: &#x27;已取消&#x27;
+  };
+  const DEPARTMENTS = {
+    product: &#x27;产品&#x27;,
+    engineering: &#x27;工程&#x27;,
+    quality: &#x27;质检&#x27;
+  };
+  const PROJECT_NAMES = {
+    cargo: &#x27;货物装载规划&#x27;
+  };
+
+  const cargoRequests = [
+    {
+      id: &#x27;req-prod-1&#x27;,
+      requestId: &#x27;req-prod-1&#x27;,
+      callId: &#x27;call-mix-product&#x27;,
+      attempt: 1,
+      totalAttempts: 1,
+      projectId: &#x27;cargo&#x27;,
+      department: &#x27;product&#x27;,
+      workItemId: &#x27;mix&#x27;,
+      workItemTitle: &#x27;增加混装方案比较&#x27;,
+      workItemType: &#x27;需求&#x27;,
+      status: &#x27;running&#x27;,
+      time: &#x27;今天 10:24&#x27;,
+      provider: &#x27;示例 Provider&#x27;,
+      model: &#x27;omp/standard&#x27;,
+      requestedModel: &#x27;omp/standard&#x27;,
+      responseModel: null,
+      durationMs: 18400,
+      context: {
+        version: &#x27;ctx-product-mix-v3&#x27;,
+        capturedAt: &#x27;今天 10:24:02&#x27;,
+        sources: [
+          { name: &#x27;项目目标&#x27;, version: &#x27;project-goal-v2&#x27;, scope: &#x27;项目级&#x27; },
+          { name: &#x27;混装方案比较工作项&#x27;, version: &#x27;work-mix-v1&#x27;, scope: &#x27;mix&#x27; },
+          { name: &#x27;产品部门历史摘要&#x27;, version: &#x27;summary-product-v4&#x27;, scope: &#x27;产品部&#x27; }
+        ],
+        omitted: &#x27;未包含工程私有对话和未确认的数量/体积优先级。&#x27;,
+        body: &#x27;目标：让计划员比较混装方案。当前需要区分数量与体积两个独立判断维度，并把待用户决定的取舍保留下来。&#x27;
+      },
+      providerConfig: {
+        version: &#x27;provider-product-v2&#x27;,
+        name: &#x27;示例 Provider&#x27;,
+        protocol: &#x27;responses&#x27;,
+        endpoint: &#x27;示例端点&#x27;,
+        temperature: 0.2,
+        maxOutputTokens: 2400
+      },
+      prompt: {
+        version: &#x27;prompt-product-v1.4&#x27;,
+        name: &#x27;产品部门执行规则&#x27;,
+        status: &#x27;生效中&#x27;,
+        body: &#x27;你是产品部。围绕项目目标整理用户问题、需求边界与取舍。遇到影响目标的优先级冲突，保留问题并请求用户决定。&#x27;
+      },
+      usage: {
+        reported: true,
+        inputTotal: 8420,
+        cacheRead: 2200,
+        output: 1120,
+        total: 9540,
+        reasoning: null,
+        fee: null,
+        feeCurrency: null
+      },
+      requestRaw: {
+        kind: &#x27;model_request&#x27;,
+        request_id: &#x27;req-prod-1&#x27;,
+        attempt: 1,
+        provider: &#x27;示例 Provider&#x27;,
+        model: &#x27;omp/standard&#x27;,
+        input: [
+          { role: &#x27;system&#x27;, content: &#x27;产品部门执行规则 · prompt-product-v1.4&#x27; },
+          { role: &#x27;user&#x27;, content: &#x27;请分析混装方案比较的目标与待决取舍。&#x27; }
+        ],
+        tools: [],
+        max_output_tokens: 2400,
+        context_version: &#x27;ctx-product-mix-v3&#x27;
+      },
+      responseRaw: {
+        kind: &#x27;provider_response&#x27;,
+        request_id: &#x27;req-prod-1&#x27;,
+        status: &#x27;in_progress&#x27;,
+        model: null,
+        output: [],
+        usage: { input_tokens: 8420, cached_input_tokens: 2200, output_tokens: 1120 }
+      },
+      events: [
+        { time: &#x27;今天 10:24:02&#x27;, kind: &#x27;request_started&#x27;, label: &#x27;请求开始&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;已冻结 Context、Provider 与 Prompt 版本。&#x27;, raw: { type: &#x27;request.started&#x27;, request_id: &#x27;req-prod-1&#x27;, context_version: &#x27;ctx-product-mix-v3&#x27;, prompt_version: &#x27;prompt-product-v1.4&#x27; } },
+        { time: &#x27;今天 10:24:08&#x27;, kind: &#x27;context_attached&#x27;, label: &#x27;装配 Context&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;载入 3 个来源，未纳入范围已标明。&#x27;, raw: { type: &#x27;context.attached&#x27;, sources: 3, omitted: &#x27;工程私有对话&#x27; } },
+        { time: &#x27;今天 10:24:20&#x27;, kind: &#x27;model_streaming&#x27;, label: &#x27;等待响应&#x27;, tone: &#x27;waiting&#x27;, detail: &#x27;当前请求仍在进行中，完整响应尚未取得。&#x27;, raw: { type: &#x27;model.streaming&#x27;, received_output_items: 0 } }
+      ]
+    },
+    {
+      id: &#x27;req-eng-1a&#x27;,
+      requestId: &#x27;req-eng-1&#x27;,
+      callId: &#x27;call-restore-engineering&#x27;,
+      attempt: 1,
+      totalAttempts: 2,
+      projectId: &#x27;cargo&#x27;,
+      department: &#x27;engineering&#x27;,
+      workItemId: &#x27;restore&#x27;,
+      workItemTitle: &#x27;修复方案保存后的恢复&#x27;,
+      workItemType: &#x27;缺陷&#x27;,
+      status: &#x27;failed&#x27;,
+      time: &#x27;昨天 16:37&#x27;,
+      provider: &#x27;示例 Provider&#x27;,
+      model: &#x27;omp/standard&#x27;,
+      requestedModel: &#x27;omp/standard&#x27;,
+      responseModel: null,
+      durationMs: 4580,
+      context: {
+        version: &#x27;ctx-engineering-restore-v5&#x27;,
+        capturedAt: &#x27;昨天 16:37:01&#x27;,
+        sources: [
+          { name: &#x27;恢复缺陷复现步骤&#x27;, version: &#x27;qa-restore-repro-v2&#x27;, scope: &#x27;restore&#x27; },
+          { name: &#x27;当前工程方案&#x27;, version: &#x27;baseline-v0.3&#x27;, scope: &#x27;项目级&#x27; },
+          { name: &#x27;工程部门历史摘要&#x27;, version: &#x27;summary-engineering-v7&#x27;, scope: &#x27;工程部&#x27; }
+        ],
+        omitted: &#x27;未将本次失败输出写回工程有效历史。&#x27;,
+        body: &#x27;复现：手动调整后保存，再恢复方案。目标是定位恢复边界条件并给出可验证修复。&#x27;
+      },
+      providerConfig: {
+        version: &#x27;provider-engineering-v2&#x27;,
+        name: &#x27;示例 Provider&#x27;,
+        protocol: &#x27;responses&#x27;,
+        endpoint: &#x27;示例端点&#x27;,
+        temperature: 0.1,
+        maxOutputTokens: 3200
+      },
+      prompt: {
+        version: &#x27;prompt-engineering-v1.8&#x27;,
+        name: &#x27;工程部门执行规则&#x27;,
+        status: &#x27;生效中&#x27;,
+        body: &#x27;你是工程部。依据已确认需求与复现材料定位实现问题，提交可验证的修复方案。失败输出只作为观察证据。&#x27;
+      },
+      usage: {
+        reported: true,
+        inputTotal: 5210,
+        cacheRead: 900,
+        output: 640,
+        total: 5850,
+        reasoning: null,
+        fee: null,
+        feeCurrency: null
+      },
+      requestRaw: {
+        kind: &#x27;model_request&#x27;,
+        request_id: &#x27;req-eng-1&#x27;,
+        attempt: 1,
+        provider: &#x27;示例 Provider&#x27;,
+        model: &#x27;omp/standard&#x27;,
+        input: [
+          { role: &#x27;system&#x27;, content: &#x27;工程部门执行规则 · prompt-engineering-v1.8&#x27; },
+          { role: &#x27;user&#x27;, content: &#x27;根据恢复缺陷复现步骤定位问题并提出修复。&#x27; }
+        ],
+        tools: [&#x27;read_source&#x27;, &#x27;run_check&#x27;],
+        max_output_tokens: 3200,
+        context_version: &#x27;ctx-engineering-restore-v5&#x27;
+      },
+      responseRaw: {
+        kind: &#x27;provider_response&#x27;,
+        request_id: &#x27;req-eng-1&#x27;,
+        status: &#x27;error&#x27;,
+        model: null,
+        error: { type: &#x27;provider_error&#x27;, code: &#x27;UPSTREAM_TIMEOUT&#x27;, message: &#x27;provider did not return a terminal response&#x27; },
+        output: [{ type: &#x27;partial_text&#x27;, text: &#x27;正在检查保存状态与恢复路径……&#x27; }],
+        usage: { input_tokens: 5210, cached_input_tokens: 900, output_tokens: 640 }
+      },
+      events: [
+        { time: &#x27;昨天 16:37:01&#x27;, kind: &#x27;request_started&#x27;, label: &#x27;请求开始&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;开始第 1 次物理尝试。&#x27;, raw: { type: &#x27;request.started&#x27;, request_id: &#x27;req-eng-1&#x27;, attempt: 1 } },
+        { time: &#x27;昨天 16:37:03&#x27;, kind: &#x27;tool_succeeded&#x27;, label: &#x27;工具返回&#x27;, tone: &#x27;success&#x27;, detail: &#x27;已取得恢复路径相关输入。&#x27;, raw: { type: &#x27;tool.completed&#x27;, tool: &#x27;read_source&#x27;, status: &#x27;succeeded&#x27;, item_count: 4 } },
+        { time: &#x27;昨天 16:37:06&#x27;, kind: &#x27;model_attempt_failed&#x27;, label: &#x27;尝试失败&#x27;, tone: &#x27;error&#x27;, detail: &#x27;Provider 未返回终态；部分输出保留在观察记录。&#x27;, raw: { type: &#x27;model_attempt.failed&#x27;, code: &#x27;UPSTREAM_TIMEOUT&#x27;, terminal: false, partial_output_preserved: true } }
+      ]
+    },
+    {
+      id: &#x27;req-eng-1b&#x27;,
+      requestId: &#x27;req-eng-1&#x27;,
+      callId: &#x27;call-restore-engineering&#x27;,
+      attempt: 2,
+      totalAttempts: 2,
+      projectId: &#x27;cargo&#x27;,
+      department: &#x27;engineering&#x27;,
+      workItemId: &#x27;restore&#x27;,
+      workItemTitle: &#x27;修复方案保存后的恢复&#x27;,
+      workItemType: &#x27;缺陷&#x27;,
+      status: &#x27;success&#x27;,
+      time: &#x27;昨天 16:40&#x27;,
+      provider: &#x27;示例 Provider&#x27;,
+      model: &#x27;omp/standard&#x27;,
+      requestedModel: &#x27;omp/standard&#x27;,
+      responseModel: &#x27;omp/standard-2026-08&#x27;,
+      durationMs: 12600,
+      context: {
+        version: &#x27;ctx-engineering-restore-v6&#x27;,
+        capturedAt: &#x27;昨天 16:40:11&#x27;,
+        sources: [
+          { name: &#x27;恢复缺陷复现步骤&#x27;, version: &#x27;qa-restore-repro-v2&#x27;, scope: &#x27;restore&#x27; },
+          { name: &#x27;失败尝试观察记录&#x27;, version: &#x27;obs-req-eng-1a&#x27;, scope: &#x27;req-eng-1&#x27; },
+          { name: &#x27;当前工程方案&#x27;, version: &#x27;baseline-v0.3&#x27;, scope: &#x27;项目级&#x27; }
+        ],
+        omitted: &#x27;未把失败尝试的部分输出作为有效工程结论。&#x27;,
+        body: &#x27;在失败尝试后重新装配输入，补充保存快照版本与恢复顺序约束。当前结果给出边界修复方向，等待质检回归。&#x27;
+      },
+      providerConfig: {
+        version: &#x27;provider-engineering-v2&#x27;,
+        name: &#x27;示例 Provider&#x27;,
+        protocol: &#x27;responses&#x27;,
+        endpoint: &#x27;示例端点&#x27;,
+        temperature: 0.1,
+        maxOutputTokens: 3200
+      },
+      prompt: {
+        version: &#x27;prompt-engineering-v1.8&#x27;,
+        name: &#x27;工程部门执行规则&#x27;,
+        status: &#x27;生效中&#x27;,
+        body: &#x27;你是工程部。依据已确认需求与复现材料定位实现问题，提交可验证的修复方案。失败输出只作为观察证据。&#x27;
+      },
+      usage: {
+        reported: true,
+        inputTotal: 7130,
+        cacheRead: 1840,
+        output: 1480,
+        total: 8610,
+        reasoning: 420,
+        fee: null,
+        feeCurrency: null
+      },
+      requestRaw: {
+        kind: &#x27;model_request&#x27;,
+        request_id: &#x27;req-eng-1&#x27;,
+        attempt: 2,
+        provider: &#x27;示例 Provider&#x27;,
+        model: &#x27;omp/standard&#x27;,
+        input: [
+          { role: &#x27;system&#x27;, content: &#x27;工程部门执行规则 · prompt-engineering-v1.8&#x27; },
+          { role: &#x27;user&#x27;, content: &#x27;基于失败尝试的观察记录，重新定位恢复边界并给出修复。&#x27; }
+        ],
+        tools: [&#x27;read_source&#x27;, &#x27;run_check&#x27;],
+        max_output_tokens: 3200,
+        context_version: &#x27;ctx-engineering-restore-v6&#x27;
+      },
+      responseRaw: {
+        kind: &#x27;provider_response&#x27;,
+        request_id: &#x27;req-eng-1&#x27;,
+        status: &#x27;completed&#x27;,
+        model: &#x27;omp/standard-2026-08&#x27;,
+        output: [{ type: &#x27;message&#x27;, text: &#x27;补充保存快照版本校验，并在恢复时按快照顺序重建方案状态。已附上回归检查路径。&#x27; }],
+        usage: { input_tokens: 7130, cached_input_tokens: 1840, output_tokens: 1480, reasoning_tokens: 420 }
+      },
+      events: [
+        { time: &#x27;昨天 16:40:11&#x27;, kind: &#x27;request_started&#x27;, label: &#x27;请求开始&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;开始同一逻辑调用的第 2 次物理尝试。&#x27;, raw: { type: &#x27;request.started&#x27;, request_id: &#x27;req-eng-1&#x27;, attempt: 2, retry_of: &#x27;req-eng-1a&#x27; } },
+        { time: &#x27;昨天 16:40:16&#x27;, kind: &#x27;tool_succeeded&#x27;, label: &#x27;工具返回&#x27;, tone: &#x27;success&#x27;, detail: &#x27;取得保存快照和恢复路径检查结果。&#x27;, raw: { type: &#x27;tool.completed&#x27;, tool: &#x27;read_source&#x27;, status: &#x27;succeeded&#x27;, item_count: 8 } },
+        { time: &#x27;昨天 16:40:23&#x27;, kind: &#x27;model_attempt_succeeded&#x27;, label: &#x27;尝试成功&#x27;, tone: &#x27;success&#x27;, detail: &#x27;Provider 返回终态，结果交给工程部门继续处理。&#x27;, raw: { type: &#x27;model_attempt.completed&#x27;, response_model: &#x27;omp/standard-2026-08&#x27;, accepted_by_control_plane: true } }
+      ]
+    },
+    {
+      id: &#x27;req-qa-1&#x27;,
+      requestId: &#x27;req-qa-1&#x27;,
+      callId: &#x27;call-export-quality&#x27;,
+      attempt: 1,
+      totalAttempts: 1,
+      projectId: &#x27;cargo&#x27;,
+      department: &#x27;quality&#x27;,
+      workItemId: &#x27;export&#x27;,
+      workItemTitle: &#x27;导出方案并保留材料&#x27;,
+      workItemType: &#x27;任务&#x27;,
+      status: &#x27;success&#x27;,
+      time: &#x27;周一 14:05&#x27;,
+      provider: &#x27;示例 Provider&#x27;,
+      model: &#x27;omp/quality&#x27;,
+      requestedModel: &#x27;omp/quality&#x27;,
+      responseModel: &#x27;omp/quality-2026-08&#x27;,
+      durationMs: 8320,
+      context: {
+        version: &#x27;ctx-quality-export-v2&#x27;,
+        capturedAt: &#x27;周一 14:05:18&#x27;,
+        sources: [
+          { name: &#x27;导出样例&#x27;, version: &#x27;export-sample-v3&#x27;, scope: &#x27;export&#x27; },
+          { name: &#x27;验收依据&#x27;, version: &#x27;qa-rules-v4&#x27;, scope: &#x27;质检部&#x27; },
+          { name: &#x27;工程提交材料&#x27;, version: &#x27;handoff-export-v1&#x27;, scope: &#x27;项目级&#x27; }
+        ],
+        omitted: &#x27;未覆盖未登记的外部文件系统权限。&#x27;,
+        body: &#x27;检查导出文件内容、方案来源和命名规则，保留已检查项与仍未覆盖的外部权限边界。&#x27;
+      },
+      providerConfig: {
+        version: &#x27;provider-quality-v1&#x27;,
+        name: &#x27;示例 Provider&#x27;,
+        protocol: &#x27;responses&#x27;,
+        endpoint: &#x27;示例端点&#x27;,
+        temperature: 0,
+        maxOutputTokens: 2000
+      },
+      prompt: {
+        version: &#x27;prompt-quality-v1.6&#x27;,
+        name: &#x27;质检部门执行规则&#x27;,
+        status: &#x27;生效中&#x27;,
+        body: &#x27;你是质检部。根据明确验收依据检查交付，分别记录通过、失败、未观察和环境限制，不能把一次通过扩展为全部场景通过。&#x27;
+      },
+      usage: {
+        reported: true,
+        inputTotal: 6120,
+        cacheRead: 1300,
+        output: 780,
+        total: 6900,
+        reasoning: null,
+        fee: null,
+        feeCurrency: null
+      },
+      requestRaw: {
+        kind: &#x27;model_request&#x27;,
+        request_id: &#x27;req-qa-1&#x27;,
+        attempt: 1,
+        provider: &#x27;示例 Provider&#x27;,
+        model: &#x27;omp/quality&#x27;,
+        input: [
+          { role: &#x27;system&#x27;, content: &#x27;质检部门执行规则 · prompt-quality-v1.6&#x27; },
+          { role: &#x27;user&#x27;, content: &#x27;检查导出方案并保留每一项验收证据。&#x27; }
+        ],
+        tools: [&#x27;inspect_artifact&#x27;, &#x27;run_check&#x27;],
+        max_output_tokens: 2000,
+        context_version: &#x27;ctx-quality-export-v2&#x27;
+      },
+      responseRaw: {
+        kind: &#x27;provider_response&#x27;,
+        request_id: &#x27;req-qa-1&#x27;,
+        status: &#x27;completed&#x27;,
+        model: &#x27;omp/quality-2026-08&#x27;,
+        output: [{ type: &#x27;message&#x27;, text: &#x27;已核对导出样例和命名规则；外部权限场景仍标记为未观察。&#x27; }],
+        usage: { input_tokens: 6120, cached_input_tokens: 1300, output_tokens: 780 }
+      },
+      events: [
+        { time: &#x27;周一 14:05:18&#x27;, kind: &#x27;request_started&#x27;, label: &#x27;请求开始&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;冻结验收依据与导出材料版本。&#x27;, raw: { type: &#x27;request.started&#x27;, request_id: &#x27;req-qa-1&#x27;, acceptance_version: &#x27;qa-rules-v4&#x27; } },
+        { time: &#x27;周一 14:05:26&#x27;, kind: &#x27;tool_succeeded&#x27;, label: &#x27;检查完成&#x27;, tone: &#x27;success&#x27;, detail: &#x27;导出内容和命名规则检查完成。&#x27;, raw: { type: &#x27;tool.completed&#x27;, tool: &#x27;inspect_artifact&#x27;, status: &#x27;succeeded&#x27;, checked: 6 } },
+        { time: &#x27;周一 14:05:30&#x27;, kind: &#x27;model_attempt_succeeded&#x27;, label: &#x27;尝试成功&#x27;, tone: &#x27;success&#x27;, detail: &#x27;结果保留未观察范围，提交质检部门记录。&#x27;, raw: { type: &#x27;model_attempt.completed&#x27;, response_model: &#x27;omp/quality-2026-08&#x27;, accepted_by_control_plane: true } }
+      ]
+    },
+    {
+      id: &#x27;req-eng-2&#x27;,
+      requestId: &#x27;req-eng-2&#x27;,
+      callId: &#x27;call-manual-engineering&#x27;,
+      attempt: 1,
+      totalAttempts: 1,
+      projectId: &#x27;cargo&#x27;,
+      department: &#x27;engineering&#x27;,
+      workItemId: &#x27;manual&#x27;,
+      workItemTitle: &#x27;优化手动摆放体验&#x27;,
+      workItemType: &#x27;任务&#x27;,
+      status: &#x27;cancelled&#x27;,
+      time: &#x27;周一 11:17&#x27;,
+      provider: &#x27;示例 Provider&#x27;,
+      model: &#x27;omp/standard&#x27;,
+      requestedModel: &#x27;omp/standard&#x27;,
+      responseModel: null,
+      durationMs: 3400,
+      context: {
+        version: &#x27;ctx-engineering-manual-v2&#x27;,
+        capturedAt: &#x27;周一 11:17:44&#x27;,
+        sources: [
+          { name: &#x27;手动摆放交互说明&#x27;, version: &#x27;manual-interaction-v2&#x27;, scope: &#x27;manual&#x27; },
+          { name: &#x27;工程部门当前成果&#x27;, version: &#x27;baseline-v0.3&#x27;, scope: &#x27;项目级&#x27; }
+        ],
+        omitted: &#x27;请求在发出终态前被取消，未产生有效响应。&#x27;,
+        body: &#x27;请求准备阶段已装配手动摆放交互材料，用户取消后不继续执行。&#x27;
+      },
+      providerConfig: {
+        version: &#x27;provider-engineering-v2&#x27;,
+        name: &#x27;示例 Provider&#x27;,
+        protocol: &#x27;responses&#x27;,
+        endpoint: &#x27;示例端点&#x27;,
+        temperature: 0.1,
+        maxOutputTokens: 2400
+      },
+      prompt: {
+        version: &#x27;prompt-engineering-v1.7&#x27;,
+        name: &#x27;工程部门执行规则&#x27;,
+        status: &#x27;历史版本&#x27;,
+        body: &#x27;你是工程部。根据交互说明完成实现与自检；若项目输入被取消，保留准备记录并停止后续动作。&#x27;
+      },
+      usage: {
+        reported: false,
+        inputTotal: null,
+        cacheRead: null,
+        output: null,
+        total: null,
+        reasoning: null,
+        fee: null,
+        feeCurrency: null
+      },
+      requestRaw: {
+        kind: &#x27;model_request_prepared&#x27;,
+        request_id: &#x27;req-eng-2&#x27;,
+        attempt: 1,
+        provider: &#x27;示例 Provider&#x27;,
+        model: &#x27;omp/standard&#x27;,
+        input: [
+          { role: &#x27;system&#x27;, content: &#x27;工程部门执行规则 · prompt-engineering-v1.7&#x27; },
+          { role: &#x27;user&#x27;, content: &#x27;优化手动摆放的选中、移动与删除交互。&#x27; }
+        ],
+        tools: [&#x27;read_source&#x27;],
+        max_output_tokens: 2400,
+        context_version: &#x27;ctx-engineering-manual-v2&#x27;,
+        dispatch: &#x27;cancelled_before_provider_response&#x27;
+      },
+      responseRaw: {
+        kind: &#x27;provider_response&#x27;,
+        request_id: &#x27;req-eng-2&#x27;,
+        status: &#x27;not_received&#x27;,
+        model: null,
+        output: [],
+        usage: null
+      },
+      events: [
+        { time: &#x27;周一 11:17:44&#x27;, kind: &#x27;request_prepared&#x27;, label: &#x27;准备完成&#x27;, tone: &#x27;neutral&#x27;, detail: &#x27;已记录实际 Provider、模型和输入版本。&#x27;, raw: { type: &#x27;request.prepared&#x27;, request_id: &#x27;req-eng-2&#x27;, provider: &#x27;示例 Provider&#x27;, model: &#x27;omp/standard&#x27; } },
+        { time: &#x27;周一 11:17:47&#x27;, kind: &#x27;request_cancelled&#x27;, label: &#x27;已取消&#x27;, tone: &#x27;waiting&#x27;, detail: &#x27;用户取消；未收到 Provider 终态，usage 保持未上报。&#x27;, raw: { type: &#x27;request.cancelled&#x27;, request_id: &#x27;req-eng-2&#x27;, provider_response: &#x27;not_received&#x27;, usage: &#x27;not_reported&#x27; } }
+      ]
+    }
+  ];
+
+  const DATA = { cargo: cargoRequests, lab: [], &#x27;archive-demo&#x27;: [] };
+
+  const CSS = `
+#yudao-project-prototype .yo-page{color:var(--yp-text);min-width:0}
+#yudao-project-prototype .yo-page *{box-sizing:border-box}
+#yudao-project-prototype .yo-header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-top:24px}
+#yudao-project-prototype .yo-header h1{font-size:25px;font-weight:500;line-height:1.35;margin:0}
+#yudao-project-prototype .yo-eyebrow{font-size:11px;letter-spacing:1.2px;color:var(--yp-muted);margin-bottom:6px}
+#yudao-project-prototype .yo-subtitle{font-size:13px;color:var(--yp-muted);margin-top:7px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#yudao-project-prototype .yo-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--yp-line);background:var(--yp-surface);color:var(--yp-text);border-radius:6px;padding:7px 11px;min-height:34px;font-size:12px;white-space:nowrap}
+#yudao-project-prototype .yo-btn:hover{background:var(--yp-soft);border-color:var(--yp-green)}
+#yudao-project-prototype .yo-btn.quiet{background:transparent}
+#yudao-project-prototype .yo-scope{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:11px 13px;margin-top:20px;font-size:12px}
+#yudao-project-prototype .yo-scope strong{font-weight:500}
+#yudao-project-prototype .yo-scope span{color:var(--yp-muted)}
+#yudao-project-prototype .yo-dot{width:7px;height:7px;border-radius:50%;background:var(--yp-green);display:inline-block;flex:0 0 auto}
+#yudao-project-prototype .yo-tabs{display:flex;gap:22px;border-bottom:1px solid var(--yp-line);margin-top:23px}
+#yudao-project-prototype .yo-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--yp-muted);font-size:12px;padding:10px 0;min-height:36px}
+#yudao-project-prototype .yo-tab:hover{color:var(--yp-text)}
+#yudao-project-prototype .yo-tab.is-active{color:var(--yp-green);border-bottom-color:var(--yp-green)}
+#yudao-project-prototype .yo-filters{display:grid;grid-template-columns:150px 190px 150px minmax(180px,1fr);gap:10px;margin-top:18px}
+#yudao-project-prototype .yo-filter{display:grid;gap:5px;min-width:0;font-size:11px;color:var(--yp-muted)}
+#yudao-project-prototype .yo-filter select,#yudao-project-prototype .yo-filter input{width:100%;min-width:0;border:1px solid var(--yp-line);border-radius:6px;background:var(--yp-surface);color:var(--yp-text);padding:8px 9px;font-size:12px;outline:none}
+#yudao-project-prototype .yo-filter select:focus,#yudao-project-prototype .yo-filter input:focus{border-color:var(--yp-green)}
+#yudao-project-prototype .yo-results{margin-top:25px}
+#yudao-project-prototype .yo-results-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:11px}
+#yudao-project-prototype .yo-results-head h2{font-size:16px;font-weight:500;margin:0}
+#yudao-project-prototype .yo-results-head p{font-size:11px;color:var(--yp-muted);margin:3px 0 0}
+#yudao-project-prototype .yo-request-list{border-top:1px solid var(--yp-line)}
+#yudao-project-prototype .yo-request-row{display:grid;grid-template-columns:minmax(170px,1.15fr) minmax(160px,1fr) minmax(155px,.9fr) minmax(120px,.7fr);gap:12px;align-items:start;width:100%;text-align:left;border:0;border-bottom:1px solid var(--yp-line);background:transparent;color:var(--yp-text);padding:14px 3px}
+#yudao-project-prototype .yo-request-row:hover,#yudao-project-prototype .yo-request-row:focus{background:var(--yp-soft);outline:none}
+#yudao-project-prototype .yo-request-main,#yudao-project-prototype .yo-request-meta,#yudao-project-prototype .yo-request-versions,#yudao-project-prototype .yo-request-usage{display:grid;gap:3px;min-width:0}
+#yudao-project-prototype .yo-request-main strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-request-main span,#yudao-project-prototype .yo-request-meta span,#yudao-project-prototype .yo-request-versions span,#yudao-project-prototype .yo-request-usage span{font-size:11px;color:var(--yp-muted);overflow-wrap:anywhere}
+#yudao-project-prototype .yo-row-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#yudao-project-prototype .yo-status{display:inline-flex;align-items:center;width:max-content;border-radius:4px;padding:2px 6px;font-size:10px;color:var(--yp-muted);background:var(--yp-soft);white-space:nowrap}
+#yudao-project-prototype .yo-status.success{color:var(--yp-green);background:var(--yp-tint)}
+#yudao-project-prototype .yo-status.failed{color:var(--yp-red);background:color-mix(in srgb,var(--yp-red) 12%,transparent)}
+#yudao-project-prototype .yo-status.running{color:var(--yp-amber);background:var(--yp-amber-bg)}
+#yudao-project-prototype .yo-status.cancelled{color:var(--yp-muted);background:var(--yp-soft)}
+#yudao-project-prototype .yo-empty{border:1px dashed var(--yp-line);border-radius:7px;padding:30px 18px;text-align:center;color:var(--yp-muted);font-size:12px}
+#yudao-project-prototype .yo-empty strong{display:block;color:var(--yp-text);font-weight:500;font-size:13px;margin-bottom:5px}
+#yudao-project-prototype .yo-usage-note{border-left:3px solid var(--yp-amber);border-radius:0 6px 6px 0;background:var(--yp-amber-bg);padding:11px 13px;color:var(--yp-muted);font-size:11px;margin-bottom:15px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-usage-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;margin-bottom:23px}
+#yudao-project-prototype .yo-metric{padding:14px 13px;border-right:1px solid var(--yp-line);min-width:0}
+#yudao-project-prototype .yo-metric:last-child{border-right:0}
+#yudao-project-prototype .yo-metric span{display:block;color:var(--yp-muted);font-size:11px;margin-bottom:4px}
+#yudao-project-prototype .yo-metric strong{display:block;font-size:16px;font-weight:500;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-metric small{display:block;color:var(--yp-muted);font-size:10px;margin-top:3px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-usage-group{margin-top:22px}
+#yudao-project-prototype .yo-usage-group h3{font-size:13px;font-weight:500;margin:0 0 8px}
+#yudao-project-prototype .yo-usage-table{border-top:1px solid var(--yp-line)}
+#yudao-project-prototype .yo-usage-line{display:grid;grid-template-columns:minmax(130px,1.4fr) repeat(4,minmax(85px,1fr));gap:10px;align-items:center;border-bottom:1px solid var(--yp-line);padding:10px 3px;font-size:11px}
+#yudao-project-prototype .yo-usage-line span{color:var(--yp-muted);overflow-wrap:anywhere}
+#yudao-project-prototype .yo-usage-line strong{font-weight:500;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-detail-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:24px}
+#yudao-project-prototype .yo-detail-title{margin-top:20px}
+#yudao-project-prototype .yo-detail-title h1{font-size:24px;font-weight:500;margin:0}
+#yudao-project-prototype .yo-detail-title p{font-size:12px;color:var(--yp-muted);margin-top:6px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-crumbs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:15px;color:var(--yp-muted);font-size:11px}
+#yudao-project-prototype .yo-crumbs strong{font-weight:500;color:var(--yp-text);overflow-wrap:anywhere}
+#yudao-project-prototype .yo-attempt-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:9px 11px;margin-top:16px}
+#yudao-project-prototype .yo-attempt-label{font-size:11px;color:var(--yp-muted);margin-right:4px}
+#yudao-project-prototype .yo-attempt{border:1px solid var(--yp-line);border-radius:5px;background:transparent;color:var(--yp-muted);padding:5px 8px;font-size:11px}
+#yudao-project-prototype .yo-attempt:hover{border-color:var(--yp-green);color:var(--yp-text)}
+#yudao-project-prototype .yo-attempt.is-active{border-color:var(--yp-green);background:var(--yp-tint);color:var(--yp-green)}
+#yudao-project-prototype .yo-attempt.failed{border-color:color-mix(in srgb,var(--yp-red) 45%,var(--yp-line));color:var(--yp-red)}
+#yudao-project-prototype .yo-detail-tabs{display:flex;gap:20px;border-bottom:1px solid var(--yp-line);margin-top:22px}
+#yudao-project-prototype .yo-detail-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--yp-muted);font-size:12px;padding:9px 0;min-height:35px}
+#yudao-project-prototype .yo-detail-tab:hover{color:var(--yp-text)}
+#yudao-project-prototype .yo-detail-tab.is-active{color:var(--yp-green);border-bottom-color:var(--yp-green)}
+#yudao-project-prototype .yo-detail-panel{margin-top:18px}
+#yudao-project-prototype .yo-overview-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(230px,.75fr);gap:17px}
+#yudao-project-prototype .yo-panel{border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:14px;min-width:0}
+#yudao-project-prototype .yo-panel h2,#yudao-project-prototype .yo-panel h3{font-size:13px;font-weight:500;margin:0}
+#yudao-project-prototype .yo-panel p{font-size:12px;color:var(--yp-muted);margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-facts{display:grid;margin-top:10px}
+#yudao-project-prototype .yo-fact{display:grid;grid-template-columns:106px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--yp-line);font-size:11px;align-items:start}
+#yudao-project-prototype .yo-fact:last-child{border-bottom:0}
+#yudao-project-prototype .yo-fact span{color:var(--yp-muted)}
+#yudao-project-prototype .yo-fact strong{font-weight:500;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-fact small{display:block;color:var(--yp-muted);margin-top:3px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-source-list{display:grid;gap:7px;margin-top:10px}
+#yudao-project-prototype .yo-source{border:1px solid var(--yp-line);border-radius:5px;padding:8px;font-size:11px}
+#yudao-project-prototype .yo-source strong{font-weight:500;display:block;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-source span{display:block;color:var(--yp-muted);margin-top:3px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-json-wrap{border:1px solid var(--yp-line);border-radius:7px;overflow:hidden;background:var(--yp-surface)}
+#yudao-project-prototype .yo-json-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid var(--yp-line)}
+#yudao-project-prototype .yo-json-head strong{font-size:13px;font-weight:500}
+#yudao-project-prototype .yo-json-head span{font-size:11px;color:var(--yp-muted);overflow-wrap:anywhere}
+#yudao-project-prototype .yo-json{display:block;margin:0;padding:14px;font:11px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:520px;overflow:auto;color:var(--yp-text)}
+#yudao-project-prototype .yo-event-list{display:grid;border-top:1px solid var(--yp-line)}
+#yudao-project-prototype .yo-event{border-bottom:1px solid var(--yp-line);padding:12px 0}
+#yudao-project-prototype .yo-event:last-child{border-bottom:0}
+#yudao-project-prototype .yo-event summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:100px 150px minmax(0,1fr) auto;gap:10px;align-items:start;padding:0 3px}
+#yudao-project-prototype .yo-event summary::-webkit-details-marker{display:none}
+#yudao-project-prototype .yo-event time,#yudao-project-prototype .yo-event-kind,#yudao-project-prototype .yo-event-detail,#yudao-project-prototype .yo-event-action{font-size:11px;overflow-wrap:anywhere}
+#yudao-project-prototype .yo-event time,#yudao-project-prototype .yo-event-detail,#yudao-project-prototype .yo-event-action{color:var(--yp-muted)}
+#yudao-project-prototype .yo-event-kind{color:var(--yp-text)}
+#yudao-project-prototype .yo-event-kind.success{color:var(--yp-green)}
+#yudao-project-prototype .yo-event-kind.error{color:var(--yp-red)}
+#yudao-project-prototype .yo-event-kind.waiting{color:var(--yp-amber)}
+#yudao-project-prototype .yo-event-raw{margin-top:10px;border-top:1px solid var(--yp-line);background:var(--yp-soft);max-height:320px}
+#yudao-project-prototype .yo-footer-note{font-size:11px;color:var(--yp-muted);margin-top:14px;overflow-wrap:anywhere}
+@media(max-width:900px){#yudao-project-prototype .yo-filters{grid-template-columns:1fr 1fr}#yudao-project-prototype .yo-filter:last-child{grid-column:1/-1}#yudao-project-prototype .yo-request-row{grid-template-columns:1fr 1fr}#yudao-project-prototype .yo-request-usage{justify-self:start}#yudao-project-prototype .yo-usage-summary{grid-template-columns:repeat(3,minmax(0,1fr))}#yudao-project-prototype .yo-metric:nth-child(3){border-right:0}#yudao-project-prototype .yo-metric:nth-child(n+4){border-top:1px solid var(--yp-line)}#yudao-project-prototype .yo-overview-grid{grid-template-columns:1fr}}
+@media(max-width:560px){#yudao-project-prototype .yo-header{display:block}#yudao-project-prototype .yo-header-actions{justify-content:flex-start;margin-top:13px}#yudao-project-prototype .yo-filters{grid-template-columns:1fr}#yudao-project-prototype .yo-filter:last-child{grid-column:auto}#yudao-project-prototype .yo-request-row{grid-template-columns:1fr;gap:9px;padding:13px 2px}#yudao-project-prototype .yo-request-usage{justify-self:stretch}#yudao-project-prototype .yo-usage-summary{grid-template-columns:1fr 1fr}#yudao-project-prototype .yo-metric{border-right:0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yo-metric:nth-child(n+3){border-top:0}#yudao-project-prototype .yo-metric:last-child{border-bottom:0}#yudao-project-prototype .yo-usage-line{grid-template-columns:1fr 1fr;gap:6px}#yudao-project-prototype .yo-usage-line strong:first-of-type{grid-column:1/-1}#yudao-project-prototype .yo-event summary{grid-template-columns:1fr;gap:3px}#yudao-project-prototype .yo-attempt-bar{align-items:flex-start}#yudao-project-prototype .yo-attempt-label{width:100%}#yudao-project-prototype .yo-fact{grid-template-columns:1fr;gap:2px}}
+@media(max-width:320px){#yudao-project-prototype .yo-header h1{font-size:21px}#yudao-project-prototype .yo-detail-title h1{font-size:21px}#yudao-project-prototype .yo-scope{align-items:flex-start;flex-direction:column}#yudao-project-prototype .yo-json{font-size:10px;padding:10px}}
+`;
+
+  function fallbackEsc(value) {
+    return String(value == null ? &#x27;&#x27; : value).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g, function (char) {
+      return ({ &#x27;&amp;&#x27;: &#x27;&amp;amp;&#x27;, &#x27;&lt;&#x27;: &#x27;&amp;lt;&#x27;, &#x27;&gt;&#x27;: &#x27;&amp;gt;&#x27;, &#x27;&quot;&#x27;: &#x27;&amp;quot;&#x27;, &quot;&#x27;&quot;: &#x27;&amp;#39;&#x27; })[char];
+    });
+  }
+
+  function create(options) {
+    options = options || {};
+    const root = options.root;
+    const esc = options.esc || fallbackEsc;
+    const icon = options.icon || function (name) { return &#x27;&lt;span aria-hidden=&quot;true&quot;&gt;&#x27; + name + &#x27;&lt;/span&gt;&#x27;; };
+    const getProjectId = options.getProjectId || function () { return &#x27;cargo&#x27;; };
+    const onBackToDepartment = options.onBackToDepartment || function () {};
+    const notify = options.notify || function () {};
+    let projectId = getProjectId() || &#x27;cargo&#x27;;
+    let mounted = false;
+    const state = {
+      tab: &#x27;requests&#x27;,
+      screen: &#x27;list&#x27;,
+      detailTab: &#x27;overview&#x27;,
+      selectedId: null,
+      returnContext: null,
+      filters: { department: &#x27;all&#x27;, workItem: &#x27;all&#x27;, status: &#x27;all&#x27;, search: &#x27;&#x27; }
+    };
+
+    function allRequests() {
+      return (DATA[projectId] || []).slice();
+    }
+
+    function requestById(id) {
+      const items = allRequests();
+      return items.find(function (item) { return item.id === id; }) ||
+        items.find(function (item) { return item.requestId === id; }) || null;
+    }
+
+    function attemptsFor(request) {
+      if (!request) return [];
+      return allRequests().filter(function (item) { return item.callId === request.callId; })
+        .sort(function (a, b) { return a.attempt - b.attempt; });
+    }
+
+    function selectedRequest() {
+      return requestById(state.selectedId);
+    }
+
+    function filteredRequests() {
+      const filters = state.filters;
+      const query = String(filters.search || &#x27;&#x27;).trim().toLowerCase();
+      return allRequests().filter(function (item) {
+        if (filters.department !== &#x27;all&#x27; &amp;&amp; item.department !== filters.department) return false;
+        if (filters.workItem !== &#x27;all&#x27; &amp;&amp; item.workItemId !== filters.workItem) return false;
+        if (filters.status !== &#x27;all&#x27; &amp;&amp; item.status !== filters.status) return false;
+        if (!query) return true;
+        const haystack = [item.id, item.requestId, item.callId, item.model, item.provider, item.workItemTitle, item.workItemType, item.departmentLabel || DEPARTMENTS[item.department]].join(&#x27; &#x27;).toLowerCase();
+        return haystack.indexOf(query) &gt;= 0;
+      });
+    }
+
+    function formatNumber(value) {
+      if (value == null) return &#x27;未上报&#x27;;
+      return Number(value).toLocaleString(&#x27;en-US&#x27;);
+    }
+
+    function formatDuration(value) {
+      if (value == null) return &#x27;未测量&#x27;;
+      if (value &lt; 1000) return value + &#x27; ms&#x27;;
+      return (value / 1000).toFixed(value % 1000 ? 1 : 0) + &#x27; s&#x27;;
+    }
+
+    function json(value) {
+      return esc(JSON.stringify(value, null, 2));
+    }
+
+    function statusTag(status) {
+      return &#x27;&lt;span class=&quot;yo-status &#x27; + esc(status) + &#x27;&quot;&gt;&#x27; + esc(STATUS[status] || status) + &#x27;&lt;/span&gt;&#x27;;
+    }
+
+    function usageSummary(items) {
+      const reported = items.filter(function (item) { return item.usage &amp;&amp; item.usage.reported; });
+      const sum = function (key) {
+        const known = reported.map(function (item) { return item.usage[key]; }).filter(function (value) { return value != null; });
+        return known.length ? known.reduce(function (total, value) { return total + Number(value); }, 0) : null;
+      };
+      return { reported: reported.length, total: items.length, input: sum(&#x27;inputTotal&#x27;), cache: sum(&#x27;cacheRead&#x27;), output: sum(&#x27;output&#x27;), all: sum(&#x27;total&#x27;) };
+    }
+
+    function filterMarkup() {
+      const filters = state.filters;
+      const items = [];
+      const seen = {};
+      allRequests().forEach(function (request) {
+        if (!seen[request.workItemId]) {
+          seen[request.workItemId] = true;
+          items.push(request);
+        }
+      });
+      return &#x27;&lt;div class=&quot;yo-filters&quot; aria-label=&quot;观测筛选&quot;&gt;&#x27; +
+        &#x27;&lt;label class=&quot;yo-filter&quot;&gt;&lt;span&gt;部门&lt;/span&gt;&lt;select data-ob-department aria-label=&quot;按部门筛选&quot;&gt;&lt;option value=&quot;all&quot; &#x27; + (filters.department === &#x27;all&#x27; ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;全部部门&lt;/option&gt;&#x27; +
+        Object.keys(DEPARTMENTS).map(function (key) { return &#x27;&lt;option value=&quot;&#x27; + key + &#x27;&quot; &#x27; + (filters.department === key ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;&#x27; + DEPARTMENTS[key] + &#x27;部&lt;/option&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/select&gt;&lt;/label&gt;&#x27; +
+        &#x27;&lt;label class=&quot;yo-filter&quot;&gt;&lt;span&gt;事项&lt;/span&gt;&lt;select data-ob-work-item aria-label=&quot;按项目事项筛选&quot;&gt;&lt;option value=&quot;all&quot; &#x27; + (filters.workItem === &#x27;all&#x27; ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;全部事项&lt;/option&gt;&#x27; +
+        items.map(function (item) { return &#x27;&lt;option value=&quot;&#x27; + esc(item.workItemId) + &#x27;&quot; &#x27; + (filters.workItem === item.workItemId ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;&#x27; + esc(item.workItemTitle) + &#x27;&lt;/option&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/select&gt;&lt;/label&gt;&#x27; +
+        &#x27;&lt;label class=&quot;yo-filter&quot;&gt;&lt;span&gt;状态&lt;/span&gt;&lt;select data-ob-status aria-label=&quot;按请求状态筛选&quot;&gt;&lt;option value=&quot;all&quot; &#x27; + (filters.status === &#x27;all&#x27; ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;全部状态&lt;/option&gt;&#x27; +
+        Object.keys(STATUS).map(function (key) { return &#x27;&lt;option value=&quot;&#x27; + key + &#x27;&quot; &#x27; + (filters.status === key ? &#x27;selected&#x27; : &#x27;&#x27;) + &#x27;&gt;&#x27; + STATUS[key] + &#x27;&lt;/option&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/select&gt;&lt;/label&gt;&#x27; +
+        &#x27;&lt;label class=&quot;yo-filter&quot;&gt;&lt;span&gt;搜索&lt;/span&gt;&lt;input data-ob-search type=&quot;search&quot; value=&quot;&#x27; + esc(filters.search) + &#x27;&quot; placeholder=&quot;请求 ID、模型、事项或调用&quot; aria-label=&quot;搜索请求&quot;&gt;&lt;/label&gt;&#x27; +
+        &#x27;&lt;/div&gt;&#x27;;
+    }
+
+    function requestRow(item) {
+      const usage = item.usage &amp;&amp; item.usage.reported ? &#x27;输入 &#x27; + formatNumber(item.usage.inputTotal) + &#x27; · 输出 &#x27; + formatNumber(item.usage.output) : &#x27;usage 未上报&#x27;;
+      return &#x27;&lt;button class=&quot;yo-request-row&quot; type=&quot;button&quot; data-ob-request=&quot;&#x27; + esc(item.id) + &#x27;&quot; aria-label=&quot;查看请求 &#x27; + esc(item.id) + &#x27;&quot;&gt;&#x27; +
+        &#x27;&lt;span class=&quot;yo-request-main&quot;&gt;&lt;span class=&quot;yo-row-title&quot;&gt;&lt;strong&gt;&#x27; + esc(item.id) + &#x27;&lt;/strong&gt;&#x27; + statusTag(item.status) + &#x27;&lt;/span&gt;&lt;span&gt;&#x27; + esc(DEPARTMENTS[item.department]) + &#x27; · &#x27; + esc(item.workItemTitle) + &#x27;&lt;/span&gt;&lt;span&gt;逻辑调用 &#x27; + esc(item.callId) + &#x27; · 第 &#x27; + item.attempt + &#x27;/&#x27; + item.totalAttempts + &#x27; 次&lt;/span&gt;&lt;/span&gt;&#x27; +
+        &#x27;&lt;span class=&quot;yo-request-meta&quot;&gt;&lt;span&gt;&#x27; + esc(item.provider) + &#x27;&lt;/span&gt;&lt;strong&gt;&#x27; + esc(item.model) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + esc(item.time) + &#x27; · &#x27; + formatDuration(item.durationMs) + &#x27;&lt;/span&gt;&lt;/span&gt;&#x27; +
+        &#x27;&lt;span class=&quot;yo-request-versions&quot;&gt;&lt;span&gt;Context · &#x27; + esc(item.context.version) + &#x27;&lt;/span&gt;&lt;span&gt;Prompt · &#x27; + esc(item.prompt.version) + &#x27;&lt;/span&gt;&lt;span&gt;Provider · &#x27; + esc(item.providerConfig.version) + &#x27;&lt;/span&gt;&lt;/span&gt;&#x27; +
+        &#x27;&lt;span class=&quot;yo-request-usage&quot;&gt;&lt;span&gt;&#x27; + usage + &#x27;&lt;/span&gt;&lt;span&gt;总 Token · &#x27; + (item.usage &amp;&amp; item.usage.reported ? formatNumber(item.usage.total) : &#x27;未上报&#x27;) + &#x27;&lt;/span&gt;&lt;span&gt;费用 · 未上报&lt;/span&gt;&lt;/span&gt;&#x27; +
+        &#x27;&lt;/button&gt;&#x27;;
+    }
+
+    function listMarkup() {
+      const items = filteredRequests();
+      const all = allRequests();
+      const title = all.length ? &#x27;模型请求&#x27; : &#x27;模型请求&#x27;;
+      return &#x27;&lt;div class=&quot;yo-results&quot;&gt;&lt;div class=&quot;yo-results-head&quot;&gt;&lt;div&gt;&lt;h2&gt;&#x27; + title + &#x27;&lt;/h2&gt;&lt;p&gt;显示 &#x27; + items.length + &#x27; / &#x27; + all.length + &#x27; 次物理尝试 · 同一逻辑调用可切换失败与成功尝试&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;yo-status &#x27; + (items.some(function (item) { return item.status === &#x27;running&#x27;; }) ? &#x27;running&#x27; : &#x27;success&#x27;) + &#x27;&quot;&gt;&#x27; + (items.some(function (item) { return item.status === &#x27;running&#x27;; }) ? &#x27;有请求进行中&#x27; : &#x27;历史记录&#x27;) + &#x27;&lt;/span&gt;&lt;/div&gt;&#x27; +
+        (items.length ? &#x27;&lt;div class=&quot;yo-request-list&quot;&gt;&#x27; + items.map(requestRow).join(&#x27;&#x27;) + &#x27;&lt;/div&gt;&#x27; : &#x27;&lt;div class=&quot;yo-empty&quot;&gt;&lt;strong&gt;&#x27; + (all.length ? &#x27;没有符合筛选条件的请求&#x27; : &#x27;该项目暂时没有模型请求观测&#x27;) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + (all.length ? &#x27;可以清除筛选后查看全部尝试。&#x27; : &#x27;选择其他项目或等待项目产生执行记录。&#x27;) + &#x27;&lt;/span&gt;&lt;/div&gt;&#x27;) +
+        &#x27;&lt;p class=&quot;yo-footer-note&quot;&gt;请求范围属于当前项目。Request 是发送前实际请求，Response 是 Provider 返回对象；失败、取消和缺少终态均保留为观察证据。&lt;/p&gt;&lt;/div&gt;&#x27;;
+    }
+
+    function usageValue(value) {
+      return value == null ? &#x27;未上报&#x27; : formatNumber(value);
+    }
+
+    function groupUsage(items, keyFn) {
+      const groups = {};
+      items.forEach(function (item) {
+        const key = keyFn(item);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+      });
+      return groups;
+    }
+
+    function usageLines(title, groups) {
+      const keys = Object.keys(groups);
+      if (!keys.length) return &#x27;&#x27;;
+      return &#x27;&lt;section class=&quot;yo-usage-group&quot;&gt;&lt;h3&gt;&#x27; + esc(title) + &#x27;&lt;/h3&gt;&lt;div class=&quot;yo-usage-table&quot;&gt;&lt;div class=&quot;yo-usage-line&quot;&gt;&lt;span&gt;分组&lt;/span&gt;&lt;span&gt;输入（含缓存）&lt;/span&gt;&lt;span&gt;缓存读取（子集）&lt;/span&gt;&lt;span&gt;输出&lt;/span&gt;&lt;span&gt;总 Token&lt;/span&gt;&lt;/div&gt;&#x27; + keys.map(function (key) {
+        const summary = usageSummary(groups[key]);
+        return &#x27;&lt;div class=&quot;yo-usage-line&quot;&gt;&lt;strong&gt;&#x27; + esc(key) + &#x27;&lt;/strong&gt;&lt;strong&gt;&#x27; + usageValue(summary.input) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + usageValue(summary.cache) + &#x27;&lt;/span&gt;&lt;span&gt;&#x27; + usageValue(summary.output) + &#x27;&lt;/span&gt;&lt;span&gt;&#x27; + usageValue(summary.all) + &#x27;&lt;/span&gt;&lt;/div&gt;&#x27;;
+      }).join(&#x27;&#x27;) + &#x27;&lt;/div&gt;&lt;/section&gt;&#x27;;
+    }
+
+    function usageMarkup() {
+      const items = filteredRequests();
+      const summary = usageSummary(items);
+      const coverage = summary.total ? Math.round(summary.reported / summary.total * 100) : 0;
+      return &#x27;&lt;div class=&quot;yo-results&quot;&gt;&lt;div class=&quot;yo-results-head&quot;&gt;&lt;div&gt;&lt;h2&gt;用量统计&lt;/h2&gt;&lt;p&gt;与请求记录使用同一组筛选 · 覆盖率 &#x27; + coverage + &#x27;%&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;yo-status &#x27; + (summary.reported === summary.total &amp;&amp; summary.total ? &#x27;success&#x27; : &#x27;running&#x27;) + &#x27;&quot;&gt;&#x27; + summary.reported + &#x27;/&#x27; + summary.total + &#x27; 次已上报&lt;/span&gt;&lt;/div&gt;&#x27; +
+        &#x27;&lt;div class=&quot;yo-usage-note&quot;&gt;输入（含缓存）已经包含缓存读取，缓存读取是输入的子集，不再重复相加。缺失用量保持“未上报”，费用当前没有独立上报来源。&lt;/div&gt;&#x27; +
+        (items.length ? &#x27;&lt;div class=&quot;yo-usage-summary&quot;&gt;&lt;div class=&quot;yo-metric&quot;&gt;&lt;span&gt;尝试数&lt;/span&gt;&lt;strong&gt;&#x27; + items.length + &#x27;&lt;/strong&gt;&lt;small&gt;当前筛选&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;yo-metric&quot;&gt;&lt;span&gt;输入（含缓存）&lt;/span&gt;&lt;strong&gt;&#x27; + usageValue(summary.input) + &#x27;&lt;/strong&gt;&lt;small&gt;仅汇总已知值&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;yo-metric&quot;&gt;&lt;span&gt;缓存读取&lt;/span&gt;&lt;strong&gt;&#x27; + usageValue(summary.cache) + &#x27;&lt;/strong&gt;&lt;small&gt;输入子集&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;yo-metric&quot;&gt;&lt;span&gt;输出&lt;/span&gt;&lt;strong&gt;&#x27; + usageValue(summary.output) + &#x27;&lt;/strong&gt;&lt;small&gt;Provider usage&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;yo-metric&quot;&gt;&lt;span&gt;费用&lt;/span&gt;&lt;strong&gt;未上报&lt;/strong&gt;&lt;small&gt;没有估算值&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&#x27; + usageLines(&#x27;按部门&#x27;, groupUsage(items, function (item) { return DEPARTMENTS[item.department]; })) + usageLines(&#x27;按 Provider / 模型&#x27;, groupUsage(items, function (item) { return item.provider + &#x27; / &#x27; + item.model; })) : &#x27;&lt;div class=&quot;yo-empty&quot;&gt;&lt;strong&gt;没有可统计的请求&lt;/strong&gt;&lt;span&gt;当前筛选范围没有尝试记录，缺失不按零处理。&lt;/span&gt;&lt;/div&gt;&#x27;) + &#x27;&lt;/div&gt;&#x27;;
+    }
+
+    function overviewMarkup(item) {
+      const usage = item.usage || {};
+      const attempts = attemptsFor(item);
+      return &#x27;&lt;div class=&quot;yo-overview-grid&quot;&gt;&lt;div class=&quot;yo-panel&quot;&gt;&lt;h2&gt;请求概览&lt;/h2&gt;&lt;div class=&quot;yo-facts&quot;&gt;&lt;div class=&quot;yo-fact&quot;&gt;&lt;span&gt;请求状态&lt;/span&gt;&lt;div&gt;&lt;strong&gt;&#x27; + statusTag(item.status) + &#x27;&lt;/strong&gt;&lt;small&gt;&#x27; + esc(item.status === &#x27;failed&#x27; ? &#x27;失败输出只作观察证据，不进入有效部门历史。&#x27; : item.status === &#x27;cancelled&#x27; ? &#x27;已取消；迟到结果不会恢复已取消流程。&#x27; : item.status === &#x27;running&#x27; ? &#x27;请求进行中，Response 可能尚未取得。&#x27; : &#x27;Provider 返回终态，是否推动部门流程仍由控制层确认。&#x27;) + &#x27;&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yo-fact&quot;&gt;&lt;span&gt;实际模型&lt;/span&gt;&lt;div&gt;&lt;strong&gt;&#x27; + esc(item.responseModel || &#x27;未知（无终态）&#x27;) + &#x27;&lt;/strong&gt;&lt;small&gt;请求配置：&#x27; + esc(item.requestedModel) + &#x27;&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yo-fact&quot;&gt;&lt;span&gt;耗时&lt;/span&gt;&lt;strong&gt;&#x27; + formatDuration(item.durationMs) + &#x27;&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;yo-fact&quot;&gt;&lt;span&gt;usage&lt;/span&gt;&lt;div&gt;&lt;strong&gt;&#x27; + (usage.reported ? &#x27;已上报&#x27; : &#x27;未上报&#x27;) + &#x27;&lt;/strong&gt;&lt;small&gt;输入（含缓存） &#x27; + formatNumber(usage.inputTotal) + &#x27; · 输出 &#x27; + formatNumber(usage.output) + &#x27; · 总量 &#x27; + formatNumber(usage.total) + &#x27;&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yo-fact&quot;&gt;&lt;span&gt;同次调用&lt;/span&gt;&lt;div&gt;&lt;strong&gt;&#x27; + esc(item.callId) + &#x27;&lt;/strong&gt;&lt;small&gt;&#x27; + attempts.length + &#x27; 次物理尝试，可在上方切换。&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yo-panel&quot;&gt;&lt;h2&gt;本次输入版本&lt;/h2&gt;&lt;div class=&quot;yo-source-list&quot;&gt;&lt;div class=&quot;yo-source&quot;&gt;&lt;strong&gt;Context · &#x27; + esc(item.context.version) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + item.context.sources.length + &#x27; 个来源 · 截止 &#x27; + esc(item.context.capturedAt) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yo-source&quot;&gt;&lt;strong&gt;Provider · &#x27; + esc(item.providerConfig.version) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + esc(item.providerConfig.name) + &#x27; · &#x27; + esc(item.providerConfig.protocol) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yo-source&quot;&gt;&lt;strong&gt;Prompt · &#x27; + esc(item.prompt.version) + &#x27;&lt;/strong&gt;&lt;span&gt;&#x27; + esc(item.prompt.name) + &#x27; · &#x27; + esc(item.prompt.status) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;p&gt;版本是本次实际采用的输入关联，不代表项目当前默认值。&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;section class=&quot;yo-panel&quot; style=&quot;margin-top:17px&quot;&gt;&lt;h2&gt;事件摘要&lt;/h2&gt;&lt;p&gt;&#x27; + esc(item.events.map(function (event) { return event.label; }).join(&#x27; · &#x27;)) + &#x27;&lt;/p&gt;&lt;p class=&quot;yo-footer-note&quot;&gt;切换到 Request、Response 或事件页签查看原始 JSON。&lt;/p&gt;&lt;/section&gt;&#x27;;
+    }
+
+    function requestMarkup(item) {
+      return &#x27;&lt;div class=&quot;yo-json-wrap&quot;&gt;&lt;div class=&quot;yo-json-head&quot;&gt;&lt;strong&gt;Request JSON · 发送前实际请求&lt;/strong&gt;&lt;span&gt;&#x27; + esc(item.provider) + &#x27; · requested model &#x27; + esc(item.requestedModel) + &#x27; · Context &#x27; + esc(item.context.version) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;pre class=&quot;yo-json&quot;&gt;&#x27; + json(item.requestRaw) + &#x27;&lt;/pre&gt;&lt;/div&gt;&lt;p class=&quot;yo-footer-note&quot;&gt;这里展示发送前记录的模型、工具、输出限制和输入内容；Context 工件另行列出来源，不冒充完整 SDK 请求。&lt;/p&gt;&#x27;;
+    }
+
+    function responseMarkup(item) {
+      return &#x27;&lt;div class=&quot;yo-json-wrap&quot;&gt;&lt;div class=&quot;yo-json-head&quot;&gt;&lt;strong&gt;Response JSON · Provider 原始响应&lt;/strong&gt;&lt;span&gt;&#x27; + esc(item.responseModel || &#x27;returned model 未知&#x27;) + &#x27; · &#x27; + esc(STATUS[item.status] || item.status) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;pre class=&quot;yo-json&quot;&gt;&#x27; + json(item.responseRaw) + &#x27;&lt;/pre&gt;&lt;/div&gt;&lt;p class=&quot;yo-footer-note&quot;&gt;响应缺失、部分输出和 usage 缺失保持原状，不从输出片段拼造完整 Response。&lt;/p&gt;&#x27;;
+    }
+
+    function eventsMarkup(item) {
+      return &#x27;&lt;div class=&quot;yo-event-list&quot;&gt;&#x27; + item.events.map(function (event) {
+        return &#x27;&lt;details class=&quot;yo-event&quot;&gt;&lt;summary&gt;&lt;time&gt;&#x27; + esc(event.time) + &#x27;&lt;/time&gt;&lt;span class=&quot;yo-event-kind &#x27; + esc(event.tone || &#x27;neutral&#x27;) + &#x27;&quot;&gt;&#x27; + esc(event.label) + &#x27;&lt;/span&gt;&lt;span class=&quot;yo-event-detail&quot;&gt;&#x27; + esc(event.detail) + &#x27;&lt;/span&gt;&lt;span class=&quot;yo-event-action&quot;&gt;查看原文&lt;/span&gt;&lt;/summary&gt;&lt;pre class=&quot;yo-json yo-event-raw&quot;&gt;&#x27; + json({ request_id: item.requestId, attempt: item.attempt, event: event.raw }) + &#x27;&lt;/pre&gt;&lt;/details&gt;&#x27;;
+      }).join(&#x27;&#x27;) + &#x27;&lt;/div&gt;&#x27;;
+    }
+
+    function detailMarkup() {
+      const item = selectedRequest();
+      if (!item) {
+        state.screen = &#x27;list&#x27;;
+        return listShellMarkup();
+      }
+      const attempts = attemptsFor(item);
+      const returnLabel = state.returnContext &amp;&amp; state.returnContext.department ? &#x27;返回&#x27; + (DEPARTMENTS[state.returnContext.department] || &#x27;部门&#x27;) + &#x27;工作区&#x27; : &#x27;&#x27;;
+      let panel = overviewMarkup(item);
+      if (state.detailTab === &#x27;request&#x27;) panel = requestMarkup(item);
+      if (state.detailTab === &#x27;response&#x27;) panel = responseMarkup(item);
+      if (state.detailTab === &#x27;events&#x27;) panel = eventsMarkup(item);
+      return &#x27;&lt;div class=&quot;yo-detail-top&quot;&gt;&lt;button class=&quot;yo-btn quiet&quot; type=&quot;button&quot; data-ob-back-list&gt;&#x27; + icon(&#x27;arrow-left&#x27;) + &#x27;返回请求记录&lt;/button&gt;&lt;div class=&quot;yo-header-actions&quot;&gt;&#x27; + (returnLabel ? &#x27;&lt;button class=&quot;yo-btn quiet&quot; type=&quot;button&quot; data-ob-back-department&gt;&#x27; + icon(&#x27;corner-up-left&#x27;) + esc(returnLabel) + &#x27;&lt;/button&gt;&#x27; : &#x27;&#x27;) + &#x27;&lt;/div&gt;&lt;/div&gt;&lt;header class=&quot;yo-detail-title&quot;&gt;&lt;div class=&quot;yo-eyebrow&quot;&gt;&#x27; + esc(PROJECT_NAMES[projectId] || projectId) + &#x27; · &#x27; + esc(DEPARTMENTS[item.department]) + &#x27;&lt;/div&gt;&lt;h1&gt;模型请求详情&lt;/h1&gt;&lt;p&gt;&#x27; + esc(item.id) + &#x27; · &#x27; + esc(item.workItemTitle) + &#x27; · &#x27; + statusTag(item.status) + &#x27;&lt;/p&gt;&lt;/header&gt;&lt;div class=&quot;yo-crumbs&quot;&gt;&lt;span&gt;项目&lt;/span&gt;&lt;strong&gt;&#x27; + esc(PROJECT_NAMES[projectId] || projectId) + &#x27;&lt;/strong&gt;&lt;span&gt;›&lt;/span&gt;&lt;span&gt;部门&lt;/span&gt;&lt;strong&gt;&#x27; + esc(DEPARTMENTS[item.department]) + &#x27;&lt;/strong&gt;&lt;span&gt;›&lt;/span&gt;&lt;span&gt;事项&lt;/span&gt;&lt;strong&gt;&#x27; + esc(item.workItemTitle) + &#x27;&lt;/strong&gt;&lt;span&gt;›&lt;/span&gt;&lt;span&gt;调用&lt;/span&gt;&lt;strong&gt;&#x27; + esc(item.callId) + &#x27;&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;yo-attempt-bar&quot;&gt;&lt;span class=&quot;yo-attempt-label&quot;&gt;同一逻辑调用 · &#x27; + esc(item.callId) + &#x27;&lt;/span&gt;&#x27; + attempts.map(function (attempt) { return &#x27;&lt;button class=&quot;yo-attempt &#x27; + (attempt.status === &#x27;failed&#x27; ? &#x27;failed&#x27; : &#x27;&#x27;) + &#x27; &#x27; + (attempt.id === item.id ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-attempt=&quot;&#x27; + esc(attempt.id) + &#x27;&quot;&gt;第 &#x27; + attempt.attempt + &#x27; 次 · &#x27; + esc(STATUS[attempt.status]) + &#x27;&lt;/button&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/div&gt;&lt;nav class=&quot;yo-detail-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;请求详情页签&quot;&gt;&lt;button class=&quot;yo-detail-tab &#x27; + (state.detailTab === &#x27;overview&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;overview&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.detailTab === &#x27;overview&#x27;) + &#x27;&quot;&gt;概览&lt;/button&gt;&lt;button class=&quot;yo-detail-tab &#x27; + (state.detailTab === &#x27;request&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;request&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.detailTab === &#x27;request&#x27;) + &#x27;&quot;&gt;Request&lt;/button&gt;&lt;button class=&quot;yo-detail-tab &#x27; + (state.detailTab === &#x27;response&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;response&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.detailTab === &#x27;response&#x27;) + &#x27;&quot;&gt;Response&lt;/button&gt;&lt;button class=&quot;yo-detail-tab &#x27; + (state.detailTab === &#x27;events&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-detail-tab=&quot;events&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.detailTab === &#x27;events&#x27;) + &#x27;&quot;&gt;事件&lt;/button&gt;&lt;/nav&gt;&lt;section class=&quot;yo-detail-panel&quot; role=&quot;tabpanel&quot;&gt;&#x27; + panel + &#x27;&lt;/section&gt;&#x27;;
+    }
+
+    function listShellMarkup() {
+      const items = filteredRequests();
+      return &#x27;&lt;header class=&quot;yo-header&quot;&gt;&lt;div&gt;&lt;div class=&quot;yo-eyebrow&quot;&gt;项目级观测 · &#x27; + esc(PROJECT_NAMES[projectId] || projectId) + &#x27;&lt;/div&gt;&lt;h1&gt;模型请求&lt;/h1&gt;&lt;p class=&quot;yo-subtitle&quot;&gt;查看三部门实际模型尝试、原始 Request / Response、事件和用量；观测独立于部门工作区。&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yo-header-actions&quot;&gt;&lt;span class=&quot;yo-status &#x27; + (items.some(function (item) { return item.status === &#x27;running&#x27;; }) ? &#x27;running&#x27; : &#x27;success&#x27;) + &#x27;&quot;&gt;&lt;span class=&quot;yo-dot&quot;&gt;&lt;/span&gt;&#x27; + (items.some(function (item) { return item.status === &#x27;running&#x27;; }) ? &#x27;1 个请求进行中&#x27; : &#x27;历史请求&#x27;) + &#x27;&lt;/span&gt;&lt;/div&gt;&lt;/header&gt;&lt;div class=&quot;yo-scope&quot;&gt;&lt;span class=&quot;yo-dot&quot;&gt;&lt;/span&gt;&lt;strong&gt;当前项目&lt;/strong&gt;&lt;span&gt;&#x27; + esc(PROJECT_NAMES[projectId] || projectId) + &#x27;&lt;/span&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;&#x27; + allRequests().length + &#x27; 次物理尝试&lt;/span&gt;&lt;span&gt;·&lt;/span&gt;&lt;span&gt;项目级入口&lt;/span&gt;&lt;/div&gt;&lt;nav class=&quot;yo-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;观测视图&quot;&gt;&lt;button class=&quot;yo-tab &#x27; + (state.tab === &#x27;requests&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-tab=&quot;requests&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.tab === &#x27;requests&#x27;) + &#x27;&quot;&gt;请求记录&lt;/button&gt;&lt;button class=&quot;yo-tab &#x27; + (state.tab === &#x27;usage&#x27; ? &#x27;is-active&#x27; : &#x27;&#x27;) + &#x27;&quot; type=&quot;button&quot; data-ob-tab=&quot;usage&quot; role=&quot;tab&quot; aria-selected=&quot;&#x27; + (state.tab === &#x27;usage&#x27;) + &#x27;&quot;&gt;用量统计&lt;/button&gt;&lt;/nav&gt;&#x27; + filterMarkup() + (state.tab === &#x27;requests&#x27; ? listMarkup() : usageMarkup());
+    }
+
+    function viewMarkup() {
+      return &#x27;&lt;section class=&quot;yo-page&quot; role=&quot;region&quot; aria-label=&quot;项目级模型请求观测&quot;&gt;&#x27; + (state.screen === &#x27;detail&#x27; ? detailMarkup() : listShellMarkup()) + &#x27;&lt;/section&gt;&#x27;;
+    }
+
+    function emitSnapshot(item) {
+      if (!root || !item || typeof root.dispatchEvent !== &#x27;function&#x27;) return;
+      root.dispatchEvent(new CustomEvent(&#x27;yudao-observation-snapshot&#x27;, { detail: snapshot(item.id) }));
+    }
+
+    function refresh() {
+      if (!root) return;
+      const host = root.querySelector(&#x27;.yp-ob-host&#x27;);
+      if (!host) return;
+      host.innerHTML = viewMarkup();
+      if (typeof global.lucide !== &#x27;undefined&#x27; &amp;&amp; global.lucide &amp;&amp; global.lucide.createIcons) global.lucide.createIcons({ attrs: { width: 17, height: 17 } });
+    }
+
+    function openRequest(id, returnContext) {
+      const item = requestById(id);
+      if (!item) return null;
+      state.screen = &#x27;detail&#x27;;
+      state.selectedId = item.id;
+      state.detailTab = &#x27;overview&#x27;;
+      state.returnContext = returnContext ? Object.assign({}, returnContext) : null;
+      emitSnapshot(item);
+      refresh();
+      return item;
+    }
+
+    function snapshot(id) {
+      const item = requestById(id);
+      if (!item) return null;
+      return {
+        id: item.id,
+        projectId: item.projectId,
+        requestId: item.requestId,
+        callId: item.callId,
+        attempt: item.attempt,
+        department: item.department,
+        workItemId: item.workItemId,
+        context: {
+          version: item.context.version,
+          capturedAt: item.context.capturedAt,
+          sources: item.context.sources.map(function (source) { return Object.assign({}, source); }),
+          omitted: item.context.omitted,
+          body: item.context.body
+        },
+        provider: Object.assign({ requestedModel: item.requestedModel, responseModel: item.responseModel }, item.providerConfig),
+        prompt: Object.assign({}, item.prompt)
+      };
+    }
+
+    function setProject(nextProjectId) {
+      const next = nextProjectId || &#x27;cargo&#x27;;
+      if (next === projectId) return api;
+      projectId = next;
+      state.screen = &#x27;list&#x27;;
+      state.selectedId = null;
+      state.returnContext = null;
+      state.filters = { department: &#x27;all&#x27;, workItem: &#x27;all&#x27;, status: &#x27;all&#x27;, search: &#x27;&#x27; };
+      refresh();
+      return api;
+    }
+
+    function handleClick(event) {
+      const target = event.target.closest(&#x27;[data-ob-tab],[data-ob-request],[data-ob-attempt],[data-ob-detail-tab],[data-ob-back-list],[data-ob-back-department]&#x27;);
+      if (!target || !root.contains(target)) return;
+      if (target.dataset.obTab) {
+        state.tab = target.dataset.obTab;
+        state.screen = &#x27;list&#x27;;
+        state.selectedId = null;
+        refresh();
+        return;
+      }
+      if (target.dataset.obRequest) {
+        openRequest(target.dataset.obRequest);
+        return;
+      }
+      if (target.dataset.obAttempt) {
+        const attempt = requestById(target.dataset.obAttempt);
+        if (attempt) {
+          state.selectedId = attempt.id;
+          emitSnapshot(attempt);
+          refresh();
+        }
+        return;
+      }
+      if (target.dataset.obDetailTab) {
+        state.detailTab = target.dataset.obDetailTab;
+        refresh();
+        return;
+      }
+      if (target.dataset.obBackList !== undefined) {
+        state.screen = &#x27;list&#x27;;
+        state.selectedId = null;
+        state.returnContext = null;
+        refresh();
+        return;
+      }
+      if (target.dataset.obBackDepartment !== undefined) {
+        const context = state.returnContext ? Object.assign({}, state.returnContext, { snapshotId: state.selectedId }) : null;
+        state.screen = &#x27;list&#x27;;
+        notify(&#x27;已返回部门工作区&#x27;);
+        onBackToDepartment(context);
+      }
+    }
+
+    function handleInput(event) {
+      if (!event.target.matches(&#x27;[data-ob-search]&#x27;)) return;
+      state.filters.search = event.target.value;
+      refresh();
+    }
+
+    function handleChange(event) {
+      const target = event.target;
+      if (target.matches(&#x27;[data-ob-department]&#x27;)) state.filters.department = target.value;
+      if (target.matches(&#x27;[data-ob-work-item]&#x27;)) state.filters.workItem = target.value;
+      if (target.matches(&#x27;[data-ob-status]&#x27;)) state.filters.status = target.value;
+      if (target.matches(&#x27;[data-ob-department],[data-ob-work-item],[data-ob-status]&#x27;)) refresh();
+    }
+
+    function mount() {
+      if (!root || mounted) return api;
+      mounted = true;
+      root.addEventListener(&#x27;click&#x27;, handleClick);
+      root.addEventListener(&#x27;input&#x27;, handleInput);
+      root.addEventListener(&#x27;change&#x27;, handleChange);
+      return api;
+    }
+
+    const api = {
+      setProject: setProject,
+      render: function () { return &#x27;&lt;style&gt;&#x27; + CSS + &#x27;&lt;/style&gt;&lt;div class=&quot;yp-ob-host&quot;&gt;&#x27; + viewMarkup() + &#x27;&lt;/div&gt;&#x27;; },
+      mount: mount,
+      openRequest: openRequest,
+      snapshot: snapshot
+    };
+    return api;
+  }
+
+  global.YudaoObservation = { create: create };
+})(globalThis);
+
+&lt;/script&gt;
+&lt;script&gt;
+(()=&gt;{
+const root=document.getElementById(&#x27;yudao-project-prototype&#x27;);
+const side=root.querySelector(&#x27;.yp-sidebar&#x27;),bar=root.querySelector(&#x27;.yp-topbar&#x27;),content=root.querySelector(&#x27;.yp-content&#x27;),overlay=root.querySelector(&#x27;.yp-modal-layer&#x27;),toastBox=root.querySelector(&#x27;.yp-toast&#x27;);
+const esc=s=&gt;String(s??&#x27;&#x27;).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g,c=&gt;({&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;,&quot;&#x27;&quot;:&#x27;&amp;#39;&#x27;}[c]));
+const icon=n=&gt;`&lt;i data-lucide=&quot;${n}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;`;
+const roles={product:{name:&#x27;产品&#x27;,icon:&#x27;clipboard-list&#x27;,text:&#x27;目标、需求与取舍&#x27;},engineering:{name:&#x27;工程&#x27;,icon:&#x27;braces&#x27;,text:&#x27;方案、实现与自检&#x27;},quality:{name:&#x27;质检&#x27;,icon:&#x27;check-check&#x27;,text:&#x27;验收依据与独立检查&#x27;}};
+const stageLabels={product:&#x27;产品&#x27;,engineering:&#x27;工程&#x27;,quality:&#x27;质检&#x27;,done:&#x27;已完成&#x27;};
+const statusLabels={waiting:&#x27;待你决定&#x27;,running:&#x27;进行中&#x27;,rework:&#x27;返工中&#x27;,qa:&#x27;待质检&#x27;,adopted:&#x27;已采纳&#x27;,done:&#x27;已采纳&#x27;};
+const projects=[
+ {id:&#x27;cargo&#x27;,name:&#x27;货物装载规划&#x27;,kind:&#x27;existing&#x27;,pinned:true,archived:false,goal:&#x27;让计划员快速生成可执行的装载方案，兼顾空间利用与操作稳定性。&#x27;,path:&#x27;C:/project/cargo_project&#x27;,material:&#x27;产品说明、交互原型、代码与测试&#x27;,status:&#x27;持续演化&#x27;,baseline:&#x27;装载工作台 v0.3&#x27;,question:&#x27;混装方案中，优先增加装载数量，还是提高体积利用率？&#x27;,answer:&#x27;&#x27;,sources:[{name:&#x27;产品说明与交互原型&#x27;,type:&#x27;资料支持&#x27;,text:&#x27;已确认装载任务、方案比较和手动摆放场景。&#x27;},{name:&#x27;代码与测试目录&#x27;,type:&#x27;资料支持&#x27;,text:&#x27;已登记 C:/project/cargo_project，原型不读取真实文件。&#x27;},{name:&#x27;混装目标&#x27;,type:&#x27;待验证&#x27;,text:&#x27;数量和体积的优先关系仍需由你决定。&#x27;}],handoffs:[{time:&#x27;今天 10:24&#x27;,item:&#x27;mix&#x27;,from:&#x27;工程&#x27;,to:&#x27;产品&#x27;,kind:&#x27;等待决定&#x27;,text:&#x27;方案比较完成，数量与体积需要明确取舍。&#x27;},{time:&#x27;昨天 16:40&#x27;,item:&#x27;restore&#x27;,from:&#x27;质检&#x27;,to:&#x27;工程&#x27;,kind:&#x27;返工&#x27;,text:&#x27;保存后恢复场景仍有一个边界条件需要修复。&#x27;},{time:&#x27;周一 14:05&#x27;,item:&#x27;export&#x27;,from:&#x27;工程&#x27;,to:&#x27;质检&#x27;,kind:&#x27;提交质检&#x27;,text:&#x27;导出结果已附上检查材料。&#x27;},{time:&#x27;周一 11:20&#x27;,item:&#x27;manual&#x27;,from:&#x27;工程&#x27;,to:&#x27;质检&#x27;,kind:&#x27;提交质检&#x27;,text:&#x27;手动摆放交互完成并保留测试记录。&#x27;}],departmentMessages:{product:[{id:&#x27;pm-1&#x27;,author:&#x27;产品&#x27;,kind:&#x27;部门记录&#x27;,time:&#x27;今天 10:24&#x27;,text:&#x27;当前目标是让计划员可以比较混装方案。数量和体积是两个独立判断维度，现阶段需要你决定优先关系。&#x27;,scope:&#x27;mix&#x27;,status:&#x27;待你回应&#x27;,snapshotId:&#x27;req-prod-1&#x27;}],engineering:[{id:&#x27;em-1&#x27;,author:&#x27;工程&#x27;,kind:&#x27;部门记录&#x27;,time:&#x27;昨天 16:40&#x27;,text:&#x27;保存与恢复流程已接入现有方案状态。质检反馈了一个恢复边界问题，正在返工。&#x27;,scope:&#x27;restore&#x27;,status:&#x27;返工中&#x27;,snapshotId:&#x27;req-eng-1b&#x27;}],quality:[{id:&#x27;qm-1&#x27;,author:&#x27;质检&#x27;,kind:&#x27;部门记录&#x27;,time:&#x27;周一 14:05&#x27;,text:&#x27;导出结果已完成一次检查，当前记录保留了通过项与仍需补充的异常路径。&#x27;,scope:&#x27;export&#x27;,status:&#x27;已记录&#x27;,snapshotId:&#x27;req-qa-1&#x27;}]},workItems:[
+   {id:&#x27;mix&#x27;,title:&#x27;增加混装方案比较&#x27;,type:&#x27;需求&#x27;,stage:&#x27;product&#x27;,status:&#x27;waiting&#x27;,summary:&#x27;比较不同混装方向，先明确数量与体积的优先关系。&#x27;,handoff:&#x27;产品待你决定&#x27;,material:&#x27;产品说明 · 目标取舍草案&#x27;,updated:&#x27;今天 10:24&#x27;,events:[{time:&#x27;今天 10:24&#x27;,from:&#x27;工程&#x27;,to:&#x27;产品&#x27;,kind:&#x27;等待决定&#x27;,text:&#x27;方案比较完成，等待目标取舍。&#x27;}],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[{id:&#x27;req-prod-1&#x27;,label:&#x27;产品分析 · 进行中&#x27;,detail:&#x27;部门消息关联快照&#x27;}],engineering:[],quality:[]}},
+   {id:&#x27;restore&#x27;,title:&#x27;修复方案保存后的恢复&#x27;,type:&#x27;缺陷&#x27;,stage:&#x27;engineering&#x27;,status:&#x27;rework&#x27;,summary:&#x27;质检发现恢复边界条件，工程正在根据返工材料修复。&#x27;,handoff:&#x27;质检 → 工程 · 返工&#x27;,material:&#x27;质检记录 · 恢复场景复现步骤&#x27;,updated:&#x27;昨天 16:40&#x27;,events:[{time:&#x27;昨天 16:40&#x27;,from:&#x27;质检&#x27;,to:&#x27;工程&#x27;,kind:&#x27;返工&#x27;,text:&#x27;附上恢复场景复现步骤，要求修复后重新提交。&#x27;},{time:&#x27;昨天 15:58&#x27;,from:&#x27;工程&#x27;,to:&#x27;质检&#x27;,kind:&#x27;提交质检&#x27;,text:&#x27;第一次修复提交后被发现边界问题。&#x27;}],messages:{product:[],engineering:[],quality:[{id:&#x27;restore-q1&#x27;,author:&#x27;质检&#x27;,kind:&#x27;返工说明&#x27;,time:&#x27;昨天 16:40&#x27;,text:&#x27;恢复场景需要覆盖手动调整后再保存的情况。&#x27;,scope:&#x27;restore&#x27;,status:&#x27;已接收&#x27;}]},snapshots:{product:[],engineering:[{id:&#x27;req-eng-1a&#x27;,label:&#x27;修复尝试 A · 失败&#x27;,detail:&#x27;模型请求失败&#x27;},{id:&#x27;req-eng-1b&#x27;,label:&#x27;修复尝试 B · 成功&#x27;,detail:&#x27;当前部门快照&#x27;}],quality:[]}},
+   {id:&#x27;export&#x27;,title:&#x27;导出方案并保留材料&#x27;,type:&#x27;任务&#x27;,stage:&#x27;quality&#x27;,status:&#x27;qa&#x27;,summary:&#x27;导出结果已提交质检，正在核对文件内容和方案来源。&#x27;,handoff:&#x27;工程 → 质检 · 待验收&#x27;,material:&#x27;导出样例 · 方案快照&#x27;,updated:&#x27;周一 14:05&#x27;,events:[{time:&#x27;周一 14:05&#x27;,from:&#x27;工程&#x27;,to:&#x27;质检&#x27;,kind:&#x27;提交质检&#x27;,text:&#x27;附上导出样例和方案快照。&#x27;}],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[],quality:[{id:&#x27;req-qa-1&#x27;,label:&#x27;导出检查 · 成功&#x27;,detail:&#x27;质检请求快照&#x27;}]}},
+   {id:&#x27;manual&#x27;,title:&#x27;优化手动摆放体验&#x27;,type:&#x27;任务&#x27;,stage:&#x27;done&#x27;,status:&#x27;adopted&#x27;,summary:&#x27;手动摆放的选中、移动和删除交互已完成检查并采纳。&#x27;,handoff:&#x27;质检 → 项目 · 已采纳&#x27;,material:&#x27;交互说明 · 键盘检查记录&#x27;,updated:&#x27;周一 11:20&#x27;,events:[{time:&#x27;周一 11:20&#x27;,from:&#x27;质检&#x27;,to:&#x27;项目&#x27;,kind:&#x27;采纳成果&#x27;,text:&#x27;检查通过，结果已纳入当前项目成果。&#x27;}],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[{id:&#x27;req-eng-2&#x27;,label:&#x27;工程执行 · 已取消&#x27;,detail:&#x27;已取消请求保留记录&#x27;}],quality:[]}}
+  ]},
+ {id:&#x27;lab&#x27;,name:&#x27;实验记录助手&#x27;,kind:&#x27;idea&#x27;,pinned:false,archived:false,goal:&#x27;帮助实验人员快速记录过程，让样品、参数和结果能够对应查询。&#x27;,path:&#x27;尚未关联目录&#x27;,material:&#x27;初始想法与用户场景&#x27;,status:&#x27;从想法开始&#x27;,baseline:&#x27;尚无交付&#x27;,question:&#x27;&#x27;,answer:&#x27;&#x27;,sources:[{name:&#x27;初始想法&#x27;,type:&#x27;资料支持&#x27;,text:&#x27;记录实验过程、样品与参数，并支持查询。&#x27;}],handoffs:[],departmentMessages:{product:[{id:&#x27;lab-p1&#x27;,author:&#x27;产品&#x27;,kind:&#x27;部门记录&#x27;,time:&#x27;今天 09:10&#x27;,text:&#x27;首轮先聚焦记录和查找两个核心场景。&#x27;,scope:&#x27;all&#x27;,status:&#x27;示例已记录&#x27;}],engineering:[],quality:[]},workItems:[{id:&#x27;lab-1&#x27;,title:&#x27;明确最小可用版本&#x27;,type:&#x27;阶段目标&#x27;,stage:&#x27;product&#x27;,status:&#x27;running&#x27;,summary:&#x27;产品正在整理核心场景，首轮聚焦记录与查找。&#x27;,handoff:&#x27;产品处理中&#x27;,material:&#x27;初始想法与用户场景&#x27;,updated:&#x27;今天 09:10&#x27;,events:[],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[],quality:{}}}]},
+ {id:&#x27;archive-demo&#x27;,name:&#x27;个人读书清单&#x27;,kind:&#x27;idea&#x27;,pinned:false,archived:true,goal:&#x27;记录阅读进度和读书笔记。&#x27;,path:&#x27;尚未关联目录&#x27;,material:&#x27;需求记录&#x27;,status:&#x27;已归档&#x27;,baseline:&#x27;首版交付&#x27;,question:&#x27;&#x27;,answer:&#x27;&#x27;,sources:[{name:&#x27;需求记录&#x27;,type:&#x27;资料支持&#x27;,text:&#x27;历史需求记录已保留。&#x27;}],handoffs:[],departmentMessages:{product:[],engineering:[],quality:[]},workItems:[]}
+];
+const state={projectId:&#x27;cargo&#x27;,page:&#x27;overview&#x27;,department:&#x27;product&#x27;,overviewMode:&#x27;flow&#x27;,deptScope:{product:&#x27;all&#x27;,engineering:&#x27;all&#x27;,quality:&#x27;all&#x27;},inspect:&#x27;context&#x27;,query:&#x27;&#x27;,menu:false,nav:false,modal:null,drafts:{},wizard:null,toastTimer:null,detailItem:null,snapshotId:null};
+let observation=null;
+const tag=(s,tone=&#x27;&#x27;)=&gt;`&lt;span class=&quot;yp-tag ${tone}&quot;&gt;${esc(s)}&lt;/span&gt;`;
+const statusTag=item=&gt;tag({waiting:&#x27;待你决定&#x27;,running:&#x27;进行中&#x27;,rework:&#x27;返工中&#x27;,qa:&#x27;待质检&#x27;,adopted:&#x27;已采纳&#x27;,done:&#x27;已采纳&#x27;}[item.status]||item.status,item.status===&#x27;waiting&#x27;||item.status===&#x27;rework&#x27;?&#x27;amber&#x27;:item.status===&#x27;qa&#x27;?&#x27;blue&#x27;:item.status===&#x27;adopted&#x27;||item.status===&#x27;done&#x27;?&#x27;green&#x27;:&#x27;&#x27;);
+const current=()=&gt;projects.find(p=&gt;p.id===state.projectId);
+const itemById=(id,p=current())=&gt;p?.workItems.find(item=&gt;item.id===id);
+const activeItems=(p=current())=&gt;p?.workItems||[];
+const stageItems=(stage,p=current())=&gt;activeItems(p).filter(item=&gt;item.stage===stage);
+const initIcons=()=&gt;{if(globalThis.lucide)lucide.createIcons({attrs:{width:17,height:17}})};
+function toast(text){toastBox.textContent=text;toastBox.hidden=false;clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=&gt;toastBox.hidden=true,3300)}
+function ensureObservation(){
+ if(observation||!globalThis.YudaoObservation?.create)return observation;
+ observation=globalThis.YudaoObservation.create({root,esc,icon,getProjectId:()=&gt;state.projectId,onBackToDepartment:context=&gt;{state.page=&#x27;department&#x27;;state.department=context?.department||&#x27;product&#x27;;state.deptScope[state.department]=context?.scope||&#x27;all&#x27;;state.snapshotId=context?.snapshotId||null;render()},notify:toast});
+ observation.setProject(state.projectId);
+ observation.mount();
+ return observation;
+}
+function visibleProjects(){return projects.filter(p=&gt;!p.archived&amp;&amp;p.name.toLowerCase().includes(state.query.toLowerCase())).sort((a,b)=&gt;Number(b.pinned)-Number(a.pinned))}
+function renderSide(){
+ const matches=visibleProjects();
+ side.innerHTML=`&lt;div class=&quot;yp-brand&quot;&gt;${icon(&#x27;boxes&#x27;)}&lt;span&gt;Yudao&lt;/span&gt;&lt;span class=&quot;yp-proto&quot;&gt;原型&lt;/span&gt;&lt;/div&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;new-project&quot;&gt;${icon(&#x27;plus&#x27;)}新建项目&lt;/button&gt;&lt;label class=&quot;yp-search&quot;&gt;${icon(&#x27;search&#x27;)}&lt;input data-search type=&quot;search&quot; value=&quot;${esc(state.query)}&quot; aria-label=&quot;搜索项目&quot; placeholder=&quot;搜索项目&quot;&gt;&lt;/label&gt;&lt;div&gt;&lt;div class=&quot;yp-side-label&quot;&gt;&lt;span&gt;项目&lt;/span&gt;&lt;span&gt;${matches.length}&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-project-list&quot;&gt;${matches.length?matches.map(p=&gt;`&lt;button class=&quot;yp-project ${p.id===state.projectId?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-project=&quot;${p.id}&quot; aria-current=&quot;${p.id===state.projectId?&#x27;page&#x27;:&#x27;false&#x27;}&quot;&gt;&lt;span class=&quot;yp-project-mark&quot;&gt;&lt;/span&gt;&lt;span&gt;${esc(p.name)}&lt;/span&gt;${p.pinned?icon(&#x27;pin&#x27;):&#x27;&#x27;}&lt;/button&gt;`).join(&#x27;&#x27;):&#x27;&lt;p class=&quot;yp-footnote&quot;&gt;没有匹配的项目&lt;/p&gt;&#x27;}&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yp-side-bottom&quot;&gt;&lt;button class=&quot;yp-sidebar-link&quot; type=&quot;button&quot; data-page=&quot;archives&quot;&gt;${icon(&#x27;archive&#x27;)}&lt;span&gt;已归档项目&lt;/span&gt;&lt;span class=&quot;yp-count&quot;&gt;${projects.filter(p=&gt;p.archived).length}&lt;/span&gt;&lt;/button&gt;&lt;p class=&quot;yp-footnote&quot;&gt;交互示例 · 不连接真实项目&lt;br&gt;刷新恢复初始数据&lt;/p&gt;&lt;/div&gt;`;
+}
+function renderBar(){
+ const p=current();
+ bar.innerHTML=`&lt;div class=&quot;yp-breadcrumb&quot;&gt;&lt;button type=&quot;button&quot; class=&quot;yp-mobile-toggle yp-icon&quot; data-action=&quot;nav&quot; aria-label=&quot;打开项目导航&quot;&gt;${icon(&#x27;menu&#x27;)}&lt;/button&gt;&lt;button type=&quot;button&quot; data-page=&quot;overview&quot;&gt;项目&lt;/button&gt;&lt;span&gt;/&lt;/span&gt;&lt;strong&gt;${esc(p?.name||&#x27;项目管理&#x27;)}&lt;/strong&gt;${state.page===&#x27;department&#x27;?`&lt;span&gt;/&lt;/span&gt;&lt;span&gt;${roles[state.department].name}&lt;/span&gt;`:state.page===&#x27;observation&#x27;?&#x27;&lt;span&gt;/&lt;/span&gt;&lt;span&gt;观测&lt;/span&gt;&#x27;:state.page===&#x27;sources&#x27;?&#x27;&lt;span&gt;/&lt;/span&gt;&lt;span&gt;资料与依据&lt;/span&gt;&#x27;:state.page===&#x27;settings&#x27;?&#x27;&lt;span&gt;/&lt;/span&gt;&lt;span&gt;项目设置&lt;/span&gt;&#x27;:&#x27;&#x27;}&lt;/div&gt;&lt;div class=&quot;yp-row&quot;&gt;&lt;span class=&quot;yp-auto&quot;&gt;&lt;span class=&quot;yp-dot&quot;&gt;&lt;/span&gt;&lt;span&gt;自动推进 · 关键问题再介入&lt;/span&gt;&lt;/span&gt;${p?`&lt;div class=&quot;yp-menu-wrap&quot;&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;menu&quot; aria-label=&quot;项目操作&quot;&gt;${icon(&#x27;more-horizontal&#x27;)}&lt;/button&gt;${state.menu?`&lt;div class=&quot;yp-menu&quot;&gt;&lt;button type=&quot;button&quot; data-action=&quot;pin&quot;&gt;${icon(&#x27;pin&#x27;)}${p.pinned?&#x27;取消置顶&#x27;:&#x27;置顶项目&#x27;}&lt;/button&gt;&lt;button type=&quot;button&quot; data-action=&quot;rename&quot;&gt;${icon(&#x27;pencil&#x27;)}重命名&lt;/button&gt;&lt;button type=&quot;button&quot; data-action=&quot;archive&quot;&gt;${icon(&#x27;archive&#x27;)}归档项目&lt;/button&gt;&lt;/div&gt;`:&#x27;&#x27;}&lt;/div&gt;`:&#x27;&#x27;}&lt;/div&gt;`;
+}
+function mainTabs(){return `&lt;nav class=&quot;yp-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;项目工作区&quot;&gt;${[[&#x27;overview&#x27;,&#x27;项目概览&#x27;],[&#x27;product&#x27;,&#x27;产品&#x27;],[&#x27;engineering&#x27;,&#x27;工程&#x27;],[&#x27;quality&#x27;,&#x27;质检&#x27;],[&#x27;observation&#x27;,&#x27;观测&#x27;]].map(([k,l])=&gt;{const selected=state.page===&#x27;overview&#x27;&amp;&amp;k===&#x27;overview&#x27;||state.page===&#x27;department&#x27;&amp;&amp;state.department===k||state.page===&#x27;observation&#x27;&amp;&amp;k===&#x27;observation&#x27;;return `&lt;button class=&quot;yp-tab ${selected?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; role=&quot;tab&quot; aria-selected=&quot;${selected}&quot; data-tab=&quot;${k}&quot;&gt;${l}&lt;/button&gt;`}).join(&#x27;&#x27;)}&lt;/nav&gt;`}
+function secondaryTabs(){return `&lt;div class=&quot;yp-secondary-tabs&quot; aria-label=&quot;项目辅助入口&quot;&gt;&lt;button class=&quot;yp-tab ${state.page===&#x27;sources&#x27;?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-page=&quot;sources&quot;&gt;${icon(&#x27;folder-open&#x27;)}资料与依据&lt;/button&gt;&lt;button class=&quot;yp-tab ${state.page===&#x27;settings&#x27;?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-page=&quot;settings&quot;&gt;${icon(&#x27;settings-2&#x27;)}项目设置&lt;/button&gt;&lt;/div&gt;`}
+function commonHeader(title,subtitle,actions=&#x27;&#x27;){
+ const p=current();return `${mainTabs()}${secondaryTabs()}&lt;header class=&quot;yp-heading&quot; style=&quot;margin-top:24px&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;${esc(p?.name||&#x27;项目&#x27;)}&lt;/div&gt;&lt;h1&gt;${title}&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;${subtitle}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-heading-actions&quot;&gt;${actions}&lt;/div&gt;&lt;/header&gt;`;
+}
+function composeProject(p){const key=`${p.id}|project|all`;return `&lt;form class=&quot;yp-composer&quot; data-form=&quot;project-input&quot;&gt;&lt;textarea data-draft=&quot;${esc(key)}&quot; aria-label=&quot;项目输入&quot; placeholder=&quot;补充项目目标、约束、资料线索或下一步想法…&quot;&gt;${esc(state.drafts[key]||&#x27;&#x27;)}&lt;/textarea&gt;&lt;div class=&quot;yp-composer-footer&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;原文保留；接收、回应和采用状态在记录中区分。&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;发送到项目 ${icon(&#x27;send&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}
+function workCard(item){return `&lt;button type=&quot;button&quot; class=&quot;yp-work-card&quot; data-item=&quot;${item.id}&quot; aria-label=&quot;查看工作项 ${esc(item.title)}&quot;&gt;&lt;span class=&quot;yp-work-card-title&quot;&gt;${esc(item.title)}&lt;/span&gt;&lt;span class=&quot;yp-work-card-meta&quot;&gt;${tag(item.type)}${statusTag(item)}&lt;/span&gt;&lt;p&gt;${esc(item.summary)}&lt;/p&gt;&lt;span class=&quot;yp-card-foot&quot;&gt;${icon(item.status===&#x27;rework&#x27;?&#x27;corner-up-left&#x27;:item.stage===&#x27;done&#x27;?&#x27;check-circle-2&#x27;:&#x27;arrow-right&#x27;)}&lt;span&gt;${esc(item.handoff)}&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;yp-card-foot&quot;&gt;${icon(&#x27;paperclip&#x27;)}&lt;span&gt;${esc(item.material)}&lt;/span&gt;&lt;/span&gt;&lt;/button&gt;`}
+function boardView(p){const columns=[[&#x27;product&#x27;,&#x27;产品&#x27;,&#x27;目标、需求与取舍&#x27;],[&#x27;engineering&#x27;,&#x27;工程&#x27;,&#x27;方案、实现与自检&#x27;],[&#x27;quality&#x27;,&#x27;质检&#x27;,&#x27;验收依据与独立检查&#x27;],[&#x27;done&#x27;,&#x27;已完成&#x27;,&#x27;已采纳的项目成果&#x27;]];return `&lt;div class=&quot;yp-board&quot; aria-label=&quot;跨部门流转看板&quot;&gt;${columns.map(([key,name,desc])=&gt;`&lt;section class=&quot;yp-board-col ${key}&quot;&gt;&lt;div class=&quot;yp-col-head&quot;&gt;&lt;div&gt;&lt;strong&gt;${name}&lt;/strong&gt;&lt;p&gt;${desc}&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;yp-col-count&quot;&gt;${stageItems(key,p).length}&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-card-stack&quot;&gt;${stageItems(key,p).map(workCard).join(&#x27;&#x27;)||&#x27;&lt;div class=&quot;yp-empty-col&quot;&gt;暂无工作项&lt;/div&gt;&#x27;}&lt;/div&gt;&lt;/section&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`}
+function flowView(p){const columns=[[&#x27;product&#x27;,&#x27;产品&#x27;],[&#x27;engineering&#x27;,&#x27;工程&#x27;],[&#x27;quality&#x27;,&#x27;质检&#x27;],[&#x27;done&#x27;,&#x27;已完成&#x27;]];return `&lt;div class=&quot;yp-flow&quot; aria-label=&quot;产品到工程到质检的项目流转&quot;&gt;${columns.map(([key,name],idx)=&gt;`&lt;section class=&quot;yp-flow-step ${stageItems(key,p).length?&#x27;current&#x27;:&#x27;&#x27;}&quot;&gt;&lt;div class=&quot;yp-flow-head&quot;&gt;&lt;span class=&quot;yp-flow-marker&quot;&gt;${idx+1}&lt;/span&gt;&lt;strong&gt;${name}&lt;/strong&gt;&lt;span class=&quot;yp-small&quot;&gt;${stageItems(key,p).length}&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-flow-items&quot;&gt;${stageItems(key,p).map(item=&gt;`&lt;button type=&quot;button&quot; class=&quot;yp-flow-item&quot; data-item=&quot;${item.id}&quot;&gt;&lt;strong&gt;${esc(item.title)}&lt;/strong&gt;&lt;p&gt;${esc(item.handoff)}&lt;/p&gt;&lt;/button&gt;`).join(&#x27;&#x27;)||&#x27;&lt;div class=&quot;yp-empty-col&quot;&gt;没有当前工作项&lt;/div&gt;&#x27;}&lt;/div&gt;&lt;/section&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`}
+function handoffList(p,limit){const rows=(p.handoffs||[]).slice(0,limit);return rows.length?`&lt;div class=&quot;yp-handoff-list&quot;&gt;${rows.map(h=&gt;`&lt;div class=&quot;yp-handoff&quot;&gt;&lt;span class=&quot;yp-handoff-time&quot;&gt;${esc(h.time)}&lt;/span&gt;&lt;div&gt;&lt;strong&gt;${esc(h.from)} → ${esc(h.to)}&lt;/strong&gt;&lt;p&gt;${esc(h.text)}&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;yp-handoff-status ${h.kind===&#x27;返工&#x27;?&#x27;rework&#x27;:&#x27;&#x27;}&quot;&gt;${esc(h.kind)}&lt;/span&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`:&#x27;&lt;p class=&quot;yp-small&quot;&gt;还没有跨部门交接记录。&lt;/p&gt;&#x27;}
+function overviewPage(){
+ const p=current();if(!p)return archivesPage();const items=activeItems(p),waiting=items.filter(i=&gt;i.status===&#x27;waiting&#x27;),done=items.filter(i=&gt;i.stage===&#x27;done&#x27;);
+ return `${commonHeader(&#x27;项目概览&#x27;,&#x27;从项目目标、当前成果和部门流转了解下一步。&#x27;)}&lt;section class=&quot;yp-project-summary&quot;&gt;&lt;div&gt;&lt;h2&gt;当前目标&lt;/h2&gt;&lt;p&gt;${esc(p.goal)}&lt;/p&gt;&lt;p class=&quot;yp-small&quot;&gt;${esc(p.path)} · ${esc(p.material)}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-summary-side&quot;&gt;&lt;div class=&quot;yp-summary-item&quot;&gt;&lt;span&gt;当前成果&lt;/span&gt;&lt;strong&gt;${esc(p.baseline)}&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;yp-summary-item&quot;&gt;&lt;span&gt;工作项&lt;/span&gt;&lt;strong&gt;${items.length} 个 · ${done.length} 个已采纳&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;yp-summary-item&quot;&gt;&lt;span&gt;项目状态&lt;/span&gt;&lt;strong&gt;${tag(p.status,&#x27;green&#x27;)}&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;/section&gt;${waiting.length?`&lt;section class=&quot;yp-section yp-notice&quot;&gt;${icon(&#x27;circle-help&#x27;)}&lt;div class=&quot;yp-notice-copy&quot;&gt;&lt;strong&gt;${esc(p.question||&#x27;有一项重要取舍等待你的决定&#x27;)}&lt;/strong&gt;&lt;p&gt;这项决定会影响后续部门如何继续推进；原文与部门建议会保留在项目记录中。&lt;/p&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;decision&quot;&gt;查看待决问题 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/section&gt;`:&#x27;&#x27;}&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;项目输入&lt;/h2&gt;&lt;span class=&quot;yp-small&quot;&gt;默认发送给整个项目 · 可在部门内定向指导&lt;/span&gt;&lt;/div&gt;${composeProject(p)}&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;div&gt;&lt;h2&gt;三部门流转&lt;/h2&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:3px&quot;&gt;需求交接、工程交付与验收反馈&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-view-toggle&quot; role=&quot;group&quot; aria-label=&quot;流转视图&quot;&gt;&lt;button type=&quot;button&quot; class=&quot;${state.overviewMode===&#x27;flow&#x27;?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-overview-mode=&quot;flow&quot;&gt;流程&lt;/button&gt;&lt;button type=&quot;button&quot; class=&quot;${state.overviewMode===&#x27;board&#x27;?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-overview-mode=&quot;board&quot;&gt;看板&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;${state.overviewMode===&#x27;flow&#x27;?flowView(p):boardView(p)}&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;最近交接&lt;/h2&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;open-all-handoffs&quot;&gt;查看全部&lt;/button&gt;&lt;/div&gt;${handoffList(p,4)}&lt;/section&gt;`;
+}
+function messageView(m){return `&lt;article class=&quot;yp-message ${m.author===&#x27;你&#x27;?&#x27;user&#x27;:&#x27;&#x27;}&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;strong&gt;${esc(m.author)} · ${esc(m.kind||&#x27;部门消息&#x27;)}&lt;/strong&gt;&lt;span class=&quot;yp-small&quot;&gt;${esc(m.time||&#x27;刚刚&#x27;)} · ${tag(m.status||&#x27;已记录&#x27;,m.status===&#x27;待你回应&#x27;?&#x27;amber&#x27;:&#x27;green&#x27;)}&lt;/span&gt;&lt;/div&gt;&lt;p&gt;${esc(m.text)}&lt;/p&gt;&lt;p class=&quot;yp-message-context&quot;&gt;范围：${esc(m.scopeLabel||&#x27;整个项目&#x27;)}${m.snapshotId?` · &lt;button type=&quot;button&quot; class=&quot;yp-link&quot; data-attempt=&quot;${esc(m.snapshotId)}&quot; data-return-dept=&quot;${esc(state.department)}&quot; data-return-scope=&quot;${esc(state.deptScope[state.department]||&#x27;all&#x27;)}&quot;&gt;查看关联快照 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;`:&#x27;&#x27;}&lt;/p&gt;&lt;/article&gt;`}
+function composeDepartment(p,dept,scope){const key=`${p.id}|${dept}|${scope}`;return `&lt;form class=&quot;yp-composer&quot; data-form=&quot;department-input&quot; data-dept=&quot;${dept}&quot; data-scope=&quot;${scope}&quot;&gt;&lt;div class=&quot;yp-small&quot; style=&quot;margin-bottom:8px&quot;&gt;接收范围 · ${scope===&#x27;all&#x27;?&#x27;整个项目&#x27;:esc(itemById(scope,p)?.title||scope)}&lt;/div&gt;&lt;textarea data-draft=&quot;${esc(key)}&quot; aria-label=&quot;发给${roles[dept].name}的指导&quot; placeholder=&quot;给${roles[dept].name}追加目标、问题或具体指导…&quot;&gt;${esc(state.drafts[key]||&#x27;&#x27;)}&lt;/textarea&gt;&lt;div class=&quot;yp-composer-footer&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;追加指导 · 发送后等待部门处理&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;发送给${roles[dept].name} ${icon(&#x27;send&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}
+function inspector(p,dept,scope,snapshots){
+ const selected=snapshots.find(s=&gt;s.id===state.snapshotId)||snapshots.at(-1)||null;
+ const data=selected?ensureObservation().snapshot(selected.id):null;
+ if(selected)state.snapshotId=selected.id;
+ const rules={product:&#x27;持续维护项目目标、需求与取舍。保留用户原话，重要且无法推断的产品决定向用户提出。&#x27;,engineering:&#x27;依据有效要求形成方案、实施和自检。保留项目架构与决定原因，收到质检反馈后修复并重新交付。&#x27;,quality:&#x27;依据项目要求独立检查交付，保留实际验证范围和证据。业务取舍交产品明确，工程问题附复现依据。&#x27;};
+ const chooser=snapshots.length?`&lt;label class=&quot;yp-field&quot; style=&quot;margin-top:12px&quot;&gt;查看请求快照&lt;select data-snapshot-select&gt;${snapshots.map(s=&gt;`&lt;option value=&quot;${esc(s.id)}&quot; ${s.id===selected?.id?&#x27;selected&#x27;:&#x27;&#x27;}&gt;${esc(s.label)}&lt;/option&gt;`).join(&#x27;&#x27;)}&lt;/select&gt;&lt;/label&gt;`:&#x27;&lt;p class=&quot;yp-small&quot;&gt;尚无模型请求，可先进行项目讨论。&lt;/p&gt;&#x27;;
+ let body=&#x27;&#x27;;
+ if(state.inspect===&#x27;context&#x27;)body=data?`&lt;div class=&quot;yp-small&quot; style=&quot;margin-top:12px&quot;&gt;${esc(data.context.version)} · ${esc(data.context.capturedAt)}&lt;/div&gt;&lt;details open&gt;&lt;summary&gt;当次输入正文&lt;/summary&gt;&lt;p&gt;${esc(data.context.body)}&lt;/p&gt;&lt;/details&gt;&lt;details open&gt;&lt;summary&gt;来源与版本&lt;/summary&gt;${data.context.sources.map(s=&gt;`&lt;p&gt;&lt;strong&gt;${esc(s.name)}&lt;/strong&gt;&lt;br&gt;${esc(s.version)} · ${esc(s.scope)}&lt;/p&gt;`).join(&#x27;&#x27;)}&lt;/details&gt;&lt;details&gt;&lt;summary&gt;未纳入内容&lt;/summary&gt;&lt;p&gt;${esc(data.context.omitted)}&lt;/p&gt;&lt;/details&gt;`:`&lt;details open&gt;&lt;summary&gt;项目工作依据&lt;/summary&gt;&lt;p&gt;${esc(p.goal)}&lt;/p&gt;&lt;p&gt;当前成果：${esc(p.baseline)}&lt;/p&gt;&lt;/details&gt;&lt;p class=&quot;yp-small&quot;&gt;这是项目当前资料，尚无对应的请求输入快照。&lt;/p&gt;`;
+ if(state.inspect===&#x27;provider&#x27;)body=data?`&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;${esc(data.provider.name)}&lt;/h3&gt;&lt;p&gt;请求模型：${esc(data.provider.requestedModel)}&lt;br&gt;返回模型：${esc(data.provider.responseModel||&#x27;未返回&#x27;)}&lt;br&gt;协议：${esc(data.provider.protocol)}&lt;br&gt;温度：${esc(data.provider.temperature)}&lt;br&gt;最大输出：${esc(data.provider.maxOutputTokens)}&lt;br&gt;配置版本：${esc(data.provider.version)}&lt;/p&gt;&lt;/div&gt;&lt;p class=&quot;yp-small&quot;&gt;所选请求的配置快照 · 示例&lt;/p&gt;`:&#x27;&lt;p&gt;还没有请求配置快照。Provider 配置将在后续设计中补充。&lt;/p&gt;&#x27;;
+ if(state.inspect===&#x27;prompt&#x27;)body=`&lt;div class=&quot;yp-small&quot; style=&quot;margin-top:12px&quot;&gt;${esc(data?.prompt.version||&#x27;项目部门规则&#x27;)} · ${data?&#x27;当次采用&#x27;:&#x27;尚未用于请求&#x27;}&lt;/div&gt;&lt;div class=&quot;yp-code&quot;&gt;${esc(data?.prompt.body||rules[dept])}&lt;/div&gt;`;
+ return `&lt;aside class=&quot;yp-inspector&quot; aria-label=&quot;部门检查区&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h3&gt;工作依据检查&lt;/h3&gt;&lt;span class=&quot;yp-tag outline&quot;&gt;${roles[dept].name}&lt;/span&gt;&lt;/div&gt;&lt;nav class=&quot;yp-tabs&quot; aria-label=&quot;检查内容&quot;&gt;${[[&#x27;context&#x27;,&#x27;Context&#x27;],[&#x27;provider&#x27;,&#x27;Provider&#x27;],[&#x27;prompt&#x27;,&#x27;Prompt&#x27;]].map(([key,label])=&gt;`&lt;button class=&quot;yp-tab ${state.inspect===key?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-inspect=&quot;${key}&quot; aria-pressed=&quot;${state.inspect===key}&quot;&gt;${label}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;${chooser}${body}${data?`&lt;button class=&quot;yp-link&quot; style=&quot;margin-top:16px&quot; type=&quot;button&quot; data-attempt=&quot;${esc(data.id)}&quot; data-return-dept=&quot;${dept}&quot; data-return-scope=&quot;${esc(scope)}&quot;&gt;查看模型请求 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;`:&#x27;&#x27;}&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-page=&quot;sources&quot; style=&quot;margin-top:16px&quot;&gt;查看项目当前资料 ${icon(&#x27;folder-open&#x27;)}&lt;/button&gt;&lt;/aside&gt;`;
+}
+function sourcesPage(){const p=current();return `${commonHeader(&#x27;资料与依据&#x27;,&#x27;项目长期保留的资料说明、三部门依据与待验证项。&#x27;,`&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;add-source&quot;&gt;${icon(&#x27;plus&#x27;)}登记资料&lt;/button&gt;`)}&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-info-strip&quot;&gt;${icon(&#x27;info&#x27;)}&lt;span&gt;&lt;strong&gt;本原型只登记位置和说明。&lt;/strong&gt; 不读取真实目录，资料支持、推断和待验证项分开保存。&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-report&quot;&gt;${(p.sources||[]).map(s=&gt;`&lt;div class=&quot;yp-source-row&quot;&gt;${icon(s.type===&#x27;待验证&#x27;?&#x27;circle-help&#x27;:&#x27;file-text&#x27;)}&lt;div&gt;&lt;strong&gt;${esc(s.name)}&lt;/strong&gt;&lt;small&gt;${esc(s.text)}&lt;/small&gt;&lt;/div&gt;${tag(s.type,s.type===&#x27;待验证&#x27;?&#x27;amber&#x27;:&#x27;green&#x27;)}&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;三部门当前依据&lt;/h2&gt;&lt;span class=&quot;yp-small&quot;&gt;项目级长期范围&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-report&quot;&gt;${Object.entries(roles).map(([k,r])=&gt;`&lt;div class=&quot;yp-fact&quot;&gt;&lt;span&gt;${esc(r.name)}&lt;/span&gt;&lt;div&gt;&lt;strong&gt;${esc(r.text)}&lt;/strong&gt;&lt;small&gt;${k===&#x27;product&#x27;?&#x27;维护目标、需求和重要取舍。&#x27;:k===&#x27;engineering&#x27;?&#x27;维护架构、代码现状和实施决定。&#x27;:&#x27;维护验收依据、缺陷与验证记录。&#x27;}&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;/section&gt;`}
+function settingsPage(){const p=current();return `${commonHeader(&#x27;项目设置&#x27;,&#x27;调整项目名称、目标和关联位置。三部门仍共享项目级依据。&#x27;)}&lt;section class=&quot;yp-section&quot;&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;settings&quot;&gt;&lt;div class=&quot;yp-form-two&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; value=&quot;${esc(p.name)}&quot; required maxlength=&quot;60&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;项目类型&lt;select name=&quot;kind&quot;&gt;&lt;option value=&quot;existing&quot; ${p.kind===&#x27;existing&#x27;?&#x27;selected&#x27;:&#x27;&#x27;}&gt;已有项目&lt;/option&gt;&lt;option value=&quot;idea&quot; ${p.kind===&#x27;idea&#x27;?&#x27;selected&#x27;:&#x27;&#x27;}&gt;从想法开始&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;/div&gt;&lt;label class=&quot;yp-field&quot;&gt;项目目标&lt;textarea name=&quot;goal&quot; required&gt;${esc(p.goal)}&lt;/textarea&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;项目目录或资料位置&lt;input name=&quot;path&quot; value=&quot;${esc(p.path)}&quot;&gt;&lt;small&gt;仅登记位置，原型不会读取文件。&lt;/small&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;修改会作用于当前项目的长期依据。&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;保存设置&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;&lt;/section&gt;`}
+function archivesPage(){const archived=projects.filter(p=&gt;p.archived);return `&lt;div class=&quot;yp-wizard&quot;&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;项目管理&lt;/div&gt;&lt;h1&gt;已归档项目&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;归档只整理项目列表，资料、部门记录和工作项仍然保留。&lt;/p&gt;&lt;div class=&quot;yp-archive-list&quot; style=&quot;margin-top:24px&quot;&gt;${archived.length?archived.map(p=&gt;`&lt;div class=&quot;yp-archive-row&quot;&gt;&lt;div&gt;&lt;strong&gt;${esc(p.name)}&lt;/strong&gt;&lt;p&gt;${esc(p.goal)}&lt;/p&gt;&lt;/div&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-restore=&quot;${p.id}&quot;&gt;${icon(&#x27;archive-restore&#x27;)}恢复项目&lt;/button&gt;&lt;/div&gt;`).join(&#x27;&#x27;):&#x27;&lt;div class=&quot;yp-empty-col&quot; style=&quot;margin-top:20px&quot;&gt;暂时没有已归档项目。&lt;/div&gt;&#x27;}&lt;/div&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-page=&quot;overview&quot;&gt;回到项目&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;new-project&quot;&gt;新建项目 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`}
+function wizardPage(){const w=state.wizard||{step:&#x27;choice&#x27;};if(w.step===&#x27;choice&#x27;)return `&lt;div class=&quot;yp-wizard&quot;&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;leave-wizard&quot;&gt;${icon(&#x27;arrow-left&#x27;)}回到项目&lt;/button&gt;&lt;div class=&quot;yp-eyebrow&quot; style=&quot;margin-top:22px&quot;&gt;项目管理 · 新建&lt;/div&gt;&lt;h1&gt;建立一个项目&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;两种入口最后都进入同一个项目级三部门工作区。&lt;/p&gt;&lt;div class=&quot;yp-choice-grid&quot;&gt;&lt;button class=&quot;yp-choice&quot; type=&quot;button&quot; data-kind=&quot;idea&quot;&gt;${icon(&#x27;lightbulb&#x27;)}&lt;strong&gt;从想法开始&lt;/strong&gt;&lt;p&gt;先记录想法、目标和约束，再由产品、工程、质检逐步形成首轮依据。&lt;/p&gt;&lt;/button&gt;&lt;button class=&quot;yp-choice&quot; type=&quot;button&quot; data-kind=&quot;existing&quot;&gt;${icon(&#x27;folder-git-2&#x27;)}&lt;strong&gt;接入已有项目&lt;/strong&gt;&lt;p&gt;登记项目目录和已有资料，先建立三部门现状，再开始后续工作。&lt;/p&gt;&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`;if(w.step===&#x27;form&#x27;)return `&lt;div class=&quot;yp-wizard&quot;&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;wizard-back&quot;&gt;${icon(&#x27;arrow-left&#x27;)}选择入口&lt;/button&gt;&lt;div class=&quot;yp-eyebrow&quot; style=&quot;margin-top:22px&quot;&gt;项目管理 · ${w.kind===&#x27;idea&#x27;?&#x27;从想法开始&#x27;:&#x27;接入已有项目&#x27;}&lt;/div&gt;&lt;h1&gt;${w.kind===&#x27;idea&#x27;?&#x27;记录项目想法&#x27;:&#x27;登记已有项目&#x27;}&lt;/h1&gt;&lt;div class=&quot;yp-steps&quot;&gt;&lt;span class=&quot;yp-step-current&quot;&gt;1 信息&lt;/span&gt;&lt;span class=&quot;yp-step-line&quot;&gt;&lt;/span&gt;&lt;span&gt;2 三部门建档&lt;/span&gt;&lt;/div&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;wizard&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; value=&quot;${esc(w.name|| (w.kind===&#x27;existing&#x27;?&#x27;货物装载规划&#x27;:&#x27;&#x27;))}&quot; required placeholder=&quot;例如：货物装载规划&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;${w.kind===&#x27;idea&#x27;?&#x27;初始想法&#x27;:&#x27;项目目标&#x27;}&lt;textarea name=&quot;goal&quot; required placeholder=&quot;说明想解决的问题、目标用户或当前目标…&quot;&gt;${esc(w.goal|| (w.kind===&#x27;existing&#x27;?&#x27;让计划员快速生成可执行的装载方案，兼顾空间利用与操作稳定性。&#x27;:&#x27;&#x27;))}&lt;/textarea&gt;&lt;/label&gt;${w.kind===&#x27;existing&#x27;?`&lt;div class=&quot;yp-form-two&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目目录&lt;input name=&quot;path&quot; value=&quot;${esc(w.path||&#x27;C:/project/cargo_project&#x27;)}&quot; placeholder=&quot;例如：C:/project/cargo_project&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;已有资料位置&lt;input name=&quot;material&quot; value=&quot;${esc(w.material||&#x27;产品说明、代码与测试&#x27;)}&quot; placeholder=&quot;例如：docs/、README、测试记录&quot;&gt;&lt;/label&gt;&lt;/div&gt;`:`&lt;label class=&quot;yp-field&quot;&gt;已有材料或约束&lt;input name=&quot;material&quot; value=&quot;${esc(w.material||&#x27;&#x27;)}&quot; placeholder=&quot;可选：用户访谈、约束、草图或链接说明&quot;&gt;&lt;/label&gt;`}&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;leave-wizard&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;${w.kind===&#x27;idea&#x27;?&#x27;建立并开始&#x27;:&#x27;继续建立三部门依据&#x27;} ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;&lt;/div&gt;`;return importReport(w)}
+function importReport(w){const name=w.name||&#x27;货物装载规划&#x27;;return `&lt;div class=&quot;yp-wizard&quot;&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;项目管理 · 三部门建档&lt;/div&gt;&lt;h1&gt;${esc(name)}&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;以下是根据已登记位置和资料说明生成的示例现状。事实、推断和待验证项分开保留。&lt;/p&gt;&lt;div class=&quot;yp-report&quot;&gt;${Object.entries(roles).map(([k,r])=&gt;`&lt;section class=&quot;yp-detail&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h3&gt;${esc(r.name)} · ${esc(r.text)}&lt;/h3&gt;${tag(k===&#x27;quality&#x27;?&#x27;待验证&#x27;:&#x27;已整理&#x27;,k===&#x27;quality&#x27;?&#x27;amber&#x27;:&#x27;green&#x27;)}&lt;/div&gt;&lt;p&gt;${k===&#x27;product&#x27;?&#x27;已有目标聚焦装载方案生成与比较；混装方案的优先指标仍需确认。&#x27;:k===&#x27;engineering&#x27;?&#x27;已登记代码和运行位置，现状扫描在正式开发时再执行；本原型只展示建档结果。&#x27;:&#x27;已登记手动摆放、保存恢复和导出检查方向；本轮实际验证尚未发生。&#x27;}&lt;/p&gt;&lt;/section&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;wizard-back&quot;&gt;调整项目信息&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;finish-import&quot;&gt;建立项目 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:10px&quot;&gt;建档记录与实际验证分开；建立后可从项目概览继续输入。&lt;/p&gt;&lt;/div&gt;`}
+function itemModal(item){const action=item.stage===&#x27;product&#x27;?`&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;${item.status===&#x27;waiting&#x27;?&#x27;decision&#x27;:&#x27;move-item&#x27;}&quot; data-item=&quot;${item.id}&quot; data-to=&quot;engineering&quot;&gt;${item.status===&#x27;waiting&#x27;?&#x27;查看待决问题&#x27;:&#x27;提交工程&#x27;} ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;`:item.stage===&#x27;engineering&#x27;?`&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;move-item&quot; data-item=&quot;${item.id}&quot; data-to=&quot;quality&quot;&gt;提交质检 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;move-item&quot; data-item=&quot;${item.id}&quot; data-to=&quot;product&quot;&gt;退回产品&lt;/button&gt;`:item.stage===&#x27;quality&#x27;?`&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;move-item&quot; data-item=&quot;${item.id}&quot; data-to=&quot;done&quot;&gt;采纳成果 ${icon(&#x27;check&#x27;)}&lt;/button&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;move-item&quot; data-item=&quot;${item.id}&quot; data-to=&quot;engineering&quot;&gt;退回工程返工&lt;/button&gt;`:&#x27;&lt;span class=&quot;yp-small&quot;&gt;已采纳到项目成果&lt;/span&gt;&#x27;;return `&lt;section class=&quot;yp-modal&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;yp-modal-title&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;工作项 · ${esc(stageLabels[item.stage])}&lt;/div&gt;&lt;h2 id=&quot;yp-modal-title&quot;&gt;${esc(item.title)}&lt;/h2&gt;&lt;/div&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot; aria-label=&quot;关闭详情&quot;&gt;${icon(&#x27;x&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;div class=&quot;yp-row&quot;&gt;${tag(item.type)}${statusTag(item)}&lt;/div&gt;&lt;p&gt;${esc(item.summary)}&lt;/p&gt;&lt;p class=&quot;yp-small&quot;&gt;当前交接：${esc(item.handoff)}&lt;br&gt;材料：${esc(item.material)}&lt;br&gt;更新时间：${esc(item.updated)}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-section&quot; style=&quot;margin-top:18px&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h3&gt;交接与返工记录&lt;/h3&gt;&lt;span class=&quot;yp-small&quot;&gt;可从这里演示业务动作&lt;/span&gt;&lt;/div&gt;${item.events?.length?`&lt;div class=&quot;yp-handoff-list&quot;&gt;${item.events.map(e=&gt;`&lt;div class=&quot;yp-handoff&quot;&gt;&lt;span class=&quot;yp-handoff-time&quot;&gt;${esc(e.time)}&lt;/span&gt;&lt;div&gt;&lt;strong&gt;${esc(e.from)} → ${esc(e.to)}&lt;/strong&gt;&lt;p&gt;${esc(e.text)}&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;yp-handoff-status ${e.kind===&#x27;返工&#x27;?&#x27;rework&#x27;:&#x27;&#x27;}&quot;&gt;${esc(e.kind)}&lt;/span&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`:&#x27;&lt;p class=&quot;yp-small&quot;&gt;暂无交接记录。&lt;/p&gt;&#x27;}&lt;/div&gt;&lt;div class=&quot;yp-row&quot; style=&quot;margin-top:16px&quot;&gt;${Object.entries(roles).map(([key,r])=&gt;`&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-open-dept=&quot;${key}&quot; data-focus-item=&quot;${item.id}&quot;&gt;进入${r.name} ${icon(&quot;arrow-up-right&quot;)}&lt;/button&gt;`).join(&quot;&quot;)}&lt;/div&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;动作仅更新本地示例记录。&lt;/span&gt;&lt;div class=&quot;yp-row&quot;&gt;${action}&lt;/div&gt;&lt;/div&gt;&lt;/section&gt;`}
+function openItem(id){const item=itemById(id);if(!item)return;state.detailItem=id;state.modal=&#x27;item&#x27;;overlay.innerHTML=itemModal(item);overlay.hidden=false;root.querySelector(&#x27;.yp-shell&#x27;).inert=true;initIcons();overlay.querySelector(&#x27;button&#x27;)?.focus()}
+function showModal(kind){state.menu=false;const p=current();let title=&#x27;&#x27;,body=&#x27;&#x27;;if(kind===&#x27;rename&#x27;)body=`&lt;form class=&quot;yp-form&quot; data-form=&quot;rename&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; value=&quot;${esc(p.name)}&quot; required maxlength=&quot;60&quot;&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;保存名称&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`;else if(kind===&#x27;archive&#x27;)body=`&lt;p&gt;「${esc(p.name)}」会从日常列表收起，资料、部门记录和工作项保留。你可以在已归档项目中恢复。&lt;/p&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;保留在列表&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;confirm-archive&quot;&gt;归档项目&lt;/button&gt;&lt;/div&gt;`;else if(kind===&#x27;decision&#x27;)body=`&lt;p&gt;${esc(p.question||&#x27;请补充本项目的重要取舍&#x27;)}&lt;/p&gt;&lt;div class=&quot;yp-report&quot;&gt;&lt;h3&gt;当前部门建议&lt;/h3&gt;&lt;p&gt;数量和体积分别呈现，先提供两种方案供比较；这只是原型里的部门建议，不代表已采用。&lt;/p&gt;&lt;/div&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;decision&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;你的决定&lt;textarea name=&quot;answer&quot; required&gt;${esc(p.answer||&#x27;数量和体积分别展示，先提供两种方案供比较。&#x27;)}&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;稍后处理&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;记录决定&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`;else if(kind===&#x27;add-source&#x27;)body=`&lt;form class=&quot;yp-form&quot; data-form=&quot;source&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;资料名称&lt;input name=&quot;name&quot; required placeholder=&quot;例如：新版需求说明&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;位置或内容说明&lt;textarea name=&quot;text&quot; required placeholder=&quot;填写来源、文件位置或需要补充的内容&quot;&gt;&lt;/textarea&gt;&lt;small&gt;本原型只登记说明，不读取或上传文件。&lt;/small&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;登记资料&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`;overlay.innerHTML=`&lt;section class=&quot;yp-modal&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;yp-modal-title&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h2 id=&quot;yp-modal-title&quot;&gt;${title||({rename:&#x27;重命名项目&#x27;,archive:&#x27;归档项目&#x27;,decision:&#x27;需要你决定&#x27;,&#x27;add-source&#x27;:&#x27;登记项目资料&#x27;}[kind]||&#x27;项目操作&#x27;)}&lt;/h2&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot; aria-label=&quot;关闭对话框&quot;&gt;${icon(&#x27;x&#x27;)}&lt;/button&gt;&lt;/div&gt;${body}&lt;/section&gt;`;overlay.hidden=false;root.querySelector(&#x27;.yp-shell&#x27;).inert=true;initIcons();overlay.querySelector(&#x27;input,textarea,button&#x27;)?.focus()}
+function closeModal(){overlay.hidden=true;overlay.innerHTML=&#x27;&#x27;;root.querySelector(&#x27;.yp-shell&#x27;).inert=false;state.modal=null;state.detailItem=null}
+function startWizard(){state.page=&#x27;wizard&#x27;;state.menu=false;state.nav=false;state.wizard={step:&#x27;choice&#x27;,kind:null,name:&#x27;&#x27;,goal:&#x27;&#x27;,path:&#x27;&#x27;,material:&#x27;&#x27;};render()}
+function createProject(w){const id=`project-${Date.now()}`,idea=w.kind===&#x27;idea&#x27;,p={id,name:w.name,kind:w.kind,pinned:false,archived:false,goal:w.goal||(idea?&#x27;逐步明确首轮目标&#x27;:&#x27;依据现有项目资料继续演化&#x27;),path:w.path||&#x27;尚未关联目录&#x27;,material:w.material||&#x27;用户原始想法&#x27;,status:idea?&#x27;从想法开始&#x27;:&#x27;已建档 · 示例&#x27;,baseline:idea?&#x27;尚无交付&#x27;:&#x27;导入起点 · 待验证&#x27;,question:&#x27;&#x27;,answer:&#x27;&#x27;,sources:[{name:idea?&#x27;初始想法&#x27;:&#x27;已有项目资料&#x27;,type:&#x27;资料支持&#x27;,text:w.material||&#x27;项目起点已登记。&#x27;}],handoffs:[],departmentMessages:{product:[],engineering:[],quality:[]},workItems:[{id:`${id}-1`,title:idea?&#x27;明确首轮目标&#x27;:&#x27;建立项目现状与三部门依据&#x27;,type:&#x27;阶段目标&#x27;,stage:&#x27;product&#x27;,status:&#x27;running&#x27;,summary:idea?&#x27;产品开始明确目标和最小范围。&#x27;:&#x27;先根据已登记资料整理项目现状。&#x27;,handoff:&#x27;产品处理中&#x27;,material:w.material||&#x27;项目起点&#x27;,updated:&#x27;刚刚&#x27;,events:[],messages:{product:[],engineering:[],quality:[]},snapshots:{product:[],engineering:[],quality:[]}}]};projects.unshift(p);state.wizard=null;goProject(id);toast(idea?&#x27;示例项目已创建，产品部开始整理&#x27;:&#x27;示例项目已建立，可以查看三部门建档结果&#x27;)}
+function recordMove(id,to){const p=current(),item=itemById(id,p);if(!item)return;const from=stageLabels[item.stage],target=stageLabels[to],kind=to===&#x27;engineering&#x27;&amp;&amp;item.stage===&#x27;quality&#x27;?&#x27;返工&#x27;:to===&#x27;done&#x27;?&#x27;采纳成果&#x27;:&#x27;提交&#x27;+target;item.stage=to;item.status=to===&#x27;done&#x27;?&#x27;adopted&#x27;:to===&#x27;quality&#x27;?&#x27;qa&#x27;:to===&#x27;engineering&#x27;&amp;&amp;from===&#x27;质检&#x27;?&#x27;rework&#x27;:to===&#x27;product&#x27;?&#x27;waiting&#x27;:&#x27;running&#x27;;item.handoff=`${from} → ${target} · ${kind}`;item.updated=&#x27;刚刚&#x27;;item.events=item.events||[];item.events.unshift({time:&#x27;刚刚（示例）&#x27;,from,to:target,kind,text:to===&#x27;done&#x27;?&#x27;检查通过，结果已纳入当前项目成果。&#x27;:kind===&#x27;返工&#x27;?&#x27;质检记录已退回工程，等待修复后重新提交。&#x27;:`已将材料交给${target}继续处理。`});p.handoffs=p.handoffs||[];p.handoffs.unshift({time:&#x27;刚刚（示例）&#x27;,item:item.id,from,to:target,kind,text:item.events[0].text});if(to===&#x27;done&#x27;)p.baseline=`${item.title} · 已采纳`;closeModal();render();toast(`示例交接已记录：${from} → ${target}`)}
+function observationPage(){const o=ensureObservation();if(o){o.setProject?.(state.projectId);try{return o.render()}catch(e){return `&lt;div class=&quot;yp-empty-col&quot; style=&quot;margin-top:25px&quot;&gt;观测模块暂时无法渲染：${esc(e.message)}&lt;/div&gt;`}}return `&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-empty-col&quot; style=&quot;padding:42px&quot;&gt;${icon(&#x27;activity&#x27;)}&lt;h3 style=&quot;margin-top:10px&quot;&gt;观测模块待装配&lt;/h3&gt;&lt;p style=&quot;margin-top:6px&quot;&gt;观测模块会在装配后显示请求、事件、Token 和原始数据；当前项目交互不受影响。&lt;/p&gt;&lt;/div&gt;&lt;/section&gt;`}
+function goProject(id){state.projectId=id;state.page=&#x27;overview&#x27;;state.department=&#x27;product&#x27;;state.deptScope={product:&#x27;all&#x27;,engineering:&#x27;all&#x27;,quality:&#x27;all&#x27;};state.detailItem=null;state.menu=false;state.nav=false;state.snapshotId=null;observation?.setProject?.(id);render()}
+root.addEventListener(&#x27;click&#x27;,e=&gt;{
+ const el=e.target.closest(&#x27;button,a,[data-attempt],[data-observation-action]&#x27;);if(!el||!root.contains(el))return;
+ 
+ if(el.dataset.project){goProject(el.dataset.project);return}
+ if(el.dataset.action===&#x27;move-item&#x27;){recordMove(el.dataset.item,el.dataset.to);return}
+ if(el.dataset.openDept){const dept=el.dataset.openDept,focus=el.dataset.focusItem;closeModal();state.page=&#x27;department&#x27;;state.department=dept;state.deptScope[dept]=focus||&#x27;all&#x27;;state.snapshotId=null;render();return}
+ if(el.dataset.action===&#x27;move-item&#x27;){recordMove(el.dataset.item,el.dataset.to);return}
+ if(el.dataset.item&amp;&amp;!el.dataset.action){openItem(el.dataset.item);return}
+ if(el.dataset.attempt){const o=ensureObservation();if(o){state.page=&#x27;observation&#x27;;state.department=el.dataset.returnDept||state.department;state.deptScope[state.department]=el.dataset.returnScope||&#x27;all&#x27;;state.snapshotId=el.dataset.attempt;o.setProject?.(state.projectId);o.openRequest(el.dataset.attempt,{department:state.department,scope:state.deptScope[state.department],snapshotId:state.snapshotId});render()}return}
+ if(el.dataset.tab){const tab=el.dataset.tab;if(tab===&#x27;overview&#x27;){state.page=&#x27;overview&#x27;}else if(tab===&#x27;observation&#x27;){state.page=&#x27;observation&#x27;;ensureObservation()?.setProject?.(state.projectId)}else{state.page=&#x27;department&#x27;;state.department=tab;state.snapshotId=null}state.menu=false;render();return}
+ if(el.dataset.page){state.page=el.dataset.page;state.menu=false;state.nav=false;render();return}
+ if(el.dataset.inspect){state.inspect=el.dataset.inspect;render();return}
+ if(el.dataset.overviewMode){state.overviewMode=el.dataset.overviewMode;render();return}
+ if(el.dataset.kind){state.wizard.kind=el.dataset.kind;state.wizard.step=&#x27;form&#x27;;render();return}
+ if(el.dataset.restore){const restored=projects.find(p=&gt;p.id===el.dataset.restore);if(restored)restored.archived=false;goProject(el.dataset.restore);toast(&#x27;项目已恢复&#x27;);return}
+ const a=el.dataset.action;if(!a)return;
+ if(a===&#x27;new-project&#x27;)startWizard();else if(a===&#x27;nav&#x27;){state.nav=!state.nav;render()}else if(a===&#x27;menu&#x27;){state.menu=!state.menu;render()}else if(a===&#x27;pin&#x27;){const p=current();p.pinned=!p.pinned;state.menu=false;render();toast(p.pinned?&#x27;项目已置顶&#x27;:&#x27;已取消置顶&#x27;)}else if([&#x27;rename&#x27;,&#x27;archive&#x27;,&#x27;decision&#x27;,&#x27;add-source&#x27;].includes(a)){showModal(a)}else if(a===&#x27;close-modal&#x27;){closeModal()}else if(a===&#x27;confirm-archive&#x27;){const p=current();p.archived=true;closeModal();state.projectId=projects.find(x=&gt;!x.archived)?.id||null;state.page=state.projectId?&#x27;overview&#x27;:&#x27;archives&#x27;;render();toast(&#x27;项目已归档，可在已归档项目中恢复&#x27;)}else if(a===&#x27;leave-wizard&#x27;){state.wizard=null;state.page=current()?&#x27;overview&#x27;:&#x27;archives&#x27;;render()}else if(a===&#x27;wizard-back&#x27;){if(state.wizard.step===&#x27;form&#x27;){const f=content.querySelector(&#x27;form&#x27;);if(f){const d=new FormData(f);[&#x27;name&#x27;,&#x27;goal&#x27;,&#x27;path&#x27;,&#x27;material&#x27;].forEach(k=&gt;state.wizard[k]=String(d.get(k)||&#x27;&#x27;).trim())}state.wizard.step=&#x27;choice&#x27;}else state.wizard.step=&#x27;form&#x27;;render()}else if(a===&#x27;finish-import&#x27;){createProject(state.wizard)}else if(a===&#x27;move-item&#x27;){recordMove(el.dataset.item,el.dataset.to)}else if(a===&#x27;open-all-handoffs&#x27;){state.overviewMode=&#x27;flow&#x27;;render()}
+});
+root.addEventListener(&#x27;change&#x27;,e=&gt;{const el=e.target;if(el.matches(&#x27;[data-snapshot-select]&#x27;)){state.snapshotId=el.value;render();return}if(el.matches(&#x27;[data-dept-scope]&#x27;)){state.department=el.dataset.deptScope;state.deptScope[state.department]=el.value;state.snapshotId=null;render()}});
+root.addEventListener(&#x27;input&#x27;,e=&gt;{const el=e.target;if(el.matches(&#x27;[data-search]&#x27;)){state.query=el.value;const pos=el.selectionStart;renderSide();initIcons();const f=side.querySelector(&#x27;[data-search]&#x27;);f?.focus();f?.setSelectionRange(pos,pos)}if(el.dataset.draft)state.drafts[el.dataset.draft]=el.value});
+root.addEventListener(&#x27;submit&#x27;,e=&gt;{const form=e.target.closest(&#x27;form&#x27;);if(!form)return;e.preventDefault();if(!form.reportValidity())return;const d=new FormData(form),kind=form.dataset.form,p=current();
+ if(kind===&#x27;project-input&#x27;){const key=`${p.id}|project|all`,text=String(state.drafts[key]||&#x27;&#x27;).trim();if(!text){toast(&#x27;请先输入项目内容&#x27;);return}p.departmentMessages.product.unshift({id:`input-${Date.now()}`,author:&#x27;你&#x27;,kind:&#x27;项目输入&#x27;,time:&#x27;刚刚（示例）&#x27;,text,scope:&#x27;all&#x27;,status:&#x27;已接收（原型）&#x27;});state.drafts[key]=&#x27;&#x27;;render();toast(&#x27;项目输入已记录，等待产品回应&#x27;)}
+ else if(kind===&#x27;department-input&#x27;){const dept=form.dataset.dept,scope=form.dataset.scope,key=`${p.id}|${dept}|${scope}`,text=String(state.drafts[key]||&#x27;&#x27;).trim();if(!text){toast(&#x27;请先输入要发送的内容&#x27;);return}const m={id:`msg-${Date.now()}`,author:&#x27;你&#x27;,kind:&#x27;定向指导&#x27;,time:&#x27;刚刚（示例）&#x27;,text,scope,status:&#x27;已接收（原型）&#x27;};if(scope===&#x27;all&#x27;){p.departmentMessages[dept].unshift(m)}else{const it=itemById(scope,p);it?.messages?.[dept]?.unshift(m)}state.drafts[key]=&#x27;&#x27;;render();toast(`已记录给${roles[dept].name}的指导原文`)}
+ else if(kind===&#x27;wizard&#x27;){const w=state.wizard;[&#x27;name&#x27;,&#x27;goal&#x27;,&#x27;path&#x27;,&#x27;material&#x27;].forEach(k=&gt;w[k]=String(d.get(k)||&#x27;&#x27;).trim());if(!w.name||!w.goal){toast(&#x27;请填写项目名称和目标&#x27;);return}if(w.kind===&#x27;existing&#x27;&amp;&amp;!w.path&amp;&amp;!w.material){toast(&#x27;请至少提供项目位置或已有资料说明&#x27;);return}if(w.kind===&#x27;idea&#x27;){createProject(w)}else{w.step=&#x27;report&#x27;;render()}}
+ else if(kind===&#x27;settings&#x27;){const name=String(d.get(&#x27;name&#x27;)||&#x27;&#x27;).trim(),goal=String(d.get(&#x27;goal&#x27;)||&#x27;&#x27;).trim();if(!name||!goal)return;p.name=name;p.goal=goal;p.path=String(d.get(&#x27;path&#x27;)||&#x27;&#x27;).trim()||&#x27;尚未关联目录&#x27;;p.kind=String(d.get(&#x27;kind&#x27;)||p.kind);render();toast(&#x27;项目设置已更新&#x27;)}
+ else if(kind===&#x27;rename&#x27;){const name=String(d.get(&#x27;name&#x27;)||&#x27;&#x27;).trim();if(!name)return;p.name=name;closeModal();render();toast(&#x27;项目名称已更新&#x27;)}
+ else if(kind===&#x27;decision&#x27;){const answer=String(d.get(&#x27;answer&#x27;)||&#x27;&#x27;).trim();if(!answer)return;p.answer=answer;p.question=&#x27;&#x27;;const it=p.workItems.find(x=&gt;x.status===&#x27;waiting&#x27;);if(it){it.status=&#x27;running&#x27;;it.stage=&#x27;engineering&#x27;;it.handoff=&#x27;产品 → 工程 · 已记录决定&#x27;;it.updated=&#x27;刚刚（示例）&#x27;;it.events.unshift({time:&#x27;刚刚（示例）&#x27;,from:&#x27;产品&#x27;,to:&#x27;工程&#x27;,kind:&#x27;提交工程&#x27;,text:&#x27;已记录你的决定，工程继续比较方案。&#x27;});p.handoffs.unshift({time:&#x27;刚刚（示例）&#x27;,item:it.id,from:&#x27;产品&#x27;,to:&#x27;工程&#x27;,kind:&#x27;提交工程&#x27;,text:&#x27;已记录你的决定，工程继续比较方案。&#x27;})}closeModal();render();toast(&#x27;决定已记录，示例流程继续推进&#x27;)}
+ else if(kind===&#x27;source&#x27;){const name=String(d.get(&#x27;name&#x27;)||&#x27;&#x27;).trim(),text=String(d.get(&#x27;text&#x27;)||&#x27;&#x27;).trim();if(!name||!text)return;p.sources.unshift({name,type:&#x27;新增登记&#x27;,text});closeModal();render();toast(&#x27;资料说明已登记&#x27;)}
+});
+root.addEventListener(&#x27;keydown&#x27;,e=&gt;{if(e.key===&#x27;Escape&#x27;&amp;&amp;state.modal){e.preventDefault();closeModal()}});
+let inspectorOpen=true;
+const layoutOptions={overviewMode:&#x27;flow&#x27;};
+projects.forEach(p=&gt;p.workItems.forEach(item=&gt;{for(const key of Object.keys(roles)){if(!Array.isArray(item.snapshots?.[key]))item.snapshots[key]=[];if(!Array.isArray(item.messages?.[key]))item.messages[key]=[]}}));
+function departmentPage(dept){const p=current(),r=roles[dept],scope=state.deptScope[dept]||&#x27;all&#x27;,item=scope===&#x27;all&#x27;?null:itemById(scope,p),messages=[];const projectMessages=(p.departmentMessages?.[dept]||[]).filter(m=&gt;scope===&#x27;all&#x27;||m.scope===&#x27;all&#x27;||m.scope===scope);projectMessages.forEach(m=&gt;messages.push({...m,scopeLabel:m.scope===&#x27;all&#x27;?&#x27;整个项目&#x27;:itemById(m.scope,p)?.title||m.scope}));if(item)(item.messages?.[dept]||[]).forEach(m=&gt;messages.push({...m,scopeLabel:item.title}));else activeItems(p).forEach(it=&gt;(it.messages?.[dept]||[]).forEach(m=&gt;messages.push({...m,scopeLabel:it.title})));const snapshots=scope===&#x27;all&#x27;?activeItems(p).flatMap(it=&gt;(Array.isArray(it.snapshots?.[dept])?it.snapshots[dept]:[]).map(s=&gt;({...s,itemId:it.id}))):(Array.isArray(item?.snapshots?.[dept])?item.snapshots[dept]:[]).map(s=&gt;({...s,itemId:item.id}));return `${commonHeader(`${r.name}工作区`,`${r.text} · 围绕整个项目持续工作`)}&lt;div class=&quot;yp-dept-layout&quot;&gt;&lt;section&gt;&lt;div class=&quot;yp-dept-toolbar&quot;&gt;&lt;div&gt;&lt;h2&gt;部门消息&lt;/h2&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:3px&quot;&gt;${scope===&#x27;all&#x27;?&#x27;当前查看整个项目&#x27;:`当前聚焦：${esc(item?.title||scope)}`}&lt;/p&gt;&lt;/div&gt;&lt;label class=&quot;yp-small&quot;&gt;查看范围 &lt;select class=&quot;yp-scope-select&quot; data-dept-scope=&quot;${dept}&quot; aria-label=&quot;部门消息查看范围&quot;&gt;&lt;option value=&quot;all&quot; ${scope===&#x27;all&#x27;?&#x27;selected&#x27;:&#x27;&#x27;}&gt;整个项目&lt;/option&gt;${activeItems(p).map(it=&gt;`&lt;option value=&quot;${it.id}&quot; ${scope===it.id?&#x27;selected&#x27;:&#x27;&#x27;}&gt;${esc(it.title)}&lt;/option&gt;`).join(&#x27;&#x27;)}&lt;/select&gt;&lt;/label&gt;&lt;/div&gt;&lt;div class=&quot;yp-timeline&quot;&gt;&lt;article class=&quot;yp-message&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;strong&gt;${r.name}&lt;/strong&gt;&lt;span class=&quot;yp-small&quot;&gt;项目依据已载入 · 示例&lt;/span&gt;&lt;/div&gt;&lt;p&gt;${dept===&#x27;product&#x27;?`当前项目目标：${esc(p.goal)} 产品部持续维护需求、优先级和取舍。`:dept===&#x27;engineering&#x27;?`从「${esc(p.baseline)}」和已登记资料开始，工程部维护整体实现与技术决定。`:`质检部维护项目验收依据，区分已有证据、本轮检查和仍未验证项。`}&lt;/p&gt;&lt;p class=&quot;yp-message-context&quot;&gt;范围：整个项目 · 来源：项目工作依据&lt;/p&gt;&lt;/article&gt;${messages.map(messageView).join(&#x27;&#x27;)||`&lt;div class=&quot;yp-empty-col&quot; style=&quot;margin:12px 0 20px&quot;&gt;${r.name}还没有该范围的消息。可以直接输入指导。&lt;/div&gt;`}&lt;/div&gt;${composeDepartment(p,dept,scope)}&lt;/section&gt;${inspector(p,dept,scope,snapshots)}&lt;/div&gt;`}
+function enhanceInspector(){const panel=content.querySelector(&#x27;.yp-inspector&#x27;);if(!panel)return;const head=panel.firstElementChild;if(head&amp;&amp;!head.querySelector(&#x27;[data-action=&quot;toggle-inspector&quot;]&#x27;)){const button=document.createElement(&#x27;button&#x27;);button.type=&#x27;button&#x27;;button.className=&#x27;yp-icon&#x27;;button.dataset.action=&#x27;toggle-inspector&#x27;;button.setAttribute(&#x27;aria-label&#x27;,&#x27;收起工作依据检查&#x27;);head.appendChild(button)}if(head){const button=head.querySelector(&#x27;[data-action=&quot;toggle-inspector&quot;]&#x27;);if(button){button.innerHTML=icon(inspectorOpen?&#x27;chevron-up&#x27;:&#x27;chevron-down&#x27;);button.setAttribute(&#x27;aria-expanded&#x27;,String(inspectorOpen));button.setAttribute(&#x27;aria-label&#x27;,inspectorOpen?&#x27;收起工作依据检查&#x27;:&#x27;展开工作依据检查&#x27;)}}Array.from(panel.children).slice(1).forEach(child=&gt;{child.hidden=!inspectorOpen})}
+function render(){const p=current();if(state.page===&#x27;observation&#x27;)ensureObservation()?.setProject?.(state.projectId);root.querySelector(&#x27;.yp-shell&#x27;).classList.toggle(&#x27;show-nav&#x27;,state.nav);renderSide();renderBar();content.innerHTML=state.page===&#x27;archives&#x27;?archivesPage():state.page===&#x27;wizard&#x27;?wizardPage():!p?archivesPage():state.page===&#x27;sources&#x27;?sourcesPage():state.page===&#x27;settings&#x27;?settingsPage():state.page===&#x27;department&#x27;?departmentPage(state.department):state.page===&#x27;observation&#x27;?observationPage():overviewPage();enhanceInspector();initIcons()}
+root.addEventListener(&#x27;click&#x27;,e=&gt;{const el=e.target.closest(&#x27;[data-action=&quot;toggle-inspector&quot;]&#x27;);if(el){inspectorOpen=!inspectorOpen;render()}});
+render();
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=&gt;{state.overviewMode=layoutOptions.overviewMode;render()}});tweak.addSelect(layoutOptions,&#x27;overviewMode&#x27;,{label:&#x27;总览默认视图&#x27;,options:[{label:&#x27;三部门流程&#x27;,value:&#x27;flow&#x27;},{label:&#x27;跨部门看板&#x27;,value:&#x27;board&#x27;}]})}
+})();
+&lt;/script&gt;
+&lt;style&gt;@media(max-width:470px){#yudao-project-prototype .yp-board{grid-template-columns:1fr}}&lt;/style&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

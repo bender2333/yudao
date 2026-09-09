@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Yudao 项目管理原型 · 2026-09-08</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Yudao 项目管理原型 · 2026-09-08" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Yudao 项目管理原型 · 2026-09-08&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;!-- Yudao 项目工作台原型 · 2026-09-08。基于已认可的三部门工作台增加项目层。全部数据与交互为内存示例，不读取目录、不调用模型、不修改真实项目。 --&gt;
+&lt;div id=&quot;yudao-project-prototype&quot; aria-label=&quot;Yudao 项目管理交互原型&quot;&gt;
+&lt;style&gt;
+#yudao-project-prototype{--yp-bg:light-dark(#f7f8f7,#171918);--yp-side:light-dark(#eff1ef,#1c1f1d);--yp-surface:light-dark(#fff,#212522);--yp-soft:light-dark(#f1f4f2,#292e2a);--yp-text:light-dark(#282e2b,#e8eee9);--yp-muted:light-dark(#68756e,#a2b0a6);--yp-line:light-dark(#dfe5e0,#37433a);--yp-green:light-dark(#087f69,#66d5b6);--yp-tint:light-dark(#e5f2eb,#243f32);--yp-amber:light-dark(#8c620e,#e7c074);--yp-amber-bg:light-dark(#faf2df,#3a3224);--yp-red:light-dark(#b44338,#ee9e92);--yp-blue:light-dark(#39658c,#92b8e0);font:14px/1.6 &quot;Microsoft YaHei UI&quot;,&quot;Microsoft YaHei&quot;,system-ui,sans-serif;color:var(--yp-text);background:var(--yp-bg);color-scheme:light dark;position:relative;min-width:0;text-align:left}
+#yudao-project-prototype *{box-sizing:border-box}#yudao-project-prototype [hidden]{display:none!important}#yudao-project-prototype button,#yudao-project-prototype input,#yudao-project-prototype textarea,#yudao-project-prototype select{font:inherit;color:inherit}#yudao-project-prototype button{cursor:pointer}#yudao-project-prototype button:disabled{cursor:default;opacity:.5}#yudao-project-prototype h1,#yudao-project-prototype h2,#yudao-project-prototype h3,#yudao-project-prototype p{margin:0}#yudao-project-prototype h1{font-size:26px;font-weight:500;line-height:1.4;letter-spacing:-.6px}#yudao-project-prototype h2{font-size:16px;font-weight:500}#yudao-project-prototype h3{font-size:14px;font-weight:500}#yudao-project-prototype strong{font-weight:500}#yudao-project-prototype svg{width:17px;height:17px;flex-shrink:0}#yudao-project-prototype .yp-shell{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:870px}#yudao-project-prototype .yp-sidebar{background:var(--yp-side);border-right:1px solid var(--yp-line);padding:22px 13px;display:flex;flex-direction:column;gap:23px;min-width:0}#yudao-project-prototype .yp-brand{display:flex;align-items:center;gap:9px;padding:0 8px;font-size:17px;font-weight:500;letter-spacing:.4px}#yudao-project-prototype .yp-brand svg{color:var(--yp-green);width:21px;height:21px}#yudao-project-prototype .yp-proto{font-size:10px;color:var(--yp-muted);border:1px solid var(--yp-line);border-radius:4px;padding:1px 4px;letter-spacing:1px;margin-left:auto}#yudao-project-prototype .yp-muted{color:var(--yp-muted)}#yudao-project-prototype .yp-small{font-size:12px;color:var(--yp-muted)}#yudao-project-prototype .yp-row{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}#yudao-project-prototype .yp-between{justify-content:space-between}#yudao-project-prototype .yp-side-label{display:flex;align-items:center;justify-content:space-between;padding:0 9px;margin:0 0 9px;font-size:11px;letter-spacing:1px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon{display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;border-radius:6px;padding:7px;min-width:30px;min-height:30px;color:var(--yp-muted)}#yudao-project-prototype .yp-icon:hover{background:var(--yp-soft);color:var(--yp-text)}#yudao-project-prototype .yp-search{display:flex;align-items:center;gap:7px;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:7px;padding:7px 9px;margin-top:15px}#yudao-project-prototype .yp-search input{width:100%;min-width:0;border:0;background:transparent;font-size:12px;padding:0}#yudao-project-prototype .yp-project{width:100%;border:1px solid transparent;background:transparent;border-radius:7px;display:flex;gap:8px;text-align:left;align-items:center;padding:9px 8px;margin-top:3px}#yudao-project-prototype .yp-project:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-project.is-selected{background:var(--yp-tint);color:var(--yp-green);border-color:color-mix(in srgb,var(--yp-green) 13%,transparent)}#yudao-project-prototype .yp-project span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}#yudao-project-prototype .yp-side-tasks{margin:4px 8px 12px 16px;border-left:1px solid var(--yp-line);padding-left:13px}#yudao-project-prototype .yp-side-task{border:0;background:transparent;width:100%;text-align:left;display:flex;align-items:center;gap:7px;padding:7px 0;font-size:11px;color:var(--yp-muted)}#yudao-project-prototype .yp-side-task span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#yudao-project-prototype .yp-side-task.is-selected{color:var(--yp-green)}#yudao-project-prototype .yp-side-bottom{margin-top:auto;display:grid;gap:9px;border-top:1px solid var(--yp-line);padding-top:17px}#yudao-project-prototype .yp-footnote{padding:0 9px;font-size:11px;color:var(--yp-muted)}#yudao-project-prototype .yp-main{min-width:0}#yudao-project-prototype .yp-topbar{padding:14px 28px;min-height:59px;border-bottom:1px solid var(--yp-line);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--yp-surface)}#yudao-project-prototype .yp-breadcrumb{display:flex;gap:8px;align-items:center;min-width:0;font-size:12px;color:var(--yp-muted);flex-wrap:wrap}#yudao-project-prototype .yp-breadcrumb button{padding:0;border:0;background:none;color:var(--yp-muted)}#yudao-project-prototype .yp-breadcrumb strong{color:var(--yp-text)}#yudao-project-prototype .yp-auto{font-size:11px;display:flex;align-items:center;gap:6px;color:var(--yp-muted);white-space:nowrap}#yudao-project-prototype .yp-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--yp-green);flex-shrink:0}#yudao-project-prototype .yp-dot.waiting{background:var(--yp-amber)}#yudao-project-prototype .yp-dot.muted{background:var(--yp-muted)}#yudao-project-prototype .yp-content{padding:29px 30px 35px;max-width:1160px;margin:auto;min-width:0}#yudao-project-prototype .yp-eyebrow{font-size:11px;letter-spacing:1.3px;color:var(--yp-muted);margin-bottom:6px}#yudao-project-prototype .yp-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}#yudao-project-prototype .yp-subtitle{font-size:13px;color:var(--yp-muted);margin-top:8px;max-width:65ch;overflow-wrap:anywhere}#yudao-project-prototype .yp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;border:1px solid var(--yp-line);border-radius:6px;background:var(--yp-surface);font-size:12px;min-height:34px;white-space:nowrap}#yudao-project-prototype .yp-btn:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-btn.primary{background:var(--yp-green);color:light-dark(#fff,#102b20);border-color:var(--yp-green)}#yudao-project-prototype .yp-btn.primary:hover{filter:brightness(1.08)}#yudao-project-prototype .yp-link{display:inline-flex;gap:5px;align-items:center;padding:0;border:0;background:transparent;color:var(--yp-green);font-size:12px;text-align:left}#yudao-project-prototype .yp-tabs{display:flex;gap:22px;border-bottom:1px solid var(--yp-line);margin-top:24px;flex-wrap:wrap}#yudao-project-prototype .yp-tab{padding:10px 0;border:0;border-bottom:2px solid transparent;background:none;color:var(--yp-muted);font-size:12px}#yudao-project-prototype .yp-tab.is-selected{color:var(--yp-green);border-bottom-color:var(--yp-green)}#yudao-project-prototype .yp-section{margin-top:25px}#yudao-project-prototype .yp-section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:13px}#yudao-project-prototype .yp-notice{padding:14px 16px;background:var(--yp-amber-bg);border-left:3px solid var(--yp-amber);border-radius:0 7px 7px 0;display:flex;gap:12px;align-items:flex-start}#yudao-project-prototype .yp-notice&gt;svg{color:var(--yp-amber);margin-top:3px}#yudao-project-prototype .yp-notice p{font-size:12px;margin-top:4px;color:var(--yp-muted)}#yudao-project-prototype .yp-notice .yp-link{margin-top:8px;color:var(--yp-amber)}#yudao-project-prototype .yp-notice-copy{flex:1;min-width:0}#yudao-project-prototype .yp-summary{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:25px;padding:20px 0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yp-summary p{font-size:13px;margin-top:8px}#yudao-project-prototype .yp-summary-side{border-left:1px solid var(--yp-line);padding-left:22px}#yudao-project-prototype .yp-tag{display:inline-flex;align-items:center;gap:5px;border-radius:4px;background:var(--yp-soft);color:var(--yp-muted);padding:2px 6px;font-size:11px;white-space:nowrap}#yudao-project-prototype .yp-tag.green{color:var(--yp-green);background:var(--yp-tint)}#yudao-project-prototype .yp-tag.amber{color:var(--yp-amber);background:var(--yp-amber-bg)}#yudao-project-prototype .yp-composer{background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:9px;padding:13px 14px;box-shadow:0 2px 5px light-dark(#24372b05,#00000015)}#yudao-project-prototype .yp-composer:focus-within{border-color:var(--yp-green)}#yudao-project-prototype .yp-composer textarea{display:block;width:100%;min-height:67px;border:0;background:transparent;resize:vertical;padding:0;font-size:13px;line-height:1.7}#yudao-project-prototype .yp-composer-footer{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:7px}#yudao-project-prototype .yp-task-list{border-top:1px solid var(--yp-line)}#yudao-project-prototype .yp-task-row{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:center;border-bottom:1px solid var(--yp-line);padding:12px 1px}#yudao-project-prototype .yp-task-row&gt;.yp-icon{padding:0;min-width:20px;min-height:24px}#yudao-project-prototype .yp-task-title{padding:0;border:0;background:none;text-align:left;font-size:13px}#yudao-project-prototype .yp-task-title:hover{color:var(--yp-green)}#yudao-project-prototype .yp-task-meta{display:flex;gap:7px;flex-wrap:wrap;color:var(--yp-muted);font-size:11px;margin-top:3px}#yudao-project-prototype .yp-depts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}#yudao-project-prototype .yp-dept{padding:14px;border:1px solid var(--yp-line);border-radius:7px;background:var(--yp-surface);min-width:0}#yudao-project-prototype .yp-dept p{font-size:12px;color:var(--yp-muted);margin:11px 0}#yudao-project-prototype .yp-dept .yp-row{gap:7px}#yudao-project-prototype .yp-dept&gt;.yp-link{margin-top:7px}#yudao-project-prototype .yp-empty{text-align:center;padding:40px 20px;border:1px dashed var(--yp-line);border-radius:8px}#yudao-project-prototype .yp-empty p{font-size:13px;color:var(--yp-muted);margin:8px 0 18px}#yudao-project-prototype .yp-menu-wrap{position:relative}#yudao-project-prototype .yp-menu{position:absolute;right:0;top:40px;z-index:4;min-width:170px;background:var(--yp-surface);border:1px solid var(--yp-line);box-shadow:0 10px 30px #0002;border-radius:7px;padding:5px}#yudao-project-prototype .yp-menu button{width:100%;display:flex;gap:8px;align-items:center;text-align:left;padding:8px;border:0;border-radius:4px;background:transparent;font-size:12px}#yudao-project-prototype .yp-menu button:hover{background:var(--yp-soft)}#yudao-project-prototype .yp-form{display:grid;gap:17px}#yudao-project-prototype .yp-field{display:grid;gap:6px;font-size:12px}#yudao-project-prototype .yp-field input,#yudao-project-prototype .yp-field textarea,#yudao-project-prototype .yp-field select{width:100%;min-width:0;border:1px solid var(--yp-line);background:var(--yp-surface);border-radius:6px;padding:9px 11px;font-size:13px}#yudao-project-prototype .yp-field textarea{resize:vertical;line-height:1.7;min-height:82px}#yudao-project-prototype .yp-field small{font-size:11px;color:var(--yp-muted)}#yudao-project-prototype .yp-form-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}#yudao-project-prototype .yp-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}#yudao-project-prototype .yp-choice{padding:19px 16px;border:1px solid var(--yp-line);border-radius:8px;background:var(--yp-surface);text-align:left;color:var(--yp-text)}#yudao-project-prototype .yp-choice:hover{border-color:var(--yp-green);background:var(--yp-tint)}#yudao-project-prototype .yp-choice svg{color:var(--yp-green);margin-bottom:14px;width:24px;height:24px}#yudao-project-prototype .yp-choice strong{display:block;font-size:15px}#yudao-project-prototype .yp-choice p{font-size:12px;color:var(--yp-muted);margin-top:8px}#yudao-project-prototype .yp-wizard{max-width:620px;margin:0 auto}#yudao-project-prototype .yp-steps{display:flex;gap:9px;align-items:center;margin:18px 0 24px;font-size:11px;color:var(--yp-muted);flex-wrap:wrap}#yudao-project-prototype .yp-step-current{color:var(--yp-green)}#yudao-project-prototype .yp-step-line{width:20px;height:1px;background:var(--yp-line)}#yudao-project-prototype .yp-form-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--yp-line);padding-top:18px;margin-top:24px}#yudao-project-prototype .yp-source-row{display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--yp-line);font-size:12px}#yudao-project-prototype .yp-source-row&gt;div{flex:1;min-width:0;overflow-wrap:anywhere}#yudao-project-prototype .yp-source-row svg{color:var(--yp-muted)}#yudao-project-prototype .yp-source-row small{display:block;font-size:11px;color:var(--yp-muted);margin-top:3px}#yudao-project-prototype .yp-report{margin-top:17px;padding:16px;background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:7px}#yudao-project-prototype .yp-fact{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--yp-line);font-size:12px;align-items:start}#yudao-project-prototype .yp-fact:last-child{border:0;padding-bottom:0}#yudao-project-prototype .yp-fact:first-of-type{margin-top:8px}#yudao-project-prototype .yp-fact small{display:block;color:var(--yp-muted);margin-top:3px;overflow-wrap:anywhere}#yudao-project-prototype .yp-check{display:flex;gap:8px;align-items:flex-start;font-size:12px;cursor:pointer}#yudao-project-prototype .yp-check input{accent-color:var(--yp-green);margin:4px 0}#yudao-project-prototype .yp-timeline{margin-top:17px}#yudao-project-prototype .yp-message{border-left:1px solid var(--yp-line);padding:0 0 24px 17px;position:relative}#yudao-project-prototype .yp-message:before{content:&quot;&quot;;position:absolute;left:-4px;top:6px;width:7px;height:7px;background:var(--yp-green);border-radius:50%}#yudao-project-prototype .yp-message.user:before{background:var(--yp-blue)}#yudao-project-prototype .yp-message p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:7px}#yudao-project-prototype .yp-message .yp-row{font-size:12px}#yudao-project-prototype .yp-work{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:25px;margin-top:22px}#yudao-project-prototype .yp-inspector{background:var(--yp-surface);border:1px solid var(--yp-line);border-radius:7px;padding:14px;align-self:start;min-width:0}#yudao-project-prototype .yp-inspector p{font-size:12px;color:var(--yp-muted);margin-top:12px;overflow-wrap:anywhere}#yudao-project-prototype .yp-inspector .yp-tabs{gap:13px;margin-top:8px}#yudao-project-prototype .yp-inspector .yp-tab{font-size:11px}#yudao-project-prototype .yp-inspector details{margin-top:13px;font-size:12px}#yudao-project-prototype .yp-inspector summary{cursor:pointer}#yudao-project-prototype .yp-detail{padding:18px 0;border-bottom:1px solid var(--yp-line)}#yudao-project-prototype .yp-detail p{font-size:13px;color:var(--yp-muted);margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere}#yudao-project-prototype .yp-code{font:12px/1.7 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--yp-line);background:var(--yp-surface);padding:14px;border-radius:7px;margin-top:14px}#yudao-project-prototype .yp-modal-layer{position:absolute;inset:0;z-index:10;background:#101f1760;padding:65px 20px 30px;display:flex;align-items:flex-start;justify-content:center}#yudao-project-prototype .yp-modal{width:100%;max-width:480px;border:1px solid var(--yp-line);border-radius:10px;background:var(--yp-surface);box-shadow:0 20px 70px #0003;padding:22px}#yudao-project-prototype .yp-modal p{font-size:13px;color:var(--yp-muted);margin-top:10px}#yudao-project-prototype .yp-modal .yp-form{margin-top:20px}#yudao-project-prototype .yp-toast{position:absolute;right:20px;top:66px;z-index:15;background:var(--yp-text);color:var(--yp-surface);padding:9px 14px;border-radius:7px;box-shadow:0 5px 20px #0002;font-size:12px;max-width:calc(100% - 40px)}#yudao-project-prototype .yp-mobile-toggle{display:none}#yudao-project-prototype .yp-error{color:var(--yp-red);font-size:12px;margin-top:7px}#yudao-project-prototype .yp-list-tools{margin-bottom:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}#yudao-project-prototype .yp-pill{border:1px solid var(--yp-line);background:transparent;font-size:11px;border-radius:5px;padding:4px 9px}#yudao-project-prototype .yp-pill.is-selected{color:var(--yp-green);background:var(--yp-tint);border-color:transparent}#yudao-project-prototype .yp-basis-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+@media(max-width:1000px){#yudao-project-prototype .yp-shell{grid-template-columns:188px minmax(0,1fr)}#yudao-project-prototype .yp-content{padding:26px 23px}#yudao-project-prototype .yp-topbar{padding:14px 23px}#yudao-project-prototype .yp-work{grid-template-columns:minmax(0,1fr)}#yudao-project-prototype .yp-inspector{max-width:none}}
+@media(max-width:740px){#yudao-project-prototype .yp-shell{grid-template-columns:1fr;min-height:830px}#yudao-project-prototype .yp-sidebar{display:none;border-right:0;border-bottom:1px solid var(--yp-line);padding:18px;gap:15px}#yudao-project-prototype .yp-shell.show-nav .yp-sidebar{display:flex}#yudao-project-prototype .yp-side-bottom{margin-top:6px}#yudao-project-prototype .yp-mobile-toggle{display:inline-flex}#yudao-project-prototype .yp-content{padding:24px 18px}#yudao-project-prototype .yp-topbar{padding:10px 16px}#yudao-project-prototype .yp-auto span:last-child{display:none}#yudao-project-prototype .yp-heading{gap:10px}#yudao-project-prototype h1{font-size:23px}#yudao-project-prototype .yp-depts,#yudao-project-prototype .yp-basis-grid{grid-template-columns:1fr}#yudao-project-prototype .yp-dept p{margin:7px 0}#yudao-project-prototype .yp-tabs{gap:18px}#yudao-project-prototype .yp-summary{gap:16px}#yudao-project-prototype .yp-modal-layer{padding:35px 13px}#yudao-project-prototype .yp-modal{padding:18px}}
+@media(max-width:430px){#yudao-project-prototype .yp-summary,#yudao-project-prototype .yp-choices,#yudao-project-prototype .yp-form-two{grid-template-columns:1fr}#yudao-project-prototype .yp-summary-side{padding-left:0;border-left:0;border-top:1px solid var(--yp-line);padding-top:14px}#yudao-project-prototype .yp-content{padding:22px 14px}#yudao-project-prototype .yp-heading{flex-wrap:wrap}#yudao-project-prototype .yp-btn,#yudao-project-prototype .yp-icon,#yudao-project-prototype .yp-tab{min-height:44px}#yudao-project-prototype .yp-field input,#yudao-project-prototype .yp-field textarea,#yudao-project-prototype .yp-field select,#yudao-project-prototype .yp-composer textarea,#yudao-project-prototype .yp-search input{font-size:16px}#yudao-project-prototype .yp-tabs{gap:16px}#yudao-project-prototype .yp-tab{font-size:11px}#yudao-project-prototype .yp-composer-footer{align-items:flex-end}#yudao-project-prototype .yp-composer-footer .yp-small{max-width:150px;font-size:11px}#yudao-project-prototype .yp-task-row{grid-template-columns:17px minmax(0,1fr)}#yudao-project-prototype .yp-task-row&gt;div:last-child{grid-column:2}#yudao-project-prototype .yp-fact{grid-template-columns:1fr;gap:4px}#yudao-project-prototype .yp-fact&gt;.yp-tag{justify-self:start}#yudao-project-prototype .yp-notice{padding:12px}#yudao-project-prototype .yp-choice{padding:16px}#yudao-project-prototype .yp-choice svg{margin-bottom:7px}}
+&lt;/style&gt;
+&lt;div class=&quot;yp-shell&quot;&gt;&lt;aside class=&quot;yp-sidebar&quot; aria-label=&quot;项目导航&quot;&gt;&lt;/aside&gt;&lt;main class=&quot;yp-main&quot;&gt;&lt;div class=&quot;yp-topbar&quot;&gt;&lt;/div&gt;&lt;div class=&quot;yp-content&quot;&gt;&lt;/div&gt;&lt;/main&gt;&lt;/div&gt;
+&lt;div class=&quot;yp-modal-layer&quot; hidden&gt;&lt;/div&gt;&lt;div class=&quot;yp-toast&quot; role=&quot;status&quot; hidden&gt;&lt;/div&gt;
+&lt;script&gt;
+(()=&gt;{
+const root=document.getElementById(&#x27;yudao-project-prototype&#x27;);
+const side=root.querySelector(&#x27;.yp-sidebar&#x27;),bar=root.querySelector(&#x27;.yp-topbar&#x27;),content=root.querySelector(&#x27;.yp-content&#x27;),overlay=root.querySelector(&#x27;.yp-modal-layer&#x27;),toastBox=root.querySelector(&#x27;.yp-toast&#x27;);
+const esc=s=&gt;String(s??&#x27;&#x27;).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g,c=&gt;({&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;,&quot;&#x27;&quot;:&#x27;&amp;#39;&#x27;}[c]));
+const icon=n=&gt;`&lt;i data-lucide=&quot;${n}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;`;
+const roles={product:{name:&#x27;产品&#x27;,icon:&#x27;clipboard-list&#x27;,text:&#x27;目标、需求与取舍&#x27;},engineering:{name:&#x27;工程&#x27;,icon:&#x27;braces&#x27;,text:&#x27;方案、实现与自检&#x27;},quality:{name:&#x27;质检&#x27;,icon:&#x27;check-check&#x27;,text:&#x27;验收依据与独立检查&#x27;}};
+const projects=[
+ {id:&#x27;cargo&#x27;,name:&#x27;货物装载规划&#x27;,kind:&#x27;existing&#x27;,pinned:true,archived:false,goal:&#x27;让计划员快速生成可执行的装载方案，兼顾空间利用与操作稳定性。&#x27;,path:&#x27;C:/project/cargo-planning&#x27;,material:&#x27;产品说明、交互原型、代码与测试&#x27;,status:&#x27;持续开发&#x27;,baseline:&#x27;装载工作台 v0.3&#x27;,sourceReady:true,question:&#x27;混装方案中，优先增加装载数量，还是提高体积利用率？&#x27;,answer:&#x27;&#x27;,tasks:[{id:&#x27;cargo-3&#x27;,title:&#x27;增加混装方案比较&#x27;,status:&#x27;waiting&#x27;,summary:&#x27;需要明确数量和体积的优先关系，其他分析已经完成。&#x27;,messages:[]},{id:&#x27;cargo-2&#x27;,title:&#x27;优化手动摆放体验&#x27;,status:&#x27;done&#x27;,summary:&#x27;完成选中、移动和删除交互；已检查键盘操作。&#x27;,messages:[]},{id:&#x27;cargo-1&#x27;,title:&#x27;接入项目并建立三部门依据&#x27;,status:&#x27;done&#x27;,summary:&#x27;已整理产品、工程和质检依据，保留未验证项。&#x27;,messages:[]}],notes:[]},
+ {id:&#x27;lab&#x27;,name:&#x27;实验记录助手&#x27;,kind:&#x27;idea&#x27;,pinned:false,archived:false,goal:&#x27;帮助实验人员快速记录过程，让样品、参数和结果能够对应查询。&#x27;,path:&#x27;尚未关联目录&#x27;,material:&#x27;初始想法与用户场景&#x27;,status:&#x27;从想法开始&#x27;,baseline:&#x27;尚无交付&#x27;,sourceReady:false,question:&#x27;&#x27;,tasks:[{id:&#x27;lab-1&#x27;,title:&#x27;明确最小可用版本&#x27;,status:&#x27;running&#x27;,summary:&#x27;产品正在整理核心场景，首轮聚焦记录与查找。&#x27;,messages:[]}],notes:[]},
+ {id:&#x27;archive-demo&#x27;,name:&#x27;个人读书清单&#x27;,kind:&#x27;idea&#x27;,pinned:false,archived:true,goal:&#x27;记录阅读进度和读书笔记。&#x27;,path:&#x27;尚未关联目录&#x27;,material:&#x27;需求记录&#x27;,status:&#x27;已归档&#x27;,baseline:&#x27;首版交付&#x27;,sourceReady:true,question:&#x27;&#x27;,tasks:[],notes:[]}
+];
+const state={projectId:&#x27;cargo&#x27;,page:&#x27;home&#x27;,taskId:null,taskTab:&#x27;overview&#x27;,inspect:&#x27;context&#x27;,query:&#x27;&#x27;,filter:&#x27;all&#x27;,menu:false,nav:false,modal:null,drafts:{},wizard:null,sourceTab:&#x27;basis&#x27;,toastTimer:null,returnPage:&#x27;home&#x27;};
+const design={density:1,sidebarWidth:210};
+let seq=10,modalReturn=null;
+const current=()=&gt;projects.find(p=&gt;p.id===state.projectId);
+const task=()=&gt;current()?.tasks.find(t=&gt;t.id===state.taskId);
+const taskLabel=s=&gt;({waiting:&#x27;需要你决定&#x27;,running:&#x27;进行中&#x27;,done:&#x27;已完成&#x27;,stopped:&#x27;已停止&#x27;,queued:&#x27;待开始&#x27;}[s]||s);
+const tag=(s,tone=&#x27;&#x27;)=&gt;`&lt;span class=&quot;yp-tag ${tone}&quot;&gt;${esc(s)}&lt;/span&gt;`;
+const statusTag=t=&gt;tag(taskLabel(t.status),t.status===&#x27;waiting&#x27;?&#x27;amber&#x27;:t.status===&#x27;running&#x27;?&#x27;green&#x27;:&#x27;&#x27;);
+const pTabs=()=&gt;`&lt;nav class=&quot;yp-tabs&quot; aria-label=&quot;项目页面&quot;&gt;${[[&#x27;home&#x27;,&#x27;项目概览&#x27;],[&#x27;tasks&#x27;,&#x27;任务&#x27;],[&#x27;sources&#x27;,&#x27;资料与依据&#x27;],[&#x27;settings&#x27;,&#x27;项目设置&#x27;]].map(([key,label])=&gt;`&lt;button type=&quot;button&quot; class=&quot;yp-tab ${state.page===key?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-page=&quot;${key}&quot; ${state.page===key?&#x27;aria-current=&quot;page&quot;&#x27;:&#x27;&#x27;}&gt;${label}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;`;
+const initIcons=()=&gt;{if(globalThis.lucide)lucide.createIcons({attrs:{width:17,height:17}})};
+function toast(text){toastBox.textContent=text;toastBox.hidden=false;clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=&gt;toastBox.hidden=true,3400)}
+function renderSide(){
+ const matches=projects.filter(p=&gt;!p.archived&amp;&amp;p.name.toLowerCase().includes(state.query.toLowerCase())).sort((a,b)=&gt;Number(b.pinned)-Number(a.pinned));
+ side.innerHTML=`&lt;div&gt;&lt;div class=&quot;yp-brand&quot;&gt;${icon(&#x27;layers-3&#x27;)}Yudao&lt;span class=&quot;yp-proto&quot;&gt;原型&lt;/span&gt;&lt;/div&gt;&lt;label class=&quot;yp-search&quot;&gt;${icon(&#x27;search&#x27;)}&lt;input aria-label=&quot;搜索项目&quot; placeholder=&quot;搜索项目&quot; value=&quot;${esc(state.query)}&quot; data-search&gt;&lt;/label&gt;&lt;/div&gt;&lt;div&gt;&lt;div class=&quot;yp-side-label&quot;&gt;&lt;span&gt;我的项目&lt;/span&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;new-project&quot; aria-label=&quot;新建或接入项目&quot;&gt;${icon(&#x27;plus&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;div&gt;${matches.map(p=&gt;`&lt;button type=&quot;button&quot; class=&quot;yp-project ${p.id===state.projectId&amp;&amp;state.page!==&#x27;archives&#x27;?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-project=&quot;${p.id}&quot;&gt;${icon(p.pinned?&#x27;folder-heart&#x27;:&#x27;folder&#x27;)}&lt;span&gt;${esc(p.name)}&lt;/span&gt;${p.question&amp;&amp;!p.answer?&#x27;&lt;span class=&quot;yp-dot waiting&quot; style=&quot;flex:0 0 6px&quot;&gt;&lt;/span&gt;&#x27;:&#x27;&#x27;}&lt;/button&gt;${p.id===state.projectId?`&lt;div class=&quot;yp-side-tasks&quot;&gt;${p.tasks.slice(0,3).map(t=&gt;`&lt;button type=&quot;button&quot; class=&quot;yp-side-task ${t.id===state.taskId?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-task=&quot;${t.id}&quot;&gt;&lt;span class=&quot;yp-dot ${t.status===&#x27;waiting&#x27;?&#x27;waiting&#x27;:t.status===&#x27;done&#x27;?&#x27;muted&#x27;:&#x27;&#x27;}&quot;&gt;&lt;/span&gt;&lt;span&gt;${esc(t.title)}&lt;/span&gt;&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;button class=&quot;yp-side-task&quot; type=&quot;button&quot; data-action=&quot;new-task&quot;&gt;${icon(&#x27;plus&#x27;)}&lt;span&gt;新任务&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;`:&#x27;&#x27;}`).join(&#x27;&#x27;)||&#x27;&lt;p class=&quot;yp-footnote&quot;&gt;没有匹配的项目&lt;/p&gt;&#x27;}&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yp-side-bottom&quot;&gt;&lt;button class=&quot;yp-project&quot; type=&quot;button&quot; data-page=&quot;archives&quot;&gt;${icon(&#x27;archive&#x27;)}&lt;span&gt;已归档项目&lt;/span&gt;${projects.filter(p=&gt;p.archived).length}&lt;/button&gt;&lt;div class=&quot;yp-footnote&quot;&gt;交互示例 · 不连接真实项目&lt;br&gt;刷新后恢复初始数据&lt;/div&gt;&lt;/div&gt;`;
+}
+function header(){const p=current();bar.innerHTML=`&lt;div class=&quot;yp-row&quot;&gt;&lt;button class=&quot;yp-icon yp-mobile-toggle&quot; type=&quot;button&quot; data-action=&quot;nav&quot; aria-label=&quot;切换项目导航&quot; aria-expanded=&quot;${state.nav}&quot;&gt;${icon(&#x27;panel-left&#x27;)}&lt;/button&gt;&lt;div class=&quot;yp-breadcrumb&quot;&gt;&lt;button type=&quot;button&quot; data-action=&quot;home&quot;&gt;项目&lt;/button&gt;${icon(&#x27;chevron-right&#x27;)}&lt;button type=&quot;button&quot; data-page=&quot;home&quot;&gt;${esc(p?.name||&#x27;工作空间&#x27;)}&lt;/button&gt;${state.page===&#x27;task&#x27;?`${icon(&#x27;chevron-right&#x27;)}&lt;strong&gt;任务工作台&lt;/strong&gt;`:state.page===&#x27;wizard&#x27;?`${icon(&#x27;chevron-right&#x27;)}&lt;strong&gt;建立项目&lt;/strong&gt;`:&#x27;&#x27;}&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yp-auto&quot;&gt;&lt;span class=&quot;yp-dot&quot;&gt;&lt;/span&gt;&lt;span&gt;自动推进 · 关键问题再询问&lt;/span&gt;&lt;/div&gt;`}
+function projectHeading(){const p=current();return `&lt;header class=&quot;yp-heading&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;${p.kind===&#x27;existing&#x27;?&#x27;接入已有项目&#x27;:&#x27;从想法开始&#x27;} · ${esc(p.status)}&lt;/div&gt;&lt;h1&gt;${esc(p.name)}&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;${esc(p.goal)}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-row&quot;&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;pin&quot; aria-label=&quot;${p.pinned?&#x27;取消置顶&#x27;:&#x27;置顶项目&#x27;}&quot; title=&quot;${p.pinned?&#x27;取消置顶&#x27;:&#x27;置顶项目&#x27;}&quot;&gt;${icon(p.pinned?&#x27;pin-off&#x27;:&#x27;pin&#x27;)}&lt;/button&gt;&lt;div class=&quot;yp-menu-wrap&quot;&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;menu&quot; aria-label=&quot;项目操作&quot; aria-expanded=&quot;${state.menu}&quot;&gt;${icon(&#x27;ellipsis&#x27;)}&lt;/button&gt;${state.menu?`&lt;div class=&quot;yp-menu&quot;&gt;&lt;button type=&quot;button&quot; data-action=&quot;rename&quot;&gt;${icon(&#x27;pencil&#x27;)}重命名项目&lt;/button&gt;&lt;button type=&quot;button&quot; data-page=&quot;settings&quot;&gt;${icon(&#x27;settings-2&#x27;)}项目设置&lt;/button&gt;&lt;button type=&quot;button&quot; data-action=&quot;archive&quot;&gt;${icon(&#x27;archive&#x27;)}归档项目&lt;/button&gt;&lt;/div&gt;`:&#x27;&#x27;}&lt;/div&gt;&lt;/div&gt;&lt;/header&gt;${pTabs()}`}
+function compose(key,label,placeholder,action=&#x27;create-task&#x27;){return `&lt;form class=&quot;yp-composer&quot; data-form=&quot;${action}&quot;&gt;&lt;textarea aria-label=&quot;${label}&quot; placeholder=&quot;${placeholder}&quot; data-draft=&quot;${key}&quot; required&gt;${esc(state.drafts[key]||&#x27;&#x27;)}&lt;/textarea&gt;&lt;div class=&quot;yp-composer-footer&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;${action===&#x27;create-task&#x27;?&#x27;沿用当前项目资料与成果&#x27;:&#x27;本次任务 · 产品负责接收整体要求&#x27;}&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;${icon(&#x27;arrow-up&#x27;)}${action===&#x27;create-task&#x27;?&#x27;开始任务&#x27;:&#x27;发送要求&#x27;}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}
+function taskRows(list){return `&lt;div class=&quot;yp-task-list&quot;&gt;${list.map(t=&gt;`&lt;div class=&quot;yp-task-row&quot;&gt;&lt;span class=&quot;yp-icon&quot;&gt;${icon(t.status===&#x27;done&#x27;?&#x27;circle-check&#x27;:t.status===&#x27;waiting&#x27;?&#x27;circle-help&#x27;:t.status===&#x27;stopped&#x27;?&#x27;circle-stop&#x27;:&#x27;circle-dashed&#x27;)}&lt;/span&gt;&lt;div&gt;&lt;button type=&quot;button&quot; class=&quot;yp-task-title&quot; data-task=&quot;${t.id}&quot;&gt;${esc(t.title)}&lt;/button&gt;&lt;div class=&quot;yp-task-meta&quot;&gt;&lt;span&gt;${esc(t.summary)}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;${statusTag(t)}&lt;/div&gt;&lt;/div&gt;`).join(&#x27;&#x27;)||&#x27;&lt;div class=&quot;yp-empty&quot;&gt;&lt;h3&gt;还没有任务&lt;/h3&gt;&lt;p&gt;把接下来想完成的事情交给三部门。&lt;/p&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;new-task&quot;&gt;新建任务&lt;/button&gt;&lt;/div&gt;&#x27;}&lt;/div&gt;`}
+function deptCards(){const p=current();return `&lt;div class=&quot;yp-depts&quot;&gt;${Object.entries(roles).map(([key,r])=&gt;`&lt;article class=&quot;yp-dept&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h3 class=&quot;yp-row&quot;&gt;${icon(r.icon)}${r.name}&lt;/h3&gt;${tag(p.sourceReady?&#x27;已建档&#x27;:&#x27;逐步形成&#x27;,p.sourceReady?&#x27;&#x27;:&#x27;green&#x27;)}&lt;/div&gt;&lt;p&gt;${r.text}&lt;/p&gt;&lt;div class=&quot;yp-small&quot;&gt;${p.sourceReady?{product:&#x27;功能与范围 · 需求来源&#x27;,engineering:&#x27;结构与实现 · 当前版本&#x27;,quality:&#x27;检查依据 · 验证缺口&#x27;}[key]:&#x27;依据首轮工作持续补充&#x27;}&lt;/div&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-basis=&quot;${key}&quot;&gt;查看工作依据 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;&lt;/article&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`}
+function home(){const p=current();return `${projectHeading()}${p.question&amp;&amp;!p.answer?`&lt;section class=&quot;yp-section yp-notice&quot;&gt;${icon(&#x27;circle-help&#x27;)}&lt;div class=&quot;yp-notice-copy&quot;&gt;&lt;strong&gt;有一项取舍需要你决定&lt;/strong&gt;&lt;p&gt;${esc(p.question)}&lt;/p&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;decision&quot;&gt;查看问题与建议 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;${tag(&#x27;产品&#x27;,&#x27;amber&#x27;)}&lt;/section&gt;`:&#x27;&#x27;}&lt;section class=&quot;yp-summary&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-small&quot;&gt;当前工作重点&lt;/div&gt;&lt;p&gt;${esc(p.tasks.find(t=&gt;t.status===&#x27;running&#x27;||t.status===&#x27;waiting&#x27;)?.title||&#x27;准备下一项工作&#x27;)}&lt;/p&gt;&lt;div class=&quot;yp-row&quot; style=&quot;margin-top:9px&quot;&gt;${p.answer?tag(&#x27;取舍已记录&#x27;,&#x27;green&#x27;):tag(p.kind===&#x27;existing&#x27;?&#x27;已有项目资料&#x27;:&#x27;初始想法&#x27;)}&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-page=&quot;sources&quot;&gt;查看依据 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;yp-summary-side&quot;&gt;&lt;div class=&quot;yp-small&quot;&gt;当前采用成果&lt;/div&gt;&lt;p&gt;${esc(p.baseline)}&lt;/p&gt;&lt;div class=&quot;yp-row&quot; style=&quot;margin-top:9px&quot;&gt;${tag(p.baseline===&#x27;尚无交付&#x27;?&#x27;等待首轮交付&#x27;:&#x27;包含历史验证记录&#x27;)}&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;delivery&quot;&gt;查看成果 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;接下来，想完成什么？&lt;/h2&gt;&lt;/div&gt;${compose(&#x27;project-&#x27;+p.id,&#x27;新任务目标&#x27;,&#x27;描述一个新功能、需要修复的问题，或想调整的方向…&#x27;)}&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;近期任务&lt;/h2&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-page=&quot;tasks&quot;&gt;全部 ${p.tasks.length} 项 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;${taskRows(p.tasks.slice(0,3))}&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;三部门工作依据&lt;/h2&gt;&lt;span class=&quot;yp-small&quot;&gt;随项目演化持续更新&lt;/span&gt;&lt;/div&gt;${deptCards()}&lt;/section&gt;`}
+function tasksPage(){const p=current();return `${projectHeading()}&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;项目任务&lt;/h2&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;new-task&quot;&gt;${icon(&#x27;plus&#x27;)}新任务&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;yp-list-tools&quot;&gt;${[[&#x27;all&#x27;,&#x27;全部&#x27;],[&#x27;active&#x27;,&#x27;进行中&#x27;],[&#x27;done&#x27;,&#x27;已完成&#x27;]].map(([v,l])=&gt;`&lt;button class=&quot;yp-pill ${state.filter===v?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-filter=&quot;${v}&quot; type=&quot;button&quot;&gt;${l}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;${taskRows(p.tasks.filter(t=&gt;state.filter===&#x27;all&#x27;||state.filter===&#x27;done&#x27;&amp;&amp;t.status===&#x27;done&#x27;||state.filter===&#x27;active&#x27;&amp;&amp;[&#x27;running&#x27;,&#x27;waiting&#x27;,&#x27;queued&#x27;].includes(t.status)))}&lt;/section&gt;`}
+function reportFacts(p,dept){if(!p.sourceReady)return `&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;${roles[dept].name}依据正在形成&lt;/h3&gt;&lt;p&gt;${dept===&#x27;product&#x27;?p.goal:dept===&#x27;engineering&#x27;?&#x27;首轮方案将在需求范围明确后形成。&#x27;:&#x27;验收依据随首轮目标形成，目前没有验证结果。&#x27;}&lt;/p&gt;&lt;p class=&quot;yp-small&quot;&gt;来源：初始想法 · 用户原文&lt;/p&gt;&lt;/div&gt;`;
+ const facts={product:[[&#x27;资料支持&#x27;,&#x27;已有需求说明与功能清单&#x27;,&#x27;来源：&#x27;+p.material],[&#x27;待核对&#x27;,&#x27;资料描述的功能，需要与当前实现逐项对应&#x27;,&#x27;来源：项目资料 · 尚未完整核对&#x27;],[&#x27;有冲突&#x27;,p.id===&#x27;cargo&#x27;?&#x27;数量与体积的优先关系在现有材料中不明确&#x27;:&#x27;旧版说明与当前计划可能存在差异，示例待核对&#x27;,&#x27;处理：影响本次工作时提出具体问题&#x27;]],engineering:[[&#x27;资料支持&#x27;,&#x27;已关联项目位置和工程资料&#x27;,&#x27;来源：&#x27;+p.path],[&#x27;推断&#x27;,&#x27;模块职责可依据工程结构形成初步说明&#x27;,&#x27;示例推断 · 需要对应到实际代码&#x27;],[&#x27;待验证&#x27;,&#x27;运行方式、依赖和未提交修改仍需核对&#x27;,&#x27;未执行构建或修改工作目录&#x27;]],quality:[[&#x27;资料支持&#x27;,&#x27;现有测试与历史验收材料列入检查依据&#x27;,&#x27;来源：已有资料 · 历史证据&#x27;],[&#x27;待验证&#x27;,&#x27;历史通过记录不代表当前版本通过&#x27;,&#x27;应核对受测版本、检查范围与执行结果&#x27;],[&#x27;待验证&#x27;,&#x27;没有测试覆盖的能力保留为验证缺口&#x27;,&#x27;不因建档完成而显示为验证通过&#x27;]]};
+ return facts[dept].map(([s,t,n])=&gt;`&lt;div class=&quot;yp-fact&quot;&gt;${tag(s,s===&#x27;有冲突&#x27;?&#x27;amber&#x27;:s===&#x27;资料支持&#x27;?&#x27;green&#x27;:&#x27;&#x27;)}&lt;div&gt;${esc(t)}&lt;small&gt;${esc(n)}&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}
+function sourcesPage(){const p=current();return `${projectHeading()}&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;资料与工作依据&lt;/h2&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;add-source&quot;&gt;${icon(&#x27;plus&#x27;)}添加资料&lt;/button&gt;&lt;/div&gt;&lt;p class=&quot;yp-small&quot;&gt;资料记录保留来源；推断与验证结果分别呈现。&lt;/p&gt;&lt;div class=&quot;yp-source-row&quot;&gt;${icon(&#x27;folder-code&#x27;)}&lt;div&gt;&lt;strong&gt;项目工作位置&lt;/strong&gt;&lt;small&gt;${esc(p.path)}&lt;/small&gt;&lt;/div&gt;${tag(&#x27;已登记&#x27;)}&lt;/div&gt;&lt;div class=&quot;yp-source-row&quot;&gt;${icon(&#x27;files&#x27;)}&lt;div&gt;&lt;strong&gt;${esc(p.material||&#x27;尚无补充资料&#x27;)}&lt;/strong&gt;&lt;small&gt;项目建立时提供的资料&lt;/small&gt;&lt;/div&gt;${tag(&#x27;来源&#x27;)}&lt;/div&gt;${p.notes.map(n=&gt;`&lt;div class=&quot;yp-source-row&quot;&gt;${icon(&#x27;file-text&#x27;)}&lt;div&gt;&lt;strong&gt;${esc(n.name)}&lt;/strong&gt;&lt;small&gt;${esc(n.text)}&lt;/small&gt;&lt;/div&gt;${tag(&#x27;补充资料&#x27;)}&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;三部门当前依据&lt;/h2&gt;&lt;/div&gt;&lt;div class=&quot;yp-list-tools&quot;&gt;${Object.entries(roles).map(([k,r])=&gt;`&lt;button class=&quot;yp-pill ${state.sourceTab===k?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; data-source-tab=&quot;${k}&quot; type=&quot;button&quot;&gt;${r.name}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;div class=&quot;yp-report&quot;&gt;${reportFacts(p,roles[state.sourceTab]?state.sourceTab:&#x27;product&#x27;)}&lt;/div&gt;&lt;/section&gt;${p.answer?`&lt;section class=&quot;yp-section&quot;&gt;&lt;h2&gt;重要决定&lt;/h2&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;${esc(p.answer)}&lt;/h3&gt;&lt;p&gt;来源：你对项目取舍的回答 · 已用于当前任务&lt;/p&gt;&lt;/div&gt;&lt;/section&gt;`:&#x27;&#x27;}`}
+function settingsPage(){const p=current();return `${projectHeading()}&lt;section class=&quot;yp-section&quot; style=&quot;max-width:620px&quot;&gt;&lt;h2&gt;项目设置&lt;/h2&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;settings&quot; style=&quot;margin-top:19px&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; value=&quot;${esc(p.name)}&quot; required maxlength=&quot;60&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;项目目标&lt;textarea name=&quot;goal&quot; required&gt;${esc(p.goal)}&lt;/textarea&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;项目工作位置&lt;input name=&quot;path&quot; value=&quot;${p.path===&#x27;尚未关联目录&#x27;?&#x27;&#x27;:esc(p.path)}&quot; placeholder=&quot;可选，例如 C:/project/my-project&quot;&gt;&lt;small&gt;关联位置是项目来源；变更工作副本在正式执行时确定。&lt;/small&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;此处修改仅作用于当前原型&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;保存设置&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;&lt;div class=&quot;yp-detail&quot; style=&quot;margin-top:20px&quot;&gt;&lt;h3&gt;默认工作方式&lt;/h3&gt;&lt;p&gt;三部门自动推进，遇到关键问题再询问，完成后供你检查。&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;部门与模型&lt;/h3&gt;&lt;p&gt;沿用产品、工程、质检三个部门。Provider 配置与模型选择将在后续原型中补充。&lt;/p&gt;&lt;/div&gt;&lt;/section&gt;`}
+function archivesPage(){return `&lt;header class=&quot;yp-heading&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;项目管理&lt;/div&gt;&lt;h1&gt;已归档项目&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;暂时收起的项目，随时可以恢复到项目列表。&lt;/p&gt;&lt;/div&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;new-project&quot;&gt;${icon(&#x27;plus&#x27;)}建立项目&lt;/button&gt;&lt;/header&gt;&lt;section class=&quot;yp-section&quot;&gt;${projects.filter(p=&gt;p.archived).map(p=&gt;`&lt;div class=&quot;yp-source-row&quot;&gt;${icon(&#x27;archive&#x27;)}&lt;div&gt;&lt;strong&gt;${esc(p.name)}&lt;/strong&gt;&lt;small&gt;${esc(p.goal)}&lt;/small&gt;&lt;/div&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-restore=&quot;${p.id}&quot;&gt;恢复项目&lt;/button&gt;&lt;/div&gt;`).join(&#x27;&#x27;)||&#x27;&lt;div class=&quot;yp-empty&quot;&gt;&lt;h3&gt;没有已归档项目&lt;/h3&gt;&lt;p&gt;归档会保留项目的资料和历史。&lt;/p&gt;&lt;/div&gt;&#x27;}&lt;/section&gt;`}
+function wizardPage(){const w=state.wizard;const stage=w.step;return `&lt;div class=&quot;yp-wizard&quot;&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;leave-wizard&quot;&gt;${icon(&#x27;arrow-left&#x27;)}返回项目&lt;/button&gt;&lt;div style=&quot;margin-top:22px&quot;&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;建立一个持续演化的项目&lt;/div&gt;&lt;h1&gt;${stage===&#x27;choice&#x27;?&#x27;从哪里开始？&#x27;:w.kind===&#x27;idea&#x27;?&#x27;从一个想法开始&#x27;:&#x27;接入已有项目&#x27;}&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;${stage===&#x27;choice&#x27;?&#x27;两种起点，同一套项目工作台。&#x27;:w.kind===&#x27;idea&#x27;?&#x27;描述你想解决的问题，三部门会逐步形成需求、方案和成果。&#x27;:&#x27;先建立产品、工程与质检依据，再基于现状继续工作。&#x27;}&lt;/p&gt;&lt;/div&gt;${stage===&#x27;choice&#x27;?`&lt;div class=&quot;yp-choices&quot;&gt;&lt;button class=&quot;yp-choice&quot; type=&quot;button&quot; data-kind=&quot;idea&quot;&gt;${icon(&#x27;lightbulb&#x27;)}&lt;strong&gt;从想法新建&lt;/strong&gt;&lt;p&gt;有一个新想法，或准备从零开发。无需提前准备完整需求。&lt;/p&gt;&lt;/button&gt;&lt;button class=&quot;yp-choice&quot; type=&quot;button&quot; data-kind=&quot;existing&quot;&gt;${icon(&#x27;folder-input&#x27;)}&lt;strong&gt;接入已有项目&lt;/strong&gt;&lt;p&gt;已有代码或部分资料，先让三部门理解项目现状。&lt;/p&gt;&lt;/button&gt;&lt;/div&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:20px&quot;&gt;项目会持续保留目标、成果和重要决定。&lt;/p&gt;`:stage===&#x27;form&#x27;?wizardForm(w):wizardReport(w)}&lt;/div&gt;`}
+function wizardForm(w){return `&lt;div class=&quot;yp-steps&quot;&gt;&lt;span class=&quot;yp-step-current&quot;&gt;01 · 项目信息&lt;/span&gt;&lt;span class=&quot;yp-step-line&quot;&gt;&lt;/span&gt;&lt;span&gt;02 · ${w.kind===&#x27;idea&#x27;?&#x27;进入首轮工作&#x27;:&#x27;三部门建档&#x27;}&lt;/span&gt;&lt;/div&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;wizard&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; required maxlength=&quot;60&quot; value=&quot;${esc(w.name)}&quot; placeholder=&quot;给项目起一个容易找到的名字&quot;&gt;&lt;/label&gt;${w.kind===&#x27;idea&#x27;?`&lt;label class=&quot;yp-field&quot;&gt;你想做什么？&lt;textarea name=&quot;goal&quot; required placeholder=&quot;希望谁在什么场景下，解决什么问题？&quot;&gt;${esc(w.goal)}&lt;/textarea&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;重要约束与参考资料 &lt;span class=&quot;yp-small&quot;&gt;选填&lt;/span&gt;&lt;textarea name=&quot;material&quot; placeholder=&quot;例如必须离线使用、已有设计稿，或暂时不做的事情&quot;&gt;${esc(w.material)}&lt;/textarea&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;工作目录 &lt;span class=&quot;yp-small&quot;&gt;选填&lt;/span&gt;&lt;input name=&quot;path&quot; value=&quot;${esc(w.path)}&quot; placeholder=&quot;可以在开发前再关联目录&quot;&gt;&lt;/label&gt;`:`&lt;label class=&quot;yp-field&quot;&gt;项目目录或资料位置&lt;input name=&quot;path&quot; value=&quot;${esc(w.path)}&quot; placeholder=&quot;例如 C:/project/my-project&quot;&gt;&lt;small&gt;可以先从代码、文档或部分资料开始，不要求齐全。&lt;/small&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;已有资料&lt;textarea name=&quot;material&quot; placeholder=&quot;列出需求说明、代码、测试、设计记录等；可填写资料位置&quot;&gt;${esc(w.material)}&lt;/textarea&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;接下来希望做什么？ &lt;span class=&quot;yp-small&quot;&gt;选填&lt;/span&gt;&lt;textarea name=&quot;goal&quot; placeholder=&quot;可以先了解项目，也可以指定准备继续开发的内容&quot;&gt;${esc(w.goal)}&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;yp-notice&quot;&gt;${icon(&#x27;info&#x27;)}&lt;div class=&quot;yp-notice-copy&quot;&gt;&lt;strong&gt;本次体验使用建档示例&lt;/strong&gt;&lt;p&gt;填写的位置只用于演示，不会读取本地目录；建档结果不是对该项目的实际分析。&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;`}&lt;p class=&quot;yp-error&quot; role=&quot;alert&quot; id=&quot;yp-wizard-error&quot; hidden&gt;&lt;/p&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;wizard-back&quot;&gt;上一步&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;${w.kind===&#x27;idea&#x27;?&#x27;创建项目并开始首轮工作&#x27;:&#x27;查看建档示例&#x27;} ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}
+function wizardReport(w){const temp={...w,sourceReady:true,id:&#x27;preview&#x27;};return `&lt;div class=&quot;yp-steps&quot;&gt;&lt;span&gt;01 · 项目信息&lt;/span&gt;&lt;span class=&quot;yp-step-line&quot;&gt;&lt;/span&gt;&lt;span class=&quot;yp-step-current&quot;&gt;02 · 三部门建档&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h2&gt;${esc(w.name)} · 建档预览&lt;/h2&gt;${tag(&#x27;示例数据&#x27;,&#x27;amber&#x27;)}&lt;/div&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:8px&quot;&gt;下面演示如何组织已有信息。没有读取目录或执行验证。&lt;/p&gt;${Object.entries(roles).map(([k,r])=&gt;`&lt;section class=&quot;yp-report&quot;&gt;&lt;h3 class=&quot;yp-row&quot;&gt;${icon(r.icon)}${r.name} · ${r.text}&lt;/h3&gt;${reportFacts(temp,k)}&lt;/section&gt;`).join(&#x27;&#x27;)}&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;wizard-back&quot;&gt;调整项目信息&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;finish-import&quot;&gt;建立示例项目 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;p class=&quot;yp-small&quot; style=&quot;margin-top:10px&quot;&gt;建档与实际验证分别记录；可从已有可靠依据开始局部工作。&lt;/p&gt;`}
+function taskPage(){const p=current(),t=task();if(!t){state.page=&#x27;home&#x27;;return home()}const dep=roles[state.taskTab];return `&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-page=&quot;home&quot;&gt;${icon(&#x27;arrow-left&#x27;)}回到项目&lt;/button&gt;&lt;header class=&quot;yp-heading&quot; style=&quot;margin-top:18px&quot;&gt;&lt;div&gt;&lt;div class=&quot;yp-eyebrow&quot;&gt;${esc(p.name)} · 任务&lt;/div&gt;&lt;h1&gt;${esc(t.title)}&lt;/h1&gt;&lt;p class=&quot;yp-subtitle&quot;&gt;${esc(t.summary)}&lt;/p&gt;&lt;/div&gt;${statusTag(t)}&lt;/header&gt;&lt;nav class=&quot;yp-tabs&quot; aria-label=&quot;任务工作区&quot;&gt;${[[&#x27;overview&#x27;,&#x27;总览&#x27;],[&#x27;product&#x27;,&#x27;产品&#x27;],[&#x27;engineering&#x27;,&#x27;工程&#x27;],[&#x27;quality&#x27;,&#x27;质检&#x27;],[&#x27;observation&#x27;,&#x27;观测&#x27;]].map(([k,l])=&gt;`&lt;button class=&quot;yp-tab ${state.taskTab===k?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-task-tab=&quot;${k}&quot; ${state.taskTab===k?&#x27;aria-current=&quot;page&quot;&#x27;:&#x27;&#x27;}&gt;${l}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;${dep?departmentView(t,dep):state.taskTab===&#x27;observation&#x27;?observationView(t):taskOverview(t)}`}
+function taskOverview(t){const p=current();return `${t.status===&#x27;waiting&#x27;?`&lt;section class=&quot;yp-section yp-notice&quot;&gt;${icon(&#x27;circle-help&#x27;)}&lt;div&gt;&lt;strong&gt;${esc(p.question||&#x27;产品需要你补充一个重要取舍&#x27;)}&lt;/strong&gt;&lt;p&gt;取舍会影响后续方案的比较方式。推荐分别呈现数量与体积指标。&lt;/p&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;decision&quot;&gt;回答问题 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/section&gt;`:&#x27;&#x27;}&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;三部门协作&lt;/h2&gt;&lt;span class=&quot;yp-small&quot;&gt;需求 → 实现 → 验收&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-depts&quot;&gt;${Object.entries(roles).map(([k,r])=&gt;`&lt;article class=&quot;yp-dept&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h3&gt;${r.name}&lt;/h3&gt;${tag(t.status===&#x27;done&#x27;?&#x27;已完成&#x27;:k===&#x27;product&#x27;?&#x27;当前工作&#x27;:&#x27;等待交接&#x27;,t.status!==&#x27;done&#x27;&amp;&amp;k===&#x27;product&#x27;?&#x27;green&#x27;:&#x27;&#x27;)}&lt;/div&gt;&lt;p&gt;${r.text}&lt;/p&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-task-tab=&quot;${k}&quot;&gt;进入工作区 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;&lt;/article&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;/section&gt;&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;${t.status===&#x27;done&#x27;?&#x27;本次交付&#x27;:&#x27;当前进展&#x27;}&lt;/h2&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;delivery&quot;&gt;查看成果与依据&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;${t.status===&#x27;done&#x27;?&#x27;工作结果已记录&#x27;:t.status===&#x27;stopped&#x27;?&#x27;任务已停止，过程记录保留&#x27;:&#x27;正在使用当前项目依据推进&#x27;}&lt;/h3&gt;&lt;p&gt;${esc(t.summary)}&lt;/p&gt;&lt;p class=&quot;yp-small&quot;&gt;基于：${esc(p.baseline)} · ${esc(p.material)}&lt;/p&gt;&lt;/div&gt;&lt;/section&gt;${t.messages.filter(m=&gt;m.scope===&#x27;global&#x27;).map(m=&gt;`&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;你追加的要求 ${tag(&#x27;已接收&#x27;,&#x27;green&#x27;)}&lt;/h3&gt;&lt;p&gt;${esc(m.text)}&lt;/p&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;section class=&quot;yp-section&quot;&gt;${[&#x27;done&#x27;,&#x27;stopped&#x27;].includes(t.status)?`&lt;div class=&quot;yp-notice&quot;&gt;${icon(&#x27;git-branch&#x27;)}&lt;div&gt;&lt;strong&gt;在同一项目中继续演化&lt;/strong&gt;&lt;p&gt;后续修改建立新任务，关联本次成果和项目依据。&lt;/p&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;new-task&quot;&gt;基于当前项目开始新任务 ${icon(&#x27;arrow-right&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`:`${compose(&#x27;task-&#x27;+t.id,&#x27;追加整体要求&#x27;,&#x27;补充本次任务的目标、优先级或约束…&#x27;,&#x27;task-input&#x27;)}&lt;div style=&quot;margin-top:10px;text-align:right&quot;&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-action=&quot;stop-task&quot;&gt;停止本次任务&lt;/button&gt;&lt;/div&gt;`}&lt;/section&gt;`}
+function departmentView(t,r){const k=state.taskTab,p=current();const messages=t.messages.filter(m=&gt;m.scope===k);return `&lt;div class=&quot;yp-work&quot;&gt;&lt;section&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;工作消息&lt;/h2&gt;&lt;span class=&quot;yp-small&quot;&gt;${r.name} · 本次任务&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;yp-timeline&quot;&gt;&lt;article class=&quot;yp-message&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;strong&gt;${r.name}&lt;/strong&gt;&lt;span class=&quot;yp-small&quot;&gt;项目依据已载入 · 示例&lt;/span&gt;&lt;/div&gt;&lt;p&gt;${k===&#x27;product&#x27;?`本次目标：${t.title}。先核对已有要求与本次变化，重要取舍会向你提出。`:k===&#x27;engineering&#x27;?`从「${p.baseline}」开始，依据产品明确的范围形成方案并实施，保留已有有效行为。`:&#x27;依据当前要求检查本次交付，并区分历史证据与本次实际验证。&#x27;}&lt;/p&gt;&lt;/article&gt;${messages.map(m=&gt;`&lt;article class=&quot;yp-message user&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;strong&gt;你 · 定向指导&lt;/strong&gt;${tag(&#x27;已接收&#x27;,&#x27;green&#x27;)}&lt;/div&gt;&lt;p&gt;${esc(m.text)}&lt;/p&gt;&lt;p class=&quot;yp-small&quot;&gt;等待${r.name}处理；不会转成其他部门的私有对话。&lt;/p&gt;&lt;/article&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;${[&#x27;done&#x27;,&#x27;stopped&#x27;].includes(t.status)?&#x27;&lt;p class=&quot;yp-small&quot;&gt;本次任务已结束，指导记录保留。&lt;/p&gt;&#x27;:`&lt;form class=&quot;yp-composer&quot; data-form=&quot;guidance&quot;&gt;&lt;div class=&quot;yp-small&quot; style=&quot;margin-bottom:8px&quot;&gt;接收方 · ${r.name}&lt;/div&gt;&lt;textarea data-draft=&quot;guidance-${t.id}-${k}&quot; aria-label=&quot;发给${r.name}的指导&quot; placeholder=&quot;给当前部门追加说明或指导…&quot; required&gt;${esc(state.drafts[&#x27;guidance-&#x27;+t.id+&#x27;-&#x27;+k]||&#x27;&#x27;)}&lt;/textarea&gt;&lt;div class=&quot;yp-composer-footer&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;保留原文与处理状态&lt;/span&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;发送指导 ${icon(&#x27;send&#x27;)}&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}&lt;/section&gt;&lt;aside class=&quot;yp-inspector&quot; aria-label=&quot;部门检查区&quot;&gt;&lt;h3&gt;本次工作依据&lt;/h3&gt;&lt;div class=&quot;yp-tabs&quot;&gt;${[[&#x27;context&#x27;,&#x27;Context&#x27;],[&#x27;provider&#x27;,&#x27;Provider&#x27;],[&#x27;prompt&#x27;,&#x27;Prompt&#x27;]].map(([v,l])=&gt;`&lt;button class=&quot;yp-tab ${state.inspect===v?&#x27;is-selected&#x27;:&#x27;&#x27;}&quot; type=&quot;button&quot; data-inspect=&quot;${v}&quot;&gt;${l}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;${state.inspect===&#x27;context&#x27;?`&lt;p&gt;当前项目目标、已采用成果及本次任务。&lt;/p&gt;&lt;details open&gt;&lt;summary&gt;项目目标&lt;/summary&gt;&lt;p&gt;${esc(p.goal)}&lt;/p&gt;&lt;/details&gt;&lt;details&gt;&lt;summary&gt;本次任务&lt;/summary&gt;&lt;p&gt;${esc(t.title)}&lt;/p&gt;&lt;/details&gt;&lt;details&gt;&lt;summary&gt;采用成果&lt;/summary&gt;&lt;p&gt;${esc(p.baseline)}&lt;/p&gt;&lt;/details&gt;&lt;button class=&quot;yp-link&quot; type=&quot;button&quot; data-page=&quot;sources&quot; style=&quot;margin-top:18px&quot;&gt;查看项目资料 ${icon(&#x27;arrow-up-right&#x27;)}&lt;/button&gt;`:state.inspect===&#x27;provider&#x27;?&#x27;&lt;p&gt;当前为交互示例，没有实际模型请求。&lt;/p&gt;&lt;p&gt;正式运行时显示本次采用的 Provider 和模型。配置管理将在后续原型中补充。&lt;/p&gt;&#x27;:`&lt;p&gt;${r.name}负责${r.text}。使用当前任务依据，遇到影响目标的重要取舍时提出问题。&lt;/p&gt;&lt;p&gt;示例部门规则 · 未连接真实 Prompt&lt;/p&gt;`}&lt;/aside&gt;&lt;/div&gt;`}
+function observationView(t){return `&lt;section class=&quot;yp-section&quot;&gt;&lt;div class=&quot;yp-section-title&quot;&gt;&lt;h2&gt;任务观测&lt;/h2&gt;${tag(&#x27;示例范围&#x27;)}&lt;/div&gt;&lt;div class=&quot;yp-empty&quot;&gt;${icon(&#x27;activity&#x27;)}&lt;h3 style=&quot;margin-top:10px&quot;&gt;本次原型没有发起模型请求&lt;/h3&gt;&lt;p&gt;正式运行的请求记录、原始数据与用量都归属当前任务。&lt;/p&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;sample-request&quot;&gt;查看请求详情样式&lt;/button&gt;&lt;/div&gt;&lt;/section&gt;`}
+function render(){root.querySelector(&#x27;.yp-shell&#x27;).classList.toggle(&#x27;show-nav&#x27;,state.nav);renderSide();header();content.innerHTML=state.page===&#x27;wizard&#x27;?wizardPage():state.page===&#x27;archives&#x27;?archivesPage():!current()?archivesPage():state.page===&#x27;tasks&#x27;?tasksPage():state.page===&#x27;sources&#x27;?sourcesPage():state.page===&#x27;settings&#x27;?settingsPage():state.page===&#x27;task&#x27;?taskPage():home();initIcons()}
+function goProject(id){state.projectId=id;state.page=&#x27;home&#x27;;state.taskId=null;state.taskTab=&#x27;overview&#x27;;state.menu=false;state.nav=false;render()}
+function openTask(id){state.taskId=id;state.page=&#x27;task&#x27;;state.taskTab=&#x27;overview&#x27;;state.menu=false;state.nav=false;render()}
+function beginWizard(){state.returnPage=state.page;state.page=&#x27;wizard&#x27;;state.taskId=null;state.menu=false;state.nav=false;state.wizard={step:&#x27;choice&#x27;,kind:null,name:&#x27;&#x27;,goal:&#x27;&#x27;,path:&#x27;&#x27;,material:&#x27;&#x27;};render()}
+function newTask(){state.page=&#x27;home&#x27;;state.taskId=null;state.menu=false;state.nav=false;render();content.querySelector(&#x27;textarea&#x27;)?.focus()}
+function createProject(w){const id=&#x27;project-&#x27;+(++seq),idea=w.kind===&#x27;idea&#x27;;const p={id,name:w.name,kind:w.kind,pinned:false,archived:false,goal:w.goal||(idea?&#x27;逐步明确首轮目标&#x27;:&#x27;依据现有项目资料继续演化&#x27;),path:w.path||&#x27;尚未关联目录&#x27;,material:w.material||&#x27;用户原始想法&#x27;,status:idea?&#x27;从想法开始&#x27;:&#x27;已建档 · 示例&#x27;,baseline:idea?&#x27;尚无交付&#x27;:&#x27;导入起点 · 待验证&#x27;,sourceReady:!idea,question:&#x27;&#x27;,answer:&#x27;&#x27;,tasks:[{id:id+&#x27;-1&#x27;,title:idea?&#x27;形成首轮需求与方案&#x27;:&#x27;建立项目现状与三部门依据&#x27;,status:idea?&#x27;running&#x27;:&#x27;done&#x27;,summary:idea?&#x27;产品开始明确目标与最小范围。&#x27;:&#x27;建档示例已保存，验证状态与实际成果分别记录。&#x27;,messages:[]}],notes:[]};projects.push(p);state.wizard=null;goProject(id);toast(idea?&#x27;示例项目已创建，首轮工作已开始&#x27;:&#x27;示例项目已建立，可以开始下一项任务&#x27;)}
+function showModal(kind){state.menu=false;modalReturn=document.activeElement;state.modal=kind;const p=current();let title=&#x27;&#x27;,body=&#x27;&#x27;;if(kind===&#x27;rename&#x27;){title=&#x27;重命名项目&#x27;;body=`&lt;form class=&quot;yp-form&quot; data-form=&quot;rename&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;项目名称&lt;input name=&quot;name&quot; value=&quot;${esc(p.name)}&quot; required maxlength=&quot;60&quot;&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;保存名称&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}else if(kind===&#x27;archive&#x27;){title=&#x27;归档这个项目&#x27;;body=`&lt;p&gt;「${esc(p.name)}」会从日常列表收起，资料和任务记录保留。你可以在“已归档项目”中恢复。&lt;/p&gt;&lt;p&gt;归档只整理列表；正在进行的任务不会因此停止。&lt;/p&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;保留在列表&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;confirm-archive&quot;&gt;归档项目&lt;/button&gt;&lt;/div&gt;`}else if(kind===&#x27;decision&#x27;){title=&#x27;需要你决定&#x27;;body=`&lt;p&gt;${esc(p.question||&#x27;请补充本次任务的重要取舍&#x27;)}&lt;/p&gt;&lt;div class=&quot;yp-report&quot;&gt;&lt;h3&gt;产品建议&lt;/h3&gt;&lt;p&gt;数量和体积分别呈现。先比较两个方向的方案，避免把不同目标合成一个分数。&lt;/p&gt;&lt;/div&gt;&lt;form class=&quot;yp-form&quot; data-form=&quot;decision&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;你的决定&lt;textarea name=&quot;answer&quot; required&gt;数量和体积分别展示，先提供两种方案供比较。&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;稍后处理&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;回复并继续&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}else if(kind===&#x27;add-source&#x27;){title=&#x27;添加项目资料&#x27;;body=`&lt;form class=&quot;yp-form&quot; data-form=&quot;source&quot;&gt;&lt;label class=&quot;yp-field&quot;&gt;资料名称&lt;input name=&quot;name&quot; required placeholder=&quot;例如：新版需求说明&quot;&gt;&lt;/label&gt;&lt;label class=&quot;yp-field&quot;&gt;位置或内容说明&lt;textarea name=&quot;text&quot; required placeholder=&quot;填写来源、文件位置或需要补充的内容&quot;&gt;&lt;/textarea&gt;&lt;small&gt;本原型只登记说明，不读取或上传文件。&lt;/small&gt;&lt;/label&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;submit&quot;&gt;添加资料&lt;/button&gt;&lt;/div&gt;&lt;/form&gt;`}else if(kind===&#x27;delivery&#x27;){title=&#x27;当前成果与检查&#x27;;body=`&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;${esc(p.baseline)}&lt;/h3&gt;&lt;p&gt;${p.baseline===&#x27;尚无交付&#x27;?&#x27;首轮工作尚未形成交付。&#x27;:p.id===&#x27;cargo&#x27;?&#x27;示例交付包含装载工作台、手动摆放与方案保存。&#x27;:&#x27;已登记项目起点或历史成果，尚需核对实际内容。&#x27;}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;验证情况&lt;/h3&gt;&lt;p&gt;${p.id===&#x27;cargo&#x27;?&#x27;历史检查覆盖了手动摆放与保存恢复；混装方案的新目标尚未验证。&#x27;:&#x27;没有本次实际验证结果。&#x27;}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-detail&quot;&gt;&lt;h3&gt;成果归属&lt;/h3&gt;&lt;p&gt;项目采用成果与本次任务关联。外部仓库整合和发布另有实际结果。&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;关闭&lt;/button&gt;&lt;button class=&quot;yp-btn primary&quot; type=&quot;button&quot; data-action=&quot;continue-project&quot;&gt;继续开发&lt;/button&gt;&lt;/div&gt;`}else if(kind===&#x27;sample-request&#x27;){title=&#x27;模型请求详情 · 样式示例&#x27;;body=&#x27;&lt;p&gt;任务、部门、工作轮次与每次尝试可相互关联。&lt;/p&gt;&lt;div class=&quot;yp-code&quot;&gt;Provider：未连接\n请求模型：未配置\n实际返回模型：未知\n输入 Token：未上报\n输出 Token：未上报&lt;/div&gt;&lt;details style=&quot;margin-top:17px&quot;&gt;&lt;summary&gt;Raw Request 示例&lt;/summary&gt;&lt;pre class=&quot;yp-code&quot;&gt;{\n  &quot;source&quot;: &quot;prototype&quot;,\n  &quot;request_sent&quot;: false\n}&lt;/pre&gt;&lt;/details&gt;&lt;div class=&quot;yp-form-actions&quot;&gt;&lt;span class=&quot;yp-small&quot;&gt;样式演示，不代表实际调用&lt;/span&gt;&lt;button class=&quot;yp-btn&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot;&gt;关闭&lt;/button&gt;&lt;/div&gt;&#x27;}overlay.innerHTML=`&lt;section class=&quot;yp-modal&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;yp-modal-title&quot;&gt;&lt;div class=&quot;yp-row yp-between&quot;&gt;&lt;h2 id=&quot;yp-modal-title&quot;&gt;${title}&lt;/h2&gt;&lt;button class=&quot;yp-icon&quot; type=&quot;button&quot; data-action=&quot;close-modal&quot; aria-label=&quot;关闭对话框&quot;&gt;${icon(&#x27;x&#x27;)}&lt;/button&gt;&lt;/div&gt;${body}&lt;/section&gt;`;overlay.hidden=false;root.querySelector(&#x27;.yp-shell&#x27;).inert=true;initIcons();overlay.querySelector(&#x27;input,textarea,button&#x27;)?.focus()}
+function closeModal(){overlay.hidden=true;overlay.innerHTML=&#x27;&#x27;;root.querySelector(&#x27;.yp-shell&#x27;).inert=false;state.modal=null;if(modalReturn?.isConnected)modalReturn.focus()}
+root.addEventListener(&#x27;click&#x27;,e=&gt;{const el=e.target.closest(&#x27;button&#x27;);if(!el)return;
+ if(el.dataset.project){goProject(el.dataset.project);return}if(el.dataset.task){openTask(el.dataset.task);return}if(el.dataset.page){state.page=el.dataset.page;state.taskId=null;state.menu=false;state.nav=false;if(state.page===&#x27;sources&#x27;)state.sourceTab=&#x27;product&#x27;;render();return}if(el.dataset.taskTab){state.taskTab=el.dataset.taskTab;state.inspect=&#x27;context&#x27;;render();return}if(el.dataset.inspect){state.inspect=el.dataset.inspect;render();return}if(el.dataset.filter){state.filter=el.dataset.filter;render();return}if(el.dataset.sourceTab){state.sourceTab=el.dataset.sourceTab;render();return}if(el.dataset.basis){state.page=&#x27;sources&#x27;;state.sourceTab=el.dataset.basis;render();return}if(el.dataset.kind){state.wizard.kind=el.dataset.kind;state.wizard.step=&#x27;form&#x27;;render();return}if(el.dataset.restore){const p=projects.find(p=&gt;p.id===el.dataset.restore);p.archived=false;goProject(p.id);toast(&#x27;项目已恢复&#x27;);return}
+ const a=el.dataset.action;if(!a)return;if(a===&#x27;new-project&#x27;){beginWizard()}else if(a===&#x27;nav&#x27;){state.nav=!state.nav;render()}else if(a===&#x27;home&#x27;){state.page=current()?&#x27;home&#x27;:&#x27;archives&#x27;;state.taskId=null;render()}else if(a===&#x27;new-task&#x27;){newTask()}else if(a===&#x27;menu&#x27;){state.menu=!state.menu;render()}else if(a===&#x27;pin&#x27;){const p=current();p.pinned=!p.pinned;render();toast(p.pinned?&#x27;项目已置顶&#x27;:&#x27;已取消置顶&#x27;)}else if([&#x27;rename&#x27;,&#x27;archive&#x27;,&#x27;decision&#x27;,&#x27;add-source&#x27;,&#x27;delivery&#x27;,&#x27;sample-request&#x27;].includes(a)){showModal(a)}else if(a===&#x27;close-modal&#x27;){closeModal()}else if(a===&#x27;confirm-archive&#x27;){const p=current();p.archived=true;closeModal();state.projectId=projects.find(p=&gt;!p.archived)?.id||null;state.taskId=null;state.page=&#x27;archives&#x27;;render();toast(&#x27;项目已归档，可随时恢复&#x27;)}else if(a===&#x27;continue-project&#x27;){closeModal();newTask()}else if(a===&#x27;leave-wizard&#x27;){state.page=current()?&#x27;home&#x27;:&#x27;archives&#x27;;state.wizard=null;render()}else if(a===&#x27;wizard-back&#x27;){const w=state.wizard;if(w.step===&#x27;form&#x27;){const f=content.querySelector(&#x27;form&#x27;);if(f){const data=new FormData(f);for(const k of [&#x27;name&#x27;,&#x27;goal&#x27;,&#x27;path&#x27;,&#x27;material&#x27;])w[k]=String(data.get(k)||&#x27;&#x27;)}w.step=&#x27;choice&#x27;}else w.step=&#x27;form&#x27;;render()}else if(a===&#x27;finish-import&#x27;){createProject(state.wizard)}else if(a===&#x27;stop-task&#x27;){task().status=&#x27;stopped&#x27;;task().summary=&#x27;用户停止了本次任务，已有工作和输入记录保留。&#x27;;render();toast(&#x27;本次示例任务已停止&#x27;)}
+});
+root.addEventListener(&#x27;input&#x27;,e=&gt;{if(e.target.matches(&#x27;[data-search]&#x27;)){state.query=e.target.value;const pos=e.target.selectionStart;renderSide();initIcons();const field=side.querySelector(&#x27;[data-search]&#x27;);field.focus();field.setSelectionRange(pos,pos)}if(e.target.dataset.draft)state.drafts[e.target.dataset.draft]=e.target.value});
+root.addEventListener(&#x27;submit&#x27;,e=&gt;{const form=e.target.closest(&#x27;form&#x27;);if(!form)return;e.preventDefault();if(!form.reportValidity())return;const data=new FormData(form),kind=form.dataset.form,p=current();
+ if(kind===&#x27;wizard&#x27;){const w=state.wizard;for(const k of [&#x27;name&#x27;,&#x27;goal&#x27;,&#x27;path&#x27;,&#x27;material&#x27;])w[k]=String(data.get(k)||&#x27;&#x27;).trim();if(!w.name||w.kind===&#x27;idea&#x27;&amp;&amp;!w.goal){toast(&#x27;请填写项目名称与想法&#x27;);return}if(w.kind===&#x27;existing&#x27;&amp;&amp;!w.path&amp;&amp;!w.material){const err=content.querySelector(&#x27;#yp-wizard-error&#x27;);err.hidden=false;err.textContent=&#x27;请至少提供一个项目位置或资料说明。&#x27;;return}if(w.kind===&#x27;idea&#x27;){createProject(w)}else{w.step=&#x27;report&#x27;;render()}}
+ else if(kind===&#x27;create-task&#x27;){const key=&#x27;project-&#x27;+p.id,text=(state.drafts[key]||&#x27;&#x27;).trim();if(!text){toast(&#x27;请描述这次想完成的事情&#x27;);return}const t={id:&#x27;task-&#x27;+(++seq),title:text.length&gt;40?text.slice(0,40)+&#x27;…&#x27;:text,status:&#x27;running&#x27;,summary:&#x27;产品正在结合项目现状明确本次目标。&#x27;,messages:[{scope:&#x27;global&#x27;,text}]};p.tasks.unshift(t);state.drafts[key]=&#x27;&#x27;;openTask(t.id);toast(&#x27;新任务已建立，示例流程开始&#x27;)}
+ else if(kind===&#x27;task-input&#x27;){const t=task(),key=&#x27;task-&#x27;+t.id,text=(state.drafts[key]||&#x27;&#x27;).trim();if(!text)return;t.messages.push({scope:&#x27;global&#x27;,text});state.drafts[key]=&#x27;&#x27;;render();toast(&#x27;要求已接收，等待产品处理&#x27;)}
+ else if(kind===&#x27;guidance&#x27;){const t=task(),key=&#x27;guidance-&#x27;+t.id+&#x27;-&#x27;+state.taskTab,text=(state.drafts[key]||&#x27;&#x27;).trim();if(!text)return;t.messages.push({scope:state.taskTab,text});state.drafts[key]=&#x27;&#x27;;render();toast(&#x27;指导已接收，等待目标部门处理&#x27;)}
+ else if(kind===&#x27;settings&#x27;){const name=String(data.get(&#x27;name&#x27;)||&#x27;&#x27;).trim(),goal=String(data.get(&#x27;goal&#x27;)||&#x27;&#x27;).trim();if(!name||!goal){toast(&#x27;项目名称和目标不能为空&#x27;);return}p.name=name;p.goal=goal;p.path=String(data.get(&#x27;path&#x27;)||&#x27;&#x27;).trim()||&#x27;尚未关联目录&#x27;;render();toast(&#x27;项目设置已更新&#x27;)}
+ else if(kind===&#x27;rename&#x27;){const name=String(data.get(&#x27;name&#x27;)||&#x27;&#x27;).trim();if(!name)return;p.name=name;closeModal();render();toast(&#x27;项目名称已更新&#x27;)}
+ else if(kind===&#x27;decision&#x27;){const answer=String(data.get(&#x27;answer&#x27;)||&#x27;&#x27;).trim();if(!answer)return;p.answer=answer;const t=p.tasks.find(t=&gt;t.status===&#x27;waiting&#x27;);if(t){t.status=&#x27;running&#x27;;t.summary=&#x27;已收到你的取舍，产品继续整理需求。&#x27;;t.messages.push({scope:&#x27;global&#x27;,text:answer})}closeModal();render();toast(&#x27;决定已记录，示例任务继续推进&#x27;)}
+ else if(kind===&#x27;source&#x27;){const name=String(data.get(&#x27;name&#x27;)||&#x27;&#x27;).trim(),text=String(data.get(&#x27;text&#x27;)||&#x27;&#x27;).trim();if(!name||!text)return;p.notes.push({name,text});closeModal();render();toast(&#x27;资料说明已添加&#x27;)}
+});
+root.addEventListener(&#x27;keydown&#x27;,e=&gt;{if(!state.modal)return;if(e.key===&#x27;Escape&#x27;){e.preventDefault();closeModal()}if(e.key===&#x27;Tab&#x27;){const els=[...overlay.querySelectorAll(&#x27;button,input,textarea,select,a[href]&#x27;)].filter(el=&gt;!el.disabled&amp;&amp;el.offsetParent!==null);if(!els.length)return;const first=els[0],last=els.at(-1);if(e.shiftKey&amp;&amp;document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&amp;&amp;document.activeElement===last){e.preventDefault();first.focus()}}});
+render();
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=&gt;{root.style.setProperty(&#x27;--yp-sidebar-width&#x27;,design.sidebarWidth+&#x27;px&#x27;);root.querySelector(&#x27;.yp-shell&#x27;).style.gridTemplateColumns=window.innerWidth&gt;740?`${design.sidebarWidth}px minmax(0,1fr)`:&#x27;&#x27;;content.style.paddingTop=(29*design.density)+&#x27;px&#x27;}});tweak.addSlider(design,&#x27;sidebarWidth&#x27;,{label:&#x27;项目导航宽度&#x27;,min:180,max:250,step:10,unit:&#x27;px&#x27;});tweak.addSlider(design,&#x27;density&#x27;,{label:&#x27;页面留白&#x27;,min:.8,max:1.2,step:.1})}
+})();
+&lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
