@@ -811,9 +811,11 @@ class Orchestrator:
                     if saved_summary != checkpoint.summary:
                         raise CompactionError("Compaction summary does not match its original artifact")
                     checkpoint_id = checkpoint_event["source_event_id"]
+                # The summary request is bounded by the model's declared output limit, not by the
+                # work-turn output budget: the plan hands it the remaining window for reasoning.
                 activation.compaction_plan = plan_compaction(
                     records, checkpoint, effective_window, pinned.input_items, pinned.tools,
-                    output_limit=output_limit,
+                    output_limit=None if identity.target is None else identity.target.max_output_tokens,
                 )
                 if activation.compaction_plan is not None:
                     plan = activation.compaction_plan

@@ -393,3 +393,38 @@ def test_assembler_records_budget_and_digest(tmp_path):
     assert assembled.manifest.digest.startswith("sha256:")
     assert assembled.manifest.token_estimate > 0
     assert any(item.source == "department_rules" for item in assembled.manifest.injected)
+
+
+def test_compaction_request_with_widened_output_limit_stays_within_the_window(tmp_path):
+    from harness.compaction import plan_compaction
+    from harness.models import canonical_hash
+
+    prompt_text = DEFAULT_PROMPTS["engineering"]
+    prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
+    projection = RunProjection(
+        run_id="run_x", task="task", phase="ENGINEERING", context_window=8000,
+        sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
+        department_prompts={"engineering": DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")},
+    )
+    assembler = ContextAssembler()
+    pinned = assembler.assemble(projection, department="engineering", session_id="ses_e", activation_id="act_1",
+                                context_window=8000, max_output_tokens=1200)
+    records = []
+    for index in range(1, 9):
+        item = {"id": f"msg-{index}", "type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": f"Evidence {index}: " + "x" * 2400}]}
+        records.append({"event_id": f"event-{index}", "seq": index, "activation_id": "act_0", "step_id": index,
+                        "item": item, "item_digest": canonical_hash(item)})
+    plan = plan_compaction(records, None, 8000, pinned.input_items, pinned.tools, output_limit=4096)
+    assert plan is not None
+    assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) > 8000 - 8000 * 85 // 100
+    assembled = assembler.assemble_compaction(
+        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
+        max_output_tokens=plan.max_output_tokens, compaction_event_id=None,
+    )
+    manifest = assembled.manifest
+    assert manifest.purpose == "compaction" and assembled.tools == []
+    assert manifest.input_token_estimate == plan.input_token_estimate
+    assert manifest.output_reserve_tokens == manifest.max_output_tokens == plan.max_output_tokens
+    # Admission is input estimate plus the output limit within the effective window.
+    assert manifest.input_token_estimate + manifest.output_reserve_tokens <= manifest.budget == 8000

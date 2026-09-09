@@ -246,6 +246,32 @@ def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_e
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
+def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path, monkeypatch):
+    """A summary cut off by the output limit is a terminal provider response: never adopted, never retried."""
+    _fast_retries(monkeypatch)
+
+    def truncated(request):
+        item = _message(request, "Decisions: the first half of the memory and then")
+        item["status"] = "incomplete"
+        return ModelResponse(output=[item], finish_reason="incomplete", error="max_output_tokens")
+
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=truncated)
+    result = system.activate_once(run_id)
+
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert not result.compactions
+    attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
+    assert len(attempts) == 1
+    events = system.store.list_events(run_id)
+    assert not any(event.type == EventType.COMPACTION_RECORDED for event in events)
+    assert not any(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events)
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert len(failed) == 1 and failed[0].payload["purpose"] == "compaction"
+    assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
+    assert "the first half" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
 def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_path, monkeypatch):
     import harness.engine as engine
 

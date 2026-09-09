@@ -109,16 +109,18 @@ def plan_compaction(
     if start >= len(records):
         raise CompactionError("History is already summarized and still does not fit the model window")
 
-    max_output_tokens = context_window - threshold
+    # The slicing reserve bounds how much source material one request may carry; the
+    # request's actual output limit is widened below to whatever the window leaves over.
+    output_reserve = context_window - threshold
     if output_limit is not None:
-        max_output_tokens = min(max_output_tokens, output_limit)
-    if max_output_tokens < 1:
+        output_reserve = min(output_reserve, output_limit)
+    if output_reserve < 1:
         raise CompactionError("The model output limit leaves no room for a compaction summary")
     summary_limit = min(
         4096,
         max(1, context_window // 10),
         max(1, (threshold - pinned_tokens) // 2),
-        max_output_tokens,
+        output_reserve,
     )
     if summary_limit < 32:
         raise CompactionError("Pinned context leaves insufficient room for a useful history summary")
@@ -140,14 +142,14 @@ def plan_compaction(
             })},
         ]
 
-    if _request_tokens(inputs([]), [], max_output_tokens) >= material_budget:
+    if _request_tokens(inputs([]), [], output_reserve) >= material_budget:
         raise CompactionError("Pinned context and previous summary leave no room for a summary source fragment")
 
     position, position_offset = start, offset
     while position < end:
         record, text = records[position], texts[position]
         whole = _fragment(record, text, position_offset, len(text))
-        if _request_tokens(inputs([*parts, whole]), [], max_output_tokens) <= material_budget:
+        if _request_tokens(inputs([*parts, whole]), [], output_reserve) <= material_budget:
             parts.append(whole)
             position += 1
             position_offset = 0
@@ -161,7 +163,7 @@ def plan_compaction(
         while low <= high:
             midpoint = (low + high) // 2
             fragment = _fragment(record, text, position_offset, midpoint)
-            if _request_tokens(inputs([fragment]), [], max_output_tokens) <= material_budget:
+            if _request_tokens(inputs([fragment]), [], output_reserve) <= material_budget:
                 fit = midpoint
                 low = midpoint + 1
             else:
@@ -184,13 +186,19 @@ def plan_compaction(
         boundary=boundary,
     )
     request_input = inputs(parts)
+    # Thinking models spend reasoning tokens inside the output limit, so the summary request
+    # gets everything the window leaves after its input (never less than the slicing reserve).
+    input_estimate = _request_tokens(request_input, [])
+    max_output_tokens = context_window - input_estimate
+    if output_limit is not None:
+        max_output_tokens = min(max_output_tokens, output_limit)
     return CompactionPlan(
         input_items=request_input,
         source_refs=[{key: value for key, value in part.items() if key != "text"} for part in parts],
         next_checkpoint=next_checkpoint,
         summary_token_limit=summary_limit,
         max_output_tokens=max_output_tokens,
-        input_token_estimate=_request_tokens(request_input, [], max_output_tokens),
+        input_token_estimate=input_estimate,
         tokens_before=before,
         previous_summary_digest=canonical_hash(previous_summary) if previous_summary is not None else None,
     )

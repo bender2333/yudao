@@ -65,7 +65,8 @@ def test_compaction_reserves_response_room_and_retains_recent_complete_steps():
         assert plan.input_items[1] == PINNED[0]
         assert plan.input_token_estimate <= 3400
         assert plan.summary_token_limit == 400
-        assert plan.max_output_tokens == 600
+        # Without a declared model limit the summary request gets the whole remaining window.
+        assert plan.max_output_tokens == 4000 - plan.input_token_estimate >= 600
         assert plan.input_token_estimate + plan.max_output_tokens <= 4000
     assert estimate_tokens(json_dumps({"input": [*PINNED, *shown], "tools": TOOLS})) <= 3400
 
@@ -79,9 +80,7 @@ def test_summary_request_opens_as_summarizer_then_pins_department_material_then_
     assert pinned == PINNED[0]
     assert material["role"] == "user"
     assert set(json.loads(material["content"])) == {"previous_summary", "source_fragments"}
-    assert plan.input_token_estimate == estimate_tokens(json_dumps({
-        "input": plan.input_items, "tools": [], "max_output_tokens": plan.max_output_tokens,
-    }))
+    assert plan.input_token_estimate == estimate_tokens(json_dumps({"input": plan.input_items, "tools": []}))
 
 
 def test_summary_source_fragments_match_exact_original_bytes_and_hashes():
@@ -175,6 +174,43 @@ def test_partial_offset_cannot_skip_unseen_original_text():
     assert checkpoint.partial_offset > 0
     with pytest.raises(CompactionError, match="digest"):
         plan_compaction(records, replace(checkpoint, partial_offset=checkpoint.partial_offset + 1), 4000, PINNED, TOOLS)
+
+
+def _small_window_case():
+    """8000-token window: ~1.2k pinned tokens, ~2.5k of work-turn tool schemas, ~4.5k summary input."""
+    pinned = [{"role": "developer", "content": "[intend]\nKeep the original request.\n[current_work]\n" + "w" * 4700}]
+    tools = [{"type": "function", "name": f"tool_{index}", "description": "d" * 1250, "parameters": {"type": "object"}}
+             for index in range(8)]
+    return _history(10, 1200), pinned, tools
+
+
+def test_thinking_room_widens_the_summary_output_limit_without_moving_the_slicing_reserve():
+    records, pinned, tools = _small_window_case()
+    plan = plan_compaction(records, None, 8000, pinned, tools, output_limit=4096)
+    assert plan.summary_token_limit == 800
+    assert 4300 <= plan.input_token_estimate <= 4700
+    assert plan.input_token_estimate == estimate_tokens(json_dumps({"input": plan.input_items, "tools": []}))
+    assert plan.max_output_tokens == min(4096, 8000 - plan.input_token_estimate) >= 3000
+    assert plan.input_token_estimate + plan.max_output_tokens <= 8000
+    # The declared model limit still caps the request; the slicing reserve (15%) never shrinks it.
+    capped = plan_compaction(records, None, 8000, pinned, tools, output_limit=2000)
+    assert capped.input_items == plan.input_items and capped.summary_token_limit == 800
+    assert capped.max_output_tokens == 2000
+    unbounded = plan_compaction(records, None, 8000, pinned, tools)
+    assert unbounded.input_items == plan.input_items
+    assert unbounded.max_output_tokens == 8000 - unbounded.input_token_estimate
+    for candidate in (plan, capped, unbounded):
+        assert candidate.max_output_tokens >= 8000 - 8000 * 85 // 100
+        assert candidate.summary_token_limit <= candidate.max_output_tokens
+
+
+@pytest.mark.parametrize("pinned, output_limit, message", [
+    ([{"role": "developer", "content": "[intend]\n" + "p" * 13300}], None, "insufficient room"),
+    (PINNED, 16, "insufficient room"),
+])
+def test_window_left_below_the_summary_limit_still_fails_before_any_request(pinned, output_limit, message):
+    with pytest.raises(CompactionError, match=message):
+        plan_compaction(_history(), None, 4000, pinned, TOOLS, output_limit=output_limit)
 
 
 def test_fixed_intend_and_current_work_cannot_be_compressed_away():
