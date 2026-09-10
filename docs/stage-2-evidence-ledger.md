@@ -1,23 +1,24 @@
 # Stage2 工作包证据账
 
-日期：2026-09-08，2026-09-09 补记 HEAD。  
+日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`cdcdce5` `fix: send object-typed change_record schema on Responses tools`。S3 报告提交 `6b41e43` 不改变应用身份。2026-09-09 HEAD `c1b26d6` 相对 `cdcdce5` 在 `harness/` 下只新增浏览器验收脚本 `test_s3_acceptance_browser.spec.js`，被测应用身份不变；后续排布见 [重新排布](stage-2-replan-2026-09-09.md)。  
+当前被测应用提交：`76e4c74` `feat(B1): 项目事项内核与 S2-0 收口`。此前 S3 被测应用仍是 `cdcdce5`；A1–A3 代码在 `03c25d4`，但真实小窗到 QA 未关闭，S2-1 尚未冻结。  
 文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 
-阶段状态：**PARTIAL**。局部代码、局部测试或一次真实成功请求都不能关闭阶段。
+阶段状态：**PARTIAL**。局部代码、局部测试或一次真实成功请求都不能关闭阶段。当前执行入口：[剩余工作计划](stage-2-completion-plan-2026-09-10.md)。
 
 ## 1. 基线与工作树
 
 | 项 | 事实 |
 | --- | --- |
 | 原始起点 | `239c3b1` `stagecommit` |
-| 当前 HEAD | `cdcdce5` `fix: send object-typed change_record schema on Responses tools` |
-| 本轮主线增量 | `fcb06ab` G1 解释/动作合同；`aef3178` HTTP 400 有界诊断；`cdcdce5` change_record object schema |
-| 分支 | `harness_1` = `origin/harness_1` |
-| 工作树 | 已修改 `jour.md`（含既有 A/B/C/D 笔记，不代为提交）；未跟踪 `.serena/project.yml` |
+| 当前 HEAD | `76e4c74` `feat(B1): 项目事项内核与 S2-0 收口` |
+| 本轮主线增量 | A1–A3 `6a89056`…`03c25d4`；B0 `f95d3fd`/`735e120`；S2-0/B1 `76e4c74` |
+| 分支 | `harness_1` 领先 `origin/harness_1` 13 个提交 |
+| 工作树 | 未跟踪 `.serena/project.yml`，不提交 |
 | 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
+| S2-0 回归 | `python -m pytest -q harness/tests -p no:cacheprovider --junitxml=.tmp/s2-0-full.xml`：923 通过、0 失败、1 跳过，1152.90 秒。定向项目测试 38 通过。未调真实模型 |
 
 ## 2. 候选提交拓扑
 
@@ -52,7 +53,9 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | W6 部门指导 | `fcb06ab` | 旧 auto-processed 已不在主线 | G1 解释/动作合同、空结果与旧写入反例、G2/G3 调度准入与 QA 竞态已测；浏览器待验 | 无真实指导闭环 | 真实验收未做 | 主线局部完成 |
 | W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
-| 2.1–2.4 / 2.E | 未开始 | 研究资料已导入 | — | — | 依赖 P0–P6 | 未开始 |
+| 2.1–2.4 / 2.E | B1 覆盖 2.E 的 E0–E2 内核；E3=B4、学习轨道未开始 | 研究资料已导入 | B1 局部测试见 S2-0 | 无 | 依赖 S2-1 冻结与 B3/B4 | 主线局部完成 / 学习未开始 |
+| B1 项目事项内核（S2-0） | 有：`76e4c74` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
+
 
 ## 4. O/U/G 状态
 
