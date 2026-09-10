@@ -841,3 +841,11 @@
 - 定向：`python -m pytest -q harness/tests/test_projects.py harness/tests/test_projects_web.py -p no:cacheprovider` 38 通过。
 - 完整 Python：`python -m pytest -q harness/tests -p no:cacheprovider --junitxml=.tmp/s2-0-full.xml`，923 通过、0 失败、1 跳过，1152.90 秒。未调真实模型。未提交 `.serena/project.yml`。
 
+
+## 2026-09-10 - S2-1：A3 timeout 收口，A1 真实小窗仍未到 QA
+
+- 冻结应用仍是 `76e4c74`。A1 反例（未声明工具不执行、三次后 `compaction_failed`）与 A2 组合 run 审计（`test_smoke_guidance_audit.py`）在该源码上通过。Node UI 35 通过，含 64KB Raw。
+- A3 timeout 在冻结上复现：0.3 秒客户端超时仍可能到不了服务端，首个 handler 上 `retry_seen.wait(5)` 与重试竞态，两次 `model_attempt_failed`。测试改为连接成功后客户端 1 秒、服务端静默 2 秒、重试预算 5 秒。timeout 连续 10 次通过；该函数五参数化 5 通过。只改测试，不改生产超时。
+- A1 真实小窗 `run_f721f94809f443d7`：p4-primary / gemini-2.5-flash，窗口 8000，未用 fake。产品合同已接纳，工程读 12180 字节参考文件后 31 次压缩，`PAUSED / model_steps_exhausted`，无交付、无 QA。审计 verified，摘要来源连续。报告 `.yudao/s2-1-a1-20260910/report.json`。未换模型、Prompt，未提高步骤或重试。
+- 根因：8000 窗里思考型模型把工程激活的 32 步花在压缩上。恢复条件：参考材料只触发 1–2 次压缩，或等到 Stage 3 的推理预算；不能靠加大 `MAX_MODEL_STEPS` 宣称通过。A1 不关闭。阶段仍 PARTIAL。
+

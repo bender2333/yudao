@@ -327,17 +327,18 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
 
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
     monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-    adapters, retry_seen = [], Event()
+    adapters = []
 
     def failure(handler, _body):
         if failure_kind == "connection":
             handler.connection.shutdown(socket.SHUT_RDWR)
             handler.connection.close()
         elif failure_kind == "timeout":
-            # 首次尝试已带着 0.3 秒超时发出;服务端不应答直到重试到达,由服务端决定"首次超时"。
-            # 重试拿回 5 秒常规预算,成功与否不再取决于机器速度。
+            # First request arrived, so CONNECT already succeeded. Raise the retry
+            # budget immediately and stay silent past the client deadline; do not
+            # wait for the retry on this handler.
             adapters[0].config = replace(adapters[0].config, timeout_sec=5)
-            retry_seen.wait(5)
+            time.sleep(2)
         elif failure_kind == "partial_stream":
             _send(handler, _stream([CALL], terminal=False))
         else:
@@ -346,16 +347,15 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
                   status=status, content_type="application/json")
 
     def success(handler, _body):
-        retry_seen.set()
         _send(handler, _submit_stream())
 
     with _server([failure, success]) as (config, captures, *_):
         if failure_kind == "timeout":
-            # 每次尝试都在超时窗口内新建 httpx 客户端;加载 certifi 证书链在 Windows 上可达数百毫秒,
-            # 会把 0.3 秒吃光、请求根本到不了服务端。本地明文 HTTP 不需要证书校验。
+            # Local plaintext HTTP does not need certifi. Skip it so CONNECT fits
+            # in a 1s budget on Windows, then let the server outlast that deadline.
             monkeypatch.setattr("harness.adapters.responses.DefaultAsyncHttpxClient",
                                 lambda **kwargs: DefaultAsyncHttpxClient(verify=False, **kwargs))
-            config = replace(config, timeout_sec=0.3)
+            config = replace(config, timeout_sec=1)
         adapters.append(ResponsesAdapter(config))
         system = LoopSystem.for_testing(tmp_path, adapters[0])
         run_id = system.create_run("local retry")
