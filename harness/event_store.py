@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 from typing import Any, Iterator
 
-from .models import Event, json_dumps, new_id, utc_now
+from .models import Event, ProjectEvent, json_dumps, new_id, utc_now
 
 
 SCHEMA = """
@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS events (
     UNIQUE(run_id, seq)
 );
 CREATE INDEX IF NOT EXISTS idx_events_run_seq ON events(run_id, seq);
+CREATE TABLE IF NOT EXISTS project_events (
+    event_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(project_id, seq)
+);
+CREATE INDEX IF NOT EXISTS idx_project_events_project_seq ON project_events(project_id, seq);
 """
 
 
@@ -146,9 +156,55 @@ class EventStore:
         for row in rows:
             yield self._from_row(row)
 
+    def append_project(self, project_id: str, type: str, payload: dict[str, Any] | None = None) -> ProjectEvent:
+        """项目流只追加；`seq` 按项目递增，与 run 流的 `seq` 无关。"""
+        event = ProjectEvent(event_id=new_id("pevt"), project_id=project_id, seq=0, type=type,
+                             payload=dict(payload or {}), created_at=utc_now())
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT COALESCE(MAX(seq), 0) AS seq FROM project_events WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            event.seq = int(row["seq"]) + 1
+            self._conn.execute(
+                "INSERT INTO project_events (event_id, project_id, seq, type, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (event.event_id, event.project_id, event.seq, event.type, json_dumps(event.payload), event.created_at),
+            )
+        return event
+
+    def list_project_events(self, project_id: str, *, after_seq: int = 0) -> list[ProjectEvent]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM project_events WHERE project_id = ? AND seq > ? ORDER BY seq ASC",
+                (project_id, after_seq),
+            ).fetchall()
+        return [self._project_from_row(row) for row in rows]
+
+    def get_project_event(self, event_id: str) -> ProjectEvent | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM project_events WHERE event_id = ?", (event_id,)).fetchone()
+        return self._project_from_row(row) if row else None
+
+    def list_project_ids(self) -> list[str]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT project_id FROM project_events GROUP BY project_id ORDER BY MAX(created_at) DESC"
+            ).fetchall()
+        return [row["project_id"] for row in rows]
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    @staticmethod
+    def _project_from_row(row: sqlite3.Row) -> ProjectEvent:
+        return ProjectEvent(
+            event_id=row["event_id"],
+            project_id=row["project_id"],
+            seq=row["seq"],
+            type=row["type"],
+            payload=json.loads(row["payload_json"]),
+            created_at=row["created_at"],
+        )
 
     def _next_seq(self, run_id: str) -> int:
         row = self._conn.execute("SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE run_id = ?", (run_id,)).fetchone()

@@ -30,6 +30,8 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
     latest_request = projection.model_requests[-1] if projection.model_requests else None
     return {
         "run_id": projection.run_id,
+        "project_id": projection.project_id,
+        "work_item_id": projection.work_item_id,
         "task": projection.task,
         "phase": projection.phase,
         "active_department": projection.active_department,

@@ -8,7 +8,9 @@ from typing import Any
 
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_result_summaries, tool_error
+from .artifacts import ArtifactStore
 from .models import (
+    ArtifactRef,
     ContextExclusion,
     ContextManifest,
     ContextSource,
@@ -137,12 +139,15 @@ class AssembledContext:
 
 
 def department_work_text(pinned: AssembledContext) -> str:
-    static = {"intend", "department_rules", "professional_completion", "collaboration_rules", "input_handling", "proposal_contract",
-              "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
+    static = {"intend", "project", "department_rules", "professional_completion", "collaboration_rules", "input_handling",
+              "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
 
 class ContextAssembler:
+    def __init__(self, artifacts: ArtifactStore | None = None) -> None:
+        self.artifacts = artifacts
+
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
                  compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
@@ -166,9 +171,40 @@ class ContextAssembler:
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
         tool_names = _tools_for(projection, department, guidance_only=guidance_only)
+        # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
+        ]
+        if projection.project_context_ref is not None:
+            if self.artifacts is None:
+                raise ValueError("project context requires an artifact store")
+            project_text = self.artifacts.get_for_run(
+                projection.run_id, ArtifactRef(**projection.project_context_ref),
+            ).decode("utf-8")
+            parts.append(ContextPart(
+                "project",
+                projection.project_context_ref["content_hash"].split(":", 1)[1][:12],
+                project_text,
+            ))
+        if guidance_items:
+            parts.append(ContextPart(
+                "department_guidance",
+                str(max(item.version for item in guidance_items)),
+                json_dumps([
+                    {
+                        "id": item.id,
+                        "department": item.department,
+                        "version": item.version,
+                        "text": item.text,
+                        "guidance_ref": asdict(item.guidance_ref),
+                        "created_event_id": item.created_event_id,
+                        "status": item.status,
+                    }
+                    for item in guidance_items
+                ]),
+            ))
+        parts.extend([
             ContextPart("department_rules", str(prompt.version), prompt.text),
             ContextPart("input_progress", str(projection.input_version), json_dumps({
                 "received": projection.input_version, "assigned_to_product": projection.product_work_input_version,
@@ -200,27 +236,7 @@ class ContextAssembler:
                 ),
             ),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
-        ]
-        if guidance_items:
-            parts.insert(
-                2,
-                ContextPart(
-                    "department_guidance",
-                    str(max(item.version for item in guidance_items)),
-                    json_dumps([
-                        {
-                            "id": item.id,
-                            "department": item.department,
-                            "version": item.version,
-                            "text": item.text,
-                            "guidance_ref": asdict(item.guidance_ref),
-                            "created_event_id": item.created_event_id,
-                            "status": item.status,
-                        }
-                        for item in guidance_items
-                    ]),
-                ),
-            )
+        ])
         pending_inputs = [item for item in projection.inputs
                           if item.version > projection.processed_input_version and item.kind == "text"]
         if pending_inputs:

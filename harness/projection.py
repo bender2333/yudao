@@ -120,6 +120,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
             department: SessionRecord(session_id=session_id, department=department, status="idle")
             for department, session_id in payload.get("sessions", {}).items()
         }
+        state.project_id = payload["project_id"]
+        state.work_item_id = payload["work_item_id"]
+        state.baseline = payload["baseline"]
+        state.workspace_digest = payload["workspace_digest"]
+        state.project_context_ref = payload["project_context_ref"]
+        state.prompt_config_versions = dict(payload["prompt_config_versions"])
         state.active_department = "product"
         return
 

@@ -1,6 +1,6 @@
 # B0 合同一页：项目、事项与部门 Prompt 项目配置
 
-日期：2026-09-09。依据：[第二阶段重新排布](stage-2-replan-2026-09-09.md) 第 2–3 节的决定 D-A～D-J、[第三版原型](prototypes/2026-09-09/README.md)、[部门 Prompt 配置约定](prototypes/2026-09-09/department-prompt-configuration.md)、[原生项目演化设计](research/native-project-evolution-design.md) §3/§5/§6/§7。
+日期：2026-09-09，2026-09-10 S2-0 收口修正。依据：[第二阶段重新排布](stage-2-replan-2026-09-09.md) 第 2–3 节的决定 D-A～D-J、[剩余工作计划](stage-2-completion-plan-2026-09-10.md) 第 6–7 节、[第三版原型](prototypes/2026-09-09/README.md)、[部门 Prompt 配置约定](prototypes/2026-09-09/department-prompt-configuration.md)、[原生项目演化设计](research/native-project-evolution-design.md) §3/§5/§6/§7。
 
 用户已确认（2026-09-09）：轨道 A 与 B 并行；旧 `.yudao/*` 运行数据随新作用域直接弃用，不迁移、不加读入口；D-H 首批无活跃事项时的部门输入只"作为新事项开始 / 记录原文"，不做模型对话；实施交给子代理。
 
@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | 运行内核（现有） | `orchestrator.py`、`context.py`、`validation.py`、`workspace.py`… | 一次 run 的部门交接、停止、合同、QA、封存、run 内 Git、重试。新增：接受归属参数并写入 `RUN_CREATED`；接受初始工作树并在建工作区前落盘；接受项目上下文材料并作为钉住材料装配 | 不知道"项目当前成果"、不做采纳、不读项目流 |
 | 项目层（新增） | `harness/projects.py`（一个模块：服务 + 投影） | 项目登记、事项创建（含建其主 run）、采纳结算、继承恢复、部门 Prompt 项目配置、项目材料记录、项目读模型 | 不生成运行事实、不改 run 流、不调用模型 |
-| 查询与 API | `web/server.py`、`observability.py`、`views.py` | `/api/projects…` 路由：命令转交项目层，只读查询拼装 | 不写事件 |
+| 查询与 API | `web/server.py`、`observability.py`、`views.py` | `/api/projects…` 路由：命令转交项目层；只读查询拼装投影 | 不发起新工作、不改 Prompt、不调模型。读取路径可以转交项目层的幂等结算（记账已发生的 run 终态，事件可审计） |
 | 工作台 | `web/static/` | 第三版外壳 | 见 B3 |
 
 项目层只通过 `Orchestrator.create_run(...)` 与内核交互，且只在事项创建时。项目层读 run 投影（`project_run`）和 run 工件（`ArtifactStore.get_for_run`），不读 run 内部状态锁。
@@ -67,7 +67,7 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 | `work_item_id: str | None` | `work_item_id` | `work_item_id: str | None` |
 | `baseline: dict | None` | `baseline` = `{adoption_id, source_run_id, delivery_event_id, tree_ref, code_tree_digest}` | `baseline: dict | None` |
 | `initial_tree: CapturedTree | None` | 不写树本身；`workspace_digest` = 落盘后 `capture_public_tree(workspace).digest`（无树时为空目录 digest） | `workspace_digest: str` |
-| `project_context: str | None` | `project_context_ref`（工件，`text/markdown`，run 作用域） | `project_context_ref: dict | None` |
+| `project_context: str | None` | `project_context_ref`（工件，`text/markdown`，run 作用域）。**不**把原文写入 `RUN_CREATED` 或 `RunProjection` | `project_context_ref: dict | None` |
 | `department_prompts: dict[str, str] | None` | 替代 `DEFAULT_PROMPTS` 作为 run 初始 Prompt 文本（`InteractionWriter.initial` 接受该参数）；另写 `prompt_config_versions: {department: int}` | `prompt_config_versions: dict[str, int]` |
 
 规则：
@@ -88,10 +88,25 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 长期目标：<goal 原文>
 当前采用成果：<无（这是项目的第一个事项）| 来自事项「<title>」（run <run_id>，采纳 <adoption_id>）：<summary>；文件：<files>；检查：<check_names>；已知风险：<known_risks>。本 run 工作区已从该成果的完整封存恢复，digest <code_tree_digest>。>
 已采纳事项：<按采纳顺序 1..n："<title>" — <summary>> | 无
+仍有效的决定：<无（第一个事项，或源 run 没有当前有效产品合同）| 见下>
 本事项：<title>
 ```
 
-不放历史对话、失败尝试、过时计划（2.E §6）。`smoke.py` 的输入审计把 `project` 部件视为合法钉住材料。
+「仍有效的决定」取源 run（当前采纳的 `source_run_id`）投影里的当前 `ProductSpec` 与 `effective_decisions`，写成确定性 Markdown，不带历史对话、失败尝试或过时计划：
+
+```
+产品合同 r<revision> hash <content_hash>
+目标：<goal>
+要求：<requirements 顿号连接，空则无>
+边界：<boundaries>
+约束：<constraints>
+验收：<acceptance_criteria>
+致命条件：<fatal_conditions>
+非目标：<non_goals>
+有效决定：<无 | 按决定顺序 1..n："<statement>" — <rationale>>
+```
+
+第一个事项或没有当前采纳时整段写「仍有效的决定：无」。`smoke.py` 的输入审计把 `project` 部件视为合法钉住材料。
 
 ## 6. 项目投影 `ProjectProjection`（从 `project_events` 重建，再读所属 run 投影派生）
 
@@ -127,19 +142,20 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 
 `ProjectService.start_work_item(project_id, text, *, title=None, max_cycles=8, context_window=32_000) -> (work_item_id, run_id)`：
 
-1. 项目必须存在且未归档。`settle_pending(project_id)`（§8）先跑一遍，保证基线是最新的。
+1. 项目必须存在。先 `_writable`（未归档），再 `settle_pending(project_id)`（§8），保证基线是最新的。归档项目在这一步失败，不得先写结算再报错。
 2. `title` 缺省取 `text` 首行截断 40 字。
-3. `baseline`：`current_adoption` 为空 → `null`，工作区为空目录；否则 `{adoption_id, source_run_id, delivery_event_id, tree_ref, code_tree_digest}`，并 `load_tree(artifacts, source_run_id, tree_ref)` 得到 `initial_tree`，核对 `digest == code_tree_digest`。
+3. `baseline`：`current_adoption` 为空 → `null`，工作区为空目录；否则 `{adoption_id, source_run_id, delivery_event_id, tree_ref, code_tree_digest}`。装树前读取源 run 投影：`project_id` 必须等于当前项目，否则 `ValueError`。再 `load_tree(artifacts, source_run_id, tree_ref)` 得到 `initial_tree`，核对 `digest == code_tree_digest`。
 4. `department_prompts` 取 `prompt_configs[dept].text`；`prompt_config_versions` 取其 `version`。
-5. 生成 `project_context`（§5）。
+5. 生成 `project_context`（§5），其中「仍有效的决定」来自源 run。
 6. 先写 `work_item_created`（含预生成 `run_id`），再 `orchestrator.create_run(text, run_id=..., project_id=..., work_item_id=..., baseline=..., initial_tree=..., project_context=..., department_prompts=..., max_cycles=..., context_window=...)`。`create_run` 抛错则写 `work_item_start_failed` 并重新抛出；该事项状态为 `not_started`，可再次创建新事项。
 7. 返回后由调用方（Web 工作进程）执行 `run_until_stop`。首批仍是每进程一个活动 run（`LoopConsoleServer` 现有 BusyError 语义），活动 run 未停前创建事项返回 409 busy。
 
 不做：同一事项追加第二个 run；项目级 Git；部门在无 run 下对话。
 
 ## 8. 采纳结算 `settle(run_id)`
+幂等。结算是项目层对已发生 run 终态的记账，不是新工作。由 Web 工作进程在 `run_until_stop` 返回后调用；`GET /api/projects/{id}` 与 `start_work_item`（仅未归档）通过 `settle_pending(project_id)` 补跑，覆盖进程中断在 RUN_DONE 与结算之间的情形。
 
-幂等；由 Web 工作进程在 `run_until_stop` 返回后调用，也在 `start_work_item` 与 `GET /api/projects/{id}` 读取时通过 `settle_pending(project_id)` 补跑（覆盖进程中断在 RUN_DONE 与结算之间的情形）。
+归档项目仍可补跑结算。创建事项、改 Prompt、记材料、重命名、置顶、归档是写命令，归档后 409。
 
 | 条件 | 结果 |
 | --- | --- |
@@ -162,9 +178,11 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 
 部门页输入框在项目没有 `in_progress` 事项时提供两项：`作为新事项开始`（= §7）与 `记录原文`（= `POST /api/projects/{id}/materials`，写 `material_recorded`，`department` 记来源部门）。不调用模型，不生成部门回应。有活跃事项时输入框走现有 run 级 `inputs`/`guidance`。
 
+「记录原文」是服务器不变量，不只是界面开关：项目已有 `in_progress` 事项时 `record_material` 失败，409 `reason: "work_item_in_progress"`。项目材料只出现在项目投影里，本阶段不注入后续 run 的模型输入。
+
 ## 11. API 清单
 
-所有错误体沿用 `{"error", "reason"?}`；`project not found` 404；归档项目上的写命令 409 `reason: "project_archived"`。
+所有错误体沿用 `{"error", "reason"?}`；`project not found` 404；归档项目上的写命令（登记之后的 rename/pin/archive/work-items/prompts PUT/materials）409 `reason: "project_archived"`。有 `in_progress` 事项时：归档 409 `reason: "work_item_in_progress"`；`POST .../materials` 同样 409 `reason: "work_item_in_progress"`。`GET /api/projects/{id}` 对归档项目仍可补跑结算。
 
 | 方法 路径 | 请求体 | 成功响应 | 写入 |
 | --- | --- | --- | --- |
@@ -173,14 +191,14 @@ project_events(event_id TEXT PK, project_id TEXT, seq INTEGER, type TEXT,
 | `GET /api/projects/{id}` | — | `ProjectProjection.to_dict()` + `overview: {goal, current_adoption, pending: [...], recent: [...]}`；读取前跑 `settle_pending` | 可能补写结算事件 |
 | `POST /api/projects/{id}/rename` | `{name}` | 200 | `project_renamed` |
 | `POST /api/projects/{id}/pin` | `{pinned: bool}` | 200 | `project_pinned` |
-| `POST /api/projects/{id}/archive` / `restore` | — | 200 | `project_archived` / `project_restored` |
+| `POST /api/projects/{id}/archive` / `restore` | — | 200；归档时若有 `in_progress` 事项则 409 `work_item_in_progress` | `project_archived` / `project_restored` |
 | `POST /api/projects/{id}/work-items` | `{text, title?, max_cycles?, context_window?}` | 201 `{work_item_id, run_id, phase}`；409 busy；503 provider 不可用（沿用现有） | `work_item_created`（+ 内核 `RUN_CREATED`） |
 | `GET /api/projects/{id}/work-items/{wid}` | — | `WorkItem.to_dict()` + `handoffs: [所有 transition]` + `rework` + `adoption | held` + `run: {run_id, phase, outcome, stop_reason}` | — |
 | `GET /api/projects/{id}/board` | — | `{work_items: [WorkItem 摘要]}`，流程图与看板同一份 | — |
 | `GET /api/projects/{id}/departments/{dept}` | `?work_item=` 可选 | 无参数：`{department, project_id, prompt_config: {version, source}, items: [{work_item_id, title, status, view: observability.department(run_id, dept)}]}` 按事项倒序；有参数：只含该事项 | — |
 | `GET /api/projects/{id}/prompts/{dept}` | — | §9 读取体 | — |
 | `PUT /api/projects/{id}/prompts/{dept}` | `{text, base_version}` | 200 `{...读取体, unchanged: bool}`；400 空白；409 `{error, reason: "prompt_config_conflict", current: 读取体}` | `department_prompt_configured` |
-| `POST /api/projects/{id}/materials` | `{text, department?}` | 201 `{material_id}` | `material_recorded` |
+| `POST /api/projects/{id}/materials` | `{text, department?}` | 201 `{material_id}`；有 `in_progress` 事项 409 `work_item_in_progress` | `material_recorded` |
 | `GET /api/projects/{id}/model-attempts` | 现有 `department/status/q/cursor/limit` + `work_item` | `{items: [...现有摘要 + run_id + work_item_id + title], next_cursor}`；跨该项目所有 run 合并、按时间倒序；`cursor` 不透明 | — |
 | `GET /api/projects/{id}/model-usage` | 同上 | 现有用量体 + `by_work_item`；未上报用量保持未知 | — |
 | `GET /api/projects/{id}/stream` | `after_seq` / `Last-Event-ID` | SSE：`event: project`（项目事件卡）与 `event: loop`（所属 run 的事件卡，data 含 `run_id`、`work_item_id`）；`id` 用 `"<project_seq>:<run_id>:<run_seq>"` 形式的游标或等价不透明串 | — |
@@ -197,8 +215,8 @@ CLI（只读）：`python -m harness project list`、`python -m harness project 
 3. run 工件跨项目读取只发生在 `start_work_item` 读源 run 的封存树（项目层行为，且源 run 必须属于同一项目）。
 4. 项目事件不改写 run 事件；结算只追加。
 5. 重放：`ProjectProjection` 由 `project_events` + `project_run(run_id)` 完全重建，与在线状态 `canonical_state()` 一致。
-6. 归档项目只读：写命令 409；仍可查询与恢复。
-7. 删除派生缓存（若实现引入任何缓存）不改变任何查询结果。
+6. 归档项目：创建事项、改 Prompt、记材料、重命名、置顶、再次归档返回 409；仍可查询、恢复，以及补跑结算。有 `in_progress` 事项时不能归档。
+7. 删除派生缓存（若实现引入任何缓存）不改变任何查询结果。派生事项状态时，所属 run 的 `project_id` / `work_item_id` 必须与事项一致；不一致则该事项不引用外部项目数据。
 
 ## 13. 反例清单（B1 实现必须全部成为正式测试）
 
@@ -210,8 +228,11 @@ CLI（只读）：`python -m harness project list`、`python -m harness project 
 - `create_run` 混给归属参数 → `ValueError`；`baseline.code_tree_digest` 与 `initial_tree.digest` 不等 → `ValueError`；工作区目录已存在 → 抛错不覆盖。
 - 项目上下文部件：每个部门首次请求的 `input_items` 中 `[project]` 出现在 `[current_work]` 之后、`[department_rules]` 之前；压缩请求的 pinned_input 含它；smoke 审计对含 `project` 部件的 run 为 verified。
 - Prompt 配置：保存 v1 → 同文本再保存不加版本 → 空白 400 → `base_version` 过期 409 且响应含当前配置 → 保存 v2 后新事项 run 的 `department_prompts[dept].text == v2 文本`、`prompt_config_versions[dept] == 2`，而 v1 期间创建的 run 请求正文不变。
-- 归档项目：`work-items`、`prompts` PUT、`materials` 均 409；`restore` 后恢复可写。
+- 归档项目：`work-items`、`prompts` PUT、`materials`、`rename` 均 409；`GET` 仍可补跑结算；`restore` 后恢复可写。
+- 有 `in_progress` 事项时 `archive` 与 `materials` 均 409 `work_item_in_progress`，不写事件。
 - D-H：无活跃事项时 `materials` 写入 `material_recorded`，不产生任何 run 事件。
+- 第二事项的 `[project]` 钉住部件含「仍有效的决定」，其中出现源 run 当前产品合同的目标与要求原文；第一个事项该段为「无」。
+- `RUN_CREATED.payload` 与 `RunProjection` 有 `project_context_ref`、无 `project_context` 原文字段。
 - `GET /api/runs` 仍列出 run（含项目 run 与 bare run）；`POST /api/runs` 的删除与其反例放到 B3。
 
 ## 14. 首批不做
@@ -220,6 +241,6 @@ CLI（只读）：`python -m harness project list`、`python -m harness project 
 
 ## 15. 实施切分（对排布文档的修正）
 
-- **B1（后端一次交付）**：`event_store.py` 项目表；`harness/projects.py`（`ProjectEventType`、`ProjectService`、`ProjectProjection`、`project_projection(store, artifacts, project_id)`）；`create_run` 归属参数与 `initial_tree`/`project_context`/`department_prompts`；`context.py` 的 `project` 部件；`models.py`/`projection.py` 的 run 归属字段；`smoke.py` 审计接受 `project` 部件；`web/server.py` 全部 `/api/projects…` 路由（`POST /api/runs` 保留到 B3）；`__main__.py` 只读 CLI；§13 全部反例。原排布中的 B2 后端并入 B1（同一模块、同一批事件），B2 不再单列。
+- **B1（后端一次交付，S2-0 收口）**：`event_store.py` 项目表；`harness/projects.py`（`ProjectEventType`、`ProjectService`、`ProjectProjection`、`project_projection(store, artifacts, project_id)`）；`create_run` 归属参数与 `initial_tree`/`project_context`/`department_prompts`；`context.py` 的 `project` 部件；`models.py`/`projection.py` 的 run 归属字段（无 `project_context` 原文）；`smoke.py` 审计接受 `project` 部件；`web/server.py` 全部 `/api/projects…` 路由（`POST /api/runs` 保留到 B3）；`__main__.py` 只读 CLI；§13 全部反例，含 2026-09-10 收口项。原排布中的 B2 后端并入 B1（同一模块、同一批事件），B2 不再单列。
 - **B3（前端）**：第三版外壳，消费 §11 接口；Prompt 检查区按 §9 分开展示；D-H 两项入口。
 - **B4（联调与真实验收）**：不变。

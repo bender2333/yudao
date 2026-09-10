@@ -183,13 +183,40 @@ class ObservabilityQuery:
         records = self._filtered_attempts(
             run_id, department=department, status=status, q=q,
         )
-        prepared_count = sum(not record.get("sent") for record in records)
-        all_records = records
-        records = [record for record in records if record.get("sent")]
         # Usage intentionally uses the complete filtered set. Cursor/limit are
         # accepted for the shared filter contract but never narrow the sum.
-        _cursor_offset(cursor, len(all_records))
+        _cursor_offset(cursor, len(records))
         _limit(limit)
+        return {"run_id": run_id, **self.usage_summary(records, department=department, status=status, q=q)}
+
+    def attempt_records(
+        self,
+        run_id: str,
+        *,
+        department: str | None = None,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Complete filtered attempt records for one run, in seq order (project-level callers merge them)."""
+
+        return self._filtered_attempts(run_id, department=department, status=status, q=q)
+
+    @staticmethod
+    def public_attempt(record: dict[str, Any]) -> dict[str, Any]:
+        return _public_attempt(record)
+
+    def usage_summary(
+        self,
+        records: list[dict[str, Any]],
+        *,
+        department: str | None = None,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> dict[str, Any]:
+        """Usage body for an already filtered record set; the same shape serves one run or a whole project."""
+
+        prepared_count = sum(not record.get("sent") for record in records)
+        records = [record for record in records if record.get("sent")]
         total = _usage_totals(records, source="reported")
         estimated_total = _usage_totals(records, source="estimated")
         department_groups: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
@@ -239,7 +266,6 @@ class ObservabilityQuery:
         coverage = _coverage(reported, len(records), estimated=estimated)
         coverage["fields"] = _field_coverage(records)
         return {
-            "run_id": run_id,
             "version": SCHEMA_VERSION,
             "totals": {field: total[field] for field in USAGE_FIELDS},
             "currency": total.get("currency"),

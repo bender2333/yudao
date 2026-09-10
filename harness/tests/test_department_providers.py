@@ -157,7 +157,9 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
 
 
 def _part(body: dict[str, Any], name: str) -> str | None:
-    content = body["input"][0]["content"]
+    # Work requests open with the pinned department material; tool-less compaction requests
+    # open with the summarizer rules and pin the department material second.
+    content = body["input"][1 if not body["tools"] else 0]["content"]
     marker = f"[{name}]\n"
     if marker not in content:
         return None
@@ -698,7 +700,14 @@ def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
         assert purposes[0] == purposes[-1] == "work"
         assert all(purpose == "compaction" for purpose in purposes[1:-1])
         assert result.compactions
-        assert all(item["max_output_tokens"] == 900 for item in result.compactions)
+        # Each summary request spends what the 6000-token window leaves after its input, capped by the
+        # model's declared 1000; the old fixed 15% reserve would have allowed only 900.
+        compaction_manifests = [manifest for manifest in result.manifests if manifest.purpose == "compaction"]
+        assert len(compaction_manifests) == len(result.compactions)
+        for manifest, item in zip(compaction_manifests, result.compactions):
+            assert manifest.max_output_tokens == item["max_output_tokens"]
+            assert manifest.max_output_tokens == min(1_000, 6_000 - manifest.input_token_estimate) > 900
+            assert manifest.input_token_estimate + manifest.max_output_tokens <= 6_000
         assert all(item["provider_config_id"] == "provider-a" for item in result.compactions)
         assert all(item["model_id"] == "model-a-product" for item in result.compactions)
         assert all(item["body"]["tools"] == [] for item, purpose in zip(captures_a[1:-1], purposes[1:-1]))

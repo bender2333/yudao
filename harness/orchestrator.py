@@ -40,6 +40,7 @@ from .models import (
 )
 from .provider_catalog import CredentialSource, ProviderCatalog, ProviderCatalogSnapshot, ResolvedProviderTarget
 from .projection import RunProjection, project_run
+from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import ToolRuntime, has_tool
@@ -186,6 +187,53 @@ def _redact_observation(value: Any, *, secret: str | None = None, key: str | Non
     return value
 
 
+BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
+
+
+def _validate_run_ownership(
+    *,
+    project_id: str | None,
+    work_item_id: str | None,
+    baseline: dict[str, Any] | None,
+    initial_tree: CapturedTree | None,
+    project_context: str | None,
+    department_prompts: dict[str, str] | None,
+    prompt_config_versions: dict[str, int] | None,
+) -> None:
+    """项目归属参数要么全给（项目层）要么全不给（bare run）；基线与初始树成对出现。"""
+    ownership = {
+        "project_id": project_id, "work_item_id": work_item_id, "project_context": project_context,
+        "department_prompts": department_prompts, "prompt_config_versions": prompt_config_versions,
+    }
+    given = [name for name, value in ownership.items() if value is not None]
+    if given and len(given) != len(ownership):
+        missing = sorted(set(ownership) - set(given))
+        raise ValueError("project ownership parameters must be given together; missing: " + ", ".join(missing))
+    if not given and (baseline is not None or initial_tree is not None):
+        raise ValueError("baseline and initial_tree require project ownership parameters")
+    if (baseline is None) != (initial_tree is None):
+        raise ValueError("baseline and initial_tree must be given together")
+    if given:
+        for name in ("project_id", "work_item_id", "project_context"):
+            if not isinstance(ownership[name], str) or not ownership[name].strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if not isinstance(department_prompts, dict) or set(department_prompts) != set(DEPARTMENTS):
+            raise ValueError("department_prompts must cover exactly the three departments")
+        if any(not isinstance(text, str) or not text.strip() for text in department_prompts.values()):
+            raise ValueError("department prompt text must be non-empty")
+        if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(DEPARTMENTS):
+            raise ValueError("prompt_config_versions must cover exactly the three departments")
+        if any(type(version) is not int or version < 0 for version in prompt_config_versions.values()):
+            raise ValueError("prompt_config_versions must be non-negative integers")
+    if baseline is not None:
+        if not isinstance(baseline, dict) or set(baseline) != BASELINE_FIELDS:
+            raise ValueError("baseline must contain exactly: " + ", ".join(sorted(BASELINE_FIELDS)))
+        if not isinstance(initial_tree, CapturedTree):
+            raise ValueError("initial_tree must be a captured tree")
+        if baseline["code_tree_digest"] != initial_tree.digest:
+            raise ValueError("baseline code_tree_digest does not match the initial tree digest")
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -213,7 +261,7 @@ class Orchestrator:
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
-        self.assembler = assembler or ContextAssembler()
+        self.assembler = assembler or ContextAssembler(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
         self._state_lock = RLock()
@@ -227,6 +275,13 @@ class Orchestrator:
         max_cycles: int = 8,
         context_window: int = 32_000,
         run_id: str | None = None,
+        project_id: str | None = None,
+        work_item_id: str | None = None,
+        baseline: dict[str, Any] | None = None,
+        initial_tree: CapturedTree | None = None,
+        project_context: str | None = None,
+        department_prompts: dict[str, str] | None = None,
+        prompt_config_versions: dict[str, int] | None = None,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -236,6 +291,11 @@ class Orchestrator:
             raise ValueError("context_window must be positive")
         if self.provider_catalog is None and self.test_adapter_factory is None:
             raise ValueError("provider_catalog is required for production runs")
+        _validate_run_ownership(
+            project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
+            project_context=project_context, department_prompts=department_prompts,
+            prompt_config_versions=prompt_config_versions,
+        )
         snapshot = None
         if self.provider_catalog is not None:
             snapshot = self.provider_catalog.resolve_snapshot(self.credentials)
@@ -243,7 +303,14 @@ class Orchestrator:
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
             raise ValueError("run_id must stay within the run materials directory")
-        initial = self.interactions.initial(run_id, task)
+        # 工作区先于其余材料落盘：继承树无法恢复时不留下半个 run。
+        workspace_dir = self.workspace_root / run_id
+        if initial_tree is not None:
+            self.workspace_root.mkdir(parents=True, exist_ok=True)
+            materialize_tree(initial_tree, workspace_dir)
+        workspace = Workspace(workspace_dir)
+        workspace_digest = capture_public_tree(workspace.root).digest
+        initial = self.interactions.initial(run_id, task, department_prompts=department_prompts)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
         if snapshot is not None:
@@ -254,7 +321,11 @@ class Orchestrator:
                 "snapshot_id": canonical_hash(provider_snapshot),
                 **provider_snapshot,
             }
-        Workspace(self.workspace_root / run_id)
+        project_context_ref = None
+        if project_context is not None:
+            project_context_ref = asdict(self.artifacts.put(
+                run_id, "project_context", project_context, media_type="text/markdown",
+            ))
         self.store.append(
             run_id,
             EventType.RUN_CREATED,
@@ -271,6 +342,12 @@ class Orchestrator:
                 "adapter": self.test_adapter_name if snapshot is None else "directory",
                 "provider_snapshot": provider_snapshot,
                 "sessions": {name: session.session_id for name, session in sessions.items()},
+                "project_id": project_id,
+                "work_item_id": work_item_id,
+                "baseline": baseline,
+                "workspace_digest": workspace_digest,
+                "project_context_ref": project_context_ref,
+                "prompt_config_versions": dict(prompt_config_versions or {}),
             },
         )
         self.store.append(

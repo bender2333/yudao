@@ -1,4 +1,4 @@
-"""命令入口：demo、serve、replay。"""
+"""命令入口：demo、serve、replay、smoke、project。"""
 
 from __future__ import annotations
 
@@ -30,13 +30,22 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--provider-config", required=True)
-    replay = sub.add_parser("replay", help="rebuild projection from the event store")
-    replay.add_argument("run_id")
+    replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
+    replay.add_argument("run_id", nargs="?")
+    replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
     replay.add_argument("--data-dir", default=str(DEFAULT_DIR))
     smoke = sub.add_parser("smoke", help="run a real-provider three-department smoke test")
     smoke.add_argument("--data-dir", default=str(SMOKE_DIR))
     smoke.add_argument("--scenario", choices=("happy", "collaboration", "all"), default="all")
     smoke.add_argument("--provider-config", required=True)
+    project = sub.add_parser("project", help="read-only project queries")
+    project_sub = project.add_subparsers(dest="project_command", required=True)
+    project_list = project_sub.add_parser("list", help="list projects")
+    project_list.add_argument("--data-dir", default=str(DEFAULT_DIR))
+    project_list.add_argument("--archived", action="store_true", help="include archived projects")
+    project_show = project_sub.add_parser("show", help="print one project projection")
+    project_show.add_argument("project_id")
+    project_show.add_argument("--data-dir", default=str(DEFAULT_DIR))
     args = parser.parse_args(argv)
 
     if args.command == "demo":
@@ -54,9 +63,35 @@ def main(argv: list[str] | None = None) -> int:
         system = _production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
     if args.command == "replay":
+        if (args.run_id is None) == (args.project_id is None):
+            parser.error("replay needs exactly one of: run_id or --project <project_id>")
         system = LoopSystem(args.data_dir)
+        if args.project_id is not None:
+            first = system.projects.projection(args.project_id).canonical_state()
+            second = system.projects.projection(args.project_id).canonical_state()
+            print(json.dumps(first, ensure_ascii=False, indent=2))
+            if first != second:
+                print("project replay is not deterministic", file=sys.stderr)
+                return 1
+            return 0
         projection = system.replay(args.run_id)
         print(json.dumps(projection.canonical_state(), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "project":
+        system = LoopSystem(args.data_dir)
+        if args.project_command == "list":
+            rows = [
+                {
+                    "project_id": item.project_id, "name": item.name, "pinned": item.pinned, "archived": item.archived,
+                    "created_at": item.created_at, "updated_at": item.updated_at,
+                    "work_item_count": len(item.work_items), "active_work_item_id": item.active_work_item_id,
+                    "current_adoption": None if item.current_adoption is None else item.current_adoption.adoption_id,
+                }
+                for item in system.projects.list_projects(include_archived=args.archived)
+            ]
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+            return 0
+        print(json.dumps(system.projects.projection(args.project_id).to_dict(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "smoke":
         scenarios = ["happy", "collaboration"] if args.scenario == "all" else [args.scenario]

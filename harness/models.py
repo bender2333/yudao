@@ -458,6 +458,21 @@ class Event:
 
 
 @dataclass
+class ProjectEvent:
+    """项目流事件：与 run 流分表，`seq` 按项目递增。"""
+
+    event_id: str
+    project_id: str
+    seq: int
+    type: str
+    payload: dict[str, Any]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class SessionRecord:
     session_id: str
     department: str
@@ -556,6 +571,12 @@ class RunProjection:
     pending_feedback: dict[str, dict[str, Any]] = field(default_factory=dict)
     evidence: list[dict[str, Any]] = field(default_factory=list)
     last_activations: dict[str, str] = field(default_factory=dict)
+    project_id: str | None = None
+    work_item_id: str | None = None
+    baseline: dict[str, Any] | None = None
+    workspace_digest: str = ""
+    project_context_ref: dict[str, Any] | None = None
+    prompt_config_versions: dict[str, int] = field(default_factory=dict)
     last_event_id: str | None = None
     last_seq: int = 0
 

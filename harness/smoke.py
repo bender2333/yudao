@@ -533,7 +533,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     received_version = 0
     prompt_versions: dict[str, int] = {}
     current_work = RunProjection()
-    assembler = ContextAssembler()
+    assembler = ContextAssembler(artifacts)
     events = store.list_events(run_id)
     has_retry_evidence = any(event.type in RETRY_EVENTS for event in events)
     for index, event in enumerate(events):

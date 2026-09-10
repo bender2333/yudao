@@ -14,6 +14,7 @@ from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .provider_catalog import CatalogValidationError, CredentialMaterial, CredentialSource, ProviderCatalog
 from .projection import RunProjection, project_run
+from .projects import ProjectService
 
 
 class LoopSystem:
@@ -48,6 +49,7 @@ class LoopSystem:
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
         )
         self.git_versions = self.orchestrator.git_versions
+        self.projects = ProjectService(self.store, self.artifacts, self.orchestrator)
 
     @property
     def provider_catalog(self) -> ProviderCatalog | None:

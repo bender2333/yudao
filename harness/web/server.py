@@ -2,20 +2,32 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 import threading
 import time
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from ..git_audit import git_version_detail
-from ..models import ArtifactRef, EventType, GIT_VERSION_EVENTS, json_dumps
-from ..observability import AttemptNotFoundError, ObservabilityQuery
+from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..observability import MAX_LIMIT, AttemptNotFoundError, ObservabilityQuery
 from ..provider_catalog import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
+from ..projects import (
+    ProjectArchivedError,
+    ProjectEventType,
+    ProjectNotFoundError,
+    PromptConfigConflict,
+    WorkItemInProgressError,
+    project_event_card,
+    project_overview,
+    work_item_handoffs,
+)
 from ..runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from ..tree_archive import load_tree
 from ..views import event_card, run_board, run_payload
@@ -43,6 +55,7 @@ class LoopConsoleServer(ThreadingHTTPServer):
         self._worker_lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._active_run_id: str | None = None
+        self._active_work: tuple[str, str] | None = None
         self._worker_errors: dict[str, str] = {}
         bound_host, bound_port = self.server_address
         self.base_url = f"http://{bound_host}:{bound_port}"
@@ -59,6 +72,16 @@ class LoopConsoleServer(ThreadingHTTPServer):
             return None
         return self._active_run_id
 
+    def active_project_id(self) -> str | None:
+        if not self.busy() or self._active_work is None:
+            return None
+        return self._active_work[0]
+
+    def active_work_item_id(self) -> str | None:
+        if not self.busy() or self._active_work is None:
+            return None
+        return self._active_work[1]
+
     def error_for(self, run_id: str) -> str | None:
         with self._worker_lock:
             return self._worker_errors.get(run_id)
@@ -72,29 +95,44 @@ class LoopConsoleServer(ThreadingHTTPServer):
 
     def start_run(self, task: str, options: dict[str, int]) -> str:
         with self._worker_lock:
-            if self._worker is not None and self._worker.is_alive():
-                raise BusyError("已有任务正在运行")
-            status = self.system.provider_status()
-            if not status.get("available", False):
-                raise ProviderUnavailableError(
-                    status.get("message") or "provider unavailable",
-                    status.get("reason") or "provider_unavailable",
-                )
+            self._require_idle_and_available()
             run_id = self.system.create_run(task, **options)
-            worker = threading.Thread(
-                target=self._run_worker,
-                args=(run_id,),
-                name=f"loop-worker-{run_id}",
-                daemon=True,
-            )
-            self._active_run_id = run_id
-            self._worker = worker
-            worker.start()
+            self._spawn_worker(run_id, None)
             return run_id
+
+    def start_work_item(self, project_id: str, text: str, options: dict[str, Any]) -> tuple[str, str]:
+        with self._worker_lock:
+            self._require_idle_and_available()
+            work_item_id, run_id = self.system.projects.start_work_item(project_id, text, **options)
+            self._spawn_worker(run_id, (project_id, work_item_id))
+            return work_item_id, run_id
+
+    def _require_idle_and_available(self) -> None:
+        if self._worker is not None and self._worker.is_alive():
+            raise BusyError("已有任务正在运行")
+        status = self.system.provider_status()
+        if not status.get("available", False):
+            raise ProviderUnavailableError(
+                status.get("message") or "provider unavailable",
+                status.get("reason") or "provider_unavailable",
+            )
+
+    def _spawn_worker(self, run_id: str, work: tuple[str, str] | None) -> None:
+        worker = threading.Thread(
+            target=self._run_worker,
+            args=(run_id,),
+            name=f"loop-worker-{run_id}",
+            daemon=True,
+        )
+        self._active_run_id = run_id
+        self._active_work = work
+        self._worker = worker
+        worker.start()
 
     def _run_worker(self, run_id: str) -> None:
         try:
             self.system.run_until_stop(run_id)
+            self.system.projects.settle(run_id)
         except Exception as exc:
             message = str(exc) or type(exc).__name__
             with self._worker_lock:
@@ -124,9 +162,15 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._send_json({"runs": self._list_runs(store)})
             if path.startswith("/api/runs/"):
                 return self._get_run(path, query, store)
+            if path == "/api/projects":
+                return self._send_json({"projects": self._list_projects(query)})
+            if path.startswith("/api/projects/"):
+                return self._get_project(path, query, store)
             self._send_json({"error": "not found"}, 404)
         except RunNotFoundError as exc:
             self._send_json({"error": f"run not found: {exc}"}, 404)
+        except ProjectNotFoundError as exc:
+            self._send_json({"error": f"project not found: {exc}"}, 404)
         except AttemptNotFoundError as exc:
             self._send_json({"error": f"model attempt not found: {exc}"}, 404)
         except ValueError as exc:
@@ -135,10 +179,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc)}, 500)
 
     def do_POST(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/")
-        parts = [item for item in path.split("/") if item]
-        try:
+        parts = self._path_parts()
+
+        def dispatch() -> None:
             if parts == ["api", "runs"]:
                 return self._create_run()
             if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "cancel":
@@ -151,13 +194,41 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._update_prompt(parts[2], parts[4])
             if len(parts) == 6 and parts[:2] == ["api", "runs"] and parts[3] == "departments" and parts[5] == "guidance":
                 return self._add_guidance(parts[2], parts[4])
-            if path.startswith("/api/"):
-                return self._send_json({"error": "not found"}, 404)
+            if parts == ["api", "projects"]:
+                return self._create_project()
+            if len(parts) == 4 and parts[:2] == ["api", "projects"]:
+                return self._post_project(parts[2], parts[3])
             self._send_json({"error": "not found"}, 404)
+
+        self._command(dispatch)
+
+    def do_PUT(self) -> None:
+        parts = self._path_parts()
+
+        def dispatch() -> None:
+            if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "prompts":
+                return self._configure_prompt(parts[2], unquote(parts[4]))
+            self._send_json({"error": "not found"}, 404)
+
+        self._command(dispatch)
+
+    def _path_parts(self) -> list[str]:
+        path = urlparse(self.path).path.rstrip("/")
+        return [item for item in path.split("/") if item]
+
+    def _command(self, dispatch: Callable[[], None]) -> None:
+        try:
+            dispatch()
         except BusyError as exc:
             self._send_json({"error": str(exc), "reason": "busy"}, 409)
         except RunTerminalError as exc:
             self._send_json({"error": str(exc), "reason": "run_terminal"}, 409)
+        except WorkItemInProgressError as exc:
+            self._send_json({"error": str(exc), "reason": "work_item_in_progress"}, 409)
+        except ProjectArchivedError as exc:
+            self._send_json({"error": str(exc), "reason": "project_archived"}, 409)
+        except PromptConfigConflict as exc:
+            self._send_json({"error": str(exc), "reason": "prompt_config_conflict", "current": exc.current}, 409)
         except CancelledInputSaveError as exc:
             message = "执行已取消，但命令原文未形成正式 Git 版本；输入框保留原文。"
             if not exc.cancellation_recorded:
@@ -171,6 +242,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc), "reason": "provider_unavailable"}, 503)
         except RunNotFoundError as exc:
             self._send_json({"error": f"run not found: {exc}"}, 404)
+        except ProjectNotFoundError as exc:
+            self._send_json({"error": f"project not found: {exc}"}, 404)
         except ValueError as exc:
             self._send_json({"error": str(exc)}, 400)
         except Exception as exc:
@@ -183,6 +256,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "ok": True,
             "busy": self.server.busy(),
             "active_run_id": self.server.active_run_id(),
+            "active_project_id": self.server.active_project_id(),
+            "active_work_item_id": self.server.active_work_item_id(),
             "adapter": getattr(test_adapter, "name", "directory"),
             "provider_available": bool(status.get("available", False)),
             "provider_message": status.get("message", ""),
@@ -270,6 +345,274 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 "phase": first.phase,
             }
         )
+
+    # ------------------------------------------------------------------ projects
+
+    def _list_projects(self, query: dict[str, list[str]]) -> list[dict[str, Any]]:
+        include_archived = self._query_scalar(query, "archived") in {"1", "true"}
+        rows = []
+        for project in self.server.system.projects.list_projects(include_archived=include_archived):
+            adoption = project.current_adoption
+            rows.append({
+                "project_id": project.project_id,
+                "name": project.name,
+                "pinned": project.pinned,
+                "archived": project.archived,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+                "work_item_count": len(project.work_items),
+                "active_work_item_id": project.active_work_item_id,
+                "current_adoption": None if adoption is None else {
+                    "adoption_id": adoption.adoption_id, "summary": adoption.summary, "adopted_at": adoption.adopted_at,
+                },
+            })
+        return rows
+
+    def _create_project(self) -> None:
+        body = self._read_json_body()
+        if set(body) != {"name", "goal"}:
+            raise ValueError("body must contain name and goal")
+        project_id = self.server.system.projects.register(body["name"], body["goal"])
+        self._send_json({"project_id": project_id}, 201)
+
+    def _post_project(self, project_id: str, command: str) -> None:
+        projects = self.server.system.projects
+        if command == "rename":
+            body = self._read_json_body()
+            if set(body) != {"name"}:
+                raise ValueError("body must contain only name")
+            projects.rename(project_id, body["name"])
+            return self._send_json({"ok": True, "project_id": project_id, "name": body["name"]})
+        if command == "pin":
+            body = self._read_json_body()
+            if set(body) != {"pinned"}:
+                raise ValueError("body must contain only pinned")
+            projects.pin(project_id, body["pinned"])
+            return self._send_json({"ok": True, "project_id": project_id, "pinned": body["pinned"]})
+        if command == "archive":
+            self._drain_body()
+            projects.archive(project_id)
+            return self._send_json({"ok": True, "project_id": project_id, "archived": True})
+        if command == "restore":
+            self._drain_body()
+            projects.restore(project_id)
+            return self._send_json({"ok": True, "project_id": project_id, "archived": False})
+        if command == "work-items":
+            body = self._read_json_body()
+            unknown = set(body) - {"text", "title", "max_cycles", "context_window"}
+            if unknown:
+                raise ValueError("unsupported work item fields: " + ", ".join(sorted(unknown)))
+            text = body.get("text")
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError("text must be a non-empty string")
+            options: dict[str, Any] = {}
+            if body.get("title") is not None:
+                if not isinstance(body["title"], str) or not body["title"].strip():
+                    raise ValueError("title must be a non-empty string")
+                options["title"] = body["title"]
+            for key in ("max_cycles", "context_window"):
+                if key not in body or body[key] is None:
+                    continue
+                options[key] = _positive_int(key, body[key])
+            work_item_id, run_id = self.server.start_work_item(project_id, text, options)
+            projection = project_run(self.server.store, run_id)
+            return self._send_json({"work_item_id": work_item_id, "run_id": run_id, "phase": projection.phase}, 201)
+        if command == "materials":
+            body = self._read_json_body()
+            unknown = set(body) - {"text", "department"}
+            if unknown:
+                raise ValueError("unsupported material fields: " + ", ".join(sorted(unknown)))
+            text = body.get("text")
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError("text must be a non-empty string")
+            department = body.get("department")
+            if department is not None and department not in DEPARTMENTS:
+                raise ValueError("unknown department")
+            material_id = projects.record_material(project_id, text, department=department)
+            return self._send_json({"material_id": material_id}, 201)
+        self._send_json({"error": "not found"}, 404)
+
+    def _configure_prompt(self, project_id: str, department: str) -> None:
+        body = self._read_json_body()
+        if set(body) != {"text", "base_version"}:
+            raise ValueError("body must contain text and base_version")
+        result = self.server.system.projects.configure_prompt(project_id, department, body["text"], body["base_version"])
+        self._send_json(result)
+
+    def _get_project(self, path: str, query: dict[str, list[str]], store) -> None:
+        parts = [item for item in path.split("/") if item]
+        project_id = parts[2]
+        rest = parts[3:]
+        projects = self.server.system.projects
+        if not rest:
+            projects.settle_pending(project_id)
+            project = projects.projection(project_id)
+            payload = project.to_dict()
+            payload["overview"] = project_overview(store, project)
+            return self._send_json(payload)
+        project = projects.projection(project_id)
+        if rest == ["board"]:
+            return self._send_json({"project_id": project_id, "work_items": [item.to_dict() for item in project.work_items]})
+        if rest[:1] == ["work-items"] and len(rest) == 2:
+            item = project.work_item(rest[1])
+            if item is None:
+                return self._send_json({"error": "work item not found"}, 404)
+            detail = item.to_dict()
+            try:
+                run = project_run(store, item.run_id)
+                events = store.list_events(item.run_id)
+            except RunNotFoundError:
+                run, events = None, []
+            detail["handoffs"] = work_item_handoffs(events)
+            detail["adoption"] = next((entry.to_dict() for entry in project.adoptions if entry.work_item_id == item.work_item_id), None)
+            detail["held"] = next((entry.to_dict() for entry in project.held if entry.work_item_id == item.work_item_id), None)
+            detail["run"] = None if run is None else {
+                "run_id": run.run_id, "phase": run.phase, "outcome": run.outcome, "stop_reason": run.stop_reason,
+            }
+            return self._send_json(detail)
+        if rest[:1] == ["departments"] and len(rest) == 2:
+            department = unquote(rest[1])
+            if department not in DEPARTMENTS:
+                raise ValueError("unknown department")
+            items = list(reversed(project.work_items))
+            wanted = self._query_scalar(query, "work_item")
+            if wanted is not None:
+                items = [item for item in items if item.work_item_id == wanted]
+                if not items:
+                    return self._send_json({"error": "work item not found"}, 404)
+            observability = ObservabilityQuery(store, self.server.system.artifacts)
+            config = project.prompt_configs[department]
+            return self._send_json({
+                "department": department,
+                "project_id": project_id,
+                "prompt_config": {"version": config.version, "source": config.source},
+                "items": [
+                    {
+                        "work_item_id": item.work_item_id, "title": item.title, "status": item.status,
+                        "view": None if item.status == "not_started" else observability.department(item.run_id, department),
+                    }
+                    for item in items
+                ],
+            })
+        if rest[:1] == ["prompts"] and len(rest) == 2:
+            return self._send_json(projects.read_prompt(project_id, unquote(rest[1])))
+        if rest in (["model-attempts"], ["model-usage"]):
+            wanted = self._query_scalar(query, "work_item")
+            if wanted is not None and project.work_item(wanted) is None:
+                return self._send_json({"error": "work item not found"}, 404)
+            if rest == ["model-attempts"]:
+                return self._send_json(self._project_attempts(project, query, store))
+            return self._send_json(self._project_usage(project, query, store))
+        if rest == ["stream"]:
+            return self._project_stream(project, query, store)
+        self._send_json({"error": "not found"}, 404)
+
+    def _project_records(self, project, query: dict[str, list[str]], store) -> tuple[list[tuple[Any, dict[str, Any]]], dict[str, Any]]:
+        filters = {
+            "department": self._query_scalar(query, "department"),
+            "status": self._query_scalar(query, "status"),
+            "q": self._query_scalar(query, "q"),
+        }
+        wanted = self._query_scalar(query, "work_item")
+        items = [item for item in project.work_items if wanted is None or item.work_item_id == wanted]
+        observability = ObservabilityQuery(store, self.server.system.artifacts)
+        merged: list[tuple[Any, dict[str, Any]]] = []
+        for item in items:
+            if item.status == "not_started":
+                continue
+            merged.extend((item, record) for record in observability.attempt_records(item.run_id, **filters))
+        return merged, filters
+
+    def _project_attempts(self, project, query: dict[str, list[str]], store) -> dict[str, Any]:
+        merged, filters = self._project_records(project, query, store)
+        merged.sort(key=lambda pair: (pair[1].get("started_at") or pair[1].get("prepared_at") or "", pair[1].get("seq", 0)),
+                    reverse=True)
+        limit = self._query_limit(query)
+        if not 1 <= limit <= MAX_LIMIT:
+            raise ValueError(f"limit must be an integer between 1 and {MAX_LIMIT}")
+        offset = _decode_offset(self._query_scalar(query, "cursor"), len(merged))
+        page = merged[offset:offset + limit]
+        next_offset = offset + len(page)
+        return {
+            "project_id": project.project_id,
+            "items": [
+                {**ObservabilityQuery.public_attempt(record), "run_id": item.run_id,
+                 "work_item_id": item.work_item_id, "title": item.title}
+                for item, record in page
+            ],
+            "total": len(merged),
+            "next_cursor": _encode_cursor({"offset": next_offset}) if next_offset < len(merged) else None,
+            "filters": {**filters, "work_item": self._query_scalar(query, "work_item")},
+        }
+
+    def _project_usage(self, project, query: dict[str, list[str]], store) -> dict[str, Any]:
+        merged, filters = self._project_records(project, query, store)
+        observability = ObservabilityQuery(store, self.server.system.artifacts)
+        by_work_item = []
+        for item in project.work_items:
+            records = [record for owner, record in merged if owner is item]
+            if not records and item.status == "not_started":
+                continue
+            by_work_item.append({
+                "work_item_id": item.work_item_id, "title": item.title, "run_id": item.run_id,
+                **observability.usage_summary(records, **filters),
+            })
+        return {
+            "project_id": project.project_id,
+            **observability.usage_summary([record for _owner, record in merged], **filters),
+            "by_work_item": by_work_item,
+        }
+
+    def _project_stream(self, project, query: dict[str, list[str]], store) -> None:
+        cursor = self._project_cursor(query)
+        runs = {item.run_id: item.work_item_id for item in project.work_items}
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+        idle = 0
+        try:
+            while True:
+                wrote = False
+                for event in store.list_project_events(project.project_id, after_seq=cursor["p"]):
+                    cursor["p"] = event.seq
+                    if event.type == ProjectEventType.WORK_ITEM_CREATED:
+                        runs[event.payload["run_id"]] = event.payload["work_item_id"]
+                    self._write_sse(_encode_cursor(cursor), "project", project_event_card(event))
+                    wrote = True
+                for run_id, work_item_id in list(runs.items()):
+                    for event in store.list_events(run_id, after_seq=cursor["r"].get(run_id, 0)):
+                        cursor["r"][run_id] = event.seq
+                        self._write_sse(_encode_cursor(cursor), "loop",
+                                        {**event_card(event), "run_id": run_id, "work_item_id": work_item_id})
+                        wrote = True
+                if wrote:
+                    idle = 0
+                else:
+                    self.wfile.write(b": keepalive\n\n")
+                    idle += 1
+                self.wfile.flush()
+                time.sleep(0.2 if idle < 25 else 1.0)
+        except Exception:
+            return
+
+    def _project_cursor(self, query: dict[str, list[str]]) -> dict[str, Any]:
+        header = self.headers.get("Last-Event-ID")
+        if header not in (None, ""):
+            cursor = _decode_cursor(header)
+            if (not isinstance(cursor, dict) or set(cursor) != {"p", "r"} or type(cursor["p"]) is not int
+                    or not isinstance(cursor["r"], dict)
+                    or any(not isinstance(key, str) or type(value) is not int for key, value in cursor["r"].items())):
+                raise ValueError("Last-Event-ID is not a project stream cursor")
+            return cursor
+        return {"p": self._resume_seq(query, default=0), "r": {}}
+
+    def _write_sse(self, identity: str, event_name: str, data: dict[str, Any]) -> None:
+        chunk = f"id: {identity}\nevent: {event_name}\ndata: {json_dumps(data)}\n\n"
+        self.wfile.write(chunk.encode("utf-8"))
+
+    # ------------------------------------------------------------------ runs
 
     def _get_run(self, path: str, query: dict[str, list[str]], store) -> None:
         parts = [item for item in path.split("/") if item]
@@ -476,6 +819,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             rows.append(
                 {
                     "run_id": run_id,
+                    "project_id": projection.project_id,
+                    "work_item_id": projection.work_item_id,
                     "task": projection.task,
                     "phase": projection.phase,
                     "outcome": projection.outcome,
@@ -547,6 +892,29 @@ def _positive_int(key: str, value: Any) -> int:
     if type(value) is not int or value < 1:
         raise ValueError(f"{key} must be a positive integer")
     return value
+
+
+def _encode_cursor(value: dict[str, Any]) -> str:
+    return base64.urlsafe_b64encode(json_dumps(value).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(raw: str) -> Any:
+    try:
+        padded = raw + "=" * (-len(raw) % 4)
+        return json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise ValueError("cursor is invalid") from exc
+
+
+def _decode_offset(cursor: str | None, total: int) -> int:
+    if cursor in (None, ""):
+        return 0
+    value = _decode_cursor(cursor)
+    if not isinstance(value, dict) or set(value) != {"offset"} or type(value["offset"]) is not int:
+        raise ValueError("cursor is invalid")
+    if value["offset"] < 0 or value["offset"] > total:
+        raise ValueError("cursor is outside the result set")
+    return value["offset"]
 
 
 def serve(system: LoopSystem, host: str = "127.0.0.1", port: int = 8765) -> LoopConsoleServer:

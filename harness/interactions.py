@@ -34,10 +34,12 @@ class InteractionWriter:
         self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
         self.git_versions = git_versions
 
-    def initial(self, run_id: str, text: str) -> dict[str, Any]:
+    def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
+        """写入首个输入与三部门初始 Prompt；项目层可用项目配置替代默认 Prompt。"""
         received = self._input(run_id, text, version=1, kind="text", previous_ref=None, parent_commit=None)
+        prompt_texts = DEFAULT_PROMPTS if department_prompts is None else department_prompts
         prompts = {department: self._prompt(run_id, department, text, 1)
-                   for department, text in DEFAULT_PROMPTS.items()}
+                   for department, text in prompt_texts.items()}
         return {"initial_input": received, "department_prompts": prompts,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
