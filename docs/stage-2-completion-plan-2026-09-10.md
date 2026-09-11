@@ -20,8 +20,8 @@
 | 已提交的内核收尾 | A1 `6a89056`、A1-b `d0f5d54`、A1-c `ed21b87`、A1-d `03c25d4`；A2 `6c7750c`、A2-b `b3c35f0`；A3 `b2c25ca` + timeout `4c5cde4`；B0 `f95d3fd` / `735e120`；B1/S2-0 `76e4c74` |
 | 工作树 | 干净。未跟踪 `.serena/project.yml`，不提交 |
 | 证据账 / 进度表 | 已同步到候选冻结 `4c5cde4` |
-| A1 真实小窗 | 代码已改四轮。`4c5cde4` 之前最新场 `run_f721f94809f443d7`（窗口 8000，参考 12180 字节）31 次压缩后 `model_steps_exhausted`，无 QA。更早 `70c72ee6` / `c13d86c9` / `9898f337` / `c62e0e61` 均未到独立 QA。本冻结重跑控制参考为 4500–6000 字节，目标 1–3 次压缩；禁止加大 `MAX_MODEL_STEPS` |
-| A2 / A3 | A2 代码按 D20 重建指导与 `snapshot_hash`；S3 组合 run `run_cb69cec4c1f74100` 的输入审计仍是 A2 之前的 unverified，必须在 `4c5cde4` 重跑。A3 timeout 用例已在本冻结；浏览器 64KB 与响应式矩阵仍待本冻结真机 |
+| A1 真实小窗 | `4c5cde4` 上三场真实运行均 `PAUSED / model_steps_exhausted`，无独立 QA。材料从 12180→5200→2800、推迟写入、限制单次读取均未关掉该项。禁止加大 `MAX_MODEL_STEPS`。A1 不关闭 |
+| A2 / A3 | A2：`run_ffa5247370e8469a` 窗口 32000，DONE/release，审计 verified，封存 CLI 通过；操作为 API。A3 timeout 用例已在冻结；浏览器 64KB 与 1440/1024/390/360/320 矩阵 PASS |
 | Stage 3 文档 | 3.0 准备包已落在 `docs/stage-3/`，不是 Stage 2 欠项 |
 
 2026-09-10 工作树未提交项目层、证据账停在 `cdcdce5` 的表述已过时，以本表为准。局部测试通过只代表该冻结的离线回归，不代表 Stage 2 验收。
