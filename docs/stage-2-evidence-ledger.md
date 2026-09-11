@@ -1,8 +1,8 @@
 # Stage2 工作包证据账
 
-日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0。  
+日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0，2026-09-11 记候选冻结 `4c5cde4`。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`76e4c74` `feat(B1): 项目事项内核与 S2-0 收口`。此前 S3 被测应用仍是 `cdcdce5`；A1–A3 代码在 `03c25d4`，但真实小窗到 QA 未关闭，S2-1 尚未冻结。  
+当前被测应用提交：`4c5cde4` `test(A3): 确定性 timeout 重试；记录 S2-1 小窗未到 QA`。S3 历史被测应用仍是 `cdcdce5`；B1/S2-0 应用是 `76e4c74`。`4c5cde4` 相对 `76e4c74` 只改 timeout 用例与文档，生产循环未再改。S2-1 尚未关闭。
 文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
 
@@ -13,12 +13,13 @@
 | 项 | 事实 |
 | --- | --- |
 | 原始起点 | `239c3b1` `stagecommit` |
-| 当前 HEAD | `76e4c74` `feat(B1): 项目事项内核与 S2-0 收口` |
-| 本轮主线增量 | A1–A3 `6a89056`…`03c25d4`；B0 `f95d3fd`/`735e120`；S2-0/B1 `76e4c74` |
-| 分支 | `harness_1` 领先 `origin/harness_1` 13 个提交 |
+| 当前 HEAD | `4c5cde4` `test(A3): 确定性 timeout 重试；记录 S2-1 小窗未到 QA` |
+| 本轮主线增量 | A1–A3 `6a89056`…`03c25d4`/`b2c25ca`；B0 `f95d3fd`/`735e120`；S2-0/B1 `76e4c74`；A3 timeout 用例 `4c5cde4` |
+| 分支 | `harness_1` 与 `origin/harness_1` 同步于 `4c5cde4` |
 | 工作树 | 未跟踪 `.serena/project.yml`，不提交 |
 | 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
 | S2-0 回归 | `python -m pytest -q harness/tests -p no:cacheprovider --junitxml=.tmp/s2-0-full.xml`：923 通过、0 失败、1 跳过，1152.90 秒。定向项目测试 38 通过。未调真实模型 |
+| `4c5cde4` 局部测试 | timeout 连续 10 次通过；该函数五参数化 5 通过；Node UI 35 通过（含 64KB Raw）。A1 反例与 `test_smoke_guidance_audit.py` 在同源应用上通过 |
 
 ## 2. 候选提交拓扑
 
@@ -54,10 +55,10 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | B1 覆盖 2.E 的 E0–E2 内核；E3=B4、学习轨道未开始 | 研究资料已导入 | B1 局部测试见 S2-0 | 无 | 依赖 S2-1 冻结与 B3/B4 | 主线局部完成 / 学习未开始 |
-| B1 项目事项内核（S2-0） | 有：`76e4c74` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
-| A1 小窗到 QA（S2-1） | 压缩规则已在 `03c25d4`/`76e4c74` | — | 未声明工具反例通过 | `run_f721f94809f443d7` 31 次压缩后 `model_steps_exhausted`，无 QA；审计 verified | 未关闭 | PARTIAL |
-| A2 组合审计（S2-1） | `6c7750c`/`b3c35f0` | — | `test_smoke_guidance_audit.py` 冻结上 verified | 无新的真实组合 run | 真实组合待 B4 | 主线局部完成 |
-| A3 timeout/64KB（S2-1） | 应用无长度分支；测试收口待本提交 | — | timeout 10/10；五参数化 5 通过；Node 64KB 通过 | 无 | 浏览器 64KB 仍是脚本注入 | 主线局部完成 |
+| B1 项目事项内核（S2-0） | 有：`76e4c74`，候选冻结 `4c5cde4` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
+| A1 小窗到 QA（S2-1） | 压缩规则已在 `03c25d4`/`76e4c74`/`4c5cde4` | — | 未声明工具反例通过 | `run_f721f94809f443d7`（`76e4c74`）参考 12180 字节、31 次压缩后 `model_steps_exhausted`，无 QA；审计 verified。下一场在 `4c5cde4` 用 4500–6000 字节重跑 | 未关闭 | PARTIAL |
+| A2 组合审计（S2-1） | `6c7750c`/`b3c35f0` | — | `test_smoke_guidance_audit.py` 冻结上 verified | 无新的真实组合 run；须在 `4c5cde4` 重跑 | 真实组合待同一冻结 | 主线局部完成 |
+| A3 timeout/64KB（S2-1） | 应用无长度分支；timeout 用例在 `4c5cde4` | — | timeout 10/10；五参数化 5 通过；Node 64KB 通过 | 无 | 浏览器 64KB 与响应式矩阵待 `4c5cde4` 真机 | 主线局部完成 |
 
 
 
@@ -85,7 +86,7 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | G2 | PARTIAL | 非活动部门可被 `guidance_only` 安排；被让出工作依据未单独保存 |
 | G3 | PARTIAL | 取消、在途指导、QA 待处理有片段；缺竞态矩阵测试 |
 
-### 4.2 当前被测提交 `cdcdce5`（2026-09-08）
+### 4.2 历史被测提交 `cdcdce5`（2026-09-08）
 
 | ID | 状态 | 证据口径 |
 | --- | --- | --- |
@@ -101,6 +102,17 @@ S2：HTTP 400 根因是 `submit_product_spec.change_record` 的 anyOf schema。�
 
 S3：联合验收 [s3-acceptance-2026-09-08.md](s3-acceptance-2026-09-08.md) 为 PARTIAL。浏览器主 run `run_cb69cec4c1f74100` DONE/release；连续输入与部门指导已取得。小窗压缩 `run_2268b511fece4392` 触发摘要后因 Gemini 返回 function_call 被宿主拒绝，未到 QA。本机 `test_responses.py::...[timeout]` 仍有既有超时 flake。
 
+### 4.3 候选冻结 `4c5cde4`（2026-09-11）
+
+| ID | 状态 | 证据口径 |
+| --- | --- | --- |
+| O1-O6 / U1-U6 / G1-G3 | 代码及局部回归沿用 `cdcdce5` 之后主线 | 本冻结未改这些实现；浏览器联调仍以本冻结重跑为准 |
+| A3 timeout | 局部关闭 | `test_responses.py` timeout 连续 10 次、五参数化 5 通过；不改生产超时 |
+| A1 真实小窗 | 未关闭 | 旧场 `run_f721f94809f443d7` 保留；新场控制材料规模，不提高 `MAX_MODEL_STEPS` |
+| A2 真实组合 | 未关闭 | 须在本冻结重跑到 verified |
+| A3 浏览器 64KB / 矩阵 | 未关闭 | Node 选择器已通过；真机注入与 1440/1024/390/360/320 待本冻结报告 |
+
+
 ## 5. 真实运行保留入口
 
 失败与部分成功均保留，不改写：
@@ -111,6 +123,8 @@ S3：联合验收 [s3-acceptance-2026-09-08.md](s3-acceptance-2026-09-08.md) 为
 - `.tmp/stage2-observed-real-acceptance/`
 - `.yudao/p4-smoke-20260907a/`：`run_506da3ee67304de7` 首次 happy 请求 HTTP 400，无交付/QA；诊断正文当时只有 status_code
 - `.yudao/p4-smoke-20260908-s2/`：`run_7c4ea172110841cc` 修正 schema 后 DONE/release
+- `.yudao/s2-1-a1-20260910/`：`run_f721f94809f443d7` 窗口 8000，参考 12180 字节，31 次压缩后 `model_steps_exhausted`，无 QA；冻结当时为 `76e4c74`
+
 
 指定配置仍是 `provider.md` 的服务与模型；能力值为试验限制，不是服务商标称上限。
 
