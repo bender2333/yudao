@@ -935,3 +935,11 @@
 - A4 不依赖第三版页面，只用 B1 已有的项目 Prompt 版本。采用结论只写被测项目配置，不改系统默认。
 - 实施交给子代理。本记录不表示 B3 或 A4 已完成。
 
+
+## 2026-09-14 - B3 外壳合入，A4 比较器已提交，阶段仍 PARTIAL
+
+- B3：删除 `POST /api/runs` 与 `start_run`。外壳换成项目列表、概览、流程/看板、D-H、项目 Prompt、项目 SSE、观测返回。部门内部与观测详情仍是第一版 `dw-*`。未做 B5、无 run 对话、拖拽、Provider 表单。
+- 独立复验：`node --test harness/tests/test_web_ui.js` 23 通过；`python -m pytest -q harness/tests/test_web.py harness/tests/test_projects_web.py -p no:cacheprovider` 57 通过。浏览器矩阵 `.yudao/s2-2-b3-20260914/` 五档×浅/深无横向溢出，`POST /api/runs` 404。64KB Raw 以 Node 断言为准，浏览器脚本未注入 64KB。
+- A4：协议与 Fake 比较器已提交 `d872da1`，4 项测试通过。结论 undecided。真实 8 场未跑。推送仍被 `198.18.0.70:22` 关闭。
+- 阶段仍 PARTIAL。下一步：A4 真实比较，然后人在 B3 外壳上做 B4 三次变更。
+

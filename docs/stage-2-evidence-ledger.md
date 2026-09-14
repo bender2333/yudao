@@ -1,8 +1,8 @@
 # Stage2 工作包证据账
 
-日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0，2026-09-11 记候选冻结 `4c5cde4`，2026-09-14 记 A1 完成条件。  
+日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0，2026-09-11 记候选冻结 `4c5cde4`，2026-09-14 记 A1 完成条件、B3 外壳与 A4 比较器。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`4c5cde4`。其后文档不改身份。S2-1 已关闭：A1 back 模型 32000 到 QA；A2/A3 沿用本冻结证据。luna 32000 `provider_error` 保留。阶段仍 PARTIAL（B3 未做）。
+当前被测应用提交：`4c5cde4`。B3 改外壳与 HTTP 入口，完成后形成新应用提交。S2-1 已关闭。阶段仍 PARTIAL（A4 真比较、B4、2.1–2.4 未做）。
 
 
 
@@ -16,8 +16,8 @@
 | 项 | 事实 |
 | --- | --- |
 | 原始起点 | `239c3b1` `stagecommit` |
-| 当前 HEAD | 文档以最新 docs 提交为准；被测应用身份仍是 `4c5cde4` |
-| 本轮主线增量 | A1–A3 `6a89056`…`03c25d4`/`b2c25ca`；B0 `f95d3fd`/`735e120`；S2-0/B1 `76e4c74`；A3 timeout 用例 `4c5cde4` |
+| 当前 HEAD | B3 合入后以新提交为准；此前被测应用身份是 `4c5cde4` |
+| 本轮主线增量 | A1–A3 `6a89056`…`03c25d4`/`b2c25ca`；B0 `f95d3fd`/`735e120`；S2-0/B1 `76e4c74`；A3 timeout `4c5cde4`；A4 比较器 `d872da1`；B3 外壳待本提交 |
 | 分支 | `harness_1` 领先 `origin/harness_1` 的文档提交以推送时点为准；应用身份 `4c5cde4` |
 | 工作树 | 未跟踪 `.serena/project.yml`，不提交 |
 | 隔离候选远端 | `origin/codex/stage2-workspace` @ `0e1616d`，不整支合入 |
@@ -55,13 +55,12 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | W4 列表/用量 | 已在主线 `20c7e42` | — | O3 取消筛选、O6 总计费用/不可合计已测 | 未作为真实验收关闭项 | 查询与 UI 口径已对齐，联调未关 | 主线局部完成 |
 | W5 总览/全局输入 | 骨架已有 | — | 终态草稿/新建入口已测（U6） | 连续输入真实验收未通过 | 待 P3 | PARTIAL |
 | W6 部门指导 | `fcb06ab` | 旧 auto-processed 已不在主线 | G1 解释/动作合同、空结果与旧写入反例、G2/G3 调度准入与 QA 竞态已测；浏览器待验 | 无真实指导闭环 | 真实验收未做 | 主线局部完成 |
-| W7 联调 | 未开始 | — | 无 1440/1024/390/360/320 对照报告 | 无 | 未开始 | 未开始 |
-| Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
-| 2.1–2.4 / 2.E | B1 覆盖 2.E 的 E0–E2 内核；E3=B4、学习轨道未开始 | 研究资料已导入 | B1 局部测试见 S2-0 | 无 | 依赖 S2-1 冻结与 B3/B4 | 主线局部完成 / 学习未开始 |
-| B1 项目事项内核（S2-0） | 有：`76e4c74`，候选冻结 `4c5cde4` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
-| A1 主验收到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过；8000 附录 | luna `run_d004266f212a4c2c` 窗口 32000 `FAILED / provider_error`，保留。用户改 back：`run_770ea827673545a5` 窗口 32000 DONE/release，`agnes-3.0-flash`，压缩 2 次（工程/质检，无工具、单部门、有来源）后继续 QA，审计 verified，echo hello。512K 对照 `run_8741e726d9dd4ba6` DONE/release，`compaction_count=0`。证据 `.yudao/s2-1-a1-back-20260914/`。luna 场 `.yudao/s2-1-a1-20260914/` | 本冻结关闭 | 主线局部完成 |
-| A2 组合审计（S2-1） | `6c7750c`/`b3c35f0` | — | `test_smoke_guidance_audit.py` verified | `run_ffa5247370e8469a` 窗口 32000，DONE/release，审计 verified，封存 CLI `id,name,status` / `1,alpha,open`。操作为 API 不是浏览器点击 | 本冻结宽窗组合关闭；S3 `run_cb69cec4c1f74100` 保持历史 unverified | 主线局部完成 |
-| A3 timeout/64KB（S2-1） | 应用无长度分支；timeout 用例在 `4c5cde4` | — | timeout 10/10；Node 64KB 通过 | 无真实 64KB 请求（注入） | 浏览器 64KB 与五档响应式矩阵 PASS，见 `.yudao/s2-1-a3-20260911/` | 浏览器项关闭 |
+| W7 联调 | B3 矩阵替代旧 run 壳联调 | — | Node 23；浏览器 `.yudao/s2-2-b3-20260914/` 五档×浅/深 | 无真实模型 | 外壳矩阵关闭；64KB 以 Node 为准 | 主线局部完成 |
+| Prompt 比较 | 协议与 Fake 比较器 `d872da1` | — | `test_a4_compare.py` 4 通过 | 未跑真实 8 场 | 未开始真比较 | PARTIAL |
+| 2.1–2.4 / 2.E | B1 内核 + B3 外壳；E3=B4、学习未开始 | 研究资料已导入 | B1 与 B3 局部测试 | 无 B4 真实三次变更 | 依赖 B4 | 主线局部完成 / 学习未开始 |
+| B1 项目事项内核（S2-0） | 有：`76e4c74` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | B3 已做，B4 未做 | 主线局部完成 |
+| B3 第三版外壳（S2-2） | `POST /api/runs` 删除；项目壳 + 第一版部门内部 | — | Node 23；pytest `test_web.py`+`test_projects_web.py` 57 | fake 浏览器矩阵 | 人在外壳上的 B4 未做 | 主线局部完成 |
+| A1 主验收到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过；8000 附录 | luna `run_d004266f212a4c2c` 窗口 32000 `FAILED / provider_error`，保留。用户改 back：`run_770ea827673545a5` 窗口 32000 DONE/release，`agnes-3.0-flash`，压缩 2 次后继续 QA。512K 对照 `run_8741e726d9dd4ba6` DONE/release | 本冻结关闭 | 主线局部完成 |
 
 
 
@@ -131,7 +130,7 @@ S3：联合验收 [s3-acceptance-2026-09-08.md](s3-acceptance-2026-09-08.md) 为
 - `.yudao/s2-1-a2-20260911/`：`run_ffa5247370e8469a` 窗口 32000，DONE/release
 - `.yudao/s2-1-a3-20260911/`：fake/demo 浏览器矩阵与 64KB 注入
 - `.yudao/s2-1-a1-20260914/`：luna 主验收 `run_d004266f212a4c2c` 窗口 32000，`provider_error`；对照 `run_84fb12435fa9454c` 窗口 1M，DONE/release
-- `.yudao/s2-1-a1-back-20260914/`：back 主验收 `run_770ea827673545a5` 窗口 32000，DONE/release，压缩 2 次；对照 `run_8741e726d9dd4ba6` 窗口 512K，DONE/release
+- `.yudao/s2-2-b3-20260914/`：B3 fake 浏览器矩阵，`POST /api/runs` 404，五档×浅/深
 
 
 

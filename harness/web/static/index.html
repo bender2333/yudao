@@ -3,49 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>协作台</title>
+  <title>Yudao</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <div id="department-workspace-prototype" role="region" aria-label="三部门协作工作台">
-    <div class="dw-shell">
-      <aside class="dw-sidebar" aria-label="协作导航">
-        <div class="dw-brand"><i data-lucide="layers-3" aria-hidden="true"></i><span>协作台</span></div>
-        <nav class="dw-nav" aria-label="协作页面">
-          <button class="dw-nav-item is-active" type="button" data-view="overview" aria-current="page"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>总览</span></button>
-          <button class="dw-nav-item" type="button" data-department="product"><i data-lucide="clipboard-list" aria-hidden="true"></i><span>产品</span></button>
-          <button class="dw-nav-item" type="button" data-department="engineering"><i data-lucide="braces" aria-hidden="true"></i><span>工程</span></button>
-          <button class="dw-nav-item" type="button" data-department="quality"><i data-lucide="check-check" aria-hidden="true"></i><span>质检</span></button>
-          <button class="dw-nav-item" type="button" data-view="observability"><i data-lucide="activity" aria-hidden="true"></i><span>观测</span></button>
-        </nav>
-      </aside>
-      <main class="dw-main" id="dw-main" aria-live="polite"></main>
+  <div id="yudao-workbench" role="region" aria-label="Yudao 项目工作台">
+    <div class="yp-shell" id="yp-shell">
+      <aside class="yp-sidebar" id="yp-sidebar" aria-label="项目导航"></aside>
+      <main class="yp-main">
+        <header class="yp-topbar" id="yp-topbar"></header>
+        <div id="department-workspace-prototype">
+          <div class="yp-content" id="dw-main" aria-live="polite"></div>
+        </div>
+      </main>
     </div>
   </div>
-  <dialog id="dw-task-dialog" aria-labelledby="dw-task-dialog-title">
-    <form method="dialog" id="dw-task-dialog-form" class="dw-dialog-form">
-      <div class="dw-dialog-head"><h2 id="dw-task-dialog-title">新建任务</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
-      <label for="dw-task-text">任务目标</label>
-      <textarea id="dw-task-text" name="task" rows="4" required placeholder="描述要完成的任务"></textarea>
-      <div class="dw-dialog-grid"><label for="dw-max-cycles">循环上限<input id="dw-max-cycles" name="max_cycles" type="number" min="1" step="1" value="8"></label><label for="dw-context-window">上下文窗口<input id="dw-context-window" name="context_window" type="number" min="1" step="1" value="32000"></label></div>
-      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" id="dw-task-submit" value="default" type="submit"><i data-lucide="plus" aria-hidden="true"></i>创建任务</button></div>
-      <p class="dw-dialog-error" id="dw-task-error" role="alert" hidden></p>
+  <dialog id="yp-project-dialog" aria-labelledby="yp-project-dialog-title">
+    <form method="dialog" id="yp-project-dialog-form" class="dw-dialog-form">
+      <div class="dw-dialog-head"><h2 id="yp-project-dialog-title">从想法新建项目</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      <label for="yp-project-name">项目名称</label>
+      <input id="yp-project-name" name="name" required placeholder="给这个长期工作一个名字">
+      <label for="yp-project-goal">长期目标</label>
+      <textarea id="yp-project-goal" name="goal" rows="4" required placeholder="描述这个项目要长期达成什么"></textarea>
+      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" id="yp-project-submit" value="default" type="submit"><i data-lucide="plus" aria-hidden="true"></i>建立项目</button></div>
+      <p class="dw-dialog-error" id="yp-project-error" role="alert" hidden></p>
     </form>
   </dialog>
-  <dialog id="dw-history-dialog" aria-labelledby="dw-history-dialog-title">
-    <form method="dialog" class="dw-dialog-form"><div class="dw-dialog-head"><h2 id="dw-history-dialog-title">任务历史</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div><div id="dw-history-list" class="dw-history-list"></div></form>
-  </dialog>
   <dialog id="dw-prompt-dialog" aria-labelledby="dw-prompt-dialog-title">
-    <form method="dialog" id="dw-prompt-dialog-form" class="dw-dialog-form">
-      <div class="dw-dialog-head"><h2 id="dw-prompt-dialog-title">编辑 Prompt</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
-      <label for="dw-prompt-text">Prompt 原文<textarea id="dw-prompt-text" name="text" rows="10" required></textarea></label>
-      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" value="default" type="submit"><i data-lucide="save" aria-hidden="true"></i>保存</button></div>
+    <form method="dialog" id="dw-prompt-dialog-form" class="dw-dialog-form yp-prompt-editor">
+      <div class="dw-dialog-head"><h2 id="dw-prompt-dialog-title">配置 Prompt</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      <p class="dw-dialog-meta" id="dw-prompt-meta"></p>
+      <div class="yp-prompt-current" id="dw-prompt-default-wrap">
+        <strong>默认内容</strong>
+        <pre id="dw-prompt-default" class="dw-prompt-block"></pre>
+      </div>
+      <label for="dw-prompt-text">编辑<textarea id="dw-prompt-text" name="text" rows="10" required></textarea></label>
+      <div class="dw-dialog-actions">
+        <button class="dw-back" id="dw-prompt-restore" type="button">恢复默认</button>
+        <button class="dw-back" value="cancel" type="submit">取消</button>
+        <button class="dw-primary" value="default" type="submit"><i data-lucide="save" aria-hidden="true"></i>保存</button>
+      </div>
       <p class="dw-dialog-error" id="dw-prompt-error" role="alert" hidden></p>
     </form>
   </dialog>
   <dialog id="dw-event-dialog" aria-labelledby="dw-event-title">
     <form method="dialog" class="dw-dialog-form"><div class="dw-dialog-head"><h2 id="dw-event-title">事件详情</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div><p id="dw-event-version" class="dw-dialog-meta" hidden></p><ul id="dw-event-files" class="dw-dialog-files" hidden></ul><pre id="dw-event-document" class="dw-dialog-json" hidden></pre><pre id="dw-event-json" class="dw-dialog-json"></pre><div id="dw-event-sources" class="dw-dialog-sources"></div></form>
+  </dialog>
+  <dialog id="yp-rename-dialog" aria-labelledby="yp-rename-dialog-title">
+    <form method="dialog" id="yp-rename-dialog-form" class="dw-dialog-form">
+      <div class="dw-dialog-head"><h2 id="yp-rename-dialog-title">重命名项目</h2><button class="dw-icon-button" value="cancel" type="submit" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      <label for="yp-rename-name">名称</label>
+      <input id="yp-rename-name" name="name" required>
+      <div class="dw-dialog-actions"><button class="dw-back" value="cancel" type="submit">取消</button><button class="dw-primary" value="default" type="submit">保存</button></div>
+      <p class="dw-dialog-error" id="yp-rename-error" role="alert" hidden></p>
+    </form>
   </dialog>
   <script src="/static/lucide.min.js"></script>
   <script src="/static/app.js"></script>

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * S3 / W5 / W7 browser acceptance. Not a production runner.
- * Uses already-installed Playwright 1.60 + Chromium 1223.
+ * HISTORICAL S3 / W5 / W7 browser evidence only. Do not run as a live entry.
+ * POST /api/runs was removed in B3; this file still talks to the first-version shell.
+ * Current browser matrix: harness/tests/test_b3_shell_browser.spec.js
+ * Uses already-installed Playwright 1.60 + Chromium 1223 if invoked manually.
  */
 "use strict";
 

@@ -219,12 +219,13 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         assert prompt == {"department": "quality", "text": DEFAULT_PROMPTS["quality"], "default_text": DEFAULT_PROMPTS["quality"],
                           "version": 0, "updated_at": None, "source": "default"}
 
-        # §13.11 GET /api/runs 仍列出 run（含项目 run 与 bare run）；POST /api/runs 保留。
-        bare = _post(host, port, "/api/runs", {"task": "bare run"}, 201)
-        wait_until(lambda: not server.busy())
+        # GET /api/runs 仍列出项目 run 与 bare run；POST /api/runs 已删除。
+        status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare run"})
+        assert status == 404 and json.loads(raw)["error"] == "not found", raw
+        bare_id = system.create_run("bare run")
         runs = {row["run_id"]: row for row in get_json(host, port, "/api/runs")["runs"]}
         assert runs[run_id]["project_id"] == project_id and runs[run_id]["work_item_id"] == work_item_id
-        assert runs[bare["run_id"]]["project_id"] is None and runs[bare["run_id"]]["work_item_id"] is None
+        assert runs[bare_id]["project_id"] is None and runs[bare_id]["work_item_id"] is None
         board = get_json(host, port, f"/api/runs/{run_id}/board")
         assert board["project_id"] == project_id and board["work_item_id"] == work_item_id
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
@@ -241,7 +242,7 @@ def test_second_work_item_returns_409_while_worker_is_busy(data_dir):
             status, raw, _ = request(host, port, "POST", f"/api/projects/{project_id}/work-items", {"text": "第二个"})
             assert status == 409 and json.loads(raw)["reason"] == "busy", raw
             status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare"})
-            assert status == 409 and json.loads(raw)["reason"] == "busy", raw
+            assert status == 404 and json.loads(raw)["error"] == "not found", raw
             assert len(get_json(host, port, f"/api/projects/{project_id}")["work_items"]) == 1
         finally:
             release.set()

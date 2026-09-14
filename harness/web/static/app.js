@@ -1,8 +1,12 @@
 (() => {
   "use strict";
 
-  const root = document.getElementById("department-workspace-prototype");
+  const workbench = document.getElementById("yudao-workbench");
+  const root = document.getElementById("department-workspace-prototype") || workbench;
   const main = document.getElementById("dw-main");
+  const sidebar = document.getElementById("yp-sidebar");
+  const topbar = document.getElementById("yp-topbar");
+  const shell = document.getElementById("yp-shell");
   const TERMINAL = new Set(["DONE", "FAILED", "PAUSED"]);
   const DEPARTMENTS = {
     product: { name: "产品部", role: "需求与方案", icon: "clipboard-list" },
@@ -10,76 +14,67 @@
     quality: { name: "质检部", role: "验证与反馈", icon: "check-check" },
   };
   const DEPARTMENT_ORDER = ["product", "engineering", "quality"];
+  const WORK_STATUS = {
+    not_started: "未开始", in_progress: "进行中", adopted: "已采纳",
+    held: "基线已变", released_unsettled: "已放行", stopped: "已停止",
+  };
   const CONTEXT_SOURCE_LABELS = {
-    intend: "用户原文",
-    current_work: "当前工作",
-    department_rules: "部门规则",
-    professional_completion: "完成标准",
-    collaboration_rules: "协作规则",
-    input_handling: "输入处理",
-    proposal_contract: "提案约束",
-    binding_refs: "绑定依据",
-    allowed_tools: "可用工具",
-    department_history: "部门历史",
-    tool_schemas: "工具定义",
-    input_progress: "输入进度",
-    loop_limits: "循环限制",
-    current_contract: "当前合同",
-    current_engineering_plan: "当前工程计划",
-    latest_response: "最近回应",
-    current_product_spec: "当前产品规格",
-    prior_delivery: "前次交付",
-    qa_defects: "质检缺陷",
-    causal_chain: "因果链",
-    department_memory: "部门记忆",
-    tools: "工具定义",
-    product_spec: "产品规格",
-    effective_contract: "有效合同",
-    engineering_plan: "工程计划",
-    delivery_spec: "交付规格",
-    validation_feedback: "质检反馈",
-    pending_request: "待处理协作",
-    provider_binding: "Provider 绑定",
+    intend: "用户原文", current_work: "当前工作", department_rules: "部门规则",
+    professional_completion: "完成标准", collaboration_rules: "协作规则", input_handling: "输入处理",
+    proposal_contract: "提案约束", binding_refs: "绑定依据", allowed_tools: "可用工具",
+    department_history: "部门历史", tool_schemas: "工具定义", input_progress: "输入进度",
+    loop_limits: "循环限制", current_contract: "当前合同", current_engineering_plan: "当前工程计划",
+    latest_response: "最近回应", current_product_spec: "当前产品规格", prior_delivery: "前次交付",
+    qa_defects: "质检缺陷", causal_chain: "因果链", department_memory: "部门记忆", tools: "工具定义",
+    product_spec: "产品规格", effective_contract: "有效合同", engineering_plan: "工程计划",
+    delivery_spec: "交付规格", validation_feedback: "质检反馈", pending_request: "待处理协作",
+    provider_binding: "Provider 绑定", project: "项目上下文",
   };
   const STATUS_LABELS = { success: "成功", failed: "失败", running: "进行中", cancelled: "已取消" };
   const PHASE_LABELS = {
-    PRODUCT_SPEC: "产品处理中",
-    ENGINEERING_PLAN: "工程计划中",
-    ENGINEERING: "工程处理中",
-    QUALITY: "质检处理中",
-    DONE: "已完成",
-    FAILED: "执行失败",
-    PAUSED: "已暂停",
+    PRODUCT_SPEC: "产品处理中", ENGINEERING_PLAN: "工程计划中", ENGINEERING: "工程处理中",
+    QUALITY: "质检处理中", DONE: "已完成", FAILED: "执行失败", PAUSED: "已暂停",
   };
 
   const state = {
     view: "overview",
     department: "product",
+    projectId: null,
+    projects: [],
+    project: null,
+    workItemId: null,
     runId: null,
-    runs: [],
     runPayload: null,
     health: null,
     departmentData: new Map(),
     contextDetails: new Map(),
-    selectedContextPart: {},
+    selectedContext: {},
     departmentLoading: false,
     observationTab: "requests",
     observationScreen: "list",
     observationDetailTab: "overview",
     observationData: null,
+    usageData: null,
     observationLoading: false,
-    observationFilters: { department: "all", status: "all", q: "" },
+    observationFilters: { department: "all", status: "all", q: "", work_item: "all" },
     observationCursor: null,
     observationMoreLoading: false,
     observationDetail: null,
     selectedAttemptId: null,
-    selectedContext: {},
+    selectedContextPart: {},
     inspectorTab: "context",
     inspectorCollapsed: false,
     selectedHandoff: null,
     globalDrafts: {},
     deptDrafts: {},
     promptDrafts: {},
+    promptConfigs: {},
+    overviewPane: "collaboration",
+    boardMode: "flow",
+    sidebarCollapsed: false,
+    mobileNav: false,
+    projectSearch: "",
+    projectMenu: false,
     routeToken: 0,
     observationSeq: 0,
     detailSeq: 0,
@@ -90,17 +85,22 @@
     inputSubmitting: null,
     guidanceSubmitting: {},
     promptSubmitting: false,
-    newTaskDraft: { task: "", max_cycles: "8", context_window: "32000" },
+    newProjectDraft: { name: "", goal: "" },
+    workDraft: { text: "", max_cycles: "8", context_window: "32000" },
     error: "",
     scrollPositions: {},
+    observationReturn: null,
   };
 
   let stream = null;
   let refreshTimer = null;
   let filterTimer = null;
   let runRequestSeq = 0;
+  let projectRequestSeq = 0;
   const departmentRequestSeq = new Map();
   const contextRequestSeq = new Map();
+
+
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -223,40 +223,6 @@
     return context?.id || null;
   }
 
-  function currentDepartmentData(department = state.department) {
-    if (!state.runId) return null;
-    return state.departmentData.get(`${state.runId}/${department}`) || null;
-  }
-
-  function scrollKey() {
-    return `${state.runId || "none"}/${state.view}/${state.department}/${state.selectedAttemptId || "list"}`;
-  }
-
-  function captureScroll() {
-    const current = typeof globalThis.scrollY === "number" ? globalThis.scrollY : (document.documentElement?.scrollTop || 0);
-    state.scrollPositions[scrollKey()] = current;
-    return current;
-  }
-
-  function restoreScroll(value) {
-    if (typeof globalThis.scrollTo !== "function") return;
-    const restore = () => globalThis.scrollTo(0, value);
-    if (typeof globalThis.requestAnimationFrame === "function") globalThis.requestAnimationFrame(restore);
-    else restore();
-  }
-
-  function jsonScrollNode() {
-    return main?.querySelector?.(".dw-detail-panel .dw-json, .dw-event-raw .dw-json");
-  }
-
-  function captureJsonScroll() {
-    return jsonScrollNode()?.scrollTop || 0;
-  }
-
-  function restoreJsonScroll(value) {
-    const node = jsonScrollNode();
-    if (node) node.scrollTop = value;
-  }
 
   function setStatus(message, kind = "") {
     state.error = message || "";
@@ -309,12 +275,127 @@
     return query ? `${path}?${query}` : path;
   }
 
+
+
+  function projectPath(id, suffix = "") {
+    return `/api/projects/${encodeURIComponent(id)}${suffix}`;
+  }
+
+  function workItems() {
+    return Array.isArray(state.project?.work_items) ? state.project.work_items : [];
+  }
+
+  function workItemById(id) {
+    return workItems().find(item => item.work_item_id === id) || null;
+  }
+
+  function activeWorkItem() {
+    return workItemById(state.project?.active_work_item_id);
+  }
+
+  function focusedWorkItem() {
+    if (state.workItemId) return workItemById(state.workItemId);
+    return null;
+  }
+
+  function focusedRunId() {
+    const item = focusedWorkItem() || activeWorkItem();
+    return item?.run_id || state.runId || null;
+  }
+
+  function hasInProgress() {
+    return Boolean(state.project?.active_work_item_id);
+  }
+
+  function isWritable() {
+    return Boolean(state.project) && !state.project.archived;
+  }
+
+  function deptDraftKey(department = state.department) {
+    const scope = state.workItemId || "project";
+    return `${state.projectId || "none"}/${department}/${scope}`;
+  }
+
+  function globalDraftKey() {
+    const scope = state.workItemId || "project";
+    return `${state.projectId || "none"}/${scope}`;
+  }
+
+  function currentDepartmentData(department = state.department) {
+    const runId = focusedRunId();
+    if (!runId) return null;
+    return state.departmentData.get(`${runId}/${department}`) || null;
+  }
+
+  function scrollKey() {
+    return `${state.projectId || "none"}/${state.view}/${state.department}/${state.workItemId || "project"}/${state.selectedAttemptId || "list"}`;
+  }
+
+  function captureScroll() {
+    const current = typeof globalThis.scrollY === "number" ? globalThis.scrollY : (document.documentElement?.scrollTop || 0);
+    state.scrollPositions[scrollKey()] = current;
+    return current;
+  }
+
+  function restoreScroll(value) {
+    if (typeof globalThis.scrollTo !== "function") return;
+    const restore = () => globalThis.scrollTo(0, value);
+    if (typeof globalThis.requestAnimationFrame === "function") globalThis.requestAnimationFrame(restore);
+    else restore();
+  }
+
+  function jsonScrollNode() {
+    return main?.querySelector?.(".dw-detail-panel .dw-json, .dw-event-raw .dw-json");
+  }
+
+  function captureJsonScroll() {
+    return jsonScrollNode()?.scrollTop || 0;
+  }
+
+  function restoreJsonScroll(value) {
+    const node = jsonScrollNode();
+    if (node) node.scrollTop = value;
+  }
+
+  function snapshotReturn() {
+    return {
+      projectId: state.projectId,
+      view: state.view,
+      department: state.department,
+      workItemId: state.workItemId,
+      inspectorTab: state.inspectorTab,
+      selectedContext: { ...state.selectedContext },
+      selectedContextPart: { ...state.selectedContextPart },
+      globalDrafts: { ...state.globalDrafts },
+      deptDrafts: { ...state.deptDrafts },
+      scroll: captureScroll(),
+    };
+  }
+
+  function applyReturn(snapshot) {
+    if (!snapshot) return;
+    state.view = snapshot.view || "department";
+    state.department = snapshot.department || state.department;
+    state.workItemId = snapshot.workItemId || null;
+    state.inspectorTab = snapshot.inspectorTab || "context";
+    Object.assign(state.selectedContext, snapshot.selectedContext || {});
+    Object.assign(state.selectedContextPart, snapshot.selectedContextPart || {});
+    Object.assign(state.globalDrafts, snapshot.globalDrafts || {});
+    Object.assign(state.deptDrafts, snapshot.deptDrafts || {});
+    state.observationScreen = "list";
+    state.observationDetail = null;
+    state.selectedAttemptId = null;
+  }
+
   function routeFromLocation() {
     const search = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
     const view = search.get("view");
-    state.view = view === "observability" || view === "department" ? view : "overview";
+    state.view = ["observability", "department", "overview"].includes(view) ? view : "overview";
     state.department = DEPARTMENTS[search.get("department")] ? search.get("department") : "product";
-    state.runId = search.get("run") || null;
+    state.projectId = search.get("project") || null;
+    state.workItemId = search.get("work_item") || null;
+    state.overviewPane = ["materials", "settings"].includes(search.get("pane")) ? search.get("pane") : "collaboration";
+    state.boardMode = search.get("board") === "board" ? "board" : "flow";
     state.observationTab = search.get("obTab") === "usage" ? "usage" : "requests";
     state.observationScreen = search.get("attempt") ? "detail" : "list";
     state.selectedAttemptId = search.get("attempt") || null;
@@ -324,22 +405,27 @@
       ? search.get("inspectorTab") : "context";
     state.inspectorCollapsed = search.get("inspector") === "collapsed";
     const contextId = search.get("context");
-    if (contextId && state.runId) state.selectedContext[`${state.runId}/${state.department}`] = contextId;
+    const runId = focusedRunId();
+    if (contextId && runId) state.selectedContext[`${runId}/${state.department}`] = contextId;
     const contextPart = search.get("contextPart");
-    if (contextId && contextPart && state.runId) state.selectedContextPart[`${state.runId}/${contextId}`] = contextPart;
+    if (contextId && contextPart && runId) state.selectedContextPart[`${runId}/${contextId}`] = contextPart;
     state.observationFilters = {
       department: ["product", "engineering", "quality"].includes(search.get("departmentFilter")) ? search.get("departmentFilter") : "all",
       status: ["success", "failed", "running", "cancelled"].includes(search.get("status")) ? search.get("status") : "all",
       q: search.get("q") || "",
+      work_item: search.get("obsWorkItem") || "all",
     };
   }
 
   function updateRoute({ push = true } = {}) {
     if (typeof history === "undefined" || typeof location === "undefined") return;
     const params = new URLSearchParams();
-    if (state.runId) params.set("run", state.runId);
+    if (state.projectId) params.set("project", state.projectId);
     if (state.view !== "overview") params.set("view", state.view);
     if (state.view === "department") params.set("department", state.department);
+    if (state.workItemId) params.set("work_item", state.workItemId);
+    if (state.view === "overview" && state.overviewPane !== "collaboration") params.set("pane", state.overviewPane);
+    if (state.view === "overview" && state.boardMode === "board") params.set("board", "board");
     if (state.view === "observability") {
       if (state.observationTab !== "requests") params.set("obTab", state.observationTab);
       if (state.observationScreen === "detail" && state.selectedAttemptId) params.set("attempt", state.selectedAttemptId);
@@ -347,13 +433,15 @@
       if (state.observationFilters.department !== "all") params.set("departmentFilter", state.observationFilters.department);
       if (state.observationFilters.status !== "all") params.set("status", state.observationFilters.status);
       if (state.observationFilters.q) params.set("q", state.observationFilters.q);
+      if (state.observationFilters.work_item && state.observationFilters.work_item !== "all") params.set("obsWorkItem", state.observationFilters.work_item);
     }
     if (state.view === "department") {
       if (state.inspectorTab !== "context") params.set("inspectorTab", state.inspectorTab);
       if (state.inspectorCollapsed) params.set("inspector", "collapsed");
-      const contextId = state.selectedContext[`${state.runId}/${state.department}`];
+      const runId = focusedRunId();
+      const contextId = runId && state.selectedContext[`${runId}/${state.department}`];
       if (contextId) params.set("context", contextId);
-      const contextPart = contextId && state.selectedContextPart[`${state.runId}/${contextId}`];
+      const contextPart = contextId && state.selectedContextPart[`${runId}/${contextId}`];
       if (contextPart) params.set("contextPart", contextPart);
     }
     const next = `${location.pathname}${params.toString() ? `?${params}` : ""}${location.hash || ""}`;
@@ -362,8 +450,9 @@
   }
 
   function icons() {
-    if (!root) return;
-    root.querySelectorAll(".dw-icon-button[aria-label], .dw-tool-button[title], .dw-inline-action[title]").forEach(button => {
+    const scope = workbench || root;
+    if (!scope) return;
+    scope.querySelectorAll(".dw-icon-button[aria-label], .dw-tool-button[title], .dw-inline-action[title], .yp-icon[aria-label], .yp-btn[title]").forEach(button => {
       if (button.getAttribute("title")) button.setAttribute("data-tooltip", button.getAttribute("title"));
       if (button.getAttribute("aria-label")) button.setAttribute("data-tooltip", button.getAttribute("aria-label"));
     });
@@ -373,25 +462,84 @@
   }
 
   function renderLoading(label = "正在读取真实记录") {
-    if (main) main.innerHTML = `<div class="dw-page"><div class="dw-load-state">${escapeHtml(label)}…</div></div>`;
-    updateNav();
+    if (main) main.innerHTML = `<div class="yp-empty"><div class="dw-load-state">${escapeHtml(label)}…</div></div>`;
+    renderChrome();
     icons();
   }
 
   function renderError(error) {
     const message = error?.message || String(error || "读取失败");
     state.error = message;
-    if (main) main.innerHTML = `<div class="dw-page"><div class="dw-load-state error">${escapeHtml(message)}</div><div class="dw-task-tools"><button class="dw-tool-button" type="button" data-action="refresh" title="重新读取"><i data-lucide="refresh-cw" aria-hidden="true"></i><span>重新读取</span></button></div></div>`;
-    updateNav();
+    if (main) main.innerHTML = `<div class="yp-empty"><div class="dw-load-state error">${escapeHtml(message)}</div><div class="dw-task-tools"><button class="dw-tool-button" type="button" data-action="refresh" title="重新读取"><i data-lucide="refresh-cw" aria-hidden="true"></i><span>重新读取</span></button></div></div>`;
+    renderChrome();
     icons();
   }
 
-  function taskToolsMarkup() {
-    const phase = state.runPayload?.board?.phase;
-    const canCancel = Boolean(state.runId && phase && !TERMINAL.has(phase) && !state.cancelling);
-    const options = state.runs.map(run => `<option value="${escapeHtml(run.run_id)}" ${run.run_id === state.runId ? "selected" : ""}>${escapeHtml(run.task || run.run_id)}</option>`).join("");
-    return `<div class="dw-task-tools"><label class="dw-run-picker"><span class="dw-small">任务</span><select data-run-picker aria-label="选择任务">${options || "<option>暂无任务</option>"}</select></label><button class="dw-tool-button" type="button" data-action="new-task" title="新建任务"><i data-lucide="plus" aria-hidden="true"></i><span>新建</span></button><button class="dw-tool-button" type="button" data-action="history" title="任务历史"><i data-lucide="history" aria-hidden="true"></i><span>历史</span></button><button class="dw-tool-button" type="button" data-action="export" title="导出任务观测"><i data-lucide="download" aria-hidden="true"></i><span>导出</span></button><button class="dw-tool-button${canCancel ? " danger" : ""}" type="button" data-action="cancel" title="取消当前任务" ${canCancel ? "" : "disabled"}><i data-lucide="square" aria-hidden="true"></i><span>取消</span></button></div>`;
+
+
+
+  function workStatusLabel(status) {
+    return WORK_STATUS[status] || status || "未知";
   }
+
+  function boardColumn(item) {
+    if (["adopted", "held", "released_unsettled", "stopped"].includes(item.status)) return "done";
+    if (item.department === "engineering") return "engineering";
+    if (item.department === "quality") return "quality";
+    return "product";
+  }
+
+  function filteredProjects() {
+    const q = (state.projectSearch || "").trim().toLowerCase();
+    const rows = state.projects || [];
+    if (!q) return rows;
+    return rows.filter(item => String(item.name || "").toLowerCase().includes(q) || String(item.project_id || "").toLowerCase().includes(q));
+  }
+
+  function renderChrome() {
+    if (shell) {
+      shell.classList.toggle("nav-collapsed", Boolean(state.sidebarCollapsed));
+      shell.classList.toggle("show-nav", Boolean(state.mobileNav));
+    }
+    if (sidebar) {
+      const rows = filteredProjects().map(item => {
+        const selected = item.project_id === state.projectId;
+        const mark = item.active_work_item_id ? "waiting" : item.archived ? "muted" : "";
+        return `<button class="yp-project ${selected ? "is-selected" : ""}" type="button" data-project-id="${escapeHtml(item.project_id)}" title="${escapeHtml(item.name)}"><span class="yp-project-mark ${mark}"></span><span>${text(item.name)}</span></button>`;
+      }).join("");
+      sidebar.innerHTML = `<div class="yp-brand"><i data-lucide="layers-3" aria-hidden="true"></i><span>Yudao</span><button class="yp-icon yp-sidebar-toggle" type="button" data-action="toggle-sidebar" aria-label="${state.sidebarCollapsed ? "展开项目列表" : "折叠项目列表"}"><i data-lucide="${state.sidebarCollapsed ? "panel-left-open" : "panel-left-close"}" aria-hidden="true"></i></button></div><button class="yp-btn primary" type="button" data-action="new-project"><i data-lucide="plus" aria-hidden="true"></i>从想法新建</button><div class="yp-search"><i data-lucide="search" aria-hidden="true"></i><input data-project-search placeholder="搜索项目" value="${escapeHtml(state.projectSearch)}" aria-label="搜索项目"></div><div class="yp-side-label"><span>项目</span></div><div class="yp-project-list">${rows || '<p class="yp-footnote">还没有项目</p>'}</div><div class="yp-side-bottom"><p class="yp-footnote">${state.projects.length ? `${state.projects.length} 个项目` : "从想法建立第一个项目"}</p></div>`;
+    }
+    if (topbar) {
+      const project = state.project;
+      const active = activeWorkItem();
+      const status = project == null ? "未选择项目" : project.archived ? "已归档" : active ? `${workStatusLabel(active.status)} · ${departmentName(active.department) || phaseLabel(active.phase)}` : "空闲";
+      const dot = project == null ? "muted" : project.archived ? "muted" : active ? "waiting" : "";
+      const menu = state.projectMenu && project ? `<div class="yp-menu">${project.archived ? `<button type="button" data-action="restore-project"><i data-lucide="archive-restore" aria-hidden="true"></i>恢复</button>` : `<button type="button" data-action="rename-project"><i data-lucide="pencil" aria-hidden="true"></i>重命名</button><button type="button" data-action="pin-project"><i data-lucide="pin" aria-hidden="true"></i>${project.pinned ? "取消置顶" : "置顶"}</button><button type="button" data-action="archive-project"><i data-lucide="archive" aria-hidden="true"></i>归档</button>`}</div>` : "";
+      topbar.innerHTML = `<div class="yp-row"><button class="yp-icon yp-mobile-toggle" type="button" data-action="toggle-mobile-nav" aria-label="打开项目列表"><i data-lucide="menu" aria-hidden="true"></i></button><nav class="yp-breadcrumb" aria-label="位置"><button type="button" data-action="home">项目</button>${project ? `<span>/</span><strong>${text(project.name)}</strong>` : ""}</nav></div><div class="yp-row"><span class="yp-auto"><span class="yp-dot ${dot}"></span><span>${text(status)}</span></span>${project ? `<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="toggle-project-menu" aria-label="项目菜单"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>${menu}</div>` : ""}</div>`;
+    }
+  }
+
+  function projectTabsMarkup() {
+    if (!state.project) return "";
+    const tab = (view, department, label) => {
+      const active = view === "department" ? state.view === "department" && state.department === department : state.view === view;
+      const attr = view === "department" ? `data-department="${department}"` : `data-view="${view}"`;
+      return `<button class="yp-tab ${active ? "is-selected" : ""}" type="button" ${attr}>${label}</button>`;
+    };
+    const secondary = state.view === "overview" ? `<div class="yp-secondary-tabs">${[["collaboration", "协作总览"], ["materials", "资料与依据"], ["settings", "项目设置"]].map(([id, label]) => `<button class="yp-tab ${state.overviewPane === id ? "is-selected" : ""}" type="button" data-overview-pane="${id}">${label}</button>`).join("")}</div>` : "";
+    return `<nav class="yp-tabs" aria-label="项目页面">${tab("overview", null, "概览")}${tab("department", "product", "产品")}${tab("department", "engineering", "工程")}${tab("department", "quality", "质检")}${tab("observability", null, "观测")}</nav>${secondary}`;
+  }
+
+  function dhComposerMarkup({ formId, draftAttr, draftKey, department, placeholder }) {
+    const archived = isWritable() === false;
+    const busy = Boolean(state.creating || state.inputSubmitting);
+    if (!hasInProgress()) {
+      return `<form class="yp-composer" id="${formId}" data-department-form="${escapeHtml(department || "")}" data-dh-form="1"><textarea ${draftAttr} rows="3" placeholder="${escapeHtml(placeholder)}" ${archived ? "disabled" : ""}>${escapeHtml(currentDraft(department ? state.deptDrafts : state.globalDrafts, draftKey))}</textarea><div class="yp-composer-footer"><span class="yp-small">${archived ? "归档项目只读" : "没有进行中的事项时，不会调用模型"}</span><div class="yp-dh-actions"><button class="yp-btn" type="submit" data-dh-action="record" ${archived || busy ? "disabled" : ""}>记录原文</button><button class="yp-btn primary" type="submit" data-dh-action="start" ${archived || busy ? "disabled" : ""}>作为新事项开始</button></div></div><p class="yp-error dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p></form>`;
+    }
+    return "";
+  }
+
+
 
   function statusTone(status) {
     if (status === "success" || status === "done" || status === "completed") return "done";
@@ -572,6 +720,7 @@
     return `<button class="dw-inline-action" type="button" data-event-id="${escapeHtml(eventId)}" data-document="${escapeHtml(documentKind || "")}" title="${escapeHtml(label)}"><i data-lucide="external-link" aria-hidden="true"></i>${escapeHtml(label)}</button>`;
   }
 
+
   function gitVersionMarkup(item) {
     const version = item?.git_version;
     if (!version) return "";
@@ -590,27 +739,6 @@
     const inputHistory = inputs.map(item => `<article class="item"><header><span>输入 v${text(item.version)}</span><span>${text(item.kind === "command" ? "系统命令" : "用户原文")}</span></header><pre class="dw-json">${text(item.text, "原文不可用")}</pre><p class="dw-small">UTF-8 字节 [${text(item.byte_start)}, ${text(item.byte_end)}) ${legacyLink(item.created_event_id, "", "查看接收记录")}</p>${gitVersionMarkup(item)}</article>`).join("");
     if (!(contracts || plans || deliveries || reviews || inputHistory)) return "";
     return `<section class="dw-materials-section" aria-labelledby="dw-history-heading"><div class="dw-section-head"><h2 id="dw-history-heading">材料与证据</h2><p>原文、Git 差异与封存下载</p></div><div class="dw-material-groups"><details class="dw-material-group"><summary>用户输入 <span>${count(inputs.length)} 条</span></summary><div class="list">${inputHistory || '<p class="dw-small">暂无用户输入记录</p>'}</div></details><details class="dw-material-group"><summary>需求与计划 <span>${count(contractHistory.length + (timeline.engineering_plans || []).length)} 条</span></summary><div class="list">${contracts || '<p class="dw-small">暂无 PRD 记录</p>'}${plans || '<p class="dw-small">暂无 PLAN 记录</p>'}</div></details><details class="dw-material-group"><summary>交付与质检 <span>${count((evidence.deliveries || []).length + (evidence.reviews || []).length)} 条</span></summary><div class="list">${deliveries || '<p class="dw-small">暂无交付记录</p>'}${reviews || '<p class="dw-small">暂无质检记录</p>'}</div></details></div></section>`;
-  }
-
-  function renderOverview() {
-    const scrollY = captureScroll();
-    const data = state.runPayload;
-    if (!data || !data.board) {
-      main.innerHTML = `<div class="dw-page dw-overview-page"><header class="dw-topline"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>协作台</strong><span>·</span><span>请选择任务</span></div><h1>没有选中的任务</h1><p class="dw-subtitle">从任务历史中打开一个任务，或创建新的任务。</p></div>${taskToolsMarkup()}</header><div class="dw-no-run"><h2>任务工作区</h2><p>当前页面只显示真实任务记录。创建任务后，产品、工程、质检和观测入口会使用同一任务范围。</p></div></div>`;
-      updateNav(); icons();
-      restoreScroll(scrollY);
-      return;
-    }
-    const board = data.board;
-    const rows = handovers();
-    if (!state.selectedHandoff || !rows.some(item => item.id === state.selectedHandoff)) state.selectedHandoff = rows[0]?.id || null;
-    const selected = rows.find(item => item.id === state.selectedHandoff);
-    const lastEvent = (data.events || [])[data.events?.length - 1];
-    const active = board.active_department ? departmentName(board.active_department) : "暂无";
-    const records = rows.slice(0, 8).map(item => `<button class="dw-record-row" type="button" data-handoff="${escapeHtml(item.id)}"><span class="dw-record-time">${escapeHtml(formatTime(item.time))}</span><span class="dw-record-text"><strong>${text(item.title)}</strong><span>${text(item.body)}</span></span><span class="dw-record-state ${["open", "needs_work", "active", "waiting"].includes(item.status) ? "waiting" : ""}">${text(handoffStatus(item.status))}</span></button>`).join("");
-    main.innerHTML = `<div class="dw-page dw-overview-page"><header class="dw-topline"><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(board.phase) === "waiting" ? "waiting" : ""}"></span><strong>任务</strong><span>·</span><span>三部门协作</span></div><h1>${text(board.task)}</h1><p class="dw-subtitle">最近更新 ${text(formatTime(lastEvent?.created_at))} · 当前协作节点为 ${text(active)}</p></div><div><span class="dw-current-state"><span class="dw-status-dot ${statusTone(board.phase) === "waiting" ? "waiting" : ""}"></span>${text(phaseLabel(board.phase))}</span>${taskToolsMarkup()}</div></header><section class="dw-section" aria-labelledby="flow-title"><div class="dw-section-head"><h2 id="flow-title">协作流转</h2><p>需求交接 → 版本交付 → 验收反馈</p></div><div class="dw-flow-map">${nodeMarkup("product", data)}<div class="dw-flow-connector" aria-hidden="true"><span>需求</span><i data-lucide="arrow-right"></i></div>${nodeMarkup("engineering", data)}<div class="dw-flow-connector" aria-hidden="true"><span>交付</span><i data-lucide="arrow-right"></i></div>${nodeMarkup("quality", data)}</div>${rows.length ? `<div class="dw-feedback-lane"><div class="dw-feedback-route">${rows.slice(0, 1).map(item => `<button class="dw-handoff ${item.id === state.selectedHandoff ? "is-selected" : ""}" type="button" data-handoff="${escapeHtml(item.id)}"><i data-lucide="corner-up-left" aria-hidden="true"></i><span class="dw-handoff-copy"><strong>${text(item.title)}</strong><span>${text(item.kind)} · ${text(formatTime(item.time))} · ${text(handoffStatus(item.status))}</span></span><span class="dw-handoff-arrow"><i data-lucide="arrow-left" aria-hidden="true"></i></span></button>`).join("")}</div></div>` : ""}${handoffDetailMarkup(selected)}</section><section class="dw-section" aria-labelledby="recent-title"><div class="dw-section-head"><h2 id="recent-title">最近流转</h2><p>按真实事件时间倒序</p></div><div class="dw-record-list">${records || '<div class="dw-empty-results">暂无部门交接记录</div>'}</div></section><section class="dw-global" aria-labelledby="global-title"><div class="dw-section-head"><h2 id="global-title">任务输入</h2><p>从用户端追加需求</p></div><div class="dw-global-log" id="dw-global-log">${globalLogMarkup()}</div><form class="dw-compose" id="dw-global-form"><div class="dw-compose-meta"><span>当前接收方</span><strong>产品部 · 任务入口</strong></div><textarea class="dw-textarea" rows="2" data-global-draft aria-label="追加任务需求" placeholder="补充目标、优先级或需要确认的事项" ${TERMINAL.has(board.phase) ? "disabled" : ""}>${escapeHtml(currentDraft(state.globalDrafts, state.runId))}</textarea><div class="dw-compose-actions"><span>${TERMINAL.has(board.phase) ? "任务已结束，请新建任务" : "提交后等待产品处理"}</span><button class="dw-primary" type="submit" ${TERMINAL.has(board.phase) || state.inputSubmitting === state.runId ? "disabled" : ""}><i data-lucide="send" aria-hidden="true"></i>发送</button></div></form></section>${legacyOverviewMarkup(data)}<p class="dw-action-error" role="alert" hidden></p></div>`;
-    updateNav(); icons();
-    restoreScroll(scrollY);
   }
 
   function messageKind(message) {
@@ -641,9 +769,6 @@
     return CONTEXT_SOURCE_LABELS[source] || `其他来源 · ${source || "未知"}`;
   }
 
-  function contextDetailFor(attemptId) {
-    return attemptId ? state.contextDetails.get(`${state.runId}/${attemptId}`) || null : null;
-  }
 
   function parseMessageText(value) {
     const raw = String(value ?? "");
@@ -662,7 +787,7 @@
 
   function contextMarkup(department, data) {
     const contexts = Array.isArray(data?.contexts) ? data.contexts : [];
-    const contextKey = `${state.runId}/${department}`;
+    const contextKey = `${focusedRunId()}/${department}`;
     const requestedId = state.selectedContext[contextKey];
     const selected = contexts.find(item => item.id === requestedId) || contexts.filter(item => item.purpose === "work").at(-1) || contexts.at(-1) || null;
     const selectedId = selected?.id || null;
@@ -671,7 +796,7 @@
     const selectedAttempt = attemptIdFromContext(selected);
     const detail = contextDetailFor(selectedAttempt);
     const parts = detail?.context && Object.prototype.hasOwnProperty.call(detail.context, "parts") ? detail.context.parts : null;
-    const partKey = `${state.runId}/${selectedAttempt || "none"}`;
+    const partKey = `${focusedRunId()}/${selectedAttempt || "none"}`;
     const selectedSource = state.selectedContextPart[partKey];
     const selectedPart = Array.isArray(parts) ? (parts.find(item => item.source === selectedSource) || parts[0] || null) : null;
     if (selectedPart) state.selectedContextPart[partKey] = selectedPart.source;
@@ -687,64 +812,67 @@
     return `<div class="dw-inspect-panel" id="dw-panel-provider" role="tabpanel" aria-labelledby="dw-tab-provider"><h3>Provider 配置</h3><dl class="dw-data-list">${rows.map(([key, item]) => `<div class="dw-data-row"><dt>${key}</dt><dd>${text(item)}</dd></div>`).join("")}</dl><p class="dw-small">以上为本次任务采用的只读快照。</p></div>`;
   }
 
+
+  function contextDetailFor(attemptId) {
+    const runId = focusedRunId();
+    return attemptId && runId ? state.contextDetails.get(`${runId}/${attemptId}`) || null : null;
+  }
+
   function promptMarkup(department, data) {
-    const saved = data?.prompt_latest || state.runPayload?.prompts?.current?.[department] || {};
-    const selectedAttempt = state.selectedContext[`${state.runId}/${department}`];
+    const config = state.promptConfigs[department] || {};
+    const selectedAttempt = state.selectedContext[`${focusedRunId()}/${department}`];
     const selectedDetail = contextDetailFor(selectedAttempt);
     const snapshotPrompt = selectedDetail?.context?.parts?.find(item => item.source === "department_rules") || null;
     const adopted = data?.prompt || {};
-    const prompt = snapshotPrompt ? { ...adopted, version: snapshotPrompt.version, text: snapshotPrompt.text, prompt_ref: { content_hash: snapshotPrompt.digest } } : adopted;
-    const key = `${state.runId}/${department}`;
-    const editable = Boolean(saved.text || adopted.text) && !TERMINAL.has(state.runPayload?.board?.phase);
-    const actualMeta = prompt.version ? `实际使用 v${prompt.version}` : "实际使用版本未知";
-    const savedMeta = saved.version && saved.version !== prompt.version ? ` · 待下次激活 v${saved.version}` : "";
-    return `<div class="dw-inspect-panel" id="dw-panel-prompt" role="tabpanel" aria-labelledby="dw-tab-prompt"><div class="dw-prompt-version"><span>本次工作 Prompt</span><span>${text(actualMeta)}${text(savedMeta, "")}</span></div><pre class="dw-prompt-block">${text(prompt.text, "当前 Prompt 原文不可用")}</pre>${saved.version && saved.version !== prompt.version ? `<p class="dw-small">最新保存版本 v${text(saved.version)} 可编辑，当前快照仍使用 v${text(prompt.version)}。</p>` : ""}${editable ? `<button class="dw-observation-link" type="button" data-prompt-edit="${escapeHtml(key)}" title="编辑 Prompt"><i data-lucide="pencil" aria-hidden="true"></i>编辑 Prompt</button>` : ""}</div>`;
+    const actual = snapshotPrompt ? { version: snapshotPrompt.version, text: snapshotPrompt.text } : adopted;
+    return `<div class="dw-inspect-panel" id="dw-panel-prompt" role="tabpanel" aria-labelledby="dw-tab-prompt"><div class="dw-prompt-version"><span>项目当前配置</span><span>${config.source === "configured" ? `配置 v${text(config.version)}` : "默认 v0"}</span></div><pre class="dw-prompt-block">${text(config.text, "当前配置原文不可用")}</pre><div class="dw-prompt-version"><span>所选请求实际 Prompt</span><span>${actual.version ? `run Prompt v${actual.version}` : "尚未绑定请求"}</span></div><pre class="dw-prompt-block">${text(actual.text, "所选请求没有 Prompt 原文")}</pre><p class="dw-small">历史请求不从当前配置回填。</p>${isWritable() ? `<button class="dw-observation-link" type="button" data-prompt-edit="${escapeHtml(department)}" title="配置 Prompt"><i data-lucide="pencil" aria-hidden="true"></i>配置 Prompt</button>` : ""}</div>`;
   }
 
   function inspectorMarkup(department, data) {
-    return `<aside class="dw-inspector ${state.inspectorCollapsed ? "is-collapsed" : ""}" aria-label="${departmentName(department)}检查区"><div class="dw-inspector-head"><div><span class="dw-inspector-kicker">检查区</span><strong>${departmentName(department)}</strong></div><button class="dw-icon-button" type="button" data-inspector-toggle aria-label="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}" title="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}"><i data-lucide="${state.inspectorCollapsed ? "panel-right-open" : "panel-right-close"}" aria-hidden="true"></i></button></div><div class="dw-inspector-content"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-controls="dw-panel-context" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-controls="dw-panel-provider" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-controls="dw-panel-prompt" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${state.inspectorTab === "provider" ? providerMarkup(data.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data)}</div></aside>`;
+    return `<aside class="dw-inspector ${state.inspectorCollapsed ? "is-collapsed" : ""}" aria-label="${departmentName(department)}检查区"><div class="dw-inspector-head"><div><span class="dw-inspector-kicker">检查区</span><strong>${departmentName(department)}</strong></div><button class="dw-icon-button" type="button" data-inspector-toggle aria-label="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}" title="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}"><i data-lucide="${state.inspectorCollapsed ? "panel-right-open" : "panel-right-close"}" aria-hidden="true"></i></button></div><div class="dw-inspector-content"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-controls="dw-panel-context" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-controls="dw-panel-provider" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-controls="dw-panel-prompt" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${state.inspectorTab === "provider" ? providerMarkup(data?.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data)}</div></aside>`;
+  }
+
+  function scopeSelectMarkup() {
+    const items = workItems();
+    const options = [`<option value="" ${!state.workItemId ? "selected" : ""}>整个项目</option>`].concat(items.map(item => `<option value="${escapeHtml(item.work_item_id)}" ${item.work_item_id === state.workItemId ? "selected" : ""}>${text(item.title)} · ${text(workStatusLabel(item.status))}</option>`));
+    return `<div class="yp-dept-toolbar"><label class="yp-small">范围 <select class="yp-scope-select" data-work-scope aria-label="部门范围">${options.join("")}</select></label>${isWritable() ? `<button class="yp-btn quiet" type="button" data-prompt-edit="${escapeHtml(state.department)}">配置 Prompt</button>` : ""}</div>`;
+  }
+
+  function departmentComposer(department, data, board) {
+    const key = deptDraftKey(department);
+    if (!hasInProgress()) {
+      return dhComposerMarkup({ formId: "dw-dept-form", draftAttr: `data-dept-draft="${escapeHtml(department)}"`, draftKey: key, department, placeholder: "作为新事项开始，或记录原文" });
+    }
+    const phase = board?.phase;
+    const guidanceBusy = Boolean(state.guidanceSubmitting[`${focusedRunId()}/${department}`]);
+    const disabled = board == null || TERMINAL.has(phase) || guidanceBusy || (state.workItemId && state.workItemId !== state.project.active_work_item_id);
+    return `<form class="dw-compose" id="dw-dept-form" data-department-form="${escapeHtml(department)}"><div class="dw-compose-meta"><span>当前接收方</span><strong>发给${text(departmentName(department))}</strong></div><textarea class="dw-textarea" rows="3" data-dept-draft="${escapeHtml(department)}" aria-label="发给${escapeHtml(departmentName(department))}" placeholder="追加对话或指导" ${disabled ? "disabled" : ""}>${escapeHtml(currentDraft(state.deptDrafts, key))}</textarea><div class="dw-compose-actions"><span>${TERMINAL.has(phase) ? "事项已结束，不会自动新建" : guidanceBusy ? "正在保存指导" : "保存后由目标部门在下一次安全激活中处理"}</span><button class="dw-primary" type="submit" ${disabled ? "disabled" : ""}><i data-lucide="send" aria-hidden="true"></i>发送指导</button></div></form>`;
   }
 
   function renderDepartment(department) {
     const scrollY = captureScroll();
     state.view = "department";
     state.department = department;
+    if (!state.project) {
+      main.innerHTML = `<div class="yp-empty"><h1>没有选中的项目</h1><p>请先选择项目再进入部门工作区。</p></div>`;
+      renderChrome(); icons(); restoreScroll(scrollY); return;
+    }
     const data = currentDepartmentData(department);
     const board = state.runPayload?.board;
-    if (!board) {
-      main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button></div><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>${departmentName(department)}</strong></div><h1>没有选中的任务</h1><p class="dw-subtitle">请选择任务后查看部门工作区。</p></div></header></div>`;
-      updateNav(); icons();
-      restoreScroll(scrollY);
-      return;
+    const item = focusedWorkItem() || activeWorkItem();
+    const status = data ? departmentStatusLabel(data.status, phaseLabel(board?.phase)) : (item ? workStatusLabel(item.status) : "空闲");
+    const departmentTask = item ? departmentTitle(department, data || {}, board || { task: item.title }) : departmentName(department);
+    const messages = ((data && data.messages) || []).map(messageMarkup).join("");
+    const body = data ? `<div class="dw-task-strip"><i data-lucide="route" aria-hidden="true"></i><span>当前范围</span><strong>${text(item ? item.title : "整个项目")}</strong></div><div class="dw-work-grid ${state.inspectorCollapsed ? "has-collapsed-inspector" : ""}"><section class="dw-conversation" aria-labelledby="conversation-title"><div class="dw-conversation-head"><h2 id="conversation-title">工作消息</h2><p>${number((data.messages || []).length, "0")} 条记录 · ${text(status)}</p></div><div class="dw-timeline" aria-live="polite">${messages || '<p class="dw-small">暂无部门消息</p>'}</div>${departmentComposer(department, data, board)}</section>${inspectorMarkup(department, data)}</div>` : `<div class="dw-load-state">${hasInProgress() || item ? "正在读取部门消息与检查区…" : "当前没有事项。可以用下面的输入作为新事项开始，或记录原文。"}</div>${departmentComposer(department, data, board)}`;
+    main.innerHTML = `<div class="dw-page dw-department-page">${projectTabsMarkup()}${scopeSelectMarkup()}<header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到概览</button><span class="dw-current-state"><span class="dw-status-dot ${statusTone(status)}"></span>${text(departmentName(department))} · ${text(status)}</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(status) === "waiting" ? "waiting" : ""}"></span><strong>${text(departmentName(department))}</strong><span>·</span><span>${text(DEPARTMENTS[department].role)}</span></div><h1>${text(departmentTask)}</h1><p class="dw-subtitle">${text(state.project.name)} · 部门工作区</p></div></header>${body}<p class="dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p></div>`;
+    if (data) {
+      const timeline = main.querySelector?.(".dw-timeline");
+      timeline?.insertAdjacentHTML?.("afterend", guidanceMarkup(data));
     }
-    if (!data) {
-      main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button><span class="dw-current-state"><span class="dw-status-dot waiting"></span>正在读取</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot waiting"></span><strong>${departmentName(department)}</strong><span>·</span><span>${text(DEPARTMENTS[department].role)}</span></div><h1>${text(board.task)}</h1><p class="dw-subtitle">${text(board.run_id)} · 部门工作区</p></div></header><div class="dw-load-state">正在读取部门消息与检查区…</div></div>`;
-      updateNav(); icons();
-      restoreScroll(scrollY);
-      return;
-    }
-    const messages = (data.messages || []).map(messageMarkup).join("");
-    const status = departmentStatusLabel(data.status, phaseLabel(board.phase));
-    const deptDraftKey = `${state.runId}/${department}`;
-    const departmentTask = departmentTitle(department, data, board);
-    main.innerHTML = `<div class="dw-page dw-department-page"><header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到总览</button><span class="dw-current-state"><span class="dw-status-dot ${statusTone(status)}"></span>${text(departmentName(department))} · ${text(status)}</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(status) === "waiting" ? "waiting" : ""}"></span><strong>${text(departmentName(department))}</strong><span>·</span><span>${text(data.role || DEPARTMENTS[department].role)}</span></div><h1>${text(departmentTask)}</h1><p class="dw-subtitle">${text(board.run_id)} · 部门工作区</p></div></header><div class="dw-task-strip"><i data-lucide="route" aria-hidden="true"></i><span>当前任务</span><strong>${text(departmentTask)}</strong></div><div class="dw-work-grid ${state.inspectorCollapsed ? "has-collapsed-inspector" : ""}"><section class="dw-conversation" aria-labelledby="conversation-title"><div class="dw-conversation-head"><h2 id="conversation-title">工作消息</h2><p>${number((data.messages || []).length, "0")} 条记录 · ${text(status)}</p></div><div class="dw-timeline" aria-live="polite">${messages || '<p class="dw-small">暂无部门消息</p>'}</div><form class="dw-compose" id="dw-dept-form" data-department-form="${escapeHtml(department)}"><div class="dw-compose-meta"><span>当前接收方</span><strong>发给${text(departmentName(department))}</strong></div><textarea class="dw-textarea" rows="3" data-dept-draft="${escapeHtml(department)}" aria-label="发给${escapeHtml(departmentName(department))}" placeholder="追加对话或指导" disabled>${escapeHtml(currentDraft(state.deptDrafts, deptDraftKey))}</textarea><div class="dw-compose-actions"><span>部门指导将在 W6 接入真实内核</span><button class="dw-primary" type="submit" disabled><i data-lucide="send" aria-hidden="true"></i>发送指导</button></div></form></section>${inspectorMarkup(department, data)}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
-    const guidanceHistory = main.querySelector?.(".dw-timeline");
-    guidanceHistory?.insertAdjacentHTML?.("afterend", guidanceMarkup(data));
-    const guidanceKey = `${state.runId}/${department}`;
-    const guidanceBusy = Boolean(state.guidanceSubmitting[guidanceKey]);
-    const guidanceDisabled = TERMINAL.has(board.phase) || guidanceBusy;
-    const guidanceForm = main.querySelector?.("#dw-dept-form");
-    const guidanceTextarea = guidanceForm?.querySelector?.("[data-dept-draft]");
-    const guidanceSubmit = guidanceForm?.querySelector?.("button[type='submit']");
-    const guidanceStatus = guidanceForm?.querySelector?.(".dw-compose-actions span");
-    if (guidanceTextarea) guidanceTextarea.disabled = guidanceDisabled;
-    if (guidanceSubmit) guidanceSubmit.disabled = guidanceDisabled;
-    if (guidanceStatus) guidanceStatus.textContent = TERMINAL.has(board.phase)
-      ? "任务已结束，请新建任务"
-      : guidanceBusy ? "正在保存指导" : "保存后由目标部门在下一次安全激活中处理";
-    updateNav(); icons();
-    restoreScroll(scrollY);
+    renderChrome(); icons(); restoreScroll(scrollY);
   }
+
+
 
   function requestStateMarkup(item) {
     const status = item.status;
@@ -757,14 +885,6 @@
     return `<button class="dw-request-row" type="button" data-obs-request="${escapeHtml(item.id)}" aria-label="查看 ${escapeHtml(logical)} 第 ${escapeHtml(item.attempt ?? "?")} 次尝试"><span class="dw-request-time">${text(formatTime(item.created_at))}${requestStateMarkup(item)}<span>尝试 ${escapeHtml(attemptText)}</span></span><span class="dw-request-main"><strong>${text(departmentName(item.department))}</strong><span>请求：${text(attemptRequestedText(item))}</span><span>返回：${text(attemptActualText(item))} · ${text(item.provider_response_id)} · ${text(item.work_round)} · ${text(item.step)}</span></span><span class="dw-request-metrics"><span>Input <strong>${usageValue(item, "input_tokens")}</strong> · Output <strong>${usageValue(item, "output_tokens", "等待响应")}</strong></span><span>耗时 <strong>${duration(usageRawValue(item, "latency_ms"), item.status)}</strong></span></span></button>`;
   }
 
-  function observationShellMarkup() {
-    const filters = state.observationFilters;
-    const items = state.observationData?.items || [];
-    const current = state.observationData ? count(state.observationData.running_attempts) : "未知";
-    const task = observationTaskText(state.observationFilters.department);
-    const scope = state.observationData?.scope || {};
-    return `<div class="dw-observation-page" role="region" aria-label="任务模型请求观测"><header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>任务</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span>${taskToolsMarkup()}</div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>任务范围</span><strong>${text(task)}</strong><span>·</span><span>${text(scope.time_range || "真实查询结果")}</span><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出 · ${count(state.observationData?.prepared_attempts)} 条准备未发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option><option value="cancelled" ${filters.status === "cancelled" ? "selected" : ""}>取消</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
-  }
 
   function requestListMarkup() {
     const data = state.observationData;
@@ -848,17 +968,6 @@
     icons();
   }
 
-  function renderObservability() {
-    const scrollY = captureScroll();
-    state.view = "observability";
-    state.observationScreen = state.selectedAttemptId ? "detail" : "list";
-    main.innerHTML = observationShellMarkup();
-    updateNav();
-    icons();
-    updateObservationContent();
-    restoreScroll(scrollY);
-  }
-
   function detailOverviewMarkup(detail) {
     const item = detail.attempt || {};
     const usage = usageOf(item);
@@ -889,6 +998,31 @@
     return ({ overview: detailOverviewMarkup(detail), request: detailRequestMarkup(detail), response: detailResponseMarkup(detail), events: detailEventsMarkup(detail) })[state.observationDetailTab] || detailOverviewMarkup(detail);
   }
 
+
+  function observationShellMarkup() {
+    const filters = state.observationFilters;
+    const current = state.observationData ? count(state.observationData.running_attempts) : "未知";
+    const task = observationTaskText(state.observationFilters.department);
+    const items = workItems();
+    const workOptions = [`<option value="all" ${filters.work_item === "all" ? "selected" : ""}>全部事项</option>`].concat(items.map(item => `<option value="${escapeHtml(item.work_item_id)}" ${filters.work_item === item.work_item_id ? "selected" : ""}>${text(item.title)}</option>`)).join("");
+    return `<div class="dw-observation-page" role="region" aria-label="项目模型请求观测">${projectTabsMarkup()}<header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>项目</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span></div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>项目范围</span><strong>${text(state.project?.name || task)}</strong><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>事项</span><select class="dw-filter-select" data-obs-work-item aria-label="按事项筛选">${workOptions}</select></label><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option><option value="cancelled" ${filters.status === "cancelled" ? "selected" : ""}>取消</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
+  }
+
+  function renderObservability() {
+    const scrollY = captureScroll();
+    state.view = "observability";
+    state.observationScreen = state.selectedAttemptId ? "detail" : "list";
+    if (!state.project) {
+      main.innerHTML = `<div class="yp-empty"><h1>没有选中的项目</h1><p>选择项目后查看模型请求。</p></div>`;
+      renderChrome(); icons(); restoreScroll(scrollY); return;
+    }
+    main.innerHTML = observationShellMarkup();
+    renderChrome();
+    icons();
+    updateObservationContent();
+    restoreScroll(scrollY);
+  }
+
   function renderObservationDetail() {
     const scrollY = captureScroll();
     const detail = state.observationDetail;
@@ -902,17 +1036,19 @@
     state.view = "observability";
     state.observationScreen = "detail";
     state.selectedAttemptId = item.id;
-    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-department="${escapeHtml(item.department)}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(item.department))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>任务</span><strong>${text(observationTaskText(item.department))}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
-    updateNav(); icons();
+    const returnDept = state.observationReturn?.department || item.department;
+    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-obs-return data-department="${escapeHtml(returnDept || "")}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(returnDept))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>项目</span><strong>${text(state.project?.name)}</strong><span aria-hidden="true">›</span><span>事项</span><strong>${text(item.title || focusedWorkItem()?.title || "项目范围")}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}" data-obs-run="${escapeHtml(attempt.run_id || item.run_id || "")}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    renderChrome(); icons();
     restoreScroll(scrollY);
   }
 
   function updateNav() {
-    if (!root) return;
-    root.querySelectorAll(".dw-nav-item").forEach(item => {
-      const active = state.view === "overview" ? item.dataset.view === "overview" : state.view === "observability" ? item.dataset.view === "observability" : item.dataset.department === state.department;
+    renderChrome();
+    if (!main) return;
+    main.querySelectorAll(".yp-tab[data-view], .yp-tab[data-department]").forEach(item => {
+      const active = item.dataset.view ? item.dataset.view === state.view : state.view === "department" && item.dataset.department === state.department;
+      item.classList.toggle("is-selected", active);
       item.classList.toggle("is-active", active);
-      if (active) item.setAttribute("aria-current", "page"); else item.removeAttribute("aria-current");
     });
   }
 
@@ -924,46 +1060,120 @@
     else renderOverview();
   }
 
+
+
+
+  function workCardMarkup(item) {
+    const dept = item.department ? departmentName(item.department) : "未进入部门";
+    return `<button class="yp-work-card" type="button" data-work-item="${escapeHtml(item.work_item_id)}" data-work-department="${escapeHtml(item.department || "product")}"><strong class="yp-work-card-title">${text(item.title)}</strong><div class="yp-work-card-meta"><span class="yp-tag ${item.status === "in_progress" ? "amber" : item.status === "adopted" ? "green" : item.status === "stopped" ? "red" : ""}">${text(workStatusLabel(item.status))}</span><span class="yp-tag outline">${text(dept)}</span></div><p>${text(item.pending_question || item.stop_reason || item.phase || item.text)}</p></button>`;
+  }
+
+  function collaborationMarkup() {
+    const items = workItems();
+    const columns = {
+      product: items.filter(item => boardColumn(item) === "product"),
+      engineering: items.filter(item => boardColumn(item) === "engineering"),
+      quality: items.filter(item => boardColumn(item) === "quality"),
+      done: items.filter(item => boardColumn(item) === "done"),
+    };
+    const col = (key, title, hint) => `<div class="yp-board-col ${key}"><div class="yp-col-head"><div><strong>${title}</strong><p>${hint}</p></div><span class="yp-col-count">${columns[key].length}</span></div><div class="yp-card-stack">${columns[key].map(workCardMarkup).join("") || '<div class="yp-empty-col">暂无事项</div>'}</div></div>`;
+    const flow = `<div class="yp-flow">${[["product", "产品"], ["engineering", "工程"], ["quality", "质检"], ["done", "完成"]].map(([key, label], index) => {
+      const current = activeWorkItem() && boardColumn(activeWorkItem()) === key;
+      return `<div class="yp-flow-step ${current ? "current" : ""}"><div class="yp-flow-head"><span class="yp-flow-marker">${index + 1}</span><strong>${label}</strong></div><div class="yp-flow-items">${columns[key].map(item => `<button class="yp-flow-item" type="button" data-work-item="${escapeHtml(item.work_item_id)}" data-work-department="${escapeHtml(item.department || key)}"><strong>${text(item.title)}</strong><p>${text(workStatusLabel(item.status))}</p></button>`).join("") || '<div class="yp-empty-col">暂无</div>'}</div></div>`;
+    }).join("")}</div>`;
+    const recent = (state.project?.overview?.recent || []).slice(0, 12).map(item => `<div class="yp-handoff"><span class="yp-handoff-time">${text(formatTime(item.at || item.created_at, true))}</span><div><strong>${text(item.title || item.type)}</strong><p>${text(item.summary || item.body || "")}</p></div><span class="yp-handoff-status">${text(item.status || "")}</span></div>`).join("");
+    const toggle = `<div class="yp-board-tools"><div class="yp-view-toggle"><button type="button" data-board-mode="flow" class="${state.boardMode === "flow" ? "is-selected" : ""}">流程</button><button type="button" data-board-mode="board" class="${state.boardMode === "board" ? "is-selected" : ""}">看板</button></div><span class="yp-small">卡片不可拖拽，点击进入事项</span></div>`;
+    const board = `<div class="yp-board">${col("product", "产品", "需求与方案")}${col("engineering", "工程", "实现与交付")}${col("quality", "质检", "验证与反馈")}${col("done", "完成", "采纳或停止")}</div>`;
+    return `<section class="yp-section"><div class="yp-section-title"><h2>协作总览</h2></div>${toggle}${state.boardMode === "board" ? board : flow}</section><section class="yp-section"><div class="yp-section-title"><h2>最近记录</h2></div><div class="yp-handoff-list">${recent || '<p class="yp-small">还没有项目事件</p>'}</div></section>`;
+  }
+
+  function materialsMarkup() {
+    const materials = state.project?.materials || [];
+    const rows = materials.map(item => `<article class="item"><header><span>${text(item.department ? departmentName(item.department) : "项目")}</span><span>${text(formatTime(item.recorded_at, true))}</span></header><pre class="dw-json">${text(item.text, "原文不可用")}</pre></article>`).join("");
+    const runData = state.runPayload;
+    return `<section class="yp-section"><div class="yp-section-title"><h2>资料与依据</h2><p class="yp-small">项目材料只记录原文，不注入后续事项</p></div><div class="dw-material-groups"><details class="dw-material-group" open><summary>已记录原文 <span>${count(materials.length)} 条</span></summary><div class="list">${rows || '<p class="dw-small">暂无记录原文</p>'}</div></details></div>${runData ? legacyOverviewMarkup(runData) : ""}</section>`;
+  }
+
+  function settingsMarkup() {
+    const project = state.project;
+    const archived = project.archived;
+    return `<section class="yp-section"><div class="yp-section-title"><h2>项目设置</h2></div><div class="yp-form"><div class="yp-field"><span>名称</span><strong>${text(project.name)}</strong></div><div class="yp-field"><span>长期目标</span><p>${text(project.goal)}</p></div><div class="yp-heading-actions">${archived ? `<button class="yp-btn" type="button" data-action="restore-project">恢复项目</button>` : `<button class="yp-btn" type="button" data-action="rename-project">重命名</button><button class="yp-btn" type="button" data-action="pin-project">${project.pinned ? "取消置顶" : "置顶"}</button><button class="yp-btn" type="button" data-action="archive-project">归档</button>`}</div><p class="yp-error dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p></div></section>`;
+  }
+
+  function overviewComposer() {
+    const active = activeWorkItem();
+    if (!hasInProgress()) {
+      return `<section class="yp-section"><div class="yp-section-title"><h2>当前事项</h2></div>${dhComposerMarkup({ formId: "dw-global-form", draftAttr: 'data-global-draft', draftKey: globalDraftKey(), department: "", placeholder: "描述这次要改变什么，或先记下原文" })}</section>`;
+    }
+    const board = state.runPayload?.board;
+    const phase = board?.phase;
+    const disabled = board == null || TERMINAL.has(phase) || state.inputSubmitting === state.runId;
+    return `<section class="yp-section"><div class="yp-section-title"><h2>当前事项</h2><span class="yp-tag amber">${text(active.title)}</span></div><div class="dw-global-log">${globalLogMarkup()}</div><form class="yp-composer" id="dw-global-form"><textarea data-global-draft rows="3" placeholder="追加需求" ${disabled ? "disabled" : ""}>${escapeHtml(currentDraft(state.globalDrafts, globalDraftKey()))}</textarea><div class="yp-composer-footer"><span class="yp-small">${TERMINAL.has(phase) ? "事项已结束，不会自动新建" : "提交后进入当前事项的产品入口"}</span><div class="yp-dh-actions">${!TERMINAL.has(phase) ? `<button class="yp-btn" type="button" data-action="cancel">${state.cancelling ? "正在取消" : "取消事项"}</button>` : ""}<button class="yp-btn primary" type="submit" ${disabled ? "disabled" : ""}>发送</button></div></div></form></section>`;
+  }
+
+  function renderOverview() {
+    const scrollY = captureScroll();
+    if (!state.projectId || !state.project) {
+      main.innerHTML = `<div class="yp-empty"><div class="yp-eyebrow">Yudao</div><h1>还没有选中的项目</h1><p>从左侧建立或选择一个项目。产品入口只通过项目与事项，不再创建裸 run。</p><button class="yp-btn primary" type="button" data-action="new-project">从想法新建</button></div>`;
+      renderChrome(); icons(); restoreScroll(scrollY); return;
+    }
+    const project = state.project;
+    const adoption = project.current_adoption;
+    const pending = project.overview?.pending || [];
+    const summary = `<div class="yp-project-summary"><div><div class="yp-eyebrow">项目概览</div><h1>${text(project.name)}</h1><p>${text(project.goal)}</p></div><div class="yp-summary-side"><div class="yp-summary-item"><span>当前成果</span><strong>${text(adoption?.summary, "尚未采纳")}</strong></div><div class="yp-summary-item"><span>进行中</span><strong>${text(activeWorkItem()?.title, "无")}</strong></div><div class="yp-summary-item"><span>待决</span><strong>${pending.length ? text(pending[0].summary || pending[0].title) : "无"}</strong></div></div></div>`;
+    let body = collaborationMarkup() + overviewComposer();
+    if (state.overviewPane === "materials") body = materialsMarkup();
+    if (state.overviewPane === "settings") body = settingsMarkup();
+    if (project.archived) body = `<div class="yp-notice"><div><strong>归档只读</strong><p>查询仍可用，写命令会返回冲突。</p></div></div>` + body;
+    main.innerHTML = `${summary}${projectTabsMarkup()}${body}<p class="dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p>`;
+    renderChrome(); icons(); restoreScroll(scrollY);
+  }
+
+
+
+
   function closeStream() {
-    if (stream) {
-      stream.close();
-      stream = null;
-    }
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
-      refreshTimer = null;
-    }
+    if (stream) { stream.close(); stream = null; }
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
   }
 
-  function handleLoopEvent(runId = state.runId, token = state.routeToken) {
-    if (!runId || token !== state.routeToken || runId !== state.runId) return;
-    return loadRunPayload(runId, token, true);
+  function handleProjectEvent(projectId = state.projectId, token = state.routeToken) {
+    if (!projectId || token !== state.routeToken || projectId !== state.projectId) return;
+    return loadProject(projectId, token, true);
   }
 
-  function openStream(runId, token) {
+  function openStream(projectId, token) {
     closeStream();
-    if (typeof EventSource !== "function" || !runId) return;
+    if (typeof EventSource !== "function" || !projectId) return;
     try {
-      stream = new EventSource(apiPath(runId, "/stream"));
-      stream.addEventListener("loop", () => {
-        if (token !== state.routeToken || runId !== state.runId) return;
-        handleLoopEvent(runId, token);
-      });
-      stream.onerror = () => {};
+      stream = new EventSource(projectPath(projectId, "/stream"));
+      const refresh = () => {
+        if (token !== state.routeToken || projectId !== state.projectId) return;
+        handleProjectEvent(projectId, token);
+      };
+      stream.addEventListener("project", refresh);
+      stream.addEventListener("loop", refresh);
+      stream.onerror = () => {
+        if (token !== state.routeToken || projectId !== state.projectId) return;
+        refresh();
+      };
     } catch { stream = null; }
     refreshTimer = setInterval(() => {
-      if (token === state.routeToken && runId === state.runId) handleLoopEvent(runId, token);
+      if (token === state.routeToken && projectId === state.projectId) handleProjectEvent(projectId, token);
     }, 5000);
   }
 
   async function loadRunPayload(runId, token, silent = false) {
+    if (!runId) { state.runPayload = null; return null; }
     const seq = ++runRequestSeq;
     try {
       const data = await fetchJSON(apiPath(runId));
-      if (token !== state.routeToken || runId !== state.runId || seq !== runRequestSeq) return null;
+      if (token !== state.routeToken || seq !== runRequestSeq) return null;
+      if (focusedRunId() && runId !== focusedRunId() && runId !== state.runId) return null;
+      state.runId = runId;
       state.runPayload = data;
       state.busy = Boolean(data.worker_active);
-      state.error = data.execution_error || "";
+      state.error = data.execution_error || state.error || "";
       if (!silent) renderCurrent();
       else if (state.view === "overview") renderOverview();
       else if (state.view === "department") await loadDepartment(state.department, token);
@@ -971,76 +1181,108 @@
       else if (state.view === "observability" && state.observationScreen === "detail" && state.selectedAttemptId) {
         await loadAttemptDetail(state.selectedAttemptId, { push: false });
       }
-      else if (!main?.innerHTML) renderCurrent();
       return data;
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== runRequestSeq) return null;
+      if (token !== state.routeToken || seq !== runRequestSeq) return null;
       if (!silent) renderError(error);
       return null;
     }
   }
 
   async function loadDepartment(department, token) {
-    if (!state.runId) return;
-    const runId = state.runId;
+    const runId = focusedRunId();
+    if (!runId) {
+      if (state.view === "department") renderDepartment(department);
+      return;
+    }
     const dataKey = `${runId}/${department}`;
     const seq = (departmentRequestSeq.get(dataKey) || 0) + 1;
     departmentRequestSeq.set(dataKey, seq);
     state.departmentLoading = true;
     try {
       const data = await fetchJSON(apiPath(runId, `/departments/${encodeURIComponent(department)}`));
-      if (token !== state.routeToken || runId !== state.runId || seq !== departmentRequestSeq.get(dataKey)) return;
+      if (token !== state.routeToken || seq !== departmentRequestSeq.get(dataKey)) return;
       state.departmentData.set(dataKey, data);
       state.departmentLoading = false;
       const contexts = Array.isArray(data.contexts) ? data.contexts : [];
       const selected = contexts.find(item => item.id === state.selectedContext[dataKey]) || contexts.filter(item => item.purpose === "work").at(-1) || contexts.at(-1) || null;
       state.selectedContext[dataKey] = selected?.id || null;
       if (state.view === "department" && state.department === department) renderDepartment(department);
-      if (selected?.id) await loadContextDetail(selected.id, token);
+      if (selected?.id) await loadContextDetail(selected.id, token, runId);
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== departmentRequestSeq.get(dataKey)) return;
+      if (token !== state.routeToken || seq !== departmentRequestSeq.get(dataKey)) return;
       state.departmentLoading = false;
       renderError(error);
     }
   }
 
-  async function loadContextDetail(attemptId, token = state.routeToken) {
-    if (!state.runId || !attemptId) return;
-    const runId = state.runId;
+  async function loadContextDetail(attemptId, token = state.routeToken, runId = focusedRunId()) {
+    if (!runId || !attemptId) return;
     const contextKey = `${runId}/${attemptId}`;
     const seq = (contextRequestSeq.get(contextKey) || 0) + 1;
     contextRequestSeq.set(contextKey, seq);
     try {
       const detail = await fetchJSON(apiPath(runId, `/model-attempts/${encodeURIComponent(attemptId)}`));
-      if (token !== state.routeToken || runId !== state.runId || seq !== contextRequestSeq.get(contextKey)) return;
+      if (token !== state.routeToken || seq !== contextRequestSeq.get(contextKey)) return;
       state.contextDetails.set(contextKey, detail);
-      const currentContext = `${state.runId}/${state.department}`;
+      const currentContext = `${focusedRunId()}/${state.department}`;
       if (state.view === "department" && state.selectedContext[currentContext] === attemptId) renderDepartment(state.department);
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== contextRequestSeq.get(contextKey)) return;
+      if (token !== state.routeToken || seq !== contextRequestSeq.get(contextKey)) return;
       state.contextDetails.set(contextKey, { context: null, error: error.message });
-      if (state.view === "department" && state.selectedContext[`${state.runId}/${state.department}`] === attemptId) renderDepartment(state.department);
+      if (state.view === "department" && state.selectedContext[`${focusedRunId()}/${state.department}`] === attemptId) renderDepartment(state.department);
     }
   }
 
+  async function loadPromptConfig(department, token = state.routeToken) {
+    if (!state.projectId || !department) return;
+    try {
+      const data = await fetchJSON(projectPath(state.projectId, `/prompts/${encodeURIComponent(department)}`));
+      if (token !== state.routeToken) return;
+      state.promptConfigs[department] = data;
+    } catch (error) {
+      if (token === state.routeToken) setStatus(error.message, "error");
+    }
+  }
+
+  function observationParams() {
+    const filters = state.observationFilters;
+    return {
+      department: filters.department,
+      status: filters.status,
+      q: filters.q,
+      work_item: filters.work_item === "all" ? "" : filters.work_item,
+      limit: 50,
+    };
+  }
+
   async function loadObservationData({ append = false } = {}) {
-    if (!state.runId) return;
-    const runId = state.runId;
+    if (!state.projectId) return;
+    const projectId = state.projectId;
     const token = state.routeToken;
     const seq = ++state.observationSeq;
-    const params = { department: state.observationFilters.department, status: state.observationFilters.status, q: state.observationFilters.q, limit: 50 };
+    const params = observationParams();
     if (append) params.cursor = state.observationData?.next_cursor;
     state.observationMoreLoading = append;
     if (!append) state.observationLoading = true;
     try {
-      const requests = await fetchJSON(queryPath(apiPath(runId, "/model-attempts"), params));
+      const requests = await fetchJSON(queryPath(projectPath(projectId, "/model-attempts"), params));
       let usage = state.usageData;
       if (!append || !usage || state.observationTab === "usage") {
-        usage = await fetchJSON(queryPath(apiPath(runId, "/model-usage"), { department: state.observationFilters.department, status: state.observationFilters.status, q: state.observationFilters.q }));
+        usage = await fetchJSON(queryPath(projectPath(projectId, "/model-usage"), {
+          department: params.department, status: params.status, q: params.q, work_item: params.work_item,
+        }));
       }
-      if (token !== state.routeToken || runId !== state.runId || seq !== state.observationSeq) return;
+      if (token !== state.routeToken || projectId !== state.projectId || seq !== state.observationSeq) return;
       const prior = append && state.observationData ? state.observationData.items || [] : [];
-      state.observationData = { ...requests, items: [...prior, ...(requests.items || [])] };
+      const items = [...prior, ...(requests.items || [])];
+      state.observationData = {
+        ...requests,
+        items,
+        running_attempts: items.filter(item => item.status === "running").length,
+        total_attempts: requests.total_attempts ?? usage?.coverage?.attempts ?? requests.total,
+        prepared_attempts: requests.prepared_attempts ?? usage?.prepared_attempts,
+      };
       state.usageData = usage;
       state.observationLoading = false;
       state.observationMoreLoading = false;
@@ -1049,16 +1291,17 @@
         if (state.observationTab === "usage") updateObservationContent();
       }
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== state.observationSeq) return;
+      if (token !== state.routeToken || projectId !== state.projectId || seq !== state.observationSeq) return;
       state.observationLoading = false;
       state.observationMoreLoading = false;
       renderError(error);
     }
   }
 
-  async function loadAttemptDetail(attemptId, { push = true } = {}) {
-    if (!state.runId || !attemptId) return;
-    const runId = state.runId;
+  async function loadAttemptDetail(attemptId, { push = true, runId = null } = {}) {
+    const item = (state.observationData?.items || []).find(entry => entry.id === attemptId);
+    const detailRun = runId || item?.run_id || focusedRunId();
+    if (!detailRun || !attemptId) return;
     const alreadyShowing = state.observationScreen === "detail" && state.observationDetail?.attempt?.id === attemptId;
     state.selectedAttemptId = attemptId;
     state.observationScreen = "detail";
@@ -1072,131 +1315,195 @@
     }
     const jsonScroll = alreadyShowing ? captureJsonScroll() : 0;
     try {
-      const detail = await fetchJSON(apiPath(runId, `/model-attempts/${encodeURIComponent(attemptId)}`));
-      if (token !== state.routeToken || runId !== state.runId || attemptId !== state.selectedAttemptId || seq !== state.detailSeq) return;
+      const detail = await fetchJSON(apiPath(detailRun, `/model-attempts/${encodeURIComponent(attemptId)}`));
+      if (token !== state.routeToken || attemptId !== state.selectedAttemptId || seq !== state.detailSeq) return;
+      if (item?.title) detail.attempt = { ...detail.attempt, title: item.title, run_id: detailRun };
+      else if (detail.attempt) detail.attempt.run_id = detailRun;
       state.observationDetail = detail;
       renderObservationDetail();
       if (alreadyShowing) restoreJsonScroll(jsonScroll);
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== state.detailSeq) return;
+      if (token !== state.routeToken || seq !== state.detailSeq) return;
       if (!alreadyShowing) renderError(error);
     }
   }
 
-  async function handlePopState() {
-    const previousRunId = state.runId;
-    routeFromLocation();
-    if (state.runId !== previousRunId) {
-      if (state.runId && state.runs.some(item => item.run_id === state.runId)) {
-        await activateRun(state.runId, { push: false, preserveRoute: true });
-        return;
-      }
-      closeStream();
-      state.runPayload = null;
-      state.observationData = null;
-      state.usageData = null;
-      state.observationDetail = null;
-      const token = ++state.routeToken;
-      if (!state.runId) {
-        renderCurrent();
-        return;
-      }
-      renderLoading("正在读取任务");
-      await loadRunPayload(state.runId, token);
-      if (token === state.routeToken && state.runId) openStream(state.runId, token);
-      if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
-      if (token === state.routeToken && state.view === "observability") {
-        if (state.observationScreen === "detail" && state.selectedAttemptId) await loadAttemptDetail(state.selectedAttemptId, { push: false });
-        else await loadObservationData();
-      }
-      return;
-    }
-    const token = ++state.routeToken;
-    if (state.observationScreen !== "detail") state.observationDetail = null;
-    renderCurrent();
-    if (state.view === "department" && state.runId) loadDepartment(state.department, token);
-    if (state.view === "observability" && state.runId && state.observationScreen === "list") loadObservationData();
-    if (state.view === "observability" && state.selectedAttemptId && state.runId) loadAttemptDetail(state.selectedAttemptId, { push: false });
-    if (state.runId) openStream(state.runId, token);
-  }
 
-  async function activateRun(runId, { push = true, preserveRoute = false } = {}) {
-    if (!runId || !state.runs.some(item => item.run_id === runId)) return;
-    const requestedAttempt = preserveRoute ? state.selectedAttemptId : null;
-    const requestedScreen = preserveRoute ? state.observationScreen : "list";
-    closeStream();
-    state.runId = runId;
+
+
+  function clearProjectCaches() {
+    state.project = null;
+    state.runId = null;
     state.runPayload = null;
+    state.departmentData = new Map();
+    state.contextDetails = new Map();
     state.observationData = null;
     state.usageData = null;
     state.observationDetail = null;
-    state.selectedAttemptId = requestedAttempt;
-    state.observationScreen = requestedAttempt && requestedScreen === "detail" ? "detail" : "list";
-    const token = ++state.routeToken;
-    if (push) updateRoute({ push: true });
-    renderLoading("正在读取任务");
-    await loadRunPayload(runId, token);
-    if (token === state.routeToken && state.runId === runId) openStream(runId, token);
-    if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
-    if (token === state.routeToken && state.view === "observability") {
-      if (state.observationScreen === "detail" && state.selectedAttemptId) await loadAttemptDetail(state.selectedAttemptId, { push: false });
-      else await loadObservationData();
+    state.promptConfigs = {};
+    state.selectedHandoff = null;
+    state.error = "";
+  }
+
+  async function loadProject(projectId, token, silent = false) {
+    const seq = ++projectRequestSeq;
+    try {
+      const data = await fetchJSON(projectPath(projectId));
+      if (token !== state.routeToken || projectId !== state.projectId || seq !== projectRequestSeq) return null;
+      state.project = data;
+      const focused = focusedWorkItem() || activeWorkItem();
+      state.runId = focused?.run_id || null;
+      if (state.workItemId && !workItemById(state.workItemId)) state.workItemId = null;
+      if (!silent) renderCurrent();
+      if (state.runId) await loadRunPayload(state.runId, token, silent);
+      else if (!silent) renderCurrent();
+      else if (state.view === "overview") renderOverview();
+      else if (state.view === "department") renderDepartment(state.department);
+      if (state.view === "department") {
+        await loadPromptConfig(state.department, token);
+        await loadDepartment(state.department, token);
+      }
+      if (state.view === "observability" && state.observationScreen === "list") await loadObservationData();
+      if (state.view === "observability" && state.observationScreen === "detail" && state.selectedAttemptId) {
+        await loadAttemptDetail(state.selectedAttemptId, { push: false });
+      }
+      return data;
+    } catch (error) {
+      if (token !== state.routeToken || seq !== projectRequestSeq) return null;
+      if (error.status === 404) {
+        state.projectId = null;
+        clearProjectCaches();
+        if (!silent) renderError(error);
+        else renderCurrent();
+        return null;
+      }
+      if (!silent) renderError(error);
+      return null;
     }
   }
 
-  async function loadRuns(preferredRunId = null, push = false) {
+  async function activateProject(projectId, { push = true, preserveRoute = false } = {}) {
+    if (!projectId) return;
+    const keepView = preserveRoute;
+    closeStream();
+    if (state.projectId !== projectId) {
+      clearProjectCaches();
+      if (!keepView) {
+        state.view = "overview";
+        state.overviewPane = "collaboration";
+        state.workItemId = null;
+        state.selectedAttemptId = null;
+        state.observationScreen = "list";
+        state.observationReturn = null;
+      }
+    }
+    state.projectId = projectId;
+    const token = ++state.routeToken;
+    if (push) updateRoute({ push: true });
+    else updateRoute({ push: false });
+    renderLoading("正在读取项目");
+    await loadProject(projectId, token);
+    if (token === state.routeToken && state.projectId === projectId) openStream(projectId, token);
+  }
+
+  async function loadProjects(preferredId = null, push = false) {
     try {
-      const payload = await fetchJSON("/api/runs");
-      if (!Array.isArray(payload.runs)) throw new Error("任务列表格式无效");
-      state.runs = payload.runs;
-      const selected = preferredRunId && state.runs.some(item => item.run_id === preferredRunId)
-        ? preferredRunId
-        : state.runId && state.runs.some(item => item.run_id === state.runId) ? state.runId : state.runs[0]?.run_id || null;
-      if (selected) await activateRun(selected, { push, preserveRoute: !push && Boolean(state.selectedAttemptId) });
-      else renderCurrent();
+      const payload = await fetchJSON("/api/projects");
+      if (!Array.isArray(payload.projects)) throw new Error("项目列表格式无效");
+      state.projects = payload.projects;
+      try {
+        const health = await fetchJSON("/api/health");
+        state.health = health;
+      } catch {}
+      const selected = preferredId && state.projects.some(item => item.project_id === preferredId)
+        ? preferredId
+        : state.projectId && state.projects.some(item => item.project_id === state.projectId)
+          ? state.projectId
+          : state.projects[0]?.project_id || null;
+      if (selected) await activateProject(selected, { push, preserveRoute: Boolean(state.projectId) && !push });
+      else {
+        renderChrome();
+        renderCurrent();
+      }
     } catch (error) {
       renderError(error);
     }
   }
 
   async function refreshCurrent() {
-    if (!state.runId) return loadRuns();
+    if (!state.projectId) return loadProjects();
     const token = state.routeToken;
-    await loadRunPayload(state.runId, token);
-    if (token === state.routeToken && state.view === "department") await loadDepartment(state.department, token);
-    if (token === state.routeToken && state.view === "observability" && state.observationScreen === "list") await loadObservationData();
+    await loadProject(state.projectId, token, true);
+    await loadProjects(state.projectId, false);
   }
 
-  async function createRun(event) {
+  async function handlePopState() {
+    const previousProject = state.projectId;
+    routeFromLocation();
+    if (state.projectId !== previousProject) {
+      closeStream();
+      clearProjectCaches();
+      const token = ++state.routeToken;
+      if (!state.projectId) {
+        renderChrome();
+        renderCurrent();
+        return;
+      }
+      renderLoading("正在读取项目");
+      await loadProject(state.projectId, token);
+      if (token === state.routeToken && state.projectId) openStream(state.projectId, token);
+      return;
+    }
+    const token = ++state.routeToken;
+    if (state.observationScreen !== "detail") state.observationDetail = null;
+    renderCurrent();
+    if (state.view === "department") {
+      loadPromptConfig(state.department, token);
+      loadDepartment(state.department, token);
+    }
+    if (state.view === "observability" && state.observationScreen === "list") loadObservationData();
+    if (state.view === "observability" && state.selectedAttemptId) loadAttemptDetail(state.selectedAttemptId, { push: false });
+    if (state.projectId) openStream(state.projectId, token);
+  }
+
+
+
+
+  function openProjectDialog() {
+    const dialog = document.getElementById("yp-project-dialog");
+    const form = document.getElementById("yp-project-dialog-form");
+    if (!dialog || !form) return;
+    form.elements.name.value = state.newProjectDraft.name;
+    form.elements.goal.value = state.newProjectDraft.goal;
+    const errorNode = document.getElementById("yp-project-error");
+    if (errorNode) errorNode.hidden = true;
+    dialog.showModal();
+    icons();
+    document.getElementById("yp-project-name")?.focus();
+  }
+
+  async function createProject(event) {
     event.preventDefault();
     if (state.creating) return;
-    if (event.submitter && event.submitter.value === "cancel") return document.getElementById("dw-task-dialog")?.close();
+    if (event.submitter && event.submitter.value === "cancel") return document.getElementById("yp-project-dialog")?.close();
     const form = event.currentTarget;
-    const task = form.elements.task.value;
-    if (!task.trim()) return;
-    state.newTaskDraft = {
-      task,
-      max_cycles: form.elements.max_cycles.value,
-      context_window: form.elements.context_window.value,
-    };
+    const name = form.elements.name.value;
+    const goal = form.elements.goal.value;
+    if (!name.trim() || !goal.trim()) return;
+    state.newProjectDraft = { name, goal };
     state.creating = true;
-    const submit = document.getElementById("dw-task-submit");
+    const submit = document.getElementById("yp-project-submit");
     if (submit) submit.disabled = true;
-    const errorNode = document.getElementById("dw-task-error");
+    const errorNode = document.getElementById("yp-project-error");
     if (errorNode) errorNode.hidden = true;
     try {
-      const body = { task };
-      if (form.elements.max_cycles.value) body.max_cycles = Number(form.elements.max_cycles.value);
-      if (form.elements.context_window.value) body.context_window = Number(form.elements.context_window.value);
-      const result = await fetchJSON("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      document.getElementById("dw-task-dialog")?.close();
-      state.newTaskDraft = { task: "", max_cycles: "8", context_window: "32000" };
-      if (result.run_id) {
+      const result = await fetchJSON("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, goal }) });
+      document.getElementById("yp-project-dialog")?.close();
+      state.newProjectDraft = { name: "", goal: "" };
+      if (result.project_id) {
         state.view = "overview";
-        state.observationScreen = "list";
-        state.observationDetail = null;
-        state.selectedAttemptId = null;
-        await loadRuns(result.run_id, true);
+        state.overviewPane = "collaboration";
+        await loadProjects(result.project_id, true);
       }
     } catch (error) {
       if (errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
@@ -1206,11 +1513,57 @@
     }
   }
 
+  async function startWorkItem(text, extras = {}) {
+    if (!state.projectId || state.creating || hasInProgress() || !isWritable()) return;
+    const value = String(text || "").trim();
+    if (!value) return;
+    state.creating = true;
+    renderCurrent();
+    try {
+      const body = { text: value };
+      if (extras.max_cycles) body.max_cycles = Number(extras.max_cycles);
+      if (extras.context_window) body.context_window = Number(extras.context_window);
+      if (extras.title) body.title = extras.title;
+      const result = await fetchJSON(projectPath(state.projectId, "/work-items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      state.workItemId = result.work_item_id;
+      state.view = "overview";
+      state.overviewPane = "collaboration";
+      updateRoute({ push: true });
+      await loadProjects(state.projectId, false);
+    } catch (error) {
+      setStatus(error.message, "error");
+      renderCurrent();
+    } finally {
+      state.creating = false;
+    }
+  }
+
+  async function recordMaterial(text, department = null) {
+    if (!state.projectId || hasInProgress() || !isWritable()) return;
+    const value = String(text || "").trim();
+    if (!value) return;
+    try {
+      const body = { text: value };
+      if (department) body.department = department;
+      await fetchJSON(projectPath(state.projectId, "/materials"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (department) {
+        const key = deptDraftKey(department);
+        if (state.deptDrafts[key] === text) delete state.deptDrafts[key];
+      } else if (state.globalDrafts[globalDraftKey()] === text) delete state.globalDrafts[globalDraftKey()];
+      await loadProject(state.projectId, state.routeToken);
+      setStatus("原文已记录", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+      renderCurrent();
+    }
+  }
+
   async function cancelRun() {
-    if (!state.runId || state.cancelling || TERMINAL.has(state.runPayload?.board?.phase)) return;
+    const runId = focusedRunId();
+    if (!runId || state.cancelling || TERMINAL.has(state.runPayload?.board?.phase)) return;
     state.cancelling = true;
     try {
-      await fetchJSON(apiPath(state.runId, "/cancel"), { method: "POST" });
+      await fetchJSON(apiPath(runId, "/cancel"), { method: "POST" });
       await refreshCurrent();
     } catch (error) {
       setStatus(error.message, "error");
@@ -1220,52 +1573,52 @@
   }
 
   async function addGlobalInput(form) {
-    if (!state.runId || state.inputSubmitting === state.runId || TERMINAL.has(state.runPayload?.board?.phase)) return;
+    if (!hasInProgress()) {
+      const textarea = form.querySelector("[data-global-draft]");
+      const action = state._dhAction || "start";
+      const value = textarea?.value || "";
+      if (action === "record") return recordMaterial(value);
+      return startWorkItem(value, state.workDraft);
+    }
+    const runId = focusedRunId();
+    if (!runId || state.inputSubmitting === runId || TERMINAL.has(state.runPayload?.board?.phase)) return;
     const textarea = form.querySelector("[data-global-draft]");
     const value = textarea?.value || "";
     if (!value.trim()) return;
-    const runId = state.runId;
     const token = state.routeToken;
-    state.globalDrafts[runId] = value;
+    const key = globalDraftKey();
+    state.globalDrafts[key] = value;
     state.inputSubmitting = runId;
     try {
       await fetchJSON(apiPath(runId, "/inputs"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: value }) });
-      if (token !== state.routeToken || runId !== state.runId) return;
-      if (state.globalDrafts[runId] === value) state.globalDrafts[runId] = "";
+      if (token !== state.routeToken) return;
+      if (state.globalDrafts[key] === value) state.globalDrafts[key] = "";
       await refreshCurrent();
     } catch (error) {
-      if (token === state.routeToken && runId === state.runId) setStatus(error.message, "error");
+      if (token === state.routeToken) setStatus(error.message, "error");
     } finally {
       if (state.inputSubmitting === runId) state.inputSubmitting = null;
     }
   }
 
-  async function exportRun() {
-    if (!state.runId) return;
-    const runId = state.runId;
-    try {
-      const payload = await fetchJSON(apiPath(runId, "/export"));
-      const link = document.createElement("a");
-      link.href = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(payload, null, 2))}`;
-      link.download = `${runId}-observations.json`;
-      link.click?.();
-      setStatus("任务观测已导出", "success");
-    } catch (error) {
-      setStatus(error.message, "error");
-    }
-  }
-
   async function addDepartmentGuidance(form) {
     const department = form?.dataset?.departmentForm;
-    if (!state.runId || !department) return;
     const textarea = form.querySelector?.("[data-dept-draft]");
     const value = textarea?.value || "";
+    if (!department) return;
+    if (!hasInProgress()) {
+      const action = state._dhAction || "start";
+      if (action === "record") return recordMaterial(value, department);
+      return startWorkItem(value, state.workDraft);
+    }
+    const runId = focusedRunId();
+    if (!runId) return;
     if (!value.trim()) return;
-    const runId = state.runId;
     const token = state.routeToken;
-    const key = `${runId}/${department}`;
+    const key = deptDraftKey(department);
     state.deptDrafts[key] = value;
-    state.guidanceSubmitting[key] = true;
+    const submitKey = `${runId}/${department}`;
+    state.guidanceSubmitting[submitKey] = true;
     renderDepartment(department);
     try {
       await fetchJSON(apiPath(runId, `/departments/${encodeURIComponent(department)}/guidance`), {
@@ -1273,59 +1626,38 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: value }),
       });
-      if (token !== state.routeToken || runId !== state.runId) return;
+      if (token !== state.routeToken) return;
       if (state.deptDrafts[key] === value) delete state.deptDrafts[key];
       await loadDepartment(department, token);
       await loadRunPayload(runId, token, true);
       setStatus("部门指导已接收", "success");
     } catch (error) {
-      if (token === state.routeToken && runId === state.runId) setStatus(error.message, "error");
+      if (token === state.routeToken) setStatus(error.message, "error");
     } finally {
-      delete state.guidanceSubmitting[key];
-      if (token === state.routeToken && runId === state.runId && state.view === "department") renderDepartment(department);
+      delete state.guidanceSubmitting[submitKey];
+      if (token === state.routeToken && state.view === "department") renderDepartment(department);
     }
   }
 
-  function openTaskDialog() {
-    const dialog = document.getElementById("dw-task-dialog");
-    if (!dialog) return;
-    const form = document.getElementById("dw-task-dialog-form");
-    if (form) {
-      form.elements.task.value = state.newTaskDraft.task;
-      form.elements.max_cycles.value = state.newTaskDraft.max_cycles;
-      form.elements.context_window.value = state.newTaskDraft.context_window;
-    }
-    dialog.showModal();
-    icons();
-    document.getElementById("dw-task-text")?.focus();
-  }
-
-  function openHistoryDialog() {
-    const dialog = document.getElementById("dw-history-dialog");
-    const list = document.getElementById("dw-history-list");
-    if (!dialog || !list) return;
-    list.innerHTML = state.runs.length ? state.runs.map(run => `<div class="dw-history-row"><button type="button" data-history-run="${escapeHtml(run.run_id)}"><strong>${text(run.task || run.run_id)}</strong><span>${text(run.run_id)} · ${text(phaseLabel(run.phase))}</span></button><span class="dw-record-state ${TERMINAL.has(run.phase) ? "" : "waiting"}">${text(run.outcome || phaseLabel(run.phase))}</span></div>`).join("") : `<p class="dw-small">暂无历史任务</p>`;
-    list.querySelectorAll("[data-history-run]").forEach(button => button.addEventListener("click", () => {
-      dialog.close();
-      activateRun(button.dataset.historyRun, { push: true });
-    }));
-    dialog.showModal();
-    icons();
-  }
-
-  function openPromptDialog(key) {
-    const [runId, department] = String(key).split("/");
-    if (runId !== state.runId) return;
-    const data = currentDepartmentData(department);
-    const prompt = data?.prompt_latest || state.runPayload?.prompts?.current?.[department] || data?.prompt;
-    if (!prompt?.text) return;
-    state.promptDrafts[key] = state.promptDrafts[key] ?? prompt.text;
+  function openPromptDialog(department) {
+    const key = `${state.projectId}/${department}`;
+    const config = state.promptConfigs[department] || {};
+    const currentText = config.text || "";
+    state.promptDrafts[key] = state.promptDrafts[key] ?? currentText;
     const dialog = document.getElementById("dw-prompt-dialog");
     const textarea = document.getElementById("dw-prompt-text");
+    const meta = document.getElementById("dw-prompt-meta");
+    const def = document.getElementById("dw-prompt-default");
     if (!dialog || !textarea) return;
     textarea.value = state.promptDrafts[key];
+    if (meta) meta.textContent = `项目 ${state.project?.name || ""} · ${departmentName(department)} · 当前配置 ${config.source === "configured" ? `v${config.version}` : "默认 v0"}`;
+    if (def) def.textContent = config.default_text || "";
     dialog.dataset.promptKey = key;
+    dialog.dataset.promptDepartment = department;
+    dialog.dataset.promptBase = String(config.version ?? 0);
     dialog.dataset.promptRouteToken = String(state.routeToken);
+    const errorNode = document.getElementById("dw-prompt-error");
+    if (errorNode) errorNode.hidden = true;
     dialog.showModal();
     icons();
     textarea.focus();
@@ -1336,14 +1668,17 @@
     if (event.submitter?.value === "cancel") return document.getElementById("dw-prompt-dialog")?.close();
     if (state.promptSubmitting) return;
     const dialog = document.getElementById("dw-prompt-dialog");
+    const department = dialog?.dataset.promptDepartment;
     const key = dialog?.dataset.promptKey;
     const textValue = document.getElementById("dw-prompt-text")?.value || "";
-    if (!key || !textValue.trim() || !state.runId) return;
-    const separator = key.lastIndexOf("/");
-    const runId = separator < 0 ? "" : key.slice(0, separator);
-    const department = separator < 0 ? "" : key.slice(separator + 1);
+    if (!key || !department || !state.projectId) return;
+    if (!textValue.trim()) {
+      const errorNode = document.getElementById("dw-prompt-error");
+      if (errorNode) { errorNode.hidden = false; errorNode.textContent = "Prompt 不能为空白"; }
+      return;
+    }
     const token = Number(dialog.dataset.promptRouteToken);
-    if (!runId || runId !== state.runId || token !== state.routeToken) return;
+    if (token !== state.routeToken) return;
     state.promptDrafts[key] = textValue;
     state.promptSubmitting = true;
     const submit = dialog.querySelector("button[value='default']");
@@ -1351,23 +1686,324 @@
     const errorNode = document.getElementById("dw-prompt-error");
     if (errorNode) errorNode.hidden = true;
     try {
-      await fetchJSON(apiPath(runId, `/prompts/${encodeURIComponent(department)}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: textValue }) });
-      if (token !== state.routeToken || runId !== state.runId) return;
+      const result = await fetchJSON(projectPath(state.projectId, `/prompts/${encodeURIComponent(department)}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textValue, base_version: Number(dialog.dataset.promptBase || 0) }),
+      });
+      if (token !== state.routeToken) return;
+      state.promptConfigs[department] = result;
       delete state.promptDrafts[key];
       dialog.close();
       await loadDepartment(department, token);
-      await loadRunPayload(runId, token);
+      renderCurrent();
     } catch (error) {
-      if (token === state.routeToken && runId === state.runId && errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
+      if (error.status === 409 && error.payload?.current) {
+        state.promptConfigs[department] = error.payload.current;
+        dialog.dataset.promptBase = String(error.payload.current.version ?? 0);
+        const meta = document.getElementById("dw-prompt-meta");
+        if (meta) meta.textContent = `项目 ${state.project?.name || ""} · ${departmentName(department)} · 当前配置 v${error.payload.current.version}（已更新，草稿仍保留）`;
+      }
+      if (token === state.routeToken && errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
     } finally {
       state.promptSubmitting = false;
       if (submit) submit.disabled = false;
     }
   }
 
+  async function projectCommand(action, body) {
+    if (!state.projectId) return;
+    try {
+      await fetchJSON(projectPath(state.projectId, `/${action}`), {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      state.projectMenu = false;
+      await loadProjects(state.projectId, false);
+    } catch (error) {
+      setStatus(error.message, "error");
+      renderCurrent();
+    }
+  }
+
+
+
+
+  function goDepartment(department, { push = true } = {}) {
+    state.view = "department";
+    state.department = department;
+    state.observationDetail = null;
+    state.selectedAttemptId = null;
+    const token = ++state.routeToken;
+    if (push) updateRoute({ push: true });
+    else updateRoute({ push: false });
+    renderCurrent();
+    loadPromptConfig(department, token);
+    loadDepartment(department, token);
+    if (state.projectId) openStream(state.projectId, token);
+  }
+
+  function goView(view, { push = true } = {}) {
+    state.view = view === "observability" ? "observability" : "overview";
+    if (view !== "observability") {
+      state.observationScreen = "list";
+      state.observationDetail = null;
+      state.selectedAttemptId = null;
+    }
+    const token = ++state.routeToken;
+    if (push) updateRoute({ push: true });
+    renderCurrent();
+    if (state.projectId) openStream(state.projectId, token);
+    if (state.view === "observability" && state.projectId) loadObservationData();
+    if (state.view === "overview" && state.projectId) loadProject(state.projectId, token, true);
+  }
+
+  function clickHandler(event) {
+    const target = event.target.closest?.("button, [data-dh-action]");
+    if (!target) return;
+    const scope = workbench || root;
+    if (scope && !scope.contains(target) && !target.closest("dialog")) return;
+    if (target.dataset.action === "toggle-sidebar") { state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); icons(); return; }
+    if (target.dataset.action === "toggle-mobile-nav") { state.mobileNav = !state.mobileNav; renderChrome(); icons(); return; }
+    if (target.dataset.action === "toggle-project-menu") { state.projectMenu = !state.projectMenu; renderChrome(); icons(); return; }
+    if (target.dataset.action === "new-project") return openProjectDialog();
+    if (target.dataset.action === "home") { state.view = "overview"; state.overviewPane = "collaboration"; updateRoute({ push: true }); renderCurrent(); return; }
+    if (target.dataset.action === "refresh") return refreshCurrent();
+    if (target.dataset.action === "cancel") return cancelRun();
+    if (target.dataset.action === "pin-project") return projectCommand("pin", { pinned: !state.project?.pinned });
+    if (target.dataset.action === "archive-project") return projectCommand("archive");
+    if (target.dataset.action === "restore-project") return projectCommand("restore");
+    if (target.dataset.action === "rename-project") {
+      const dialog = document.getElementById("yp-rename-dialog");
+      const input = document.getElementById("yp-rename-name");
+      if (dialog && input) { input.value = state.project?.name || ""; dialog.showModal(); input.focus(); }
+      return;
+    }
+    if (target.dataset.projectId) {
+      state.mobileNav = false;
+      return activateProject(target.dataset.projectId, { push: true });
+    }
+    if (target.dataset.overviewPane) {
+      state.view = "overview";
+      state.overviewPane = target.dataset.overviewPane;
+      updateRoute({ push: true });
+      renderOverview();
+      return;
+    }
+    if (target.dataset.boardMode) {
+      state.boardMode = target.dataset.boardMode;
+      updateRoute({ push: false });
+      renderOverview();
+      return;
+    }
+    if (target.dataset.workItem) {
+      state.workItemId = target.dataset.workItem;
+      const dept = target.dataset.workDepartment;
+      if (dept && DEPARTMENTS[dept]) return goDepartment(dept);
+      state.view = "overview";
+      updateRoute({ push: true });
+      const token = ++state.routeToken;
+      loadProject(state.projectId, token);
+      return;
+    }
+    if (target.dataset.department && target.dataset.obsReturn === undefined && !target.dataset.obsAttempt) {
+      return goDepartment(target.dataset.department);
+    }
+    if (target.dataset.view) return goView(target.dataset.view);
+    if (target.dataset.handoff) {
+      state.selectedHandoff = target.dataset.handoff;
+      updateRoute({ push: false });
+      renderOverview();
+      return;
+    }
+    if (target.dataset.eventId) return openEvent(target.dataset.eventId, target.dataset.document);
+    if (target.dataset.obsReturn !== undefined) {
+      const snapshot = state.observationReturn;
+      applyReturn(snapshot);
+      state.observationReturn = null;
+      const token = ++state.routeToken;
+      updateRoute({ push: true });
+      renderCurrent();
+      if (state.view === "department") {
+        loadPromptConfig(state.department, token);
+        loadDepartment(state.department, token);
+      }
+      restoreScroll(snapshot?.scroll || 0);
+      return;
+    }
+    if (target.dataset.obsBack !== undefined) {
+      state.observationScreen = "list";
+      state.observationDetail = null;
+      state.selectedAttemptId = null;
+      updateRoute({ push: true });
+      renderObservability();
+      if (state.projectId) openStream(state.projectId, state.routeToken);
+      loadObservationData();
+      return;
+    }
+    if (target.dataset.obsRequest) return loadAttemptDetail(target.dataset.obsRequest);
+    if (target.dataset.obsAttempt) return loadAttemptDetail(target.dataset.obsAttempt, { runId: target.dataset.obsRun || null });
+    if (target.dataset.obTab) {
+      state.observationTab = target.dataset.obTab;
+      updateRoute({ push: true });
+      updateObservationContent();
+      loadObservationData();
+      return;
+    }
+    if (target.dataset.obDetailTab) {
+      state.observationDetailTab = target.dataset.obDetailTab;
+      updateRoute({ push: false });
+      if (state.observationDetail) renderObservationDetail();
+      return;
+    }
+    if (target.dataset.obsMore !== undefined) return loadObservationData({ append: true });
+    if (target.dataset.observeAttempt) {
+      state.observationReturn = snapshotReturn();
+      if (currentDepartmentData()?.department) state.observationFilters.department = currentDepartmentData().department;
+      if (state.workItemId) state.observationFilters.work_item = state.workItemId;
+      return loadAttemptDetail(target.dataset.observeAttempt);
+    }
+    if (target.dataset.inspectorTab) {
+      state.inspectorTab = target.dataset.inspectorTab;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.contextId) {
+      state.selectedContext[`${focusedRunId()}/${state.department}`] = target.dataset.contextId;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      loadContextDetail(target.dataset.contextId, state.routeToken);
+      return;
+    }
+    if (target.dataset.contextPartSource) {
+      const selectedAttempt = state.selectedContext[`${focusedRunId()}/${state.department}`];
+      state.selectedContextPart[`${focusedRunId()}/${selectedAttempt}`] = target.dataset.contextPartSource;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.inspectorToggle !== undefined) {
+      state.inspectorCollapsed = state.inspectorCollapsed === false;
+      updateRoute({ push: false });
+      renderDepartment(state.department);
+      return;
+    }
+    if (target.dataset.promptEdit) {
+      const department = target.dataset.promptEdit.includes("/") ? target.dataset.promptEdit.split("/").pop() : target.dataset.promptEdit;
+      loadPromptConfig(department).then(() => openPromptDialog(department));
+      return;
+    }
+    if (target.dataset.dhAction) {
+      state._dhAction = target.dataset.dhAction;
+    }
+  }
+
+  function inputHandler(event) {
+    const target = event.target;
+    if (target.matches?.("[data-project-search]")) {
+      state.projectSearch = target.value;
+      renderChrome();
+      return;
+    }
+    if (target.matches?.("[data-global-draft]")) state.globalDrafts[globalDraftKey()] = target.value;
+    if (target.matches?.("[data-dept-draft]")) state.deptDrafts[deptDraftKey(target.dataset.deptDraft)] = target.value;
+    if (target.matches?.("[data-obs-search]")) {
+      state.observationFilters.q = target.value;
+      updateRoute({ push: false });
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(() => loadObservationData(), 180);
+    }
+  }
+
+  function changeHandler(event) {
+    const target = event.target;
+    if (target.matches?.("[data-work-scope]")) {
+      state.workItemId = target.value || null;
+      const item = focusedWorkItem();
+      state.runId = item?.run_id || activeWorkItem()?.run_id || null;
+      const token = ++state.routeToken;
+      updateRoute({ push: true });
+      renderCurrent();
+      if (state.view === "department") {
+        loadPromptConfig(state.department, token);
+        loadDepartment(state.department, token);
+      }
+      if (state.runId) loadRunPayload(state.runId, token, true);
+      return;
+    }
+    if (target.matches?.("[data-obs-department]")) state.observationFilters.department = target.value;
+    if (target.matches?.("[data-obs-status]")) state.observationFilters.status = target.value;
+    if (target.matches?.("[data-obs-work-item]")) state.observationFilters.work_item = target.value;
+    if (target.matches?.("[data-obs-department], [data-obs-status], [data-obs-work-item]")) {
+      state.observationData = null;
+      state.usageData = null;
+      updateRoute({ push: false });
+      loadObservationData();
+    }
+  }
+
+  function submitHandler(event) {
+    const form = event.target;
+    if (form.id === "dw-global-form") {
+      event.preventDefault();
+      const submitter = event.submitter;
+      if (submitter?.dataset?.dhAction) state._dhAction = submitter.dataset.dhAction;
+      addGlobalInput(form);
+      state._dhAction = null;
+    }
+    if (form.id === "dw-dept-form") {
+      event.preventDefault();
+      const submitter = event.submitter;
+      if (submitter?.dataset?.dhAction) state._dhAction = submitter.dataset.dhAction;
+      addDepartmentGuidance(form);
+      state._dhAction = null;
+    }
+  }
+
+  function bootDialogs() {
+    const projectForm = document.getElementById("yp-project-dialog-form");
+    projectForm?.addEventListener("input", () => {
+      state.newProjectDraft = { name: projectForm.elements.name.value, goal: projectForm.elements.goal.value };
+    });
+    projectForm?.addEventListener("submit", createProject);
+    document.getElementById("dw-prompt-dialog-form")?.addEventListener("submit", savePrompt);
+    document.getElementById("dw-prompt-restore")?.addEventListener("click", () => {
+      const department = document.getElementById("dw-prompt-dialog")?.dataset.promptDepartment;
+      const config = state.promptConfigs[department] || {};
+      const textarea = document.getElementById("dw-prompt-text");
+      if (textarea) textarea.value = config.default_text || "";
+    });
+    document.getElementById("yp-rename-dialog-form")?.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (event.submitter?.value === "cancel") return document.getElementById("yp-rename-dialog")?.close();
+      const name = document.getElementById("yp-rename-name")?.value || "";
+      const errorNode = document.getElementById("yp-rename-error");
+      try {
+        await projectCommand("rename", { name });
+        document.getElementById("yp-rename-dialog")?.close();
+      } catch (error) {
+        if (errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
+      }
+    });
+  }
+
+  function boot() {
+    routeFromLocation();
+    const scope = workbench || root;
+    scope?.addEventListener("click", clickHandler);
+    scope?.addEventListener("input", inputHandler);
+    scope?.addEventListener("change", changeHandler);
+    scope?.addEventListener("submit", submitHandler);
+    globalThis.addEventListener?.("popstate", () => { handlePopState(); });
+    bootDialogs();
+    loadProjects(state.projectId, false);
+  }
+
   async function openEvent(eventId, documentKind = "") {
-    if (!state.runId || !eventId) return;
-    const runId = state.runId;
+    const runId = focusedRunId() || state.runId;
+    if (!runId || !eventId) return;
     const token = state.routeToken;
     const seq = ++state.eventSeq;
     const dialog = document.getElementById("dw-event-dialog");
@@ -1384,7 +2020,7 @@
     if (sourcesNode) sourcesNode.replaceChildren();
     try {
       const data = await fetchJSON(apiPath(runId, `/events/${encodeURIComponent(eventId)}`));
-      if (token !== state.routeToken || runId !== state.runId || seq !== state.eventSeq) return;
+      if (token !== state.routeToken || seq !== state.eventSeq) return;
       let documentText = null;
       if (documentKind === "tree" && data.tree_archive) documentText = JSON.stringify(data.tree_archive, null, 2);
       else if (documentKind === "git") documentText = data.git_version_detail?.diff;
@@ -1412,164 +2048,10 @@
       }
       if (dialog) dialog.showModal();
     } catch (error) {
-      if (token !== state.routeToken || runId !== state.runId || seq !== state.eventSeq) return;
+      if (token !== state.routeToken || seq !== state.eventSeq) return;
       setStatus(error.message, "error");
       dialog?.close();
     }
-  }
-
-  function clickHandler(event) {
-    const target = event.target.closest?.("button");
-    if (!target || !root?.contains?.(target)) return;
-    if (target.dataset.action === "new-task") return openTaskDialog();
-    if (target.dataset.action === "history") return openHistoryDialog();
-    if (target.dataset.action === "cancel") return cancelRun();
-    if (target.dataset.action === "export") return exportRun();
-    if (target.dataset.action === "refresh") return refreshCurrent();
-    if (target.dataset.historyRun) {
-      document.getElementById("dw-history-dialog")?.close();
-      return activateRun(target.dataset.historyRun, { push: true });
-    }
-    if (target.dataset.runPicker) return activateRun(target.value, { push: true });
-    if (target.dataset.department) {
-      state.view = "department";
-      state.department = target.dataset.department;
-      state.observationDetail = null;
-      state.selectedAttemptId = null;
-      const token = ++state.routeToken;
-      updateRoute({ push: true });
-      renderCurrent();
-      if (state.runId) loadDepartment(state.department, token);
-      return;
-    }
-    if (target.dataset.view) {
-      state.view = target.dataset.view === "observability" ? "observability" : "overview";
-      state.observationScreen = "list";
-      state.observationDetail = null;
-      state.selectedAttemptId = null;
-      const token = ++state.routeToken;
-      updateRoute({ push: true });
-      renderCurrent();
-      if (state.runId) openStream(state.runId, token);
-      if (state.view === "observability" && state.runId) loadObservationData();
-      if (state.view === "overview" && state.runId) loadRunPayload(state.runId, token);
-      return;
-    }
-    if (target.dataset.handoff) {
-      state.selectedHandoff = target.dataset.handoff;
-      updateRoute({ push: false });
-      renderOverview();
-      return;
-    }
-    if (target.dataset.eventId) return openEvent(target.dataset.eventId, target.dataset.document);
-    if (target.dataset.obsBack !== undefined) {
-      state.observationScreen = "list";
-      state.observationDetail = null;
-      state.selectedAttemptId = null;
-      updateRoute({ push: true });
-      renderObservability();
-      openStream(state.runId, state.routeToken);
-      loadObservationData();
-      return;
-    }
-    if (target.dataset.obsRequest) return loadAttemptDetail(target.dataset.obsRequest);
-    if (target.dataset.obsAttempt) return loadAttemptDetail(target.dataset.obsAttempt);
-    if (target.dataset.obTab) {
-      state.observationTab = target.dataset.obTab;
-      updateRoute({ push: true });
-      updateObservationContent();
-      loadObservationData();
-      return;
-    }
-    if (target.dataset.obDetailTab) {
-      state.observationDetailTab = target.dataset.obDetailTab;
-      updateRoute({ push: false });
-      if (state.observationDetail) renderObservationDetail();
-      return;
-    }
-    if (target.dataset.obsMore !== undefined) return loadObservationData({ append: true });
-    if (target.dataset.observeAttempt) {
-      state.observationFilters.department = currentDepartmentData()?.department || state.observationFilters.department;
-      return loadAttemptDetail(target.dataset.observeAttempt);
-    }
-    if (target.dataset.inspectorTab) {
-      state.inspectorTab = target.dataset.inspectorTab;
-      updateRoute({ push: false });
-      renderDepartment(state.department);
-      return;
-    }
-    if (target.dataset.contextId) {
-      state.selectedContext[`${state.runId}/${state.department}`] = target.dataset.contextId;
-      updateRoute({ push: false });
-      renderDepartment(state.department);
-      loadContextDetail(target.dataset.contextId, state.routeToken);
-      return;
-    }
-    if (target.dataset.contextPartSource) {
-      const selectedAttempt = state.selectedContext[`${state.runId}/${state.department}`];
-      state.selectedContextPart[`${state.runId}/${selectedAttempt}`] = target.dataset.contextPartSource;
-      updateRoute({ push: false });
-      renderDepartment(state.department);
-      return;
-    }
-    if (target.dataset.inspectorToggle !== undefined) {
-      state.inspectorCollapsed = !state.inspectorCollapsed;
-      updateRoute({ push: false });
-      renderDepartment(state.department);
-      return;
-    }
-    if (target.dataset.promptEdit) return openPromptDialog(target.dataset.promptEdit);
-  }
-
-  function inputHandler(event) {
-    const target = event.target;
-    if (target.matches?.("[data-global-draft]") && state.runId) state.globalDrafts[state.runId] = target.value;
-    if (target.matches?.("[data-dept-draft]") && state.runId) state.deptDrafts[`${state.runId}/${target.dataset.deptDraft}`] = target.value;
-    if (target.matches?.("[data-obs-search]")) {
-      state.observationFilters.q = target.value;
-      updateRoute({ push: false });
-      clearTimeout(filterTimer);
-      filterTimer = setTimeout(() => loadObservationData(), 180);
-    }
-  }
-
-  function changeHandler(event) {
-    const target = event.target;
-    if (target.matches?.("[data-obs-department]")) state.observationFilters.department = target.value;
-    if (target.matches?.("[data-obs-status]")) state.observationFilters.status = target.value;
-    if (target.matches?.("[data-run-picker]")) return activateRun(target.value, { push: true });
-    if (target.matches?.("[data-obs-department], [data-obs-status]")) {
-      state.observationData = null;
-      state.usageData = null;
-      updateRoute({ push: false });
-      loadObservationData();
-    }
-  }
-
-  function submitHandler(event) {
-    const form = event.target;
-    if (form.id === "dw-global-form") { event.preventDefault(); addGlobalInput(form); }
-    if (form.id === "dw-dept-form") { event.preventDefault(); addDepartmentGuidance(form); }
-  }
-
-  function bootDialogs() {
-    const taskForm = document.getElementById("dw-task-dialog-form");
-    taskForm?.addEventListener("input", () => {
-      state.newTaskDraft = { task: taskForm.elements.task.value, max_cycles: taskForm.elements.max_cycles.value, context_window: taskForm.elements.context_window.value };
-    });
-    taskForm?.addEventListener("submit", createRun);
-    document.getElementById("dw-prompt-dialog-form")?.addEventListener("submit", savePrompt);
-  }
-
-  function boot() {
-    routeFromLocation();
-    root.addEventListener("click", clickHandler);
-    root.addEventListener("input", inputHandler);
-    root.addEventListener("change", changeHandler);
-    root.addEventListener("submit", submitHandler);
-    globalThis.addEventListener?.("popstate", () => { handlePopState(); });
-    bootDialogs();
-    loadRuns();
   }
 
   const api = {
@@ -1581,8 +2063,9 @@
     renderObservability,
     renderObservationDetail,
     updateObservationContent,
-    loadRuns,
-    activateRun,
+    loadProjects,
+    activateProject,
+    loadProject,
     loadRunPayload,
     loadDepartment,
     loadContextDetail,
@@ -1592,22 +2075,27 @@
     usageMarkup,
     contextMarkup,
     promptMarkup,
-    createRun,
+    createProject,
+    startWorkItem,
+    recordMaterial,
     cancelRun,
-    exportRun,
     addGlobalInput,
     addDepartmentGuidance,
-    openTaskDialog,
+    openProjectDialog,
     openPromptDialog,
     savePrompt,
     refreshCurrent,
     updateRoute,
     handlePopState,
-    handleLoopEvent,
+    handleProjectEvent,
     openStream,
     changeHandler,
+    deptDraftKey,
+    globalDraftKey,
+    snapshotReturn,
+    applyReturn,
   };
   globalThis.harnessWeb = api;
-  if (!root || !main || globalThis.__HARNESS_SKIP_BOOT__) return;
+  if ((!root && !workbench) || !main || globalThis.__HARNESS_SKIP_BOOT__) return;
   boot();
 })();

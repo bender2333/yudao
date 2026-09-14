@@ -61,6 +61,17 @@ def get_json(host, port, path):
     return json.loads(body)
 
 
+
+def register_project(host, port, name="测试项目", goal="长期目标"):
+    status, body, _ = request(host, port, "POST", "/api/projects", {"name": name, "goal": goal})
+    assert status == 201, body
+    return json.loads(body)["project_id"]
+
+
+def start_work_item(host, port, project_id, text, **options):
+    payload = {"text": text, **options}
+    return request(host, port, "POST", f"/api/projects/{project_id}/work-items", payload)
+
 def provider_config(tmp_path, *, credential_ref="MISSING_PROVIDER_KEY"):
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
@@ -239,14 +250,11 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
     system, _projection = run_scripted(data_dir, happy_script())
     with running_server(system) as (_server, host, port):
         html = request(host, port, "GET", "/")[1]
+        assert 'id="yudao-workbench"' in html
         assert 'id="department-workspace-prototype"' in html
-        assert 'class="dw-shell"' in html
-        assert 'data-view="overview"' in html
-        assert 'data-department="product"' in html
-        assert 'data-department="engineering"' in html
-        assert 'data-department="quality"' in html
-        assert 'data-view="observability"' in html
-        assert 'id="dw-task-dialog-form"' in html
+        assert 'class="yp-shell"' in html
+        assert 'id="yp-sidebar"' in html
+        assert 'id="yp-project-dialog-form"' in html
         assert 'src="/static/lucide.min.js"' in html
         assert "python -m" not in html
         assert "Event Store" not in html
@@ -264,8 +272,8 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
         assert "letter-spacing: 0.04" not in css
         js = request(host, port, "GET", "/static/app.js")[1]
         assert "产品" in js and "工程" in js and "质检" in js
-        assert 'data-action="new-task"' in js
-        assert 'data-action="history"' in js
+        assert 'data-action="new-project"' in js
+        assert "作为新事项开始" in js and "记录原文" in js
         assert "/departments/" in js and "/events/" in js
         assert "dw-panel-provider" in js
         assert "/model-attempts" in js and "/model-usage" in js
@@ -279,7 +287,7 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
 def test_create_run_goes_through_engine_and_replays(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     calls = []
-    original_create = system.create_run
+    original_create = system.orchestrator.create_run
     original_run = system.run_until_stop
 
     def create(task, **kwargs):
@@ -290,15 +298,13 @@ def test_create_run_goes_through_engine_and_replays(data_dir):
         calls.append(("run", run_id))
         return original_run(run_id)
 
+    system.orchestrator.create_run = create
     system.create_run = create
     system.run_until_stop = run
     with running_server(system) as (_server, host, port):
-        status, body, _ = request(
-            host,
-            port,
-            "POST",
-            "/api/runs",
-            {"task": "build echo", "max_cycles": 6, "context_window": 16000},
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(
+            host, port, project_id, "build echo", max_cycles=6, context_window=16000,
         )
         assert status == 201, body
         created = json.loads(body)
@@ -327,19 +333,21 @@ def test_second_start_returns_409_until_worker_exits(data_dir):
     adapter, entered, release = gated_adapter()
     system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "first"})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "first")
         assert status == 201, body
         first_id = json.loads(body)["run_id"]
         assert entered.wait(timeout=5)
         assert server.busy() is True
-        conflict, conflict_body, _ = request(host, port, "POST", "/api/runs", {"task": "second"})
+        conflict, conflict_body, _ = start_work_item(host, port, project_id, "second")
         assert conflict == 409, conflict_body
         payload = json.loads(conflict_body)
         assert payload.get("reason") == "busy"
         assert get_json(host, port, "/api/health")["busy"] is True
+        assert request(host, port, "POST", "/api/runs", {"task": "bare"})[0] == 404
         release.set()
         wait_until(lambda: not server.busy())
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "third"})
+        status, body, _ = start_work_item(host, port, project_id, "third")
         assert status == 201, body
         assert json.loads(body)["run_id"] != first_id
 
@@ -356,7 +364,8 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
     system = LoopSystem.for_testing(data_dir, adapter)
     original, addition, prompt = "  echo\r\n", "继续\n  ", "  PRODUCT_PROMPT_V2\r\n按原文处理需求。  "
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": original})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, original)
         assert status == 201, body
         run_id = json.loads(body)["run_id"]
         try:
@@ -395,7 +404,8 @@ def test_text_cancel_records_raw_command_before_immediate_cancellation(data_dir,
     adapter, entered, release = gated_adapter()
     system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
-        _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
+        project_id = register_project(host, port)
+        _, body, _ = start_work_item(host, port, project_id, "echo")
         run_id = json.loads(body)["run_id"]
         try:
             assert entered.wait(5)
@@ -418,7 +428,8 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
     adapter, entered, release = gated_adapter()
     system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
-        _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
+        project_id = register_project(host, port)
+        _, body, _ = start_work_item(host, port, project_id, "echo")
         run_id = json.loads(body)["run_id"]
         try:
             assert entered.wait(5)
@@ -474,7 +485,8 @@ def test_cancel_button_needs_no_git_save_or_raw_command(data_dir, monkeypatch):
     adapter, entered, release = gated_adapter()
     system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
-        _, body, _ = request(host, port, "POST", "/api/runs", {"task": "echo"})
+        project_id = register_project(host, port)
+        _, body, _ = start_work_item(host, port, project_id, "echo")
         run_id = json.loads(body)["run_id"]
         try:
             assert entered.wait(5)
@@ -528,7 +540,8 @@ def test_cancel_keeps_slot_until_worker_exits(data_dir):
 
     system.cancel = cancel
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "hold"})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "hold")
         assert status == 201, body
         run_id = json.loads(body)["run_id"]
         assert entered.wait(timeout=5)
@@ -538,17 +551,17 @@ def test_cancel_keeps_slot_until_worker_exits(data_dir):
         assert cancelled["stop_reason"] == "cancelled"
         assert calls == [run_id]
         assert server.busy() is True
-        conflict, conflict_body, _ = request(host, port, "POST", "/api/runs", {"task": "too-soon"})
+        conflict, conflict_body, _ = start_work_item(host, port, project_id, "too-soon")
         assert conflict == 409, conflict_body
         release.set()
         wait_until(lambda: not server.busy())
         payload = wait_terminal(host, port, run_id)
         assert payload["board"]["phase"] == "FAILED"
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "after-exit"})
+        status, body, _ = start_work_item(host, port, project_id, "after-exit")
         assert status == 201, body
 
 
-def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
+def test_product_post_runs_is_404_and_unknown_run_is_404(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     with running_server(system) as (_server, host, port):
         before = system.list_run_ids()
@@ -562,12 +575,14 @@ def test_invalid_input_is_400_and_unknown_run_is_404(data_dir):
             {"task": "x", "max_cycles": 1.5},
             {"task": "x", "context_window": 8.0},
             {"task": "x", "max_cycles": "8"},
+            {"task": "x"},
         ]
         for body in bad_bodies:
             status, response, _ = request(host, port, "POST", "/api/runs", body)
-            assert status == 400, (body, status, response)
+            assert status == 404, (body, status, response)
+            assert json.loads(response)["error"] == "not found"
             assert system.list_run_ids() == before
-        assert request(host, port, "POST", "/api/runs", b"{", headers={"Content-Type": "application/json", "Content-Length": "1"})[0] == 400
+        assert request(host, port, "POST", "/api/runs", b"{", headers={"Content-Type": "application/json", "Content-Length": "1"})[0] == 404
         assert system.list_run_ids() == before
         missing = request(host, port, "GET", "/api/runs/run_missing")
         assert missing[0] == 404
@@ -588,7 +603,9 @@ def test_unconfigured_test_provider_is_clear_error_and_does_not_create(data_dir)
         health = get_json(host, port, "/api/health")
         assert health["adapter"] == "responses"
         assert health["provider_available"] is False
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "build echo"})
+        assert request(host, port, "POST", "/api/runs", {"task": "build echo"})[0] == 404
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "build echo")
         assert status == 503, body
         payload = json.loads(body)
         assert payload.get("reason") == "provider_unavailable"
@@ -775,7 +792,8 @@ def test_worker_exception_is_visible_and_does_not_complete(data_dir):
 
     system.run_until_stop = boom
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "explode"})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "explode")
         assert status == 201, body
         run_id = json.loads(body)["run_id"]
         wait_until(lambda: not server.busy())
@@ -813,8 +831,10 @@ def test_unconfigured_provider_stays_on_health_after_listing_runs(data_dir):
         assert health["provider_available"] is False
         assert health["provider_message"]
         html = request(host, port, "GET", "/")[1]
-        assert 'id="dw-task-dialog-form"' in html
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "must be rejected"})
+        assert 'id="yp-project-dialog-form"' in html
+        assert request(host, port, "POST", "/api/runs", {"task": "must be rejected"})[0] == 404
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "must be rejected")
         assert status == 503
         assert health["provider_message"] in body
         assert health["provider_message"] != done["board"]["phase"]
@@ -824,7 +844,8 @@ def test_health_stays_busy_after_cancel_until_worker_exits_without_new_events(da
     adapter, entered, release = gated_adapter()
     system = LoopSystem.for_testing(data_dir, adapter)
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "hold"})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "hold")
         assert status == 201, body
         run_id = json.loads(body)["run_id"]
         assert entered.wait(timeout=5)
@@ -860,7 +881,8 @@ def test_worker_error_after_last_event_is_on_that_run_only(data_dir):
     original_run = system.run_until_stop
     system.run_until_stop = late
     with running_server(system) as (server, host, port):
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "late"})
+        project_id = register_project(host, port)
+        status, body, _ = start_work_item(host, port, project_id, "late")
         assert status == 201, body
         run_id = json.loads(body)["run_id"]
         assert entered.wait(timeout=5)
@@ -878,7 +900,7 @@ def test_worker_error_after_last_event_is_on_that_run_only(data_dir):
         assert "late-boom" in (crashed["execution_error"] or "")
         assert system.project(run_id).last_seq == seq
         system.run_until_stop = original_run
-        status, body, _ = request(host, port, "POST", "/api/runs", {"task": "next"})
+        status, body, _ = start_work_item(host, port, project_id, "next")
         assert status == 201, body
         other_id = json.loads(body)["run_id"]
         other = wait_terminal(host, port, other_id)

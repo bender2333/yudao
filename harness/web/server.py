@@ -93,13 +93,6 @@ class LoopConsoleServer(ThreadingHTTPServer):
             run_id, message = next(reversed(self._worker_errors.items()))
             return {"run_id": run_id, "message": message}
 
-    def start_run(self, task: str, options: dict[str, int]) -> str:
-        with self._worker_lock:
-            self._require_idle_and_available()
-            run_id = self.system.create_run(task, **options)
-            self._spawn_worker(run_id, None)
-            return run_id
-
     def start_work_item(self, project_id: str, text: str, options: dict[str, Any]) -> tuple[str, str]:
         with self._worker_lock:
             self._require_idle_and_available()
@@ -183,7 +176,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
 
         def dispatch() -> None:
             if parts == ["api", "runs"]:
-                return self._create_run()
+                self._drain_body()
+                return self._send_json({"error": "not found"}, 404)
             if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "cancel":
                 return self._cancel_run(parts[2])
             if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "replay":
@@ -265,23 +259,6 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "provider_status": status,
             "worker_error": self.server.last_worker_error(),
         }
-
-    def _create_run(self) -> None:
-        body = self._read_json_body()
-        unknown = set(body) - {"task", "max_cycles", "context_window"}
-        if unknown:
-            raise ValueError("unsupported task fields: " + ", ".join(sorted(unknown)))
-        task = body.get("task")
-        if not isinstance(task, str) or not task.strip():
-            raise ValueError("task must be a non-empty string")
-        options: dict[str, int] = {}
-        for key in ("max_cycles", "context_window"):
-            if key not in body or body[key] is None:
-                continue
-            options[key] = _positive_int(key, body[key])
-        run_id = self.server.start_run(task, options)
-        projection = project_run(self.server.store, run_id)
-        self._send_json({"run_id": run_id, "phase": projection.phase}, 201)
 
     def _cancel_run(self, run_id: str) -> None:
         self._drain_body()
