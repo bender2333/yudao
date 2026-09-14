@@ -1,4 +1,4 @@
-"""A4 prompt comparison: two projects, frozen tasks, FakeAdapter only."""
+"""A4 prompt comparison: two projects, frozen tasks. FakeAdapter by default."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .models import EventType
 from .projects import ProjectEventType
 from .proposals import delivery_turn, engineering_plan, product_spec, review_turn
 from .public_tree import materialize_tree
-from .runtime import LoopSystem
+from .runtime import LoopSystem, environment_credentials
 from .smoke import summarize_run
 from .tree_archive import load_tree
 
@@ -166,11 +166,20 @@ def run_a4_comparison(system: LoopSystem, out_dir: str | Path) -> dict[str, Any]
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="A4 prompt comparison (FakeAdapter only)")
+    parser = argparse.ArgumentParser(description="A4 prompt comparison")
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--provider-config", help="real catalog; omit for FakeAdapter")
     args = parser.parse_args(argv)
-    system = build_fake_comparison_system(args.data_dir)
+    if args.provider_config:
+        from .provider_catalog import ProviderCatalog
+        catalog = ProviderCatalog.load(args.provider_config)
+        system = LoopSystem(args.data_dir, provider_catalog=catalog, credentials=environment_credentials)
+        status = system.provider_status()
+        if not status["available"]:
+            raise SystemExit(f"provider unavailable: {status.get('reason') or status.get('message')}")
+    else:
+        system = build_fake_comparison_system(args.data_dir)
     run_a4_comparison(system, args.out)
     return 0
 
