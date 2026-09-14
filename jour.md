@@ -909,7 +909,15 @@
 - 主验收 `run_d004266f212a4c2c`：任务窗 32000，有效窗 32000。产品部门 3 次请求均 `Model provider connection failed`，无 `actual_model`，停在 PRODUCT_SPEC，`FAILED / provider_error`，338.8 秒。未发出连续输入。审计 verified，未用 fake。不宣称到 QA。
 - 1M 对照 `run_84fb12435fa9454c`：run 窗与有效窗均为 1_000_000。首请求也曾失败，随后恢复。DONE/release，luna，封存回放 `python src/echo.py hello` 输出 hello / 0，审计 verified，`compaction_count=0`，1075.7 秒。对照不单独关闭 S2-1。
 - 两场压缩均为 0，未加第三场、未写填充文件。8000 压力记录不升级。
-- S2-1 仍开放。恢复条件：同一目录、同一 Prompt，再跑一场 32000 主验收；不改内核重试、不换模型。B3 仍等 32000 到 QA。
+- S2-1 当时仍开放。luna 32000 失败场保留。用户随后要求改用 `provider.md` 的 back 模型重测。
+
+## 2026-09-14 - A1 用 back 模型重测并关闭 S2-1
+
+- `provider.md` back 段 `model`/`mode` 与主段对调。按主段对照：模型 `agnes-3.0-flash`，协议 Responses，声明窗 512K，输出上限 65536（有来源）。目录 `.yudao/providers.stage2-a1-back.json`。luna 证据未覆盖。
+- 主验收 `run_770ea827673545a5`：任务窗 32000，有效窗 32000，输出上限 65536。两段连续输入（空参 usage、未知 flag）。DONE/release，`agnes-3.0-flash`，封存 echo hello / 0，审计 verified，未用 fake，687.8 秒。`compaction_count=2`：工程、质检各一次，请求无工具、单部门、有来源，压缩后继续放到 QA。
+- 容量对照 `run_8741e726d9dd4ba6`：run 窗与有效窗 512000。DONE/release，无追加输入，`compaction_count=0`，295.6 秒。此 Provider 声明是 512K，不是 1M。
+- S2-1 关闭：A1 在 `4c5cde4` 上 32000 到独立 QA；A2/A3 沿用本冻结证据。luna 32000 `provider_error` 仍保留。阶段仍 PARTIAL，因为 B3/A4/B4/2.1–2.4 未做。B3 可以开工。
+
 
 
 

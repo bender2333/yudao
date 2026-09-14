@@ -20,7 +20,7 @@
 | 已提交的内核收尾 | A1 `6a89056`、A1-b `d0f5d54`、A1-c `ed21b87`、A1-d `03c25d4`；A2 `6c7750c`、A2-b `b3c35f0`；A3 `b2c25ca` + timeout `4c5cde4`；B0 `f95d3fd` / `735e120`；B1/S2-0 `76e4c74` |
 | 工作树 | 未跟踪 `.serena/project.yml` 与 `uv.lock`，不提交 |
 | 证据账 / 进度表 | 被测应用身份 `4c5cde4`；本轮同步 A1 完成条件 |
-| A1 真实主验收 | 8000 三场为压力附录。2026-09-14：目录 luna / 1M / 验收输出 4096。主验收 `run_d004266f212a4c2c` 窗口 32000，`FAILED / provider_error`，未到 QA。1M 对照 `run_84fb12435fa9454c` DONE/release，有效窗 1M，`compaction_count=0`。S2-1 仍开放。压缩是观察项 |
+| A1 真实主验收 | luna 32000 `run_d004266f212a4c2c` `provider_error` 保留。用户改 back：`run_770ea827673545a5` 窗口 32000 DONE/release，`agnes-3.0-flash`，压缩 2 次后继续 QA。512K 对照 `run_8741e726d9dd4ba6` DONE/release。S2-1 关闭。阶段仍 PARTIAL |
 | A2 / A3 | A2：`run_ffa5247370e8469a` 窗口 32000，DONE/release，审计 verified，`compaction_count=0`，封存 CLI 通过；操作为 API。A3 timeout 用例已在冻结；浏览器 64KB 与 1440/1024/390/360/320 矩阵 PASS |
 | Stage 3 文档 | 3.0 准备包已落在 `docs/stage-3/`，不是 Stage 2 欠项 |
 
