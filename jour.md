@@ -903,6 +903,15 @@
 - Stage 2 完成条件：用户确认 A1 压缩不再构成阶段完成条件。D10 实现与 8000 压力记录留下。阶段完成看 B3、B4、A4、2.1–2.4。8000 与 32000 不得拼成「压缩后继续完成」。
 - A1 仍跑：`gpt-5.6-luna`，脱敏目录 `context_window=1_000_000`、`max_output_tokens=4096`（验收发送上限，非服务商标称）。主验收任务窗口 32000、多轮连续输入、到独立 QA。另做 run 窗口 1M 的容量对照。压缩只记录：发生则核对部门隔离、无工具、来源连续；0 次则记未触发并停止加跑。S2-1 在 32000 到 QA 后可关（A2/A3 证据保留）。B3 等这场到 QA，不等待压缩。应用冻结仍是 `4c5cde4`。
 
+## 2026-09-14 - A1 真实验收：32000 主验收失败，1M 对照放行
+
+- 脱敏目录 `.yudao/providers.stage2-a1.json`：luna / Responses / 声明窗 1M / 验收输出 4096。未改 `4c5cde4`。证据 `.yudao/s2-1-a1-20260914/`。报告未检出密钥。
+- 主验收 `run_d004266f212a4c2c`：任务窗 32000，有效窗 32000。产品部门 3 次请求均 `Model provider connection failed`，无 `actual_model`，停在 PRODUCT_SPEC，`FAILED / provider_error`，338.8 秒。未发出连续输入。审计 verified，未用 fake。不宣称到 QA。
+- 1M 对照 `run_84fb12435fa9454c`：run 窗与有效窗均为 1_000_000。首请求也曾失败，随后恢复。DONE/release，luna，封存回放 `python src/echo.py hello` 输出 hello / 0，审计 verified，`compaction_count=0`，1075.7 秒。对照不单独关闭 S2-1。
+- 两场压缩均为 0，未加第三场、未写填充文件。8000 压力记录不升级。
+- S2-1 仍开放。恢复条件：同一目录、同一 Prompt，再跑一场 32000 主验收；不改内核重试、不换模型。B3 仍等 32000 到 QA。
+
+
 
 
 

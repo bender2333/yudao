@@ -2,7 +2,8 @@
 
 日期：2026-09-08，2026-09-09 补记 HEAD，2026-09-10 记 S2-0，2026-09-11 记候选冻结 `4c5cde4`，2026-09-14 记 A1 完成条件。  
 原始冻结起点：`239c3b1b4eb71020555ccff62764abcf4e6f8e9d`。  
-当前被测应用提交：`4c5cde4` `test(A3): 确定性 timeout 重试；记录 S2-1 小窗未到 QA`。其后文档不改身份。S3 历史被测应用仍是 `cdcdce5`。S2-1 尚未关闭（A1 未在 luna / 32000 到 QA；A2/A3 已有本冻结证据）。压缩不是阶段完成条件。
+当前被测应用提交：`4c5cde4` `test(A3): 确定性 timeout 重试；记录 S2-1 小窗未到 QA`。其后文档不改身份。S3 历史被测应用仍是 `cdcdce5`。S2-1 尚未关闭（luna 32000 主验收 `run_d004266f212a4c2c` 为 `provider_error`；1M 对照已放行；A2/A3 已有本冻结证据）。压缩不是阶段完成条件。
+
 
 文档提交不改变被测应用身份；本文件更新只解释当前提交与历史记录。  
 本表区分五类证据，不能互相替代：主线代码、候选代码、局部测试、真实运行、最终验收。
@@ -57,7 +58,7 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | B1 覆盖 2.E 的 E0–E2 内核；E3=B4、学习轨道未开始 | 研究资料已导入 | B1 局部测试见 S2-0 | 无 | 依赖 S2-1 冻结与 B3/B4 | 主线局部完成 / 学习未开始 |
 | B1 项目事项内核（S2-0） | 有：`76e4c74`，候选冻结 `4c5cde4` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
-| A1 主验收到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过；8000 压力记录保留为附录 | 本冻结三场 8000 均未到 QA，见 `.yudao/s2-1-a1-20260911/`。关闭改为 luna、任务窗口 32000 到 QA，外加 1M 对照；`max_output_tokens=4096` 是验收发送上限。压缩只记录，不再构成 Stage 2 完成条件 | 未关闭 | PARTIAL |
+| A1 主验收到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过；8000 压力记录保留为附录 | 2026-09-14 目录 luna / 1M / 验收输出 4096。主验收 `run_d004266f212a4c2c` 窗口 32000，3 次产品请求连接失败，`FAILED / provider_error`，无 QA，审计 verified，未用 fake。1M 对照 `run_84fb12435fa9454c` DONE/release，有效窗 1_000_000，luna，封存 echo hello，审计 verified，`compaction_count=0`。证据 `.yudao/s2-1-a1-20260914/`。对照不能替代 32000 到 QA | 未关闭 | PARTIAL |
 | A2 组合审计（S2-1） | `6c7750c`/`b3c35f0` | — | `test_smoke_guidance_audit.py` verified | `run_ffa5247370e8469a` 窗口 32000，DONE/release，审计 verified，封存 CLI `id,name,status` / `1,alpha,open`。操作为 API 不是浏览器点击 | 本冻结宽窗组合关闭；S3 `run_cb69cec4c1f74100` 保持历史 unverified | 主线局部完成 |
 | A3 timeout/64KB（S2-1） | 应用无长度分支；timeout 用例在 `4c5cde4` | — | timeout 10/10；Node 64KB 通过 | 无真实 64KB 请求（注入） | 浏览器 64KB 与五档响应式矩阵 PASS，见 `.yudao/s2-1-a3-20260911/` | 浏览器项关闭 |
 
@@ -128,6 +129,8 @@ S3：联合验收 [s3-acceptance-2026-09-08.md](s3-acceptance-2026-09-08.md) 为
 - `.yudao/s2-1-a1-20260911/`：`run_55c1957632854891` / `run_b432e4604d3149d1` / `run_16d31b59894c4387`，窗口 8000，均未到 QA
 - `.yudao/s2-1-a2-20260911/`：`run_ffa5247370e8469a` 窗口 32000，DONE/release
 - `.yudao/s2-1-a3-20260911/`：fake/demo 浏览器矩阵与 64KB 注入
+- `.yudao/s2-1-a1-20260914/`：主验收 `run_d004266f212a4c2c` 窗口 32000，`provider_error`；对照 `run_84fb12435fa9454c` 窗口 1M，DONE/release
+
 
 
 指定配置仍是 `provider.md` 的服务与模型；能力值为试验限制，不是服务商标称上限。

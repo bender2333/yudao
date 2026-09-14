@@ -1,6 +1,7 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-14。用户要求完成整个第二阶段。当前执行入口是 [剩余工作计划](stage-2-completion-plan-2026-09-10.md)，上位为 [重新排布](stage-2-replan-2026-09-09.md)、[B0 合同](project-workbench-contract.md)、[证据账](stage-2-evidence-ledger.md)。候选冻结 / 被测应用 `4c5cde4`（其后文档提交不改身份）。S2-1 仍 PARTIAL：A1 尚未在 luna / 32000 到 QA；A2/A3 已有本冻结证据。压缩不再构成阶段完成条件。阶段状态 PARTIAL。
+更新日期：2026-09-14。用户要求完成整个第二阶段。当前执行入口是 [剩余工作计划](stage-2-completion-plan-2026-09-10.md)，上位为 [重新排布](stage-2-replan-2026-09-09.md)、[B0 合同](project-workbench-contract.md)、[证据账](stage-2-evidence-ledger.md)。候选冻结 / 被测应用 `4c5cde4`（其后文档提交不改身份）。S2-1 仍 PARTIAL：luna 32000 主验收 `run_d004266f212a4c2c` 为 `provider_error`，未到 QA；1M 对照 `run_84fb12435fa9454c` DONE/release。A2/A3 已有本冻结证据。压缩不再构成阶段完成条件。阶段状态 PARTIAL。
+
 
 
 2026-09-09 起 Web 外壳的视觉基线改为 [第三版原型](prototypes/2026-09-09/README.md)，第一版原型继续作为部门页内部与观测详情的基线；下文"原型约束"一节中"唯一视觉来源是冻结原型"记录的是 2026-09-08 之前的状态。
@@ -11,8 +12,8 @@
 
 | 顺序 | 交付 | 当前状态 | 下一项完成依据 |
 | --- | --- | --- | --- |
-| 1 | Provider 连接、统一目录与部门绑定 | 连接复用已提交并验证；新增原始采集查明两场为 `server_is_overloaded`，已补遗漏的临时错误分类并通过本地测试 | 脱敏目录登记 luna / Responses / `context_window=1_000_000` / 验收输出上限 4096，并在真实请求中核对有效窗口 |
-| 2 | 第一阶段真实验收 | 宽窗组合 `run_ffa5247370e8469a` 在 `4c5cde4` DONE/release、审计 verified、`compaction_count=0`。8000 压力三场均 `model_steps_exhausted`，只作附录 | luna 任务窗口 32000 到独立 QA，另做 run 窗口 1M 对照。压缩只记录，0 次则停止加跑 |
+| 1 | Provider 连接、统一目录与部门绑定 | 脱敏目录 `.yudao/providers.stage2-a1.json`：luna / Responses / 声明 1M / 验收输出 4096。1M 对照请求的有效窗口为 1_000_000 | 32000 主验收三次连接失败后的恢复：同一目录再跑一场到 QA，不改内核 |
+| 2 | 第一阶段真实验收 | A2 宽窗组合已关闭。A1 主验收 `run_d004266f212a4c2c` 窗口 32000，`FAILED / provider_error`，无 QA。1M 对照 `run_84fb12435fa9454c` DONE/release，审计 verified，`compaction_count=0`，封存 echo hello。证据 `.yudao/s2-1-a1-20260914/` | 同一冻结上再跑 luna 任务窗口 32000 到独立 QA。失败场保留。B3 仍等这场 |
 | 3 | OMP 系统审查 | 固定版本源码审查及独立复核完成，采用项已映射到 W1/W3 与 Prompt 批次 | 已有等价能力、不采用项及新增改进边界可追源；对应应用改进按计划验证 |
 | 4 | Context/Trace View | 采集、结构化来源、取消查询已在主线；O3/O6 代码及局部回归已在 `20c7e42`，浏览器待验 | 与 W5/W7 同一冻结提交做浏览器联调 |
 | 5 | 按原型完善 Web | W5/W7 历史联调见 S3；本冻结 A3 浏览器 64KB 与 1440/1024/390/360/320 矩阵 PASS。小窗 QA 不再作为关闭项 | B3 等 S2-1 的 32000 到 QA，不等待压缩 |
