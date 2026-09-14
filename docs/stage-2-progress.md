@@ -1,6 +1,6 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-11。用户要求完成整个第二阶段。当前执行入口是 [剩余工作计划](stage-2-completion-plan-2026-09-10.md)，上位为 [重新排布](stage-2-replan-2026-09-09.md)、[B0 合同](project-workbench-contract.md)、[证据账](stage-2-evidence-ledger.md)。冻结起点 `239c3b1`，候选冻结 / 被测应用 `4c5cde4`（文档提交 `6879ce8` 不改身份）。S2-1 仍 PARTIAL：A1 未到 QA，A2/A3 已有本冻结证据。阶段状态 PARTIAL。
+更新日期：2026-09-14。用户要求完成整个第二阶段。当前执行入口是 [剩余工作计划](stage-2-completion-plan-2026-09-10.md)，上位为 [重新排布](stage-2-replan-2026-09-09.md)、[B0 合同](project-workbench-contract.md)、[证据账](stage-2-evidence-ledger.md)。候选冻结 / 被测应用 `4c5cde4`（当前 HEAD `8e7c691` 只更新文档，不改身份）。S2-1 仍 PARTIAL：A1 主验收未到 QA，A2/A3 已有本冻结证据。阶段状态 PARTIAL。
 
 2026-09-09 起 Web 外壳的视觉基线改为 [第三版原型](prototypes/2026-09-09/README.md)，第一版原型继续作为部门页内部与观测详情的基线；下文"原型约束"一节中"唯一视觉来源是冻结原型"记录的是 2026-09-08 之前的状态。
 
@@ -11,7 +11,7 @@
 | 顺序 | 交付 | 当前状态 | 下一项完成依据 |
 | --- | --- | --- | --- |
 | 1 | Provider 连接、统一目录与部门绑定 | 连接复用已提交并验证；新增原始采集查明两场为 `server_is_overloaded`，已补遗漏的临时错误分类并通过本地测试 | 使用修正后冻结版本完成真实连续输入与压缩流程，保留全部实际失败 |
-| 2 | 第一阶段真实验收 | 宽窗组合 `run_ffa5247370e8469a` 在 `4c5cde4` DONE/release、审计 verified。小窗三场均 `model_steps_exhausted`，无 QA。未提高步骤上限 | A1 关闭条件仍是 8000 窗、同一 Prompt 下压缩后到独立 QA；当前不满足 |
+| 2 | 第一阶段真实验收 | 宽窗组合 `run_ffa5247370e8469a` 在 `4c5cde4` DONE/release、审计 verified。8000 压力场景三场均 `model_steps_exhausted`，无 QA；该压力场景不再是阶段要求 | 按 `provider.md` 的 `gpt-5.6-luna` / Responses / context 1M，使用有效任务窗口完成 A1 主验收并到独立 QA |
 | 3 | OMP 系统审查 | 固定版本源码审查及独立复核完成，采用项已映射到 W1/W3 与 Prompt 批次 | 已有等价能力、不采用项及新增改进边界可追源；对应应用改进按计划验证 |
 | 4 | Context/Trace View | 采集、结构化来源、取消查询已在主线；O3/O6 代码及局部回归已在 `20c7e42`，浏览器待验 | 与 W5/W7 同一冻结提交做浏览器联调 |
 | 5 | 按原型完善 Web | W5/W7 历史联调见 S3；本冻结 A3 浏览器 64KB 与 1440/1024/390/360/320 矩阵 PASS。小窗 QA 仍缺 | 小窗到 QA 仍开放；B3 第三版外壳等 S2-1 关闭 |

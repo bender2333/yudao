@@ -56,7 +56,7 @@ HEAD 在这些候选之后继续有：`e3b9830` Context 查看、`db71d5e` 测�
 | Prompt 比较 | 仅有比较方案 | — | 无固定任务比较 | 真实验收仍用原 Prompt | 未开始 | 未开始 |
 | 2.1–2.4 / 2.E | B1 覆盖 2.E 的 E0–E2 内核；E3=B4、学习轨道未开始 | 研究资料已导入 | B1 局部测试见 S2-0 | 无 | 依赖 S2-1 冻结与 B3/B4 | 主线局部完成 / 学习未开始 |
 | B1 项目事项内核（S2-0） | 有：`76e4c74`，候选冻结 `4c5cde4` | — | 项目 38 通过；完整 Python 923/1 跳过 | 无 | 未做 B3 外壳与 B4 三次变更 | 主线局部完成 |
-| A1 小窗到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过 | 本冻结三场均未到 QA：`run_55c1957632854891` 产品 16 次压缩；`run_b432e4604d3149d1` 工程 20 次；`run_16d31b59894c4387` 工程 24 次。均 `model_steps_exhausted`，审计 verified，未用 fake，未提高步骤 | 未关闭 | PARTIAL |
+| A1 主验收到 QA（S2-1） | 压缩规则已在 `03c25d4`/`4c5cde4` | — | 未声明工具反例通过；8000 压力记录保留 | 本冻结三场 8000 压力运行均未到 QA：`run_55c1957632854891` 产品 16 次压缩；`run_b432e4604d3149d1` 工程 20 次；`run_16d31b59894c4387` 工程 24 次。均 `model_steps_exhausted`，审计 verified，未用 fake，未提高步骤。8000 不再作为阶段完成要求；主验收待按 `provider.md` 的 1M 声明与有效任务窗口重跑 | 未关闭 | PARTIAL |
 | A2 组合审计（S2-1） | `6c7750c`/`b3c35f0` | — | `test_smoke_guidance_audit.py` verified | `run_ffa5247370e8469a` 窗口 32000，DONE/release，审计 verified，封存 CLI `id,name,status` / `1,alpha,open`。操作为 API 不是浏览器点击 | 本冻结宽窗组合关闭；S3 `run_cb69cec4c1f74100` 保持历史 unverified | 主线局部完成 |
 | A3 timeout/64KB（S2-1） | 应用无长度分支；timeout 用例在 `4c5cde4` | — | timeout 10/10；Node 64KB 通过 | 无真实 64KB 请求（注入） | 浏览器 64KB 与五档响应式矩阵 PASS，见 `.yudao/s2-1-a3-20260911/` | 浏览器项关闭 |
 
