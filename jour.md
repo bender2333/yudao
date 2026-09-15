@@ -967,4 +967,5 @@
 
 - 用户明确：Stage 2 的首要目标是做成一个类似 OMP 的可运行 Agent Harness，只是执行引擎由 Product / Engineering / Quality 三部门组成；证据驱动的局部控制、跨任务经验和综合比较属于后续阶段。
 - 因此 2.2–2.4 不再作为 Stage 2 完成门槛。Stage 2 收尾改为核心 Harness 的真实端到端验收：Web/API 入口、三部门上下文与交接、工具、QA、交付、停止、重试、压缩、审计和 replay。
+- 当前剩余不是新增学习算法，而是把已有局部能力串成同一条真实 Provider 运行链；Fake 浏览器矩阵和单独 API 成功不能替代这条收口记录。
 
