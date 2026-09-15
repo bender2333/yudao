@@ -1,6 +1,6 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED**（2.6.6 全量回归数字以当日 pytest 记录为准）。
+更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED**。
 
 同日更早的 H0–H5 收口计划和「学习轨道 2.1–2.4」不再作为本阶段门槛。学习轨道（局部控制、跨任务经验、四组比较）仍后置。
 
@@ -13,7 +13,7 @@
 | 2.3 Context/Trace | CLOSED | `041eaa1`：`context-view.js` / `trace-view.js`；取消场次可见 `error_class=cancelled` |
 | 2.4 OMP 对标 | CLOSED | [stage-2-omp-feature-comparison.md](stage-2-omp-feature-comparison.md) P0 空 |
 | 2.5 Prompt | CLOSED | [stage-2-prompt-analysis.md](stage-2-prompt-analysis.md) 保留默认 |
-| 2.6 日常可用性 | CLOSED（2.6.1–2.6.5） | [stage-2-real-task-validation.md](stage-2-real-task-validation.md)：041eaa1 上 9/10 DONE，1 场计划取消可追溯 |
+| 2.6 日常可用性 | CLOSED | [stage-2-real-task-validation.md](stage-2-real-task-validation.md)：041eaa1 上 9/10 DONE；Python 958/1 skip；Node 29 |
 
 2.6 十场与 2.1.3 五场数据目录隔离。luna 历史失败不改写。
 

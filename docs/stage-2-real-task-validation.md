@@ -93,8 +93,14 @@
 
 弱于 OMP 的编码工具面与 `--resume` 属 Stage 3 / P3，不是本阶段 P0。
 
+## 2.6.6 回归
+
+- Python：`python -m pytest harness/tests -q --tb=line -p no:cacheprovider` 在缺凭据 CLI 断言改为检查环境变量名与部门后，**958 passed, 1 skipped**（收集 959），1423 s。计划下限 ≥683。
+- JavaScript：`node --test harness/tests/test_web_ui.js` **29 passed**。计划写的 ≥50 是 D18 时期口径；当前工作台 Node 文件是这一份，全部通过。
+- 浏览器：2.6.4 桌面 1440 / 手机 390 真实截图；未再跑 Fake 矩阵。
+- 未做独立性能测试。未观察到相对 2.1.3 的明显退化。
+
 ## 边界
 
-- 2.6.6 全量 Python/JS 回归未在本包执行（本验收合同为 2.6.1–2.6.5；避免与并行子代理抢测试）。
 - 第 4 场为廉价参考资料，未再开 8000/小窗压测；压缩证据来自第 3 场方向调整。
 - 未复用 2.1.3 数据目录。

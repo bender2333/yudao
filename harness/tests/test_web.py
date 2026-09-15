@@ -773,7 +773,8 @@ def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, t
     code = main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"])
     assert code == 0
     err = capsys.readouterr().err
-    assert "credential reference cannot be resolved" in err
+    assert "MISSING_PROVIDER_KEY" in err
+    assert "product" in err
     assert started["ok"] is True
     assert started["closed"] is True
 

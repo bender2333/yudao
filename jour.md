@@ -1013,5 +1013,5 @@
 - 应用冻结 `041eaa1`。2.6 十场在 `.yudao/stage2-validation/`：9 次 DONE/released，1 次 FAILED/cancelled。主代理 replay 方向调整、取消、最后一场，canonical 一致。
 - 配置页截图可见连接成功 `agnes-3.0-flash`，凭据只显示引用名。取消 Trace 详情头为错误分类 `cancelled`。
 - 2.2 / 2.3 代码已入主干。2.4 P0 为空。2.5 保持默认 Prompt。
-- 2.6.6 全量 pytest 另记；不把超时中的部分进度写成已通过。
+- 2.6.6：全仓 Python 958 passed / 1 skipped；Node UI 29 passed。缺凭据 CLI 测试改为断言环境变量名与部门，不再钉死旧英文句子。
 
