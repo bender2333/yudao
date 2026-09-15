@@ -998,3 +998,12 @@
 - 2.5 以已有真实 transcript（A1/A4/B4）为分析样本；A4 已得出保留原版，本项先出分析，没有可测量改善就不改默认 Prompt。
 - 本轮仍由子代理实现应用代码，主代理负责边界、原型、独立验收、日记和提交。
 
+
+## 2026-09-15 - 2.1 F 真实验收关闭
+
+- 网络诊断：`docs/stage-1-f-network-diagnostic.md`。primary 流式 1/3 `SSLEOFError`；back 流式 3/3 成功。选定 back / `agnes-3.0-flash`，保持 D17。
+- 2.1.3 独立核对：数据目录 `.yudao/stage1-final-validation/`。五场 `events.sqlite` 终态均为 `DONE`；小窗 `run_4ab85fd4b43845ca` 压缩 8 次；Web `run_94f496413d7b4aed` 压缩 1 次。主代理对 Web 与小窗各做两次 `LoopSystem.replay`，canonical 一致且 phase=`DONE`。
+- 截图桌面 1440×900 可见 CLI Echo 已采纳、方向为 `HELLO`。手机图 780×1688，按 2x 对应 390 宽。
+- 被测内核启动时 SHA `7b9cbdc`。静态文件在 2.2 合入后被同进程读到，截图里出现「模型与 Provider」不表示这五场跑在 2.2 内核上。
+- 未改写失败记录；本场无失败。luna 历史 `provider_error` 仍保留。
+
