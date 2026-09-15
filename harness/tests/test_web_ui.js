@@ -6,6 +6,8 @@ const vm = require("node:vm");
 
 const staticDir = path.join(__dirname, "..", "web", "static");
 const APP_JS = fs.readFileSync(path.join(staticDir, "app.js"), "utf8");
+const CONTEXT_JS = fs.readFileSync(path.join(staticDir, "context-view.js"), "utf8");
+const TRACE_JS = fs.readFileSync(path.join(staticDir, "trace-view.js"), "utf8");
 const INDEX_HTML = fs.readFileSync(path.join(staticDir, "index.html"), "utf8");
 const STYLES_CSS = fs.readFileSync(path.join(staticDir, "styles.css"), "utf8");
 
@@ -52,6 +54,8 @@ function loadApp(fetchImpl = async () => ({ ok: true, status: 200, statusText: "
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
+  vm.runInContext(CONTEXT_JS, sandbox);
+  vm.runInContext(TRACE_JS, sandbox);
   vm.runInContext(APP_JS, sandbox);
   sandbox.harnessWeb.location = location;
   return sandbox.harnessWeb;
@@ -603,3 +607,141 @@ test("createProject posts name and goal then selects the new project", async () 
   assert.deepEqual(JSON.parse(calls[0][1].body), { name: "N", goal: "G" });
   assert.equal(web.state.projectId, "proj_new");
 });
+
+test("context-view and trace-view scripts load before app.js", () => {
+  assert.match(INDEX_HTML, /src="\/static\/context-view\.js"/);
+  assert.match(INDEX_HTML, /src="\/static\/trace-view\.js"/);
+  const contextAt = INDEX_HTML.indexOf("/static/context-view.js");
+  const traceAt = INDEX_HTML.indexOf("/static/trace-view.js");
+  const appAt = INDEX_HTML.indexOf("/static/app.js");
+  assert.ok(contextAt >= 0 && traceAt >= 0 && contextAt < appAt && traceAt < appAt);
+  assert.match(STYLES_CSS, /@media \(min-width: 1440px\)/);
+  assert.match(STYLES_CSS, /@media \(max-width: 390px\)/);
+});
+
+test("observation filters expose provider and model and keep page size 50", async () => {
+  const calls = [];
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async (url) => {
+    calls.push(String(url));
+    if (String(url).includes("/model-attempts")) return response({ items: [], total: 0, next_cursor: null });
+    return response({ totals: {}, coverage: {} });
+  }, document);
+  web.state.projectId = "proj_a";
+  web.state.project = sampleProject("proj_a");
+  web.state.routeToken = 1;
+  web.state.observationData = { items: [{ id: "a1", requested_provider: "penguin", requested_model: "luna", actual_provider: "penguin", actual_model: "luna-actual", status: "success", department: "product" }], total: 1, total_attempts: 1 };
+  web.renderObservability();
+  const html = pageHtml(nodes);
+  assert.match(html, /data-obs-provider/);
+  assert.match(html, /data-obs-requested-model/);
+  assert.match(html, /data-obs-actual-model/);
+  assert.match(html, /data-obs-department/);
+  assert.match(html, /data-obs-status/);
+  assert.match(html, /data-obs-search/);
+  web.state.observationFilters.provider = "penguin";
+  web.state.observationFilters.requested_model = "luna";
+  web.state.observationFilters.actual_model = "luna-actual";
+  await web.loadObservationData();
+  assert.match(calls[0], /\/model-attempts\?/);
+  assert.match(calls[0], /provider=penguin/);
+  assert.match(calls[0], /requested_model=luna/);
+  assert.match(calls[0], /actual_model=luna-actual/);
+  assert.match(calls[0], /limit=50/);
+  assert.match(calls[1], /\/model-usage\?/);
+  assert.match(calls[1], /provider=penguin/);
+});
+
+test("attempt detail header shows error class diagnostics retry and partial output", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.projectId = "proj_a";
+  web.state.project = sampleProject("proj_a");
+  web.state.observationDetail = {
+    attempt: {
+      id: "attempt-1",
+      status: "failed",
+      department: "engineering",
+      logical_call_id: "call-1",
+      attempt: 2,
+      attempt_count: 3,
+      started_at: "2026-09-15T01:00:00Z",
+      duration_ms: 1200,
+      partial_output: true,
+      output_item_count: 1,
+      requested_provider: "penguin",
+      requested_model: "luna",
+      actual_provider: "penguin",
+      actual_model: "luna-actual",
+      error_class: "provider_error",
+      reason: "provider_error",
+      diagnostics: { error_type: "timeout", error_code: "server_is_overloaded" },
+      error: "Model request timed out",
+    },
+    siblings: [],
+  };
+  web.renderObservationDetail();
+  const html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /dw-attempt-diagnostics/);
+  assert.match(html, /错误分类 provider_error/);
+  assert.match(html, /timeout/);
+  assert.match(html, /server_is_overloaded/);
+  assert.match(html, /部分输出/);
+  assert.match(html, /第 2\/3 次/);
+  assert.match(html, /请求 penguin \/ luna/);
+  assert.match(html, /返回 penguin \/ luna-actual/);
+});
+
+test("context summary shows coverage range and original event control", () => {
+  const web = loadApp();
+  web.state.runId = "run-a";
+  web.state.projectId = "proj_a";
+  web.state.contextDetails.set("run-a/attempt-9", {
+    context: {
+      parts: [
+        { source: "department_rules", text: "developer instruction", version: 1, digest: "abc" },
+        { source: "department_history", text: JSON.stringify([{ role: "user", content: "[department_memory]\n" + JSON.stringify({ summary: "kept the contract", covered_through_event_id: "evt-9" }) }]), version: 1, digest: "def" },
+        { source: "tool_schemas", text: "[]", version: 1, digest: "ghi" },
+        { source: "current_contract", text: "{\"goal\":\"ship\"}", version: 1, digest: "jkl" },
+      ],
+      coverage: {
+        compaction_event_id: "cmp-1",
+        covered_through_event_id: "evt-9",
+        covered_through_seq: 12,
+        source_seq_from: 4,
+        source_seq_through: 12,
+      },
+      summaries: [{ source: "department_memory", summary: "kept the contract", covered_through_event_id: "evt-9" }],
+    },
+  });
+  const html = web.contextMarkup("engineering", { contexts: [{ id: "attempt-9", title: "工作输入", purpose: "work" }] });
+  assert.match(html, /Developer 指令/);
+  assert.match(html, /部门历史/);
+  assert.match(html, /工具 schema/);
+  assert.match(html, /合同摘要/);
+  assert.match(html, /覆盖范围 seq 4–12/);
+  assert.match(html, /covered_through evt-9/);
+  assert.match(html, /data-event-id="cmp-1"/);
+  assert.match(html, /data-observe-attempt="attempt-9"/);
+});
+
+test("breadcrumb names task department and request without dropping provider page", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.projectId = "proj_a";
+  web.state.project = sampleProject("proj_a", {
+    work_items: [{ work_item_id: "wi_1", title: "导出 CSV", run_id: "run-a", status: "in_progress", department: "engineering" }],
+  });
+  web.state.workItemId = "wi_1";
+  web.state.view = "observability";
+  web.state.observationScreen = "detail";
+  web.state.observationDetail = { attempt: { id: "a1", attempt: 2, department: "engineering" }, siblings: [] };
+  web.renderObservationDetail();
+  const bar = nodes.get("yp-topbar").innerHTML;
+  assert.match(bar, /导出 CSV/);
+  assert.match(bar, /工程部/);
+  assert.match(bar, /请求 2/);
+  assert.match(APP_JS, /模型与 Provider/);
+  assert.match(APP_JS, /data-action="providers"/);
+});
+

@@ -16,7 +16,7 @@ from .artifacts import ArtifactStore
 from .event_store import EventStore
 from .models import ArtifactRef, DEPARTMENTS, Event, EventType, Usage, canonical_hash, json_dumps
 from .projection import RunNotFoundError, project_run
-from .views import event_card, run_payload
+from .views import compaction_coverage, event_card, run_payload
 
 
 SCHEMA_VERSION = 1
@@ -62,11 +62,15 @@ class ObservabilityQuery:
         department: str | None = None,
         status: str | None = None,
         q: str | None = None,
+        provider: str | None = None,
+        requested_model: str | None = None,
+        actual_model: str | None = None,
         cursor: str | None = None,
         limit: int = DEFAULT_LIMIT,
     ) -> dict[str, Any]:
         records = self._filtered_attempts(
             run_id, department=department, status=status, q=q,
+            provider=provider, requested_model=requested_model, actual_model=actual_model,
         )
         offset = _cursor_offset(cursor, len(records))
         page = [_public_attempt(record) for record in records[offset : offset + _limit(limit)]]
@@ -177,17 +181,24 @@ class ObservabilityQuery:
         department: str | None = None,
         status: str | None = None,
         q: str | None = None,
+        provider: str | None = None,
+        requested_model: str | None = None,
+        actual_model: str | None = None,
         cursor: str | None = None,
         limit: int = DEFAULT_LIMIT,
     ) -> dict[str, Any]:
         records = self._filtered_attempts(
             run_id, department=department, status=status, q=q,
+            provider=provider, requested_model=requested_model, actual_model=actual_model,
         )
         # Usage intentionally uses the complete filtered set. Cursor/limit are
         # accepted for the shared filter contract but never narrow the sum.
         _cursor_offset(cursor, len(records))
         _limit(limit)
-        return {"run_id": run_id, **self.usage_summary(records, department=department, status=status, q=q)}
+        return {"run_id": run_id, **self.usage_summary(
+            records, department=department, status=status, q=q,
+            provider=provider, requested_model=requested_model, actual_model=actual_model,
+        )}
 
     def attempt_records(
         self,
@@ -196,10 +207,16 @@ class ObservabilityQuery:
         department: str | None = None,
         status: str | None = None,
         q: str | None = None,
+        provider: str | None = None,
+        requested_model: str | None = None,
+        actual_model: str | None = None,
     ) -> list[dict[str, Any]]:
         """Complete filtered attempt records for one run, in seq order (project-level callers merge them)."""
 
-        return self._filtered_attempts(run_id, department=department, status=status, q=q)
+        return self._filtered_attempts(
+            run_id, department=department, status=status, q=q,
+            provider=provider, requested_model=requested_model, actual_model=actual_model,
+        )
 
     @staticmethod
     def public_attempt(record: dict[str, Any]) -> dict[str, Any]:
@@ -212,6 +229,9 @@ class ObservabilityQuery:
         department: str | None = None,
         status: str | None = None,
         q: str | None = None,
+        provider: str | None = None,
+        requested_model: str | None = None,
+        actual_model: str | None = None,
     ) -> dict[str, Any]:
         """Usage body for an already filtered record set; the same shape serves one run or a whole project."""
 
@@ -280,6 +300,9 @@ class ObservabilityQuery:
                 "department": department,
                 "status": status,
                 "q": q,
+                "provider": provider,
+                "requested_model": requested_model,
+                "actual_model": actual_model,
             },
         }
 
@@ -507,19 +530,39 @@ class ObservabilityQuery:
             "prompt_latest": None if latest_prompt is None else {**asdict(latest_prompt), "status": "pending"},
         }
 
-    def _filtered_attempts(self, run_id: str, *, department: str | None,
-                           status: str | None, q: str | None) -> list[dict[str, Any]]:
+    def _filtered_attempts(
+        self,
+        run_id: str,
+        *,
+        department: str | None,
+        status: str | None,
+        q: str | None,
+        provider: str | None = None,
+        requested_model: str | None = None,
+        actual_model: str | None = None,
+    ) -> list[dict[str, Any]]:
         if department is not None and department not in DEPARTMENTS:
             raise ValueError("unknown department")
         if status is not None and status not in {"success", "failed", "cancelled", "running"}:
             raise ValueError("unknown model attempt status")
         records = list(self._attempt_records(run_id).values())
         needle = q.strip().casefold() if isinstance(q, str) and q.strip() else None
+        provider_needle = provider.strip() if isinstance(provider, str) and provider.strip() else None
+        requested_needle = requested_model.strip() if isinstance(requested_model, str) and requested_model.strip() else None
+        actual_needle = actual_model.strip() if isinstance(actual_model, str) and actual_model.strip() else None
         result = []
         for record in records:
             if department is not None and record.get("department") != department:
                 continue
             if status is not None and _public_status(record) != status:
+                continue
+            if provider_needle is not None and provider_needle not in {
+                record.get("requested_provider"), record.get("actual_provider"),
+            }:
+                continue
+            if requested_needle is not None and record.get("requested_model") != requested_needle:
+                continue
+            if actual_needle is not None and record.get("actual_model") != actual_needle:
                 continue
             if needle is not None and needle not in _search_text(record):
                 continue
@@ -687,6 +730,11 @@ class ObservabilityQuery:
             if not isinstance(parts, list):
                 raise ValueError("context parts artifact is unavailable")
             _validate_context_parts(parts, payload.get("injected"))
+        compaction_id = payload.get("compaction_event_id")
+        coverage = None
+        if compaction_id:
+            coverage = compaction_coverage(self.store.get_event(compaction_id))
+        summaries = _summaries_from_parts(parts)
         return {
             "event_id": event.event_id,
             "seq": event.seq,
@@ -695,6 +743,8 @@ class ObservabilityQuery:
             "parts": parts,
             "parts_ref": parts_ref,
             "source_event_ids": [event.event_id],
+            "coverage": coverage,
+            "summaries": summaries,
         }
 
     def _artifact_json(self, run_id: str, ref: Any) -> Any:
@@ -807,6 +857,12 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
         "duration_ms": record.get("duration_ms"),
         "usage": record.get("usage"),
         "observed_scope": record.get("collection_scope"),
+        "error_class": record.get("reason") or record.get("error_class"),
+        "reason": record.get("reason"),
+        "diagnostics": record.get("diagnostics"),
+        "error": record.get("error"),
+        "retryable": record.get("retryable"),
+        "will_retry": record.get("will_retry"),
     }
 
 
@@ -928,6 +984,12 @@ def _merge_finished(record: dict[str, Any], event: Event, payload: dict[str, Any
         "finished_event_id": event.event_id,
         "actual_provider": (payload.get("actual_provider") or event.provider) if has_response else record.get("actual_provider"),
         "actual_model": actual_model if has_response else record.get("actual_model"),
+        "reason": payload.get("reason"),
+        "error_class": payload.get("reason"),
+        "diagnostics": payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else None,
+        "retryable": payload.get("retryable"),
+        "will_retry": payload.get("will_retry"),
+        "error": event.error or payload.get("error"),
     })
 
 
@@ -1063,6 +1125,49 @@ def _material_summary(event: Event) -> str:
         EventType.QA_SUBMITTED: payload.get("rationale") or payload.get("verdict") or "已提交质检结果",
     }
     return _short_text(values.get(event.type) or event.type, 1200)
+
+
+def _summaries_from_parts(parts: list[Any] | None) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    if not isinstance(parts, list):
+        return result
+    marker = "[department_memory]"
+    blobs: list[str] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        text = part.get("text")
+        if not isinstance(text, str) or not text:
+            continue
+        if part.get("source") == "department_history":
+            try:
+                history = json.loads(text)
+            except json.JSONDecodeError:
+                history = None
+            if isinstance(history, list):
+                for item in history:
+                    content = item.get("content") if isinstance(item, dict) else None
+                    if isinstance(content, str) and marker in content:
+                        blobs.append(content)
+                continue
+        if marker in text or part.get("source") == "department_memory":
+            blobs.append(text)
+    for blob in blobs:
+        at = blob.find(marker)
+        raw = blob[at + len(marker):].strip() if at >= 0 else blob
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {"summary": raw}
+        if not isinstance(parsed, dict):
+            parsed = {"summary": raw}
+        result.append({
+            "source": "department_memory",
+            "summary": parsed.get("summary") or "",
+            "covered_through_event_id": parsed.get("covered_through_event_id"),
+            "covered_digest": parsed.get("covered_digest"),
+        })
+    return result
 
 
 def _validate_context_parts(parts: list[Any], injected: Any) -> None:

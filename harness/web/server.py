@@ -773,6 +773,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "department": self._query_scalar(query, "department"),
             "status": self._query_scalar(query, "status"),
             "q": self._query_scalar(query, "q"),
+            "provider": self._query_scalar(query, "provider"),
+            "requested_model": self._query_scalar(query, "requested_model"),
+            "actual_model": self._query_scalar(query, "actual_model"),
         }
         wanted = self._query_scalar(query, "work_item")
         items = [item for item in project.work_items if wanted is None or item.work_item_id == wanted]
@@ -891,6 +894,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 department=self._query_scalar(query, "department"),
                 status=self._query_scalar(query, "status"),
                 q=self._query_scalar(query, "q"),
+                provider=self._query_scalar(query, "provider"),
+                requested_model=self._query_scalar(query, "requested_model"),
+                actual_model=self._query_scalar(query, "actual_model"),
                 cursor=self._query_scalar(query, "cursor"),
                 limit=self._query_limit(query),
             ))
@@ -902,6 +908,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 department=self._query_scalar(query, "department"),
                 status=self._query_scalar(query, "status"),
                 q=self._query_scalar(query, "q"),
+                provider=self._query_scalar(query, "provider"),
+                requested_model=self._query_scalar(query, "requested_model"),
+                actual_model=self._query_scalar(query, "actual_model"),
                 cursor=self._query_scalar(query, "cursor"),
                 limit=self._query_limit(query),
             ))

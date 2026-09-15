@@ -421,6 +421,47 @@ def test_generic_adapter_failure_closes_raw_capture_and_keeps_stream_evidence(tm
     assert row["actual_model"] == "broken-model"
     detail = query.model_attempt_detail(run_id, row["id"])
     assert any(event["source"] == "sdk_decoded_stream" for event in detail["events"])
+    assert row["error_class"] == "provider_error"
+    assert row["diagnostics"]["error_type"] == "adapter_failure"
+    assert detail["attempt"]["error_class"] == "provider_error"
+
+
+def test_list_model_attempts_filters_provider_and_models(tmp_path: Path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
+    run_id = system.create_run("filter attempts")
+    system.run_until_stop(run_id)
+    query = ObservabilityQuery(system.store, system.artifacts)
+    listing = query.list_model_attempts(run_id)
+    row = listing["items"][0]
+    provider = row["requested_provider"]
+    requested = row["requested_model"]
+    actual = row["actual_model"]
+    assert provider
+    assert query.list_model_attempts(run_id, provider=provider)["total"] == listing["total"]
+    assert query.list_model_attempts(run_id, provider="missing-provider")["total"] == 0
+    assert query.list_model_attempts(run_id, requested_model=requested)["total"] >= 1
+    if actual:
+        assert query.list_model_attempts(run_id, actual_model=actual)["total"] >= 1
+        assert query.model_usage(run_id, actual_model=actual)["total_attempts"] == query.list_model_attempts(run_id, actual_model=actual)["total_attempts"]
+    assert query.list_model_attempts(run_id, actual_model="no-such-model")["total"] == 0
+
+
+def test_compaction_coverage_exposes_seq_range_and_covered_through():
+    from harness.views import compaction_coverage
+
+    coverage = compaction_coverage({
+        "source_event_id": "cmp-1",
+        "checkpoint": {"covered_through_event_id": "evt-9"},
+        "source_refs": [
+            {"event_id": "evt-1", "seq": 4},
+            {"event_id": "evt-9", "seq": 12},
+        ],
+    })
+    assert coverage["compaction_event_id"] == "cmp-1"
+    assert coverage["covered_through_event_id"] == "evt-9"
+    assert coverage["covered_through_seq"] == 12
+    assert coverage["source_seq_from"] == 4
+    assert coverage["source_seq_through"] == 12
 
 
 def test_partial_stream_failure_keeps_stream_artifact_and_actual_identity(tmp_path: Path, monkeypatch):

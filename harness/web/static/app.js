@@ -56,7 +56,7 @@
     observationData: null,
     usageData: null,
     observationLoading: false,
-    observationFilters: { department: "all", status: "all", q: "", work_item: "all" },
+    observationFilters: { department: "all", status: "all", q: "", work_item: "all", provider: "all", requested_model: "all", actual_model: "all" },
     observationCursor: null,
     observationMoreLoading: false,
     observationDetail: null,
@@ -414,6 +414,9 @@
       status: ["success", "failed", "running", "cancelled"].includes(search.get("status")) ? search.get("status") : "all",
       q: search.get("q") || "",
       work_item: search.get("obsWorkItem") || "all",
+      provider: search.get("provider") || "all",
+      requested_model: search.get("requestedModel") || "all",
+      actual_model: search.get("actualModel") || "all",
     };
   }
 
@@ -435,6 +438,9 @@
       if (state.observationFilters.status !== "all") params.set("status", state.observationFilters.status);
       if (state.observationFilters.q) params.set("q", state.observationFilters.q);
       if (state.observationFilters.work_item && state.observationFilters.work_item !== "all") params.set("obsWorkItem", state.observationFilters.work_item);
+      if (state.observationFilters.provider && state.observationFilters.provider !== "all") params.set("provider", state.observationFilters.provider);
+      if (state.observationFilters.requested_model && state.observationFilters.requested_model !== "all") params.set("requestedModel", state.observationFilters.requested_model);
+      if (state.observationFilters.actual_model && state.observationFilters.actual_model !== "all") params.set("actualModel", state.observationFilters.actual_model);
     }
     if (state.view === "department") {
       if (state.inspectorTab !== "context") params.set("inspectorTab", state.inspectorTab);
@@ -490,6 +496,39 @@
     return "product";
   }
 
+  function breadcrumbInner() {
+    if (state.view === "providers") {
+      return `<button type="button" data-action="home">项目</button><span>/</span><strong>模型与 Provider</strong>`;
+    }
+    const parts = [`<button type="button" data-action="home">项目</button>`];
+    const project = state.project;
+    if (!project) return parts.join("");
+    const item = focusedWorkItem() || activeWorkItem();
+    if (state.view === "overview" && !item) {
+      parts.push(`<span>/</span><strong>${text(project.name)}</strong>`);
+      return parts.join("");
+    }
+    parts.push(`<span>/</span><button type="button" data-view="overview">${text(project.name)}</button>`);
+    if (item) {
+      if (state.view === "overview") parts.push(`<span>/</span><strong>${text(item.title)}</strong>`);
+      else parts.push(`<span>/</span><button type="button" data-view="overview">${text(item.title)}</button>`);
+    }
+    if (state.view === "department") {
+      parts.push(`<span>/</span><strong>${text(departmentName(state.department))}</strong>`);
+    }
+    if (state.view === "observability") {
+      const attempt = state.observationDetail?.attempt;
+      if (state.observationScreen === "detail" && attempt) {
+        const dept = attempt.department || state.department;
+        parts.push(`<span>/</span><button type="button" data-department="${escapeHtml(dept || "")}">${text(departmentName(dept))}</button>`);
+        parts.push(`<span>/</span><strong>请求 ${text(attempt.attempt != null ? String(attempt.attempt) : "")}</strong>`);
+      } else {
+        parts.push(`<span>/</span><strong>观测</strong>`);
+      }
+    }
+    return parts.join("");
+  }
+
   function filteredProjects() {
     const q = (state.projectSearch || "").trim().toLowerCase();
     const rows = state.projects || [];
@@ -517,7 +556,7 @@
       const dot = project == null ? "muted" : project.archived ? "muted" : active ? "waiting" : "";
       const providerCrumb = state.view === "providers" ? `<span>/</span><strong>模型与 Provider</strong>` : "";
       const menu = state.projectMenu && project ? `<div class="yp-menu">${project.archived ? `<button type="button" data-action="restore-project"><i data-lucide="archive-restore" aria-hidden="true"></i>恢复</button>` : `<button type="button" data-action="rename-project"><i data-lucide="pencil" aria-hidden="true"></i>重命名</button><button type="button" data-action="pin-project"><i data-lucide="pin" aria-hidden="true"></i>${project.pinned ? "取消置顶" : "置顶"}</button><button type="button" data-action="archive-project"><i data-lucide="archive" aria-hidden="true"></i>归档</button>`}</div>` : "";
-      topbar.innerHTML = `<div class="yp-row"><button class="yp-icon yp-mobile-toggle" type="button" data-action="toggle-mobile-nav" aria-label="打开项目列表"><i data-lucide="menu" aria-hidden="true"></i></button><nav class="yp-breadcrumb" aria-label="位置"><button type="button" data-action="home">项目</button>${providerCrumb}${!providerCrumb && project ? `<span>/</span><strong>${text(project.name)}</strong>` : ""}</nav></div><div class="yp-row"><button class="yp-btn quiet" type="button" data-action="providers">模型与 Provider</button><span class="yp-auto"><span class="yp-dot ${dot}"></span><span>${text(status)}</span></span>${project ? `<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="toggle-project-menu" aria-label="项目菜单"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>${menu}</div>` : ""}</div>`;
+      topbar.innerHTML = `<div class="yp-row"><button class="yp-icon yp-mobile-toggle" type="button" data-action="toggle-mobile-nav" aria-label="打开项目列表"><i data-lucide="menu" aria-hidden="true"></i></button><nav class="yp-breadcrumb" aria-label="位置">${breadcrumbInner()}</nav></div><div class="yp-row"><button class="yp-btn quiet" type="button" data-action="providers">模型与 Provider</button><span class="yp-auto"><span class="yp-dot ${dot}"></span><span>${text(status)}</span></span>${project ? `<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="toggle-project-menu" aria-label="项目菜单"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>${menu}</div>` : ""}</div>`;
     }
   }
 
@@ -787,25 +826,21 @@
     return { text: raw, clipped: false };
   }
 
+  function uiHost() {
+    return {
+      escapeHtml, text, displayValue, number, count, safeClass, json,
+      departmentName, attemptStatusLabel, formatTime, duration,
+      usageValue, usageRawValue, usageCostValue, usageValueMarkup,
+      attemptRequestedText, attemptActualText, requestStateMarkup,
+      focusedRunId, focusedWorkItem, workItems, state,
+      contextDetailFor, attemptIdFromContext, contextSourceLabel,
+      observationTaskText, projectTabsMarkup,
+    };
+  }
+
+
   function contextMarkup(department, data) {
-    const contexts = Array.isArray(data?.contexts) ? data.contexts : [];
-    const contextKey = `${focusedRunId()}/${department}`;
-    const requestedId = state.selectedContext[contextKey];
-    const selected = contexts.find(item => item.id === requestedId) || contexts.filter(item => item.purpose === "work").at(-1) || contexts.at(-1) || null;
-    const selectedId = selected?.id || null;
-    state.selectedContext[contextKey] = selectedId;
-    const items = contexts.map(item => `<button class="dw-context-item ${item.id === selectedId ? "is-selected" : ""}" type="button" data-context-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><strong>${text(item.title)}</strong><span>${text(item.meta || formatTime(item.snapshot_at))}</span></button>`).join("");
-    const selectedAttempt = attemptIdFromContext(selected);
-    const detail = contextDetailFor(selectedAttempt);
-    const parts = detail?.context && Object.prototype.hasOwnProperty.call(detail.context, "parts") ? detail.context.parts : null;
-    const partKey = `${focusedRunId()}/${selectedAttempt || "none"}`;
-    const selectedSource = state.selectedContextPart[partKey];
-    const selectedPart = Array.isArray(parts) ? (parts.find(item => item.source === selectedSource) || parts[0] || null) : null;
-    if (selectedPart) state.selectedContextPart[partKey] = selectedPart.source;
-    const partItems = Array.isArray(parts) ? parts.map(item => `<button class="dw-context-part ${item.source === selectedPart?.source ? "is-selected" : ""}" type="button" data-context-part-source="${escapeHtml(item.source)}"><strong>${text(contextSourceLabel(item.source))}</strong><span>${item.version == null ? "版本未知" : `v${escapeHtml(item.version)}`} · ${text(String(item.digest || "").slice(0, 12), "摘要未知")}</span></button>`).join("") : "";
-    const sourceBody = !selectedAttempt ? "当前没有可查看的 Context 原文" : !detail ? "正在读取本次快照来源…" : detail.error ? `本次 Context 来源读取失败：${detail.error}` : !Array.isArray(parts) ? "本次 Context 来源未记录" : !selectedPart ? "本次 Context 没有可显示来源" : selectedPart.text;
-    const observe = selectedAttempt ? `<button class="dw-observation-link" type="button" data-observe-attempt="${escapeHtml(selectedAttempt)}"><i data-lucide="activity" aria-hidden="true"></i>查看模型请求</button>` : `<span class="dw-observation-link is-disabled"><i data-lucide="circle-help" aria-hidden="true"></i>本次 Context 尚未发起模型请求</span>`;
-    return `<div class="dw-inspect-panel" id="dw-panel-context" role="tabpanel" aria-labelledby="dw-tab-context"><h3>Context 快照</h3><div class="dw-context-snapshot-meta"><strong>本次工作输入</strong><time>快照时间 · ${text(formatTime(selected?.snapshot_at || data?.snapshot_at))}</time></div><div class="dw-context-list">${items || '<p class="dw-small">暂无 Context 快照</p>'}</div><div class="dw-context-part-list" aria-label="本次快照来源">${partItems || (detail && Array.isArray(parts) ? '<p class="dw-small">本次 Context 没有来源条目</p>' : '<p class="dw-small">本次 Context 来源未记录</p>')}</div><div class="dw-context-body"><p>${text(sourceBody, "当前没有可查看的 Context 原文")}</p></div>${observe}</div>`;
+    return globalThis.YudaoContextView.render(uiHost(), department, data);
   }
 
   function providerMarkup(provider) {
@@ -882,9 +917,7 @@
   }
 
   function attemptRowMarkup(item) {
-    const logical = item.logical_call_id || "未知调用";
-    const attemptText = `${number(item.attempt, "?")}/${number(item.attempt_count, "?")}`;
-    return `<button class="dw-request-row" type="button" data-obs-request="${escapeHtml(item.id)}" aria-label="查看 ${escapeHtml(logical)} 第 ${escapeHtml(item.attempt ?? "?")} 次尝试"><span class="dw-request-time">${text(formatTime(item.created_at))}${requestStateMarkup(item)}<span>尝试 ${escapeHtml(attemptText)}</span></span><span class="dw-request-main"><strong>${text(departmentName(item.department))}</strong><span>请求：${text(attemptRequestedText(item))}</span><span>返回：${text(attemptActualText(item))} · ${text(item.provider_response_id)} · ${text(item.work_round)} · ${text(item.step)}</span></span><span class="dw-request-metrics"><span>Input <strong>${usageValue(item, "input_tokens")}</strong> · Output <strong>${usageValue(item, "output_tokens", "等待响应")}</strong></span><span>耗时 <strong>${duration(usageRawValue(item, "latency_ms"), item.status)}</strong></span></span></button>`;
+    return globalThis.YudaoTraceView.attemptRowMarkup(uiHost(), item);
   }
 
 
@@ -1007,7 +1040,7 @@
     const task = observationTaskText(state.observationFilters.department);
     const items = workItems();
     const workOptions = [`<option value="all" ${filters.work_item === "all" ? "selected" : ""}>全部事项</option>`].concat(items.map(item => `<option value="${escapeHtml(item.work_item_id)}" ${filters.work_item === item.work_item_id ? "selected" : ""}>${text(item.title)}</option>`)).join("");
-    return `<div class="dw-observation-page" role="region" aria-label="项目模型请求观测">${projectTabsMarkup()}<header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>项目</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span></div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>项目范围</span><strong>${text(state.project?.name || task)}</strong><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div><div class="dw-observation-filters"><label class="dw-filter-field"><span>事项</span><select class="dw-filter-select" data-obs-work-item aria-label="按事项筛选">${workOptions}</select></label><label class="dw-filter-field"><span>部门</span><select class="dw-filter-select" data-obs-department aria-label="按部门筛选"><option value="all" ${filters.department === "all" ? "selected" : ""}>全部部门</option><option value="product" ${filters.department === "product" ? "selected" : ""}>产品部</option><option value="engineering" ${filters.department === "engineering" ? "selected" : ""}>工程部</option><option value="quality" ${filters.department === "quality" ? "selected" : ""}>质检部</option></select></label><label class="dw-filter-field"><span>状态</span><select class="dw-filter-select" data-obs-status aria-label="按状态筛选"><option value="all" ${filters.status === "all" ? "selected" : ""}>全部状态</option><option value="success" ${filters.status === "success" ? "selected" : ""}>成功</option><option value="failed" ${filters.status === "failed" ? "selected" : ""}>失败</option><option value="running" ${filters.status === "running" ? "selected" : ""}>进行中</option><option value="cancelled" ${filters.status === "cancelled" ? "selected" : ""}>取消</option></select></label><label class="dw-filter-field"><span>搜索</span><input class="dw-search-input" type="search" data-obs-search aria-label="搜索调用 ID、Provider 或模型" placeholder="调用 ID、Provider 或模型" value="${escapeHtml(filters.q)}"></label></div><div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    return `<div class="dw-observation-page" role="region" aria-label="项目模型请求观测">${projectTabsMarkup()}<header class="dw-observation-head"><div><div class="dw-eyebrow"><span class="dw-status-dot"></span><strong>观测</strong><span>·</span><span>项目</span></div><h1>${state.observationScreen === "detail" ? "模型请求详情" : "模型请求"}</h1><p class="dw-subtitle">请求 · 响应 · usage</p></div><div><span class="dw-current-state"><span class="dw-status-dot waiting"></span>${text(current)} 个请求进行中</span></div></header><div class="dw-observation-scope"><i data-lucide="activity" aria-hidden="true"></i><span>项目范围</span><strong>${text(state.project?.name || task)}</strong><span>·</span><span>${count(state.observationData?.total)} 条记录 · ${count(state.observationData?.total_attempts)} 次已发出</span></div><div class="dw-observation-tabs" role="tablist" aria-label="观测页签"><button id="dw-ob-tab-requests" class="dw-observation-tab ${state.observationTab === "requests" ? "is-active" : ""}" type="button" data-ob-tab="requests" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "requests"}">请求记录</button><button id="dw-ob-tab-usage" class="dw-observation-tab ${state.observationTab === "usage" ? "is-active" : ""}" type="button" data-ob-tab="usage" role="tab" aria-controls="dw-observation-content" aria-selected="${state.observationTab === "usage"}">用量统计</button></div>${globalThis.YudaoTraceView.filtersMarkup(uiHost(), filters, workOptions)}<div id="dw-observation-content" role="tabpanel" aria-live="polite"></div><p class="dw-action-error" role="alert" hidden></p></div>`;
   }
 
   function renderObservability() {
@@ -1039,7 +1072,7 @@
     state.observationScreen = "detail";
     state.selectedAttemptId = item.id;
     const returnDept = state.observationReturn?.department || item.department;
-    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-obs-return data-department="${escapeHtml(returnDept || "")}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(returnDept))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p></header><div class="dw-observation-crumbs" aria-label="请求关联"><span>项目</span><strong>${text(state.project?.name)}</strong><span aria-hidden="true">›</span><span>事项</span><strong>${text(item.title || focusedWorkItem()?.title || "项目范围")}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}" data-obs-run="${escapeHtml(attempt.run_id || item.run_id || "")}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
+    main.innerHTML = `<div class="dw-observation-page" role="region" aria-label="模型请求详情"><div class="dw-observation-detail-top"><button class="dw-back" type="button" data-obs-back><i data-lucide="arrow-left" aria-hidden="true"></i>返回请求记录</button><button class="dw-back" type="button" data-obs-return data-department="${escapeHtml(returnDept || "")}"><i data-lucide="corner-up-left" aria-hidden="true"></i>返回${text(departmentName(returnDept))}</button></div><header class="dw-observation-detail-title" style="margin-top:18px"><h1>模型请求详情</h1><p>${text(item.logical_call_id)} · <span class="dw-request-state ${safeClass(item.status)}">${text(attemptStatusLabel(item))}</span></p>${globalThis.YudaoTraceView.detailHeaderExtras(uiHost(), detail)}</header><div class="dw-observation-crumbs" aria-label="请求关联"><span>项目</span><strong>${text(state.project?.name)}</strong><span aria-hidden="true">›</span><span>事项</span><strong>${text(item.title || focusedWorkItem()?.title || "项目范围")}</strong><span aria-hidden="true">›</span><span>部门</span><strong>${text(departmentName(item.department))}</strong><span aria-hidden="true">›</span><span>本轮工作</span><strong>${text(item.work_round)}</strong><span aria-hidden="true">›</span><span>调用</span><strong>${text(item.logical_call_id)}</strong><span aria-hidden="true">›</span><span>尝试</span><strong>第 ${text(item.attempt)}/${text(item.attempt_count)}</strong></div><div class="dw-attempt-bar"><span class="dw-attempt-label">同次调用 · ${text(item.logical_call_id)}</span>${attempts.map(attempt => `<button class="dw-attempt-option ${attempt.status === "failed" ? "failed" : ""} ${attempt.id === item.id ? "is-active" : ""}" type="button" data-obs-attempt="${escapeHtml(attempt.id)}" data-obs-run="${escapeHtml(attempt.run_id || item.run_id || "")}">第 ${text(attempt.attempt)} 次 · ${text(attemptStatusLabel(attempt))}</button>`).join("")}</div><div class="dw-observation-detail-tabs" role="tablist" aria-label="请求详情页签"><button class="dw-detail-tab ${state.observationDetailTab === "overview" ? "is-active" : ""}" type="button" data-ob-detail-tab="overview" role="tab" aria-selected="${state.observationDetailTab === "overview"}">概览</button><button class="dw-detail-tab ${state.observationDetailTab === "request" ? "is-active" : ""}" type="button" data-ob-detail-tab="request" role="tab" aria-selected="${state.observationDetailTab === "request"}">Request</button><button class="dw-detail-tab ${state.observationDetailTab === "response" ? "is-active" : ""}" type="button" data-ob-detail-tab="response" role="tab" aria-selected="${state.observationDetailTab === "response"}">Response</button><button class="dw-detail-tab ${state.observationDetailTab === "events" ? "is-active" : ""}" type="button" data-ob-detail-tab="events" role="tab" aria-selected="${state.observationDetailTab === "events"}">事件</button></div><div id="dw-observation-detail-content" role="tabpanel" aria-live="polite">${detailTabContent()}</div><p class="dw-action-error" role="alert" hidden></p></div>`;
     renderChrome(); icons();
     restoreScroll(scrollY);
   }
@@ -1265,6 +1298,9 @@
       status: filters.status,
       q: filters.q,
       work_item: filters.work_item === "all" ? "" : filters.work_item,
+      provider: filters.provider,
+      requested_model: filters.requested_model,
+      actual_model: filters.actual_model,
       limit: 50,
     };
   }
@@ -1284,6 +1320,7 @@
       if (!append || !usage || state.observationTab === "usage") {
         usage = await fetchJSON(queryPath(projectPath(projectId, "/model-usage"), {
           department: params.department, status: params.status, q: params.q, work_item: params.work_item,
+          provider: params.provider, requested_model: params.requested_model, actual_model: params.actual_model,
         }));
       }
       if (token !== state.routeToken || projectId !== state.projectId || seq !== state.observationSeq) return;
@@ -1967,7 +2004,10 @@
     if (target.matches?.("[data-obs-department]")) state.observationFilters.department = target.value;
     if (target.matches?.("[data-obs-status]")) state.observationFilters.status = target.value;
     if (target.matches?.("[data-obs-work-item]")) state.observationFilters.work_item = target.value;
-    if (target.matches?.("[data-obs-department], [data-obs-status], [data-obs-work-item]")) {
+    if (target.matches?.("[data-obs-provider]")) state.observationFilters.provider = target.value;
+    if (target.matches?.("[data-obs-requested-model]")) state.observationFilters.requested_model = target.value;
+    if (target.matches?.("[data-obs-actual-model]")) state.observationFilters.actual_model = target.value;
+    if (target.matches?.("[data-obs-department], [data-obs-status], [data-obs-work-item], [data-obs-provider], [data-obs-requested-model], [data-obs-actual-model]")) {
       state.observationData = null;
       state.usageData = null;
       updateRoute({ push: false });
@@ -2077,6 +2117,25 @@
           sourcesNode.appendChild(link);
         });
       }
+      if (sourcesNode && Array.isArray(data.source_events) && data.source_events.length) {
+        const seqs = data.source_events.map(item => item.seq).filter(value => typeof value === "number");
+        const through = data.payload?.checkpoint?.covered_through_event_id;
+        const range = document.createElement("p");
+        range.className = "dw-coverage-range";
+        range.textContent = seqs.length
+          ? `覆盖范围 seq ${Math.min(...seqs)}–${Math.max(...seqs)}${through ? ` · covered_through ${through}` : ""}`
+          : (through ? `covered_through ${through}` : "原始事件");
+        sourcesNode.appendChild(range);
+        data.source_events.forEach(source => {
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = "dw-observation-link";
+          row.dataset.eventId = source.event_id;
+          row.textContent = `seq ${source.seq ?? "?"} · ${source.type || "event"} · ${source.event_id}`;
+          sourcesNode.appendChild(row);
+        });
+      }
+      if (titleNode && data.compaction_summary) titleNode.textContent = "摘要来源事件";
       if (dialog) dialog.showModal();
     } catch (error) {
       if (token !== state.routeToken || seq !== state.eventSeq) return;
