@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 模型与 Provider</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font: 14px/1.5 "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+      background: light-dark(#f3f4f3, #171918); color: light-dark(#262827, #ecedeb);
+    }
+    header {
+      display: flex; justify-content: space-between; gap: 16px; align-items: center;
+      padding: 18px clamp(16px, 3vw, 40px); border-bottom: 1px solid light-dark(#dfe2e0, #383c3a);
+      background: light-dark(#fff, #1d1f1e);
+    }
+    header p { margin: 0; color: light-dark(#6f7472, #a5a9a6); font-size: .82rem; }
+    h1 { margin: 0; font-size: 1.25rem; font-weight: 500; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px clamp(16px, 3vw, 40px) 48px; display: grid; gap: 20px; }
+    section {
+      background: light-dark(#fff, #1d1f1e); border: 1px solid light-dark(#dfe2e0, #383c3a);
+      border-radius: 10px; padding: 18px;
+    }
+    h2 { margin: 0 0 12px; font-size: 1rem; font-weight: 500; }
+    .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid light-dark(#dfe2e0, #383c3a); }
+    th { color: light-dark(#6f7472, #a5a9a6); font-weight: 500; }
+    label { display: grid; gap: 4px; margin-bottom: 10px; font-size: .82rem; color: light-dark(#6f7472, #a5a9a6); }
+    input, select, textarea {
+      width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid light-dark(#c6cbc8, #515652);
+      background: light-dark(#fafbfa, #242625); color: inherit; font: inherit;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button {
+      border: 1px solid light-dark(#c6cbc8, #515652); background: light-dark(#fafbfa, #242625);
+      color: inherit; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+    }
+    button.primary { background: light-dark(#087f69, #56d1b3); color: light-dark(#fff, #10231d); border-color: transparent; }
+    .ok { color: light-dark(#087f69, #56d1b3); }
+    .bad { color: light-dark(#b9473e, #ef8278); }
+    .note { color: light-dark(#6f7472, #a5a9a6); font-size: .78rem; }
+    @media (max-width: 720px) {
+      .row { grid-template-columns: 1fr; }
+      header { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>模型与 Provider</h1>
+      <p>系统默认目录。保存后只影响新事项；密钥只存在环境变量里。</p>
+    </div>
+    <div class="actions">
+      <button type="button">导入 JSON</button>
+      <button type="button">导出</button>
+      <button type="button">返回项目列表</button>
+    </div>
+  </header>
+  <main>
+    <section>
+      <h2>Provider</h2>
+      <div class="row">
+        <table>
+          <thead><tr><th>名称</th><th>协议</th><th>凭据</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td>Stage2 A1 back</td><td>responses</td><td>YUDAO_BACK_KEY</td><td class="ok">已配置</td></tr>
+          </tbody>
+        </table>
+        <form>
+          <label>ID<input value="p4-back" readonly></label>
+          <label>名称<input value="Stage2 A1 back"></label>
+          <label>协议
+            <select><option selected>responses</option></select>
+          </label>
+          <label>地址<input value="https://api.agnes-ai.cn/v1"></label>
+          <label>凭据引用<input value="YUDAO_BACK_KEY"></label>
+          <label>超时（秒）<input value="600"></label>
+          <p class="note">测试会发一次最小请求，不创建事项。</p>
+          <div class="actions">
+            <button class="primary" type="button">保存</button>
+            <button type="button">测试连接</button>
+            <button type="button">删除</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <section>
+      <h2>模型</h2>
+      <div class="row">
+        <table>
+          <thead><tr><th>ID</th><th>模型</th><th>窗口</th><th>输出上限</th></tr></thead>
+          <tbody>
+            <tr><td>agnes-flash</td><td>agnes-3.0-flash</td><td>512000</td><td>65536</td></tr>
+          </tbody>
+        </table>
+        <form>
+          <label>ID<input value="agnes-flash"></label>
+          <label>所属 Provider
+            <select><option selected>p4-back · Stage2 A1 back</option></select>
+          </label>
+          <label>模型名<input value="agnes-3.0-flash"></label>
+          <label>context_window<input value="512000"></label>
+          <label>max_output_tokens<input value="65536"></label>
+          <div class="actions"><button class="primary" type="button">保存模型</button></div>
+        </form>
+      </div>
+    </section>
+    <section>
+      <h2>三部门绑定</h2>
+      <form class="row" style="grid-template-columns: 1fr;">
+        <label>产品
+          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+        </label>
+        <label>工程
+          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+        </label>
+        <label>质检
+          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+        </label>
+        <p class="note">缺任一部门时创建事项会指出该部门。在途事项仍用创建时的快照。</p>
+        <div class="actions"><button class="primary" type="button">保存绑定</button></div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
