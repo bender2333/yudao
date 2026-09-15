@@ -2,13 +2,13 @@
 
 面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、计划、交付和完整代码树的 QA release 才能进入 `DONE`。
 
-OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构的运行证据与本次原生循环的验证分开记录，见 [MVP 验收记录](docs/mvp-acceptance.md)。
+## 当前状态
 
-第一阶段正在按 [A-H 工作包](docs/stage-1-alignment.md) 验收。原生循环、部门完整历史与自动压缩、同源 PRD、事前计划、完整交付封存、受控删除移动、通用专家协作、持续输入及 prompt 编辑均已实现。任务内 Git 版本和差异已实现并通过确定性验收。H 模型有界重试已实现，慢响应、取消、追加输入和桌面手机已验证；真实完整方向调整和压缩后最终放行仍有连续连接失败导致的缺口，结果见 [验收记录](docs/mvp-acceptance.md)。
+- **Stage 1（可信交付）**: ✅ 已完成。三部门循环、压缩、Git 版本、重试、完整封存已验收通过。
+- **Stage 2（Harness 基线）**: ✅ 已完成。Provider 配置、Context/Trace 视图、真实任务验收（9/10 成功率）已达标。
+- **Stage 3（可持续运行）**: 计划中。异步恢复、并行任务、运维职责。
 
-第二阶段首批已接入统一 Provider/模型目录和三部门独立绑定，覆盖任务冻结、请求路由、模型容量及只读观察，见 [D18](docs/requirements/department-providers.md)。本地多连接与完整回归已通过；真实跨 Provider 最终 QA 仍待验收，Provider 配置界面等待原型。
-
-第一阶段此前保留的真实控制台地址为 [http://127.0.0.1:8774](http://127.0.0.1:8774)，数据目录为 `.yudao/stage1-retry-final-20260906`，对应当时的单 Provider 基线及 600 秒默认等待。该历史基线取得了 `gpt-5.6-luna` 的真实响应和重试恢复证据，但未完成最终 QA；不能将这个旧进程视为当前部门绑定实现。运行基线与历史服务记录见 [验收记录](docs/mvp-acceptance.md)。
+详见 [验收记录](docs/mvp-acceptance.md)、[Stage 2 进度](docs/stage-2-progress.md) 和 [总体路线图](docs/program-roadmap.md)。
 
 ## 分层
 
@@ -20,28 +20,83 @@ OMP 仅作为底层实现的代码参考，不是运行依赖。旧 OMP 架构�
 
 Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。
 
-## 启动
+## 快速开始
 
-需要 Python 3.11 或更新版本，以及可从 `PATH` 调用的 Git CLI。Git 用于每个任务的本地版本存储，无需配置远程仓库。
+### 前置要求
+
+- Python 3.11 或更新版本
+- Git CLI（可从 `PATH` 调用）
+- 模型 API 密钥（如 OpenAI、Anthropic 或兼容服务）
+
+### 安装
 
 ```bash
 python -m pip install -e ".[dev]"
+```
+
+### 配置 Provider
+
+1. 创建 Provider 配置文件 `.yudao/providers.json`：
+
+```json
+{
+  "providers": {
+    "my-provider": {
+      "base_url": "https://api.example.com/v1",
+      "protocol": "responses",
+      "credential_ref": "MY_API_KEY",
+      "timeout_sec": 600
+    }
+  },
+  "models": {
+    "my-model": {
+      "provider_id": "my-provider",
+      "model_id": "gpt-4",
+      "context_window": 128000,
+      "max_output_tokens": 4096
+    }
+  },
+  "department_bindings": {
+    "product": { "provider_id": "my-provider", "model_name": "my-model" },
+    "engineering": { "provider_id": "my-provider", "model_name": "my-model" },
+    "quality": { "provider_id": "my-provider", "model_name": "my-model" }
+  }
+}
+```
+
+参考 [Provider 配置示例](docs/examples/providers.json)。
+
+2. 设置环境变量：
+
+```bash
+# Windows PowerShell
+$env:MY_API_KEY = '<your-api-key>'
+
+# Linux/Mac
+export MY_API_KEY='<your-api-key>'
+```
+
+### 启动服务
+
+```bash
+python -m harness serve --provider-config .yudao/providers.json --data-dir .yudao/data --port 8765
+```
+
+访问 [http://localhost:8765](http://localhost:8765) 打开 Web 控制台。
+
+### 运行演示（无需 API 密钥）
+
+```bash
 python -m harness demo --serve --port 8765
 ```
 
-只跑样例：
-
-```bash
-python -m harness demo
-```
-
-重放：
+### 重放历史任务
 
 ```bash
 python -m harness replay <run_id>
 ```
 
-默认数据目录是 `.yudao/native-loop`。旧 OMP 数据目录保留为历史证据，与原生事件格式不兼容，不能交给新服务混用；本次不提供迁移或兼容层。
+默认数据目录是 `.yudao/native-loop`。
 
 ## 测试
 
@@ -60,28 +115,134 @@ python -m harness smoke --provider-config .yudao/providers.json --scenario colla
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
 
+## 如何使用
+
+### 1. 创建项目与任务
+
+通过 Web 界面：
+1. 访问控制台首页
+2. 点击"新建项目"，输入项目名称
+3. 在项目中点击"作为新事项开始"
+4. 输入需求描述，例如："创建一个 Python 脚本，从 CSV 读取数据并输出统计信息"
+
+通过 API：
+
+```bash
+# 创建项目
+curl -X POST http://localhost:8765/api/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": "我的项目"}'
+
+# 创建任务
+curl -X POST http://localhost:8765/api/projects/{project_id}/work-items \
+  -H "Content-Type: application/json" \
+  -d '{"intent": "创建一个 hello world 脚本"}'
+```
+
+### 2. 观察三部门协作
+
+任务会经过三个部门：
+
+- **产品部 (Product)**: 理解需求，形成有效 PRD
+- **工程部 (Engineering)**: 制定计划，实现代码
+- **质检部 (Quality)**: 独立验证，放行交付
+
+在 Web 界面可以：
+- **总览页**: 查看部门流转和交接状态
+- **部门页**: 查看各部门的工作消息和历史
+- **观测页**: 查看模型请求、用量统计、Context/Trace
+
+### 3. 追加需求与调整方向
+
+任务运行中可以追加输入：
+
+```bash
+# 全局输入（交给产品处理）
+curl -X POST http://localhost:8765/api/runs/{run_id}/inputs \
+  -H "Content-Type: application/json" \
+  -d '{"text": "需要支持 UTF-8 编码"}'
+
+# 部门定向指导（直接给工程/质检）
+curl -X POST http://localhost:8765/api/runs/{run_id}/departments/engineering/guidance \
+  -H "Content-Type: application/json" \
+  -d '{"text": "使用 pandas 库处理 CSV"}'
+```
+
+Web 界面：
+- 总览页底部输入框：全局追加
+- 部门页指导区：定向指导
+
+### 4. 查看失败原因
+
+如果任务失败或暂停：
+1. 进入**观测页** → **请求列表**
+2. 筛选失败状态
+3. 点击失败请求查看详情：
+   - **Context**: 查看失败时的上下文快照
+   - **Trace**: 查看错误分类和重试历史
+   - **Response**: 查看部分输出（如有）
+
+### 5. 取消任务
+
+```bash
+curl -X POST http://localhost:8765/api/runs/{run_id}/cancel
+```
+
+或在 Web 界面点击"取消"按钮。
+
+### 6. 下载交付物
+
+任务完成后：
+
+```bash
+# 导出事件与投影
+curl http://localhost:8765/api/runs/{run_id}/export > run.json
+
+# 下载交付文件
+curl "http://localhost:8765/api/runs/{run_id}/events/{event_id}/files?path=output.csv" > output.csv
+```
+
+Web 界面可在事项详情页查看完整交付清单和 Git 差异。
+
+### 7. 编辑部门 Prompt
+
+```bash
+curl -X POST http://localhost:8765/api/runs/{run_id}/prompts/engineering \
+  -H "Content-Type: application/json" \
+  -d '{"text": "你是资深 Python 工程师，优先使用标准库..."}'
+```
+
+Prompt 在下次该部门激活时生效，当前激活不受影响。
+
 ## HTTP 接口
 
 查询接口只读。创建 run 和取消走控制层，界面不能直接改 spec、投影或完成状态。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/` | 控制台：运行看板、规格时间线、证据、上下文/追踪 |
-| GET | `/api/health` | 健康检查与 adapter 可用性 |
-| GET | `/api/runs` | run 列表 |
-| POST | `/api/runs` | 创建任务并由控制层执行 |
-| GET | `/api/runs/{id}` | 四个视图的聚合 |
-| GET | `/api/runs/{id}/events` | 事件卡片 |
-| GET | `/api/runs/{id}/events/{event_id}` | 完整事件；附实际模型输入或正式材料及经前后版本核验的 Git diff |
-| GET | `/api/runs/{id}/events/{event_id}/files?path=...` | 从已接纳交付封存下载文件原字节 |
-| GET | `/api/runs/{id}/stream` | SSE |
+| GET | `/` | 控制台：项目列表、看板、部门视图、观测 |
+| GET | `/api/health` | 健康检查与 Provider 可用性 |
+| GET | `/api/projects` | 项目列表 |
+| POST | `/api/projects` | 创建项目 |
+| GET | `/api/projects/{id}` | 项目详情 |
+| POST | `/api/projects/{id}/work-items` | 创建任务 |
+| GET | `/api/projects/{id}/stream` | 项目级 SSE |
+| GET | `/api/runs/{id}` | 任务详情 |
+| GET | `/api/runs/{id}/events` | 事件列表 |
+| GET | `/api/runs/{id}/events/{event_id}` | 事件详情（含 Git diff） |
+| GET | `/api/runs/{id}/events/{event_id}/files?path=...` | 下载交付文件 |
+| GET | `/api/runs/{id}/stream` | 任务级 SSE |
 | GET | `/api/runs/{id}/export` | 导出事件与投影 |
-| POST | `/api/runs/{id}/replay` | 校验投影可重放，不写状态 |
-| POST | `/api/runs/{id}/cancel` | 取消当前 run |
-| POST | `/api/runs/{id}/inputs` | 按原文补充当前任务，正文 `{ "text": "..." }` |
-| POST | `/api/runs/{id}/prompts/{department}` | 修改当前任务的部门 prompt，正文 `{ "text": "..." }` |
+| POST | `/api/runs/{id}/replay` | 校验可重放性 |
+| POST | `/api/runs/{id}/cancel` | 取消任务 |
+| POST | `/api/runs/{id}/inputs` | 追加全局输入 |
+| POST | `/api/runs/{id}/departments/{dept}/guidance` | 部门定向指导 |
+| POST | `/api/runs/{id}/prompts/{department}` | 修改部门 prompt |
+| GET | `/api/runs/{id}/departments/{dept}` | 部门视图 |
+| GET | `/api/runs/{id}/model-attempts` | 模型请求列表 |
+| GET | `/api/runs/{id}/model-attempts/{id}` | 请求详情（Context/Trace） |
 
-活动任务中可持续提交原文；当前已开始工具结束后回产品维护需求，尚未开始的工具跳过。输入接收、交给产品与有效需求处理分别展示。`/stop`、`/cancel` 立即发出停止信号并保存原文；Git 或材料保存失败也会停止，界面保留草稿并说明保存失败，不生成虚假的输入版本。按钮取消不生成文本。终态任务不恢复，新的工作明确创建新任务。prompt 可折叠和编辑，一次激活固定版本，下一次目标部门激活采用更新，实际输入与采用历史可查。
+详见 [API 文档](docs/api.md)（如有）。
 
 ## 任务内 Git 版本
 

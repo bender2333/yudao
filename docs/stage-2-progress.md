@@ -1,6 +1,14 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED**。
+更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED** ✅。
+
+Stage 2 验收已完成，所有 6 个子阶段（2.1-2.6）均已通过验收：
+- 真实任务成功率 90% (9/10)
+- Context/Trace View 可追溯失败
+- Provider 配置界面可用（21s 完成配置）
+- 桌面/手机界面流畅
+- 核心功能不弱于 OMP（P0 清单为空）
+- 回归测试通过（Python 958 passed, JS 29 passed）
 
 同日更早的 H0–H5 收口计划和「学习轨道 2.1–2.4」不再作为本阶段门槛。学习轨道（局部控制、跨任务经验、四组比较）仍后置。
 
