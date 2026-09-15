@@ -963,3 +963,8 @@
 - 用户确认保持 back 结果关闭 S2-1：`agnes-3.0-flash` 的 32000 任务窗口已到独立 QA/release，并完成 512K 容量对照；原 `gpt-5.6-luna` 的 `provider_error` 作为真实失败记录保留。
 - 8000 仅为压力验收附录，不作为 A1 或 Stage 2 完成条件。完成判定和证据账已同步这一口径。
 
+## 2026-09-15 - 重定 Stage 2 边界：先完成三部门 Harness
+
+- 用户明确：Stage 2 的首要目标是做成一个类似 OMP 的可运行 Agent Harness，只是执行引擎由 Product / Engineering / Quality 三部门组成；证据驱动的局部控制、跨任务经验和综合比较属于后续阶段。
+- 因此 2.2–2.4 不再作为 Stage 2 完成门槛。Stage 2 收尾改为核心 Harness 的真实端到端验收：Web/API 入口、三部门上下文与交接、工具、QA、交付、停止、重试、压缩、审计和 replay。
+
