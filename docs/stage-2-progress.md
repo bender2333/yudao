@@ -1,6 +1,23 @@
 # 第二阶段执行进度
 
-更新日期：2026-09-15。Stage 2 的目标重定为“类似 OMP 的三部门 Harness”。S2-1 / B3 / A4（保留原版）/ B4 三次变更已有证据；当前仍 **PARTIAL**，剩余是核心 Harness 的真实端到端收口。2.1–2.4 改列为后续证据改进阶段，不作为本阶段门槛。
+更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED**（2.6.6 全量回归数字以当日 pytest 记录为准）。
+
+同日更早的 H0–H5 收口计划和「学习轨道 2.1–2.4」不再作为本阶段门槛。学习轨道（局部控制、跨任务经验、四组比较）仍后置。
+
+## 实施计划 2.1–2.6 收口
+
+| 包 | 状态 | 证据 |
+| --- | --- | --- |
+| 2.1 F 真实验收 | CLOSED | 诊断 [stage-1-f-network-diagnostic.md](stage-1-f-network-diagnostic.md)；五场 `.yudao/stage1-final-validation/`，5/5 DONE，Web+小窗独立 replay |
+| 2.2 Provider 配置界面 | CLOSED | 原型 `docs/prototypes/provider-config/`；API+页 `77a26df`；2.6 配置页连接测试成功 |
+| 2.3 Context/Trace | CLOSED | `041eaa1`：`context-view.js` / `trace-view.js`；取消场次可见 `error_class=cancelled` |
+| 2.4 OMP 对标 | CLOSED | [stage-2-omp-feature-comparison.md](stage-2-omp-feature-comparison.md) P0 空 |
+| 2.5 Prompt | CLOSED | [stage-2-prompt-analysis.md](stage-2-prompt-analysis.md) 保留默认 |
+| 2.6 日常可用性 | CLOSED（2.6.1–2.6.5） | [stage-2-real-task-validation.md](stage-2-real-task-validation.md)：041eaa1 上 9/10 DONE，1 场计划取消可追溯 |
+
+2.6 十场与 2.1.3 五场数据目录隔离。luna 历史失败不改写。
+
+## 历史进度表（H0–H5 / 学习轨道，保留）
 
 
 

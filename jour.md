@@ -1007,3 +1007,11 @@
 - 被测内核启动时 SHA `7b9cbdc`。静态文件在 2.2 合入后被同进程读到，截图里出现「模型与 Provider」不表示这五场跑在 2.2 内核上。
 - 未改写失败记录；本场无失败。luna 历史 `provider_error` 仍保留。
 
+
+## 2026-09-15 - Stage 2 harness 基线关闭
+
+- 应用冻结 `041eaa1`。2.6 十场在 `.yudao/stage2-validation/`：9 次 DONE/released，1 次 FAILED/cancelled。主代理 replay 方向调整、取消、最后一场，canonical 一致。
+- 配置页截图可见连接成功 `agnes-3.0-flash`，凭据只显示引用名。取消 Trace 详情头为错误分类 `cancelled`。
+- 2.2 / 2.3 代码已入主干。2.4 P0 为空。2.5 保持默认 Prompt。
+- 2.6.6 全量 pytest 另记；不把超时中的部分进度写成已通过。
+
