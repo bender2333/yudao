@@ -4,19 +4,29 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import threading
 import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Event
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from ..adapters.base import ModelRequest, ProviderError
+from ..context import AssembledContext, ContextPart
 from ..git_audit import git_version_detail
-from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..models import ArtifactRef, ContextManifest, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
 from ..observability import MAX_LIMIT, AttemptNotFoundError, ObservabilityQuery
-from ..provider_catalog import CatalogValidationError
+from ..provider_catalog import (
+    CatalogValidationError,
+    ProviderCatalog,
+    ResolvedProviderTarget,
+    SUPPORTED_PROTOCOLS,
+    ValidationIssue,
+)
 from ..projection import RunNotFoundError, project_run
 from ..projects import (
     ProjectArchivedError,
@@ -45,13 +55,26 @@ class ProviderUnavailableError(Exception):
         self.reason = reason
 
 
+class _ResponseSent(Exception):
+    pass
+
+
 class LoopConsoleServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, host: str, port: int, system: LoopSystem) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        system: LoopSystem,
+        *,
+        provider_config: str | Path | None = None,
+    ) -> None:
         super().__init__((host, port), LoopConsoleHandler)
         self.system = system
         self.store = system.store
+        path = provider_config if provider_config is not None else getattr(system, "provider_config_path", None)
+        self.provider_config_path = None if path is None else Path(path)
         self._worker_lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._active_run_id: str | None = None
@@ -59,6 +82,7 @@ class LoopConsoleServer(ThreadingHTTPServer):
         self._worker_errors: dict[str, str] = {}
         bound_host, bound_port = self.server_address
         self.base_url = f"http://{bound_host}:{bound_port}"
+
 
     def handle_error(self, request, client_address) -> None:
         return
@@ -159,6 +183,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._send_json({"projects": self._list_projects(query)})
             if path.startswith("/api/projects/"):
                 return self._get_project(path, query, store)
+            if path == "/api/providers":
+                return self._send_json(self._providers_payload())
+            if path == "/api/department-bindings":
+                return self._send_json(self._bindings_payload())
             self._send_json({"error": "not found"}, 404)
         except RunNotFoundError as exc:
             self._send_json({"error": f"run not found: {exc}"}, 404)
@@ -192,6 +220,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._create_project()
             if len(parts) == 4 and parts[:2] == ["api", "projects"]:
                 return self._post_project(parts[2], parts[3])
+            if parts == ["api", "providers"]:
+                return self._post_providers()
+            if len(parts) == 4 and parts[:2] == ["api", "providers"] and parts[3] == "test":
+                return self._test_provider(unquote(parts[2]))
             self._send_json({"error": "not found"}, 404)
 
         self._command(dispatch)
@@ -202,9 +234,24 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         def dispatch() -> None:
             if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "prompts":
                 return self._configure_prompt(parts[2], unquote(parts[4]))
+            if len(parts) == 3 and parts[:2] == ["api", "providers"]:
+                return self._put_provider(unquote(parts[2]))
+            if parts == ["api", "department-bindings"]:
+                return self._put_bindings()
             self._send_json({"error": "not found"}, 404)
 
         self._command(dispatch)
+
+    def do_DELETE(self) -> None:
+        parts = self._path_parts()
+
+        def dispatch() -> None:
+            if len(parts) == 3 and parts[:2] == ["api", "providers"]:
+                return self._delete_provider(unquote(parts[2]))
+            self._send_json({"error": "not found"}, 404)
+
+        self._command(dispatch)
+
 
     def _path_parts(self) -> list[str]:
         path = urlparse(self.path).path.rstrip("/")
@@ -213,6 +260,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
     def _command(self, dispatch: Callable[[], None]) -> None:
         try:
             dispatch()
+        except _ResponseSent:
+            return
         except BusyError as exc:
             self._send_json({"error": str(exc), "reason": "busy"}, 409)
         except RunTerminalError as exc:
@@ -415,6 +464,241 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             raise ValueError("body must contain text and base_version")
         result = self.server.system.projects.configure_prompt(project_id, department, body["text"], body["base_version"])
         self._send_json(result)
+
+    def _providers_payload(self) -> dict[str, Any]:
+        catalog = self.server.system.provider_catalog
+        if catalog is None:
+            return {"providers": [], "models": [], "bindings": {}}
+        credentials = self.server.system.credentials
+        providers = []
+        for provider in catalog.providers.values():
+            item = provider.public_dict()
+            item["credential_configured"] = _credential_ready(provider, credentials)
+            item["models"] = [
+                model.public_dict()
+                for model in catalog.models.values()
+                if model.provider_id == provider.id
+            ]
+            providers.append(item)
+        providers.sort(key=lambda item: item["id"])
+        return {
+            "providers": providers,
+            "models": [catalog.models[key].public_dict() for key in sorted(catalog.models)],
+            "bindings": {
+                department: catalog.bindings[department].public_dict()
+                for department in DEPARTMENTS
+                if department in catalog.bindings
+            },
+        }
+
+    def _bindings_payload(self) -> dict[str, Any]:
+        catalog = self.server.system.provider_catalog
+        if catalog is None:
+            return {"bindings": {}}
+        bindings: dict[str, Any] = {}
+        for department in DEPARTMENTS:
+            binding = catalog.bindings.get(department)
+            if binding is None:
+                continue
+            provider = catalog.providers.get(binding.provider_id)
+            model = catalog.models.get(binding.model_id)
+            item = binding.public_dict()
+            if provider is not None:
+                item["provider_name"] = provider.name
+                item["protocol"] = provider.protocol
+            if model is not None:
+                item["model"] = model.model
+                item["context_window"] = model.context_window
+                item["max_output_tokens"] = model.max_output_tokens
+            bindings[department] = item
+        return {"bindings": bindings}
+
+    def _post_providers(self) -> None:
+        body = self._read_json_body()
+        if "providers" in body:
+            catalog = self._catalog_from_document(body)
+            self._persist_catalog(catalog)
+            return self._send_json(self._providers_payload())
+        catalog = self._merge_provider(body, existing_id=None)
+        self._persist_catalog(catalog)
+        return self._send_json(self._providers_payload(), 201)
+
+    def _put_provider(self, provider_id: str) -> None:
+        body = self._read_json_body()
+        if "id" in body and body["id"] != provider_id:
+            raise ValueError("provider id cannot be changed")
+        body = {**body, "id": provider_id}
+        catalog = self._merge_provider(body, existing_id=provider_id)
+        self._persist_catalog(catalog)
+        return self._send_json(self._providers_payload())
+
+    def _delete_provider(self, provider_id: str) -> None:
+        self._drain_body()
+        catalog = self.server.system.provider_catalog
+        if catalog is None or provider_id not in catalog.providers:
+            return self._send_json({"error": "provider not found"}, 404)
+        dependents = _provider_dependents(catalog, provider_id)
+        if dependents:
+            return self._send_json({
+                "error": "provider is in use: " + ", ".join(dependents),
+                "reason": "in_use",
+                "dependents": dependents,
+            }, 409)
+        raw = catalog.to_dict()
+        raw["providers"] = [item for item in raw["providers"] if item["id"] != provider_id]
+        raw["models"] = [item for item in raw["models"] if item["provider_id"] != provider_id]
+        try:
+            updated = ProviderCatalog.from_dict(raw)
+        except CatalogValidationError as exc:
+            return self._send_catalog_error(exc)
+        self._persist_catalog(updated)
+        return self._send_json(self._providers_payload())
+
+    def _put_bindings(self) -> None:
+        body = self._read_json_body()
+        bindings = body.get("bindings", body)
+        if not isinstance(bindings, dict):
+            raise ValueError("bindings must be an object")
+        catalog = self.server.system.provider_catalog
+        raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
+        raw["bindings"] = bindings
+        try:
+            updated = ProviderCatalog.from_dict(raw)
+        except CatalogValidationError as exc:
+            return self._send_catalog_error(exc)
+        self._persist_catalog(updated)
+        return self._send_json(self._bindings_payload())
+
+    def _test_provider(self, provider_id: str) -> None:
+        self._drain_body()
+        catalog = self.server.system.provider_catalog
+        if catalog is None or provider_id not in catalog.providers:
+            return self._send_json({"error": "provider not found"}, 404)
+        provider = catalog.providers[provider_id]
+        model = next((item for item in catalog.models.values() if item.provider_id == provider_id), None)
+        if model is None:
+            raise ValueError("provider has no models")
+        started = time.monotonic()
+        if provider.protocol == "fake":
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            return self._send_json({
+                "ok": True, "error": None, "actual_model": model.model, "elapsed_ms": elapsed_ms,
+            })
+        if provider.protocol not in SUPPORTED_PROTOCOLS:
+            raise ValueError("unsupported provider protocol")
+        material = _resolved_secret(self.server.system.credentials, provider.credential_ref)
+        if material is None:
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            return self._send_json({
+                "ok": False,
+                "error": f"credential reference {provider.credential_ref} cannot be resolved",
+                "actual_model": None,
+                "elapsed_ms": elapsed_ms,
+            })
+        target = ResolvedProviderTarget(
+            department="product",
+            provider_id=provider.id,
+            provider_name=provider.name,
+            model_id=model.id,
+            protocol=provider.protocol,
+            base_url=provider.base_url,
+            model=model.model,
+            context_window=model.context_window or model.max_output_tokens,
+            max_output_tokens=model.max_output_tokens,
+            timeout_sec=provider.timeout_sec,
+            credential_ref=provider.credential_ref or None,
+            api_key=material,
+        )
+        adapter = target.create_adapter()
+        request = _connection_test_request(model.max_output_tokens)
+        try:
+            response = adapter.complete(request)
+        except ProviderError as exc:
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            return self._send_json({
+                "ok": False,
+                "error": _redact_secret(str(exc), material),
+                "actual_model": None,
+                "elapsed_ms": elapsed_ms,
+            })
+        elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+        actual = response.model or model.model
+        return self._send_json({
+            "ok": True,
+            "error": None,
+            "actual_model": _redact_secret(str(actual), material),
+            "elapsed_ms": elapsed_ms,
+        })
+
+    def _merge_provider(self, body: dict[str, Any], *, existing_id: str | None) -> ProviderCatalog:
+        if not isinstance(body, dict):
+            raise ValueError("JSON body must be an object")
+        models = body.get("models", [])
+        provider_fields = {key: value for key, value in body.items() if key != "models"}
+        _validate_provider_fields(provider_fields)
+        provider_id = provider_fields["id"]
+        catalog = self.server.system.provider_catalog
+        raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
+        existing_ids = {item["id"] for item in raw["providers"]}
+        if existing_id is None and provider_id in existing_ids:
+            self._send_json({"error": f"provider already exists: {provider_id}", "reason": "conflict"}, 409)
+            raise _ResponseSent()
+        if existing_id is not None and existing_id not in existing_ids:
+            self._send_json({"error": "provider not found"}, 404)
+            raise _ResponseSent()
+        raw["providers"] = [item for item in raw["providers"] if item["id"] != provider_id]
+        raw["providers"].append({
+            "id": provider_fields["id"],
+            "name": provider_fields["name"],
+            "protocol": provider_fields["protocol"],
+            "base_url": provider_fields.get("base_url", ""),
+            "credential_ref": provider_fields.get("credential_ref", ""),
+            "timeout_sec": provider_fields.get("timeout_sec", 600.0),
+        })
+        if "models" in body:
+            if not isinstance(models, list):
+                raise ValueError("models must be an array")
+            nested = []
+            for index, item in enumerate(models):
+                if not isinstance(item, dict):
+                    raise ValueError(f"models[{index}] must be an object")
+                nested.append({**item, "provider_id": provider_id})
+            raw["models"] = [item for item in raw["models"] if item.get("provider_id") != provider_id]
+            raw["models"].extend(nested)
+        try:
+            return ProviderCatalog.from_dict(raw)
+        except CatalogValidationError as exc:
+            self._send_catalog_error(exc)
+            raise _ResponseSent() from exc
+
+    def _catalog_from_document(self, body: dict[str, Any]) -> ProviderCatalog:
+        try:
+            return ProviderCatalog.from_dict(body)
+        except CatalogValidationError as exc:
+            self._send_catalog_error(exc)
+            raise _ResponseSent() from exc
+
+    def _persist_catalog(self, catalog: ProviderCatalog) -> None:
+        path = self.server.provider_config_path
+        if path is None:
+            raise ProviderUnavailableError("provider catalog path is not configured")
+        payload = json.dumps(catalog.to_dict(), ensure_ascii=False, indent=2) + "\n"
+        tmp_path = path.with_name(path.name + ".tmp")
+        try:
+            tmp_path.write_text(payload, encoding="utf-8")
+            os.replace(tmp_path, path)
+        except OSError as exc:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise ProviderUnavailableError("provider catalog file is not writable") from exc
+        self.server.system.provider_catalog = catalog
+
+    def _send_catalog_error(self, exc: CatalogValidationError) -> None:
+        issues = [{"location": issue.location, "message": issue.message} for issue in exc.issues]
+        self._send_json({"error": str(exc), "reason": "invalid_catalog", "issues": issues}, 400)
+
 
     def _get_project(self, path: str, query: dict[str, list[str]], store) -> None:
         parts = [item for item in path.split("/") if item]
@@ -865,6 +1149,89 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
+def _credential_ready(provider: Any, source: Any) -> bool:
+    if getattr(provider, "protocol", "") != "responses":
+        return True
+    reference = getattr(provider, "credential_ref", "")
+    return _resolved_secret(source, reference) is not None
+
+
+def _resolved_secret(source: Any, reference: str) -> str | None:
+    if not reference or source is None:
+        return None
+    try:
+        value = source(reference) if callable(source) else source.get(reference)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    secret = getattr(value, "secret", value)
+    if isinstance(secret, str) and secret.strip():
+        return secret
+    return None
+
+
+def _redact_secret(text: str, secret: str | None) -> str:
+    if not secret:
+        return text
+    return text.replace(secret, "***")
+
+
+def _provider_dependents(catalog: ProviderCatalog, provider_id: str) -> list[str]:
+    dependents: list[str] = []
+    model_ids = []
+    for model in catalog.models.values():
+        if model.provider_id == provider_id:
+            dependents.append(f"models.{model.id}")
+            model_ids.append(model.id)
+    for department, binding in catalog.bindings.items():
+        if binding.provider_id == provider_id:
+            dependents.append(f"bindings.{department}")
+        elif binding.model_id in model_ids:
+            dependents.append(f"bindings.{department}")
+    return dependents
+
+
+def _validate_provider_fields(body: dict[str, Any]) -> None:
+    required = {"id", "name", "protocol"}
+    missing = required - set(body)
+    if missing:
+        raise ValueError("missing fields: " + ", ".join(sorted(missing)))
+    protocol = body["protocol"]
+    if not isinstance(protocol, str) or protocol.strip().casefold() not in SUPPORTED_PROTOCOLS:
+        raise ValueError("protocol must be responses or fake")
+    timeout = body.get("timeout_sec", 600)
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise ValueError("timeout_sec must be positive")
+
+
+def _connection_test_request(max_output_tokens: int) -> ModelRequest:
+    manifest = ContextManifest(
+        session_id="provider-test",
+        department="product",
+        activation_id="provider-test",
+        injected=[],
+        excluded=[],
+        token_estimate=1,
+        budget=max(16, max_output_tokens),
+        digest="provider-test",
+        purpose="work",
+        max_output_tokens=max_output_tokens,
+    )
+    context = AssembledContext(
+        department="product",
+        prompt_text="ping",
+        parts=[ContextPart("intend", "1", "ping")],
+        manifest=manifest,
+        input_items=[{"role": "user", "content": "ping"}],
+        tools=[],
+    )
+    return ModelRequest(
+        "provider-test", "product", "provider-test", "provider-test", 1,
+        context, [], Event(), max_output_tokens=max_output_tokens,
+    )
+
+
 def _positive_int(key: str, value: Any) -> int:
     if type(value) is not int or value < 1:
         raise ValueError(f"{key} must be a positive integer")
@@ -894,5 +1261,10 @@ def _decode_offset(cursor: str | None, total: int) -> int:
     return value["offset"]
 
 
-def serve(system: LoopSystem, host: str = "127.0.0.1", port: int = 8765) -> LoopConsoleServer:
-    return LoopConsoleServer(host, port, system)
+def serve(
+    system: LoopSystem,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    provider_config: str | Path | None = None,
+) -> LoopConsoleServer:
+    return LoopConsoleServer(host, port, system, provider_config=provider_config)

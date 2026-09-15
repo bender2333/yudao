@@ -127,7 +127,12 @@ def _production_system(data_dir: str | Path, provider_config: str | Path) -> Loo
         catalog = ProviderCatalog.load(provider_config)
     except CatalogValidationError as exc:
         raise SystemExit(f"provider config is invalid: {exc}") from exc
-    return LoopSystem(data_dir, provider_catalog=catalog, credentials=environment_credentials)
+    return LoopSystem(
+        data_dir,
+        provider_catalog=catalog,
+        credentials=environment_credentials,
+        provider_config_path=provider_config,
+    )
 
 
 if __name__ == "__main__":

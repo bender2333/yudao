@@ -26,6 +26,7 @@ class LoopSystem:
         credentials: CredentialSource | None = None,
         test_adapter_factory: Callable[[str], ModelAdapter] | None = None,
         test_adapter: ModelAdapter | None = None,
+        provider_config_path: str | Path | None = None,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -50,6 +51,8 @@ class LoopSystem:
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.artifacts, self.orchestrator)
+        self.provider_config_path = None if provider_config_path is None else Path(provider_config_path)
+
 
     @property
     def provider_catalog(self) -> ProviderCatalog | None:
@@ -97,7 +100,7 @@ class LoopSystem:
             return {
                 "available": False,
                 "reason": "provider_unavailable",
-                "message": str(exc),
+                "message": _catalog_status_message(exc, self.provider_catalog),
                 "departments": {},
             }
         return {
@@ -139,6 +142,32 @@ class LoopSystem:
 
     def list_run_ids(self) -> list[str]:
         return self.store.list_run_ids()
+
+
+
+def _catalog_status_message(exc: CatalogValidationError, catalog: ProviderCatalog) -> str:
+    parts: list[str] = []
+    for issue in exc.issues:
+        location = issue.location
+        if "credential" in issue.message or location.endswith(".credential"):
+            department = location.split(".")[1] if location.startswith("departments.") else ""
+            binding = catalog.bindings.get(department)
+            provider = None if binding is None else catalog.providers.get(binding.provider_id)
+            reference = "" if provider is None else provider.credential_ref
+            if reference:
+                parts.append(
+                    f"{location}: 部门 {department} 缺少凭据环境变量 {reference}，请补充后重试"
+                )
+                continue
+        if "binding is required" in issue.message:
+            department = location.rsplit(".", 1)[-1]
+            parts.append(f"{location}: 部门 {department} 未绑定 Provider 与模型")
+            continue
+        if "context_window" in issue.message:
+            parts.append(f"{location}: {issue.message}（请为该部门绑定声明容量的模型）")
+            continue
+        parts.append(f"{location}: {issue.message}")
+    return "; ".join(parts) if parts else str(exc)
 
 
 def build_adapter(name: str, **kwargs) -> ModelAdapter:

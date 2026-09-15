@@ -165,8 +165,8 @@ test("production shell uses third-version chrome and local Lucide bundle", () =>
   assert.match(INDEX_HTML, /id="department-workspace-prototype"/);
   assert.match(INDEX_HTML, /class="yp-shell"/);
   assert.match(INDEX_HTML, /id="yp-project-dialog-form"/);
-  assert.match(INDEX_HTML, /src="\/static\/lucide\.min\.js"/);
   assert.match(INDEX_HTML, /src="\/static\/app\.js"/);
+  assert.match(INDEX_HTML, /src="\/static\/provider-config\.js"/);
   assert.doesNotMatch(INDEX_HTML, /department-workspace-preview|iframe/);
   assert.doesNotMatch(INDEX_HTML, /id="dw-task-dialog"/);
 });
@@ -192,6 +192,21 @@ test("UI source contains no prototype sample state and keeps D-H plus guidance c
   assert.match(APP_JS, /记录原文/);
   assert.match(APP_JS, /发送指导/);
 });
+
+test("provider config is a top-bar page and not project Prompt settings", () => {
+  const configJs = fs.readFileSync(path.join(staticDir, "provider-config.js"), "utf8");
+  assert.match(APP_JS, /data-action="providers"/);
+  assert.match(APP_JS, /模型与 Provider/);
+  assert.match(configJs, /三部门绑定/);
+  assert.match(configJs, /\/api\/providers/);
+  assert.match(configJs, /\/api\/department-bindings/);
+  assert.match(STYLES_CSS, /yp-provider-row/);
+  assert.match(STYLES_CSS, /@media \(max-width: 720px\)/);
+  const settings = APP_JS.slice(APP_JS.indexOf("function settingsMarkup"), APP_JS.indexOf("function overviewComposer"));
+  assert.doesNotMatch(settings, /模型与 Provider/);
+  assert.doesNotMatch(settings, /data-action="providers"/);
+});
+
 
 test("project list selection updates route without calling POST /api/runs", async () => {
   const calls = [];

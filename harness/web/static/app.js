@@ -390,7 +390,7 @@
   function routeFromLocation() {
     const search = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
     const view = search.get("view");
-    state.view = ["observability", "department", "overview"].includes(view) ? view : "overview";
+    state.view = ["observability", "department", "overview", "providers"].includes(view) ? view : "overview";
     state.department = DEPARTMENTS[search.get("department")] ? search.get("department") : "product";
     state.projectId = search.get("project") || null;
     state.workItemId = search.get("work_item") || null;
@@ -422,6 +422,7 @@
     const params = new URLSearchParams();
     if (state.projectId) params.set("project", state.projectId);
     if (state.view !== "overview") params.set("view", state.view);
+    if (state.view === "providers") params.set("view", "providers");
     if (state.view === "department") params.set("department", state.department);
     if (state.workItemId) params.set("work_item", state.workItemId);
     if (state.view === "overview" && state.overviewPane !== "collaboration") params.set("pane", state.overviewPane);
@@ -514,8 +515,9 @@
       const active = activeWorkItem();
       const status = project == null ? "未选择项目" : project.archived ? "已归档" : active ? `${workStatusLabel(active.status)} · ${departmentName(active.department) || phaseLabel(active.phase)}` : "空闲";
       const dot = project == null ? "muted" : project.archived ? "muted" : active ? "waiting" : "";
+      const providerCrumb = state.view === "providers" ? `<span>/</span><strong>模型与 Provider</strong>` : "";
       const menu = state.projectMenu && project ? `<div class="yp-menu">${project.archived ? `<button type="button" data-action="restore-project"><i data-lucide="archive-restore" aria-hidden="true"></i>恢复</button>` : `<button type="button" data-action="rename-project"><i data-lucide="pencil" aria-hidden="true"></i>重命名</button><button type="button" data-action="pin-project"><i data-lucide="pin" aria-hidden="true"></i>${project.pinned ? "取消置顶" : "置顶"}</button><button type="button" data-action="archive-project"><i data-lucide="archive" aria-hidden="true"></i>归档</button>`}</div>` : "";
-      topbar.innerHTML = `<div class="yp-row"><button class="yp-icon yp-mobile-toggle" type="button" data-action="toggle-mobile-nav" aria-label="打开项目列表"><i data-lucide="menu" aria-hidden="true"></i></button><nav class="yp-breadcrumb" aria-label="位置"><button type="button" data-action="home">项目</button>${project ? `<span>/</span><strong>${text(project.name)}</strong>` : ""}</nav></div><div class="yp-row"><span class="yp-auto"><span class="yp-dot ${dot}"></span><span>${text(status)}</span></span>${project ? `<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="toggle-project-menu" aria-label="项目菜单"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>${menu}</div>` : ""}</div>`;
+      topbar.innerHTML = `<div class="yp-row"><button class="yp-icon yp-mobile-toggle" type="button" data-action="toggle-mobile-nav" aria-label="打开项目列表"><i data-lucide="menu" aria-hidden="true"></i></button><nav class="yp-breadcrumb" aria-label="位置"><button type="button" data-action="home">项目</button>${providerCrumb}${!providerCrumb && project ? `<span>/</span><strong>${text(project.name)}</strong>` : ""}</nav></div><div class="yp-row"><button class="yp-btn quiet" type="button" data-action="providers">模型与 Provider</button><span class="yp-auto"><span class="yp-dot ${dot}"></span><span>${text(status)}</span></span>${project ? `<div class="yp-menu-wrap"><button class="yp-icon" type="button" data-action="toggle-project-menu" aria-label="项目菜单"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>${menu}</div>` : ""}</div>`;
     }
   }
 
@@ -1054,10 +1056,21 @@
 
   function renderCurrent() {
     if (!main) return;
+    if (state.view === "providers") return renderProviders();
     if (state.view === "observability" && state.observationScreen === "detail" && state.observationDetail) renderObservationDetail();
     else if (state.view === "observability") renderObservability();
     else if (state.view === "department") renderDepartment(state.department);
     else renderOverview();
+  }
+
+  function renderProviders() {
+    renderChrome();
+    if (globalThis.harnessProviderConfig && typeof globalThis.harnessProviderConfig.mount === "function") {
+      globalThis.harnessProviderConfig.mount(main);
+    } else if (main) {
+      main.innerHTML = `<div class="yp-empty"><h1>模型与 Provider</h1><p>配置界面未能加载。</p></div>`;
+    }
+    icons();
   }
 
 
@@ -1388,7 +1401,7 @@
     closeStream();
     if (state.projectId !== projectId) {
       clearProjectCaches();
-      if (!keepView) {
+      if (!keepView && state.view !== "providers") {
         state.view = "overview";
         state.overviewPane = "collaboration";
         state.workItemId = null;
@@ -1401,7 +1414,7 @@
     const token = ++state.routeToken;
     if (push) updateRoute({ push: true });
     else updateRoute({ push: false });
-    renderLoading("正在读取项目");
+    if (state.view !== "providers") renderLoading("正在读取项目");
     await loadProject(projectId, token);
     if (token === state.routeToken && state.projectId === projectId) openStream(projectId, token);
   }
@@ -1431,6 +1444,10 @@
   }
 
   async function refreshCurrent() {
+    if (state.view === "providers") {
+      renderProviders();
+      return;
+    }
     if (!state.projectId) return loadProjects();
     const token = state.routeToken;
     await loadProject(state.projectId, token, true);
@@ -1745,6 +1762,13 @@
   }
 
   function goView(view, { push = true } = {}) {
+    if (view === "providers") {
+      state.view = "providers";
+      ++state.routeToken;
+      if (push) updateRoute({ push: true });
+      renderCurrent();
+      return;
+    }
     state.view = view === "observability" ? "observability" : "overview";
     if (view !== "observability") {
       state.observationScreen = "list";
@@ -1759,6 +1783,7 @@
     if (state.view === "overview" && state.projectId) loadProject(state.projectId, token, true);
   }
 
+
   function clickHandler(event) {
     const target = event.target.closest?.("button, [data-dh-action]");
     if (!target) return;
@@ -1769,6 +1794,12 @@
     if (target.dataset.action === "toggle-project-menu") { state.projectMenu = !state.projectMenu; renderChrome(); icons(); return; }
     if (target.dataset.action === "new-project") return openProjectDialog();
     if (target.dataset.action === "home") { state.view = "overview"; state.overviewPane = "collaboration"; updateRoute({ push: true }); renderCurrent(); return; }
+    if (target.dataset.action === "providers") {
+      state.view = "providers";
+      updateRoute({ push: true });
+      renderCurrent();
+      return;
+    }
     if (target.dataset.action === "refresh") return refreshCurrent();
     if (target.dataset.action === "cancel") return cancelRun();
     if (target.dataset.action === "pin-project") return projectCommand("pin", { pinned: !state.project?.pinned });

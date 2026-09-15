@@ -256,6 +256,7 @@ def test_console_exposes_chinese_views_and_command_form(data_dir):
         assert 'id="yp-sidebar"' in html
         assert 'id="yp-project-dialog-form"' in html
         assert 'src="/static/lucide.min.js"' in html
+        assert 'src="/static/provider-config.js"' in html
         assert "python -m" not in html
         assert "Event Store" not in html
         assert 'class="panel"' not in html
