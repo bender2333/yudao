@@ -122,7 +122,8 @@
     return (data.providers || []).map(item => {
       const ready = item.credential_configured !== false;
       const selected = item.id === selectedProviderId ? " is-selected" : "";
-      return `<tr class="${selected}" data-provider-id="${escapeHtml(item.id)}"><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.protocol)}</td><td>${escapeHtml(item.base_url || "—")}</td><td>${escapeHtml(item.credential_ref || "—")}</td><td class="${ready ? "ok" : "bad"}">${ready ? "已配置" : "缺失"}</td></tr>`;
+      const selectedState = item.id === selectedProviderId ? "true" : "false";
+      return `<tr class="${selected}" data-provider-id="${escapeHtml(item.id)}" tabindex="0" role="button" aria-selected="${selectedState}" aria-label="选择 Provider ${escapeHtml(item.name)}"><td data-label="名称">${escapeHtml(item.name)}</td><td data-label="协议">${escapeHtml(item.protocol)}</td><td data-label="地址" title="${escapeHtml(item.base_url || "—")}">${escapeHtml(item.base_url || "—")}</td><td data-label="凭据引用" title="${escapeHtml(item.credential_ref || "—")}">${escapeHtml(item.credential_ref || "—")}</td><td data-label="状态" class="${ready ? "ok" : "bad"}">${ready ? "已配置" : "缺失"}</td></tr>`;
     }).join("") || `<tr><td colspan="5" class="yp-small">还没有 Provider</td></tr>`;
   }
 
@@ -130,7 +131,8 @@
     const rows = allModels();
     return rows.map(item => {
       const selected = item.id === selectedModelId ? " is-selected" : "";
-      return `<tr class="${selected}" data-model-id="${escapeHtml(item.id)}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(item.model)}</td><td>${escapeHtml(item.context_window ?? "—")}</td><td>${escapeHtml(item.max_output_tokens ?? "—")}</td></tr>`;
+      const selectedState = item.id === selectedModelId ? "true" : "false";
+      return `<tr class="${selected}" data-model-id="${escapeHtml(item.id)}" tabindex="0" role="button" aria-selected="${selectedState}" aria-label="选择模型 ${escapeHtml(item.model)}"><td data-label="ID" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</td><td data-label="模型" title="${escapeHtml(item.model)}">${escapeHtml(item.model)}</td><td data-label="窗口">${escapeHtml(item.context_window ?? "—")}</td><td data-label="输出上限">${escapeHtml(item.max_output_tokens ?? "—")}</td></tr>`;
     }).join("") || `<tr><td colspan="4" class="yp-small">还没有模型</td></tr>`;
   }
 
@@ -216,17 +218,31 @@
   function bind() {
     if (!root) return;
     root.querySelectorAll("[data-provider-id]").forEach(row => {
-      row.addEventListener("click", () => {
+      const choose = () => {
         selectProvider(row.dataset.providerId);
         render();
+      };
+      row.addEventListener("click", choose);
+      row.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          choose();
+        }
       });
     });
     root.querySelectorAll("[data-model-id]").forEach(row => {
-      row.addEventListener("click", () => {
+      const choose = () => {
         const model = allModels().find(item => item.id === row.dataset.modelId);
         if (model) selectProvider(model.provider_id);
         selectModel(row.dataset.modelId);
         render();
+      };
+      row.addEventListener("click", choose);
+      row.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          choose();
+        }
       });
     });
     root.querySelector("[data-pc-form='provider']")?.addEventListener("submit", saveProvider);
@@ -404,6 +420,9 @@
 
   async function deleteProvider() {
     if (!selectedProviderId || creatingProvider) return;
+    const provider = selectedProvider();
+    const name = provider?.name || selectedProviderId;
+    if (typeof globalThis.confirm === "function" && !globalThis.confirm(`删除 Provider“${name}”？模型和部门绑定也会受到影响。`)) return;
     try {
       const response = await fetch(`/api/providers/${encodeURIComponent(selectedProviderId)}`, { method: "DELETE" });
       const raw = await response.text();
