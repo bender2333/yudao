@@ -240,10 +240,14 @@ class ObservabilityQuery:
         total = _usage_totals(records, source="reported")
         estimated_total = _usage_totals(records, source="estimated")
         department_groups: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
-        model_groups: dict[tuple[str | None, str | None], list[dict[str, Any]]] = defaultdict(list)
+        model_groups: dict[tuple[str | None, str | None, str | None], list[dict[str, Any]]] = defaultdict(list)
         for record in records:
             department_groups[record.get("department")].append(record)
-            model_groups[(record.get("requested_provider"), record.get("actual_model"))].append(record)
+            model_groups[(
+                record.get("requested_provider"),
+                record.get("requested_model"),
+                record.get("actual_model"),
+            )].append(record)
 
         def group_payload(label: str, items: list[dict[str, Any]], **identity: Any) -> dict[str, Any]:
             summary = _usage_totals(items, source="reported")
@@ -271,13 +275,17 @@ class ObservabilityQuery:
         ]
         model_payload = [
             group_payload(
-                f"{provider or '未知 Provider'} · {model or '未知模型'}",
+                (
+                    f"{provider or '未知 Provider'} · {model}"
+                    if model
+                    else f"{provider or '未知 Provider'} · {requested or '未知模型'}（请求） · 实际模型未知"
+                ),
                 items,
                 provider=provider,
                 model=model,
-                requested_model=next((item.get("requested_model") for item in items if item.get("requested_model")), None),
+                requested_model=requested,
             )
-            for (provider, model), items in model_groups.items()
+            for (provider, requested, model), items in model_groups.items()
         ]
         department_payload.sort(key=lambda item: item["label"])
         model_payload.sort(key=lambda item: item["label"])
@@ -562,8 +570,12 @@ class ObservabilityQuery:
                 continue
             if requested_needle is not None and record.get("requested_model") != requested_needle:
                 continue
-            if actual_needle is not None and record.get("actual_model") != actual_needle:
-                continue
+            if actual_needle is not None:
+                # 超时/断连等失败拿不到 actual_model 时回退到 requested_model，
+                # 按 actual_model 筛选才不会漏掉这些记录；有实际返回的仍只按实际值匹配。
+                effective_actual = record.get("actual_model") or record.get("requested_model")
+                if effective_actual != actual_needle:
+                    continue
             if needle is not None and needle not in _search_text(record):
                 continue
             result.append(record)
