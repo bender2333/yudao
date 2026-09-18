@@ -288,6 +288,30 @@
     }
   }
 
+  function describeError(error) {
+    const issues = error && error.payload && error.payload.issues;
+    if (Array.isArray(issues) && issues.length) {
+      return issues.map(item => {
+        if (item && item.location) return `${item.location}: ${item.message || ""}`;
+        return String((item && item.message) || item);
+      }).join("；");
+    }
+    return (error && error.message) || "保存失败";
+  }
+
+  function moveModelDocument(model, sourceId, targetId, oldId) {
+    const document = exportDocument();
+    document.models = document.models.filter(item => item.id !== oldId);
+    document.models.push(model);
+    for (const key of Object.keys(document.bindings || {})) {
+      const binding = document.bindings[key];
+      if (binding && binding.provider_id === sourceId && binding.model_id === oldId) {
+        document.bindings[key] = { provider_id: targetId, model_id: model.id };
+      }
+    }
+    return document;
+  }
+
   async function saveModel(event) {
     event.preventDefault();
     const fields = formObject(event.currentTarget);
@@ -304,6 +328,32 @@
       context_window: Number(fields.context_window),
       max_output_tokens: Number(fields.max_output_tokens),
     };
+    const provider = (data.providers || []).find(item => item.id === providerId);
+    if (!provider) {
+      setMessage("所属 Provider 不存在", "bad");
+      render();
+      return;
+    }
+    const sourceModel = creatingModel
+      ? null
+      : allModels().find(item => item.id === selectedModelId) || null;
+    const sourceId = sourceModel ? sourceModel.provider_id : null;
+    if (sourceId && sourceId !== providerId) {
+      // 移动语义：整份目录一次提交，原子地换归属并让引用旧归属的绑定跟随，
+      // 旧 Provider 下不残留同 id 条目，也不会留下中间态的重复 id 或悬空绑定。
+      try {
+        await fetchJSON("/api/providers", jsonHeaders(moveModelDocument(model, sourceId, providerId, selectedModelId)));
+        setMessage("模型已保存", "ok");
+        await load();
+        selectProvider(providerId);
+        selectModel(model.id);
+        render();
+      } catch (error) {
+        setMessage(describeError(error), "bad");
+        render();
+      }
+      return;
+    }
     const models = modelsOf(providerId).filter(item => item.id !== selectedModelId || creatingModel);
     if (!creatingModel) {
       const rest = models.filter(item => item.id !== model.id);
@@ -312,12 +362,6 @@
       models.push(...rest);
     } else {
       models.push(model);
-    }
-    const provider = (data.providers || []).find(item => item.id === providerId);
-    if (!provider) {
-      setMessage("所属 Provider 不存在", "bad");
-      render();
-      return;
     }
     const payload = {
       id: provider.id, name: provider.name, protocol: provider.protocol,
@@ -332,7 +376,7 @@
       selectModel(model.id);
       render();
     } catch (error) {
-      setMessage(error.message, "bad");
+      setMessage(describeError(error), "bad");
       render();
     }
   }
