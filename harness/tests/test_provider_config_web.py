@@ -181,7 +181,7 @@ def test_validation_and_delete_dependents(tmp_path):
             "id": "ok", "name": "BadProto", "protocol": "openai",
         })
         assert status == 400, body
-        assert "protocol" in body
+        assert "协议" in body
 
         status, body = request(host, port, "PUT", "/api/providers/fake-a", {
             "name": "Still fake", "protocol": "fake",

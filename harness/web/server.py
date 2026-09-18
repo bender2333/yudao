@@ -537,7 +537,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
     def _put_provider(self, provider_id: str) -> None:
         body = self._read_json_body()
         if "id" in body and body["id"] != provider_id:
-            raise ValueError("provider id cannot be changed")
+            raise ValueError("Provider ID 不可修改")
         body = {**body, "id": provider_id}
         catalog = self._merge_provider(body, existing_id=provider_id)
         self._persist_catalog(catalog)
@@ -547,11 +547,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self._drain_body()
         catalog = self.server.system.provider_catalog
         if catalog is None or provider_id not in catalog.providers:
-            return self._send_json({"error": "provider not found"}, 404)
+            return self._send_json({"error": "Provider 不存在"}, 404)
         dependents = _provider_dependents(catalog, provider_id)
         if dependents:
             return self._send_json({
-                "error": "provider is in use: " + ", ".join(dependents),
+                "error": "Provider 仍被引用：" + "、".join(dependents),
                 "reason": "in_use",
                 "dependents": dependents,
             }, 409)
@@ -569,7 +569,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
         bindings = body.get("bindings", body)
         if not isinstance(bindings, dict):
-            raise ValueError("bindings must be an object")
+            raise ValueError("bindings 必须是对象")
         catalog = self.server.system.provider_catalog
         raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
         raw["bindings"] = bindings
@@ -584,11 +584,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self._drain_body()
         catalog = self.server.system.provider_catalog
         if catalog is None or provider_id not in catalog.providers:
-            return self._send_json({"error": "provider not found"}, 404)
+            return self._send_json({"error": "Provider 不存在"}, 404)
         provider = catalog.providers[provider_id]
         model = next((item for item in catalog.models.values() if item.provider_id == provider_id), None)
         if model is None:
-            raise ValueError("provider has no models")
+            raise ValueError("Provider 还没有模型，请先保存模型再测试连接")
         started = time.monotonic()
         if provider.protocol == "fake":
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
@@ -596,13 +596,13 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 "ok": True, "error": None, "actual_model": model.model, "elapsed_ms": elapsed_ms,
             })
         if provider.protocol not in SUPPORTED_PROTOCOLS:
-            raise ValueError("unsupported provider protocol")
+            raise ValueError("暂不支持的 Provider 协议")
         material = _resolved_secret(self.server.system.credentials, provider.credential_ref)
         if material is None:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             return self._send_json({
                 "ok": False,
-                "error": f"credential reference {provider.credential_ref} cannot be resolved",
+                "error": f"缺少凭据环境变量 {provider.credential_ref}，请补充后重试",
                 "actual_model": None,
                 "elapsed_ms": elapsed_ms,
             })
@@ -626,9 +626,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             response = adapter.complete(request)
         except ProviderError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            detail = _redact_secret(str(exc), material)
+            label = _TEST_FAILURE_LABELS.get(exc.reason, "连接失败")
             return self._send_json({
                 "ok": False,
-                "error": _redact_secret(str(exc), material),
+                "error": f"{label}：{detail}",
                 "actual_model": None,
                 "elapsed_ms": elapsed_ms,
             })
@@ -643,7 +645,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
 
     def _merge_provider(self, body: dict[str, Any], *, existing_id: str | None) -> ProviderCatalog:
         if not isinstance(body, dict):
-            raise ValueError("JSON body must be an object")
+            raise ValueError("请求体必须是 JSON 对象")
         models = body.get("models", [])
         provider_fields = {key: value for key, value in body.items() if key != "models"}
         _validate_provider_fields(provider_fields)
@@ -652,10 +654,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
         existing_ids = {item["id"] for item in raw["providers"]}
         if existing_id is None and provider_id in existing_ids:
-            self._send_json({"error": f"provider already exists: {provider_id}", "reason": "conflict"}, 409)
+            self._send_json({"error": f"Provider 已存在：{provider_id}", "reason": "conflict"}, 409)
             raise _ResponseSent()
         if existing_id is not None and existing_id not in existing_ids:
-            self._send_json({"error": "provider not found"}, 404)
+            self._send_json({"error": "Provider 不存在"}, 404)
             raise _ResponseSent()
         raw["providers"] = [item for item in raw["providers"] if item["id"] != provider_id]
         raw["providers"].append({
@@ -668,11 +670,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         })
         if "models" in body:
             if not isinstance(models, list):
-                raise ValueError("models must be an array")
+                raise ValueError("models 必须是数组")
             nested = []
             for index, item in enumerate(models):
                 if not isinstance(item, dict):
-                    raise ValueError(f"models[{index}] must be an object")
+                    raise ValueError(f"models[{index}] 必须是对象")
                 nested.append({**item, "provider_id": provider_id})
             raw["models"] = [item for item in raw["models"] if item.get("provider_id") != provider_id]
             raw["models"].extend(nested)
@@ -1216,13 +1218,23 @@ def _validate_provider_fields(body: dict[str, Any]) -> None:
     required = {"id", "name", "protocol"}
     missing = required - set(body)
     if missing:
-        raise ValueError("missing fields: " + ", ".join(sorted(missing)))
+        raise ValueError("缺少字段：" + ", ".join(sorted(missing)))
     protocol = body["protocol"]
     if not isinstance(protocol, str) or protocol.strip().casefold() not in SUPPORTED_PROTOCOLS:
-        raise ValueError("protocol must be responses or fake")
+        raise ValueError("协议只支持 responses 或 fake")
     timeout = body.get("timeout_sec", 600)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
-        raise ValueError("timeout_sec must be positive")
+        raise ValueError("timeout_sec 必须是正数")
+
+
+_TEST_FAILURE_LABELS = {
+    "provider_timeout": "连接超时",
+    "provider_protocol": "协议错误",
+    "context_overflow": "上下文超限",
+    "provider_unavailable": "Provider 不可用",
+    "cancelled": "已取消",
+    "provider_error": "Provider 返回错误",
+}
 
 
 def _connection_test_request(max_output_tokens: int) -> ModelRequest:
@@ -1254,7 +1266,7 @@ def _connection_test_request(max_output_tokens: int) -> ModelRequest:
 
 def _positive_int(key: str, value: Any) -> int:
     if type(value) is not int or value < 1:
-        raise ValueError(f"{key} must be a positive integer")
+        raise ValueError(f"{key} 必须是正整数")
     return value
 
 

@@ -150,7 +150,7 @@ def _catalog_status_message(exc: CatalogValidationError, catalog: ProviderCatalo
     parts: list[str] = []
     for issue in exc.issues:
         location = issue.location
-        if "credential" in issue.message or location.endswith(".credential"):
+        if location.endswith(".credential") or "凭据引用无法解析" in issue.message:
             department = location.split(".")[1] if location.startswith("departments.") else ""
             binding = catalog.bindings.get(department)
             provider = None if binding is None else catalog.providers.get(binding.provider_id)
@@ -160,7 +160,7 @@ def _catalog_status_message(exc: CatalogValidationError, catalog: ProviderCatalo
                     f"{location}: 部门 {department} 缺少凭据环境变量 {reference}，请补充后重试"
                 )
                 continue
-        if "binding is required" in issue.message:
+        if "部门绑定缺失" in issue.message:
             department = location.rsplit(".", 1)[-1]
             parts.append(f"{location}: 部门 {department} 未绑定 Provider 与模型")
             continue
@@ -168,7 +168,7 @@ def _catalog_status_message(exc: CatalogValidationError, catalog: ProviderCatalo
             parts.append(f"{location}: {issue.message}（请为该部门绑定声明容量的模型）")
             continue
         parts.append(f"{location}: {issue.message}")
-    return "; ".join(parts) if parts else str(exc)
+    return "；".join(parts) if parts else str(exc)
 
 
 def build_adapter(name: str, **kwargs) -> ModelAdapter:

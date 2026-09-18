@@ -133,7 +133,7 @@ def test_responses_provider_rejects_credentials_in_url_and_missing_credential_re
 def test_unknown_model_capacity_is_rejected_for_a_bound_department():
     with pytest.raises(CatalogValidationError) as caught:
         _catalog(context_window=None)
-    assert any("context_window is required" in issue.message for issue in caught.value.issues)
+    assert any("模型缺少 context_window" in issue.message for issue in caught.value.issues)
 
 
 def test_max_output_tokens_is_required_and_positive_in_json():

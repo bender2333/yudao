@@ -38,8 +38,8 @@ class CatalogValidationError(ValueError):
     def __init__(self, issues: Iterable[ValidationIssue]) -> None:
         self.issues = tuple(issues)
         if not self.issues:
-            self.issues = (ValidationIssue("catalog", "invalid provider catalog"),)
-        super().__init__("; ".join(f"{issue.location}: {issue.message}" for issue in self.issues))
+            self.issues = (ValidationIssue("catalog", "Provider 目录无效"),)
+        super().__init__("；".join(f"{issue.location}: {issue.message}" for issue in self.issues))
 
 
 @dataclass(frozen=True)
@@ -230,10 +230,10 @@ class ProviderCatalog:
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "ProviderCatalog":
         if not isinstance(raw, Mapping):
-            raise CatalogValidationError((ValidationIssue("catalog", "expected a JSON object"),))
+            raise CatalogValidationError((ValidationIssue("catalog", "应为 JSON 对象"),))
         allowed = {"providers", "models", "bindings"}
         unknown = sorted(set(raw) - allowed, key=str)
-        issues: list[ValidationIssue] = [ValidationIssue(f"catalog.{key}", "unknown field") for key in unknown]
+        issues: list[ValidationIssue] = [ValidationIssue(f"catalog.{key}", "未知字段") for key in unknown]
         providers: list[ProviderDefinition] = []
         models: list[ModelDefinition] = []
         bindings: dict[str, DepartmentBinding | Mapping[str, Any]] = {}
@@ -241,7 +241,7 @@ class ProviderCatalog:
         model_items = raw.get("models")
         raw_bindings = raw.get("bindings")
         if not isinstance(provider_items, list):
-            issues.append(ValidationIssue("providers", "must be an array"))
+            issues.append(ValidationIssue("providers", "应为数组"))
         else:
             for index, item in enumerate(provider_items):
                 parsed, item_issues = _parse_provider(item, f"providers[{index}]")
@@ -249,7 +249,7 @@ class ProviderCatalog:
                 if parsed is not None:
                     providers.append(parsed)
         if not isinstance(model_items, list):
-            issues.append(ValidationIssue("models", "must be an array"))
+            issues.append(ValidationIssue("models", "应为数组"))
         else:
             for index, item in enumerate(model_items):
                 parsed, item_issues = _parse_model(item, f"models[{index}]")
@@ -257,11 +257,11 @@ class ProviderCatalog:
                 if parsed is not None:
                     models.append(parsed)
         if not isinstance(raw_bindings, Mapping):
-            issues.append(ValidationIssue("bindings", "must be an object"))
+            issues.append(ValidationIssue("bindings", "应为对象"))
         else:
             for department, item in raw_bindings.items():
                 if not isinstance(department, str):
-                    issues.append(ValidationIssue("bindings", "department names must be strings"))
+                    issues.append(ValidationIssue("bindings", "部门名称必须是字符串"))
                     continue
                 parsed, item_issues = _parse_binding(item, f"bindings.{department}", department)
                 issues.extend(item_issues)
@@ -277,7 +277,7 @@ class ProviderCatalog:
         try:
             raw = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise CatalogValidationError((ValidationIssue("catalog", "cannot read provider catalog"),)) from exc
+            raise CatalogValidationError((ValidationIssue("catalog", "无法读取 Provider 目录"),)) from exc
         return cls.from_dict(raw)
 
     def to_dict(self) -> dict[str, Any]:
@@ -319,7 +319,7 @@ class ProviderCatalog:
                 if material is None or not isinstance(material.secret, str) or not material.secret.strip():
                     credential_issues.append(ValidationIssue(
                         f"departments.{department}.credential",
-                        "credential reference cannot be resolved",
+                        "凭据引用无法解析",
                     ))
                     continue
             targets[department] = ResolvedProviderTarget(
@@ -350,59 +350,59 @@ class ProviderCatalog:
         for index, provider in enumerate(self._provider_items):
             location = f"providers[{index}]"
             if not isinstance(provider, ProviderDefinition):
-                issues.append(ValidationIssue(location, "must be a provider definition"))
+                issues.append(ValidationIssue(location, "应为 Provider 定义"))
                 continue
             if not _valid_identifier(provider.id):
-                issues.append(ValidationIssue(f"{location}.id", "must be a simple non-empty identifier"))
+                issues.append(ValidationIssue(f"{location}.id", "必须是非空简单标识符"))
             if _hashable(provider.id) and provider.id in provider_ids:
-                issues.append(ValidationIssue(f"{location}.id", "duplicate provider id"))
+                issues.append(ValidationIssue(f"{location}.id", "Provider ID 重复"))
             if _hashable(provider.id):
                 provider_ids.add(provider.id)
             if not isinstance(provider.name, str) or not provider.name:
-                issues.append(ValidationIssue(f"{location}.name", "must be a non-empty string"))
+                issues.append(ValidationIssue(f"{location}.name", "必须是非空字符串"))
             if not isinstance(provider.protocol, str) or not provider.protocol:
-                issues.append(ValidationIssue(f"{location}.protocol", "must be a non-empty string"))
+                issues.append(ValidationIssue(f"{location}.protocol", "必须是非空字符串"))
             if not isinstance(provider.timeout_sec, (int, float)) or isinstance(provider.timeout_sec, bool) \
                     or not math.isfinite(float(provider.timeout_sec)) or provider.timeout_sec <= 0:
-                issues.append(ValidationIssue(f"{location}.timeout_sec", "must be positive and finite"))
+                issues.append(ValidationIssue(f"{location}.timeout_sec", "必须是正的有限数值"))
             if provider.protocol == "responses":
                 if not _valid_url(provider.base_url):
-                    issues.append(ValidationIssue(f"{location}.base_url", "must be an HTTP(S) URL without credentials"))
+                    issues.append(ValidationIssue(f"{location}.base_url", "必须是 HTTP(S) URL 且不能携带凭据"))
                 if not _valid_identifier(provider.credential_ref):
-                    issues.append(ValidationIssue(f"{location}.credential_ref", "must be a non-empty credential reference"))
+                    issues.append(ValidationIssue(f"{location}.credential_ref", "必须是非空凭据引用"))
             elif provider.protocol == "fake":
                 if provider.base_url:
-                    issues.append(ValidationIssue(f"{location}.base_url", "fake provider must not define a URL"))
+                    issues.append(ValidationIssue(f"{location}.base_url", "fake Provider 不能定义地址"))
                 if provider.credential_ref:
-                    issues.append(ValidationIssue(f"{location}.credential_ref", "fake provider must not define credentials"))
+                    issues.append(ValidationIssue(f"{location}.credential_ref", "fake Provider 不能定义凭据"))
             elif provider.base_url and not _valid_url(provider.base_url):
-                issues.append(ValidationIssue(f"{location}.base_url", "must be an HTTP(S) URL without credentials"))
+                issues.append(ValidationIssue(f"{location}.base_url", "必须是 HTTP(S) URL 且不能携带凭据"))
             if isinstance(provider.protocol, str) and provider.protocol not in SUPPORTED_PROTOCOLS and provider.credential_ref \
                     and not _valid_identifier(provider.credential_ref):
-                issues.append(ValidationIssue(f"{location}.credential_ref", "must be a credential reference"))
+                issues.append(ValidationIssue(f"{location}.credential_ref", "必须是凭据引用"))
 
         model_ids: set[str] = set()
         for index, model in enumerate(self._model_items):
             location = f"models[{index}]"
             if not isinstance(model, ModelDefinition):
-                issues.append(ValidationIssue(location, "must be a model definition"))
+                issues.append(ValidationIssue(location, "应为模型定义"))
                 continue
             if not _valid_identifier(model.id):
-                issues.append(ValidationIssue(f"{location}.id", "must be a simple non-empty identifier"))
+                issues.append(ValidationIssue(f"{location}.id", "必须是非空简单标识符"))
             if _hashable(model.id) and model.id in model_ids:
-                issues.append(ValidationIssue(f"{location}.id", "duplicate model id"))
+                issues.append(ValidationIssue(f"{location}.id", "模型 ID 重复"))
             if _hashable(model.id):
                 model_ids.add(model.id)
             if not _valid_identifier(model.provider_id):
-                issues.append(ValidationIssue(f"{location}.provider_id", "must be a provider identifier"))
+                issues.append(ValidationIssue(f"{location}.provider_id", "必须是 Provider 标识"))
             if not isinstance(model.model, str) or not model.model.strip():
-                issues.append(ValidationIssue(f"{location}.model", "must be a non-empty string"))
+                issues.append(ValidationIssue(f"{location}.model", "必须是非空字符串"))
             _validate_positive_int(model.context_window, f"{location}.context_window", issues, allow_none=True)
             _validate_positive_int(model.max_output_tokens, f"{location}.max_output_tokens", issues, allow_none=False)
             if model.context_window is not None and model.max_output_tokens is not None \
                     and isinstance(model.context_window, int) and isinstance(model.max_output_tokens, int) \
                     and model.max_output_tokens > model.context_window:
-                issues.append(ValidationIssue(f"{location}.max_output_tokens", "must not exceed context_window"))
+                issues.append(ValidationIssue(f"{location}.max_output_tokens", "不能超过 context_window"))
 
         issues.extend(self._binding_issues())
         if issues:
@@ -413,34 +413,34 @@ class ProviderCatalog:
         for department in DEPARTMENTS:
             binding = self.bindings.get(department)
             if binding is None:
-                issues.append(ValidationIssue(f"bindings.{department}", "department binding is required"))
+                issues.append(ValidationIssue(f"bindings.{department}", "部门绑定缺失"))
                 continue
             provider = _mapping_get(self.providers, binding.provider_id)
             model = _mapping_get(self.models, binding.model_id)
             if provider is None:
                 issues.append(ValidationIssue(
-                    f"bindings.{department}.provider_id", "provider does not exist",
+                    f"bindings.{department}.provider_id", "Provider 不存在",
                 ))
             if model is None:
                 issues.append(ValidationIssue(
-                    f"bindings.{department}.model_id", "model does not exist",
+                    f"bindings.{department}.model_id", "模型不存在",
                 ))
             if provider is not None and model is not None and model.provider_id != provider.id:
                 issues.append(ValidationIssue(
-                    f"bindings.{department}", "model belongs to a different provider",
+                    f"bindings.{department}", "模型不属于该 Provider",
                 ))
             if provider is not None and (
                     not isinstance(provider.protocol, str) or provider.protocol not in SUPPORTED_PROTOCOLS):
                 issues.append(ValidationIssue(
-                    f"bindings.{department}.provider_id", "provider protocol is unsupported",
+                    f"bindings.{department}.provider_id", "Provider 协议不受支持",
                 ))
             if model is not None and model.context_window is None:
                 issues.append(ValidationIssue(
-                    f"bindings.{department}.model_id", "model context_window is required for a task",
+                    f"bindings.{department}.model_id", "模型缺少 context_window，无法用于任务",
                 ))
         for department in self.bindings:
             if department not in DEPARTMENTS:
-                issues.append(ValidationIssue(f"bindings.{department}", "unknown department"))
+                issues.append(ValidationIssue(f"bindings.{department}", "未知部门"))
         return issues
 
 
@@ -453,7 +453,7 @@ def _normalize_bindings(
         if isinstance(raw, DepartmentBinding):
             binding = raw
             if binding.department != department:
-                issues.append(ValidationIssue(f"bindings.{department}", "department key does not match binding"))
+                issues.append(ValidationIssue(f"bindings.{department}", "部门键与绑定不一致"))
             normalized[department] = binding
             continue
         parsed, item_issues = _parse_binding(raw, f"bindings.{department}", department)
@@ -488,13 +488,13 @@ def _mapping_get(mapping: Mapping[Any, Any], key: Any) -> Any:
 
 def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
-        return None, [ValidationIssue(location, "must be an object")]
+        return None, [ValidationIssue(location, "应为对象")]
     allowed = {"id", "name", "protocol", "base_url", "credential_ref", "timeout_sec"}
-    issues = [ValidationIssue(f"{location}.{key}", "unknown field")
+    issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
     required = {"id", "name", "protocol"}
     missing = required - set(raw)
-    issues.extend(ValidationIssue(f"{location}.{key}", "is required") for key in sorted(missing))
+    issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
     provider = ProviderDefinition(
@@ -507,13 +507,13 @@ def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None,
 
 def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
-        return None, [ValidationIssue(location, "must be an object")]
+        return None, [ValidationIssue(location, "应为对象")]
     allowed = {"id", "provider_id", "model", "context_window", "max_output_tokens"}
-    issues = [ValidationIssue(f"{location}.{key}", "unknown field")
+    issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
     required = {"id", "provider_id", "model", "max_output_tokens"}
     missing = required - set(raw)
-    issues.extend(ValidationIssue(f"{location}.{key}", "is required") for key in sorted(missing))
+    issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
     return ModelDefinition(
@@ -524,12 +524,12 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
 
 def _parse_binding(raw: Any, location: str, department: str) -> tuple[DepartmentBinding | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
-        return None, [ValidationIssue(location, "must be an object")]
+        return None, [ValidationIssue(location, "应为对象")]
     allowed = {"provider_id", "model_id"}
-    issues = [ValidationIssue(f"{location}.{key}", "unknown field")
+    issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
     required = allowed - set(raw)
-    issues.extend(ValidationIssue(f"{location}.{key}", "is required") for key in sorted(required))
+    issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(required))
     if issues:
         return None, issues
     return DepartmentBinding(department, raw["provider_id"], raw["model_id"]), issues
@@ -561,7 +561,7 @@ def _validate_positive_int(value: Any, location: str, issues: list[ValidationIss
     if value is None and allow_none:
         return
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        issues.append(ValidationIssue(location, "must be a positive integer"))
+        issues.append(ValidationIssue(location, "必须是正整数"))
 
 
 def _resolve_credential(source: CredentialSource | None, reference: str) -> CredentialMaterial | None:
