@@ -1008,6 +1008,27 @@
 - 未改写失败记录；本场无失败。luna 历史 `provider_error` 仍保留。
 
 
+## 2026-09-18 - P1 五条 + README 示例修复完成，已验收未提交
+
+- 6 个单元并行委派 deep agent 实现，主代理验收。改动未提交：README.md、harness/replay_check.py(新建)、runtime.py、web/server.py、__main__.py、observability.py、web/static/provider-config.js、orchestrator.py、projects.py、tests/test_delivery_tree_engine.py(断言更新)。
+- README 示例改为数组结构(bindings/model 键修正)，已用 from_dict 验证通过；test_provider_catalog 通过。
+- replay 三路径统一走 verify_replay：双投影自比对保留，交付 blob 逐个 load_tree 核 digest、含 Git 版本事件时 verify_git_history；损坏分别以 tree_archive/git_history 失败(CLI exit 1、Web 500 ok:false)。test_replay + release_archive_integrity 12 passed，30+ 调用 replay 的测试文件回归通过。
+- 用量分组键改为 (requested_provider, requested_model, actual_model)，无 actual 组 label 明确“实际模型未知”并带 requested；actual 筛选对无 actual 记录回退 requested 匹配。test_observability 20/22，2 失败经干净树对照为预存环境问题。
+- 模型换归属改为移动语义：整份目录一次 POST 原子提交，绑定跟随改写，失败不推进状态；21 passed + Node UI 29 pass。
+- 提案锁内重取 snapshot 并重算 evaluate_proposal，陈旧走 execution_basis 的 PROPOSAL_REJECTED，不再 host_commit_error/FAILED；两处“改树后提交”测试断言已更新为干净拒绝。interaction + collaboration 81 passed。
+- _settle_run 空 delivery_specs 或无 release 时 return None；test_projects 28 passed。
+- py_compile 全过；LSP(basedpyright)未安装沿用 pytest 覆盖。project_run 在 server.py 另 7 处仍用，import 保留；RunNotFoundError 路径与改前一致。
+
+## 2026-09-17 - 代码与阶段 Review:Stage 2 关闭成立,5 条 P1 待修
+
+- 上午的 review 会话两次派发并行审查失败后中断;本次从原会话续跑补完。三条审查线(阶段证据核对、运行内核/项目层/Provider 观测并行审查、主线核对)全部完成,我独立抽查了全部 P1 结论,与源码一致。
+- 阶段判定:Stage 2 作为 Harness 基线关闭**成立**。十场验收实为 9 DONE + 1 计划内取消(user_cancel),无系统性失败,此前日记"8 DONE/2 FAILED"口径有误。但这是低压力验收:十场中 8 场是 echo 变体,窄窗思考型模型把 32 步耗在压缩上的压力场景未进验收矩阵。P0 为空。
+- P1 五条:①replay 三条路径只做投影自比对,`load_tree`/`verify_git_history` 存在但未接入,README"校验可重放性"名不符实;②用量分组按 `(requested_provider, actual_model)` 分组,失败(无 actual_model)混入"未知模型"桶;③配置界面改模型归属是复制不是移动,保存后 duplicate model id 400;④提案对锁外旧快照校验后提交,fail-closed 但以 host_commit_error/FAILED 收场而非干净拒绝;⑤`_settle_run` 用 `delivery_specs[-1]` 与裸 `next()` 无守卫,部分写入时读路径 500。
+- P2 十二条:校验原地改写提案、事项创建失败 UI 不刷新、SSE+轮询双重加载、协议校验不一致、停止原因处置表不闭合(9-07 日记遗留)、事件库无链式哈希等,均带 file:line 依据。
+- README 快速开始的 Provider 示例确认无效:顶层键应为 `bindings`、providers/models 应为数组、模型键是 `model` 不是 `model_id`/`model_name`;照抄会被 `CatalogValidationError` 拒绝。`docs/examples/providers.json` 是正确格式。
+- 架构:三层分层干净,无虚账(日记说修了代码确实修了);最大演化风险是 orchestrator.py 约 2000 行聚合全部控制流。Stage 3(异步恢复、并行任务)开工前建议先做停止原因闭集 + 结算/归档分离两个重构包。
+- 下一阶段建议顺序:先修 P1(replay 接入完整性检查、用量分组加 requested_model 维度、模型移动语义)+ README 修正(十分钟一等修复)→ 补 2-3 场中等压力验收(多轮返工+窄窗)→ 再开 Stage 3 工作包。凭据轮换、暂停恢复、并行激活、token 预算明确不带入。roadmap 口径注意:文档中"Stage 3"指可持续运行组织,review 建议的"证据改进阶段"对应 roadmap 第二阶段(可验证的持续改进),两者命名需在下一阶段计划里统一。
+
 ## 2026-09-15 - Stage 2 harness 基线关闭
 
 - 应用冻结 `041eaa1`。2.6 十场在 `.yudao/stage2-validation/`：9 次 DONE/released，1 次 FAILED/cancelled。主代理 replay 方向调整、取消、最后一场，canonical 一致。
