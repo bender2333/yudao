@@ -1,5 +1,7 @@
 # Stage 2 剩余工作计划
 
+> 历史合同：H0–H5 已被 2026-09-15 的 Harness 基线实施合同替代，不再作为新任务清单。当前入口为 [总体路线图](program-roadmap.md)、[当前验收基线](current-baseline.md)、[Stage 3 计划](stage-3-plan.md)。保留原文用于理解历史判定，不把下文 PARTIAL 当作当前阶段结论。
+
 日期：2026-09-15。性质：架构与工作包计划，不是验收。阶段状态：**PARTIAL**。
 
 本文以当前 `harness_1` 工作树为起点，接续 [重新排布](stage-2-replan-2026-09-09.md) 与 [B0 合同](project-workbench-contract.md)，不改变已经确认的 Stage 2 边界。编写本文不表示应用改造或阶段完成。

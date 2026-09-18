@@ -1,9 +1,11 @@
 # 第二阶段执行进度
 
+> 2026-09-19 状态口径：本文是 Stage 2 Harness 基线的历史验收记录。阶段名称与新工作依赖以 [总体路线图](program-roadmap.md) 为准，当前版本验证范围见 [当前验收基线](current-baseline.md)。下文 CLOSED 只对应当时冻结版本与合同；历史进度表中的 OPEN/PARTIAL 不自动成为当前欠项。
+
 更新日期：2026-09-15。用户指定以 [harness 基线实施计划](stage-2-implementation-plan.md) 为 Stage 2 完成合同。应用冻结 `041eaa1`。阶段状态：**CLOSED** ✅。
 
 Stage 2 验收已完成，所有 6 个子阶段（2.1-2.6）均已通过验收：
-- 真实任务成功率 90% (9/10)
+- 十场真实验收：9 次 DONE、1 次计划取消；场景以 echo 变体为主，不外推复杂任务成功率
 - Context/Trace View 可追溯失败
 - Provider 配置界面可用（21s 完成配置）
 - 桌面/手机界面流畅
