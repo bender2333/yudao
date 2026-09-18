@@ -40,26 +40,29 @@ python -m pip install -e ".[dev]"
 
 ```json
 {
-  "providers": {
-    "my-provider": {
-      "base_url": "https://api.example.com/v1",
+  "providers": [
+    {
+      "id": "my-provider",
+      "name": "My Provider",
       "protocol": "responses",
+      "base_url": "https://api.example.com/v1",
       "credential_ref": "MY_API_KEY",
       "timeout_sec": 600
     }
-  },
-  "models": {
-    "my-model": {
+  ],
+  "models": [
+    {
+      "id": "my-model",
       "provider_id": "my-provider",
-      "model_id": "gpt-4",
+      "model": "gpt-4",
       "context_window": 128000,
       "max_output_tokens": 4096
     }
-  },
-  "department_bindings": {
-    "product": { "provider_id": "my-provider", "model_name": "my-model" },
-    "engineering": { "provider_id": "my-provider", "model_name": "my-model" },
-    "quality": { "provider_id": "my-provider", "model_name": "my-model" }
+  ],
+  "bindings": {
+    "product": { "provider_id": "my-provider", "model_id": "my-model" },
+    "engineering": { "provider_id": "my-provider", "model_id": "my-model" },
+    "quality": { "provider_id": "my-provider", "model_id": "my-model" }
   }
 }
 ```
