@@ -15,6 +15,7 @@ from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalErro
 from .provider_catalog import CatalogValidationError, CredentialMaterial, CredentialSource, ProviderCatalog
 from .projection import RunProjection, project_run
 from .projects import ProjectService
+from .replay_check import verify_replay
 
 
 class LoopSystem:
@@ -138,7 +139,7 @@ class LoopSystem:
         return self.orchestrator.workspace(run_id)
 
     def replay(self, run_id: str) -> RunProjection:
-        return project_run(self.store, run_id)
+        return verify_replay(self.store, self.artifacts, self.git_versions, run_id)
 
     def list_run_ids(self) -> list[str]:
         return self.store.list_run_ids()

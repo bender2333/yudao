@@ -74,7 +74,11 @@ def main(argv: list[str] | None = None) -> int:
                 print("project replay is not deterministic", file=sys.stderr)
                 return 1
             return 0
-        projection = system.replay(args.run_id)
+        try:
+            projection = system.replay(args.run_id)
+        except (ValueError, OSError) as exc:
+            print(f"replay failed: {exc}", file=sys.stderr)
+            return 1
         print(json.dumps(projection.canonical_state(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "project":

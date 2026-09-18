@@ -28,6 +28,7 @@ from ..provider_catalog import (
     ValidationIssue,
 )
 from ..projection import RunNotFoundError, project_run
+from ..replay_check import ReplayIntegrityError
 from ..projects import (
     ProjectArchivedError,
     ProjectEventType,
@@ -360,12 +361,22 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
 
     def _replay_run(self, run_id: str) -> None:
         self._drain_body()
-        first = project_run(self.server.store, run_id)
-        second = project_run(self.server.store, run_id)
-        match = first.canonical_state() == second.canonical_state()
+        try:
+            first = self.server.system.replay(run_id)
+        except ReplayIntegrityError as exc:
+            self._send_json(
+                {
+                    "ok": False,
+                    "mutated": False,
+                    "reason": exc.reason,
+                    "error": str(exc),
+                },
+                500,
+            )
+            return
         self._send_json(
             {
-                "ok": match,
+                "ok": True,
                 "mutated": False,
                 "event_count": first.last_seq,
                 "phase": first.phase,
