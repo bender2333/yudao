@@ -1799,6 +1799,29 @@ class Orchestrator:
                     or request_basis(current) != request_basis(evaluated)):
                 decision = ProposalDecision(False, [FieldError("execution_basis", "The input, contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
             projection = current
+            # 锁外获取的 snapshot 在进入本锁前可能已被并发写入改旧；若直接用
+            # 它提交，submissions.commit 的字节核对会以 host_commit_error/FAILED
+            # 脏收场。锁内重取快照并重算校验，陈旧则走 PROPOSAL_REJECTED 干净拒绝；
+            # 接受时提交的 snapshot 与锁内投影一致，QA release 不再绑定陈旧快照。
+            fresh_snapshot = self.workspace(run_id).snapshot()
+            if fresh_snapshot != snapshot:
+                decision = ProposalDecision(False, [FieldError("execution_basis", "The workspace snapshot changed after this activation began; stale results cannot be rebound.")])
+            elif decision.accepted:
+                try:
+                    decision = evaluate_proposal(
+                        phase=current.phase,
+                        department=department,
+                        proposal=proposal,
+                        projection=current,
+                        snapshot=fresh_snapshot,
+                        events=self.store.list_events(run_id),
+                    )
+                except Exception as exc:
+                    decision = ProposalDecision(
+                        False,
+                        [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
+                    )
+            snapshot = fresh_snapshot
             if proposal is not None:
                 self.store.append(
                     run_id, EventType.PROPOSAL_SUBMITTED, role=department,

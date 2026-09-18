@@ -88,15 +88,17 @@ def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, m
     monkeypatch.setattr(orchestration, "evaluate_proposal", mutate_after_validation)
     monkeypatch.setattr(submissions, "store_tree", archive_validated_tree)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "host_commit_error"
+    assert result.phase == "ENGINEERING", result.error
+    assert result.stop_reason is None
     assert result.delivery_spec is None
     assert len(captured) == 1
-    assert len(archived) == 1
-    preserved = load_tree(system.artifacts, run_id, archived[0])
-    assert preserved == captured[0].tree
-    assert next(item.data for item in preserved.files if item.path == "src/echo.py") != b"changed after validation"
+    assert len(archived) == 0
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.DELIVERY_ACCEPTED for event in events)
+    assert not any(event.type == EventType.RUN_FAILED for event in events)
+    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
+    assert rejected
+    assert any(item.get("field") == "execution_basis" for item in rejected[-1].payload["errors"])
     receipt = system.workspace(run_id).snapshot().checks[-1]
     assert receipt.snapshot_hash == captured[0].digest
     assert receipt.snapshot_hash != system.workspace(run_id).digest()
@@ -122,11 +124,16 @@ def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_pa
 
     monkeypatch.setattr(orchestration, "evaluate_proposal", mutate_after_quality_validation)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "host_commit_error"
+    assert result.phase == "QUALITY", result.error
+    assert result.stop_reason is None
     assert result.last_review is None
     assert result.delivery_spec.code_tree_digest == accepted_tree_digest
     events = system.store.list_events(run_id)
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in events)
+    assert not any(event.type == EventType.RUN_FAILED for event in events)
+    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
+    assert rejected
+    assert any(item.get("field") == "execution_basis" for item in rejected[-1].payload["errors"])
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
