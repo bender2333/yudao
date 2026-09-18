@@ -645,8 +645,12 @@ class ProjectService:
         item = project.work_item_for_run(run.run_id)
         if item is None or item.work_item_id != run.work_item_id:
             return None
+        if not run.delivery_specs:
+            return None
         delivery = run.delivery_specs[-1]
-        release = next(review for review in reversed(run.reviews) if review.verdict == "release")
+        release = next((review for review in reversed(run.reviews) if review.verdict == "release"), None)
+        if release is None:
+            return None
         expected = None if item.baseline is None else item.baseline["adoption_id"]
         current = None if project.current_adoption is None else project.current_adoption.adoption_id
         if expected != current:
