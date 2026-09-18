@@ -18,15 +18,16 @@
     }
     header p { margin: 0; color: light-dark(#6f7472, #a5a9a6); font-size: .82rem; }
     h1 { margin: 0; font-size: 1.25rem; font-weight: 500; }
-    main { max-width: 1100px; margin: 0 auto; padding: 24px clamp(16px, 3vw, 40px) 48px; display: grid; gap: 20px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px clamp(16px, 3vw, 40px) 48px; display: grid; gap: 20px; min-width: 0; }
     section {
       background: light-dark(#fff, #1d1f1e); border: 1px solid light-dark(#dfe2e0, #383c3a);
-      border-radius: 10px; padding: 18px;
+      border-radius: 10px; padding: 18px; min-width: 0; overflow-x: hidden;
     }
     h2 { margin: 0 0 12px; font-size: 1rem; font-weight: 500; }
-    .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid light-dark(#dfe2e0, #383c3a); }
+    .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 16px; min-width: 0; }
+    .row > * { min-width: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid light-dark(#dfe2e0, #383c3a); overflow-wrap: anywhere; word-break: break-all; }
     th { color: light-dark(#6f7472, #a5a9a6); font-weight: 500; }
     label { display: grid; gap: 4px; margin-bottom: 10px; font-size: .82rem; color: light-dark(#6f7472, #a5a9a6); }
     input, select, textarea {
@@ -42,6 +43,13 @@
     .ok { color: light-dark(#087f69, #56d1b3); }
     .bad { color: light-dark(#b9473e, #ef8278); }
     .note { color: light-dark(#6f7472, #a5a9a6); font-size: .78rem; }
+    tr.is-selected td { background: light-dark(#e4f4ef, #17372f); }
+    tr[data-provider-id], tr[data-model-id] { cursor: pointer; }
+    .msg { border: 1px solid light-dark(#dfe2e0, #383c3a); border-radius: 8px; padding: 8px 10px; font-size: .82rem; }
+    .msg[hidden] { display: none; }
+    .msg.ok { border-color: light-dark(#087f69, #56d1b3); }
+    .msg.bad { border-color: light-dark(#b9473e, #ef8278); }
+    button:disabled { opacity: .55; cursor: default; }
     @media (max-width: 720px) {
       .row { grid-template-columns: 1fr; }
       header { align-items: flex-start; flex-direction: column; }
@@ -58,29 +66,33 @@
       <button type="button">导入 JSON</button>
       <button type="button">导出</button>
       <button type="button">返回项目列表</button>
+      <input type="file" accept="application/json,.json" hidden>
     </div>
   </header>
   <main>
+    <p class="msg" role="status" hidden>状态消息区：保存成功显示“已保存”；失败显示原因（含字段级 issues）；测试成功显示“连接成功 · 实际上报模型 · 耗时 ms”。</p>
     <section>
       <h2>Provider</h2>
       <div class="row">
         <table>
-          <thead><tr><th>名称</th><th>协议</th><th>凭据</th><th>状态</th></tr></thead>
+          <thead><tr><th>名称</th><th>协议</th><th>地址</th><th>凭据引用</th><th>状态</th></tr></thead>
           <tbody>
-            <tr><td>Stage2 A1 back</td><td>responses</td><td>YUDAO_BACK_KEY</td><td class="ok">已配置</td></tr>
+            <tr class="is-selected"><td>Stage2 A1 back</td><td>responses</td><td>https://api.agnes-ai.cn/v1</td><td>YUDAO_BACK_KEY</td><td class="ok">已配置</td></tr>
+            <tr><td colspan="5" class="note">还没有 Provider（空态示例行，实际按行隐藏）</td></tr>
           </tbody>
         </table>
         <form>
           <label>ID<input value="p4-back" readonly></label>
           <label>名称<input value="Stage2 A1 back"></label>
           <label>协议
-            <select><option selected>responses</option></select>
+            <select><option selected>responses</option><option>fake（测试）</option></select>
           </label>
-          <label>地址<input value="https://api.agnes-ai.cn/v1"></label>
-          <label>凭据引用<input value="YUDAO_BACK_KEY"></label>
+          <label>地址<input value="https://api.agnes-ai.cn/v1" placeholder="https://..."></label>
+          <label>凭据引用<input value="YUDAO_BACK_KEY" placeholder="YUDAO_BACK_KEY"></label>
           <label>超时（秒）<input value="600"></label>
-          <p class="note">测试会发一次最小请求，不创建事项。</p>
+          <p class="note">测试会发一次最小请求，不创建事项。表单不保存密钥。ID 新建后不可改。fake 只给测试：保存时清空地址与凭据引用，测试直接返回成功不发请求。删除被模型引用或被部门绑定时返回 409 并指出依赖。</p>
           <div class="actions">
+            <button type="button">新建</button>
             <button class="primary" type="button">保存</button>
             <button type="button">测试连接</button>
             <button type="button">删除</button>
@@ -94,7 +106,8 @@
         <table>
           <thead><tr><th>ID</th><th>模型</th><th>窗口</th><th>输出上限</th></tr></thead>
           <tbody>
-            <tr><td>agnes-flash</td><td>agnes-3.0-flash</td><td>512000</td><td>65536</td></tr>
+            <tr class="is-selected"><td>agnes-flash</td><td>agnes-3.0-flash</td><td>512000</td><td>65536</td></tr>
+            <tr><td colspan="4" class="note">还没有模型（空态示例行）</td></tr>
           </tbody>
         </table>
         <form>
@@ -105,7 +118,8 @@
           <label>模型名<input value="agnes-3.0-flash"></label>
           <label>context_window<input value="512000"></label>
           <label>max_output_tokens<input value="65536"></label>
-          <div class="actions"><button class="primary" type="button">保存模型</button></div>
+          <p class="note">切换所属 Provider 为原子移动：旧归属不残留同 id，引用旧归属的部门绑定跟随新归属。</p>
+          <div class="actions"><button type="button">新建模型</button><button class="primary" type="button">保存模型</button></div>
         </form>
       </div>
     </section>
@@ -113,15 +127,15 @@
       <h2>三部门绑定</h2>
       <form class="row" style="grid-template-columns: 1fr;">
         <label>产品
-          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+          <select><option>未绑定</option><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
         </label>
         <label>工程
-          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+          <select><option>未绑定</option><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
         </label>
         <label>质检
-          <select><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
+          <select><option>未绑定</option><option selected>p4-back / agnes-flash · 窗口 512000 · 输出 65536</option></select>
         </label>
-        <p class="note">缺任一部门时创建事项会指出该部门。在途事项仍用创建时的快照。</p>
+        <p class="note">缺任一部门时创建事项会指出该部门。在途事项仍用创建时的快照。测试中按钮禁用并显示“测试中…”；未保存的新 Provider 先保存再测试。</p>
         <div class="actions"><button class="primary" type="button">保存绑定</button></div>
       </form>
     </section>

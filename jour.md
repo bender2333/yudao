@@ -1008,6 +1008,10 @@
 - 未改写失败记录；本场无失败。luna 历史 `provider_error` 仍保留。
 
 
+## 2026-09-18 - P1 修复已提交推送，远程部署用户叫停
+
+- 7 个原子提交已推送到 origin/harness_1(af967d5)。SSH 免密已建好并验证通过(ed25519 yudao-deploy)。用户叫停后部署未执行：远端未拉代码、未安装依赖、未启动 serve，无需回滚。
+
 ## 2026-09-18 - P1 五条 + README 示例修复完成，已验收未提交
 
 - 6 个单元并行委派 deep agent 实现，主代理验收。改动未提交：README.md、harness/replay_check.py(新建)、runtime.py、web/server.py、__main__.py、observability.py、web/static/provider-config.js、orchestrator.py、projects.py、tests/test_delivery_tree_engine.py(断言更新)。
@@ -1036,3 +1040,22 @@
 - 2.2 / 2.3 代码已入主干。2.4 P0 为空。2.5 保持默认 Prompt。
 - 2.6.6：全仓 Python 958 passed / 1 skipped；Node UI 29 passed。缺凭据 CLI 测试改为断言环境变量名与部门，不再钉死旧英文句子。
 
+## 2026-09-18 - 原型与当前实现一致性核对
+
+- 本轮对照基线是最新项目级融合原型 `docs/prototypes/2026-09-09/project-collaboration.html` 及其 README；旧版 2026-09-06 三部门视觉契约只作为历史依据，不能覆盖项目级导航变化。
+- 结论不是“原型已原样实现”，而是“项目级信息架构和主要真实链路已落地，少数行为边界及完整验收仍不一致”。当前生产入口已从静态内存示例切换为真实项目、事项、事件、工件、REST/SSE 和 Provider 数据；这属于从原型到产品实现的预期演化。
+- 已对上的主线：项目侧栏与概览、流程/看板、产品/工程/质检/观测页签；事项创建、取消、全局追加、部门指导；真实状态投影与项目 SSE；部门 Context 精确绑定模型尝试；Request/Response/事件原文、重试切换、usage 分组与缺失值；项目级 Prompt 版本、冲突、恢复默认；项目资料、归档/恢复和观测返回状态保留。
+- 关键行为差异：最新原型允许没有活跃事项时进入部门并进行项目级讨论；当前实现的空部门输入只能“作为新事项开始”或“记录原文”，没有持久的无 run 部门对话。该差异与项目工作台合同中“首批不做无 run 部门模型对话”的决定一致，但需要在产品判断中明确为有意收缩，而不是误判为已对齐。
+- 其他范围差异：原型要求的“已有项目代码/资料接入并查看三部门建档示例”尚未实现，当前只有项目登记和文本材料登记；原型要求打开事项查看交接/返工详情，当前 REST 有事项详情但总览前端主要展示摘要，交接详情入口仍不完整；Provider 配置页已有实现，但它属于后续独立原型，不是 2026-09-09 原型的已确认范围。
+- 证据边界：Node UI 与项目/Web 定向测试通过；代码已覆盖取消筛选、费用未知、Raw 滚动、请求/实际身份等修补，但这些以及 W5 连续输入、W6 部门指导真实闭环、W7 完整浏览器/真实 Provider 联调仍不能仅凭局部测试宣布完成。
+- 后续讨论应先决定是否保留“无 run 部门项目级讨论”这一收缩边界；若保留，需把原型 README 的表述改成当前合同；若恢复原型承诺，应新增项目级部门消息模型和查询/命令链，不应把 `record_material` 伪装成部门对话。
+
+## 2026-09-18 - Provider 配置页真实页面走查：消息中文化与移动端卡片
+
+- 沿前一实验收继续：走查真实实现页（`harness/web/static/provider-config.js` + `server.py`），对照原型 README 验收路径 2–6。隔离服务用 `.yudao/pc-ui-check/`（catalog 副本、占位凭据）、端口 8879，未动用户 8765 实例。
+- 实测问题两类：① 390 下表格单元格只剩约 69px，URL/凭据引用/名称被 ellipsis 截断且无 title，1440 下地址列（119px vs 需要约 201px）也被截断；② 失败与校验消息为英文（测试连接、删除 409、导入/保存字段级 issues），与全站中文不一致，也未体现“分类后的原因”。
+- 修正：单元格改为换行显示（与原型契约一致）；桌面 `td:nth-child` 百分比宽度收进 `@media (min-width: 391px)`——390 卡片布局曾继承这些宽度，实测 td 仅 64px、值列被压成 0px、字符逐行折断，是本次走查发现的真实缺陷；`provider_catalog.py`、`web/server.py` 的 Provider 消息与 `__main__.py` CLI 提示改中文；测试连接失败按 `ProviderError.reason` 加中文分类前缀；凭据缺失提示引用名且不回显密钥；`runtime.py` 同步匹配中文消息；字段列表分隔符改“；”。`test_provider_catalog.py` 一处断言随之更新。
+- 并行写入：走查期间 `provider-config.js`、`styles.css`、`jour.md` 出现本会话之外的改动（行卡片键盘/aria、单元格 title/data-label、删除确认框、390 卡片布局、上一条原型一致性核对）。未回退任何内容，全部纳入本次复验。
+- 复验：1440 `scrollWidth 1425 ≤ 1440`、无截断单元格；390 `docScrollWidth 375 ≤ 390`、卡片显示“名称/协议/地址/凭据引用/状态”全值、无溢出元素；测试连接显示“缺少凭据环境变量 MY_API_KEY，请补充后重试”；删除被引用提示“Provider 仍被引用：models.my-model、bindings.product、bindings.quality”；坏文件导入返回中文字段级 issues 且旧目录保留；导出/导入、模型与绑定保存通过；控制台无应用错误（409/400 的 fetch 失败属预期）。
+- 测试：`provider_catalog + provider_config_web + test_web` 68 passed；`node --test harness/tests/test_web_ui.js` 29 passed。`test_department_providers.py` 的 8 项失败已在暂存本轮改动后用干净代码复现，属本机既有 flake（本地 stub 服务未收到请求），与本轮无关。
+- 证据：`.tmp/provider-config-real-1440-final.png`、`.tmp/provider-config-real-390-merged2.png`；本轮按原子提交打包（消息中文化 / UI 可读性与移动端 / 文档）。
