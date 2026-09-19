@@ -46,6 +46,7 @@ flowchart TB
 | Go 真实候选刷新 | 对 `https://opencode.ai/zen/go/v1/models` 真实取回 37 个候选，三条预置协议提示分别命中 glm-5.1、gpt-5.6-luna、minimax-m2.7；不使用任何凭据、不落盘 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
 | 无凭据 smoke | 退出码 2，逐部门指出缺少 `YUDAO_OPENCODE_GO_KEY`，未启动空壳运行 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
 | 键盘与可达性 | 真实 Chromium 中 Tab/Enter 可激活“自定义连接”并进入表单；所有可见输入控件都有标签；390 与 1440 无横向溢出、无越界控件 | `.yudao/stage-2-7-20260919/keyboard-390.png` |
+| Go 无效凭据错误分类 | 三个真实协议端点均返回 HTTP 401，统一判为非可重试 `provider_error`，不重试、不换 Key；responses 错误体带 `autherror`，chat/messages 未给出可识别代码时保持 `http_status` 回退，不编造原因 | `.yudao/stage-2-7-20260919/go-unauth-errors.log` |
 
 ## 5. 界面行为要点
 
@@ -56,7 +57,7 @@ flowchart TB
 
 ## 6. 受阻与边界
 
-- Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有），三个协议的真实推理与工具往返未执行。已取得的真实外部证据是公开模型列表刷新（37 个候选、预置提示命中）与无凭据时 smoke 的明确失败；二者都不能替代带凭据的真实推理验收。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理。
+- Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有），三个协议的真实推理与工具往返未执行。已取得的真实外部证据是公开模型列表刷新（37 个候选、预置提示命中）、无凭据时 smoke 的明确失败，以及无效凭据下三个端点的 401 分类；三者都不能替代带有效凭据的真实推理验收。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理。
 - 键盘可达性已在真实 Chromium 中验证：Tab/Enter 可完成“添加模型服务”入口操作，可见输入控件均有标签（隐藏的导入文件框补上 `aria-label`），1440 与 390 无横向溢出。逐字段的键盘输入流程未逐项录制。
 - 其他订阅、OAuth、推理参数、额度查询维持后置；恢复与并行不得重建第二套模型接入路径。
 
