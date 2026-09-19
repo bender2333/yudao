@@ -20,8 +20,27 @@
 8. 先看成熟产品怎么解决同一个问题，用已验证的模式，别从零发明。
 9. 不要因为时间急迫就被迫妥协，你有足够的时间和资源
 10. 请记得小步快跑，做完小功能后就及时commit和push
+
+
+
 11. 为保持上下文有效，尽可能使用subagent和并发
 
+
+设计说明，逻辑和交互说明，模块化交互图
 # 输出
 使用中文进行输出，包括日记
+
+## Agent skills
+
+### Issue tracker
+
+Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文设计与证据仍留在 `docs/`，issue 只放队列状态并链接到 `docs/`。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+沿用五个默认标签字符串：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文（single-context）：根 `CONTEXT.md` + `docs/adr/`，尚未创建，由 `/domain-modeling` 在术语或决策真正定下来时惰性创建。见 `docs/agents/domain.md`。
 
