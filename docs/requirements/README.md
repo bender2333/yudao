@@ -27,7 +27,7 @@
 | D19 | [按原型建设 Web 工作台](web-workspace-prototype.md) | 原型已归档、任务已规划；Provider 等配置原型预留 |
 | D20 | [部门定向追加指导](department-guidance.md) | 用户场景已确认；处理时机、原文范围及放行关系待设计，尚未实现 |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件，完整采集及新查询/页面待实现 |
-| D22 | [启动与 Provider 热生效](startup-provider-reload.md) | 已确认，待实现；Stage 2.7：无参空态、统一模块重载、仅新任务生效、页面 Key 与独立 .env 来源 |
-| D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已确认，设计完成、待实现；先 Go API Key 与三协议，其他订阅后续；说明与交互图见 [主设计](../provider-layer-design.md) |
+| D22 | [启动与 Provider 热生效](startup-provider-reload.md) | 已实现；无参空态启动、统一模块重载、仅新任务生效、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 部分待凭据 |
+| D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通，真实 Go 三协议验收因缺少订阅凭据受阻，见 [执行报告](../stage-2-7-provider-report.md) |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

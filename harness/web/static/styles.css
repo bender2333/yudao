@@ -846,3 +846,59 @@ body { overflow-x: hidden; }
   #yudao-workbench .yp-provider-table tr > td[colspan] { display: block; text-align: center; }
   #yudao-workbench .yp-provider-table tr > td[colspan]::before { display: none; }
 }
+
+/* —— Provider 设置页：首次接入、状态条、候选与测试结果 —— */
+#yudao-workbench .yp-notice.bad { background: color-mix(in srgb, var(--yp-red) 10%, transparent); border-left-color: var(--yp-red); }
+#yudao-workbench .yp-notice.bad p { color: var(--yp-red); }
+#yudao-workbench .yp-small.bad { color: var(--yp-red); }
+#yudao-workbench .yp-small.warn { color: var(--yp-amber); }
+#yudao-workbench .yp-status-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 14px; }
+#yudao-workbench .yp-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; background: var(--yp-soft); color: var(--yp-muted); padding: 3px 8px; font-size: 11px; max-width: 100%; overflow-wrap: anywhere; }
+#yudao-workbench .yp-chip.ok { color: var(--yp-green); background: var(--yp-tint); }
+#yudao-workbench .yp-chip.warn { color: var(--yp-amber); background: var(--yp-amber-bg); }
+#yudao-workbench .yp-chip.bad { color: var(--yp-red); background: color-mix(in srgb, var(--yp-red) 12%, transparent); }
+#yudao-workbench button.yp-chip { border: 1px solid transparent; cursor: pointer; text-align: left; font: inherit; }
+#yudao-workbench button.yp-chip:hover { border-color: currentColor; }
+#yudao-workbench button.yp-chip:focus-visible { outline: 2px solid var(--yp-green); outline-offset: 1px; }
+#yudao-workbench .yp-setup-paths { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+#yudao-workbench .yp-setup-path { border: 1px solid var(--yp-line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+#yudao-workbench .yp-preset-card { border: 1px solid var(--yp-line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+#yudao-workbench .yp-preset-card .yp-heading-actions { justify-content: flex-start; }
+#yudao-workbench .yp-setup-form-wrap { max-width: 620px; }
+#yudao-workbench .yp-preset-panel { border: 1px dashed var(--yp-line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; margin-bottom: 10px; min-width: 0; }
+#yudao-workbench .yp-endpoint-line { display: grid; grid-template-columns: minmax(96px, 30%) minmax(0, 1fr); gap: 8px; font-size: 12px; align-items: baseline; }
+#yudao-workbench .yp-endpoint-line code { overflow-wrap: anywhere; min-width: 0; color: var(--yp-text); }
+#yudao-workbench .yp-test-progress { padding: 10px 12px; font-size: 12px; color: var(--yp-muted); background: var(--yp-soft); border-radius: 8px; margin-bottom: 12px; overflow-wrap: anywhere; }
+#yudao-workbench .yp-test-result { border-radius: 8px; padding: 10px 12px; font-size: 12px; margin-bottom: 6px; overflow-wrap: anywhere; }
+#yudao-workbench .yp-test-result.ok { background: var(--yp-tint); color: var(--yp-green); }
+#yudao-workbench .yp-test-result.bad { background: color-mix(in srgb, var(--yp-red) 12%, transparent); color: var(--yp-red); }
+#yudao-workbench .yp-provider-table .warn { color: var(--yp-amber); }
+#yudao-workbench .yp-provider-table .admission.admitted { color: var(--yp-green); }
+#yudao-workbench .yp-provider-table .admission.unadmitted { color: var(--yp-amber); }
+#yudao-workbench .yp-provider-table .admission.stale { color: var(--yp-amber); }
+#yudao-workbench .yp-candidate-table tr { cursor: default; }
+@media (min-width: 391px) {
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(1) { width: 17%; }
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(2) { width: 17%; }
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(3) { width: 14%; }
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(4) { width: 12%; }
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(5) { width: 12%; }
+  #yudao-workbench .yp-provider-table.yp-model-table td:nth-child(6) { width: 28%; }
+  #yudao-workbench .yp-provider-table.yp-candidate-table td:nth-child(1) { width: 32%; }
+  #yudao-workbench .yp-provider-table.yp-candidate-table td:nth-child(2) { width: 22%; }
+  #yudao-workbench .yp-provider-table.yp-candidate-table td:nth-child(3) { width: 24%; }
+  #yudao-workbench .yp-provider-table.yp-candidate-table td:nth-child(4) { width: 22%; }
+}
+@media (max-width: 720px) {
+  #yudao-workbench .yp-setup-paths { grid-template-columns: 1fr; }
+}
+@media (max-width: 390px) {
+  #yudao-workbench .yp-provider-table tr[data-candidate-id] {
+    padding: 10px 11px;
+    border: 1px solid var(--yp-line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--yp-surface);
+  }
+  #yudao-workbench .yp-endpoint-line { grid-template-columns: 1fr; gap: 2px; }
+}

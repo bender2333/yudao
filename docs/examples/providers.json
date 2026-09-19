@@ -1,57 +1,91 @@
 {
+  "revision": 3,
   "providers": [
     {
-      "id": "provider-a",
-      "name": "Provider A",
-      "protocol": "responses",
-      "base_url": "https://provider-a.example/v1",
-      "credential_ref": "YUDAO_PROVIDER_A_KEY",
-      "timeout_sec": 600
+      "id": "opencode-go",
+      "name": "OpenCode Go",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "credential_ref": "YUDAO_OPENCODE_GO_KEY",
+      "timeout_sec": 600,
+      "preset_id": "opencode-go",
+      "models_url": "https://opencode.ai/zen/go/v1/models"
     },
     {
-      "id": "provider-b",
-      "name": "Provider B",
-      "protocol": "responses",
-      "base_url": "https://provider-b.example/v1",
-      "credential_ref": "YUDAO_PROVIDER_B_KEY",
-      "timeout_sec": 600
+      "id": "custom-compatible",
+      "name": "自定义兼容服务",
+      "base_url": "https://gateway.example/v1",
+      "credential_ref": "YUDAO_CUSTOM_KEY",
+      "timeout_sec": 600,
+      "preset_id": "",
+      "models_url": ""
     }
   ],
   "models": [
     {
-      "id": "product-model",
-      "provider_id": "provider-a",
-      "model": "model-product",
+      "id": "go-luna-responses",
+      "provider_id": "opencode-go",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
       "context_window": 128000,
-      "max_output_tokens": 8192
+      "max_output_tokens": 8192,
+      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证",
+      "admitted_at": null,
+      "admitted_revision": null,
+      "admitted_model": null,
+      "admitted_protocol": null
     },
     {
-      "id": "engineering-model",
-      "provider_id": "provider-b",
-      "model": "model-engineering",
+      "id": "go-glm-chat",
+      "provider_id": "opencode-go",
+      "model": "glm-5.1",
+      "protocol": "chat_completions",
+      "context_window": 128000,
+      "max_output_tokens": 8192,
+      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证",
+      "admitted_at": "2026-09-19T00:00:00+00:00",
+      "admitted_revision": 3,
+      "admitted_model": "glm-5.1",
+      "admitted_protocol": "chat_completions"
+    },
+    {
+      "id": "go-minimax-messages",
+      "provider_id": "opencode-go",
+      "model": "minimax-m2.7",
+      "protocol": "messages",
+      "context_window": 128000,
+      "max_output_tokens": 8192,
+      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证",
+      "admitted_at": null,
+      "admitted_revision": null,
+      "admitted_model": null,
+      "admitted_protocol": null
+    },
+    {
+      "id": "custom-responses",
+      "provider_id": "custom-compatible",
+      "model": "your-model-id",
+      "protocol": "responses",
       "context_window": 64000,
-      "max_output_tokens": 8192
-    },
-    {
-      "id": "quality-model",
-      "provider_id": "provider-a",
-      "model": "model-quality",
-      "context_window": 128000,
-      "max_output_tokens": 8192
+      "max_output_tokens": 4096,
+      "capability_source": "自定义连接：按服务实际能力填写",
+      "admitted_at": "2026-09-19T00:00:00+00:00",
+      "admitted_revision": 3,
+      "admitted_model": "your-model-id",
+      "admitted_protocol": "responses"
     }
   ],
   "bindings": {
     "product": {
-      "provider_id": "provider-a",
-      "model_id": "product-model"
+      "provider_id": "opencode-go",
+      "model_id": "go-glm-chat"
     },
     "engineering": {
-      "provider_id": "provider-b",
-      "model_id": "engineering-model"
+      "provider_id": "custom-compatible",
+      "model_id": "custom-responses"
     },
     "quality": {
-      "provider_id": "provider-a",
-      "model_id": "quality-model"
+      "provider_id": "opencode-go",
+      "model_id": "go-glm-chat"
     }
   }
 }

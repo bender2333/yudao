@@ -1,5 +1,3 @@
-"""A single stateless Responses request; department and tool execution live above it."""
-
 from __future__ import annotations
 
 import asyncio
@@ -10,8 +8,8 @@ import re
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from threading import Lock
-from typing import Any
+from threading import Event, Lock
+from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import httpx
@@ -24,15 +22,18 @@ from openai import (
     DefaultAsyncHttpxClient,
 )
 
-from ..models import Usage
-from .base import Availability, ModelObservation, ModelRequest, ModelResponse, ProviderError
+from .errors import CancelledError, ProviderError
+from .invoke import InvokeResult, Observer, ProviderInput
+from .presets import build_identity_headers
+from .resolve import FrozenTarget
 
 
 _STREAM_DRAIN_TIMEOUT_SEC = 0.1
 
 
 class _ObservationCaptureError(Exception):
-    """A raw observation sink failure that must never be swallowed by stream drain."""
+    # 观察接收方失败不可吞入流排空
+    pass
 
 
 @dataclass(frozen=True)
@@ -42,11 +43,23 @@ class ResponsesConfig:
     provider: str = "openai"
     base_url: str = "https://api.openai.com/v1"
     timeout_sec: float = 600.0
+    # 跨协议统一请求身份（真实客户端 User-Agent、会话标识），不进日志与证据正文
+    identity_headers: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
+
+
+@dataclass
+class _InvokeRequest:
+    frozen_target: FrozenTarget
+    provider_input: ProviderInput
+    session_id: str
+    attempt_id: str
+    abort_event: Event
+    observer: Observer
+    config: ResponsesConfig
 
 
 class _TransportTrace:
-    """Keep only safe transport phase facts for one model request."""
-
+    # 只保留安全的传输阶段事实，不记录正文与凭据
     def __init__(self) -> None:
         self._last_event: dict[str, str | None] | None = None
         self._failure_event: dict[str, str | None] | None = None
@@ -76,8 +89,7 @@ class _TransportTrace:
 
 @dataclass
 class _RequestContext:
-    request: ModelRequest
-    config: ResponsesConfig
+    invocation: _InvokeRequest
     trace: _TransportTrace
     observation_errors: list[BaseException]
 
@@ -95,17 +107,16 @@ class _CompletionDeadline:
 
 
 class ResponsesExecutionScope:
-    """Own one synchronous run's event loop and reusable provider clients."""
-
+    # 拥有一次同步运行的事件循环与可复用连接，认证句柄只在内存中隔离
     def __init__(self) -> None:
         self._runner = asyncio.Runner()
-        self._clients: dict[tuple[str, str, float, str], AsyncOpenAI] = {}
+        self._clients: dict[tuple[Any, ...], AsyncOpenAI] = {}
         self._request_context: ContextVar[_RequestContext | None] = ContextVar(
-            "yudao_responses_request_context", default=None,
+            "yudao_providers_responses_request_context", default=None,
         )
         self._closed = False
 
-    def __enter__(self) -> "ResponsesExecutionScope":
+    def __enter__(self) -> ResponsesExecutionScope:
         return self
 
     def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
@@ -120,7 +131,8 @@ class ResponsesExecutionScope:
         if self._closed:
             raise RuntimeError("Responses execution scope is closed")
         # The credential is an in-memory connection identity only; it is never logged or persisted.
-        key = (config.provider, config.base_url, float(config.timeout_sec), config.api_key)
+        identity = tuple(sorted(dict(config.identity_headers).items()))
+        key = (config.provider, config.base_url, float(config.timeout_sec), config.api_key, identity)
         client = self._clients.get(key)
         if client is None:
             http_client = DefaultAsyncHttpxClient(
@@ -133,6 +145,7 @@ class ResponsesExecutionScope:
                 timeout=config.timeout_sec,
                 max_retries=0,
                 http_client=http_client,
+                default_headers=dict(config.identity_headers) or None,
             )
             self._clients[key] = client
         return client
@@ -150,13 +163,15 @@ class ResponsesExecutionScope:
         http_request.extensions["trace"] = context.trace
         try:
             body = _request_body(http_request)
-            context.request.observe(ModelObservation(
-                id=_request_observation_id(context.request),
-                kind="request",
-                payload=body,
-                provider=context.config.provider,
-                model=context.config.model,
-            ))
+            context.invocation.observer.on_event({
+                "kind": "request",
+                "id": _request_observation_id(context.invocation),
+                "session_id": context.invocation.session_id,
+                "attempt_id": context.invocation.attempt_id,
+                "provider": context.invocation.config.provider,
+                "model": context.invocation.config.model,
+                "payload": body,
+            })
         except BaseException as exc:
             context.observation_errors.append(exc)
             raise
@@ -177,103 +192,131 @@ class ResponsesExecutionScope:
             self._runner.close()
 
 
-class ResponsesAdapter:
-    name = "responses"
+def invoke_responses(
+    frozen_target: FrozenTarget,
+    provider_input: ProviderInput,
+    session_id: str,
+    attempt_id: str,
+    abort_event: Event,
+    observer: Observer,
+    *,
+    execution_scope: ResponsesExecutionScope | None = None,
+) -> InvokeResult:
+    # 单次 Responses 调用，SDK 内部重试关闭
+    config = ResponsesConfig(
+        model=frozen_target.model,
+        api_key=frozen_target.api_key,
+        provider=frozen_target.provider_id,
+        base_url=frozen_target.base_url,
+        timeout_sec=frozen_target.timeout_sec,
+        identity_headers=build_identity_headers(frozen_target.header_profile, session_id),
+    )
+    invocation = _InvokeRequest(
+        frozen_target=frozen_target, provider_input=provider_input,
+        session_id=session_id, attempt_id=attempt_id,
+        abort_event=abort_event, observer=observer, config=config,
+    )
+    availability = check_availability(config)
+    if not availability["available"]:
+        raise ProviderError(availability["message"], reason=availability["reason"])
+    if abort_event.is_set():
+        raise CancelledError()
+    invoker = _ResponsesInvoker(execution_scope=execution_scope)
+    try:
+        if execution_scope is None:
+            return asyncio.run(invoker.complete(invocation))
+        return execution_scope.run(invoker.complete(invocation))
+    except ProviderError:
+        raise
+    except (TimeoutError, APITimeoutError) as exc:
+        raise ProviderError("Model request timed out", reason="provider_timeout", retryable=True,
+                            diagnostics=_transport_diagnostics("timeout", exc)) from exc
+    except APIStatusError as exc:
+        code = _error_code(exc.body)
+        reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+        diagnostics = _http_status_diagnostics(exc, _request_observation_id(invocation), secrets=(config.api_key,))
+        retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
+        if retry_after is not None:
+            diagnostics["retry_after_sec"] = retry_after
+        raise ProviderError(
+            f"Model provider returned HTTP {exc.status_code}", reason=reason,
+            retryable=_retryable_http_status(exc.status_code, code),
+            diagnostics=diagnostics,
+        ) from exc
+    except APIConnectionError as exc:
+        if _has_nonretryable_connection_cause(exc):
+            raise _nonretryable_http_error() from exc
+        raise ProviderError("Model provider connection failed", retryable=True,
+                            diagnostics=_transport_diagnostics("connection", exc)) from exc
+    except APIError as exc:
+        code = _error_code(exc.body)
+        reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+        raise ProviderError(
+            "Model provider returned an invalid API response", reason=reason,
+            retryable=reason != "context_overflow" and _retryable_code(code),
+            diagnostics=_diagnostic_code(code, "provider_response"),
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ProviderError("Model provider returned malformed stream JSON") from exc
 
-    def __init__(self, config: ResponsesConfig, *, execution_scope: ResponsesExecutionScope | None = None) -> None:
-        self.config = config
-        self.model = self.config.model or "unconfigured"
+
+def check_availability(config: ResponsesConfig) -> dict[str, Any]:
+    # 发送前可用性检查，不触网
+    missing = []
+    if not config.api_key:
+        missing.append("provider credential")
+    if not config.model:
+        missing.append("model")
+    if missing:
+        return {"available": False, "reason": "provider_unavailable",
+                "message": "Missing configuration: " + ", ".join(missing)}
+    try:
+        url = urlsplit(config.base_url)
+        valid_url = url.scheme in {"https", "http"} and bool(url.hostname) and not url.username and not url.password
+    except ValueError:
+        valid_url = False
+    if not valid_url:
+        return {"available": False, "reason": "provider_unavailable", "message": "Invalid provider base URL"}
+    if not math.isfinite(config.timeout_sec) or config.timeout_sec <= 0:
+        return {"available": False, "reason": "provider_unavailable",
+                "message": "Provider timeout must be positive and finite"}
+    if not config.provider:
+        return {"available": False, "reason": "provider_unavailable",
+                "message": "Provider identity must not be empty"}
+    return {"available": True, "reason": "", "message": ""}
+
+
+class _ResponsesInvoker:
+    def __init__(self, *, execution_scope: ResponsesExecutionScope | None = None) -> None:
         self.execution_scope = execution_scope
         self._lock = Lock()
-        self._active: tuple[str, asyncio.AbstractEventLoop, asyncio.Task] | None = None
+        self._active: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Task]] = {}
 
-    def availability(self) -> Availability:
-        missing = []
-        if not self.config.api_key:
-            missing.append("provider credential")
-        if not self.config.model:
-            missing.append("model")
-        if missing:
-            return Availability(False, "provider_unavailable", "Missing configuration: " + ", ".join(missing))
-        try:
-            url = urlsplit(self.config.base_url)
-            valid_url = url.scheme in {"https", "http"} and bool(url.hostname) and not url.username and not url.password
-        except ValueError:
-            valid_url = False
-        if not valid_url:
-            return Availability(False, "provider_unavailable", "Invalid provider base URL")
-        if not math.isfinite(self.config.timeout_sec) or self.config.timeout_sec <= 0:
-            return Availability(False, "provider_unavailable", "Provider timeout must be positive and finite")
-        if not self.config.provider:
-            return Availability(False, "provider_unavailable", "Provider identity must not be empty")
-        return Availability(True)
-
-    def abort(self, session_id: str) -> None:
+    def abort(self, attempt_id: str) -> None:
+        # 取消只作用于本次调用尝试
         with self._lock:
-            if self._active is not None and self._active[0] == session_id:
-                _, loop, task = self._active
+            entry = self._active.get(str(attempt_id))
+            if entry is not None:
+                _, task = entry
+                loop, _ = entry
                 loop.call_soon_threadsafe(task.cancel)
 
-    def complete(self, request: ModelRequest) -> ModelResponse:
-        availability = self.availability()
-        if not availability.available:
-            raise ProviderError(availability.message, reason=availability.reason)
-        if request.abort_flag.is_set():
-            raise ProviderError("Model request cancelled", reason="cancelled")
-        try:
-            if self.execution_scope is None:
-                return asyncio.run(self._complete(request))
-            return self.execution_scope.run(self._complete(request))
-        except ProviderError:
-            raise
-        except (TimeoutError, APITimeoutError) as exc:
-            raise ProviderError("Model request timed out", reason="provider_timeout", retryable=True,
-                                diagnostics=_transport_diagnostics("timeout", exc)) from exc
-        except APIStatusError as exc:
-            code = _error_code(exc.body)
-            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
-            # Provider error bodies may echo input or credentials; keep only bounded identity.
-            diagnostics = _http_status_diagnostics(exc, request, secrets=(self.config.api_key,))
-            retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
-            if retry_after is not None:
-                diagnostics["retry_after_sec"] = retry_after
-            raise ProviderError(
-                f"Model provider returned HTTP {exc.status_code}", reason=reason,
-                retryable=_retryable_http_status(exc.status_code, code),
-                diagnostics=diagnostics,
-            ) from exc
-        except APIConnectionError as exc:
-            if _has_nonretryable_connection_cause(exc):
-                raise _nonretryable_http_error() from exc
-            raise ProviderError("Model provider connection failed", retryable=True,
-                                diagnostics=_transport_diagnostics("connection", exc)) from exc
-        except APIError as exc:
-            code = _error_code(exc.body)
-            reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
-            raise ProviderError(
-                "Model provider returned an invalid API response", reason=reason,
-                retryable=reason != "context_overflow" and _retryable_code(code),
-                diagnostics=_diagnostic_code(code, "provider_response"),
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise ProviderError("Model provider returned malformed stream JSON") from exc
-
-    async def _complete(self, request: ModelRequest) -> ModelResponse:
+    async def complete(self, invocation: _InvokeRequest) -> InvokeResult:
         loop = asyncio.get_running_loop()
         trace = _TransportTrace()
         deadline = _CompletionDeadline()
         with self._lock:
-            if self._active is not None:
-                raise ProviderError("Responses adapter already has an active model request")
-            task = asyncio.create_task(self._stream_once(request, trace, deadline))
-            self._active = (request.session_id, loop, task)
-        watcher = asyncio.create_task(self._watch_abort(request, task))
+            if invocation.attempt_id in self._active:
+                raise ProviderError("Responses invocation already active for this attempt")
+            task = asyncio.create_task(self._stream_once(invocation, trace, deadline))
+            self._active[invocation.attempt_id] = (loop, task)
+        watcher = asyncio.create_task(self._watch_abort(invocation, task))
         try:
-            async with asyncio.timeout(self.config.timeout_sec) as timeout:
+            async with asyncio.timeout(invocation.config.timeout_sec) as timeout:
                 deadline.bind(timeout)
                 return await task
         except asyncio.CancelledError as exc:
-            raise ProviderError("Model request cancelled", reason="cancelled") from exc
+            raise CancelledError() from exc
         except TimeoutError as exc:
             _attach_transport_trace(exc, trace.snapshot())
             raise
@@ -282,33 +325,33 @@ class ResponsesAdapter:
             raise
         finally:
             with self._lock:
-                self._active = None
+                self._active.pop(invocation.attempt_id, None)
             watcher.cancel()
             await asyncio.gather(watcher, return_exceptions=True)
 
     @staticmethod
-    async def _watch_abort(request: ModelRequest, task: asyncio.Task) -> None:
+    async def _watch_abort(invocation: _InvokeRequest, task: asyncio.Task) -> None:
         while not task.done():
-            if request.abort_flag.is_set():
+            if invocation.abort_event.is_set():
                 task.cancel()
                 return
             await asyncio.sleep(0.02)
 
     async def _stream_once(
         self,
-        request: ModelRequest,
+        invocation: _InvokeRequest,
         trace: _TransportTrace,
         deadline: _CompletionDeadline,
-    ) -> ModelResponse:
+    ) -> InvokeResult:
         started = time.monotonic()
         observation_errors: list[BaseException] = []
         if self.execution_scope is not None:
-            context = _RequestContext(request, self.config, trace, observation_errors)
+            context = _RequestContext(invocation, trace, observation_errors)
             token = self.execution_scope.bind(context)
             try:
-                client = await self.execution_scope.client_for(self.config)
+                client = await self.execution_scope.client_for(invocation.config)
                 return await self._stream_with_client(
-                    request, trace, observation_errors, client, started, deadline,
+                    invocation, trace, observation_errors, client, started, deadline,
                 )
             finally:
                 self.execution_scope.reset(token)
@@ -317,46 +360,51 @@ class ResponsesAdapter:
             http_request.extensions["trace"] = trace
             try:
                 body = _request_body(http_request)
-                request.observe(ModelObservation(
-                    id=_request_observation_id(request),
-                    kind="request",
-                    payload=body,
-                    provider=self.config.provider,
-                    model=self.config.model,
-                ))
+                invocation.observer.on_event({
+                    "kind": "request",
+                    "id": _request_observation_id(invocation),
+                    "session_id": invocation.session_id,
+                    "attempt_id": invocation.attempt_id,
+                    "provider": invocation.config.provider,
+                    "model": invocation.config.model,
+                    "payload": body,
+                })
             except BaseException as exc:
                 observation_errors.append(exc)
                 raise
 
         http_client = DefaultAsyncHttpxClient(
-            timeout=self.config.timeout_sec,
+            timeout=invocation.config.timeout_sec,
             event_hooks={"request": [observe_request]},
         )
         async with AsyncOpenAI(
-            api_key=self.config.api_key,
-            base_url=self.config.base_url,
-            timeout=self.config.timeout_sec,
+            api_key=invocation.config.api_key,
+            base_url=invocation.config.base_url,
+            timeout=invocation.config.timeout_sec,
             max_retries=0,
             http_client=http_client,
+            default_headers=dict(invocation.config.identity_headers) or None,
         ) as client:
             return await self._stream_with_client(
-                request, trace, observation_errors, client, started, deadline,
+                invocation, trace, observation_errors, client, started, deadline,
             )
 
-    async def _observed_events(self, request: ModelRequest, event_source: Any):
+    async def _observed_events(self, invocation: _InvokeRequest, event_source: Any):
         event_index = 0
         async for event in event_source:
-            event_payload = _sdk_json(event, secrets=(self.config.api_key,))
+            event_payload = _sdk_json(event, secrets=(invocation.config.api_key,))
             try:
-                request.observe_raw(ModelObservation(
-                    id=f"{_request_observation_id(request)}:stream-{event_index}",
-                    kind="stream_event",
-                    payload=event_payload,
-                    provider=self.config.provider,
-                    model=_actual_model(event_payload) or _actual_model(event_payload.get("response")),
-                    source="sdk_decoded_stream",
-                    sequence=event_index,
-                ))
+                invocation.observer.on_event({
+                    "kind": "stream_event",
+                    "id": f"{_request_observation_id(invocation)}:stream-{event_index}",
+                    "session_id": invocation.session_id,
+                    "attempt_id": invocation.attempt_id,
+                    "provider": invocation.config.provider,
+                    "model": _actual_model(event_payload) or _actual_model(event_payload.get("response")),
+                    "source": "sdk_decoded_stream",
+                    "sequence": event_index,
+                    "payload": event_payload,
+                })
             except BaseException as exc:
                 raise _ObservationCaptureError from exc
             event_index += 1
@@ -364,19 +412,20 @@ class ResponsesAdapter:
 
     async def _stream_with_client(
         self,
-        request: ModelRequest,
+        invocation: _InvokeRequest,
         trace: _TransportTrace,
         observation_errors: list[BaseException],
         client: AsyncOpenAI,
         started: float,
         deadline: _CompletionDeadline,
-    ) -> ModelResponse:
-        output_limit = {} if request.max_output_tokens is None else {"max_output_tokens": request.max_output_tokens}
+    ) -> InvokeResult:
+        provider_input = invocation.provider_input
+        output_limit = {} if provider_input.max_output_tokens is None else {"max_output_tokens": provider_input.max_output_tokens}
         try:
             stream = await client.responses.create(
-                model=self.config.model,
-                input=request.input_items,
-                tools=request.tools,
+                model=invocation.config.model,
+                input=_responses_input_items(provider_input),
+                tools=_responses_tools(provider_input),
                 store=False,
                 stream=True,
                 **output_limit,
@@ -392,52 +441,59 @@ class ResponsesAdapter:
         if observation_errors:
             raise observation_errors[0]
         seen_items: set[str] = set()
-        completed_response: ModelResponse | None = None
+        completed_response: InvokeResult | None = None
         async with stream:
-            event_source = self._observed_events(request, _provider_events(stream, trace))
+            event_source = self._observed_events(invocation, _provider_events(stream, trace))
             async for event in event_source:
-                if request.abort_flag.is_set():
-                    raise ProviderError("Model request cancelled", reason="cancelled")
+                if invocation.abort_event.is_set():
+                    raise CancelledError()
                 if event.type == "response.output_item.done":
                     self._observe_item(
-                        request,
+                        invocation,
                         event.item.model_dump(mode="json", exclude_unset=True),
                         seen_items,
                     )
                 elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
                     response = event.response
                     actual_model = _actual_model(response)
-                    raw_response = _sdk_json(response, secrets=(self.config.api_key,))
-                    request.observe_raw(ModelObservation(
-                        id=str(raw_response.get("id") or _request_observation_id(request)),
-                        kind="response",
-                        payload=raw_response,
-                        provider=self.config.provider,
-                        model=actual_model,
-                        source="sdk_response",
-                    ))
+                    raw_response = _sdk_json(response, secrets=(invocation.config.api_key,))
+                    invocation.observer.on_event({
+                        "kind": "response",
+                        "id": str(raw_response.get("id") or _request_observation_id(invocation)),
+                        "session_id": invocation.session_id,
+                        "attempt_id": invocation.attempt_id,
+                        "provider": invocation.config.provider,
+                        "model": actual_model,
+                        "source": "sdk_response",
+                        "payload": raw_response,
+                    })
                     output = [
                         _redact_sdk_json(
                             item.model_dump(mode="json", exclude_unset=True),
-                            secrets=(self.config.api_key,),
+                            secrets=(invocation.config.api_key,),
                         )
                         for item in (response.output or [])
                     ]
                     for item in output:
-                        self._observe_item(request, item, seen_items, actual_model=actual_model)
+                        self._observe_item(invocation, item, seen_items, actual_model=actual_model)
                     raw_usage = (
                         _redact_sdk_json(
                             response.usage.model_dump(mode="json", exclude_unset=True),
-                            secrets=(self.config.api_key,),
+                            secrets=(invocation.config.api_key,),
                         )
                         if response.usage else None
                     )
                     usage = _usage(raw_usage, started)
-                    request.observe(ModelObservation(
-                        id=response.id, kind="usage",
-                        payload={"response_id": response.id, "usage": raw_usage},
-                        usage=usage, provider=self.config.provider, model=response.model,
-                    ))
+                    invocation.observer.on_event({
+                        "kind": "usage",
+                        "id": response.id,
+                        "session_id": invocation.session_id,
+                        "attempt_id": invocation.attempt_id,
+                        "provider": invocation.config.provider,
+                        "model": response.model,
+                        "payload": {"response_id": response.id, "usage": raw_usage},
+                        "usage": usage,
+                    })
                     if event.type != "response.completed" or response.status != "completed":
                         code = getattr(response.error, "code", None) if response.error else None
                         reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
@@ -459,10 +515,18 @@ class ResponsesAdapter:
                         )
                     if response.output is None:
                         raise ProviderError("Completed model response has no output array")
-                    completed_response = ModelResponse(
-                        output=output, usage=usage, provider=self.config.provider,
-                        model=actual_model or "", response_id=response.id,
-                        sdk_response=raw_response,
+                    text = "\n".join(
+                        part.get("text", "") for item in output for part in (item.get("content") or [])
+                        if isinstance(part, dict) and part.get("type") == "output_text"
+                    )
+                    completed_response = InvokeResult(
+                        output=output, text=text, usage=usage,
+                        finish_reason="completed",
+                        provider=invocation.config.provider,
+                        model=invocation.config.model,
+                        response_id=response.id, protocol="responses",
+                        actual_model=actual_model or "",
+                        wire_evidence={"response_id": response.id, "attempt_id": invocation.attempt_id},
                     )
                     deadline.stop()
                     break
@@ -474,7 +538,7 @@ class ResponsesAdapter:
                         diagnostics=_diagnostic_code(event.code, "stream_error"),
                     )
             if completed_response is not None:
-                await _drain_completed_stream(event_source, request)
+                await _drain_completed_stream(event_source, invocation)
                 return completed_response
         raise ProviderError(
             "Model response stream ended before a terminal response",
@@ -484,13 +548,13 @@ class ResponsesAdapter:
 
     def _observe_item(
         self,
-        request: ModelRequest,
+        invocation: _InvokeRequest,
         item: dict[str, Any],
         seen: set[str],
         *,
         actual_model: str | None = None,
     ) -> None:
-        item = _redact_sdk_json(item, secrets=(self.config.api_key,))
+        item = _redact_sdk_json(item, secrets=(invocation.config.api_key,))
         item_id = item.get("id")
         if not isinstance(item_id, str) or not item_id:
             raise ProviderError("Model output item has no identity")
@@ -501,11 +565,58 @@ class ResponsesAdapter:
             part.get("text", "") for part in (item.get("content") or [])
             if isinstance(part, dict) and part.get("type") == "output_text"
         )
-        request.observe(ModelObservation(
-            id=item_id, kind="message", payload=item, text=text,
-            provider=self.config.provider,
-            model=_actual_model(item) or actual_model,
-        ))
+        invocation.observer.on_event({
+            "kind": "message",
+            "id": item_id,
+            "session_id": invocation.session_id,
+            "attempt_id": invocation.attempt_id,
+            "provider": invocation.config.provider,
+            "model": _actual_model(item) or actual_model,
+            "text": text,
+            "payload": item,
+        })
+
+
+def _responses_input_items(provider_input: ProviderInput) -> list[dict[str, Any]]:
+    # 统一消息按原顺序编码，不提升用户材料为系统指令
+    raw = provider_input.raw_request
+    if isinstance(raw, dict):
+        raw_input = raw.get("input")
+        if isinstance(raw_input, list):
+            # 过渡期桥接：内核仍按原 Responses 形状组装上下文，桥接层把整份
+            # input 原样放入 raw_request，保证实际发送与审计持久化逐字节一致
+            return [dict(item) if isinstance(item, dict) else item for item in raw_input]
+    items: list[dict[str, Any]] = []
+    for message in provider_input.messages:
+        item: dict[str, Any] = {"role": message.role, "content": message.content}
+        if message.name:
+            item["name"] = message.name
+        items.append(item)
+    for result in provider_input.tool_results:
+        items.append({
+            "type": "function_call_output",
+            "call_id": result.call_id,
+            "output": result.output,
+        })
+    return items
+
+
+def _responses_tools(provider_input: ProviderInput) -> list[dict[str, Any]]:
+    raw = provider_input.raw_request
+    if isinstance(raw, dict):
+        raw_tools = raw.get("tools")
+        if isinstance(raw_tools, list):
+            # 同上，工具 schema 原样直传，不丢弃 strict 等协议字段
+            return [dict(item) if isinstance(item, dict) else item for item in raw_tools]
+    tools: list[dict[str, Any]] = []
+    for tool in provider_input.tools:
+        tools.append({
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": dict(tool.parameters),
+        })
+    return tools
 
 
 _SAFE_ERROR_TOKEN = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
@@ -540,14 +651,14 @@ def _sanitized_error_param(value: Any) -> str | None:
 
 def _http_status_diagnostics(
     exc: APIStatusError,
-    request: ModelRequest,
+    observation_id: str,
     *,
     secrets: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     error = _error_object(exc.body)
     diagnostics: dict[str, Any] = {
         "status_code": exc.status_code,
-        "request_observation_id": _request_observation_id(request),
+        "request_observation_id": observation_id,
     }
     code = _safe_error_code(_error_code(exc.body)) or _sanitized_error_token(error.get("code"))
     if code is not None:
@@ -562,8 +673,7 @@ def _http_status_diagnostics(
 
 
 def _actual_model(value: Any) -> str | None:
-    """读取服务实际返回的模型；配置中的请求模型不是返回模型证据。"""
-
+    # 读取服务实际返回的模型，配置中的请求模型不是返回证据
     model = getattr(value, "model", None)
     if model is None and isinstance(value, dict):
         model = value.get("model")
@@ -571,8 +681,6 @@ def _actual_model(value: Any) -> str | None:
 
 
 def _sdk_json(value: Any, *, secrets: tuple[str, ...] = ()) -> dict[str, Any]:
-    """Return the JSON object exposed by an SDK model without capturing HTTP bytes."""
-
     if isinstance(value, dict):
         payload = json.loads(json.dumps(value, ensure_ascii=False))
         return _redact_sdk_json(payload, secrets=secrets)
@@ -592,6 +700,7 @@ _SENSITIVE_SDK_KEYS = frozenset({
 
 
 def _redact_sdk_json(value: Any, *, secrets: tuple[str, ...] = (), key: str | None = None) -> Any:
+    # 敏感键与 secret 子串一律脱敏，不进入日志与事件
     normalized_key = key.casefold().replace("-", "_") if isinstance(key, str) else ""
     if normalized_key in _SENSITIVE_SDK_KEYS or normalized_key.endswith("_api_key"):
         return "[REDACTED]"
@@ -611,9 +720,9 @@ def _redact_sdk_json(value: Any, *, secrets: tuple[str, ...] = (), key: str | No
     return value
 
 
-def _request_observation_id(request: ModelRequest) -> str:
-    root = request.request_id or request.activation_id
-    return f"{root}:{request.step_id}:attempt-{request.attempt}"
+def _request_observation_id(invocation: _InvokeRequest) -> str:
+    # 内核传入的 attempt_id 已是本次调用尝试的规范身份，直接作为观察身份
+    return invocation.attempt_id
 
 
 def _request_body(http_request: httpx.Request) -> dict[str, Any]:
@@ -763,9 +872,8 @@ async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
         yield event
 
 
-async def _drain_completed_stream(event_source: Any, request: ModelRequest) -> None:
-    """Give a completed SDK stream a short chance to reach EOF for reuse."""
-
+async def _drain_completed_stream(event_source: Any, invocation: _InvokeRequest) -> None:
+    # 完成后给 SDK 流一次短暂排空机会以复用连接
     try:
         async with asyncio.timeout(_STREAM_DRAIN_TIMEOUT_SEC):
             async for _event in event_source:
@@ -778,11 +886,11 @@ async def _drain_completed_stream(event_source: Any, request: ModelRequest) -> N
             if cause is not None:
                 raise cause
             raise
-        if request.abort_flag.is_set():
-            raise ProviderError("Model request cancelled", reason="cancelled")
+        if invocation.abort_event.is_set():
+            raise CancelledError()
         return
-    if request.abort_flag.is_set():
-        raise ProviderError("Model request cancelled", reason="cancelled")
+    if invocation.abort_event.is_set():
+        raise CancelledError()
 
 
 def _retry_after(headers: Any) -> float | None:
@@ -810,10 +918,11 @@ def _retry_after(headers: Any) -> float | None:
     return delay if 0 < delay and math.isfinite(delay) else None
 
 
-def _usage(raw: dict[str, Any] | None, started: float) -> Usage:
+def _usage(raw: dict[str, Any] | None, started: float) -> dict[str, Any]:
+    # 用量只做只读记录，未上报保持未知，不估算
     latency = int((time.monotonic() - started) * 1000)
     if raw is None:
-        return Usage(latency_ms=latency, reported=False)
+        return {"reported": False, "latency_ms": latency}
     details = raw.get("input_tokens_details")
     details = details if isinstance(details, dict) else {}
     input_tokens = raw.get("input_tokens", 0)
@@ -824,11 +933,11 @@ def _usage(raw: dict[str, Any] | None, started: float) -> Usage:
     output_tokens = output_tokens if isinstance(output_tokens, int) and not isinstance(output_tokens, bool) else 0
     total_tokens = total_tokens if isinstance(total_tokens, int) and not isinstance(total_tokens, bool) else 0
     cached = cached if isinstance(cached, int) and not isinstance(cached, bool) else 0
-    return Usage(
-        input_tokens=max(0, input_tokens - cached),
-        output_tokens=output_tokens,
-        total_tokens=total_tokens,
-        cache_read_tokens=cached,
-        latency_ms=latency,
-        reported=True,
-    )
+    return {
+        "input_tokens": max(0, input_tokens - cached),
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "cache_read_tokens": cached,
+        "latency_ms": latency,
+        "reported": True,
+    }

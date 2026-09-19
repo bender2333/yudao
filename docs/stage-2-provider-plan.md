@@ -1,6 +1,6 @@
 # Stage 2.7：统一 Provider 层、多厂商接入与 OpenCode Go
 
-日期：2026-09-19。状态：设计完成，代码与验收未开始。spec 已发布为 [issue #1](https://github.com/bender2333/yudao/issues/1)。
+日期：2026-09-19。状态：2.7.1–2.7.4 的代码与应用侧验收完成，执行报告见 [Stage 2.7 执行报告](stage-2-7-provider-report.md)；真实 OpenCode Go 三协议验收因本机缺少订阅凭据记为受阻。spec 已发布为 [issue #1](https://github.com/bender2333/yudao/issues/1)。
 
 Stage 2.1–2.6 按原合同关闭的结论保留；用户新增 2.7 作为进入 Stage 3 前的补充阶段。新需求以 [D22](requirements/startup-provider-reload.md) 和 [D23](requirements/provider-layer.md) 为准。
 
@@ -78,6 +78,8 @@ Stage 3.3 改为其他 Provider/订阅和推理设置；Go 必需协议不再留
 
 ## 7. 本轮交付状态
 
-已形成需求、研究和主设计，包含模块关系图、启动/调用/热更新时序图及设置页交互。2026-09-19 与用户逐条确认 Provider 层的多厂商口径：端点按协议建模、厂商不进数据结构（[ADR-0001](adr/0001-endpoints-by-protocol-not-vendor.md)），候选须经真实测试准入（[ADR-0002](adr/0002-candidates-need-test-to-admit.md)），预置表数据驱动且版本可见（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)）；词汇固化在 [CONTEXT.md](../CONTEXT.md)。代码、依赖安装、Go 登录/购买、真实推理和验收均未执行。
+已形成需求、研究和主设计，包含模块关系图、启动/调用/热更新时序图及设置页交互。2026-09-19 与用户逐条确认 Provider 层的多厂商口径：端点按协议建模、厂商不进数据结构（[ADR-0001](adr/0001-endpoints-by-protocol-not-vendor.md)），候选须经真实测试准入（[ADR-0002](adr/0002-candidates-need-test-to-admit.md)），预置表数据驱动且版本可见（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)）；词汇固化在 [CONTEXT.md](../CONTEXT.md)。
 
-下一项是 2.7.1 的冻结起点与实现安排，而不是跳过 Provider 补充阶段开始通用工具。
+同日完成 2.7.1–2.7.4 的实现与本地验收：独立 Provider 模块取代旧的目录工厂与适配器重复路径，无参启动与热生效按 D22 落地，Chat Completions 与 Anthropic Messages 接入并经本地报文捕获验证，Go 预置表、候选刷新与模型准入贯通设置页与内核。真实 Go 三协议验收等待用户订阅的 API Key，按设计保留受阻状态，不用本地模拟冒充。结果与证据见 [执行报告](stage-2-7-provider-report.md)。
+
+下一项是补齐受阻的真实 Go 三协议验收（以及 3.0B 在当前冻结版本上的回归），而不是跳过 Provider 补充阶段开始通用工具。

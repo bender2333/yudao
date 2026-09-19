@@ -4,29 +4,19 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import sys
 import threading
 import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import Event
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from ..adapters.base import ModelRequest, ProviderError
-from ..context import AssembledContext, ContextPart
 from ..git_audit import git_version_detail
-from ..models import ArtifactRef, ContextManifest, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
 from ..observability import MAX_LIMIT, AttemptNotFoundError, ObservabilityQuery
-from ..provider_catalog import (
-    CatalogValidationError,
-    ProviderCatalog,
-    ResolvedProviderTarget,
-    SUPPORTED_PROTOCOLS,
-    ValidationIssue,
-)
+from ..providers.errors import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
 from ..replay_check import ReplayIntegrityError
 from ..projects import (
@@ -74,8 +64,10 @@ class LoopConsoleServer(ThreadingHTTPServer):
         super().__init__((host, port), LoopConsoleHandler)
         self.system = system
         self.store = system.store
-        path = provider_config if provider_config is not None else getattr(system, "provider_config_path", None)
-        self.provider_config_path = None if path is None else Path(path)
+        # 本地源真相在独立 Provider 模块内，Web 只提交命令和读取状态
+        if provider_config is not None and system.facade.config_path is None:
+            system.facade.configure_paths(Path(provider_config), system.facade.dotenv_path)
+        self.provider_config_path = system.facade.config_path
         self._worker_lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._active_run_id: str | None = None
@@ -186,6 +178,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._get_project(path, query, store)
             if path == "/api/providers":
                 return self._send_json(self._providers_payload())
+            if path == "/api/provider-presets":
+                return self._send_json(self._provider_presets())
             if path == "/api/department-bindings":
                 return self._send_json(self._bindings_payload())
             self._send_json({"error": "not found"}, 404)
@@ -223,6 +217,12 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._post_project(parts[2], parts[3])
             if parts == ["api", "providers"]:
                 return self._post_providers()
+            if parts == ["api", "providers", "reload"]:
+                return self._post_reload()
+            if parts == ["api", "provider-credentials"]:
+                return self._post_credentials()
+            if len(parts) == 4 and parts[:2] == ["api", "providers"] and parts[3] == "candidates":
+                return self._provider_candidates(unquote(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "providers"] and parts[3] == "test":
                 return self._test_provider(unquote(parts[2]))
             self._send_json({"error": "not found"}, 404)
@@ -296,6 +296,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
     def _health(self) -> dict[str, Any]:
         status = self.server.system.provider_status()
         test_adapter = getattr(self.server.system, "test_adapter", None)
+        config = self.server.system.facade.config_status()
         return {
             "ok": True,
             "busy": self.server.busy(),
@@ -307,6 +308,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "provider_message": status.get("message", ""),
             "provider_bindings": status.get("departments", {}),
             "provider_status": status,
+            "provider_config": config["config_path"],
+            "provider_revision": config["revision"],
+            "provider_reload_error": config["reload_error"],
+            "provider_issues": config["issues"],
             "worker_error": self.server.last_worker_error(),
         }
 
@@ -476,93 +481,110 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         result = self.server.system.projects.configure_prompt(project_id, department, body["text"], body["base_version"])
         self._send_json(result)
 
+    def _facade(self):
+        return self.server.system.facade
+
     def _providers_payload(self) -> dict[str, Any]:
-        catalog = self.server.system.provider_catalog
-        if catalog is None:
-            return {"providers": [], "models": [], "bindings": {}}
-        credentials = self.server.system.credentials
-        providers = []
-        for provider in catalog.providers.values():
-            item = provider.public_dict()
-            item["credential_configured"] = _credential_ready(provider, credentials)
-            item["models"] = [
-                model.public_dict()
-                for model in catalog.models.values()
-                if model.provider_id == provider.id
-            ]
-            providers.append(item)
-        providers.sort(key=lambda item: item["id"])
-        return {
-            "providers": providers,
-            "models": [catalog.models[key].public_dict() for key in sorted(catalog.models)],
-            "bindings": {
-                department: catalog.bindings[department].public_dict()
-                for department in DEPARTMENTS
-                if department in catalog.bindings
-            },
-        }
+        # 处理器只转交独立 Provider 模块，不读写目录与密钥
+        return self._facade().providers_view()
 
     def _bindings_payload(self) -> dict[str, Any]:
-        catalog = self.server.system.provider_catalog
-        if catalog is None:
-            return {"bindings": {}}
+        facade = self._facade()
+        view = facade.providers_view()
+        providers = {item["id"]: item for item in view["providers"]}
+        models = {item["id"]: item for item in view["models"]}
         bindings: dict[str, Any] = {}
-        for department in DEPARTMENTS:
-            binding = catalog.bindings.get(department)
-            if binding is None:
-                continue
-            provider = catalog.providers.get(binding.provider_id)
-            model = catalog.models.get(binding.model_id)
-            item = binding.public_dict()
+        for department, binding in view["bindings"].items():
+            item = dict(binding)
+            provider = providers.get(binding.get("provider_id", ""))
+            model = models.get(binding.get("model_id", ""))
             if provider is not None:
-                item["provider_name"] = provider.name
-                item["protocol"] = provider.protocol
+                item["provider_name"] = provider["name"]
             if model is not None:
-                item["model"] = model.model
-                item["context_window"] = model.context_window
-                item["max_output_tokens"] = model.max_output_tokens
+                item["protocol"] = model["protocol"]
+                item["model"] = model["model"]
+                item["context_window"] = model["context_window"]
+                item["max_output_tokens"] = model["max_output_tokens"]
             bindings[department] = item
         return {"bindings": bindings}
 
     def _post_providers(self) -> None:
         body = self._read_json_body()
         if "providers" in body:
-            catalog = self._catalog_from_document(body)
-            self._persist_catalog(catalog)
+            previous = self._facade().to_document()
+            try:
+                self._facade().store_document(body)
+            except CatalogValidationError as exc:
+                return self._send_catalog_error(exc)
+            try:
+                self._persist_facade(previous)
+            except ProviderUnavailableError as exc:
+                return self._send_json({"error": str(exc), "reason": exc.reason}, 503)
             return self._send_json(self._providers_payload())
-        catalog = self._merge_provider(body, existing_id=None)
-        self._persist_catalog(catalog)
-        return self._send_json(self._providers_payload(), 201)
+        self._save_provider_entry(body, existing_id=None, created=True)
 
     def _put_provider(self, provider_id: str) -> None:
         body = self._read_json_body()
         if "id" in body and body["id"] != provider_id:
             raise ValueError("Provider ID 不可修改")
         body = {**body, "id": provider_id}
-        catalog = self._merge_provider(body, existing_id=provider_id)
-        self._persist_catalog(catalog)
-        return self._send_json(self._providers_payload())
+        self._save_provider_entry(body, existing_id=provider_id, created=False)
+
+    def _save_provider_entry(self, body: dict[str, Any], *, existing_id: str | None,
+                             created: bool) -> None:
+        if not isinstance(body, dict):
+            raise ValueError("请求体必须是 JSON 对象")
+        facade = self._facade()
+        known_ids = {item["id"] for item in facade.providers_view()["providers"]}
+        provider_id = body.get("id")
+        if not isinstance(provider_id, str) or not provider_id.strip():
+            raise ValueError("缺少字段：id")
+        if existing_id is None and provider_id in known_ids:
+            self._send_json({"error": f"Provider 已存在：{provider_id}", "reason": "conflict"}, 409)
+            raise _ResponseSent()
+        if existing_id is not None and existing_id not in known_ids:
+            self._send_json({"error": "Provider 不存在"}, 404)
+            raise _ResponseSent()
+        _validate_provider_entry(body)
+        models = body.get("models")
+        if models is not None and not isinstance(models, list):
+            raise ValueError("models 必须是数组")
+        previous = facade.to_document()
+        try:
+            facade.save_provider_entry(
+                {key: value for key, value in body.items() if key != "models"},
+                [dict(item) for item in models] if isinstance(models, list) else None,
+            )
+        except CatalogValidationError as exc:
+            return self._send_catalog_error(exc)
+        try:
+            self._persist_facade(previous)
+        except ProviderUnavailableError as exc:
+            return self._send_json({"error": str(exc), "reason": exc.reason}, 503)
+        return self._send_json(self._providers_payload(), 201 if created else 200)
 
     def _delete_provider(self, provider_id: str) -> None:
         self._drain_body()
-        catalog = self.server.system.provider_catalog
-        if catalog is None or provider_id not in catalog.providers:
-            return self._send_json({"error": "Provider 不存在"}, 404)
-        dependents = _provider_dependents(catalog, provider_id)
-        if dependents:
-            return self._send_json({
-                "error": "Provider 仍被引用：" + "、".join(dependents),
-                "reason": "in_use",
-                "dependents": dependents,
-            }, 409)
-        raw = catalog.to_dict()
-        raw["providers"] = [item for item in raw["providers"] if item["id"] != provider_id]
-        raw["models"] = [item for item in raw["models"] if item["provider_id"] != provider_id]
+        previous = self._facade().to_document()
         try:
-            updated = ProviderCatalog.from_dict(raw)
+            self._facade().delete_provider(provider_id)
         except CatalogValidationError as exc:
-            return self._send_catalog_error(exc)
-        self._persist_catalog(updated)
+            issues = [{"location": issue.location, "message": issue.message} for issue in exc.issues]
+            if any("仍被引用" in issue.message for issue in exc.issues):
+                dependents = [issue.location for issue in exc.issues]
+                return self._send_json({
+                    "error": "Provider 仍被引用：" + "、".join(dependents),
+                    "reason": "in_use",
+                    "dependents": dependents,
+                }, 409)
+            if any("不存在" in issue.message for issue in exc.issues):
+                return self._send_json({"error": "Provider 不存在"}, 404)
+            return self._send_json({"error": str(exc), "reason": "invalid_catalog",
+                                    "issues": issues}, 400)
+        try:
+            self._persist_facade(previous)
+        except ProviderUnavailableError as exc:
+            return self._send_json({"error": str(exc), "reason": exc.reason}, 503)
         return self._send_json(self._providers_payload())
 
     def _put_bindings(self) -> None:
@@ -570,143 +592,226 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         bindings = body.get("bindings", body)
         if not isinstance(bindings, dict):
             raise ValueError("bindings 必须是对象")
-        catalog = self.server.system.provider_catalog
-        raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
-        raw["bindings"] = bindings
+        previous = self._facade().to_document()
         try:
-            updated = ProviderCatalog.from_dict(raw)
+            self._facade().save_bindings(bindings)
         except CatalogValidationError as exc:
             return self._send_catalog_error(exc)
-        self._persist_catalog(updated)
+        try:
+            self._persist_facade(previous)
+        except ProviderUnavailableError as exc:
+            return self._send_json({"error": str(exc), "reason": exc.reason}, 503)
         return self._send_json(self._bindings_payload())
 
-    def _test_provider(self, provider_id: str) -> None:
-        self._drain_body()
-        catalog = self.server.system.provider_catalog
-        if catalog is None or provider_id not in catalog.providers:
+    def _provider_presets(self) -> dict[str, Any]:
+        # 服务方案预置表带版本与来源，Web 只转交独立 Provider 模块
+        return self._facade().presets_public_view()
+
+    def _provider_candidates(self, provider_id: str) -> None:
+        # 显式刷新候选模型：上游不可用时返回状态 unknown，不沿用上次列表
+        body = self._read_json_body()
+        override = None
+        if isinstance(body, dict):
+            raw = body.get("models_url")
+            if isinstance(raw, str) and raw.strip():
+                override = raw.strip()
+        view = self._facade().providers_view()
+        if not any(item["id"] == provider_id for item in view["providers"]):
             return self._send_json({"error": "Provider 不存在"}, 404)
-        provider = catalog.providers[provider_id]
-        model = next((item for item in catalog.models.values() if item.provider_id == provider_id), None)
-        if model is None:
+        result = self._facade().refresh_candidates(provider_id, models_url_override=override)
+        return self._send_json(result)
+
+    def _test_provider(self, provider_id: str) -> None:
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            raise ValueError("请求体必须是 JSON 对象")
+        kind = body.get("kind", "connection")
+        model_id = body.get("model_id")
+        facade = self._facade()
+        view = facade.providers_view()
+        provider = next((item for item in view["providers"] if item["id"] == provider_id), None)
+        if provider is None:
+            return self._send_json({"error": "Provider 不存在"}, 404)
+        if kind == "model":
+            return self._model_test(provider_id, model_id, provider, facade)
+        if kind != "connection":
+            raise ValueError("kind 必须是 connection 或 model")
+        candidates = [item for item in view["models"]
+                      if item["provider_id"] == provider_id
+                      and (model_id is None or item["id"] == model_id)]
+        if model_id is not None and not candidates:
+            return self._send_json({"error": "模型不存在"}, 404)
+        if not candidates:
             raise ValueError("Provider 还没有模型，请先保存模型再测试连接")
+        model = candidates[0]
         started = time.monotonic()
-        if provider.protocol == "fake":
-            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-            return self._send_json({
-                "ok": True, "error": None, "actual_model": model.model, "elapsed_ms": elapsed_ms,
-            })
-        if provider.protocol not in SUPPORTED_PROTOCOLS:
-            raise ValueError("暂不支持的 Provider 协议")
-        material = _resolved_secret(self.server.system.credentials, provider.credential_ref)
-        if material is None:
-            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-            return self._send_json({
-                "ok": False,
-                "error": f"缺少凭据环境变量 {provider.credential_ref}，请补充后重试",
-                "actual_model": None,
-                "elapsed_ms": elapsed_ms,
-            })
-        target = ResolvedProviderTarget(
-            department="product",
-            provider_id=provider.id,
-            provider_name=provider.name,
-            model_id=model.id,
-            protocol=provider.protocol,
-            base_url=provider.base_url,
-            model=model.model,
-            context_window=model.context_window or model.max_output_tokens,
-            max_output_tokens=model.max_output_tokens,
-            timeout_sec=provider.timeout_sec,
-            credential_ref=provider.credential_ref or None,
-            api_key=material,
-        )
-        adapter = target.create_adapter()
-        request = _connection_test_request(model.max_output_tokens)
         try:
-            response = adapter.complete(request)
-        except ProviderError as exc:
+            result = facade.test_connection(
+                {"key": provider_id, "provider_id": provider_id, "model_id": model["id"]})
+        except CatalogValidationError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-            detail = _redact_secret(str(exc), material)
-            label = _TEST_FAILURE_LABELS.get(exc.reason, "连接失败")
+            reference = provider.get("credential_ref", "")
+            if reference and any(issue.location.endswith(".credential")
+                                 or "凭据引用无法解析" in issue.message for issue in exc.issues):
+                error = f"缺少凭据环境变量 {reference}，请补充后重试"
+            else:
+                error = _readiness_message(exc, facade)
             return self._send_json({
                 "ok": False,
-                "error": f"{label}：{detail}",
+                "error": error,
                 "actual_model": None,
                 "elapsed_ms": elapsed_ms,
+                "revision": facade.revision,
+                "admitted": None,
+                "protocol": None,
             })
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-        actual = response.model or model.model
+        if not result.get("ok"):
+            return self._send_json({
+                "ok": False,
+                "error": result.get("message") or result.get("reason") or "连接失败",
+                "actual_model": None,
+                "elapsed_ms": elapsed_ms,
+                "revision": facade.revision,
+                "admitted": None,
+                "protocol": result.get("protocol"),
+            })
         return self._send_json({
             "ok": True,
             "error": None,
-            "actual_model": _redact_secret(str(actual), material),
+            "actual_model": model["model"],
             "elapsed_ms": elapsed_ms,
+            "revision": result.get("revision", facade.revision),
+            "admitted": None,
+            "protocol": result.get("protocol"),
         })
 
-    def _merge_provider(self, body: dict[str, Any], *, existing_id: str | None) -> ProviderCatalog:
+    def _model_test(self, provider_id: str, model_id: Any, provider: dict[str, Any],
+                    facade: Any) -> None:
+        # 模型测试发一次真实最小推理，通过后由模块记录准入
+        if not isinstance(model_id, str) or not model_id.strip():
+            raise ValueError("模型测试需要 model_id")
+        model_id = model_id.strip()
+        view = facade.providers_view()
+        model = next((item for item in view["models"]
+                      if item["provider_id"] == provider_id and item["id"] == model_id), None)
+        if model is None:
+            return self._send_json({"error": "模型不存在"}, 404)
+        started = time.monotonic()
+        try:
+            result = facade.model_test(provider_id, model_id)
+        except CatalogValidationError as exc:
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            reference = provider.get("credential_ref", "")
+            if reference and any(issue.location.endswith(".credential")
+                                 or "凭据引用无法解析" in issue.message for issue in exc.issues):
+                error = f"缺少凭据环境变量 {reference}，请补充后重试"
+            else:
+                error = _readiness_message(exc, facade)
+            return self._send_json({
+                "ok": False, "error": error, "actual_model": None,
+                "elapsed_ms": elapsed_ms, "revision": facade.revision,
+                "admitted": False, "protocol": model.get("protocol"),
+            })
+        elapsed_ms = result.get("elapsed_ms")
+        if not isinstance(elapsed_ms, int):
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+        ok = bool(result.get("ok"))
+        return self._send_json({
+            "ok": ok,
+            "error": result.get("error"),
+            "actual_model": result.get("model") or result.get("actual_model"),
+            "elapsed_ms": elapsed_ms,
+            "revision": result.get("revision", facade.revision),
+            "admitted": bool(result.get("admitted", ok)),
+            "protocol": result.get("protocol") or model.get("protocol"),
+            "usage_reported": bool(result.get("usage_reported", False)),
+        })
+
+    def _post_credentials(self) -> None:
+        # 提交凭据及是否持久化；清除与删除用显式动作，不拿空字符串猜意图
+        body = self._read_json_body()
         if not isinstance(body, dict):
             raise ValueError("请求体必须是 JSON 对象")
-        models = body.get("models", [])
-        provider_fields = {key: value for key, value in body.items() if key != "models"}
-        _validate_provider_fields(provider_fields)
-        provider_id = provider_fields["id"]
-        catalog = self.server.system.provider_catalog
-        raw = {"providers": [], "models": [], "bindings": {}} if catalog is None else catalog.to_dict()
-        existing_ids = {item["id"] for item in raw["providers"]}
-        if existing_id is None and provider_id in existing_ids:
-            self._send_json({"error": f"Provider 已存在：{provider_id}", "reason": "conflict"}, 409)
-            raise _ResponseSent()
-        if existing_id is not None and existing_id not in existing_ids:
-            self._send_json({"error": "Provider 不存在"}, 404)
-            raise _ResponseSent()
-        raw["providers"] = [item for item in raw["providers"] if item["id"] != provider_id]
-        raw["providers"].append({
-            "id": provider_fields["id"],
-            "name": provider_fields["name"],
-            "protocol": provider_fields["protocol"],
-            "base_url": provider_fields.get("base_url", ""),
-            "credential_ref": provider_fields.get("credential_ref", ""),
-            "timeout_sec": provider_fields.get("timeout_sec", 600.0),
-        })
-        if "models" in body:
-            if not isinstance(models, list):
-                raise ValueError("models 必须是数组")
-            nested = []
-            for index, item in enumerate(models):
-                if not isinstance(item, dict):
-                    raise ValueError(f"models[{index}] 必须是对象")
-                nested.append({**item, "provider_id": provider_id})
-            raw["models"] = [item for item in raw["models"] if item.get("provider_id") != provider_id]
-            raw["models"].extend(nested)
-        try:
-            return ProviderCatalog.from_dict(raw)
-        except CatalogValidationError as exc:
-            self._send_catalog_error(exc)
-            raise _ResponseSent() from exc
+        facade = self._facade()
+        ref = body.get("ref", body.get("credential_ref", ""))
+        action = body.get("action", "set")
+        if not isinstance(ref, str) or not ref.strip():
+            raise ValueError("缺少字段：ref")
+        ref = ref.strip()
+        if action == "set":
+            secret = body.get("secret", body.get("api_key"))
+            if not isinstance(secret, str) or not secret.strip():
+                raise ValueError("提交凭据需要非空 secret，清除请用 clear_override 动作")
+            facade.set_credential_override(ref, secret)
+            if body.get("persist"):
+                dotenv_path = facade.dotenv_path
+                if dotenv_path is None:
+                    return self._send_json(
+                        {"error": "dotenv path is not configured", "reason": "dotenv_unconfigured"}, 503)
+                try:
+                    facade.save_dotenv_value(dotenv_path, ref, secret)
+                except (CatalogValidationError, ValueError, OSError) as exc:
+                    facade.clear_credential_override(ref)
+                    return self._send_json({"error": f"持久化失败，未保存：{exc}",
+                                            "reason": "dotenv_write_failed"}, 500)
+            described = facade.providers_view()
+            credential = next(
+                (item["credential"] for item in described["providers"]
+                 if item.get("credential_ref") == ref),
+                {"ref": ref, "configured": True, "source": "override", "has_override": True},
+            )
+            return self._send_json({"ok": True, "ref": ref, "credential": credential,
+                                    "revision": described["revision"]})
+        if action == "clear_override":
+            cleared = facade.clear_credential_override(ref)
+            described = facade.providers_view()
+            credential = next(
+                (item["credential"] for item in described["providers"]
+                 if item.get("credential_ref") == ref),
+                {"ref": ref, "configured": False, "source": "missing", "has_override": False},
+            )
+            return self._send_json({"ok": True, "ref": ref, "cleared": cleared,
+                                    "credential": credential, "revision": described["revision"]})
+        if action == "remove_persisted":
+            dotenv_path = facade.dotenv_path
+            if dotenv_path is None:
+                return self._send_json(
+                    {"error": "dotenv path is not configured", "reason": "dotenv_unconfigured"}, 503)
+            try:
+                result = facade.remove_dotenv_value(dotenv_path, ref)
+            except (ValueError, OSError) as exc:
+                return self._send_json({"error": f"删除失败：{exc}",
+                                        "reason": "dotenv_write_failed"}, 500)
+            return self._send_json({"ok": True, "ref": ref,
+                                    "removed": bool(result.get("removed")),
+                                    "credential": {key: result[key] for key in
+                                                   ("ref", "configured", "source", "has_override")
+                                                   if key in result},
+                                    "revision": facade.revision})
+        raise ValueError("未知动作：action 必须是 set、clear_override 或 remove_persisted")
 
-    def _catalog_from_document(self, body: dict[str, Any]) -> ProviderCatalog:
-        try:
-            return ProviderCatalog.from_dict(body)
-        except CatalogValidationError as exc:
-            self._send_catalog_error(exc)
-            raise _ResponseSent() from exc
+    def _post_reload(self) -> None:
+        # 手动重载立即重读本地源，不调模型，返回实际生效修订及错误
+        self._drain_body()
+        result = self._facade().reload()
+        return self._send_json(result)
 
-    def _persist_catalog(self, catalog: ProviderCatalog) -> None:
-        path = self.server.provider_config_path
+    def _persist_facade(self, previous: dict[str, Any] | None = None) -> None:
+        # 界面保存经模块原子写盘并立即发布；落盘失败回滚内存，不报成功
+        facade = self._facade()
+        path = facade.config_path
         if path is None:
             raise ProviderUnavailableError("provider catalog path is not configured")
-        payload = json.dumps(catalog.to_dict(), ensure_ascii=False, indent=2) + "\n"
-        tmp_path = path.with_name(path.name + ".tmp")
         try:
-            tmp_path.write_text(payload, encoding="utf-8")
-            os.replace(tmp_path, path)
+            facade.persist_document(path)
         except OSError as exc:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if previous is not None:
+                try:
+                    facade.store_document(previous)
+                except (CatalogValidationError, ValueError):
+                    pass
             raise ProviderUnavailableError("provider catalog file is not writable") from exc
-        self.server.system.provider_catalog = catalog
 
     def _send_catalog_error(self, exc: CatalogValidationError) -> None:
         issues = [{"location": issue.location, "message": issue.message} for issue in exc.issues]
@@ -1171,97 +1276,39 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def _credential_ready(provider: Any, source: Any) -> bool:
-    if getattr(provider, "protocol", "") != "responses":
-        return True
-    reference = getattr(provider, "credential_ref", "")
-    return _resolved_secret(source, reference) is not None
-
-
-def _resolved_secret(source: Any, reference: str) -> str | None:
-    if not reference or source is None:
-        return None
-    try:
-        value = source(reference) if callable(source) else source.get(reference)
-    except Exception:
-        return None
-    if value is None:
-        return None
-    secret = getattr(value, "secret", value)
-    if isinstance(secret, str) and secret.strip():
-        return secret
-    return None
-
-
-def _redact_secret(text: str, secret: str | None) -> str:
-    if not secret:
-        return text
-    return text.replace(secret, "***")
-
-
-def _provider_dependents(catalog: ProviderCatalog, provider_id: str) -> list[str]:
-    dependents: list[str] = []
-    model_ids = []
-    for model in catalog.models.values():
-        if model.provider_id == provider_id:
-            dependents.append(f"models.{model.id}")
-            model_ids.append(model.id)
-    for department, binding in catalog.bindings.items():
-        if binding.provider_id == provider_id:
-            dependents.append(f"bindings.{department}")
-        elif binding.model_id in model_ids:
-            dependents.append(f"bindings.{department}")
-    return dependents
-
-
-def _validate_provider_fields(body: dict[str, Any]) -> None:
-    required = {"id", "name", "protocol"}
+def _validate_provider_entry(body: dict[str, Any]) -> None:
+    # 新结构：协议在模型访问定义声明，Provider 级 protocol 明确拒绝
+    required = {"id", "name"}
     missing = required - set(body)
     if missing:
         raise ValueError("缺少字段：" + ", ".join(sorted(missing)))
-    protocol = body["protocol"]
-    if not isinstance(protocol, str) or protocol.strip().casefold() not in SUPPORTED_PROTOCOLS:
-        raise ValueError("协议只支持 responses 或 fake")
+    if "protocol" in body:
+        raise ValueError("Provider 级 protocol 已移除，请在模型访问定义声明 protocol")
     timeout = body.get("timeout_sec", 600)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
         raise ValueError("timeout_sec 必须是正数")
 
 
-_TEST_FAILURE_LABELS = {
-    "provider_timeout": "连接超时",
-    "provider_protocol": "协议错误",
-    "context_overflow": "上下文超限",
-    "provider_unavailable": "Provider 不可用",
-    "cancelled": "已取消",
-    "provider_error": "Provider 返回错误",
-}
-
-
-def _connection_test_request(max_output_tokens: int) -> ModelRequest:
-    manifest = ContextManifest(
-        session_id="provider-test",
-        department="product",
-        activation_id="provider-test",
-        injected=[],
-        excluded=[],
-        token_estimate=1,
-        budget=max(16, max_output_tokens),
-        digest="provider-test",
-        purpose="work",
-        max_output_tokens=max_output_tokens,
-    )
-    context = AssembledContext(
-        department="product",
-        prompt_text="ping",
-        parts=[ContextPart("intend", "1", "ping")],
-        manifest=manifest,
-        input_items=[{"role": "user", "content": "ping"}],
-        tools=[],
-    )
-    return ModelRequest(
-        "provider-test", "product", "provider-test", "provider-test", 1,
-        context, [], Event(), max_output_tokens=max_output_tokens,
-    )
+def _readiness_message(exc: CatalogValidationError, facade: Any) -> str:
+    # 连接测试失败的可定位说明：缺凭据点名引用，不露密钥
+    view = facade.providers_view()
+    providers = {item["id"]: item for item in view["providers"]}
+    bindings = view["bindings"]
+    parts: list[str] = []
+    for issue in exc.issues:
+        location = issue.location
+        if location.endswith(".credential") or "凭据引用无法解析" in issue.message:
+            department = location.split(".")[1] if location.startswith("selections.") else ""
+            reference = ""
+            binding = bindings.get(department)
+            if isinstance(binding, dict):
+                provider = providers.get(binding.get("provider_id", ""))
+                reference = "" if provider is None else provider.get("credential_ref", "")
+            if reference:
+                parts.append(f"缺少凭据环境变量 {reference}，请补充后重试")
+                continue
+        parts.append(f"{location}: {issue.message}")
+    return "；".join(parts) if parts else str(exc)
 
 
 def _positive_int(key: str, value: Any) -> int:

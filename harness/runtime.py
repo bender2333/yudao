@@ -1,8 +1,5 @@
-"""Loop System 门面：装配持久化、Provider 目录与原生编排器。"""
-
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -12,82 +9,85 @@ from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
 from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
-from .provider_catalog import CatalogValidationError, CredentialMaterial, CredentialSource, ProviderCatalog
 from .projection import RunProjection, project_run
 from .projects import ProjectService
+from .providers import ProviderFacade, ResponsesExecutionScope
 from .replay_check import verify_replay
+
+__all__ = [
+    "LoopSystem",
+    "CancelledInputSaveError",
+    "RunTerminalError",
+]
 
 
 class LoopSystem:
+    # 系统装配：持久化、独立 Provider 模块与原生编排器，空态可启动
     def __init__(
         self,
         data_dir: str | Path,
         *,
-        provider_catalog: ProviderCatalog | None = None,
-        credentials: CredentialSource | None = None,
+        facade: ProviderFacade | None = None,
         test_adapter_factory: Callable[[str], ModelAdapter] | None = None,
         test_adapter: ModelAdapter | None = None,
         provider_config_path: str | Path | None = None,
+        dotenv_path: str | Path | None = None,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
         self.artifacts = ArtifactStore(self.data_dir / "artifacts")
-        if test_adapter_factory is not None and provider_catalog is not None:
-            raise ValueError("provider_catalog and test_adapter_factory are mutually exclusive")
+        if test_adapter_factory is not None and facade is not None:
+            raise ValueError("facade and test_adapter_factory are mutually exclusive")
         if test_adapter is not None and test_adapter_factory is not None:
             raise ValueError("provide test_adapter or test_adapter_factory, not both")
         if test_adapter is not None:
             test_adapter_factory = lambda _department: test_adapter
         self.test_adapter = test_adapter
+        self.facade = facade if facade is not None else ProviderFacade()
+        if provider_config_path is not None or dotenv_path is not None:
+            config = None if provider_config_path is None else Path(provider_config_path)
+            dotenv = None if dotenv_path is None else Path(dotenv_path)
+            self.facade.configure_paths(config, dotenv)
+            # 启动读取一致版本：缺文件空态，有效修订与重载错误由模块记录，不抛错
+            self.facade.reload()
         self.orchestrator = Orchestrator(
             self.store,
             self.artifacts,
             self.data_dir / "workspaces",
-            provider_catalog=provider_catalog,
-            credentials=credentials,
+            facade=self.facade,
             test_adapter_factory=test_adapter_factory,
             test_provider=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.artifacts, self.orchestrator)
-        self.provider_config_path = None if provider_config_path is None else Path(provider_config_path)
-
 
     @property
-    def provider_catalog(self) -> ProviderCatalog | None:
-        return self.orchestrator.provider_catalog
-
-    @provider_catalog.setter
-    def provider_catalog(self, value: ProviderCatalog | None) -> None:
-        self.orchestrator.provider_catalog = value
+    def provider_config_path(self) -> Path | None:
+        return self.facade.config_path
 
     @property
-    def credentials(self) -> CredentialSource | None:
-        return self.orchestrator.credentials
-
-    @credentials.setter
-    def credentials(self, value: CredentialSource | None) -> None:
-        self.orchestrator.credentials = value
+    def dotenv_path(self) -> Path | None:
+        return self.facade.dotenv_path
 
     @classmethod
     def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter) -> "LoopSystem":
-        """Use one explicitly supplied adapter in deterministic tests only."""
-
+        # 显式提供的确定性适配器只用于确定性测试
         return cls(data_dir, test_adapter=adapter)
 
-    def provider_status(self) -> dict[str, Any]:
-        """Return safe provider readiness information for CLI and Web health."""
+    def start_provider_watching(self, interval_sec: float = 1.0) -> None:
+        # 文件重载由系统装配启动，Web 只提交命令和读取状态
+        self.facade.start_watching(interval_sec)
 
-        if self.provider_catalog is None:
-            if self.test_adapter is None:
-                return {
-                    "available": False,
-                    "reason": "provider_config_missing",
-                    "message": "Provider catalog is required to create a production run.",
-                    "departments": {},
-                }
+    def close(self) -> None:
+        # 服务关闭停止轮询并释放存储
+        self.facade.stop_watching()
+        self.store.close()
+
+    def provider_status(self) -> dict[str, Any]:
+        # 服务健康与模型就绪分开描述，不露密钥
+        if self.test_adapter is not None:
             availability = self.test_adapter.availability()
             return {
                 "available": availability.available,
@@ -95,30 +95,25 @@ class LoopSystem:
                 "message": availability.message,
                 "departments": {},
             }
-        try:
-            snapshot = self.provider_catalog.resolve_snapshot(self.credentials)
-        except CatalogValidationError as exc:
-            return {
-                "available": False,
-                "reason": "provider_unavailable",
-                "message": _catalog_status_message(exc, self.provider_catalog),
-                "departments": {},
-            }
+        status = self.facade.describe_readiness()
         return {
-            "available": True,
-            "reason": "",
-            "message": "",
-            "departments": snapshot.public_dict()["departments"],
+            "available": status["available"],
+            "reason": status["reason"],
+            "message": status["message"],
+            "departments": status["departments"],
         }
 
     def create_run(self, task: str, **kwargs) -> str:
         return self.orchestrator.create_run(task, **kwargs)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
-        return self.orchestrator.run_until_stop(run_id)
+        # 一次同步运行共享连接作用域，连接按端点与认证句柄复用隔离
+        with ResponsesExecutionScope() as execution_scope:
+            return self.orchestrator.run_until_stop(run_id, execution_scope)
 
     def activate_once(self, run_id: str) -> RunProjection:
-        return self.orchestrator.activate_once(run_id)
+        with ResponsesExecutionScope() as execution_scope:
+            return self.orchestrator.activate_once(run_id, execution_scope)
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)
@@ -143,50 +138,3 @@ class LoopSystem:
 
     def list_run_ids(self) -> list[str]:
         return self.store.list_run_ids()
-
-
-
-def _catalog_status_message(exc: CatalogValidationError, catalog: ProviderCatalog) -> str:
-    parts: list[str] = []
-    for issue in exc.issues:
-        location = issue.location
-        if location.endswith(".credential") or "凭据引用无法解析" in issue.message:
-            department = location.split(".")[1] if location.startswith("departments.") else ""
-            binding = catalog.bindings.get(department)
-            provider = None if binding is None else catalog.providers.get(binding.provider_id)
-            reference = "" if provider is None else provider.credential_ref
-            if reference:
-                parts.append(
-                    f"{location}: 部门 {department} 缺少凭据环境变量 {reference}，请补充后重试"
-                )
-                continue
-        if "部门绑定缺失" in issue.message:
-            department = location.rsplit(".", 1)[-1]
-            parts.append(f"{location}: 部门 {department} 未绑定 Provider 与模型")
-            continue
-        if "context_window" in issue.message:
-            parts.append(f"{location}: {issue.message}（请为该部门绑定声明容量的模型）")
-            continue
-        parts.append(f"{location}: {issue.message}")
-    return "；".join(parts) if parts else str(exc)
-
-
-def build_adapter(name: str, **kwargs) -> ModelAdapter:
-    """Build only an explicitly requested deterministic test adapter.
-
-    Production adapters are created from a ProviderCatalogSnapshot at activation
-    time so a single environment-wide Responses adapter cannot bypass bindings.
-    """
-
-    if name == "fake":
-        return FakeAdapter(kwargs.get("script"))
-    raise ValueError(f"unknown test adapter: {name}")
-
-
-def environment_credentials(reference: str) -> CredentialMaterial | None:
-    """Resolve a catalog credential reference from the current host environment."""
-
-    value = os.environ.get(reference)
-    if value is None:
-        return None
-    return CredentialMaterial(value)

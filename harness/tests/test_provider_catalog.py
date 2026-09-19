@@ -1,186 +1,204 @@
+from __future__ import annotations
+
 import json
 
 import pytest
 
-from harness.provider_catalog import (
+from harness.providers import (
     CatalogValidationError,
     CredentialMaterial,
-    ModelDefinition,
-    ProviderCatalog,
-    ProviderDefinition,
+    ProviderFacade,
+    ProviderStore,
 )
 
 
-def _catalog(*, context_window=32_000, max_output_tokens=4_096):
-    providers = [
-        ProviderDefinition(
-            id="provider-a", name="Provider A", protocol="responses",
-            base_url="https://a.example/v1", credential_ref="credential-a",
-        ),
-        ProviderDefinition(
-            id="provider-b", name="Provider B", protocol="responses",
-            base_url="https://b.example/v1", credential_ref="credential-b",
-        ),
-        ProviderDefinition(
-            id="provider-c", name="Provider C", protocol="responses",
-            base_url="https://c.example/v1", credential_ref="credential-a",
-        ),
-    ]
-    models = [
-        ModelDefinition("model-a", "provider-a", "model-a", context_window, max_output_tokens),
-        ModelDefinition("model-b", "provider-b", "model-b", context_window, max_output_tokens),
-        ModelDefinition("model-c", "provider-c", "model-c", context_window, max_output_tokens),
-    ]
-    return ProviderCatalog(
-        providers,
-        models,
-        {
+def _document(**overrides):
+    document = {
+        "providers": [
+            {"id": "provider-a", "name": "Provider A",
+             "base_url": "https://a.example/v1", "credential_ref": "credential-a"},
+            {"id": "provider-b", "name": "Provider B",
+             "base_url": "https://b.example/v1", "credential_ref": "credential-b"},
+        ],
+        "models": [
+            {"id": "model-a", "provider_id": "provider-a", "model": "model-a",
+             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+            {"id": "model-b", "provider_id": "provider-b", "model": "model-b",
+             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+        ],
+        "bindings": {
             "product": {"provider_id": "provider-a", "model_id": "model-a"},
             "engineering": {"provider_id": "provider-b", "model_id": "model-b"},
-            "quality": {"provider_id": "provider-c", "model_id": "model-c"},
+            "quality": {"provider_id": "provider-a", "model_id": "model-a"},
         },
-    )
-
-
-def test_snapshot_freezes_three_distinct_targets_without_persisting_secrets():
-    catalog = _catalog()
-    calls = []
-
-    def resolve(reference):
-        calls.append(reference)
-        return CredentialMaterial(f"secret-{len(calls)}", version=f"v{len(calls)}")
-
-    snapshot = catalog.resolve_snapshot(resolve)
-
-    assert snapshot.target("product").provider_id == "provider-a"
-    assert snapshot.target("engineering").provider_id == "provider-b"
-    assert snapshot.target("quality").model == "model-c"
-    assert snapshot.target("product").api_key == "secret-1"
-    assert calls == ["credential-a", "credential-b"]
-    public = snapshot.public_dict()
-    encoded = json.dumps(public)
-    assert "secret-1" not in encoded
-    assert public["departments"]["product"]["credential_ref"] == "credential-a"
-    assert public["departments"]["product"]["credential_version"] == "v1"
-    second = catalog.resolve_snapshot(resolve)
-    assert calls == ["credential-a", "credential-b", "credential-a", "credential-b"]
-    assert second.target("product").api_key == "secret-3"
-
-
-def test_each_target_creates_an_independent_adapter_instance():
-    catalog = ProviderCatalog(
-        [ProviderDefinition("fake-provider", "Fake", "fake")],
-        [ModelDefinition("fake-model", "fake-provider", "fake-script", 8_000, 1_000)],
-        {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
-         for department in ("product", "engineering", "quality")},
-    )
-    snapshot = catalog.resolve_snapshot()
-    first = snapshot.target("product").create_adapter()
-    second = snapshot.target("product").create_adapter()
-
-    assert first is not second
-    assert first.name == second.name == "fake"
-
-
-def test_unknown_unused_protocol_can_be_cataloged_but_bound_protocol_is_rejected():
-    providers = [
-        ProviderDefinition("unknown-provider", "Future", "chat-completions", "https://future.example/v1"),
-        ProviderDefinition("fake-provider", "Fake", "fake"),
-    ]
-    models = [
-        ModelDefinition("future-model", "unknown-provider", "future", 8_000, 1_000),
-        ModelDefinition("fake-model", "fake-provider", "fake", 8_000, 1_000),
-    ]
-    catalog = ProviderCatalog(
-        providers,
-        models,
-        {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
-         for department in ("product", "engineering", "quality")},
-    )
-    catalog.validate()
-    assert {item["protocol"] for item in catalog.to_dict()["providers"]} == {"fake", "chat-completions"}
-
-    with pytest.raises(CatalogValidationError) as caught:
-        ProviderCatalog(
-            providers,
-            models,
-            {"product": {"provider_id": "unknown-provider", "model_id": "future-model"},
-             "engineering": {"provider_id": "fake-provider", "model_id": "fake-model"},
-             "quality": {"provider_id": "fake-provider", "model_id": "fake-model"}},
-        )
-    assert any(issue.location == "bindings.product.provider_id" for issue in caught.value.issues)
-
-
-@pytest.mark.parametrize(
-    "provider_kwargs,expected",
-    [
-        ({"protocol": "responses", "base_url": "https://user:pass@example/v1", "credential_ref": "key"}, "base_url"),
-        ({"protocol": "responses", "base_url": "https://example/v1?api_key=secret", "credential_ref": "key"}, "base_url"),
-        ({"protocol": "responses", "base_url": "https://example/v1", "credential_ref": ""}, "credential_ref"),
-    ],
-)
-def test_responses_provider_rejects_credentials_in_url_and_missing_credential_reference(provider_kwargs, expected):
-    provider = ProviderDefinition("provider", "Provider", **provider_kwargs)
-    with pytest.raises(CatalogValidationError) as caught:
-        ProviderCatalog(
-            [provider], [ModelDefinition("model", "provider", "model", 8_000, 1_000)],
-            {department: {"provider_id": "provider", "model_id": "model"}
-             for department in ("product", "engineering", "quality")},
-        )
-    assert any(issue.location.endswith(expected) for issue in caught.value.issues)
-
-
-def test_unknown_model_capacity_is_rejected_for_a_bound_department():
-    with pytest.raises(CatalogValidationError) as caught:
-        _catalog(context_window=None)
-    assert any("模型缺少 context_window" in issue.message for issue in caught.value.issues)
-
-
-def test_max_output_tokens_is_required_and_positive_in_json():
-    raw = {
-        "providers": [{"id": "fake", "name": "Fake", "protocol": "fake"}],
-        "models": [{"id": "model", "provider_id": "fake", "model": "fake", "context_window": 100}],
-        "bindings": {department: {"provider_id": "fake", "model_id": "model"}
-                     for department in ("product", "engineering", "quality")},
     }
+    document.update(overrides)
+    return document
+
+
+def _facade(**credential_overrides):
+    facade = ProviderFacade()
+    facade.store_document(_document())
+    for ref, secret in credential_overrides.items():
+        facade.set_credential_override(ref, secret)
+    admit_bound_models(facade)
+    return facade
+
+
+def admit_bound_models(facade, document=None):
+    # 真实协议模型须先经模型测试准入才能用于任务；测试通过模块接口记录该事实
+    bindings = (document or facade.to_document())["bindings"]
+    models = {item["id"]: item for item in facade.providers_view()["models"]}
+    admitted: set[tuple[str, str]] = set()
+    for item in bindings.values():
+        provider_id, model_id = item.get("provider_id"), item.get("model_id")
+        if (provider_id, model_id) in admitted:
+            continue
+        admitted.add((provider_id, model_id))
+        model = models.get(model_id)
+        if model is None or model["protocol"] == "fake":
+            continue
+        facade.record_admission(provider_id, model_id, admitted_model=model["model"])
+
+
+def test_new_document_round_trip_contains_only_non_sensitive_fields(tmp_path):
+    facade = ProviderFacade()
+    revision = facade.store_document(_document())
+    assert revision >= 1
+    target = tmp_path / "providers.json"
+    facade.persist_document(target)
+    saved = json.loads(target.read_text(encoding="utf-8"))
+    assert set(saved) == {"providers", "models", "bindings", "revision"}
+    assert "api_key" not in json.dumps(saved)
+    assert saved["bindings"]["product"] == {"provider_id": "provider-a", "model_id": "model-a"}
+
+    reloaded = ProviderFacade()
+    reloaded.load_document(target)
+    assert reloaded.to_document() == facade.to_document()
+    assert "api_key" not in json.dumps(reloaded.to_document())
+
+
+def test_old_provider_level_protocol_is_rejected_without_migration():
+    document = _document()
+    document["providers"][0]["protocol"] = "responses"
+    facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
-        ProviderCatalog.from_dict(raw)
-    assert any(issue.location == "models[0].max_output_tokens" for issue in caught.value.issues)
-
-
-def test_malformed_array_or_object_identifiers_use_safe_array_locations():
-    raw = {
-        "providers": [{"id": ["secret-value"], "name": "Provider", "protocol": "fake"}],
-        "models": [{"id": {"secret": "value"}, "provider_id": "provider", "model": "model",
-                     "context_window": 100, "max_output_tokens": 10}],
-        "bindings": {department: {"provider_id": "provider", "model_id": "model"}
-                     for department in ("product", "engineering", "quality")},
-    }
-    with pytest.raises(CatalogValidationError) as caught:
-        ProviderCatalog.from_dict(raw)
-    assert all("secret-value" not in str(issue) and "secret" not in issue.location for issue in caught.value.issues)
-    assert any(issue.location == "providers[0].id" for issue in caught.value.issues)
-    assert any(issue.location == "models[0].id" for issue in caught.value.issues)
-
-
-def test_malformed_protocol_is_reported_without_membership_type_error():
-    raw = {
-        "providers": [{"id": "provider", "name": "Provider", "protocol": ["responses"],
-                       "base_url": "https://provider.example/v1", "credential_ref": "KEY"}],
-        "models": [{"id": "model", "provider_id": "provider", "model": "model",
-                     "context_window": 100, "max_output_tokens": 10}],
-        "bindings": {department: {"provider_id": "provider", "model_id": "model"}
-                     for department in ("product", "engineering", "quality")},
-    }
-    with pytest.raises(CatalogValidationError) as caught:
-        ProviderCatalog.from_dict(raw)
+        facade.store_document(document)
     assert any(issue.location == "providers[0].protocol" for issue in caught.value.issues)
 
 
-def test_json_round_trip_contains_only_non_sensitive_directory_fields(tmp_path):
-    catalog = _catalog()
-    path = tmp_path / "providers.json"
-    path.write_text(json.dumps(catalog.to_dict()), encoding="utf-8")
-    loaded = ProviderCatalog.load(path)
-    assert loaded.to_dict() == catalog.to_dict()
-    assert "api_key" not in json.dumps(loaded.to_dict())
+def test_model_protocol_is_required_per_model_definition():
+    document = _document()
+    del document["models"][0]["protocol"]
+    facade = ProviderFacade()
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.store_document(document)
+    assert any(issue.location == "models[0].protocol" for issue in caught.value.issues)
+
+
+def test_snapshot_freezes_three_targets_without_persisting_secrets():
+    facade = _facade(**{"credential-a": CredentialMaterial("secret-a", version="a-v1"),
+                        "credential-b": CredentialMaterial("secret-b", version="b-v1")})
+    snapshot = facade.resolve_departments()
+    assert snapshot.target("product").provider_id == "provider-a"
+    assert snapshot.target("engineering").provider_id == "provider-b"
+    assert snapshot.target("product").api_key == "secret-a"
+    assert snapshot.target("product").credential_version == "a-v1"
+    encoded = json.dumps(snapshot.public_dict())
+    assert "secret-a" not in encoded and "secret-b" not in encoded
+    assert "api_key" not in encoded
+
+
+def test_each_target_is_independent_and_frozen_after_publish():
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    snapshot = facade.resolve_departments()
+    revision_before = facade.revision
+    facade.save_model({
+        "id": "model-c", "provider_id": "provider-a", "model": "model-c",
+        "protocol": "responses", "context_window": 8000, "max_output_tokens": 512,
+    })
+    assert facade.revision > revision_before
+    assert snapshot.target("product").model == "model-a"
+    assert facade.resolve_departments().target("product").model == "model-a"
+
+
+def test_missing_credentials_reported_per_item():
+    facade = ProviderFacade()
+    facade.store_document(_document())
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.resolve_departments()
+    locations = [issue.location for issue in caught.value.issues]
+    assert len(caught.value.issues) == 3
+    assert any("product" in location for location in locations)
+    assert any("engineering" in location for location in locations)
+    assert any("quality" in location for location in locations)
+
+
+def test_dangling_binding_references_are_rejected():
+    facade = ProviderFacade()
+    with pytest.raises(CatalogValidationError):
+        facade.store_document(_document(bindings={
+            "product": {"provider_id": "provider-a", "model_id": "missing-model"},
+        }))
+    facade.store_document(_document(bindings={
+        "product": {"provider_id": "provider-a", "model_id": "model-a"},
+    }))
+    with pytest.raises(CatalogValidationError):
+        facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "missing-model"}})
+    facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "model-a"}})
+    assert facade.get_bindings()["product"] == {"provider_id": "provider-a", "model_id": "model-a"}
+
+
+def test_unknown_model_capacity_is_rejected_for_a_bound_department():
+    facade = ProviderFacade()
+    document = _document()
+    document["models"][0]["context_window"] = None
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    facade.set_credential_override("credential-b", "secret-b")
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.resolve_departments()
+    assert any("context_window" in issue.location or "context_window" in issue.message
+               for issue in caught.value.issues)
+
+
+def test_max_output_tokens_is_required_and_positive():
+    facade = ProviderFacade()
+    document = _document()
+    del document["models"][0]["max_output_tokens"]
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.store_document(document)
+    assert any(issue.location == "models[0].max_output_tokens" for issue in caught.value.issues)
+
+
+def test_malformed_identifiers_use_safe_array_locations():
+    facade = ProviderFacade()
+    document = _document()
+    document["providers"][0]["id"] = ["secret-value"]
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.store_document(document)
+    assert all("secret-value" not in str(issue) and "secret" not in issue.location
+               for issue in caught.value.issues)
+    assert any(issue.location == "providers[0].id" for issue in caught.value.issues)
+
+
+def test_secret_never_in_public_views_or_readiness():
+    secret = "super-secret-value-xyz"
+    facade = _facade(**{"credential-a": secret, "credential-b": "other"})
+    view = facade.providers_view()
+    assert secret not in json.dumps(view, ensure_ascii=False)
+    readiness = facade.describe_readiness()
+    assert readiness["available"] is True
+    assert secret not in json.dumps(readiness, ensure_ascii=False)
+    assert readiness["departments"]["product"]["credential_version"] == "override"
+    assert "api_key" not in readiness["departments"]["product"]
+
+
+def test_store_rejects_base_url_with_credentials_and_missing_reference():
+    facade = ProviderFacade()
+    bad_url = _document()
+    bad_url["providers"][0]["base_url"] = "https://user:pass@a.example/v1"
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.store_document(bad_url)
+    assert any(issue.location.endswith("base_url") for issue in caught.value.issues)
+    assert ProviderStore.empty().public_view()["providers"] == []

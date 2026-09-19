@@ -13,7 +13,8 @@ import pytest
 
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
-from harness.adapters.responses import ResponsesAdapter, ResponsesConfig
+from harness.providers import ResponsesConfig
+from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -75,9 +76,10 @@ def start_work_item(host, port, project_id, text, **options):
 def provider_config(tmp_path, *, credential_ref="MISSING_PROVIDER_KEY"):
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "provider", "name": "Provider", "protocol": "responses",
+        "providers": [{"id": "provider", "name": "Provider",
                        "base_url": "https://provider.example/v1", "credential_ref": credential_ref}],
         "models": [{"id": "model", "provider_id": "provider", "model": "model",
+                     "protocol": "responses",
                      "context_window": 32000, "max_output_tokens": 4096}],
         "bindings": {department: {"provider_id": "provider", "model_id": "model"}
                      for department in ("product", "engineering", "quality")},
@@ -743,7 +745,7 @@ def test_serve_cli_requires_provider_config(monkeypatch, tmp_path):
     seen = {}
 
     def fake_serve(system, host, port):
-        seen["catalog"] = system.provider_catalog
+        seen["config"] = system.facade.config_path
         seen["host"] = host
         seen["port"] = port
         return 0
@@ -751,7 +753,7 @@ def test_serve_cli_requires_provider_config(monkeypatch, tmp_path):
     monkeypatch.setattr("harness.__main__._serve", fake_serve)
     config = provider_config(tmp_path)
     assert main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"]) == 0
-    assert seen["catalog"] is not None
+    assert seen["config"] is not None
     assert seen["port"] == 0
 
 
@@ -779,9 +781,23 @@ def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, t
     assert started["closed"] is True
 
 
-def test_serve_cli_rejects_missing_or_removed_adapter_flags(tmp_path):
-    with pytest.raises(SystemExit):
-        main(["serve", "--data-dir", str(tmp_path)])
+def test_serve_cli_starts_without_provider_config_and_rejects_removed_flags(monkeypatch, tmp_path):
+    started = {}
+
+    class Dummy:
+        base_url = "http://127.0.0.1:0"
+
+        def serve_forever(self):
+            started["ok"] = True
+            raise KeyboardInterrupt()
+
+        def server_close(self):
+            started["closed"] = True
+
+    monkeypatch.setattr("harness.__main__.serve", lambda system, host, port: Dummy())
+    assert main(["serve", "--data-dir", str(tmp_path)]) == 0
+    assert started["ok"] is True
+    assert started["closed"] is True
     with pytest.raises(SystemExit):
         main(["serve", "--adapter", "fake", "--provider-config", str(provider_config(tmp_path)), "--data-dir", str(tmp_path)])
 

@@ -16,7 +16,8 @@ from .models import EventType
 from .projects import ProjectEventType
 from .proposals import delivery_turn, engineering_plan, product_spec, review_turn
 from .public_tree import materialize_tree
-from .runtime import LoopSystem, environment_credentials
+from .providers import ProviderFacade
+from .runtime import LoopSystem
 from .smoke import summarize_run
 from .tree_archive import load_tree
 
@@ -172,9 +173,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-config", help="real catalog; omit for FakeAdapter")
     args = parser.parse_args(argv)
     if args.provider_config:
-        from .provider_catalog import ProviderCatalog
-        catalog = ProviderCatalog.load(args.provider_config)
-        system = LoopSystem(args.data_dir, provider_catalog=catalog, credentials=environment_credentials)
+        facade = ProviderFacade()
+        facade.configure_paths(args.provider_config, None)
+        facade.reload()
+        system = LoopSystem(args.data_dir, facade=facade)
         status = system.provider_status()
         if not status["available"]:
             raise SystemExit(f"provider unavailable: {status.get('reason') or status.get('message')}")

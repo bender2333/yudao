@@ -16,7 +16,8 @@ import httpx
 from openai import APIConnectionError, AsyncOpenAI, DefaultAsyncHttpxClient
 
 from harness.adapters.base import ModelRequest, ProviderError
-from harness.adapters.responses import ResponsesAdapter, ResponsesConfig, ResponsesExecutionScope
+from harness.providers import ResponsesConfig, ResponsesExecutionScope
+from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
@@ -283,7 +284,7 @@ def _mock_transport(monkeypatch, handler):
     def client_factory(**kwargs):
         return httpx.AsyncClient(transport=httpx.MockTransport(handler), **kwargs)
 
-    monkeypatch.setattr("harness.adapters.responses.DefaultAsyncHttpxClient", client_factory)
+    monkeypatch.setattr("harness.providers.responses.DefaultAsyncHttpxClient", client_factory)
 
 
 async def _trace_failure(request, event_name, error):
@@ -353,7 +354,7 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
         if failure_kind == "timeout":
             # Local plaintext HTTP does not need certifi. Skip it so CONNECT fits
             # in a 1s budget on Windows, then let the server outlast that deadline.
-            monkeypatch.setattr("harness.adapters.responses.DefaultAsyncHttpxClient",
+            monkeypatch.setattr("harness.providers.responses.DefaultAsyncHttpxClient",
                                 lambda **kwargs: DefaultAsyncHttpxClient(verify=False, **kwargs))
             config = replace(config, timeout_sec=1)
         adapters.append(ResponsesAdapter(config))
@@ -675,7 +676,7 @@ def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_
 
 def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeypatch):
     monkeypatch.setattr("openai._base_client.get_platform", lambda: "test")
-    monkeypatch.setattr("harness.adapters.responses._STREAM_DRAIN_TIMEOUT_SEC", 0.5)
+    monkeypatch.setattr("harness.providers.responses._STREAM_DRAIN_TIMEOUT_SEC", 0.5)
     body = _stream([TEXT])
     closed = Event()
 
@@ -1009,7 +1010,7 @@ def test_sdk_connection_error_with_local_protocol_cause_is_not_retryable(monkeyp
         async def __aexit__(self, *_args):
             return False
 
-    monkeypatch.setattr("harness.adapters.responses.AsyncOpenAI", FailingClient)
+    monkeypatch.setattr("harness.providers.responses.AsyncOpenAI", FailingClient)
     with pytest.raises(ProviderError) as caught:
         ResponsesAdapter(ResponsesConfig(model="local-model", api_key=KEY)).complete(_request())
     assert caught.value.retryable is False

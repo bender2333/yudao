@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from harness.adapters.responses import ResponsesAdapter
+from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import ArtifactRef, EventType
 from harness.tests.test_responses import _server, _submit_stream
 from harness.runtime import LoopSystem

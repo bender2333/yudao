@@ -104,7 +104,7 @@ def test_baseline_requests_unaffected_after_candidate_v1(comparison):
 def test_comparison_writes_report_without_network(comparison):
     system, report, out = comparison
     assert system.test_adapter.name == "fake"
-    assert system.provider_catalog is None
+    assert system.facade.describe_readiness()["available"] is False
     assert report["conclusion"] == "undecided"
     markdown = (out / "a4-compare.md").read_text(encoding="utf-8")
     assert "结论：`undecided`" in markdown

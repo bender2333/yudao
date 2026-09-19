@@ -433,16 +433,20 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
 
 def _bound_system(tmp_path, monkeypatch, script, *, context_window, max_output_tokens):
     """A run frozen to a fake-protocol model with the given limits, answered by one scripted adapter."""
-    from harness.provider_catalog import ModelDefinition, ProviderCatalog, ProviderDefinition, ResolvedProviderTarget
+    from harness.adapters.facade_adapter import FacadeAdapter
+    from harness.providers import ProviderFacade
 
     adapter = FakeAdapter(script)
-    monkeypatch.setattr(ResolvedProviderTarget, "create_adapter", lambda self, **_kwargs: adapter)
-    catalog = ProviderCatalog(
-        [ProviderDefinition(id="fake", name="Fake", protocol="fake")],
-        [ModelDefinition("model", "fake", "model", context_window, max_output_tokens)],
-        {department: {"provider_id": "fake", "model_id": "model"} for department in ("product", "engineering", "quality")},
-    )
-    return LoopSystem(tmp_path, provider_catalog=catalog), adapter
+    monkeypatch.setattr(FacadeAdapter, "complete", lambda self, request: adapter.complete(request))
+    facade = ProviderFacade()
+    facade.store_document({
+        "providers": [{"id": "fake", "name": "Fake"}],
+        "models": [{"id": "model", "provider_id": "fake", "model": "model", "protocol": "fake",
+                    "context_window": context_window, "max_output_tokens": max_output_tokens}],
+        "bindings": {department: {"provider_id": "fake", "model_id": "model"}
+                     for department in ("product", "engineering", "quality")},
+    })
+    return LoopSystem(tmp_path, facade=facade), adapter
 
 
 def _work_assemblies(system, run_id):

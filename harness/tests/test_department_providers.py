@@ -12,9 +12,8 @@ from typing import Any, Callable, Iterator
 import pytest
 
 import harness.engine as engine
-from harness.adapters.responses import ResponsesConfig
 from harness.models import ArtifactRef, EventType, json_dumps
-from harness.provider_catalog import CredentialMaterial, ModelDefinition, ProviderCatalog, ProviderDefinition
+from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
 from harness.proposals import collaboration_request, collaboration_response, delivery, engineering_plan, product_spec, review
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
@@ -184,33 +183,51 @@ def _contract_hash(body: dict[str, Any]) -> str:
     return json.loads(raw)["content_hash"]
 
 
-def _catalog(
+def _facade(
     product_url: str,
     engineering_url: str,
     *,
     product_context_window: int = 20_000,
     product_provider: str = "provider-a",
-) -> ProviderCatalog:
-    providers = [
-        ProviderDefinition("provider-a", "Provider A", "responses", product_url, "credential-a", timeout_sec=10),
-        ProviderDefinition("provider-b", "Provider B", "responses", engineering_url, "credential-b", timeout_sec=10),
-    ]
-    models = [
-        ModelDefinition("model-a-product", "provider-a", "a-product", product_context_window, 1_000),
-        ModelDefinition("model-a-quality", "provider-a", "a-quality", 20_000, 1_000),
-        ModelDefinition("model-b-engineering", "provider-b", "b-engineering", 20_000, 1_000),
-        ModelDefinition("model-b-product", "provider-b", "b-product", product_context_window, 1_000),
-    ]
+    credentials: dict | None = None,
+) -> ProviderFacade:
     product_model_id = "model-a-product" if product_provider == "provider-a" else "model-b-product"
-    return ProviderCatalog(
-        providers,
-        models,
-        {
+    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade.store_document({
+        "providers": [
+            {"id": "provider-a", "name": "Provider A", "base_url": product_url,
+             "credential_ref": "credential-a", "timeout_sec": 10},
+            {"id": "provider-b", "name": "Provider B", "base_url": engineering_url,
+             "credential_ref": "credential-b", "timeout_sec": 10},
+        ],
+        "models": [
+            {"id": "model-a-product", "provider_id": "provider-a", "model": "a-product",
+             "protocol": "responses", "context_window": product_context_window, "max_output_tokens": 1_000},
+            {"id": "model-a-quality", "provider_id": "provider-a", "model": "a-quality",
+             "protocol": "responses", "context_window": 20_000, "max_output_tokens": 1_000},
+            {"id": "model-b-engineering", "provider_id": "provider-b", "model": "b-engineering",
+             "protocol": "responses", "context_window": 20_000, "max_output_tokens": 1_000},
+            {"id": "model-b-product", "provider_id": "provider-b", "model": "b-product",
+             "protocol": "responses", "context_window": product_context_window, "max_output_tokens": 1_000},
+        ],
+        "bindings": {
             "product": {"provider_id": product_provider, "model_id": product_model_id},
             "engineering": {"provider_id": "provider-b", "model_id": "model-b-engineering"},
             "quality": {"provider_id": "provider-a", "model_id": "model-a-quality"},
         },
-    )
+    })
+    for ref, material in (credentials or {}).items():
+        facade.set_credential_override(ref, material)
+    # 真实协议模型须先经模型测试准入才能用于任务，测试通过模块接口记录该事实
+    entries = {item["id"]: item for item in facade.providers_view()["models"]}
+    for provider_id, model_id in (
+        ("provider-a", "model-a-product"), ("provider-a", "model-a-quality"),
+        ("provider-b", "model-b-engineering"), ("provider-b", "model-b-product"),
+    ):
+        entry = entries.get(model_id)
+        if entry is not None:
+            facade.record_admission(provider_id, model_id, admitted_model=entry["model"])
+    return facade
 
 
 def _credentials(product: str = "provider-a-key-v1") -> dict[str, CredentialMaterial]:
@@ -300,8 +317,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             _provider_server("provider-b", "provider-b-key-v1", provider_b) as (config_b, captures_b, errors_b):
         system = LoopSystem(
             tmp_path,
-            provider_catalog=_catalog(config_a.base_url, config_b.base_url),
-            credentials=_credentials(),
+            facade=_facade(config_a.base_url, config_b.base_url, credentials=_credentials()),
         )
         run_id = system.create_run("build an echo command")
         result = system.run_until_stop(run_id)
@@ -375,17 +391,16 @@ def test_provider_credentials_are_frozen_per_run_and_rotated_for_new_runs(tmp_pa
         credentials = _credentials()
         original = LoopSystem(
             tmp_path,
-            provider_catalog=_catalog(config_a.base_url, config_b.base_url),
-            credentials=credentials,
+            facade=_facade(config_a.base_url, config_b.base_url, credentials=credentials),
         )
         first_run = original.create_run("first task")
         credentials["credential-b"] = CredentialMaterial("provider-b-key-v2", version="b-v2")
-        updated_catalog = _catalog(
+        updated = LoopSystem(tmp_path, facade=_facade(
             config_a.base_url,
             config_b.base_url,
             product_provider="provider-b",
-        )
-        updated = LoopSystem(tmp_path, provider_catalog=updated_catalog, credentials=credentials)
+            credentials=credentials,
+        ))
         second_run = updated.create_run("second task")
 
         first = original.activate_once(first_run)
@@ -423,10 +438,11 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
 
     with _provider_server("provider-a", "provider-a-key", shared) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         cancel_run = system.create_run("cancel-me")
         other_run = system.create_run("finish-me")
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -454,22 +470,22 @@ def test_restart_cannot_rebind_an_existing_run_to_new_credentials(tmp_path):
 
     with _provider_server("provider-a", "provider-a-key", unexpected) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", unexpected) as (config_b, _captures_b, _errors_b):
-        catalog = _catalog(config_a.base_url, config_b.base_url)
         credentials = {
             "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
             "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
         }
-        original = LoopSystem(tmp_path, provider_catalog=catalog, credentials=credentials)
+        original = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials=credentials))
         run_id = original.create_run("must remain on its frozen target")
         original.store.close()
 
         restarted = LoopSystem(
             tmp_path,
-            provider_catalog=catalog,
-            credentials={
-                "credential-a": CredentialMaterial("provider-a-new-key", version="a-v2"),
-                "credential-b": CredentialMaterial("provider-b-new-key", version="b-v2"),
-            },
+            facade=_facade(
+                config_a.base_url, config_b.base_url, credentials={
+                    "credential-a": CredentialMaterial("provider-a-new-key", version="a-v2"),
+                    "credential-b": CredentialMaterial("provider-b-new-key", version="b-v2"),
+                }),
         )
         result = restarted.activate_once(run_id)
 
@@ -496,10 +512,11 @@ def test_retry_stays_on_the_bound_provider_and_model(tmp_path, monkeypatch):
 
     with _provider_server("provider-a", "provider-a-key", retrying) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, captures_b, errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         run_id = system.create_run("retry this task")
         result = system.activate_once(run_id)
 
@@ -536,10 +553,11 @@ def test_missing_returned_model_remains_unknown_in_request_trace(tmp_path):
 
     with _provider_server("provider-a", "provider-a-key", without_model) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         run_id = system.create_run("trace missing actual model")
         result = system.activate_once(run_id)
 
@@ -571,10 +589,11 @@ def test_terminal_returned_models_are_recorded_for_unreported_multi_step_work(tm
 
     with _provider_server("provider-a", "provider-a-key", unreported) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         run_id = system.create_run("retain returned models without usage")
         result = system.activate_once(run_id)
 
@@ -599,10 +618,11 @@ def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_p
 
     with _provider_server("provider-a", "provider-a-key", always_fails) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         run_id = system.create_run("provider failure has no response model")
         result = system.activate_once(run_id)
 
@@ -632,10 +652,11 @@ def test_cancelled_http_request_keeps_bound_identity_without_a_response(tmp_path
 
     with _provider_server("provider-a", "provider-a-key", blocked) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, provider_catalog=_catalog(config_a.base_url, config_b.base_url), credentials={
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        })
+        system = LoopSystem(tmp_path, facade=_facade(
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
         run_id = system.create_run("cancel this task")
         with ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(system.activate_once, run_id)
@@ -681,11 +702,12 @@ def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
         system = LoopSystem(
             tmp_path,
-            provider_catalog=_catalog(config_a.base_url, config_b.base_url, product_context_window=6_000),
-            credentials={
-                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-            },
+            facade=_facade(
+                config_a.base_url, config_b.base_url, product_context_window=6_000,
+                credentials={
+                    "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                    "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+                }),
         )
         run_id = system.create_run("compact product history")
         system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)

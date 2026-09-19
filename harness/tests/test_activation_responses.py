@@ -5,7 +5,7 @@ from dataclasses import replace
 from threading import Event
 
 import harness.engine as engine
-from harness.adapters.responses import ResponsesAdapter
+from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem

@@ -11,7 +11,7 @@ from threading import Event, RLock
 from typing import Any
 
 from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
-from .adapters.responses import ResponsesExecutionScope
+from .adapters.facade_adapter import FacadeAdapter
 from .artifacts import ArtifactStore
 from .context import ContextAssembler, GUIDANCE_ONLY_TOOLS, department_work_text
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
@@ -38,7 +38,8 @@ from .models import (
     new_id,
     utc_now,
 )
-from .provider_catalog import CredentialSource, ProviderCatalog, ProviderCatalogSnapshot, ResolvedProviderTarget
+from .providers import ProviderFacade
+from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .sessions import SessionFactory
@@ -57,7 +58,7 @@ class _Activation:
     abort_flag: Event
     parent_event_id: str
     adapter: ModelAdapter
-    target: ResolvedProviderTarget | None
+    target: FrozenTarget | None
     snapshot_id: str | None
     input_version: int
     prompt: DepartmentPrompt
@@ -234,6 +235,18 @@ def _validate_run_ownership(
             raise ValueError("baseline code_tree_digest does not match the initial tree digest")
 
 
+def _snapshot_event_dict(snapshot: ResolveSnapshot) -> dict[str, Any]:
+    # 任务快照只存非敏感身份：各部门冻结目标公开身份加凭据版本，不含密钥
+    departments = {}
+    for key in sorted(snapshot.targets):
+        frozen = snapshot.targets[key]
+        payload = frozen.public_dict()
+        payload["department"] = key
+        payload["credential_version"] = frozen.credential_version
+        departments[key] = payload
+    return {"revision": snapshot.revision, "departments": departments}
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -241,8 +254,7 @@ class Orchestrator:
         artifacts: ArtifactStore,
         workspace_root: str | Path,
         *,
-        provider_catalog: ProviderCatalog | None = None,
-        credentials: CredentialSource | None = None,
+        facade: ProviderFacade | None = None,
         test_adapter_factory: Any | None = None,
         test_provider: str = "test",
         test_adapter_name: str = "test",
@@ -256,8 +268,7 @@ class Orchestrator:
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(store, artifacts, self.materials_root, self.git_versions)
         self.interactions = InteractionWriter(store, artifacts, self.materials_root, self.git_versions)
-        self.provider_catalog = provider_catalog
-        self.credentials = credentials
+        self.facade = facade
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
@@ -266,7 +277,7 @@ class Orchestrator:
         self._abort: dict[str, Event] = {}
         self._state_lock = RLock()
         self._active: dict[str, _Activation] = {}
-        self._snapshots: dict[str, ProviderCatalogSnapshot] = {}
+        self._snapshots: dict[str, ResolveSnapshot] = {}
 
     def create_run(
         self,
@@ -289,16 +300,20 @@ class Orchestrator:
             raise ValueError("max_cycles must be positive")
         if context_window < 1:
             raise ValueError("context_window must be positive")
-        if self.provider_catalog is None and self.test_adapter_factory is None:
-            raise ValueError("provider_catalog is required for production runs")
+        if self.facade is None and self.test_adapter_factory is None:
+            raise ValueError("provider facade is required for production runs")
         _validate_run_ownership(
             project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
             project_context=project_context, department_prompts=department_prompts,
             prompt_config_versions=prompt_config_versions,
         )
         snapshot = None
-        if self.provider_catalog is not None:
-            snapshot = self.provider_catalog.resolve_snapshot(self.credentials)
+        use_facade = self.facade is not None and (
+            self.test_adapter_factory is None or bool(self.facade.get_bindings()))
+        if use_facade:
+            # 任务创建一次读取一致的目录版本、凭据来源与目标列表并冻结
+            assert self.facade is not None
+            snapshot = self.facade.resolve_departments()
         run_id = run_id or new_id("run")
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
@@ -315,7 +330,7 @@ class Orchestrator:
         self._abort[run_id] = Event()
         if snapshot is not None:
             self._snapshots[run_id] = snapshot
-        provider_snapshot = {} if snapshot is None else snapshot.public_dict()
+        provider_snapshot = {} if snapshot is None else _snapshot_event_dict(snapshot)
         if snapshot is not None:
             provider_snapshot = {
                 "snapshot_id": canonical_hash(provider_snapshot),
@@ -518,21 +533,19 @@ class Orchestrator:
                 activation.adapter.abort(activation.session_id)
         return self.project(run_id)
 
-    def run_until_stop(self, run_id: str) -> RunProjection:
-        with ResponsesExecutionScope() as execution_scope:
-            while True:
-                projection = self.project(run_id)
-                if projection.phase in TERMINAL_PHASES:
-                    return projection
-                if self._abort.get(run_id) and self._abort[run_id].is_set():
-                    return self.cancel(run_id)
-                self._activate_once(run_id, execution_scope)
+    def run_until_stop(self, run_id: str, execution_scope: Any | None = None) -> RunProjection:
+        while True:
+            projection = self.project(run_id)
+            if projection.phase in TERMINAL_PHASES:
+                return projection
+            if self._abort.get(run_id) and self._abort[run_id].is_set():
+                return self.cancel(run_id)
+            self._activate_once(run_id, execution_scope)
 
-    def activate_once(self, run_id: str) -> RunProjection:
-        with ResponsesExecutionScope() as execution_scope:
-            return self._activate_once(run_id, execution_scope)
+    def activate_once(self, run_id: str, execution_scope: Any | None = None) -> RunProjection:
+        return self._activate_once(run_id, execution_scope)
 
-    def _activate_once(self, run_id: str, execution_scope: ResponsesExecutionScope) -> RunProjection:
+    def _activate_once(self, run_id: str, execution_scope: Any | None) -> RunProjection:
         with self._state_lock:
             if run_id in self._active:
                 raise RuntimeError("run already has an active department invocation")
@@ -568,7 +581,7 @@ class Orchestrator:
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
-    def _prepare_activation(self, run_id: str, execution_scope: ResponsesExecutionScope) -> _Activation | None:
+    def _prepare_activation(self, run_id: str, execution_scope: Any | None) -> _Activation | None:
         projection = self.project(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
@@ -593,12 +606,12 @@ class Orchestrator:
             self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
             return None
 
-        target: ResolvedProviderTarget | None = None
+        target: FrozenTarget | None = None
         snapshot_id: str | None = None
         run_has_frozen_provider = bool(projection.provider_snapshot.get("snapshot_id"))
         snapshot = self._snapshots.get(run_id)
         if run_has_frozen_provider or snapshot is not None:
-            if snapshot is None:
+            if snapshot is None or self.facade is None:
                 self._fail(
                     run_id,
                     projection,
@@ -608,16 +621,9 @@ class Orchestrator:
                 return None
             try:
                 target = snapshot.target(department)
-                snapshot_id = canonical_hash(snapshot.public_dict())
-                if target.max_output_tokens is None:
-                    self._fail(
-                        run_id,
-                        projection,
-                        "provider_unavailable",
-                        f"The bound model for {department} has no declared output limit.",
-                    )
-                    return None
-                adapter = target.create_adapter(execution_scope=execution_scope)
+                snapshot_id = canonical_hash(_snapshot_event_dict(snapshot))
+                # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
+                adapter = FacadeAdapter(self.facade, target, execution_scope=execution_scope)
             except (KeyError, ValueError) as exc:
                 self._fail(run_id, projection, "provider_unavailable", str(exc))
                 return None
@@ -689,7 +695,7 @@ class Orchestrator:
         }
 
     @staticmethod
-    def _configured_provider(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
+    def _configured_provider(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
         return target.provider_id if target is not None else getattr(adapter, "name", "test")
 
     @staticmethod
@@ -701,13 +707,13 @@ class Orchestrator:
         return f"{logical_call_id}:attempt-{attempt}"
 
     @staticmethod
-    def _configured_model(target: ResolvedProviderTarget | None, adapter: ModelAdapter) -> str:
+    def _configured_model(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
         return target.model if target is not None else getattr(adapter, "model", "unknown")
 
     @classmethod
     def _target_metadata(
         cls,
-        target: ResolvedProviderTarget | None,
+        target: FrozenTarget | None,
         adapter: ModelAdapter,
         snapshot_id: str | None = None,
     ) -> dict[str, Any]:
@@ -744,7 +750,7 @@ class Orchestrator:
         }
 
     @staticmethod
-    def _effective_limits(projection: RunProjection, target: ResolvedProviderTarget | None) -> tuple[int, int | None, int]:
+    def _effective_limits(projection: RunProjection, target: FrozenTarget | None) -> tuple[int, int | None, int]:
         """(effective window, model output cap, response reserve).
 
         The reserve drives compaction and overflow decisions; each request's actual

@@ -328,12 +328,12 @@ def test_release_without_quality_evidence_is_rejected(data_dir):
 def test_effective_limits_keep_the_wide_window_and_reserve_half_of_a_narrow_one():
     from harness.models import RunProjection
     from harness.orchestrator import Orchestrator
-    from harness.provider_catalog import ResolvedProviderTarget
+    from harness.providers import FrozenTarget
 
     def target(context_window, max_output_tokens):
-        return ResolvedProviderTarget(department="product", provider_id="fake", provider_name="Fake", model_id="model",
-                                      protocol="fake", base_url="", model="model", context_window=context_window,
-                                      max_output_tokens=max_output_tokens, timeout_sec=1.0)
+        return FrozenTarget(target_key="product", provider_id="fake", provider_name="Fake", model_id="model",
+                            protocol="fake", base_url="", model="model", context_window=context_window,
+                            max_output_tokens=max_output_tokens, timeout_sec=1.0)
 
     projection = RunProjection(run_id="run_x", task="task", phase="PRODUCT_SPEC", context_window=32000)
     # (effective window, declared output cap, response reserve). Wide windows keep the 15% reserve

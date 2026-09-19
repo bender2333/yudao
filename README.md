@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **Stage 1（可信交付）**: ✅ 已完成。三部门循环、压缩、Git 版本、重试、完整封存已验收通过。
-- **Stage 2（三部门 Harness 基线）**: 2.1–2.6 按 2026-09-15 合同关闭；新增 **2.7 统一 Provider 层与 OpenCode Go**，设计未完成、待实现。历史十场为 9 次完成、1 次计划取消，不外推复杂任务成功率。
+- **Stage 2（三部门 Harness 基线）**: 2.1–2.6 按 2026-09-15 合同关闭；**2.7 统一 Provider 层、无配置启动与 OpenCode Go 接入**已实现并通过本地回归，真实 Go 三协议验收因缺少订阅凭据记为受阻。历史十场为 9 次完成、1 次计划取消，不外推复杂任务成功率。
 - **Stage 3（通用工具、可靠恢复与持续运行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
 - **持续改进工作线 / Stage 4 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/provider-layer-design.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/mvp-acceptance.md) 与 [Stage 2 进度](docs/stage-2-progress.md)。无配置启动和 Go 尚未实现，下面的运行说明仍描述当前应用。
+当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/provider-layer-design.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/mvp-acceptance.md) 与 [Stage 2 进度](docs/stage-2-progress.md)。
 
 ## 分层
 
@@ -37,56 +37,56 @@ python -m pip install -e ".[dev]"
 
 ### 配置 Provider
 
-1. 创建 Provider 配置文件 `.yudao/providers.json`：
+无配置也能启动控制台：`python -m harness` 直接使用默认路径，配置缺失时进入空态，可以在页面里逐项完成接入。非敏感配置写在 `.yudao/providers.json`；凭据默认只在进程内存中有效，需要跨重启时写入 `.yudao/.env`。
 
 ```json
 {
   "providers": [
     {
-      "id": "my-provider",
-      "name": "My Provider",
-      "protocol": "responses",
-      "base_url": "https://api.example.com/v1",
-      "credential_ref": "MY_API_KEY",
-      "timeout_sec": 600
+      "id": "opencode-go",
+      "name": "OpenCode Go",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "credential_ref": "YUDAO_OPENCODE_GO_KEY",
+      "timeout_sec": 600,
+      "preset_id": "opencode-go",
+      "models_url": "https://opencode.ai/zen/go/v1/models"
     }
   ],
   "models": [
     {
-      "id": "my-model",
-      "provider_id": "my-provider",
-      "model": "gpt-4",
+      "id": "go-glm-chat",
+      "provider_id": "opencode-go",
+      "model": "glm-5.1",
+      "protocol": "chat_completions",
       "context_window": 128000,
-      "max_output_tokens": 4096
+      "max_output_tokens": 8192,
+      "capability_source": "预置提示：官方端点示例"
     }
   ],
   "bindings": {
-    "product": { "provider_id": "my-provider", "model_id": "my-model" },
-    "engineering": { "provider_id": "my-provider", "model_id": "my-model" },
-    "quality": { "provider_id": "my-provider", "model_id": "my-model" }
+    "product": { "provider_id": "opencode-go", "model_id": "go-glm-chat" },
+    "engineering": { "provider_id": "opencode-go", "model_id": "go-glm-chat" },
+    "quality": { "provider_id": "opencode-go", "model_id": "go-glm-chat" }
   }
 }
 ```
 
-参考 [Provider 配置示例](docs/examples/providers.json)。
+协议在模型访问定义上声明，一条定义只走一条协议（`responses` / `chat_completions` / `messages`），需要多协议时在同一模型上建多条定义。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
 
-2. 设置环境变量：
+凭据来源优先级为进程内存覆盖 > 进程环境变量 > `.yudao/.env`。页面填写 Key 默认只对本进程有效，勾选持久化才写入 `.env`；已保存的 Key 不回填，也不进入日志、事件与导出。
 
-```bash
-# Windows PowerShell
-$env:MY_API_KEY = '<your-api-key>'
-
-# Linux/Mac
-export MY_API_KEY='<your-api-key>'
-```
+服务方案（OpenCode Go 是第一个预置方案）自带端点、认证方式与模型列表地址；模型列表只产生候选，候选要建立访问定义并执行一次模型测试通过（准入）后才能绑定到部门。
 
 ### 启动服务
 
 ```bash
-python -m harness serve --provider-config .yudao/providers.json --data-dir .yudao/data --port 8765
+# 等价于 python -m harness serve，默认 data-dir .yudao/native-loop、provider-config .yudao/providers.json、端口 8765
+python -m harness
 ```
 
 访问 [http://localhost:8765](http://localhost:8765) 打开 Web 控制台。
+
+界面保存、磁盘修改（约 1 秒轮询，按内容哈希核对）与手动重载都对新建事项生效；已创建事项继续使用创建时冻结的模型、协议与凭据。
 
 ### 运行演示（无需 API 密钥）
 
@@ -258,21 +258,20 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ## 模型配置
 
-真实模型通过官方 OpenAI Python SDK 发送单次、无服务端会话续接的 Responses 请求。Provider 和模型由统一目录管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定和凭据；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md) 和 [D18](docs/requirements/department-providers.md)。
+模型接入由独立的 Provider 模块承担（`harness/providers/`），三部门循环、Web、CLI 与 smoke 都经同一接口调用，不各自直连 SDK。Provider 配置、模型访问定义与部门绑定统一管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定、凭据与模型准入；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
 
-需要 Python 3.11 或更新版本，`pip install -e ".[dev]"` 会安装 SDK。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
+需要 Python 3.11 或更新版本，`pip install -e ".[dev]"` 会安装 SDK（OpenAI、Anthropic、HTTPX）。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
 
-目录格式见 [两套 Provider、三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 和 `max_output_tokens` 必须明确；当前真实协议仅支持 `responses`。有效窗口取任务限制与模型窗口较小值，工作与压缩输出均受该模型限制。
+目录格式见 [Provider 与三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 与 `max_output_tokens` 必须明确；协议在模型访问定义上声明，`responses`、`chat_completions`、`messages` 三条已接入，一条定义只走一条协议。有效窗口取任务限制与模型窗口较小值，工作与压缩输出均受该模型限制。
 
-PowerShell 启动示例，目录放在 `.yudao/providers.json`。`credential_ref` 对应环境变量名称，密钥只通过当前终端环境注入，应用不读取 `provider.md`：
+凭据只经内存、进程环境或 `.yudao/.env` 解析，Key 不回填、不进入日志、事件、Git 与导出：
 
 ```powershell
-$env:YUDAO_PROVIDER_A_KEY = '<provider-a-key>'
-$env:YUDAO_PROVIDER_B_KEY = '<provider-b-key>'
-python -m harness serve --provider-config .yudao/providers.json --data-dir .yudao/native-loop --port 8766
+$env:YUDAO_OPENCODE_GO_KEY = '<your-api-key>'
+python -m harness
 ```
 
-旧的 `YUDAO_MODEL_*` 单配置入口已移除。任务创建时冻结三部门配置，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。CLI 在服务启动时读取 JSON 文件，不自动重载文件变更。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。Provider 配置及绑定选择界面等待对应原型。
+`credential_ref` 对应环境变量名称；应用不读取 `provider.md`。旧的 `YUDAO_MODEL_*` 单配置入口与 Provider 级 `protocol` 字段已移除，旧的目录文件按新结构明确报错，不做迁移。任务创建时冻结三部门的目标与认证句柄，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。Provider 模块在后台轮询本地配置与 `.env`（约 1 秒，按内容核对），界面保存与手动重载也经同一接口发布；文件损坏时保留上一有效版本并持续显示重载错误。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。
 
 默认单次等待 600 秒，由目录中 Provider 的 `timeout_sec` 设置。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒，超过时明确停止而不提前重发。各实际尝试计入每次部门激活的 32 次模型调用上限，压缩调用同样适用，不另设累计耗时预算。等待可被取消或新增输入打断，每次实际尝试重新装配上下文并准入。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
 

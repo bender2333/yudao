@@ -9,7 +9,7 @@ from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
-from harness.provider_catalog import ModelDefinition, ProviderCatalog, ProviderDefinition
+from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence, _git_evidence
 from harness.tests.helpers import run_scripted
@@ -81,19 +81,21 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
 
 
-def test_directory_fake_protocol_is_rejected_even_when_it_fails_without_a_response(tmp_path):
-    catalog = ProviderCatalog(
-        [ProviderDefinition("fake-provider", "Fake", "fake")],
-        [ModelDefinition("fake-model", "fake-provider", "fake-script", 32_000, 4_096)],
-        {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
-         for department in ("product", "engineering", "quality")},
-    )
-    system = LoopSystem(tmp_path, provider_catalog=catalog)
-    run_id = system.create_run("fake provider fails before a response")
+def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
+    facade = ProviderFacade()
+    facade.store_document({
+        "providers": [{"id": "fake-provider", "name": "Fake"}],
+        "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "protocol": "fake", "context_window": 32_000, "max_output_tokens": 4_096}],
+        "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
+                     for department in ("product", "engineering", "quality")},
+    })
+    system = LoopSystem(tmp_path, facade=facade)
+    run_id = system.create_run("fake provider cannot submit real work")
     result = system.activate_once(run_id)
     summary = summarize_run(system, run_id, scenario="happy")
 
-    assert result.phase == "FAILED"
+    assert result.phase == "PAUSED"
     assert summary["fake_used"] is True
     assert summary["provider_bindings"]["product"]["protocol"] == "fake"
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
@@ -512,7 +514,7 @@ def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
         "bindings": {department: {"provider_id": "provider", "model_id": "model"}
                      for department in ("product", "engineering", "quality")},
     }), encoding="utf-8")
-    report = run_smoke(tmp_path, provider_config=config, credentials={})
+    report = run_smoke(tmp_path, provider_config=config)
     assert report["available"] is False
     assert report["scenarios"] == {}
 

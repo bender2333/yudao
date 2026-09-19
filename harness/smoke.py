@@ -18,14 +18,15 @@ from .event_store import EventStore
 from .git_audit import verify_git_history
 from .models import (ArtifactRef, EventType, RunProjection, canonical_hash, department_for_phase, estimate_tokens,
                      json_dumps)
-from .provider_catalog import CatalogValidationError, ProviderCatalog
 from .projection import apply_event, project_run
+from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
-from .runtime import LoopSystem, environment_credentials
+from .runtime import LoopSystem
 from .tree_archive import load_tree
 
 
 DEFAULT_DIR = Path(".yudao") / "native-validation"
+DEFAULT_PROVIDER_CONFIG = Path(".yudao") / "providers.json"
 
 MODEL_ATTEMPT_FAILED = EventType.MODEL_ATTEMPT_FAILED
 MODEL_RETRY_SCHEDULED = EventType.MODEL_RETRY_SCHEDULED
@@ -54,8 +55,8 @@ COLLABORATION_TASK = (
 def run_smoke(
     data_dir: str | Path = DEFAULT_DIR,
     *,
-    provider_config: str | Path,
-    credentials=None,
+    provider_config: str | Path | None = None,
+    dotenv_path: str | Path | None = None,
     scenarios: list[str] | None = None,
 ) -> dict[str, Any]:
     data_dir = Path(data_dir)
@@ -63,27 +64,24 @@ def run_smoke(
     selected = scenarios or ["happy", "collaboration"]
     if any(name not in {"happy", "collaboration"} for name in selected):
         raise ValueError("unknown smoke scenario")
-    credentials = environment_credentials if credentials is None else credentials
+    config_path = Path(provider_config) if provider_config is not None else DEFAULT_PROVIDER_CONFIG
     report: dict[str, Any] = {
-        "provider_config": str(provider_config),
+        "provider_config": str(config_path),
         "available": False,
         "scenarios": {},
     }
-    try:
-        catalog = ProviderCatalog.load(provider_config)
-        system = LoopSystem(data_dir, provider_catalog=catalog, credentials=credentials)
-        status = system.provider_status()
-    except CatalogValidationError as exc:
-        report["error"] = str(exc)
-        report["stop_reason"] = "provider_unavailable"
-        _write_report(data_dir, report)
-        return report
+    # 短命 CLI 执行前读取一致版本，缺可用配置明确失败，不偷换 Fake
+    facade = ProviderFacade()
+    facade.configure_paths(config_path, None if dotenv_path is None else Path(dotenv_path))
+    facade.reload()
+    system = LoopSystem(data_dir, facade=facade)
+    status = system.provider_status()
     report.update({
         "available": bool(status.get("available")),
         "provider_bindings": status.get("departments", {}),
         "provider": None,
         "model": None,
-        "adapter": status.get("adapter", "directory"),
+        "adapter": "directory",
     })
     if not report["available"]:
         report["error"] = status.get("message", "provider unavailable")

@@ -745,3 +745,488 @@ test("breadcrumb names task department and request without dropping provider pag
   assert.match(APP_JS, /data-action="providers"/);
 });
 
+// —— provider-config 设置页：解析 markup() 输出的轻量 DOM 与 fetch 桩 ——
+
+const PROVIDER_CONFIG_JS = fs.readFileSync(path.join(staticDir, "provider-config.js"), "utf8");
+
+function decodeEntities(text) {
+  return String(text)
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+const PROVIDER_VOID_TAGS = new Set(["input", "br", "hr", "img", "link", "meta"]);
+
+function parseProviderAttrs(raw) {
+  const attrs = {};
+  const attrRe = /([a-zA-Z_][-\w]*)(?:="([^"]*)")?/g;
+  let match;
+  while ((match = attrRe.exec(raw))) {
+    attrs[match[1]] = match[2] === undefined ? "" : decodeEntities(match[2]);
+  }
+  return attrs;
+}
+
+function makeProviderDomNode(tag, attrs) {
+  const dataset = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key.startsWith("data-")) {
+      dataset[key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase())] = value;
+    }
+  }
+  const listeners = {};
+  const node = {
+    tag,
+    attrs,
+    dataset,
+    value: tag === "select" ? undefined : (attrs.value ?? ""),
+    checked: attrs.type === "checkbox" ? "checked" in attrs : undefined,
+    disabled: "disabled" in attrs,
+    hidden: "hidden" in attrs,
+    focused: false,
+    _fields: [],
+    addEventListener(type, callback) { (listeners[type] ||= []).push(callback); },
+    async dispatch(type, event = {}) {
+      for (const callback of listeners[type] || []) {
+        await callback({ target: node, currentTarget: node, stopPropagation() {}, preventDefault() {}, ...event });
+      }
+    },
+    focus() { node.focused = true; },
+    click() { return node.dispatch("click"); },
+  };
+  return node;
+}
+
+function parseProviderHtml(html) {
+  const nodes = [];
+  const stack = [];
+  const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>/g;
+  let match;
+  while ((match = tagRe.exec(html))) {
+    const tag = match[2].toLowerCase();
+    if (match[1]) {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].tag === tag) {
+          if (tag === "select" && stack[i].value === undefined) {
+            stack[i].value = stack[i]._firstOptionValue ?? "";
+          }
+          stack.length = i;
+          break;
+        }
+      }
+      continue;
+    }
+    const attrs = parseProviderAttrs(match[3] || "");
+    const node = makeProviderDomNode(tag, attrs);
+    nodes.push(node);
+    if (tag === "option") {
+      const select = [...stack].reverse().find(item => item.tag === "select");
+      if (select) {
+        if (select._firstOptionValue === undefined) select._firstOptionValue = attrs.value ?? "";
+        if ("selected" in attrs) select.value = attrs.value ?? "";
+      }
+      continue;
+    }
+    if (tag === "input" || tag === "select" || tag === "textarea") {
+      const form = [...stack].reverse().find(item => item.tag === "form");
+      if (form && attrs.name) {
+        form._fields.push({ name: attrs.name, kind: attrs.type === "checkbox" ? "checkbox" : tag, node });
+      }
+    }
+    if (!PROVIDER_VOID_TAGS.has(tag)) stack.push(node);
+  }
+  return nodes;
+}
+
+function providerMatches(node, selector) {
+  const idMatch = /^#([\w-]+)$/.exec(selector);
+  if (idMatch) return node.attrs.id === idMatch[1];
+  const attrMatch = /^\[([a-zA-Z-]+)(?:='([^']*)'|="([^"]*)")?\]$/.exec(selector);
+  if (attrMatch) {
+    if (!Object.prototype.hasOwnProperty.call(node.attrs, attrMatch[1])) return false;
+    if (attrMatch[2] !== undefined) return node.attrs[attrMatch[1]] === attrMatch[2];
+    if (attrMatch[3] !== undefined) return node.attrs[attrMatch[1]] === attrMatch[3];
+    return true;
+  }
+  return false;
+}
+
+function providerRoot() {
+  return {
+    _html: "",
+    _nodes: [],
+    set innerHTML(html) { this._html = String(html); this._nodes = parseProviderHtml(this._html); },
+    get innerHTML() { return this._html; },
+    querySelectorAll(selector) { return this._nodes.filter(node => providerMatches(node, selector)); },
+    querySelector(selector) { return this._nodes.find(node => providerMatches(node, selector)) || null; },
+  };
+}
+
+class ProviderFormData {
+  constructor(form) {
+    this._entries = [];
+    for (const field of (form && form._fields) || []) {
+      if (field.kind === "checkbox") {
+        if (field.node.checked) this._entries.push([field.name, field.node.attrs.value || "on"]);
+      } else {
+        this._entries.push([field.name, field.node.value ?? ""]);
+      }
+    }
+  }
+  entries() { return this._entries[Symbol.iterator](); }
+}
+
+function loadProviderConfig(fetchImpl) {
+  const sandbox = {
+    console, Promise, Map, Set, JSON, Error, Number, String, Array, Object, Math, Date,
+    encodeURIComponent, setTimeout, clearTimeout,
+    fetch: fetchImpl,
+    FormData: ProviderFormData,
+    Blob: class { constructor(parts, options) { this.parts = parts; this.type = options && options.type; } },
+    URL: class { static createObjectURL() { return "blob:test"; } static revokeObjectURL() {} },
+    document: { createElement(tag) { return { tagName: tag, href: "", download: "", click() {} }; } },
+    confirm: () => true,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(PROVIDER_CONFIG_JS, sandbox);
+  return sandbox.harnessProviderConfig;
+}
+
+function providerFetch(routes) {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    const route = routes[String(url)];
+    if (route === undefined) return response({ error: `未打桩的请求：${url}` }, 404);
+    return response(typeof route === "function" ? route(options) : route);
+  };
+  return { calls, fetchImpl };
+}
+
+function samplePreset() {
+  return {
+    id: "opencode-go", name: "OpenCode Go", auth: "api_key",
+    endpoints: {
+      responses: "https://go.example.com/v1",
+      chat_completions: "https://go.example.com/v1",
+      messages: "https://go.example.com/anthropic",
+    },
+    models_url: "https://go.example.com/models",
+    docs_url: "https://go.example.com/docs",
+    source: "official", notes: "OpenCode Go 订阅接入",
+    known_models: [{ model_id: "gpt-5.6-luna", protocol: "responses", capability_source: "preset-v1" }],
+  };
+}
+
+function catalogModel(id, model, overrides = {}) {
+  return {
+    id, provider_id: "p1", model, protocol: "responses",
+    context_window: 128000, max_output_tokens: 4096, capability_source: "preset-v1",
+    admitted_at: null, admitted_model: null, admitted_revision: null,
+    ...overrides,
+  };
+}
+
+function catalogView({ revision = 5, credential = { ref: "K", configured: true, source: "env", has_override: false }, models = [], bindings = {} } = {}) {
+  const provider = {
+    id: "p1", name: "Go 连接", base_url: "https://go.example.com/v1",
+    credential_ref: "K", timeout_sec: 600, preset_id: "", models_url: "",
+    credential, credential_configured: credential.configured !== false,
+    models,
+  };
+  return { revision, providers: [provider], models, bindings };
+}
+
+test("provider empty state lists presets and prefills the form without auto-saving", async () => {
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "preset-v1", presets: [samplePreset()] },
+    "/api/providers": { revision: 3, providers: [], models: [], bindings: {} },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  let html = root.innerHTML;
+  assert.match(html, /添加模型服务/);
+  assert.match(html, /选择服务方案/);
+  assert.match(html, /自定义连接/);
+  assert.match(html, /OpenCode Go/);
+  assert.match(html, /预置表版本 preset-v1/);
+  assert.match(html, /不会自动保存任何任务绑定/);
+  const chooseButton = root.querySelectorAll("[data-pc-action='choose-preset']")[0];
+  await chooseButton.dispatch("click");
+  html = root.innerHTML;
+  assert.match(html, /data-preset-panel/);
+  assert.match(html, /OPENCODE_GO_KEY/);
+  assert.match(html, /https:\/\/go\.example\.com\/v1/);
+  assert.match(html, /https:\/\/go\.example\.com\/models/);
+  assert.match(html, /端点（按协议）/);
+  assert.match(html, /官方文档与 Key 获取/);
+  // 选择方案后展示 Key 输入与内存作用域说明
+  assert.match(html, /name="secret"/);
+  assert.match(html, /本进程有效，重启后需重新提供/);
+  assert.match(html, /持久化到 \.yudao\/\.env/);
+  // 预填不触发任何保存或绑定请求
+  assert.equal(calls.some(([, options]) => options && options.method === "POST"), false);
+  assert.equal(calls.some(([url]) => String(url).includes("/api/department-bindings")), false);
+});
+
+test("candidate refresh renders suggested protocols and drops the older list on unknown", async () => {
+  let candidatesStatus = "ok";
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": () => catalogView({ models: [catalogModel("m1", "luna")] }),
+    "/api/providers/p1/candidates": options => {
+      const body = JSON.parse(options.body || "{}");
+      if (candidatesStatus === "ok") {
+        assert.deepEqual(body, {});
+        return {
+          provider_id: "p1", source_url: "https://go.example.com/models",
+          fetched_at: "2026-09-19T10:00:00Z", status: "ok",
+          candidates: [
+            { id: "gpt-5.6-luna", protocol: "responses", capability_source: "preset-v1" },
+            { id: "mystery-7", protocol: null, capability_source: null },
+          ],
+          error: null,
+        };
+      }
+      assert.deepEqual(body, { models_url: "https://custom.example.com/models" });
+      return {
+        provider_id: "p1", source_url: "https://custom.example.com/models",
+        fetched_at: "2026-09-19T10:05:00Z", status: "unknown",
+        candidates: [], error: "上游 503",
+      };
+    },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  await root.querySelector("[data-pc-action='refresh-candidates']").dispatch("click");
+  let html = root.innerHTML;
+  assert.match(html, /data-candidates="ok"/);
+  assert.match(html, /gpt-5\.6-luna/);
+  assert.match(html, /需选择协议/);
+  assert.match(html, /建立访问定义/);
+  assert.match(html, /候选不落盘、不自动绑定/);
+  // 建立访问定义只预填表单：无建议协议时必须手动选择，容量字段不造默认值
+  const admitButton = root.querySelectorAll("[data-pc-action='admit-candidate']")
+    .find(button => button.dataset.candidateId === "mystery-7");
+  await admitButton.dispatch("click");
+  const modelForm = root.querySelector("[data-pc-form='model']");
+  assert.equal(modelForm._fields.find(field => field.name === "protocol").node.value, "");
+  assert.equal(modelForm._fields.find(field => field.name === "context_window").node.value, "");
+  assert.equal(modelForm._fields.find(field => field.name === "max_output_tokens").node.value, "");
+  assert.match(root.innerHTML, /需选择协议/);
+  // 覆写模型列表地址后刷新：上游不可达时显示候选未知，且不沿用上一次列表
+  const providerForm = root.querySelector("[data-pc-form='provider']");
+  providerForm._fields.find(field => field.name === "models_url").node.value = "https://custom.example.com/models";
+  candidatesStatus = "unknown";
+  await root.querySelector("[data-pc-action='refresh-candidates']").dispatch("click");
+  html = root.innerHTML;
+  assert.match(html, /data-candidates="unknown"/);
+  assert.match(html, /候选未知/);
+  assert.match(html, /上游 503/);
+  assert.doesNotMatch(html, /gpt-5\.6-luna/);
+  assert.doesNotMatch(html, /建立访问定义/);
+  assert.equal(calls.filter(([url]) => String(url).endsWith("/candidates")).length, 2);
+});
+
+test("model rows show admission badges for admitted, unadmitted and stale revisions", async () => {
+  const models = [
+    catalogModel("m-admitted", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna-actual", admitted_revision: 7 }),
+    catalogModel("m-fresh", "nova", { protocol: "chat_completions", capability_source: "" }),
+    catalogModel("m-stale", "orion", { protocol: "messages", admitted_at: "2026-09-18T09:00:00Z", admitted_model: "orion", admitted_revision: 6 }),
+  ];
+  const { fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ revision: 7, models, bindings: { product: { provider_id: "p1", model_id: "m-admitted" } } }),
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const html = root.innerHTML;
+  assert.match(html, /class="admission admitted"/);
+  assert.match(html, /class="admission unadmitted"/);
+  assert.match(html, /class="admission stale"/);
+  assert.match(html, /测试结果不对应当前修订/);
+  // 配置、凭据、准入、额度分开呈现，不合并成一个绿点
+  assert.match(html, /data-status-strip/);
+  assert.match(html, /配置：就绪 · 1\/3 模型已准入/);
+  assert.match(html, /凭据：已配置 · 来源 宿主进程环境/);
+  assert.match(html, /准入：1\/3 已准入/);
+  assert.match(html, /额度：未知/);
+});
+
+test("saved key is never echoed back and credential status shows source and override", async () => {
+  let view = catalogView({ credential: { ref: "K", configured: false, source: "missing", has_override: false }, models: [catalogModel("m1", "luna")] });
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": () => view,
+    "/api/provider-credentials": options => {
+      const body = JSON.parse(options.body);
+      if (body.action === "set") {
+        view = catalogView({
+          credential: { ref: "K", configured: true, source: "override", has_override: true },
+          models: [catalogModel("m1", "luna")],
+        });
+        return { ok: true, ref: "K", credential: { ref: "K", configured: true, source: "override", has_override: true }, revision: 2 };
+      }
+      return { ok: true };
+    },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  assert.match(root.innerHTML, /凭据：缺失/);
+  const credentialForm = root.querySelector("[data-pc-form='credential']");
+  credentialForm._fields.find(field => field.name === "secret").node.value = "sk-secret-value-123";
+  await credentialForm.dispatch("submit");
+  const saveCall = calls.find(([url, options]) => url === "/api/provider-credentials" && options.method === "POST");
+  assert.deepEqual(JSON.parse(saveCall[1].body), { ref: "K", action: "set", secret: "sk-secret-value-123", persist: false });
+  const html = root.innerHTML;
+  // 已保存的 Key 永不回填，页面只显示 configured/source/has_override
+  assert.doesNotMatch(html, /sk-secret-value-123/);
+  assert.match(html, /临时 Key/);
+  assert.match(html, /本进程有效，重启后需重新提供/);
+  assert.match(html, /内存覆盖当前生效/);
+  assert.match(html, /data-credential-status/);
+  assert.match(html, /清除内存覆盖/);
+  assert.match(html, /删除持久凭据/);
+});
+
+test("model test shows inline progress then result and keeps filled fields", async () => {
+  let resolveTest;
+  const testResponse = new Promise(resolve => { resolveTest = resolve; });
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (url === "/api/provider-presets") return response({ table_version: "v1", presets: [] });
+    if (url === "/api/providers") return response(catalogView({ models: [catalogModel("m1", "luna")] }));
+    if (String(url).endsWith("/test")) return testResponse.then(payload => response(payload));
+    return response({ error: "not found" }, 404);
+  };
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  // 预填一个未保存的容量值：测试过程中不能丢失已填的非敏感字段
+  const modelForm = root.querySelector("[data-pc-form='model']");
+  modelForm._fields.find(field => field.name === "context_window").node.value = "256000";
+  const pending = root.querySelector("[data-pc-action='test-model']").dispatch("click");
+  // dispatch 同步执行监听器前缀，此时进度渲染已完成
+  let html = root.innerHTML;
+  assert.match(html, /data-test-progress/);
+  assert.match(html, /测试中…/);
+  assert.equal(root.querySelector("[data-pc-action='test-model']").disabled, true);
+  resolveTest({ ok: true, error: null, actual_model: "luna-actual", elapsed_ms: 812, revision: 8, admitted: true, protocol: "responses" });
+  await pending;
+  html = root.innerHTML;
+  assert.match(html, /data-test-result="ok"/);
+  assert.match(html, /实际返回 luna-actual/);
+  assert.match(html, /协议 responses/);
+  assert.match(html, /修订 8/);
+  assert.match(html, /耗时 812 ms/);
+  assert.match(html, /class="admission admitted"/);
+  const modelFormAfter = root.querySelector("[data-pc-form='model']");
+  assert.equal(modelFormAfter._fields.find(field => field.name === "context_window").node.value, "256000");
+  const testCall = calls.find(([url]) => String(url).endsWith("/test"));
+  assert.deepEqual(JSON.parse(testCall[1].body), { model_id: "m1", kind: "model" });
+});
+
+test("model test failure keeps the verifiable reason and filled fields", async () => {
+  const { fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
+    "/api/providers/p1/test": { ok: false, error: "缺少凭据环境变量 K，请补充后重试", actual_model: null, elapsed_ms: 3, revision: 5, admitted: false, protocol: null },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const modelForm = root.querySelector("[data-pc-form='model']");
+  modelForm._fields.find(field => field.name === "max_output_tokens").node.value = "2048";
+  await root.querySelector("[data-pc-action='test-model']").dispatch("click");
+  const html = root.innerHTML;
+  assert.match(html, /data-test-result="bad"/);
+  assert.match(html, /模型测试失败 · m1/);
+  assert.match(html, /缺少凭据环境变量 K，请补充后重试/);
+  const modelFormAfter = root.querySelector("[data-pc-form='model']");
+  assert.equal(modelFormAfter._fields.find(field => field.name === "max_output_tokens").node.value, "2048");
+});
+
+test("binding options mark unadmitted models unavailable with the reason visible", async () => {
+  const models = [
+    catalogModel("m1", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna", admitted_revision: 5 }),
+    catalogModel("m2", "nova"),
+  ];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
+    "/api/department-bindings": { bindings: { product: { provider_id: "p1", model_id: "m1" } } },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const html = root.innerHTML;
+  assert.match(html, /未准入的模型不能绑定到部门/);
+  const m1Option = html.match(/<option value="p1\/m1"[^>]*>([^<]*)<\/option>/);
+  const m2Option = html.match(/<option value="p1\/m2"[^>]*disabled[^>]*>([^<]*)<\/option>/);
+  assert.ok(m1Option, "已准入模型应出现在绑定下拉中");
+  assert.ok(!/disabled/.test(m1Option[0]), "已准入模型可以被选择");
+  assert.ok(m2Option, "未准入模型应被禁用");
+  assert.match(m2Option[1], /未准入，需先通过模型测试/);
+  // 保存绑定后提示只影响新任务
+  await root.querySelector("[data-pc-form='bindings']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => url === "/api/department-bindings" && options.method === "PUT");
+  assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1" } });
+  assert.match(root.innerHTML, /新任务将使用此配置，已有任务保持原配置/);
+});
+
+test("readiness gap chip jumps to the missing credential field", async () => {
+  const { fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ credential: { ref: "K", configured: false, source: "missing", has_override: false }, models: [] }),
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const html = root.innerHTML;
+  assert.match(html, /已保存但未就绪 · 缺凭据/);
+  assert.match(html, /点击跳到对应字段/);
+  const chip = root.querySelector("[data-pc-jump]");
+  assert.equal(chip.dataset.pcJump, "credential-secret");
+  await chip.dispatch("click");
+  assert.equal(root.querySelector("[data-pc-field='credential-secret']").focused, true);
+});
+
+test("reload error keeps a visible notice that the current revision stays in use", async () => {
+  const { fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
+    "/api/providers/reload": { ok: false, revision: 4, reload_error: "Provider 配置无法解析：Expecting value", changed: false },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  await root.querySelector("[data-pc-action='reload']").dispatch("click");
+  const html = root.innerHTML;
+  assert.match(html, /data-reload-notice/);
+  assert.match(html, /文件更新未生效/);
+  assert.match(html, /Provider 配置无法解析：Expecting value/);
+  assert.match(html, /当前仍用修订 4/);
+});
+
+test("provider level connection test posts kind=connection and reports the revision", async () => {
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
+    "/api/providers/p1/test": { ok: true, error: null, actual_model: "luna", elapsed_ms: 120, revision: 5, admitted: false, protocol: "responses" },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  await root.querySelector("[data-pc-action='test']").dispatch("click");
+  const testCall = calls.find(([url]) => String(url).endsWith("/test"));
+  assert.deepEqual(JSON.parse(testCall[1].body), { kind: "connection" });
+  assert.match(root.innerHTML, /连接成功 · luna · 120 ms · 修订 5/);
+});
+

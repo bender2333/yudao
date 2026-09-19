@@ -12,7 +12,7 @@ import pytest
 
 from harness.artifacts import ArtifactStore
 from harness.adapters.base import Availability, ModelObservation, ModelResponse, ProviderError
-from harness.adapters.responses import ResponsesAdapter
+from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import ArtifactRef, EventType, Usage
 from harness.observability import ObservabilityQuery, _detail_events, _usage_totals
 from harness.runtime import LoopSystem
@@ -321,7 +321,7 @@ def test_legacy_stream_events_keep_unknown_time_and_provider_sequence():
 
 
 def test_sdk_json_observation_redacts_configured_credential(tmp_path: Path):
-    from harness.adapters.responses import _redact_sdk_json
+    from harness.providers.responses import _redact_sdk_json
 
     secret = "credential-sentinel"
     payload = _redact_sdk_json(
