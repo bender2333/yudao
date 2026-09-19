@@ -43,6 +43,8 @@ flowchart TB
 | D22 专项 | 10 项通过：无配置启动、CLI 默认入口、结构合法保存、冻结快照、损坏文件保留上一有效版本、删除撤销、同尺寸改写、文件轮询、凭据来源链、密钥不泄漏 | `harness/tests/test_startup_reload.py` |
 | 设置页真实流程 | 创建 Provider 201 → 未准入时 `provider_available=false` → 模型测试准入 → 绑定 200 → `provider_available=true`；无 `models_url` 时候选为 unknown 且给出原因 | `.yudao/stage-2-7-20260919/settings-flow.log` |
 | 浏览器走查 | 1440 与 390 两档完整流程无横向溢出；准入徽章、状态条分项、绑定下拉标注正确 | `.yudao/stage-2-7-20260919/flow-1440.png`、`flow-390.png` |
+| Go 真实候选刷新 | 对 `https://opencode.ai/zen/go/v1/models` 真实取回 37 个候选，三条预置协议提示分别命中 glm-5.1、gpt-5.6-luna、minimax-m2.7；不使用任何凭据、不落盘 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
+| 无凭据 smoke | 退出码 2，逐部门指出缺少 `YUDAO_OPENCODE_GO_KEY`，未启动空壳运行 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
 
 ## 5. 界面行为要点
 
@@ -53,7 +55,7 @@ flowchart TB
 
 ## 6. 受阻与边界
 
-- Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有）。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理，因此三个协议的真实 Go 代表模型验证仍未执行。本地 HTTP/流式捕获只能证明请求形状、身份头与配对逻辑，不能替代真实订阅验收。
+- Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有），三个协议的真实推理与工具往返未执行。已取得的真实外部证据是公开模型列表刷新（37 个候选、预置提示命中）与无凭据时 smoke 的明确失败；二者都不能替代带凭据的真实推理验收。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理。
 - 未做浏览器键盘逐项驱动；走查覆盖布局、状态与错误提示，键盘可达性由现有控件语义与 Node UI 测试覆盖。
 - 其他订阅、OAuth、推理参数、额度查询维持后置；恢复与并行不得重建第二套模型接入路径。
 
