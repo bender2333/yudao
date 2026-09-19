@@ -1,6 +1,6 @@
 # Stage 2.7：统一 Provider 层与 OpenCode Go 接入
 
-日期：2026-09-19。状态：设计完成，代码与验收未开始。
+日期：2026-09-19。状态：设计未完成，代码与验收未开始。
 
 Stage 2.1–2.6 按原合同关闭的结论保留；用户新增 2.7 作为进入 Stage 3 前的补充阶段。新需求以 [D22](requirements/startup-provider-reload.md) 和 [D23](requirements/provider-layer.md) 为准。
 
