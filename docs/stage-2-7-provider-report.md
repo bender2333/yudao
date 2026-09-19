@@ -45,6 +45,7 @@ flowchart TB
 | 浏览器走查 | 1440 与 390 两档完整流程无横向溢出；准入徽章、状态条分项、绑定下拉标注正确 | `.yudao/stage-2-7-20260919/flow-1440.png`、`flow-390.png` |
 | Go 真实候选刷新 | 对 `https://opencode.ai/zen/go/v1/models` 真实取回 37 个候选，三条预置协议提示分别命中 glm-5.1、gpt-5.6-luna、minimax-m2.7；不使用任何凭据、不落盘 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
 | 无凭据 smoke | 退出码 2，逐部门指出缺少 `YUDAO_OPENCODE_GO_KEY`，未启动空壳运行 | `.yudao/stage-2-7-20260919/go-public-discovery.log` |
+| 键盘与可达性 | 真实 Chromium 中 Tab/Enter 可激活“自定义连接”并进入表单；所有可见输入控件都有标签；390 与 1440 无横向溢出、无越界控件 | `.yudao/stage-2-7-20260919/keyboard-390.png` |
 
 ## 5. 界面行为要点
 
@@ -56,7 +57,7 @@ flowchart TB
 ## 6. 受阻与边界
 
 - Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有），三个协议的真实推理与工具往返未执行。已取得的真实外部证据是公开模型列表刷新（37 个候选、预置提示命中）与无凭据时 smoke 的明确失败；二者都不能替代带凭据的真实推理验收。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理。
-- 未做浏览器键盘逐项驱动；走查覆盖布局、状态与错误提示，键盘可达性由现有控件语义与 Node UI 测试覆盖。
+- 键盘可达性已在真实 Chromium 中验证：Tab/Enter 可完成“添加模型服务”入口操作，可见输入控件均有标签（隐藏的导入文件框补上 `aria-label`），1440 与 390 无横向溢出。逐字段的键盘输入流程未逐项录制。
 - 其他订阅、OAuth、推理参数、额度查询维持后置；恢复与并行不得重建第二套模型接入路径。
 
 ## 7. 真实 Go 验收的解封步骤

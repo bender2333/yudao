@@ -639,7 +639,7 @@
           <button class="yp-btn" type="button" data-pc-action="import">导入 JSON</button>
           <button class="yp-btn" type="button" data-pc-action="export">导出</button>
           <button class="yp-btn" type="button" data-action="home">返回项目列表</button>
-          <input id="yp-provider-import" type="file" accept="application/json,.json" hidden>
+          <input id="yp-provider-import" type="file" accept="application/json,.json" hidden aria-label="导入 Provider 目录 JSON 文件">
         </div>
       </div>
       <p class="yp-provider-msg ${messageKind}" role="status"${message ? "" : " hidden"}>${escapeHtml(message)}</p>
