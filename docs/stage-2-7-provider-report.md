@@ -53,6 +53,17 @@ flowchart TB
 
 ## 6. 受阻与边界
 
-- 本机没有 OpenCode Go 订阅 Key，三个协议的真实 Go 代表模型验证未执行；本地 HTTP/流式捕获只能证明请求形状、身份头与配对逻辑，不能替代真实订阅验收。
+- Yudao 尚未配置 OpenCode Go 凭据（进程环境与 `.yudao/.env` 都没有）。本机 opencode 自身的凭据库存在一个 `opencode-go` API Key，未经用户授权不读取、不用于推理，因此三个协议的真实 Go 代表模型验证仍未执行。本地 HTTP/流式捕获只能证明请求形状、身份头与配对逻辑，不能替代真实订阅验收。
 - 未做浏览器键盘逐项驱动；走查覆盖布局、状态与错误提示，键盘可达性由现有控件语义与 Node UI 测试覆盖。
 - 其他订阅、OAuth、推理参数、额度查询维持后置；恢复与并行不得重建第二套模型接入路径。
+
+## 7. 真实 Go 验收的解封步骤
+
+凭据就绪后按顺序执行，全部证据写入 `.yudao/stage-2-7-20260919/`：
+
+1. 在当前终端导出订阅 Key（不写入仓库）：`$env:YUDAO_OPENCODE_GO_KEY = '<go-key>'`。
+2. 对三个协议的代表模型分别执行模型测试（设置页“测试模型”或 `POST /api/providers/opencode-go/test` 带 `{"model_id": ..., "kind": "model"}`），记录准入与真实返回模型。
+3. 用同一份配置运行三部门真实 smoke：`python -m harness smoke --provider-config .yudao/stage-2-7-20260919/go-providers.json --scenario all`。当前准备的三部门绑定分别落在 Responses、Chat Completions、Anthropic Messages 三个模型上，一次运行即覆盖三种协议的工具请求与结果往返。
+4. 混合服务验收再配置第二套真实 Provider（`credential_ref` 指向其环境变量），把其中一个部门绑定到它，重复第 3 步。
+
+`.yudao/stage-2-7-20260919/go-providers.json` 已按上述三分工准备好，未包含任何密钥。真实结果未取得前，本报告的受阻状态保持有效。
