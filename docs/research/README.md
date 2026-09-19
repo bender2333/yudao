@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-19 新资料：[OpenCode Go 与统一 Provider 层一手核对](opencode-go-provider-integration.md)。支持当前 [Stage 2.7](../stage-2-provider-plan.md)，含 Go API Key、三协议、会话身份、模型发现限制和固定 OMP 源码依据；下文保留旧研究导入背景。
+
 > 日期：2026-09-06。工作树：`D:/codes/yudao-stage2`；分支：`codex/framework-and-stage2`。
 > 本轮交付是细化设计、论文与成熟实现研究。没有新增运行能力，没有完成正式收益实验，也没有改变第一阶段验收状态。
 > 上位入口：[总体路线图](../program-roadmap.md)、[总体架构](../system-architecture.md)、[实施准备](../implementation-readiness.md)。

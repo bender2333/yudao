@@ -5,11 +5,11 @@
 ## 当前状态
 
 - **Stage 1（可信交付）**: ✅ 已完成。三部门循环、压缩、Git 版本、重试、完整封存已验收通过。
-- **Stage 2（三部门 Harness 基线）**: 按 2026-09-15 合同已关闭。历史十场为 9 次完成、1 次计划取消，场景以简单任务为主，不代表复杂任务的通用成功率。
+- **Stage 2（三部门 Harness 基线）**: 2.1–2.6 按 2026-09-15 合同关闭；新增 **2.7 统一 Provider 层与 OpenCode Go**，设计完成、待实现。历史十场为 9 次完成、1 次计划取消，不外推复杂任务成功率。
 - **Stage 3（通用工具、可靠恢复与持续运行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
 - **持续改进工作线 / Stage 4 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[当前验收基线](docs/current-baseline.md)、[Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/mvp-acceptance.md) 与 [Stage 2 进度](docs/stage-2-progress.md)。新版本回归与中等压力验收仍待执行。
+当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/provider-layer-design.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/mvp-acceptance.md) 与 [Stage 2 进度](docs/stage-2-progress.md)。无配置启动和 Go 尚未实现，下面的运行说明仍描述当前应用。
 
 ## 分层
 

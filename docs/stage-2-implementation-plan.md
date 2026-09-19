@@ -1,5 +1,7 @@
 # Stage 2 详细实施计划
 
+> 2026-09-19：本文是已关闭的 2.1–2.6 历史合同。用户新增的 2.7 统一 Provider 层与 Go 接入见 [独立计划](stage-2-provider-plan.md)，不改写本文历史验收结果。
+
 日期：2026-09-15  
 版本：v1.0  
 依据：`docs/stage-2-harness-baseline.md`（Stage 2 重新收敛定义）
