@@ -1093,3 +1093,19 @@
 - 按 codebase-design/research 进行架构与一手研究，设置交互采用 ui-ux-pro-max 的字段标签、就近错误及提交状态反馈。两名子代理均因模型服务 503 未启动，研究和设计由主代理完成，不宣称有独立子代理复核。
 - 本轮只有文档设计，未改业务代码、安装依赖、修改真实配置或运行 Go 验收。用户原有 D22 文件、索引和日记内容在本次设计上继续完善并保留来源。
 - 文档自检：28 个本地链接、7 个 Mermaid 图块结构与表格列数通过；未进行 Mermaid 渲染或业务测试。本轮之外的 AGENTS.md 和 Stage 3 本地命令段编辑保留在工作区，只提交本次 Provider 设计与路线调整。
+
+## 2026-09-19 - 接入工程 skill 仓库配置，并纠正四处「设计完成」口径
+
+- 用户调用 setup-matt-pocock-skills：issue 队列定为 GitHub Issues（`gh` CLI，仓库 bender2333/yudao），triage 标签沿用五个默认字符串，领域文档按单上下文（根 CONTEXT.md + docs/adr/）。新增 docs/agents/issue-tracker.md、triage-labels.md、domain.md，并在 AGENTS.md 追加 `## Agent skills` 段。
+- 在 issue-tracker 配置里额外写明 docs/ 与 issue 的分工：issue 记队列状态，长文设计与证据留在 docs/，避免两套平行台账。远程创建 needs-triage / needs-info / ready-for-agent / ready-for-human 四个标签；wontfix 复用 GitHub 默认标签。
+- 用户指出「2.7 还没有设计完」，与代码库中四处「设计完成」表述冲突。按用户口径改回：stage-2-provider-plan.md 状态行、program-roadmap.md、stage-2-progress.md、README.md。这四处互相引用，是把后续会话引向错误路线（直接 to-spec）的直接原因。
+- 恢复 docs/stage-3-plan.md 第 60 行被截断的「本地命令」行（工作区原为 `| 本地命令 | 项目Z状态 |`，HEAD 为完整三列），恢复后整文件与 HEAD 一致。
+
+## 2026-09-19 - Provider 层多厂商口径确认（grill-with-docs）
+
+- 用户提出 2.7 的真实缺口：Provider 要支持不同厂商与自定义接入、可选择指定配置模型测试、获取模型列表，「至少像 cc switch 那样」。
+- 现场核对：设计里已有「自定义兼容服务」「刷新候选」「对选中模型执行连接测试」三块，真正缺的是**口径**（§1 与计划写死「首批只接 Go」）与**候选→可用的转化规则**；代码 `provider_catalog.py` 的 SUPPORTED_PROTOCOLS 仍只有 `{"responses", "fake"}`。
+- 事实调研（两个 scout，结论均带源码出处）：cc-switch 是**配置切换器**（改写 ~/.claude/settings.json、~/.codex/config.toml），没有调用层，不能照抄运行时语义；其模型列表确实调 `/v1/models`，但需要候选 URL 链与 `modelsUrl` 覆写（DeepSeek 的 `/models` 挂在根而非 `/anthropic` 下）；其测试只测可达性（收到任意 HTTP 响应即算可达），CHANGELOG 记录曾用真实流式请求、因第三方 401/403/WAF 误判而回退；能力 fail-open（未知按 text+image 放行）。对照 Cherry Studio 2.1：Provider/Model 两层、端点按协议（EndpointType）而非厂商、目录是生成产物且带 schema 版本与兼容基线、probe 按模型类型分派且是真实最小推理、专设 api_key_required/api_key_unavailable。LiteLLM：能力表启动即从 GitHub 拉取并暴露 source_revision，/health 逐模型真调。Open WebUI：按用户 TTL 缓存、手工清单可短路。
+- 六条决定（用户确认「按照推荐做」）：①厂商不进数据结构，端点按协议建模；②预置表数据驱动、带 revision 与来源、不做远端热更；③候选须建定义 + 指定协议 + 测试通过才准入，缺字段不套全局默认（保持 fail-closed）；④协议由预置给、给不出由用户选一条，绝不自动试换，一个定义一条协议；⑤测试分三层（连接 / 模型真实推理 / 工具能力），错误结构化并把「缺凭据」与「凭据无效」分开，测试不创建任务、不计入 D09；⑥2.7.3 改名扩为「多厂商接入与设置交互」，2.7.4 验收加「两家不同厂商 + 一个自定义端点，至少一个模型经列表刷新与测试准入」，不另开 2.8。
+- 落盘：新增 CONTEXT.md（14 个词，含候选、准入、三类测试）与 docs/adr/0001-0003；provider-layer-design.md 的标题、§2、§4、§7.1、§8.1、§8.2、§10 同步；stage-2-provider-plan.md 的标题、§1、§3、§5、§7 同步。
+- 未决：拉回的候选是否物化落盘，留待第 2 轮确认。本轮只改文档，未改运行代码、未安装依赖、未调用真实 Provider。
