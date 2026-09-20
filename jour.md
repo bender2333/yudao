@@ -1152,4 +1152,4 @@
   - 场景 C 进行中：`run_1c68a95693e84432`（`context_window=12000`、`max_cycles=12`、材料 27542 字节、方向调整 `input_version=2`），已记录 12 次 `compaction_recorded`；终态、压缩来源追溯与压缩后独立质检待补。
 - 真实凭据：`provider.md`（gitignore）中的 OpenCode Go key 经进程环境注入；不打印、不写入证据文件、不进入提交。Provider 侧同 Key 探针（带 `User-Agent` 与 `x-opencode-session`）返回 200，三次间歇失败未改模型、未扩重试。
 - 服务：8891（浏览器核对数据副本）、8892（场景数据目录）。原始证据在 `.yudao/stage-3-0b-20260920/` 与 `.yudao/stage-3-0b-scenarios-20260921/`。
-- 下一步：等场景 C 终态并补证据包；如需在代码侧验证场景 B 的修复链路，调整受控缺陷使检查以退出码直接判定；随后进入 3.2A（issue #12）。
+- 下一步：**#11 已收口**（三场景全部 DONE/released，issue #11 已关闭，报告提交 `9f95688`）。场景 C 最终 `run_9f6108de39d5405a`（窗口 24000、4 次真实压缩、方向调整与新增 `count=` 均进入最终交付、质检 release）；首次两次 12000 窗 `compaction_failed` 与场景 B 的前 5 次尝试全部保留在报告与 `attempts.md`。随后进入 3.2A（issue #12 可信代码快照接入）。
