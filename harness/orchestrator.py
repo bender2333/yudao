@@ -44,7 +44,7 @@ from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
-from .tools import ToolRuntime, has_tool
+from .tools import ToolRuntime, has_tool, normalize_registered_commands
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 from .workspace import Workspace, WorkspaceSnapshot
 
@@ -258,6 +258,44 @@ def _snapshot_event_dict(snapshot: ResolveSnapshot) -> dict[str, Any]:
     return {"revision": snapshot.revision, "departments": departments}
 
 
+def _validate_frozen_commands(registered_commands: dict[str, Any] | None,
+                              command_versions: dict[str, int] | None) -> tuple[dict[str, Any], dict[str, int]]:
+    # 登记命令随事项创建冻结：两份必须成对出现，键集合一致，版本号为非负整数
+    if registered_commands is None and command_versions is None:
+        return {}, {}
+    if registered_commands is None or command_versions is None:
+        raise ValueError("registered_commands and command_versions must be given together")
+    normalized = normalize_registered_commands(registered_commands)
+    if not isinstance(command_versions, dict) or any(
+            not isinstance(name, str) or type(version) is not int or version < 1
+            for name, version in command_versions.items()):
+        raise ValueError("command_versions must map command names to positive integers")
+    if set(normalized) != set(command_versions):
+        raise ValueError("registered_commands and command_versions must cover the same commands")
+    return normalized, dict(command_versions)
+
+
+def _run_command_basis(workspace: Workspace, projection: RunProjection,
+                       args: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    # 执行前依据：命令身份（登记名与完整参数）加当时工作区快照摘要；只读核对，不执行
+    name = args.get("name")
+    if not isinstance(name, str) or not name:
+        return "run_command requires a registered command name", {}
+    entry = projection.registered_commands.get(name)
+    if entry is None:
+        return f"unknown registered command: {name}; only project-registered commands may run", {}
+    extra = args.get("args", [])
+    if extra is None:
+        extra = []
+    if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
+        return f"run_command {name} args must be a list of strings", {}
+    for item in extra:
+        if item not in entry.get("args", []):
+            return f"argument not allowlisted for {name}: {item}", {}
+    return None, {"registered_name": name, "registered_argv": [*entry["argv"], *extra],
+                  "snapshot_hash": workspace.snapshot().digest}
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -305,6 +343,8 @@ class Orchestrator:
         project_context: str | None = None,
         department_prompts: dict[str, str] | None = None,
         prompt_config_versions: dict[str, int] | None = None,
+        registered_commands: dict[str, Any] | None = None,
+        command_versions: dict[str, int] | None = None,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -320,6 +360,7 @@ class Orchestrator:
             project_context=project_context, department_prompts=department_prompts,
             prompt_config_versions=prompt_config_versions,
         )
+        frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
         snapshot = None
         use_facade = self.facade is not None and (
             self.test_adapter_factory is None or bool(self.facade.get_bindings()))
@@ -377,6 +418,8 @@ class Orchestrator:
                 "workspace_digest": workspace_digest,
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),
+                "registered_commands": frozen_commands[0],
+                "command_versions": frozen_commands[1],
             },
         )
         self.store.append(
@@ -793,7 +836,7 @@ class Orchestrator:
                 engineering_plan_hash=request.engineering_plan_hash,
             )
             submission = run_department(
-                activation.adapter, ToolRuntime(workspace),
+                activation.adapter, ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
                 prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
                     activation, step, attempt, root, retry_of,
                 ),
@@ -1480,6 +1523,13 @@ class Orchestrator:
             error = tool_error(current, request.department, call["name"], call["args"])
             if error:
                 return ToolAdmission(error=error)
+            command_basis: dict[str, Any] = {}
+            if call["name"] == "run_command":
+                # 登记命令在执行前核对冻结注册表：未登记的名称与越界参数在这里拒绝，不执行
+                basis_error, command_basis = _run_command_basis(
+                    self.workspace(request.run_id), current, call["args"])
+                if basis_error:
+                    return ToolAdmission(error=basis_error)
             if call["name"] in {"write_file", "edit_range", "delete_file", "move_file"}:
                 plan = current.engineering_plan
                 if plan is None or plan.effective_contract_hash != current_contract_hash(current):
@@ -1507,7 +1557,8 @@ class Orchestrator:
                                        "attempt": request.attempt,
                                        **activation.versions(),
                                        "effective_contract_hash": activation.effective_contract_hash,
-                                       "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
+                                       "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id,
+                                       **command_basis})
             return ToolAdmission()
 
     def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:

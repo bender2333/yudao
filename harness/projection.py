@@ -127,6 +127,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.workspace_digest = payload["workspace_digest"]
         state.project_context_ref = payload["project_context_ref"]
         state.prompt_config_versions = dict(payload["prompt_config_versions"])
+        state.registered_commands = dict(payload.get("registered_commands") or {})
+        state.command_versions = dict(payload.get("command_versions") or {})
         state.active_department = "product"
         return
 

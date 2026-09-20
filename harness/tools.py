@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ TOOL_DEFS = {
     "delete_file": {"access": "write", "departments": ("engineering",)},
     "move_file": {"access": "write", "departments": ("engineering",)},
     "run_check": {"access": "check", "departments": ("product", "engineering", "quality")},
+    "run_command": {"access": "check", "departments": ("engineering",)},
     "collect_evidence": {"access": "check", "departments": ("quality",)},
     "submit_product_spec": {"access": "submit", "departments": ("product",)},
     "submit_product_decision": {"access": "submit", "departments": ("product",)},
@@ -59,6 +61,41 @@ SUBMIT_KINDS = {
 
 _PYTHON_NAMES = {"python", "python3", "py", "python.exe", "python3.exe"}
 
+# 登记命令名只允许简单标识，避免路径与 shell 元字符进入注册表
+_COMMAND_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+# 超时上限 10 分钟：登记命令是受信构建/测试入口，不是常驻服务
+COMMAND_TIMEOUT_MAX_SEC = 600
+
+
+def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, Any]:
+    # 校验一条项目登记命令，返回冻结用的规范形态；任一非法直接报错
+    if not isinstance(name, str) or not _COMMAND_NAME_PATTERN.fullmatch(name):
+        raise ValueError("command name must match [A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+    if not isinstance(config, dict):
+        raise ValueError(f"registered command {name} must be an object")
+    argv = config.get("argv")
+    if not isinstance(argv, list) or not argv or any(not isinstance(item, str) or not item for item in argv):
+        raise ValueError(f"registered command {name} requires a non-empty argv list of strings")
+    extra_args = config.get("args", [])
+    if not isinstance(extra_args, list) or any(not isinstance(item, str) or not item for item in extra_args):
+        raise ValueError(f"registered command {name} allowlist args must be a list of non-empty strings")
+    timeout_sec = config.get("timeout_sec", CHECK_TIMEOUT_SEC)
+    if type(timeout_sec) is not int or not 1 <= timeout_sec <= COMMAND_TIMEOUT_MAX_SEC:
+        raise ValueError(f"registered command {name} timeout_sec must be an integer in 1..{COMMAND_TIMEOUT_MAX_SEC}")
+    output_limit = config.get("output_limit", CHECK_OUTPUT_LIMIT)
+    if type(output_limit) is not int or output_limit < 1:
+        raise ValueError(f"registered command {name} output_limit must be an integer >= 1")
+    return {"argv": list(argv), "args": list(extra_args), "timeout_sec": timeout_sec, "output_limit": output_limit}
+
+
+def normalize_registered_commands(registry: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    # 冻结注册表逐条校验并规范化；空注册表表示本轮没有可用命令
+    if registry is None:
+        return {}
+    if not isinstance(registry, dict):
+        raise ValueError("registered_commands must be an object")
+    return {name: validate_registered_command(name, config) for name, config in registry.items()}
+
 
 @dataclass(frozen=True)
 class ToolResult:
@@ -82,8 +119,10 @@ def host_tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:
 
 
 class ToolRuntime:
-    def __init__(self, workspace: Workspace) -> None:
+    def __init__(self, workspace: Workspace, registered_commands: dict[str, Any] | None = None) -> None:
         self.workspace = workspace
+        self._registered_commands = normalize_registered_commands(registered_commands)
+        self._command_attempts: dict[str, int] = {}
         self._handlers: dict[str, Callable[..., Any]] = {
             "read_file": self._read_file,
             "list_files": self._list_files,
@@ -94,6 +133,7 @@ class ToolRuntime:
             "delete_file": self._delete_file,
             "move_file": self._move_file,
             "run_check": self._run_check,
+            "run_command": self._run_command,
             "collect_evidence": self._collect_evidence,
             "submit_product_spec": self._submit,
             "submit_product_decision": self._submit,
@@ -324,6 +364,44 @@ class ToolRuntime:
     def _run_check(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
         return self._execute_check(department, args)
 
+    def _run_command(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
+        name = args.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError("run_command requires a registered command name")
+        entry = self._registered_commands.get(name)
+        if entry is None:
+            raise ValueError(f"unknown registered command: {name}; only project-registered commands may run")
+        extra = args.get("args", [])
+        if extra is None:
+            extra = []
+        if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
+            raise ValueError(f"run_command {name} args must be a list of strings")
+        for item in extra:
+            if item not in entry["args"]:
+                raise ValueError(f"argument not allowlisted for {name}: {item}")
+        # 模型自报 exit_code 不是证据：这里只读登记表与主机执行结果，从不读取该字段
+        argv = [*entry["argv"], *extra]
+        resolved = _resolve_argv(self.workspace, argv)
+        snapshot = self.workspace.snapshot()
+        attempt = self._command_attempts.get(name, 0) + 1
+        self._command_attempts[name] = attempt
+        outcome = _run_process_tree(
+            resolved, self.workspace.root,
+            {**sanitized_env(), "PYTHONDONTWRITEBYTECODE": "1"},
+            entry["timeout_sec"], entry["output_limit"],
+        )
+        return {
+            "name": name,
+            "argv": argv,
+            "exit_code": outcome["exit_code"],
+            "status": outcome["status"],
+            "output": outcome["output"],
+            "truncated": outcome["truncated"],
+            "snapshot_hash": snapshot.digest,
+            "executor": "host",
+            "attempt": attempt,
+        }
+
     def _collect_evidence(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
         return self._execute_check(department, args)
 
@@ -465,6 +543,47 @@ def _summarize_output(stdout: str, stderr: str) -> str:
     if len(text) > CHECK_OUTPUT_LIMIT:
         text = text[:CHECK_OUTPUT_LIMIT] + "\n...truncated..."
     return text
+
+
+def _run_process_tree(argv: list[str], cwd: Path, env: dict[str, str],
+                      timeout_sec: int, output_limit: int) -> dict[str, Any]:
+    # 登记命令固定工作目录与最简环境执行；超时后整棵进程树必须停止，不留孤儿
+    spawn_kwargs: dict[str, Any] = {}
+    if os.name == "nt":
+        spawn_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        spawn_kwargs["start_new_session"] = True
+    proc = subprocess.Popen(
+        argv, cwd=str(cwd), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8", errors="replace",
+        **spawn_kwargs,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_sec)
+        exit_code = int(proc.returncode)
+        status = "ok" if exit_code == 0 else "failed"
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(proc)
+        stdout, stderr = proc.communicate()
+        exit_code = 124
+        status = "timeout"
+    text = "\n".join(part for part in ((stdout or "").strip(), (stderr or "").strip()) if part)
+    truncated = False
+    if len(text) > output_limit:
+        text = text[:output_limit] + "\n...truncated..."
+        truncated = True
+    if status == "timeout":
+        text = ((text + "\n") if text else "") + f"command timed out after {timeout_sec}s; the process tree was stopped"
+    return {"exit_code": exit_code, "status": status, "output": redact_text(text), "truncated": truncated}
+
+
+def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
+    # Windows 用 taskkill 按树杀，POSIX 杀整个会话进程组；两边都处理显式分支
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True)
+    else:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
 
 
 def _page_size(value: Any) -> int:
@@ -666,6 +785,23 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
             },
             ["name", "argv"],
+        ),
+        "loadMode": "essential",
+    },
+    "run_command": {
+        "name": "run_command",
+        "label": "run_command",
+        "description": "Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read.",
+        "parameters": _object_schema(
+            {
+                "name": {"type": "string", "description": "Registered command name frozen for this run"},
+                "args": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Extra arguments; every item must be in the registered allowlist",
+                },
+            },
+            ["name"],
         ),
         "loadMode": "essential",
     },

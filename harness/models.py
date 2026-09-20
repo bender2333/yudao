@@ -578,6 +578,8 @@ class RunProjection:
     workspace_digest: str = ""
     project_context_ref: dict[str, Any] | None = None
     prompt_config_versions: dict[str, int] = field(default_factory=dict)
+    registered_commands: dict[str, Any] = field(default_factory=dict)
+    command_versions: dict[str, int] = field(default_factory=dict)
     last_event_id: str | None = None
     last_seq: int = 0
 

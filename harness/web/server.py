@@ -20,6 +20,7 @@ from ..providers.errors import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
 from ..replay_check import ReplayIntegrityError
 from ..projects import (
+    CommandConfigConflict,
     ProjectArchivedError,
     ProjectEventType,
     ProjectNotFoundError,
@@ -243,6 +244,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         def dispatch() -> None:
             if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "prompts":
                 return self._configure_prompt(parts[2], unquote(parts[4]))
+            if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "commands":
+                return self._configure_command(parts[2], unquote(parts[4]))
             if len(parts) == 3 and parts[:2] == ["api", "providers"]:
                 return self._put_provider(unquote(parts[2]))
             if parts == ["api", "department-bindings"]:
@@ -281,6 +284,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc), "reason": "project_archived"}, 409)
         except PromptConfigConflict as exc:
             self._send_json({"error": str(exc), "reason": "prompt_config_conflict", "current": exc.current}, 409)
+        except CommandConfigConflict as exc:
+            self._send_json({"error": str(exc), "reason": "command_config_conflict", "current": exc.current}, 409)
         except CancelledInputSaveError as exc:
             message = "执行已取消，但命令原文未形成正式 Git 版本；输入框保留原文。"
             if not exc.cancellation_recorded:
@@ -491,6 +496,24 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if set(body) != {"text", "base_version"}:
             raise ValueError("body must contain text and base_version")
         result = self.server.system.projects.configure_prompt(project_id, department, body["text"], body["base_version"])
+        self._send_json(result)
+
+    def _configure_command(self, project_id: str, name: str) -> None:
+        body = self._read_json_body()
+        if not isinstance(body, dict):
+            raise ValueError("body must be a JSON object")
+        unknown = set(body) - {"argv", "args", "timeout_sec", "output_limit", "base_version"}
+        if unknown:
+            raise ValueError("unsupported command fields: " + ", ".join(sorted(unknown)))
+        if "argv" not in body or "base_version" not in body:
+            raise ValueError("body must contain argv and base_version")
+        if not isinstance(body["base_version"], int) or isinstance(body["base_version"], bool):
+            raise ValueError("base_version must be an integer")
+        kwargs: dict[str, Any] = {"base_version": body["base_version"]}
+        for key in ("args", "timeout_sec", "output_limit"):
+            if body.get(key) is not None:
+                kwargs[key] = body[key]
+        result = self.server.system.projects.configure_command(project_id, name, body["argv"], **kwargs)
         self._send_json(result)
 
     def _facade(self):
@@ -891,6 +914,13 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             })
         if rest[:1] == ["prompts"] and len(rest) == 2:
             return self._send_json(projects.read_prompt(project_id, unquote(rest[1])))
+        if rest == ["commands"]:
+            return self._send_json({"project_id": project_id, "commands": projects.read_commands(project_id)})
+        if rest[:1] == ["commands"] and len(rest) == 2:
+            try:
+                return self._send_json(projects.read_command(project_id, unquote(rest[1])))
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, 404)
         if rest in (["model-attempts"], ["model-usage"]):
             wanted = self._query_scalar(query, "work_item")
             if wanted is not None and project.work_item(wanted) is None:

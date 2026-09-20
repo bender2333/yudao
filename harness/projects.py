@@ -29,6 +29,7 @@ from .models import (
 )
 from .projection import RunNotFoundError, project_run
 from .snapshot import ingest_snapshot
+from .tools import validate_registered_command
 from .tree_archive import load_tree
 
 TITLE_LIMIT = 40
@@ -48,6 +49,7 @@ class ProjectEventType:
     DELIVERABLE_ADOPTED = "deliverable_adopted"
     ADOPTION_HELD = "adoption_held"
     DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
+    COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
 
 
@@ -67,6 +69,13 @@ class PromptConfigConflict(Exception):
     """所编辑的配置版本已过期；`current` 是项目当前配置的读取体。"""
     def __init__(self, current: dict[str, Any]) -> None:
         super().__init__("department prompt configuration changed since base_version")
+        self.current = current
+
+
+class CommandConfigConflict(Exception):
+    """所编辑的命令版本已过期；`current` 是项目当前命令的读取体。"""
+    def __init__(self, current: dict[str, Any]) -> None:
+        super().__init__("registered command changed since base_version")
         self.current = current
 
 
@@ -143,6 +152,27 @@ class Material:
 
 
 @dataclass
+class RegisteredCommand:
+    name: str
+    version: int
+    argv: list[str]
+    args: list[str]
+    timeout_sec: int
+    output_limit: int
+    base_version: int | None = None
+    updated_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+    def frozen(self) -> dict[str, Any]:
+        # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
+        return {"argv": list(self.argv), "args": list(self.args),
+                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit}
+
+
+@dataclass
 class WorkItem:
     work_item_id: str
     title: str
@@ -158,6 +188,7 @@ class WorkItem:
     event_id: str
     snapshot: dict[str, Any] | None = None
     start_error: str | None = None
+    command_versions: dict[str, int] = field(default_factory=dict)
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
@@ -190,6 +221,8 @@ class ProjectProjection:
     held: list[HeldCandidate] = field(default_factory=list)
     prompt_configs: dict[str, PromptConfig] = field(default_factory=dict)
     prompt_config_history: list[PromptConfig] = field(default_factory=list)
+    commands: dict[str, RegisteredCommand] = field(default_factory=dict)
+    command_history: list[RegisteredCommand] = field(default_factory=list)
     materials: list[Material] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
@@ -265,7 +298,9 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         state.work_items.append(WorkItem(
             work_item_id=payload["work_item_id"], title=payload["title"], text=payload["text"], run_id=payload["run_id"],
             baseline=payload["baseline"], project_context_ref=payload["project_context_ref"],
-            prompt_config_versions=dict(payload["prompt_config_versions"]), max_cycles=int(payload["max_cycles"]),
+            prompt_config_versions=dict(payload["prompt_config_versions"]),
+            command_versions=dict(payload.get("command_versions") or {}),
+            max_cycles=int(payload["max_cycles"]),
             context_window=int(payload["context_window"]), created_at=event.created_at, seq=event.seq,
             event_id=event.event_id, snapshot=payload.get("snapshot"),
         ))
@@ -304,6 +339,16 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         )
         state.prompt_configs[config.department] = config
         state.prompt_config_history.append(config)
+        return
+    if etype == ProjectEventType.COMMAND_CONFIGURED:
+        command = RegisteredCommand(
+            name=payload["name"], version=int(payload["version"]), argv=list(payload["argv"]),
+            args=list(payload["args"]), timeout_sec=int(payload["timeout_sec"]),
+            output_limit=int(payload["output_limit"]), base_version=payload["base_version"],
+            updated_at=event.created_at, event_id=event.event_id,
+        )
+        state.commands[command.name] = command
+        state.command_history.append(command)
         return
     if etype == ProjectEventType.MATERIAL_RECORDED:
         state.materials.append(Material(
@@ -520,6 +565,15 @@ class ProjectService:
             raise ValueError("unknown department")
         return _prompt_view(self.projection(project_id).prompt_configs[department])
 
+    def read_commands(self, project_id: str) -> list[dict[str, Any]]:
+        return [_command_view(config) for _, config in sorted(self.projection(project_id).commands.items())]
+
+    def read_command(self, project_id: str, name: str) -> dict[str, Any]:
+        config = self.projection(project_id).commands.get(name)
+        if config is None:
+            raise ValueError(f"unknown registered command: {name}")
+        return _command_view(config)
+
     # 项目登记与状态
 
     def register(self, name: str, goal: str) -> str:
@@ -618,6 +672,9 @@ class ProjectService:
         title = work_item_title(text) if title is None else title
         department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
         prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
+        # 登记命令在事项创建时冻结：之后项目再改注册表，不影响已创建事项的执行依据
+        frozen_commands = {name: config.frozen() for name, config in project.commands.items()}
+        command_versions = {name: config.version for name, config in project.commands.items()}
         context_text = project_context_text(project, title, source_run)
         work_item_id, run_id = work_item_id or new_id("wi"), run_id or new_id("run")
         # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
@@ -626,6 +683,7 @@ class ProjectService:
             "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
+            "command_versions": command_versions,
             "max_cycles": max_cycles, "context_window": context_window,
         })
         try:
@@ -635,6 +693,7 @@ class ProjectService:
                 code_snapshot=snapshot,
                 project_context=context_text, department_prompts=department_prompts,
                 prompt_config_versions=prompt_config_versions,
+                registered_commands=frozen_commands, command_versions=command_versions,
             )
         except Exception as exc:
             self.store.append_project(project.project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
@@ -723,6 +782,31 @@ class ProjectService:
             })
             return {**self.read_prompt(project_id, department), "unchanged": False}
 
+    # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
+
+    def configure_command(self, project_id: str, name: str, argv: list[str], *,
+                          args: list[str] | None = None, timeout_sec: int | None = None,
+                          output_limit: int | None = None, base_version: int = 0) -> dict[str, Any]:
+        if type(base_version) is not int or base_version < 0:
+            raise ValueError("base_version must be a non-negative integer")
+        with self._lock:
+            project = self._writable(project_id)
+            current = project.commands.get(name)
+            current_version = 0 if current is None else current.version
+            if base_version != current_version:
+                raise CommandConfigConflict({} if current is None else _command_view(current))
+            normalized = validate_registered_command(name, {
+                "argv": argv, "args": [] if args is None else args,
+                **({} if timeout_sec is None else {"timeout_sec": timeout_sec}),
+                **({} if output_limit is None else {"output_limit": output_limit}),
+            })
+            if current is not None and current.frozen() == normalized:
+                return {**_command_view(current), "unchanged": True}
+            self.store.append_project(project_id, ProjectEventType.COMMAND_CONFIGURED, {
+                "name": name, "version": current_version + 1, **normalized, "base_version": base_version,
+            })
+            return {**self.read_command(project_id, name), "unchanged": False}
+
     # 材料（D-H：无活跃事项时记录原文）
 
     def record_material(self, project_id: str, text: str, *, department: str | None = None) -> str:
@@ -759,6 +843,18 @@ def _prompt_view(config: PromptConfig) -> dict[str, Any]:
         "version": config.version,
         "updated_at": config.updated_at,
         "source": config.source,
+    }
+
+
+def _command_view(config: RegisteredCommand) -> dict[str, Any]:
+    return {
+        "name": config.name,
+        "argv": list(config.argv),
+        "args": list(config.args),
+        "timeout_sec": config.timeout_sec,
+        "output_limit": config.output_limit,
+        "version": config.version,
+        "updated_at": config.updated_at,
     }
 
 
