@@ -1169,3 +1169,10 @@
 - 搜索后端决策：本机未安装 ripgrep，安装软件超出本票范围；按计划 §4.3「不静默退回另一套语义」，只用 Python 标准库 `re` 语义（schema 与返回中明示），不调用 `rg`、不做双语义回退。若后续采用 ripgrep 应另开票声明前置并校验平台可用性。
 - 验证：`test_search_tools + test_tools + test_engine` EXIT=0（新文件 13 passed、1 skipped：本机无符号链接权限）；子代理另跑 `test_tools + test_public_tree + test_engine + test_smoke`（155 passed、7 skipped）EXIT=0。issue #13 已留证据评论并关闭。
 - 下一步：`#14` 按区间编辑与交付质检闭环（已解锁），随后 `#15` 本地命令与动作回执；3.2A 完成后进入 3.1 恢复。
+
+## 2026-09-21 - #14 按区间编辑完成、#15 登记命令实现完成（3.2A 第三、四票）
+
+- **#14 按区间编辑与交付质检闭环**：委派 `unspecified-high` 子代理实现，主代理审查并复跑测试后提交 `15a908c`。`harness/tools.py` 新增 `edit_range`（仅工程，`access: write`）：要求 `expected_text` 与已读取版本一致、可选 `expected_digest` 核对文件摘要；成功返回新摘要与变更区间。四类反例拒绝且文件字节不变：文件已变、重复匹配、目标缺失、编码差异。交付/质检绑定沿用既有实现（完整树交付、回执绑定最后提交树、改树后旧结论被 `PROPOSAL_REJECTED` 拒绝）。新增 `test_range_edit.py`（20 passed、1 skipped）。issue #14 已关闭。
+- **#15 项目登记的本地命令与动作回执**：委派 `unspecified-high` 子代理实现，主代理复跑测试后提交 `d525e17`。`run_command`（仅工程）只接受本项目登记的命令名与允许参数范围，未登记/越界在 `TOOL_STARTED` 前拒绝且不执行；固定工作目录、`sanitized_env` 剥离凭据、时限与输出上限；超时/取消按进程树终止（**Windows 已验证**，POSIX 分支已写未在本机验证）；执行前记录动作身份与依据，结果绑定命令/快照/主机退出状态/输出/尝试；模型自报 `exit_code` 不作证据。`command_configured` 项目事件 + 事项冻结 `command_versions`；HTTP 命令登记与读取路由。新增 `test_registered_commands.py`（8 passed）与验收路径文档 `docs/stage-3/3.2a-registered-commands-e2e.md`。
+- **#15 保持打开**：真实模型全链路验收（搜索 → 阅读 → 编辑 → 命令 → 独立质检 → 封存 → 采纳）尚未执行，按票据验收要求未完成，状态评论已留。
+- 下一步：执行 #15 的真实模型全链路验收并按 `3.2a-registered-commands-e2e.md` 留证；随后进入 3.1 单机可靠恢复（#16–#18）与 3.4A/B 并行（#19–#20）。
