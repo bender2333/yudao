@@ -1137,3 +1137,19 @@
 - 重跑（00:00 启动）带 watchdog（每 300s 转储全部线程堆栈）与 `-u`，已越过原卡点推进；结果待记。首次卡死未复现，原因未定位，按「首次失败与重新运行全部纳入报告」保留。
 - 真实 Go 凭据：`.yudao/.env` 与进程环境均无 `YUDAO_OPENCODE_GO_KEY`；本机 gitignore 的 `provider.md`（今日 20:55 更新）含 OpenCode Go key。浏览器核对与后续场景经进程环境注入该凭据，不打印、不写入任何证据文件、不进入提交。
 - 浏览器阶段服务在 8891 启动（数据目录为 go-mimo 真实数据副本，含 DONE `run_9a5bee38da564de1` 与 FAILED `run_bb19bbfdd3534862`），`/api/health` ok、`provider_available=true`；UI 结构已用 Playwright MCP 核对（「从想法新建」对话框、项目工作台）。
+
+## 2026-09-21 - Stage 3 推进：#10 关闭、#11 场景 A/B 完成与 C 进行中
+
+- 用户指示「完成stage3」。执行口径：Stage 3 = harness 主线（`D:/codes/yudao`，`harness_1`）的 issue #9–#20；C: 的 stage-3 工作区是旧 init 提交、无代码，按上一轮决定废弃，不在那里实现。
+- **#10 已完成并关闭**（提交 `6c35789`，报告 `docs/stage-3/3.0b-baseline-2026-09-21.md`）：
+  - 冻结 `bcfe89d`；Python 全量 990 passed / 7 skipped（重跑，35:16，EXIT=0）；Node 39 passed；重点路径 128 passed；P1 五项反例覆盖测试 196 passed，真实数据上交付树与 Git 损坏均被 replay fail-closed 拒绝。
+  - 首次全量运行在 26% 处停滞 46 分钟未复现；前缀对照 264 passed、该用例单跑 2 passed / 47s；现场保留（`diag/`），分类为测试宿主环境条件。
+  - 浏览器核对：新事项创建 / 方向调整 / 部门指导（`run_7d9701d7b34f4f75`）、失败定位（受控无效凭据 → 真实 401，`run_e809aaed35b64c0a`）、交付下载（`run_5a311cb894e3490a`，200 / 45 字节）、1440 与 390；两项开放项：界面无交付下载控件、失败详情页 390 下 6px 溢出。
+  - 7 项跳过解释：6 项符号链接不可用 + 1 项 FIFO 不可用（平台条件）；历史观测测试失败本轮未复现（22/22 通过）。
+- **#11 场景材料先入库**（提交 `8947903`，`docs/stage-3/3.0b-scenarios-20260921.md`）；执行报告 `docs/stage-3/3.0b-scenarios-report-2026-09-21.md`：
+  - 场景 A 完成：`run_f8398037d03346e2`（建立基线）与 `run_454a60ebd40f446c`（多文件增量变更）均 DONE/released，新旧公开检查全过。
+  - 场景 B 完成（第 6 次尝试）：`run_ce17ef7107a7471e`。受控缺陷（脚本覆写 `format.py` 为字母序）→ 质检 rev1 `rework_product` 精确指出根因与规格矛盾 → 指导 `guidance_c0f7c8ea684b4e48` 在返工激活 `act_d150f1323825456e` 中 `explained` → rev2 `release`。前 5 次尝试（3 次 provider 间歇失败、1 次循环上限不足、1 次质检未判违规）全部保留。
+  - 场景 C 进行中：`run_1c68a95693e84432`（`context_window=12000`、`max_cycles=12`、材料 27542 字节、方向调整 `input_version=2`），已记录 12 次 `compaction_recorded`；终态、压缩来源追溯与压缩后独立质检待补。
+- 真实凭据：`provider.md`（gitignore）中的 OpenCode Go key 经进程环境注入；不打印、不写入证据文件、不进入提交。Provider 侧同 Key 探针（带 `User-Agent` 与 `x-opencode-session`）返回 200，三次间歇失败未改模型、未扩重试。
+- 服务：8891（浏览器核对数据副本）、8892（场景数据目录）。原始证据在 `.yudao/stage-3-0b-20260920/` 与 `.yudao/stage-3-0b-scenarios-20260921/`。
+- 下一步：等场景 C 终态并补证据包；如需在代码侧验证场景 B 的修复链路，调整受控缺陷使检查以退出码直接判定；随后进入 3.2A（issue #12）。
