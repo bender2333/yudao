@@ -1,6 +1,6 @@
 # 第二阶段执行进度
 
-> 2026-09-19 新增阶段：2.1–2.6 的历史关闭保留；用户新增 **2.7 统一 Provider 层与 OpenCode Go**，设计与实现已完成并通过本地验收，真实 Go 三协议验收因尚未配置订阅凭据受阻。当前执行入口见 [2.7 计划](stage-2-provider-plan.md)，结果见 [2.7 执行报告](stage-2-7-provider-report.md)。下文“所有六项完成”不包含新增的第七项。
+> 2026-09-19 新增阶段：2.1–2.6 的历史关闭保留；用户新增 **2.7 统一 Provider 层与 OpenCode Go**，设计与实现已完成并通过本地验收，真实 Go 验收用用户指定模型在 Responses 端点完成模型测试与三部门任务，Chat Completions 与 Messages 对该模型受区域限制。当前执行入口见 [2.7 计划](stage-2-provider-plan.md)，结果见 [2.7 执行报告](stage-2-7-provider-report.md)。下文“所有六项完成”不包含新增的第七项。
 
 > 2026-09-19 状态口径：本文是 Stage 2 Harness 基线的历史验收记录。阶段名称与新工作依赖以 [总体路线图](program-roadmap.md) 为准，当前版本验证范围见 [当前验收基线](current-baseline.md)。下文 CLOSED 只对应当时冻结版本与合同；历史进度表中的 OPEN/PARTIAL 不自动成为当前欠项。
 

@@ -1,6 +1,6 @@
 # Stage 2.7：统一 Provider 层、多厂商接入与 OpenCode Go
 
-日期：2026-09-19。状态：2.7.1–2.7.4 的代码与应用侧验收完成，执行报告见 [Stage 2.7 执行报告](stage-2-7-provider-report.md)；真实 OpenCode Go 三协议验收因尚未配置订阅凭据记为受阻。spec 已发布为 [issue #1](https://github.com/bender2333/yudao/issues/1)。
+日期：2026-09-19。状态：2.7.1–2.7.4 的代码与应用侧验收完成，执行报告见 [Stage 2.7 执行报告](stage-2-7-provider-report.md)；真实 Go 验收已用用户指定模型 `muse-spark-1.3-contributor` 在 Responses 端点完成模型测试与三部门任务，Chat Completions 与 Anthropic Messages 对该模型分别返回 503 与 403（区域限制），未换其他模型。spec 已发布为 [issue #1](https://github.com/bender2333/yudao/issues/1)。
 
 Stage 2.1–2.6 按原合同关闭的结论保留；用户新增 2.7 作为进入 Stage 3 前的补充阶段。新需求以 [D22](requirements/startup-provider-reload.md) 和 [D23](requirements/provider-layer.md) 为准。
 
