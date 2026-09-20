@@ -1127,3 +1127,13 @@
 - 与计划的对应：2.7.1 ← #2；2.7.2 ← #3；2.7.3 ← #4~#7；2.7.4 ← #8。前沿：现在只有 #2 可立即开工。
 - 事故记录：发布脚本放在 eval 收尾时内核超时被杀，七张票已创建，但 #8 的三条阻塞边没连上；下一个 cell 补齐，并用 `issue_dependencies_summary` 逐张核对全部七张票的边。教训：批量外部写操作不要放在 eval 的长时间收尾里，宁可分批或改走 bash。
 - 本轮只创建 issue 与提交日记；未改运行代码、未安装依赖、未调用真实 Provider。
+
+## 2026-09-21 - Stage 3 开工：#10 冻结回归（首次运行卡死排查与重跑）
+
+- 用户指示「完成stage3」。核对口径：Stage 3 = harness 主线（`D:/codes/yudao`，分支 `harness_1`）的 issue #9–#20；C: 的 stage-3 工作区是旧 init 提交、无代码，按上一轮决定废弃，不在那里实现。队列前沿：#8 已关闭，#10 可开工，#11 阻塞于 #10。
+- 冻结（23:58）：应用 SHA `bcfe89d`；工作树差异为 4 个文档（CONTEXT.md、docs/agents/domain.md、docs/stage-3-plan.md、docs/stage-3/recovery-contract-and-fault-matrix.md）；部门提示 `harness/department_prompts.py` sha256 `4A2400B1…`；环境 Python 3.14.7 / pytest 9.1.1 / Node v24.20.0 / Windows 10.0.26200。证据目录 `.yudao/stage-3-0b-20260920/`。
+- Node 界面 39 passed、0 failed（EXIT=0）。
+- Python 全量首次运行（23:47 启动）在约 26% 处停滞 46 分钟无进展，卡点为 `test_department_guidance.py::test_old_delivery_or_check_cannot_complete_guidance_after_spec_change`（临时目录 23:56:02 后冻结；手动执行同一 git 命令瞬时完成、无锁）。单跑该用例 2 passed / 47s。中止保留现场：`diag/hung-*.txt`、`python-full.aborted-1.log`。
+- 重跑（00:00 启动）带 watchdog（每 300s 转储全部线程堆栈）与 `-u`，已越过原卡点推进；结果待记。首次卡死未复现，原因未定位，按「首次失败与重新运行全部纳入报告」保留。
+- 真实 Go 凭据：`.yudao/.env` 与进程环境均无 `YUDAO_OPENCODE_GO_KEY`；本机 gitignore 的 `provider.md`（今日 20:55 更新）含 OpenCode Go key。浏览器核对与后续场景经进程环境注入该凭据，不打印、不写入任何证据文件、不进入提交。
+- 浏览器阶段服务在 8891 启动（数据目录为 go-mimo 真实数据副本，含 DONE `run_9a5bee38da564de1` 与 FAILED `run_bb19bbfdd3534862`），`/api/health` ok、`provider_available=true`；UI 结构已用 Playwright MCP 核对（「从想法新建」对话框、项目工作台）。
