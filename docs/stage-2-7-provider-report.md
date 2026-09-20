@@ -4,7 +4,7 @@
 
 ## 1. 结论
 
-2.7.1–2.7.4 的代码与应用侧验收已完成：所有模型入口经独立 Provider 模块调用，无配置可启动并热生效，三协议适配就位，预置表、候选刷新与准入贯通，界面可用。真实 OpenCode Go 验收已用用户指定的 `muse-spark-1.3-contributor` 在 Responses 端点完成模型测试与三部门任务（DONE/released）；同一模型在 Chat Completions 与 Anthropic Messages 端点分别返回 503 与 403（区域限制），按用户「不得换其他模型」的约束未改用其他模型，这两个协议的真实覆盖记为受限。
+2.7.1–2.7.4 的代码与应用侧验收已完成：所有模型入口经独立 Provider 模块调用，无配置可启动并热生效，三协议适配就位，预置表、候选刷新与准入贯通，界面可用。真实 OpenCode Go 覆盖两个协议且各自使用用户指定模型：Responses 端点用 `muse-spark-1.3-contributor`、Chat Completions 端点用 `mimo-v2.5`，两者都完成模型测试与三部门任务（DONE/released）；Anthropic Messages 对这两个模型分别返回 403（区域限制）与 503（端点不可用），真实覆盖保持受限。
 
 ## 2. 交付结果
 
@@ -12,7 +12,7 @@
 | --- | --- |
 | 2.7.1 统一模块与原 Responses | 新建 `harness/providers/`（facade、store、credentials、resolve、invoke、responses、chat、messages、presets、discovery）；目录、凭据、目标解析、单次调用与取消统一；旧的 `provider_catalog.py` 与 `adapters/responses.py` 删除，调用方只经模块 |
 | 2.7.2 D22 启动与热生效 | `python -m harness` 无参等价全默认 serve；缺文件/坏 JSON/空目录均可空态启动；界面保存、磁盘修改（约 1 秒轮询、内容哈希核对）、手动重载只影响新任务；凭据来源优先级内存 > 环境 > `.yudao/.env` |
-| 2.7.3 多厂商接入与设置交互 | 协议移到模型访问定义，一条定义一条协议；Responses、Chat Completions、Anthropic Messages 三条适配各自完成工具调用/结果往返；Go 服务方案预置表带版本与来源；候选刷新只产生候选，模型测试通过才准入并可绑定。真实 Go 侧：用户指定模型 `muse-spark-1.3-contributor` 在 Responses 端点通过模型测试并完成三部门任务；Chat Completions 返回 503、Messages 返回 403（区域限制） |
+| 2.7.3 多厂商接入与设置交互 | 协议移到模型访问定义，一条定义一条协议；Responses、Chat Completions、Anthropic Messages 三条适配各自完成工具调用/结果往返；Go 服务方案预置表带版本与来源；候选刷新只产生候选，模型测试通过才准入并可绑定。真实 Go 侧：`muse-spark-1.3-contributor` 在 Responses 端点、`mimo-v2.5` 在 Chat Completions 端点分别通过模型测试并完成三部门任务；Anthropic Messages 对两个模型分别为 403（区域限制）与 503（端点不可用） |
 | 2.7.4 冻结与综合验收 | Python 全量、Node UI、设置页真实 HTTP 流程与 1440/390 浏览器走查通过；证据位置见第 4 节 |
 
 ## 3. 模块结构
@@ -50,6 +50,8 @@ flowchart TB
 | Go 真实模型测试 | `muse-spark-1.3-contributor` 在 Responses 端点通过：ok、admitted、实际返回模型同名、修订 2、准入已落盘、用量上报 | `.yudao/stage-2-7-20260919/go-real-muse.log` |
 | Go 三部门真实任务 | `run_cc2724605f9f42c9`：DONE/released，11 次模型请求、0 重试、未用 fake；replay、逐步输入审计、上下文隔离、主机检查回执、完整封存、Git 版本与协作审计全部 verified；交付 `src/echo.py` | `.yudao/stage-2-7-20260919/go-muse-data/smoke-report.md` |
 | 端点可用性诊断 | 同一模型：Responses 200 真实完成；Chat Completions 503 `Endpoint is unavailable`；Messages 403 `RegionError`（该模型在所在国家/地区不可用） | `.yudao/stage-2-7-20260919/go-muse-raw.log` |
+| Go 三部门真实任务（Chat Completions） | `run_9a5bee38da564de1`：DONE/released，`mimo-v2.5` 走 chat_completions，11 次请求、0 重试、无 fake；replay、输入审计、上下文隔离、主机回执（两部门 exit=0）、封存、Git 与协作审计全部 verified；交付 `src/echo.py` | `.yudao/stage-2-7-20260919/go-mimo-data/smoke-report.md` |
+| MiMo 端点可用性 | `mimo-v2.5` 与 `mimo-v2.5-pro`：Chat Completions 200（真实完成并返回同名模型）；Responses 503；Messages 改用 `x-api-key` 认证后仍 503（认证已通过，端点不可用） | `.yudao/stage-2-7-20260919/go-mimo-probe.log` |
 
 ## 5. 界面行为要点
 
@@ -60,7 +62,7 @@ flowchart TB
 
 ## 6. 受阻与边界
 
-- 真实 Go 验收已用用户指定模型完成 Responses 端点的模型测试与三部门任务；Chat Completions 与 Anthropic Messages 对同一模型分别返回 503 与 403（区域限制），按「不得换其他模型」的要求未改用其他代表模型，这两个协议的真实覆盖保持受限。
+- 真实 Go 覆盖 Responses 与 Chat Completions 两个协议，各自绑定用户指定模型完成三部门任务；Anthropic Messages 对 `muse-spark-1.3-contributor` 返回 403（区域限制）、对 `mimo-v2.5` 返回 503（端点不可用），该协议的真实覆盖保持受限。
 - 失败路径已用真实端点验证：无效凭据一律 401 非可重试，无凭据时 smoke 明确失败，均不启动空壳运行、不自动换 Key 或模型。
 - 键盘可达性已在真实 Chromium 中验证：Tab/Enter 可完成“添加模型服务”入口操作，可见输入控件均有标签（隐藏的导入文件框补上 `aria-label`），1440 与 390 无横向溢出。逐字段的键盘输入流程未逐项录制。
 - 其他订阅、OAuth、推理参数、额度查询维持后置；恢复与并行不得重建第二套模型接入路径。
@@ -71,6 +73,13 @@ flowchart TB
 
 1. 用户提供的订阅 Key 经进程环境注入，不写入仓库，也不进入任何证据文件（证据目录已检查不含 `oc_sk_` 前缀）。
 2. `muse-spark-1.3-contributor` 通过模型测试并把准入落盘；独立进程的 smoke 读取同一份配置后创建三部门任务，`run_cc2724605f9f42c9` 完成到 DONE/released，11 次模型请求、0 重试、未用 fake，replay、输入审计、上下文隔离、主机检查回执、完整封存、Git 版本与协作审计全部 verified。
-3. 同一模型逐端点探测：Responses 200 真实完成；Chat Completions 503（端点不可用）；Messages 403（区域限制）。
+3. 按用户后续指定换用 `mimo-v2.5`，在 Chat Completions 端点通过模型测试并完成三部门任务 `run_9a5bee38da564de1`，指标与第 2 步相同，两个部门的主机检查 exit=0。
+4. 逐端点探测两个模型：`muse-spark-1.3-contributor` 的 Responses 200、Chat 503、Messages 403；`mimo-v2.5` 与 `mimo-v2.5-pro` 的 Chat 200、Responses 503、Messages 503。
 
-后续条件：若要在真实服务上覆盖 Chat Completions 与 Anthropic Messages，需要该区域可用的代表模型或服务方开放对应端点；在解除「不得换模型」约束之前，这两条保持受限，不用其他模型替代。
+本轮修复的缺陷（由真实验证暴露）：
+
+- 模型测试准入原先只存在内存，独立进程的 CLI 与 smoke 不可见，任务被拒绝创建；现原子写回配置并如实报告落盘失败的 `persist_error`。
+- 内核桥接层把非 Responses 目标判为不支持协议，Chat 模型无法参与任务；现按协议统一可用性检查。
+- 诊断与内核路径把 Responses 执行作用域交给 Chat/Messages 适配器，触发 `FrozenTarget` 被当配置读取的报错；现按协议选择匹配的作用域。
+
+后续条件：若要在真实服务上覆盖 Anthropic Messages，需要该区域可用且开放该端点的代表模型；README 与验收报告不将另外两个协议的真实结果外推到它。
