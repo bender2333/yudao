@@ -291,6 +291,35 @@ def test_responses_requests_carry_identity_headers():
     assert result.text == "ok"
 
 
+def test_facade_adapter_accepts_chat_targets():
+    # 桥接层不能只认 Responses：Chat 与 Messages 目标同样可用
+    from harness.adapters.facade_adapter import FacadeAdapter
+
+    server, _capture, base = _serve(_chat_responder)
+    try:
+        facade = _facade_with(base + "/v1", protocol="chat_completions")
+        adapter = FacadeAdapter(facade, _target(facade))
+        assert adapter.availability().available is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_model_test_uses_the_matching_execution_scope_for_chat():
+    server, _capture, base = _serve(_chat_responder)
+    try:
+        facade = _facade_with(base + "/v1", protocol="chat_completions")
+        result = facade.model_test("go", "m-go")
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert result["ok"] is True
+    assert result["admitted"] is True
+    assert result["protocol"] == "chat_completions"
+    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
+    assert stored["admitted_revision"] == result["revision"]
+
+
 def test_anthropic_base_url_does_not_duplicate_v1():
     assert anthropic_base_url("https://opencode.ai/zen/go/v1") == "https://opencode.ai/zen/go"
     assert anthropic_base_url("https://api.anthropic.com") == "https://api.anthropic.com"

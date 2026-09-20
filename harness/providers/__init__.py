@@ -21,6 +21,7 @@ from .invoke import (
     ProviderMessage,
     ToolResult,
     ToolSpec,
+    check_target_availability,
     invoke_once,
     to_provider_input,
 )
@@ -73,6 +74,7 @@ __all__ = [
     "CancelRegistry",
     "invoke_once",
     "to_provider_input",
+    "check_target_availability",
     "ResponsesConfig",
     "ResponsesExecutionScope",
     "check_availability",

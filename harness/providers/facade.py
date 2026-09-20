@@ -10,6 +10,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any, Mapping, Sequence
 
+from .chat import ChatExecutionScope
 from .credentials import CredentialChain, CredentialMaterial
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
@@ -22,6 +23,7 @@ from .invoke import (
     to_provider_input,
 )
 from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
+from .messages import MessagesExecutionScope
 from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
 from .responses import ResponsesExecutionScope, check_availability
 from .store import ProviderStore
@@ -475,17 +477,31 @@ class ProviderFacade:
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
                          model: Any) -> InvokeResult:
-        # 诊断调用走与正式调用相同的协议与身份路径，使用独立会话与尝试身份
+        # 诊断调用走与正式调用相同的协议与身份路径，使用独立会话与尝试身份；
+        # 执行作用域按协议选择，不能把 Responses 作用域交给 Chat 或 Messages
         session_id = f"diagnostic:{target.provider_id}:{model.id}"
         attempt_id = f"diagnostic:{model.id}:1"
         if target.protocol == "fake":
             return _invoke_once(target, provider_input, session_id, attempt_id)
-        if self._scope is not None:
-            return _invoke_once(target, provider_input, session_id, attempt_id,
-                                execution_scope=self._scope)
-        with ResponsesExecutionScope() as scope:
+        scope = self._scope_for_protocol(target.protocol)
+        try:
             return _invoke_once(target, provider_input, session_id, attempt_id,
                                 execution_scope=scope)
+        finally:
+            if scope is not None and scope is not self._scope:
+                scope.close()
+
+    def _scope_for_protocol(self, protocol: str) -> Any | None:
+        expected = {
+            "responses": ResponsesExecutionScope,
+            "chat_completions": ChatExecutionScope,
+            "messages": MessagesExecutionScope,
+        }.get(str(protocol))
+        if expected is None:
+            return None
+        if isinstance(self._scope, expected):
+            return self._scope
+        return expected()
 
     def describe_readiness(
         self,

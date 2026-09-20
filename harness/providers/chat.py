@@ -225,8 +225,10 @@ class _ChatInvoker:
         })
         headers = build_identity_headers(target.header_profile, invocation.session_id)
         params["_request_headers"] = headers
-        if self.execution_scope is not None:
-            client = await self.execution_scope.client_for(target)
+        # 只有本协议的执行作用域才用于连接复用，其他协议的 scope 不适用
+        scope = self.execution_scope if isinstance(self.execution_scope, ChatExecutionScope) else None
+        if scope is not None:
+            client = await scope.client_for(target)
             return await self._stream_with_client(invocation, trace, client, params, started, deadline)
         async with AsyncOpenAI(
             api_key=target.api_key, base_url=target.base_url,

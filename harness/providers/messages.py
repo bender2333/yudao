@@ -234,8 +234,10 @@ class _MessagesInvoker:
             "evidence_source": "constructed_request_params",
         })
         headers = build_identity_headers(target.header_profile, invocation.session_id)
-        if self.execution_scope is not None:
-            client = await self.execution_scope.client_for(target)
+        # 只有本协议的执行作用域才用于连接复用，其他协议的 scope 不适用
+        scope = self.execution_scope if isinstance(self.execution_scope, MessagesExecutionScope) else None
+        if scope is not None:
+            client = await scope.client_for(target)
             return await self._stream_with_client(invocation, trace, client, params, headers, started, deadline)
         async with AsyncAnthropic(
             api_key=target.api_key, base_url=anthropic_base_url(target.base_url),

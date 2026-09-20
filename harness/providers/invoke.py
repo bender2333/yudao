@@ -109,6 +109,37 @@ class CancelRegistry:
         return True
 
 
+def check_target_availability(frozen_target: FrozenTarget) -> dict[str, Any]:
+    # 发送前的通用可用性检查：凭据、模型、地址与超时，不触网，按协议同规则
+    from math import isfinite
+    from urllib.parse import urlsplit
+
+    missing = []
+    if frozen_target.protocol != "fake" and not frozen_target.api_key:
+        missing.append("provider credential")
+    if not frozen_target.model:
+        missing.append("model")
+    if missing:
+        return {"available": False, "reason": "provider_unavailable",
+                "message": "Missing configuration: " + ", ".join(missing)}
+    if frozen_target.protocol != "fake":
+        try:
+            url = urlsplit(frozen_target.base_url or "")
+            valid_url = url.scheme in {"https", "http"} and bool(url.hostname) \
+                and url.username is None and url.password is None
+        except ValueError:
+            valid_url = False
+        if not valid_url:
+            return {"available": False, "reason": "provider_unavailable",
+                    "message": "Invalid provider base URL"}
+        timeout = frozen_target.timeout_sec
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) \
+                or not isfinite(float(timeout)) or float(timeout) <= 0:
+            return {"available": False, "reason": "provider_unavailable",
+                    "message": "Provider timeout must be positive and finite"}
+    return {"available": True, "reason": "", "message": ""}
+
+
 def build_request_evidence(
     frozen_target: FrozenTarget,
     provider_input: ProviderInput,

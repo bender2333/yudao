@@ -345,16 +345,18 @@ class _ResponsesInvoker:
     ) -> InvokeResult:
         started = time.monotonic()
         observation_errors: list[BaseException] = []
-        if self.execution_scope is not None:
+        # 只有本协议的执行作用域才用于连接复用，其他协议的 scope 不适用
+        scope = self.execution_scope if isinstance(self.execution_scope, ResponsesExecutionScope) else None
+        if scope is not None:
             context = _RequestContext(invocation, trace, observation_errors)
-            token = self.execution_scope.bind(context)
+            token = scope.bind(context)
             try:
-                client = await self.execution_scope.client_for(invocation.config)
+                client = await scope.client_for(invocation.config)
                 return await self._stream_with_client(
                     invocation, trace, observation_errors, client, started, deadline,
                 )
             finally:
-                self.execution_scope.reset(token)
+                scope.reset(token)
 
         async def observe_request(http_request: httpx.Request) -> None:
             http_request.extensions["trace"] = trace

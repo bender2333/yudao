@@ -11,10 +11,9 @@ from ..providers import (
     ProviderMessage,
     ToolResult,
     ToolSpec,
-    check_availability,
+    check_target_availability,
 )
 from ..providers.errors import ProviderError as FacadeProviderError
-from ..providers.responses import ResponsesConfig
 from .base import Availability, ModelObservation, ModelRequest, ModelResponse, ProviderError
 
 
@@ -32,16 +31,8 @@ class FacadeAdapter:
         self._lock = Lock()
 
     def availability(self) -> Availability:
-        if self.target.protocol == "fake":
-            return Availability(True)
-        if self.target.protocol != "responses":
-            return Availability(False, "provider_unavailable",
-                                f"unsupported provider protocol: {self.target.protocol}")
-        result = check_availability(ResponsesConfig(
-            model=self.target.model, api_key=self.target.api_key,
-            provider=self.target.provider_id, base_url=self.target.base_url,
-            timeout_sec=self.target.timeout_sec,
-        ))
+        # 协议差异由 Provider 模块处理，桥接层不做 Responses 专属判断
+        result = check_target_availability(self.target)
         if result["available"]:
             return Availability(True)
         return Availability(False, result["reason"], result["message"])
