@@ -1153,3 +1153,11 @@
 - 真实凭据：`provider.md`（gitignore）中的 OpenCode Go key 经进程环境注入；不打印、不写入证据文件、不进入提交。Provider 侧同 Key 探针（带 `User-Agent` 与 `x-opencode-session`）返回 200，三次间歇失败未改模型、未扩重试。
 - 服务：8891（浏览器核对数据副本）、8892（场景数据目录）。原始证据在 `.yudao/stage-3-0b-20260920/` 与 `.yudao/stage-3-0b-scenarios-20260921/`。
 - 下一步：**#11 已收口**（三场景全部 DONE/released，issue #11 已关闭，报告提交 `9f95688`）。场景 C 最终 `run_9f6108de39d5405a`（窗口 24000、4 次真实压缩、方向调整与新增 `count=` 均进入最终交付、质检 release）；首次两次 12000 窗 `compaction_failed` 与场景 B 的前 5 次尝试全部保留在报告与 `attempts.md`。随后进入 3.2A（issue #12 可信代码快照接入）。
+
+## 2026-09-21 - #12 可信代码快照接入完成（3.2A 第一票）
+
+- 委派 `unspecified-high` 子代理实现，主代理审查并复跑测试后提交 `1180020`。
+- 新增 `harness/snapshot.py`（`ingest_snapshot` 只读采集、显式拒绝宿主私有路径、`restore_snapshot` 仅凭持久工件恢复）；`orchestrator.create_run` 增加 `code_snapshot`（与 `baseline` 互斥、摘要与初始树一致）；`ProjectService.start_work_item_from_snapshot` 与 HTTP `source_dir` 入口；工作区在任何部门激活前由快照落盘。
+- 新增 `harness/tests/test_snapshot.py`（真实文件系统，无 mock）：源目录只读、身份与独立恢复（含二进制、隐藏文件、空目录）、独立工作区、越界/符号链接/私有路径拒绝、删源后恢复、事项集成。本机无符号链接权限，1 项按既有平台条件跳过。
+- 验证：新测试 9 passed/1 skipped；相关回归 `test_projects`、`test_projects_web`、`test_tree_archive`、`test_public_tree`、`test_workspace_delivery`、`test_web` EXIT=0。issue #12 已留证据评论并关闭。
+- 下一步：`#13` 搜索与按区间阅读（已解锁），随后 `#14` 区间编辑与质检闭环、`#15` 本地命令与动作回执。
