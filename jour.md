@@ -1161,3 +1161,11 @@
 - 新增 `harness/tests/test_snapshot.py`（真实文件系统，无 mock）：源目录只读、身份与独立恢复（含二进制、隐藏文件、空目录）、独立工作区、越界/符号链接/私有路径拒绝、删源后恢复、事项集成。本机无符号链接权限，1 项按既有平台条件跳过。
 - 验证：新测试 9 passed/1 skipped；相关回归 `test_projects`、`test_projects_web`、`test_tree_archive`、`test_public_tree`、`test_workspace_delivery`、`test_web` EXIT=0。issue #12 已留证据评论并关闭。
 - 下一步：`#13` 搜索与按区间阅读（已解锁），随后 `#14` 区间编辑与质检闭环、`#15` 本地命令与动作回执。
+
+## 2026-09-21 - #13 搜索与按区间阅读完成（3.2A 第二票）
+
+- 委派 `unspecified-high` 子代理实现，主代理审查并复跑测试后提交 `dc0b9f9`。
+- `harness/tools.py` 新增只读工具 `search` 与 `read_range`（`access: read`，部门同 `read_file`）：`re` 正则逐行匹配、按快照字节排序确定性输出、命中含 `path` 与 1 基行号与上下文；按 `CHECK_OUTPUT_LIMIT` 限宽并给出 `truncated` 与 `next_cursor`，续取无遗漏无重复；路径全部经 `resolve_public_path`（私有目录、`.git` 元数据、逃逸、歧义/保留名、符号链接均拒绝）；结果与游标绑定工作区快照摘要，快照变化后旧游标直接报错，不返回陈旧内容。
+- 搜索后端决策：本机未安装 ripgrep，安装软件超出本票范围；按计划 §4.3「不静默退回另一套语义」，只用 Python 标准库 `re` 语义（schema 与返回中明示），不调用 `rg`、不做双语义回退。若后续采用 ripgrep 应另开票声明前置并校验平台可用性。
+- 验证：`test_search_tools + test_tools + test_engine` EXIT=0（新文件 13 passed、1 skipped：本机无符号链接权限）；子代理另跑 `test_tools + test_public_tree + test_engine + test_smoke`（155 passed、7 skipped）EXIT=0。issue #13 已留证据评论并关闭。
+- 下一步：`#14` 按区间编辑与交付质检闭环（已解锁），随后 `#15` 本地命令与动作回执；3.2A 完成后进入 3.1 恢复。
