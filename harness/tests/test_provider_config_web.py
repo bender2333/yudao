@@ -557,7 +557,7 @@ def test_candidates_report_unknown_when_upstream_unreachable(tmp_path):
 
 
 def test_model_test_records_admission_with_revision(tmp_path):
-    system, _config = catalog_system(tmp_path)
+    system, config = catalog_system(tmp_path)
     with running_server(system) as (_server, host, port):
         before = get_json(host, port, "/api/providers")
         status, body = request(host, port, "POST", "/api/providers/fake-a/test",
@@ -568,10 +568,18 @@ def test_model_test_records_admission_with_revision(tmp_path):
         assert payload["admitted"] is True
         assert payload["protocol"] == "fake"
         assert payload["revision"] > before["revision"]
+        assert payload["persisted"] is True
         listed = get_json(host, port, "/api/providers")
         model = next(item for item in listed["models"] if item["id"] == "model-a")
         assert model["admitted_revision"] == payload["revision"]
         assert model["admitted_at"]
+
+        # 准入结果落盘：独立进程（CLI/smoke）读取同一份配置也应看到准入
+        reloaded = ProviderFacade()
+        reloaded.load_document(config)
+        stored = next(item for item in reloaded.providers_view()["models"] if item["id"] == "model-a")
+        assert stored["admitted_revision"] == payload["revision"]
+        assert stored["admitted_at"]
 
         status, body = request(host, port, "POST", "/api/providers/fake-a/test",
                                {"kind": "model"})

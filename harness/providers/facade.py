@@ -450,12 +450,28 @@ class ProviderFacade:
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
         actual = result.actual_model or result.model or None
         admission = self.record_admission(provider_id, model.id, admitted_model=actual)
-        return {
+        persisted, persist_error = self._persist_admission()
+        payload = {
             "ok": True, "error": None, "model": actual, "admitted": True,
             "protocol": model.protocol, "revision": admission["revision"],
             "elapsed_ms": elapsed_ms,
             "usage_reported": bool(result.usage.get("reported", False)),
+            "persisted": persisted,
         }
+        if persist_error is not None:
+            payload["persist_error"] = persist_error
+        return payload
+
+    def _persist_admission(self) -> tuple[bool, str | None]:
+        # 准入是需落盘的结果：CLI 与 smoke 在独立进程读取同一份配置；
+        # 写入失败时保留内存准入并如实报告，不谎称已持久化
+        if self._config_path is None:
+            return False, None
+        try:
+            self.persist_document(self._config_path)
+        except OSError as exc:
+            return False, f"准入未能写入 {self._config_path}：{exc}"
+        return True, None
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
                          model: Any) -> InvokeResult:

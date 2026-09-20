@@ -717,7 +717,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if not isinstance(elapsed_ms, int):
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
         ok = bool(result.get("ok"))
-        return self._send_json({
+        payload = {
             "ok": ok,
             "error": result.get("error"),
             "actual_model": result.get("model") or result.get("actual_model"),
@@ -726,7 +726,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "admitted": bool(result.get("admitted", ok)),
             "protocol": result.get("protocol") or model.get("protocol"),
             "usage_reported": bool(result.get("usage_reported", False)),
-        })
+            "persisted": bool(result.get("persisted", False)),
+        }
+        if result.get("persist_error"):
+            payload["persist_error"] = result["persist_error"]
+        return self._send_json(payload)
 
     def _post_credentials(self) -> None:
         # 提交凭据及是否持久化；清除与删除用显式动作，不拿空字符串猜意图
