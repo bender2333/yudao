@@ -189,6 +189,7 @@ def _redact_observation(value: Any, *, secret: str | None = None, key: str | Non
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
+SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref"})
 
 
 def _validate_run_ownership(
@@ -197,6 +198,7 @@ def _validate_run_ownership(
     work_item_id: str | None,
     baseline: dict[str, Any] | None,
     initial_tree: CapturedTree | None,
+    code_snapshot: dict[str, Any] | None,
     project_context: str | None,
     department_prompts: dict[str, str] | None,
     prompt_config_versions: dict[str, int] | None,
@@ -210,9 +212,18 @@ def _validate_run_ownership(
     if given and len(given) != len(ownership):
         missing = sorted(set(ownership) - set(given))
         raise ValueError("project ownership parameters must be given together; missing: " + ", ".join(missing))
-    if not given and (baseline is not None or initial_tree is not None):
+    if not given and (baseline is not None or initial_tree is not None or code_snapshot is not None):
         raise ValueError("baseline and initial_tree require project ownership parameters")
-    if (baseline is None) != (initial_tree is None):
+    if code_snapshot is not None:
+        if baseline is not None:
+            raise ValueError("snapshot and baseline cannot be given together")
+        if initial_tree is None:
+            raise ValueError("snapshot and initial_tree must be given together")
+        if not isinstance(code_snapshot, dict) or set(code_snapshot) != SNAPSHOT_FIELDS:
+            raise ValueError("snapshot must contain exactly: " + ", ".join(sorted(SNAPSHOT_FIELDS)))
+        if code_snapshot["tree_digest"] != initial_tree.digest:
+            raise ValueError("snapshot tree_digest does not match the initial tree digest")
+    elif (baseline is None) != (initial_tree is None):
         raise ValueError("baseline and initial_tree must be given together")
     if given:
         for name in ("project_id", "work_item_id", "project_context"):
@@ -290,6 +301,7 @@ class Orchestrator:
         work_item_id: str | None = None,
         baseline: dict[str, Any] | None = None,
         initial_tree: CapturedTree | None = None,
+        code_snapshot: dict[str, Any] | None = None,
         project_context: str | None = None,
         department_prompts: dict[str, str] | None = None,
         prompt_config_versions: dict[str, int] | None = None,
@@ -304,6 +316,7 @@ class Orchestrator:
             raise ValueError("provider facade is required for production runs")
         _validate_run_ownership(
             project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
+            code_snapshot=code_snapshot,
             project_context=project_context, department_prompts=department_prompts,
             prompt_config_versions=prompt_config_versions,
         )
@@ -360,6 +373,7 @@ class Orchestrator:
                 "project_id": project_id,
                 "work_item_id": work_item_id,
                 "baseline": baseline,
+                "snapshot": code_snapshot,
                 "workspace_digest": workspace_digest,
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),

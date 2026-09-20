@@ -28,6 +28,7 @@ from .models import (
     new_id,
 )
 from .projection import RunNotFoundError, project_run
+from .snapshot import ingest_snapshot
 from .tree_archive import load_tree
 
 TITLE_LIMIT = 40
@@ -155,6 +156,7 @@ class WorkItem:
     created_at: str
     seq: int
     event_id: str
+    snapshot: dict[str, Any] | None = None
     start_error: str | None = None
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
@@ -265,7 +267,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             baseline=payload["baseline"], project_context_ref=payload["project_context_ref"],
             prompt_config_versions=dict(payload["prompt_config_versions"]), max_cycles=int(payload["max_cycles"]),
             context_window=int(payload["context_window"]), created_at=event.created_at, seq=event.seq,
-            event_id=event.event_id,
+            event_id=event.event_id, snapshot=payload.get("snapshot"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:
@@ -562,13 +564,10 @@ class ProjectService:
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
                         max_cycles: int = 8, context_window: int = 32_000) -> tuple[str, str]:
         _require_text("text", text)
-        if title is not None and (not isinstance(title, str) or not title.strip()):
-            raise ValueError("title must be a non-empty string when given")
         with self._lock:
             self._writable(project_id)
             self.settle_pending(project_id)
             project = self.projection(project_id)
-            title = work_item_title(text) if title is None else title
             baseline = None
             initial_tree = None
             source_run = None
@@ -585,30 +584,64 @@ class ProjectService:
                 initial_tree = load_tree(self.artifacts, adoption.run_id, ArtifactRef(**adoption.tree_ref))
                 if initial_tree.digest != adoption.code_tree_digest:
                     raise ValueError("archived tree does not match the adopted deliverable digest")
-            department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
-            prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
-            context_text = project_context_text(project, title, source_run)
+            return self._emit_work_item(
+                project, text, title=title, max_cycles=max_cycles, context_window=context_window,
+                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+            )
+
+    def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
+                                      title: str | None = None, max_cycles: int = 8,
+                                      context_window: int = 32_000) -> tuple[str, str]:
+        # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
+        _require_text("text", text)
+        if not isinstance(source_dir, str) or not source_dir.strip():
+            raise ValueError("source_dir must be a non-empty string")
+        with self._lock:
+            self._writable(project_id)
+            self.settle_pending(project_id)
+            project = self.projection(project_id)
             work_item_id, run_id = new_id("wi"), new_id("run")
-            # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
-            context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
-            self.store.append_project(project_id, ProjectEventType.WORK_ITEM_CREATED, {
-                "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
-                "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
-                "max_cycles": max_cycles, "context_window": context_window,
+            tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
+            return self._emit_work_item(
+                project, text, title=title, max_cycles=max_cycles, context_window=context_window,
+                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+                work_item_id=work_item_id, run_id=run_id,
+            )
+
+    def _emit_work_item(self, project: ProjectProjection, text: str, *, title: str | None,
+                        max_cycles: int, context_window: int, baseline: dict[str, Any] | None,
+                        initial_tree: Any, snapshot: dict[str, Any] | None,
+                        source_run: Any, work_item_id: str | None = None,
+                        run_id: str | None = None) -> tuple[str, str]:
+        if title is not None and (not isinstance(title, str) or not title.strip()):
+            raise ValueError("title must be a non-empty string when given")
+        title = work_item_title(text) if title is None else title
+        department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
+        prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
+        context_text = project_context_text(project, title, source_run)
+        work_item_id, run_id = work_item_id or new_id("wi"), run_id or new_id("run")
+        # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
+        context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
+        self.store.append_project(project.project_id, ProjectEventType.WORK_ITEM_CREATED, {
+            "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
+            "snapshot": snapshot,
+            "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
+            "max_cycles": max_cycles, "context_window": context_window,
+        })
+        try:
+            self.orchestrator.create_run(
+                text, run_id=run_id, max_cycles=max_cycles, context_window=context_window,
+                project_id=project.project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
+                code_snapshot=snapshot,
+                project_context=context_text, department_prompts=department_prompts,
+                prompt_config_versions=prompt_config_versions,
+            )
+        except Exception as exc:
+            self.store.append_project(project.project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
+                "work_item_id": work_item_id, "run_id": run_id, "error": str(exc) or type(exc).__name__,
             })
-            try:
-                self.orchestrator.create_run(
-                    text, run_id=run_id, max_cycles=max_cycles, context_window=context_window,
-                    project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
-                    project_context=context_text, department_prompts=department_prompts,
-                    prompt_config_versions=prompt_config_versions,
-                )
-            except Exception as exc:
-                self.store.append_project(project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
-                    "work_item_id": work_item_id, "run_id": run_id, "error": str(exc) or type(exc).__name__,
-                })
-                raise
-            return work_item_id, run_id
+            raise
+        return work_item_id, run_id
 
     # 结算
 

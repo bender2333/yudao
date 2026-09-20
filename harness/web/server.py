@@ -113,7 +113,15 @@ class LoopConsoleServer(ThreadingHTTPServer):
     def start_work_item(self, project_id: str, text: str, options: dict[str, Any]) -> tuple[str, str]:
         with self._worker_lock:
             self._require_idle_and_available()
-            work_item_id, run_id = self.system.projects.start_work_item(project_id, text, **options)
+            if options.get("source_dir") is not None:
+                source_dir = options["source_dir"]
+                if not isinstance(source_dir, str) or not source_dir.strip():
+                    raise ValueError("source_dir must be a non-empty string")
+                rest = {key: value for key, value in options.items() if key != "source_dir"}
+                work_item_id, run_id = self.system.projects.start_work_item_from_snapshot(
+                    project_id, source_dir, text, **rest)
+            else:
+                work_item_id, run_id = self.system.projects.start_work_item(project_id, text, **options)
             self._spawn_worker(run_id, (project_id, work_item_id))
             return work_item_id, run_id
 
@@ -441,7 +449,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._send_json({"ok": True, "project_id": project_id, "archived": False})
         if command == "work-items":
             body = self._read_json_body()
-            unknown = set(body) - {"text", "title", "max_cycles", "context_window"}
+            unknown = set(body) - {"text", "title", "max_cycles", "context_window", "source_dir"}
             if unknown:
                 raise ValueError("unsupported work item fields: " + ", ".join(sorted(unknown)))
             text = body.get("text")
@@ -452,6 +460,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 if not isinstance(body["title"], str) or not body["title"].strip():
                     raise ValueError("title must be a non-empty string")
                 options["title"] = body["title"]
+            if body.get("source_dir") is not None:
+                if not isinstance(body["source_dir"], str) or not body["source_dir"].strip():
+                    raise ValueError("source_dir must be a non-empty string")
+                options["source_dir"] = body["source_dir"]
             for key in ("max_cycles", "context_window"):
                 if key not in body or body[key] is None:
                     continue

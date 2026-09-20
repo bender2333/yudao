@@ -574,6 +574,7 @@ class RunProjection:
     project_id: str | None = None
     work_item_id: str | None = None
     baseline: dict[str, Any] | None = None
+    snapshot: dict[str, Any] | None = None
     workspace_digest: str = ""
     project_context_ref: dict[str, Any] | None = None
     prompt_config_versions: dict[str, int] = field(default_factory=dict)
