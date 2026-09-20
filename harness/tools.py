@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import os
+import re
 import shlex
 import subprocess
 import sys
@@ -16,10 +20,16 @@ from .workspace import Workspace
 
 CHECK_TIMEOUT_SEC = 30
 CHECK_OUTPUT_LIMIT = 4000
+# 单页默认命中数；单页输出同样受 CHECK_OUTPUT_LIMIT 约束
+SEARCH_DEFAULT_PAGE = 50
+# 单行过长时保留的片段长度，避免一行占满整页输出
+SEARCH_SNIPPET_LIMIT = 1000
 
 TOOL_DEFS = {
     "read_file": {"access": "read", "departments": ("product", "engineering", "quality")},
     "list_files": {"access": "read", "departments": ("product", "engineering", "quality")},
+    "search": {"access": "read", "departments": ("product", "engineering", "quality")},
+    "read_range": {"access": "read", "departments": ("product", "engineering", "quality")},
     "write_file": {"access": "write", "departments": ("engineering",)},
     "delete_file": {"access": "write", "departments": ("engineering",)},
     "move_file": {"access": "write", "departments": ("engineering",)},
@@ -76,6 +86,8 @@ class ToolRuntime:
         self._handlers: dict[str, Callable[..., Any]] = {
             "read_file": self._read_file,
             "list_files": self._list_files,
+            "search": self._search,
+            "read_range": self._read_range,
             "write_file": self._write_file,
             "delete_file": self._delete_file,
             "move_file": self._move_file,
@@ -113,6 +125,110 @@ class ToolRuntime:
     def _list_files(self, department: str, args: dict[str, Any]) -> list[str]:
         prefix = args.get("prefix")
         return self.workspace.list_files(None if prefix in (None, "") else str(prefix))
+
+    def _search(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
+        pattern = args.get("pattern")
+        if not isinstance(pattern, str) or not pattern:
+            raise ValueError("search requires a non-empty pattern")
+        compiled = re.compile(pattern)
+        scope = args.get("path")
+        scope_rel = None if scope in (None, "") else str(scope).rstrip("/")
+        page_size = _page_size(args.get("max_results"))
+        offset = 0
+        cursor_arg = args.get("cursor")
+        cursor: dict[str, Any] | None = None
+        if cursor_arg not in (None, ""):
+            cursor = _decode_cursor(str(cursor_arg), kind="search")
+            if cursor.get("pattern") != pattern or cursor.get("path") != scope_rel or cursor.get("page_size") != page_size:
+                raise ValueError("cursor does not match the current search arguments")
+            offset = cursor["offset"]
+        snapshot = self.workspace.snapshot()
+        digest = snapshot.digest
+        if cursor is not None and cursor.get("digest") != digest:
+            raise ValueError("workspace changed since the cursor was issued; start a new search")
+        if scope_rel is None:
+            files = list(snapshot.tree.files)
+        else:
+            # 作用域同样走公开路径校验，私有、逃逸、链接与歧义路径直接报错
+            target = self.workspace.resolve(scope_rel)
+            if not os.path.lexists(target):
+                raise FileNotFoundError(f"search scope not found: {scope_rel}")
+            if target.is_dir():
+                files = [item for item in snapshot.tree.files
+                         if item.path == scope_rel or item.path.startswith(scope_rel + "/")]
+            else:
+                files = [item for item in snapshot.tree.files if item.path == scope_rel]
+                if not files:
+                    raise FileNotFoundError(f"search scope not found: {scope_rel}")
+        matches: list[dict[str, Any]] = []
+        for item in files:
+            # 二进制内容按替换字符解码后同样参与匹配，作用域内不静默跳过任何文件
+            for number, line in enumerate(item.data.decode("utf-8", errors="replace").splitlines(), 1):
+                if compiled.search(line):
+                    matches.append({"path": item.path, "line": number, "snippet": _clip_snippet(line)})
+        page = matches[offset:offset + page_size]
+        truncated = offset + len(page) < len(matches)
+        page, truncated = _fit_match_page(page, truncated)
+        return {
+            "pattern": pattern,
+            "path": scope_rel,
+            "digest": digest,
+            "matches": page,
+            "total_matches": len(matches),
+            "truncated": truncated,
+            "next_cursor": _encode_cursor({
+                "kind": "search", "pattern": pattern, "path": scope_rel,
+                "page_size": page_size, "offset": offset + len(page), "digest": digest,
+            }) if truncated else None,
+        }
+
+    def _read_range(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
+        rel = args.get("path")
+        if not isinstance(rel, str) or not rel:
+            raise ValueError("read_range requires a path")
+        start = args.get("start_line")
+        if type(start) is not int or start < 1:
+            raise ValueError("start_line must be an integer >= 1")
+        end = args.get("end_line")
+        if end is not None and (type(end) is not int or end < start):
+            raise ValueError("end_line must be an integer >= start_line")
+        offset = start
+        cursor: dict[str, Any] | None = None
+        cursor_arg = args.get("cursor")
+        if cursor_arg not in (None, ""):
+            cursor = _decode_cursor(str(cursor_arg), kind="read_range")
+            if cursor.get("path") != rel or cursor.get("start_line") != start or cursor.get("end_line") != end:
+                raise ValueError("cursor does not match the current read_range arguments")
+            offset = cursor["offset"]
+        self.workspace.resolve(rel)
+        snapshot = self.workspace.snapshot()
+        digest = snapshot.digest
+        if cursor is not None and cursor.get("digest") != digest:
+            raise ValueError("workspace changed since the cursor was issued; start a new read")
+        raw = next((item.data for item in snapshot.tree.files if item.path == rel), None)
+        if raw is None:
+            raise FileNotFoundError(f"file not found: {rel}")
+        # 与 read_file 一致使用严格解码，二进制内容直接报错而不猜测
+        numbered = list(enumerate(raw.decode("utf-8").splitlines(), 1))
+        total = len(numbered)
+        wanted = [(number, text) for number, text in numbered if number >= offset and (end is None or number <= end)]
+        entries, consumed = _fit_line_entries(wanted)
+        truncated = consumed < len(wanted)
+        next_offset = offset + consumed
+        last = offset + consumed - 1
+        return {
+            "path": rel,
+            "digest": digest,
+            "start_line": offset,
+            "end_line": last if consumed else min(total, offset - 1),
+            "total_lines": total,
+            "lines": entries,
+            "truncated": truncated,
+            "next_cursor": _encode_cursor({
+                "kind": "read_range", "path": rel, "start_line": start, "end_line": end,
+                "offset": next_offset, "digest": digest,
+            }) if truncated else None,
+        }
 
     def _write_file(self, department: str, args: dict[str, Any]) -> str:
         return self.workspace.write_file(str(args["path"]), str(args["content"]))
@@ -271,6 +387,73 @@ def _summarize_output(stdout: str, stderr: str) -> str:
     return text
 
 
+def _page_size(value: Any) -> int:
+    if value is None:
+        return SEARCH_DEFAULT_PAGE
+    if type(value) is not int or value < 1:
+        raise ValueError("max_results must be an integer >= 1")
+    return value
+
+
+def _clip_snippet(line: str) -> str:
+    if len(line) > SEARCH_SNIPPET_LIMIT:
+        return line[:SEARCH_SNIPPET_LIMIT] + "\n...truncated..."
+    return line
+
+
+def _encode_cursor(payload: dict[str, Any]) -> str:
+    return base64.urlsafe_b64encode(json_dumps(payload).encode("utf-8")).decode("ascii")
+
+
+def _decode_cursor(cursor: str, *, kind: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8"))
+    except Exception as exc:
+        raise ValueError(f"invalid cursor: {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("kind") != kind or type(payload.get("offset")) is not int:
+        raise ValueError("invalid cursor")
+    return payload
+
+
+def _result_size(result: dict[str, Any]) -> int:
+    return len(json_dumps(result))
+
+
+def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[dict[str, Any]], bool]:
+    # 按输出上限收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
+    probe = {"matches": page}
+    while len(page) > 1 and _result_size({**probe, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+        page = page[:-1]
+        truncated = True
+    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+        only = dict(page[0])
+        snippet = only["snippet"]
+        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > CHECK_OUTPUT_LIMIT:
+            snippet = snippet[:len(snippet) // 2]
+        only["snippet"] = snippet + "\n...truncated..."
+        page = [only]
+        truncated = True
+    return page, truncated
+
+
+def _fit_line_entries(wanted: list[tuple[int, str]]) -> tuple[list[dict[str, Any]], int]:
+    # 逐行累加直到输出上限；单行超限则截断该行文本，保证每页至少返回一行或空
+    entries: list[dict[str, Any]] = []
+    for number, text in wanted:
+        candidate = entries + [{"line": number, "text": text}]
+        if _result_size({"lines": candidate, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+            break
+        entries = candidate
+    if not entries and wanted:
+        number, text = wanted[0]
+        clipped = text
+        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > CHECK_OUTPUT_LIMIT:
+            clipped = clipped[:len(clipped) // 2]
+        entries = [{"line": number, "text": clipped + "\n...truncated..."}]
+        return entries, 1
+    return entries, len(entries)
+
+
 def _decode(raw: str | bytes | None) -> str:
     if raw is None:
         return ""
@@ -307,6 +490,36 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "label": "list_files",
         "description": "List workspace files. Does not include .checks.",
         "parameters": _object_schema({"prefix": {"type": "string", "description": "Optional path prefix"}}),
+        "loadMode": "essential",
+    },
+    "search": {
+        "name": "search",
+        "label": "search",
+        "description": "Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.",
+        "parameters": _object_schema(
+            {
+                "pattern": {"type": "string", "description": "Python re regex searched per line"},
+                "path": {"type": ["string", "null"], "description": "Optional file or directory scope within the public tree"},
+                "max_results": {"type": ["integer", "null"], "description": "Maximum matches per page"},
+                "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated search"},
+            },
+            ["pattern"],
+        ),
+        "loadMode": "essential",
+    },
+    "read_range": {
+        "name": "read_range",
+        "label": "read_range",
+        "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines and the snapshot digest. Truncated output carries next_cursor.",
+        "parameters": _object_schema(
+            {
+                "path": {"type": "string", "description": "Workspace-relative file path"},
+                "start_line": {"type": "integer", "description": "First line to read, 1-based"},
+                "end_line": {"type": ["integer", "null"], "description": "Last line to read, inclusive; omit for end of file"},
+                "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated read"},
+            },
+            ["path", "start_line"],
+        ),
         "loadMode": "essential",
     },
     "write_file": {
