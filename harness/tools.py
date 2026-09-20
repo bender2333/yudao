@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .models import json_dumps
+from .models import hash_bytes, json_dumps
 from .public_tree import capture_public_tree, is_private_path
 from .redact import redact_text, sanitized_env
 from .workspace import Workspace
@@ -31,6 +31,7 @@ TOOL_DEFS = {
     "search": {"access": "read", "departments": ("product", "engineering", "quality")},
     "read_range": {"access": "read", "departments": ("product", "engineering", "quality")},
     "write_file": {"access": "write", "departments": ("engineering",)},
+    "edit_range": {"access": "write", "departments": ("engineering",)},
     "delete_file": {"access": "write", "departments": ("engineering",)},
     "move_file": {"access": "write", "departments": ("engineering",)},
     "run_check": {"access": "check", "departments": ("product", "engineering", "quality")},
@@ -89,6 +90,7 @@ class ToolRuntime:
             "search": self._search,
             "read_range": self._read_range,
             "write_file": self._write_file,
+            "edit_range": self._edit_range,
             "delete_file": self._delete_file,
             "move_file": self._move_file,
             "run_check": self._run_check,
@@ -219,6 +221,7 @@ class ToolRuntime:
         return {
             "path": rel,
             "digest": digest,
+            "content_hash": hash_bytes(raw),
             "start_line": offset,
             "end_line": last if consumed else min(total, offset - 1),
             "total_lines": total,
@@ -232,6 +235,83 @@ class ToolRuntime:
 
     def _write_file(self, department: str, args: dict[str, Any]) -> str:
         return self.workspace.write_file(str(args["path"]), str(args["content"]))
+
+    def _edit_range(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
+        rel = args.get("path")
+        if not isinstance(rel, str) or not rel:
+            raise ValueError("edit_range requires a path")
+        start = args.get("start_line")
+        if type(start) is not int or start < 1:
+            raise ValueError("start_line must be an integer >= 1")
+        end = args.get("end_line")
+        if type(end) is not int or end < start:
+            raise ValueError("end_line must be an integer >= start_line")
+        expected = args.get("expected_text")
+        if not isinstance(expected, str) or not expected:
+            raise ValueError("expected_text must be a non-empty string")
+        new_text = args.get("new_text")
+        if not isinstance(new_text, str):
+            raise ValueError("new_text must be a string")
+        expected_digest = args.get("expected_digest")
+        if expected_digest is not None and (not isinstance(expected_digest, str) or not expected_digest):
+            raise ValueError("expected_digest must be a file content hash string when given")
+        for label, value in (("expected_text", expected), ("new_text", new_text)):
+            try:
+                value.encode("utf-8", errors="strict")
+            except (UnicodeEncodeError, ValueError) as exc:
+                raise ValueError(f"encoding difference: {label} cannot be encoded as UTF-8 identically") from exc
+        # 路径校验复用公开树规则，私有、逃逸、链接与歧义名称直接报错
+        target = self.workspace.resolve(rel)
+        if not os.path.lexists(target):
+            raise FileNotFoundError(f"file not found: {rel}")
+        if not target.is_file():
+            raise ValueError(f"edit_range requires an existing regular file: {rel}")
+        snapshot = self.workspace.snapshot()
+        raw = next((item.data for item in snapshot.tree.files if item.path == rel), None)
+        if raw is None:
+            raise FileNotFoundError(f"file not found: {rel}")
+        # 文件级摘要只绑定目标文件，其它文件的改动不影响本次核对
+        if expected_digest is not None and hash_bytes(raw) != expected_digest:
+            raise ValueError("file changed since the read; re-read the span before editing")
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"encoding difference: {rel} is not valid UTF-8; re-read and use matching bytes") from exc
+        # 与 read_range 一致按通用换行分行，落盘时保留原换行格式
+        crlf = "\r\n" in text
+        normalized = text.replace("\r\n", "\n")
+        ends_newline = normalized.endswith(("\n", "\r"))
+        # 与 read_range 同一切分口径，尾换行不计为一行
+        file_lines = normalized.splitlines()
+        total = len(file_lines)
+        if end > total:
+            raise ValueError(f"target span {start}-{end} does not exist in {rel} with {total} lines")
+        current_span = "\n".join(file_lines[start - 1:end])
+        if current_span != expected:
+            raise ValueError("file changed since the read; re-read the span before editing")
+        occurrences = normalized.count(expected)
+        if occurrences != 1:
+            raise ValueError(f"expected text matches {occurrences} times in {rel}; the span is ambiguous, re-read with a unique span")
+        new_lines = new_text.split("\n")
+        merged = file_lines[:start - 1] + new_lines + file_lines[end:]
+        if not merged:
+            new_raw = b""
+        else:
+            joined = "\n".join(merged)
+            if crlf:
+                joined = joined.replace("\n", "\r\n")
+            new_raw = (joined + ("\r\n" if crlf else "\n") if ends_newline else joined).encode("utf-8")
+        # 全部核对通过后才落盘；任一拒绝都不触碰文件字节
+        self.workspace.resolve(rel).write_bytes(new_raw)
+        final = self.workspace.snapshot()
+        return {
+            "path": rel,
+            "start_line": start,
+            "end_line": start + len(new_lines) - 1,
+            "total_lines": len(merged),
+            "digest": final.digest,
+            "content_hash": hash_bytes(new_raw),
+        }
 
     def _delete_file(self, department: str, args: dict[str, Any]) -> str:
         _require_reason(args)
@@ -510,7 +590,7 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "read_range": {
         "name": "read_range",
         "label": "read_range",
-        "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines and the snapshot digest. Truncated output carries next_cursor.",
+        "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.",
         "parameters": _object_schema(
             {
                 "path": {"type": "string", "description": "Workspace-relative file path"},
@@ -535,8 +615,24 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         ),
         "loadMode": "essential",
     },
-    "delete_file": {
-        "name": "delete_file",
+    "edit_range": {
+        "name": "edit_range",
+        "label": "edit_range",
+        "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
+        "parameters": _object_schema(
+            {
+                "path": {"type": "string", "description": "Workspace-relative file path"},
+                "start_line": {"type": "integer", "description": "First line to replace, 1-based"},
+                "end_line": {"type": "integer", "description": "Last line to replace, inclusive"},
+                "expected_text": {"type": "string", "description": "Exact original lines previously read, joined by newline without a trailing newline"},
+                "new_text": {"type": "string", "description": "Replacement text for the span, lines joined by newline"},
+                "expected_digest": {"type": ["string", "null"], "description": "File content_hash observed when the span was read; omit to skip the digest check"},
+            },
+            ["path", "start_line", "end_line", "expected_text", "new_text"],
+        ),
+        "loadMode": "essential",
+    },
+    "delete_file": {        "name": "delete_file",
         "label": "delete_file",
         "description": "Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
         "parameters": _object_schema(

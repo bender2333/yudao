@@ -1480,7 +1480,7 @@ class Orchestrator:
             error = tool_error(current, request.department, call["name"], call["args"])
             if error:
                 return ToolAdmission(error=error)
-            if call["name"] in {"write_file", "delete_file", "move_file"}:
+            if call["name"] in {"write_file", "edit_range", "delete_file", "move_file"}:
                 plan = current.engineering_plan
                 if plan is None or plan.effective_contract_hash != current_contract_hash(current):
                     return ToolAdmission(error="Submit an engineering plan for the current effective contract before writing files.")

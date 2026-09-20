@@ -13,7 +13,7 @@ from .models import (
 from .tools import SUBMIT_KINDS, TOOL_DEFS
 
 
-_MUTATIONS = {"write_file", "delete_file", "move_file"}
+_MUTATIONS = {"write_file", "edit_range", "delete_file", "move_file"}
 _READS = {"read_file", "list_files"}
 _CHECKS = {"run_check", "collect_evidence"}
 _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
