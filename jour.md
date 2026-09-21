@@ -1207,3 +1207,9 @@
 - 用户指示"具体参数与实现参考 opencode 与 omp"。opencode 调研完成（`sst/opencode` @ 70a24697，`packages/core/src/session/compaction.ts` V2 路径），OMP 调研任务超时未完成。采用 opencode 的口径（提交 `a46781d`）：摘要 `max_output_tokens` 固定 4096、请求不带 tools 与推理参数、只取可见文本增量、发送前预检、**空/超限摘要不再中断运行**（返回"未压缩"，部门继续，后续以更小切片重试）、摘要材料中工具输出截断 2000 字符。同步更新 README 失败条件、`docs/requirements/context-compaction.md` 与 `docs/decision.md`。单测 75 passed。
 - 真实验收（`run_5abc7679e54e4f29`）：`compaction_failed` 消失，运行 56 分钟、7525 事件、61 次模型调用、135 次工具调用（0 失败）、2 次压缩；终态 `PAUSED / model_steps_exhausted`（cycle 5/12）——工程激活用尽 32 步上限未提交交付。
 - #15 仍打开：新阻塞为验收任务的工具链长度与步数上限，三条候选方向（收窄验收任务 / 明确记录后调整该验收步数上限 / 换模型）已写在 issue #15 评论，未自行选定。
+
+## 2026-09-21 - #15 验收第二个数据点：收窄任务仍未提交交付
+
+- 收窄版任务（保留全链路六环节，明确"检查通过即提交、不再探索"）：`run_25b9814fd9104bb5` 终态 `PAUSED / max_cycles`（12/12），0 交付、0 质检回执，5052 条事件。
+- 加上 `run_5abc7679e54e4f29`（`PAUSED / model_steps_exhausted`，工程 32 步用尽、135 次工具调用），两次不同限额与停止原因均无交付。
+- 判定：压缩与畸形工具参数两个真实缺陷已修复并留证；剩余阻塞为 `mimo-v2.5` 在本验收任务上不在限额内提交交付。三条候选方向待用户定案，未用放宽断言或改测试绕过。
