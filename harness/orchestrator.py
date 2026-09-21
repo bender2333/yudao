@@ -1103,6 +1103,9 @@ class Orchestrator:
                 checkpoint = finish_compaction(plan, response.output)
             except CompactionError as exc:
                 raise ProviderError(str(exc), reason="compaction_failed") from exc
+            if checkpoint is None:
+                # 摘要为空或超限：非致命，不记录压缩事件，后续激活重试压缩
+                return
             summary_ref = self.artifacts.put(activation.run_id, "department_summary", checkpoint.summary, media_type="text/plain")
             plan_ref = self.artifacts.put(activation.run_id, "compaction_plan", json_dumps(asdict(plan)), media_type="application/json")
             self.store.append(activation.run_id, EventType.COMPACTION_RECORDED, role=activation.department,

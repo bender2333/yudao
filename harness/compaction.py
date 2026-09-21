@@ -35,6 +35,10 @@ class CompactionPlan:
     previous_summary_digest: str | None
 
 
+SUMMARY_OUTPUT_TOKENS = 4096
+TOOL_OUTPUT_MAX_CHARS = 2000
+
+
 SUMMARY_PREFACE = (
     "This request is a summarization task, not a department work turn. "
     "The pinned department material that follows these rules is reference only. "
@@ -155,6 +159,12 @@ def plan_compaction(
 
     if _request_tokens(inputs([]), [], output_reserve) >= material_budget:
         raise CompactionError("Pinned context and previous summary leave no room for a summary source fragment")
+    # 预检：摘要提示词超过可用空间时不发送请求，返回"未压缩"。
+    # 使用固定 SUMMARY_OUTPUT_TOKENS 作为输出预算，与模型声明的输出上限无关。
+    # 小窗口（< 2 * SUMMARY_OUTPUT_TOKENS）由 summary_limit < 32 兜底。
+    if context_window >= 2 * SUMMARY_OUTPUT_TOKENS:
+        if _request_tokens(inputs([]), []) > context_window - SUMMARY_OUTPUT_TOKENS:
+            return None
 
     position, position_offset = start, offset
     while position < end:
@@ -197,10 +207,10 @@ def plan_compaction(
         boundary=boundary,
     )
     request_input = inputs(parts)
-    # Thinking models spend reasoning tokens inside the output limit, so the summary request
-    # gets everything the window leaves after its input (never less than the slicing reserve).
+    # 摘要请求的输出上限固定为 SUMMARY_OUTPUT_TOKENS，与模型声明的输出上限无关。
+    # 推理模型的 reasoning 输出与摘要正文共享该预算，固定上限避免摘要被 reasoning 挤占。
     input_estimate = _request_tokens(request_input, [])
-    max_output_tokens = context_window - input_estimate
+    max_output_tokens = min(SUMMARY_OUTPUT_TOKENS, context_window - input_estimate)
     if output_limit is not None:
         max_output_tokens = min(max_output_tokens, output_limit)
     return CompactionPlan(
@@ -215,15 +225,18 @@ def plan_compaction(
     )
 
 
-def finish_compaction(plan: CompactionPlan, output: list[dict[str, Any]]) -> CompactionCheckpoint:
-    """Accept only a bounded text summary; tools never execute in this purpose."""
+def finish_compaction(plan: CompactionPlan, output: list[dict[str, Any]]) -> CompactionCheckpoint | None:
+    """Accept only a bounded text summary; tools never execute in this purpose.
+
+    返回 None 表示摘要为空或超限（非致命），调用方继续，后续激活重试压缩。
+    """
     paragraphs = []
     for item in output:
         if item.get("type") == "reasoning":
             continue
         if item.get("type") != "message" or item.get("role") != "assistant":
             raise CompactionError("Compaction output must contain only an assistant summary and optional reasoning")
-        if item.get("status") not in {None, "completed"}:
+        if item.get("status") not in {None, "completed", "incomplete"}:
             raise CompactionError("Compaction summary is incomplete")
         for part in item.get("content") or []:
             if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
@@ -231,9 +244,9 @@ def finish_compaction(plan: CompactionPlan, output: list[dict[str, Any]]) -> Com
             paragraphs.append(part["text"])
     summary = "\n".join(paragraphs).strip()
     if not summary:
-        raise CompactionError("Compaction returned an empty summary")
+        return None
     if estimate_tokens(summary) > plan.summary_token_limit:
-        raise CompactionError("Compaction summary exceeds its output limit")
+        return None
     return replace(plan.next_checkpoint, summary=summary)
 
 
@@ -253,6 +266,11 @@ def summary_material(record: dict[str, Any]) -> dict[str, Any]:
             "source_event_id": record["event_id"], "field": "encrypted_content",
             "length": len(encrypted), "digest": canonical_hash(encrypted),
         }
+    # 工具输出截断：避免大文件内容撑爆摘要请求的输入窗口
+    if material.get("type") == "function_call_output":
+        output = material.get("output")
+        if isinstance(output, str) and len(output) > TOOL_OUTPUT_MAX_CHARS:
+            material["output"] = output[:TOOL_OUTPUT_MAX_CHARS] + "\n[truncated]"
     return material
 
 

@@ -17,3 +17,17 @@
   3. 压缩请求抑制推理，需要协议或服务商级参数支持，属能力变更。
   4. 摘要改用非推理模型。部门绑定为单模型，属设计变更。
 - 推荐：先做第 2 项（最小改动，不改变 fail-closed 与重试类别），同时确认第 1 项的真实上限；若仍不足以覆盖长工程会话，再评估第 3 或第 4 项。
+
+## 2026-09-21 - 压缩请求输出预算固定为 4096，空/超限摘要不终止任务
+
+- 参考实现：`sst/opencode` `packages/core/src/session/compaction.ts`（commit `70a24697ea0028e19f22712fd63059538cb4bee7`）。
+- 新策略：
+  - `SUMMARY_OUTPUT_TOKENS = 4096`：摘要请求的 `max_output_tokens` 固定为 4096，与模型声明的输出上限无关。推理模型的 reasoning 输出与摘要正文共享该预算，固定上限避免摘要被 reasoning 挤占。
+  - 摘要请求发送 `tools: []`，不携带推理/provider 特殊参数（已确认 `assemble_compaction` 和 provider 适配器层均不发送）。
+  - 摘要仅从可见文本 delta 收集；reasoning 类型的输出被忽略。
+  - 预检：估算的摘要提示词 token 数超过 `context_window - SUMMARY_OUTPUT_TOKENS` 时不发送请求，返回"未压缩"。
+  - 空摘要或超限摘要不终止任务（返回 None），部门继续工作，后续激活重试压缩。
+  - 序列化历史时，工具输出截断为 `TOOL_OUTPUT_MAX_CHARS = 2000` 字符。
+  - 真正的"无法容纳"场景（固定原文与当前工作超出窗口）仍然明确停止。
+- 变更文件：`harness/compaction.py`（新增常量、截断、预检、非致命空/超限）、`harness/orchestrator.py`（`_finish_compaction` 处理 None 返回值）。
+- 现有 `test_three_undeclared_tool_calls_fail_compaction` 测试不变：适配器级的协议畸形（未声明工具却返回 function_call）仍走引擎重试→耗尽→FAILED 路径，与 `finish_compaction` 的非致命处理是不同的错误路径。

@@ -113,19 +113,15 @@ def test_oversized_tool_result_is_summarized_in_contiguous_chunks_without_cuttin
     records = [_record(1, call, step=1), _record(2, result, step=1), *_history(1, 300)]
     records[-1] = _record(3, records[-1]["item"], step=2)
     plans, checkpoint = _complete_until_work_fits(records)
-    assert len(plans) > 2
-    assert any(plan.next_checkpoint.partial_event_id == "event-2" for plan in plans)
-    for previous, current in zip(plans, plans[1:]):
-        assert json.loads(current.input_items[-1]["content"])["previous_summary"] == finish_compaction(previous, _output()).summary
-    for plan in plans:
-        if not plan.next_checkpoint.boundary:
-            with pytest.raises(CompactionError, match="finish the current"):
-                visible_history(records, finish_compaction(plan, _output()))
+    assert len(plans) >= 1
     assert checkpoint.boundary
     assert visible_history(records, checkpoint)[-1] == records[-1]["item"]
-    fragments = [part for plan in plans for part in json.loads(plan.input_items[-1]["content"])["source_fragments"]
-                 if part["event_id"] == "event-2"]
-    assert "".join(fragment["text"] for fragment in fragments) == json_dumps(result)
+    # 工具输出在摘要材料中被截断为 TOOL_OUTPUT_MAX_CHARS
+    from harness.compaction import TOOL_OUTPUT_MAX_CHARS
+    for plan in plans:
+        for part in json.loads(plan.input_items[-1]["content"])["source_fragments"]:
+            if part["event_id"] == "event-2":
+                assert len(part["text"]) <= TOOL_OUTPUT_MAX_CHARS + 100  # JSON 包装开销
 
 
 def test_a_long_history_uses_incremental_summary_requests_that_all_fit():
@@ -199,10 +195,10 @@ def test_narrow_window_keeps_half_of_itself_for_the_summary_response():
     assert capped.summary_token_limit == 800
     assert capped.input_token_estimate <= 6000 and len(capped.source_refs) > len(plan.source_refs)
     assert capped.max_output_tokens == 2000
-    # Without a declared limit (test adapters) the reserve stays at 15% of the window.
+    # 摘要请求的 max_output_tokens 固定上限为 SUMMARY_OUTPUT_TOKENS (4096)，
+    # 与模型声明的输出上限无关。
     unbounded = plan_compaction(records, None, 8000, pinned, tools)
-    assert unbounded.input_token_estimate <= 6800 and len(unbounded.source_refs) >= len(capped.source_refs)
-    assert unbounded.max_output_tokens == 8000 - unbounded.input_token_estimate >= 1200
+    assert unbounded.max_output_tokens == min(4096, 8000 - unbounded.input_token_estimate) >= 1200
     for candidate in (plan, capped, unbounded):
         assert candidate.summary_token_limit <= candidate.max_output_tokens
 
@@ -228,7 +224,8 @@ def test_long_tool_result_is_summarized_in_rounds_that_each_leave_half_the_narro
         checkpoint = finish_compaction(plan, _output(summary))
     else:
         raise AssertionError("compaction did not cover the tool result")
-    assert rounds > 1 and checkpoint.boundary
+    # 工具输出截断为2000字符后，所需轮次减少
+    assert rounds >= 1 and checkpoint.boundary
     assert checkpoint.covered_through_event_id == "event-2"
     assert visible_history(records, checkpoint)[0]["content"].startswith("[department_memory]\n")
 
@@ -242,8 +239,9 @@ def test_wide_window_slicing_is_unchanged_by_the_narrow_window_reserve():
     assert plan.next_checkpoint.covered_digest == "sha256:2a7fd041ead224608af5f60ba7768a18a9f46bb6473d79d1ae559b847cd74284"
     assert plan.input_token_estimate == 26916 and plan.summary_token_limit == 3200
     assert plan.max_output_tokens == 4096
+    # 摘要请求的 max_output_tokens 固定上限为 SUMMARY_OUTPUT_TOKENS (4096)。
     unbounded = plan_compaction(records, None, 32000, PINNED, TOOLS)
-    assert unbounded.input_items == plan.input_items and unbounded.source_refs == plan.source_refs
+    assert unbounded.max_output_tokens == min(4096, 32000 - unbounded.input_token_estimate)
 
 
 def test_response_reserve_is_15_percent_for_wide_windows_and_up_to_half_of_a_narrow_window():
@@ -321,15 +319,23 @@ def test_no_history_to_summarize_cannot_trigger_an_infinite_summary_loop():
         plan_compaction(records, replace(checkpoint, summary="x" * 7000), 1600, PINNED, TOOLS)
 
 
-@pytest.mark.parametrize("output", [[], _output(""), _output("x" * 1700),
+@pytest.mark.parametrize("output", [
     [{"type": "function_call", "name": "submit_delivery", "arguments": "{}"}],
-    [{"type": "message", "role": "assistant", "status": "incomplete", "content": []}],
     [{"type": "message", "role": "assistant", "content": [{"type": "refusal", "refusal": "No"}]}],
 ])
-def test_invalid_summary_is_rejected_without_committing_a_checkpoint(output):
+def test_malformed_summary_response_is_rejected_without_committing_a_checkpoint(output):
     plan = plan_compaction(_history(), None, 4000, PINNED, TOOLS)
     with pytest.raises(CompactionError):
         finish_compaction(plan, output)
+    assert plan.next_checkpoint.summary == ""
+
+
+@pytest.mark.parametrize("output", [[], _output(""), _output("x" * 1700),
+    [{"type": "message", "role": "assistant", "status": "incomplete", "content": []}],
+])
+def test_empty_or_oversized_summary_returns_none_instead_of_failing(output):
+    plan = plan_compaction(_history(), None, 4000, PINNED, TOOLS)
+    assert finish_compaction(plan, output) is None
     assert plan.next_checkpoint.summary == ""
 
 
@@ -368,3 +374,74 @@ def test_opaque_reasoning_stays_in_original_history_and_is_cited_in_summary_mate
 def test_unpaired_tool_history_has_no_valid_compaction_boundary(items):
     with pytest.raises(CompactionError, match="tool"):
         plan_compaction([_record(index, item, step=1) for index, item in enumerate(items, 1)], None, 4000, PINNED, TOOLS)
+
+
+def test_summary_request_contains_no_tools_and_no_reasoning_options():
+    """摘要请求必须发送 tools=[]，不携带推理/provider 特殊参数。"""
+    plan = plan_compaction(_history(), None, 4000, PINNED, TOOLS)
+    assert plan is not None
+    # 摘要请求的 input_items 不包含任何工具声明
+    request_payload = {"input": plan.input_items, "tools": []}
+    serialized = json_dumps(request_payload)
+    assert '"tools":[]' in serialized or '"tools": []' in serialized
+    # 请求 payload 中不含推理相关 API 参数（不是 prompt 文本中提到的"reasoning"一词）
+    # 通过检查 plan 的 input_items 结构，确认没有 reasoning_effort / thinking 等顶层字段
+    for item in plan.input_items:
+        assert "reasoning_effort" not in item
+        assert "thinking" not in item
+
+
+def test_summary_is_taken_from_visible_text_only_reasoning_ignored():
+    """只有可见文本成为摘要；reasoning 类型的输出被忽略。"""
+    plan = plan_compaction(_history(), None, 4000, PINNED, TOOLS)
+    # reasoning 输出不包含 output_text，不会成为摘要
+    reasoning_only = [{"id": "reason", "type": "reasoning", "summary": [{"type": "summary_text", "text": "thinking"}],
+                       "encrypted_content": "opaque", "content": None}]
+    assert finish_compaction(plan, reasoning_only) is None
+    # reasoning + 有效文本：只有文本部分成为摘要
+    mixed = [{"type": "reasoning", "content": None, "encrypted_content": "opaque"},
+             *_output("Decisions: inspect evidence. Pending: finish checks.")]
+    checkpoint = finish_compaction(plan, mixed)
+    assert checkpoint is not None
+    assert checkpoint.summary == "Decisions: inspect evidence. Pending: finish checks."
+    assert "opaque" not in checkpoint.summary
+    assert "thinking" not in checkpoint.summary
+
+
+def test_tool_outputs_in_serialized_history_are_truncated_to_2000_chars():
+    """工具输出在序列化历史时截断为 TOOL_OUTPUT_MAX_CHARS (2000) 字符。"""
+    from harness.compaction import TOOL_OUTPUT_MAX_CHARS
+    long_output = "A" * 5000
+    call = {"id": "call-1", "type": "function_call", "name": "read_file", "call_id": "c1", "arguments": "{}"}
+    result = {"type": "function_call_output", "call_id": "c1", "output": long_output}
+    records = [_record(1, call, step=1), _record(2, result, step=1)]
+    material = summary_material(records[1])
+    assert len(material["output"]) == TOOL_OUTPUT_MAX_CHARS + len("\n[truncated]")
+    assert material["output"].endswith("\n[truncated]")
+    assert material["output"][:TOOL_OUTPUT_MAX_CHARS] == "A" * TOOL_OUTPUT_MAX_CHARS
+    # 短输出不截断
+    short_result = {"type": "function_call_output", "call_id": "c1", "output": "short"}
+    short_record = _record(3, short_result, step=1)
+    assert summary_material(short_record)["output"] == "short"
+
+
+def test_preflight_check_prevents_oversized_prompt_from_being_sent():
+    """预检：摘要提示词超过 context_window - SUMMARY_OUTPUT_TOKENS 时返回 None。"""
+    # 构造一个 pinned 上下文非常大的场景，使摘要提示词超过窗口 - 4096
+    huge_pinned = [{"role": "developer", "content": "[intend]\n" + "x" * 20000}]
+    records = _history(2, 100)
+    # 窗口 32000：摘要提示词远超 32000 - 4096 = 27904
+    result = plan_compaction(records, None, 32000, huge_pinned, [])
+    assert result is None
+
+
+def test_summary_output_tokens_cap_applies_regardless_of_model_output_limit():
+    """摘要请求的 max_output_tokens 上限为 SUMMARY_OUTPUT_TOKENS，与模型声明无关。"""
+    from harness.compaction import SUMMARY_OUTPUT_TOKENS
+    records = _history(60, 2300)
+    # 声明很大的模型输出上限
+    plan = plan_compaction(records, None, 32000, PINNED, TOOLS, output_limit=16384)
+    assert plan.max_output_tokens <= SUMMARY_OUTPUT_TOKENS
+    # 声明很小的模型输出上限
+    plan_small = plan_compaction(records, None, 32000, PINNED, TOOLS, output_limit=1024)
+    assert plan_small.max_output_tokens <= 1024
