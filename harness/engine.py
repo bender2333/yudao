@@ -6,7 +6,7 @@ import json
 import math
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from .adapters.base import ModelAdapter, ModelRequest, ModelResponse, ProviderError
@@ -109,7 +109,9 @@ def run_department(
             retry_of_step_id = step_id
             continue
         try:
-            record_response(response)
+            # 截断流产生的无效参数不得进入有效历史，否则下次回放即被上游拒绝；
+            # 工具循环仍用原始输出，保证具体参数错误回传模型且不启动工具
+            record_response(_sanitized_response(response))
         except Exception as exc:
             host_error = ProviderError(
                 f"model observation persistence failed: {type(exc).__name__}",
@@ -249,6 +251,30 @@ def _validate_response(response: ModelResponse) -> None:
     if len(call_ids) != len(set(call_ids)):
         raise ProviderError("model response contains duplicate tool call_id values",
                             diagnostics={"error_type": "protocol"})
+
+
+def _valid_tool_arguments(raw: Any) -> bool:
+    # 与工具循环同口径：能解析为对象才算有效
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return False
+    return isinstance(parsed, dict)
+
+
+def _sanitized_response(response: ModelResponse) -> ModelResponse:
+    # 无效工具参数替换为有效 JSON 后再记入历史，具体错误仍经工具结果回传
+    cleaned: list[dict[str, Any]] = []
+    changed = False
+    for item in response.output:
+        if isinstance(item, dict) and item.get("type") == "function_call" \
+                and not _valid_tool_arguments(item.get("arguments")):
+            item = {**item, "arguments": "{}"}
+            changed = True
+        cleaned.append(item)
+    if not changed:
+        return response
+    return replace(response, output=cleaned)
 
 
 def _undeclared_tool_calls(request: ModelRequest, response: ModelResponse) -> list[str]:
