@@ -1176,3 +1176,12 @@
 - **#15 项目登记的本地命令与动作回执**：委派 `unspecified-high` 子代理实现，主代理复跑测试后提交 `d525e17`。`run_command`（仅工程）只接受本项目登记的命令名与允许参数范围，未登记/越界在 `TOOL_STARTED` 前拒绝且不执行；固定工作目录、`sanitized_env` 剥离凭据、时限与输出上限；超时/取消按进程树终止（**Windows 已验证**，POSIX 分支已写未在本机验证）；执行前记录动作身份与依据，结果绑定命令/快照/主机退出状态/输出/尝试；模型自报 `exit_code` 不作证据。`command_configured` 项目事件 + 事项冻结 `command_versions`；HTTP 命令登记与读取路由。新增 `test_registered_commands.py`（8 passed）与验收路径文档 `docs/stage-3/3.2a-registered-commands-e2e.md`。
 - **#15 保持打开**：真实模型全链路验收（搜索 → 阅读 → 编辑 → 命令 → 独立质检 → 封存 → 采纳）尚未执行，按票据验收要求未完成，状态评论已留。
 - 下一步：执行 #15 的真实模型全链路验收并按 `3.2a-registered-commands-e2e.md` 留证；随后进入 3.1 单机可靠恢复（#16–#18）与 3.4A/B 并行（#19–#20）。
+
+## 2026-09-21 - #15 真实验收：修复"畸形工具参数回放导致上游 400"，暴露压缩失败阻塞
+
+- 真实验收（`run_f8e1a8dd4e9e416e`、`run_f40d3414be5e4b0b`）连续两次以 `provider_error / HTTP 400` 立即失败。按 LOOP.md 硬边界停止重试，转根因分析。
+- **根因（已定位并复现）**：模型流式工具调用参数被截断（例如 `{"pattern": "def add", "path": `），应用把非法 JSON 的 assistant 消息记入部门历史，下一次请求回放它时上游对整请求返回 400。证据链：应用捕获的失败请求原样回放 → 400（`Upstream request failed: [400] Provider returned error`）；去掉 `tools` 仍 400；只发最后 2 条消息 200、最后 4 条（含该 assistant 消息与其 tool 结果）400。探针脚本在 `.yudao/stage-3-0b-20260920/3.2a-e2e/`。
+- **修复（提交 `1cc6858`）**：记录部门历史前把非法 `function.arguments` 清洗为 `{}`（`engine._sanitized_response`），工具循环仍遍历原始输出、具体参数错误经工具结果回传；不新增重试类别、不改重试次数、不切换模型。新增 `test_malformed_tool_arguments.py`（本地回环 HTTP 服务复现截断流）。该缺陷同时解释了今晚多次间歇 HTTP 400。
+- **修复后的真实验收**（`run_4280c207b68248cd`）：快照接入与工程链路成立——工程推进到第 9 循环、55 次工具启动 / 154 次工具调用、2 次压缩，未再出现 400；但运行以 `compaction_failed` 结束（`Compaction returned an empty summary`；同一窗口下的另一形态是 `Compaction summary exceeds its output limit`）。
+- **新阻塞（需设计决定，未自行选定）**：`mimo-v2.5` 为推理型模型，压缩摘要预算按窗口 15%（32000 窗约 4800）被推理输出挤占，长工程会话进入 `FAILED / compaction_failed`；本机模型声明容量 32000，无法只靠调大事项窗口绕开。候选方向：提高压缩请求输出预算 / 压缩请求抑制推理 / 换非推理模型做摘要 / 将该形态定义为可恢复并走现有重试额度。涉及 D10 压缩语义与 D17 重试边界。
+- #15 保持打开；实现与单测已完成，真实全链路验收待压缩问题解决后重跑。状态评论已留在 issue #15。
