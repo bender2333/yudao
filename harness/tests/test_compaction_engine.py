@@ -287,8 +287,10 @@ def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_pa
     assert result.product_spec is None
 
 
-def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
+def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path, monkeypatch):
     """空摘要不导致任务失败，部门继续工作，后续激活可重试压缩。"""
+    import harness.engine as engine
+    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
     invocation_count = 0
 
     def respond(request):
@@ -322,8 +324,10 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
     assert len(compaction_invocations) >= 1
 
 
-def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
+def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path, monkeypatch):
     """空摘要后，下次激活可重新尝试压缩。"""
+    import harness.engine as engine
+    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
     current_activation = [0]
 
     def respond(request):

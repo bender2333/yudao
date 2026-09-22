@@ -116,12 +116,18 @@ def test_oversized_tool_result_is_summarized_in_contiguous_chunks_without_cuttin
     assert len(plans) >= 1
     assert checkpoint.boundary
     assert visible_history(records, checkpoint)[-1] == records[-1]["item"]
-    # 工具输出在摘要材料中被截断为 TOOL_OUTPUT_MAX_CHARS
-    from harness.compaction import TOOL_OUTPUT_MAX_CHARS
-    for plan in plans:
-        for part in json.loads(plan.input_items[-1]["content"])["source_fragments"]:
-            if part["event_id"] == "event-2":
-                assert len(part["text"]) <= TOOL_OUTPUT_MAX_CHARS + 100  # JSON 包装开销
+    # 工具输出保持原始字节：超大结果按窗口预算分片，连续且拼合后与原始事件一致（不再截断）
+    MAX_FRAGMENT_CHARS = 14000  # 4000-token 窗口下单个分片的经验上限
+    source = json_dumps(records[1]["item"])
+    fragments = [part for plan in plans
+                 for part in json.loads(plan.input_items[-1]["content"])["source_fragments"]
+                 if part["event_id"] == "event-2"]
+    assert fragments
+    assert fragments[0]["start_offset"] == 0
+    assert all(left["end_offset"] == right["start_offset"] for left, right in zip(fragments, fragments[1:]))
+    assert "".join(part["text"] for part in fragments) == source
+    for part in fragments:
+        assert 0 < len(part["text"]) <= MAX_FRAGMENT_CHARS
 
 
 def test_a_long_history_uses_incremental_summary_requests_that_all_fit():
@@ -406,23 +412,6 @@ def test_summary_is_taken_from_visible_text_only_reasoning_ignored():
     assert checkpoint.summary == "Decisions: inspect evidence. Pending: finish checks."
     assert "opaque" not in checkpoint.summary
     assert "thinking" not in checkpoint.summary
-
-
-def test_tool_outputs_in_serialized_history_are_truncated_to_2000_chars():
-    """工具输出在序列化历史时截断为 TOOL_OUTPUT_MAX_CHARS (2000) 字符。"""
-    from harness.compaction import TOOL_OUTPUT_MAX_CHARS
-    long_output = "A" * 5000
-    call = {"id": "call-1", "type": "function_call", "name": "read_file", "call_id": "c1", "arguments": "{}"}
-    result = {"type": "function_call_output", "call_id": "c1", "output": long_output}
-    records = [_record(1, call, step=1), _record(2, result, step=1)]
-    material = summary_material(records[1])
-    assert len(material["output"]) == TOOL_OUTPUT_MAX_CHARS + len("\n[truncated]")
-    assert material["output"].endswith("\n[truncated]")
-    assert material["output"][:TOOL_OUTPUT_MAX_CHARS] == "A" * TOOL_OUTPUT_MAX_CHARS
-    # 短输出不截断
-    short_result = {"type": "function_call_output", "call_id": "c1", "output": "short"}
-    short_record = _record(3, short_result, step=1)
-    assert summary_material(short_record)["output"] == "short"
 
 
 def test_preflight_check_prevents_oversized_prompt_from_being_sent():

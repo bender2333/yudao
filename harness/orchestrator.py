@@ -25,6 +25,8 @@ from .interactions import CancelledInputSaveError, InteractionWriter, RunTermina
 from .models import (
     Event as RunEvent,
     ArtifactRef,
+    DEFAULT_MAX_CYCLES,
+    DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
     DepartmentPrompt,
     EventType,
@@ -327,12 +329,14 @@ class Orchestrator:
         self._state_lock = RLock()
         self._active: dict[str, _Activation] = {}
         self._snapshots: dict[str, ResolveSnapshot] = {}
+        self._run_start_times: dict[str, float] = {}
 
     def create_run(
         self,
         task: str,
         *,
-        max_cycles: int = 8,
+        max_cycles: int = DEFAULT_MAX_CYCLES,
+        run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
         context_window: int = 32_000,
         run_id: str | None = None,
         project_id: str | None = None,
@@ -350,6 +354,8 @@ class Orchestrator:
             raise ValueError("task must be non-empty")
         if max_cycles < 1:
             raise ValueError("max_cycles must be positive")
+        if run_time_limit_sec < 1:
+            raise ValueError("run_time_limit_sec must be positive")
         if context_window < 1:
             raise ValueError("context_window must be positive")
         if self.facade is None and self.test_adapter_factory is None:
@@ -406,6 +412,7 @@ class Orchestrator:
                 **initial,
                 "intend_path": (Path("materials") / run_id / "intend.md").as_posix(),
                 "max_cycles": max_cycles,
+                "run_time_limit_sec": run_time_limit_sec,
                 "context_window": context_window,
                 "provider": self.test_provider if snapshot is None else "directory",
                 "adapter": self.test_adapter_name if snapshot is None else "directory",
@@ -526,6 +533,9 @@ class Orchestrator:
         with self._state_lock:
             if activation.abort_flag.is_set():
                 return True
+            elapsed = time.monotonic() - self._run_start_times.get(activation.run_id, time.monotonic())
+            if elapsed >= self.project(activation.run_id).run_time_limit_sec:
+                return True
             current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
             return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
                     or current.input_version != activation.input_version
@@ -639,6 +649,8 @@ class Orchestrator:
         return self.project(run_id)
 
     def _prepare_activation(self, run_id: str, execution_scope: Any | None) -> _Activation | None:
+        if run_id not in self._run_start_times:
+            self._run_start_times[run_id] = time.monotonic()
         projection = self.project(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
@@ -647,6 +659,11 @@ class Orchestrator:
             return None
         if projection.cycle_count >= projection.max_cycles:
             self._pause(run_id, projection, "max_cycles")
+            return None
+        elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
+        if elapsed >= projection.run_time_limit_sec:
+            self._fail(run_id, projection, "time_limit",
+                       f"run wall-clock time {int(elapsed)}s exceeded limit of {projection.run_time_limit_sec}s")
             return None
         normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
         pending_guidance = [item for item in projection.department_guidance
@@ -868,7 +885,13 @@ class Orchestrator:
             return
 
         current = self.project(run_id)
-        if current.phase in TERMINAL_PHASES or submission is None:
+        if current.phase in TERMINAL_PHASES:
+            return
+        if submission is None:
+            elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
+            if elapsed >= current.run_time_limit_sec:
+                self._fail(run_id, current, "time_limit",
+                           f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s")
             return
 
         try:
@@ -2079,6 +2102,7 @@ class Orchestrator:
             "context_overflow": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
             "compaction_failed": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
             "host_commit_error": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。",
+            "time_limit": HUMAN_ACTIONS["time_limit"],
         }.get(reason)
         with self._state_lock:
             projection = self.project(run_id)

@@ -189,12 +189,14 @@ def test_illegal_workpiece_stays_in_department(data_dir):
     assert projection.rejections[0]["errors"][0]["field"] == "kind"
 
 
-def test_natural_language_completion_does_not_finish(data_dir):
+def test_natural_language_completion_does_not_finish(data_dir, monkeypatch):
+    import harness.engine as engine
+    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
     script = [
         product_spec(),
         plan_turn(),
         delivery_turn(),
-        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(MAX_MODEL_STEPS)],
+        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(32)],
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")

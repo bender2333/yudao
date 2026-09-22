@@ -53,13 +53,18 @@ FAILED_REASONS = frozenset(
         "context_overflow",
         "compaction_failed",
         "host_commit_error",
+        "time_limit",
     }
 )
 
 HUMAN_ACTIONS = {
     "model_steps_exhausted": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。",
     "max_cycles": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。",
+    "time_limit": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。",
 }
+
+DEFAULT_MAX_CYCLES = 999_999
+DEFAULT_RUN_TIME_LIMIT_SEC = 7200
 
 
 class EventType:
@@ -524,7 +529,8 @@ class RunProjection:
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None
-    max_cycles: int = 8
+    max_cycles: int = DEFAULT_MAX_CYCLES
+    run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC
     context_window: int = 32_000
     cycle_count: int = 0
     token_used: int = 0

@@ -36,7 +36,6 @@ class CompactionPlan:
 
 
 SUMMARY_OUTPUT_TOKENS = 4096
-TOOL_OUTPUT_MAX_CHARS = 2000
 
 
 SUMMARY_PREFACE = (
@@ -266,11 +265,7 @@ def summary_material(record: dict[str, Any]) -> dict[str, Any]:
             "source_event_id": record["event_id"], "field": "encrypted_content",
             "length": len(encrypted), "digest": canonical_hash(encrypted),
         }
-    # 工具输出截断：避免大文件内容撑爆摘要请求的输入窗口
-    if material.get("type") == "function_call_output":
-        output = material.get("output")
-        if isinstance(output, str) and len(output) > TOOL_OUTPUT_MAX_CHARS:
-            material["output"] = output[:TOOL_OUTPUT_MAX_CHARS] + "\n[truncated]"
+    # 工具输出保持原始字节：压缩来源必须能与部门原始事件逐字核对（模型输入审计）
     return material
 
 

@@ -377,7 +377,12 @@ def test_project_context_guidance_stays_before_department_rules(data_dir):
     assert sources[:5] == ["intend", "current_work", "project", "department_guidance", "department_rules"]
 
 
-def test_compaction_pinned_input_contains_project_part(data_dir):
+def test_compaction_pinned_input_contains_project_part(data_dir, monkeypatch):
+    # 步数上限已放开为时间边界，本用例按旧步数上限验证单次激活内的压缩行为
+    from harness import engine
+
+    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
+
     def respond(request):
         if request.purpose == "compaction":
             return ModelResponse(output=[{

@@ -17,6 +17,8 @@ from .event_store import EventStore
 from .materials import save_text_material
 from .models import (
     ArtifactRef,
+    DEFAULT_MAX_CYCLES,
+    DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
     Event,
     EventType,
@@ -182,6 +184,7 @@ class WorkItem:
     project_context_ref: dict[str, Any]
     prompt_config_versions: dict[str, int]
     max_cycles: int
+    run_time_limit_sec: int
     context_window: int
     created_at: str
     seq: int
@@ -301,6 +304,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             prompt_config_versions=dict(payload["prompt_config_versions"]),
             command_versions=dict(payload.get("command_versions") or {}),
             max_cycles=int(payload["max_cycles"]),
+            run_time_limit_sec=int(payload.get("run_time_limit_sec", 7200)),
             context_window=int(payload["context_window"]), created_at=event.created_at, seq=event.seq,
             event_id=event.event_id, snapshot=payload.get("snapshot"),
         ))
@@ -616,7 +620,8 @@ class ProjectService:
     # 事项
 
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
-                        max_cycles: int = 8, context_window: int = 32_000) -> tuple[str, str]:
+                        max_cycles: int = DEFAULT_MAX_CYCLES, run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
+                        context_window: int = 32_000) -> tuple[str, str]:
         _require_text("text", text)
         with self._lock:
             self._writable(project_id)
@@ -639,12 +644,14 @@ class ProjectService:
                 if initial_tree.digest != adoption.code_tree_digest:
                     raise ValueError("archived tree does not match the adopted deliverable digest")
             return self._emit_work_item(
-                project, text, title=title, max_cycles=max_cycles, context_window=context_window,
+                project, text, title=title, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
+                context_window=context_window,
                 baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
             )
 
     def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
-                                      title: str | None = None, max_cycles: int = 8,
+                                      title: str | None = None, max_cycles: int = DEFAULT_MAX_CYCLES,
+                                      run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
                                       context_window: int = 32_000) -> tuple[str, str]:
         # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
         _require_text("text", text)
@@ -657,13 +664,14 @@ class ProjectService:
             work_item_id, run_id = new_id("wi"), new_id("run")
             tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
             return self._emit_work_item(
-                project, text, title=title, max_cycles=max_cycles, context_window=context_window,
+                project, text, title=title, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
+                context_window=context_window,
                 baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
                 work_item_id=work_item_id, run_id=run_id,
             )
 
     def _emit_work_item(self, project: ProjectProjection, text: str, *, title: str | None,
-                        max_cycles: int, context_window: int, baseline: dict[str, Any] | None,
+                        max_cycles: int, run_time_limit_sec: int, context_window: int, baseline: dict[str, Any] | None,
                         initial_tree: Any, snapshot: dict[str, Any] | None,
                         source_run: Any, work_item_id: str | None = None,
                         run_id: str | None = None) -> tuple[str, str]:
@@ -684,11 +692,12 @@ class ProjectService:
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
             "command_versions": command_versions,
-            "max_cycles": max_cycles, "context_window": context_window,
+            "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
         })
         try:
             self.orchestrator.create_run(
-                text, run_id=run_id, max_cycles=max_cycles, context_window=context_window,
+                text, run_id=run_id, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
+                context_window=context_window,
                 project_id=project.project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
                 code_snapshot=snapshot,
                 project_context=context_text, department_prompts=department_prompts,

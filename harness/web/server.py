@@ -454,7 +454,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._send_json({"ok": True, "project_id": project_id, "archived": False})
         if command == "work-items":
             body = self._read_json_body()
-            unknown = set(body) - {"text", "title", "max_cycles", "context_window", "source_dir"}
+            unknown = set(body) - {"text", "title", "max_cycles", "run_time_limit_sec", "context_window", "source_dir"}
             if unknown:
                 raise ValueError("unsupported work item fields: " + ", ".join(sorted(unknown)))
             text = body.get("text")
@@ -469,7 +469,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 if not isinstance(body["source_dir"], str) or not body["source_dir"].strip():
                     raise ValueError("source_dir must be a non-empty string")
                 options["source_dir"] = body["source_dir"]
-            for key in ("max_cycles", "context_window"):
+            for key in ("max_cycles", "run_time_limit_sec", "context_window"):
                 if key not in body or body[key] is None:
                     continue
                 options[key] = _positive_int(key, body[key])

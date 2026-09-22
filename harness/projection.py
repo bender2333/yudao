@@ -111,6 +111,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             state.prompt_versions.append(prompt)
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
+        state.run_time_limit_sec = int(payload.get("run_time_limit_sec", 7200))
         state.context_window = int(payload.get("context_window", 32_000))
         state.provider = payload.get("provider", "fake")
         state.adapter = payload["adapter"]

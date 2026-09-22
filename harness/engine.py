@@ -13,7 +13,7 @@ from .adapters.base import ModelAdapter, ModelRequest, ModelResponse, ProviderEr
 from .models import json_dumps
 from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
-MAX_MODEL_STEPS = 32
+MAX_MODEL_STEPS = 999_999
 MAX_PROVIDER_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SEC = 1.0
 RETRY_MAX_DELAY_SEC = 60.0

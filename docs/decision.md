@@ -1,5 +1,16 @@
 # 决策记录
 
+## 2026-09-22 - 运行时间限制替代计数限制作为主要收敛保证
+
+- 用户指令：「不用限额。进行时间限制即可，尽可能放开限制，确定收敛即可」。
+- 事实：真实验收运行因计数限制（`max_cycles=12`、`MAX_MODEL_STEPS=32`）在模型提交前被暂停（`PAUSED / model_steps_exhausted`、`PAUSED / max_cycles`），无法完成交付。
+- 决策：
+  - 新增 `run_time_limit_sec`（默认 7200 秒）作为运行级挂钟时间限制，使用单调时钟在每次激活准备和每步之间检查，达到上限进入 `FAILED`（停止原因为 `time_limit`）。
+  - `max_cycles` 默认值从 8 放宽至 999999，`MAX_MODEL_STEPS` 默认值从 32 放宽至 999999，实际运行中不再成为有效约束。
+  - 保留计数限制的完整机制：调用方仍可显式配置较小值以恢复旧行为，达到上限时仍进入 `PAUSED`。
+  - 终态选择 `FAILED` 而非 `PAUSED`：时间限制是系统强制停止，与取消、provider 错误等同类，不属于「暂停后可继续」的语义。
+- 变更文件：`harness/models.py`、`harness/engine.py`、`harness/orchestrator.py`、`harness/projection.py`、`harness/projects.py`、`harness/web/server.py`、`harness/tests/test_run_time_limit.py`、`harness/tests/test_orchestrator.py`、`README.md`、`docs/requirements/execution-limits.md`。
+
 ## 2026-09-05 - 从基础 Harness 重启
 
 - 新分支从 `origin/exp/native-harness` 开始，因为其中的三部门协议与目标一致。
