@@ -1213,3 +1213,13 @@
 - 收窄版任务（保留全链路六环节，明确"检查通过即提交、不再探索"）：`run_25b9814fd9104bb5` 终态 `PAUSED / max_cycles`（12/12），0 交付、0 质检回执，5052 条事件。
 - 加上 `run_5abc7679e54e4f29`（`PAUSED / model_steps_exhausted`，工程 32 步用尽、135 次工具调用），两次不同限额与停止原因均无交付。
 - 判定：压缩与畸形工具参数两个真实缺陷已修复并留证；剩余阻塞为 `mimo-v2.5` 在本验收任务上不在限额内提交交付。三条候选方向待用户定案，未用放宽断言或改测试绕过。
+
+## 2026-09-22 - 运行边界改为时间上限；撤销压缩材料截断；验收被凭据失效阻塞
+
+- 用户指示："不用限额。进行时间限制即可，尽可能放开限制，确定收敛即可。"（提交 `fb565e4`）
+  - 新增 `run_time_limit_sec`（默认 7200 秒，可按事项与 API 配置），在模型步骤之间与部门激活之间确定性检查，超时以 `time_limit` 终止，保证收敛。
+  - `MAX_MODEL_STEPS` 32 → 999999；`max_cycles` 默认 8 → 999999；机器保留，显式小值仍走既有 PAUSED 路径。
+  - 同步更新 README 停止条件、`docs/requirements/execution-limits.md`、`docs/decision.md`；新增 `test_run_time_limit.py`（13 项）。
+- **撤销压缩材料中的工具输出截断**：opencode 参考里的 `TOOL_OUTPUT_MAX_CHARS=2000` 截断破坏 Yudao 的模型输入审计（`event 12: compaction source fragment differs from this department's original event`）；Yudao 的可审计不变量优先，截断移除，压缩其余改造保留（4096 上限、无 tools、无推理参数、只取可见文本、发送前预检、空/超限摘要非致命）。受影响测试按原意图调整，压缩与项目测试全绿（75 passed）。
+- **真实验收被外部条件阻塞**：`provider.md` 的 OpenCode Go 凭据（自 09-20 20:55 未变）现返回 HTTP 401；同 Key 直接探针亦 401，运行首次调用即 `FAILED / provider_error`。需更新有效 Key 或恢复订阅后重跑；任务、服务（8893）、可信项目与驱动脚本均已就绪，限额已放开、仅受 7200 秒时间边界约束。
+- 全量回归已在本机后台启动（08:39 起），结果待下一轮收取。
