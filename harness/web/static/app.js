@@ -64,12 +64,14 @@
     selectedContextPart: {},
     inspectorTab: "context",
     inspectorCollapsed: false,
+    deptMenu: false,
+    roomInspect: false,
     selectedHandoff: null,
     globalDrafts: {},
     deptDrafts: {},
     promptDrafts: {},
     promptConfigs: {},
-    overviewPane: "collaboration",
+    overviewPane: "handoffs",
     boardMode: "flow",
     sidebarCollapsed: false,
     mobileNav: false,
@@ -364,6 +366,7 @@
       department: state.department,
       workItemId: state.workItemId,
       inspectorTab: state.inspectorTab,
+      roomInspect: state.roomInspect,
       selectedContext: { ...state.selectedContext },
       selectedContextPart: { ...state.selectedContextPart },
       globalDrafts: { ...state.globalDrafts },
@@ -378,6 +381,7 @@
     state.department = snapshot.department || state.department;
     state.workItemId = snapshot.workItemId || null;
     state.inspectorTab = snapshot.inspectorTab || "context";
+    state.roomInspect = Boolean(snapshot.roomInspect);
     Object.assign(state.selectedContext, snapshot.selectedContext || {});
     Object.assign(state.selectedContextPart, snapshot.selectedContextPart || {});
     Object.assign(state.globalDrafts, snapshot.globalDrafts || {});
@@ -394,7 +398,7 @@
     state.department = DEPARTMENTS[search.get("department")] ? search.get("department") : "product";
     state.projectId = search.get("project") || null;
     state.workItemId = search.get("work_item") || null;
-    state.overviewPane = ["materials", "settings"].includes(search.get("pane")) ? search.get("pane") : "collaboration";
+    state.overviewPane = ["materials", "settings", "board"].includes(search.get("pane")) ? search.get("pane") : "handoffs";
     state.boardMode = search.get("board") === "board" ? "board" : "flow";
     state.observationTab = search.get("obTab") === "usage" ? "usage" : "requests";
     state.observationScreen = search.get("attempt") ? "detail" : "list";
@@ -428,7 +432,7 @@
     if (state.view === "providers") params.set("view", "providers");
     if (state.view === "department") params.set("department", state.department);
     if (state.workItemId) params.set("work_item", state.workItemId);
-    if (state.view === "overview" && state.overviewPane !== "collaboration") params.set("pane", state.overviewPane);
+    if (state.view === "overview" && state.overviewPane !== "handoffs") params.set("pane", state.overviewPane);
     if (state.view === "overview" && state.boardMode === "board") params.set("board", "board");
     if (state.view === "observability") {
       if (state.observationTab !== "requests") params.set("obTab", state.observationTab);
@@ -547,7 +551,7 @@
         const mark = item.active_work_item_id ? "waiting" : item.archived ? "muted" : "";
         return `<button class="yp-project ${selected ? "is-selected" : ""}" type="button" data-project-id="${escapeHtml(item.project_id)}" title="${escapeHtml(item.name)}"><span class="yp-project-mark ${mark}"></span><span>${text(item.name)}</span></button>`;
       }).join("");
-      sidebar.innerHTML = `<div class="yp-brand"><i data-lucide="layers-3" aria-hidden="true"></i><span>Yudao</span><button class="yp-icon yp-sidebar-toggle" type="button" data-action="toggle-sidebar" aria-label="${state.sidebarCollapsed ? "展开项目列表" : "折叠项目列表"}"><i data-lucide="${state.sidebarCollapsed ? "panel-left-open" : "panel-left-close"}" aria-hidden="true"></i></button></div><button class="yp-btn primary" type="button" data-action="new-project"><i data-lucide="plus" aria-hidden="true"></i>从想法新建</button><div class="yp-search"><i data-lucide="search" aria-hidden="true"></i><input data-project-search placeholder="搜索项目" value="${escapeHtml(state.projectSearch)}" aria-label="搜索项目"></div><div class="yp-side-label"><span>项目</span></div><div class="yp-project-list">${rows || '<p class="yp-footnote">还没有项目</p>'}</div><div class="yp-side-bottom"><p class="yp-footnote">${state.projects.length ? `${state.projects.length} 个项目` : "从想法建立第一个项目"}</p></div>`;
+      sidebar.innerHTML = `<div class="yp-brand"><i data-lucide="layers-3" aria-hidden="true"></i><span>Yudao</span><button class="yp-icon yp-sidebar-toggle" type="button" data-action="toggle-sidebar" aria-label="${state.sidebarCollapsed ? "展开项目列表" : "折叠项目列表"}"><i data-lucide="${state.sidebarCollapsed ? "panel-left-open" : "panel-left-close"}" aria-hidden="true"></i></button></div><button class="yp-btn primary" type="button" data-action="new-project"><i data-lucide="plus" aria-hidden="true"></i>从想法新建</button><div class="yp-search"><i data-lucide="search" aria-hidden="true"></i><input data-project-search placeholder="搜索项目" value="${escapeHtml(state.projectSearch)}" aria-label="搜索项目"></div><div class="yp-side-label"><span>项目</span></div><div class="yp-project-list">${rows || '<p class="yp-footnote">还没有项目</p>'}</div><div class="yp-side-bottom"><button class="yp-sidebar-link ${state.view === "providers" ? "is-active" : ""}" type="button" data-action="providers"><i data-lucide="cpu" aria-hidden="true"></i><span>模型管理</span></button><p class="yp-footnote">${state.projects.length ? `${state.projects.length} 个项目` : "从想法建立第一个项目"}</p></div>`;
     }
     if (topbar) {
       const project = state.project;
@@ -567,7 +571,7 @@
       const attr = view === "department" ? `data-department="${department}"` : `data-view="${view}"`;
       return `<button class="yp-tab ${active ? "is-selected" : ""}" type="button" ${attr}>${label}</button>`;
     };
-    const secondary = state.view === "overview" ? `<div class="yp-secondary-tabs">${[["collaboration", "协作总览"], ["materials", "资料与依据"], ["settings", "项目设置"]].map(([id, label]) => `<button class="yp-tab ${state.overviewPane === id ? "is-selected" : ""}" type="button" data-overview-pane="${id}">${label}</button>`).join("")}</div>` : "";
+    const secondary = state.view === "overview" ? `<div class="yp-secondary-tabs">${[["handoffs", "流转"], ["board", "协作看板"], ["materials", "资料与依据"], ["settings", "项目设置"]].map(([id, label]) => `<button class="yp-tab ${state.overviewPane === id ? "is-selected" : ""}" type="button" data-overview-pane="${id}">${label}</button>`).join("")}</div>` : "";
     return `<nav class="yp-tabs" aria-label="项目页面">${tab("overview", null, "概览")}${tab("department", "product", "产品")}${tab("department", "engineering", "工程")}${tab("department", "quality", "质检")}${tab("observability", null, "观测")}</nav>${secondary}`;
   }
 
@@ -865,14 +869,10 @@
     return `<div class="dw-inspect-panel" id="dw-panel-prompt" role="tabpanel" aria-labelledby="dw-tab-prompt"><div class="dw-prompt-version"><span>项目当前配置</span><span>${config.source === "configured" ? `配置 v${text(config.version)}` : "默认 v0"}</span></div><pre class="dw-prompt-block">${text(config.text, "当前配置原文不可用")}</pre><div class="dw-prompt-version"><span>所选请求实际 Prompt</span><span>${actual.version ? `run Prompt v${actual.version}` : "尚未绑定请求"}</span></div><pre class="dw-prompt-block">${text(actual.text, "所选请求没有 Prompt 原文")}</pre><p class="dw-small">历史请求不从当前配置回填。</p>${isWritable() ? `<button class="dw-observation-link" type="button" data-prompt-edit="${escapeHtml(department)}" title="配置 Prompt"><i data-lucide="pencil" aria-hidden="true"></i>配置 Prompt</button>` : ""}</div>`;
   }
 
-  function inspectorMarkup(department, data) {
-    return `<aside class="dw-inspector ${state.inspectorCollapsed ? "is-collapsed" : ""}" aria-label="${departmentName(department)}检查区"><div class="dw-inspector-head"><div><span class="dw-inspector-kicker">检查区</span><strong>${departmentName(department)}</strong></div><button class="dw-icon-button" type="button" data-inspector-toggle aria-label="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}" title="${state.inspectorCollapsed ? "展开检查区" : "收起检查区"}"><i data-lucide="${state.inspectorCollapsed ? "panel-right-open" : "panel-right-close"}" aria-hidden="true"></i></button></div><div class="dw-inspector-content"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-controls="dw-panel-context" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-controls="dw-panel-provider" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-controls="dw-panel-prompt" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${state.inspectorTab === "provider" ? providerMarkup(data?.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data)}</div></aside>`;
-  }
-
   function scopeSelectMarkup() {
     const items = workItems();
     const options = [`<option value="" ${!state.workItemId ? "selected" : ""}>整个项目</option>`].concat(items.map(item => `<option value="${escapeHtml(item.work_item_id)}" ${item.work_item_id === state.workItemId ? "selected" : ""}>${text(item.title)} · ${text(workStatusLabel(item.status))}</option>`));
-    return `<div class="yp-dept-toolbar"><label class="yp-small">范围 <select class="yp-scope-select" data-work-scope aria-label="部门范围">${options.join("")}</select></label>${isWritable() ? `<button class="yp-btn quiet" type="button" data-prompt-edit="${escapeHtml(state.department)}">配置 Prompt</button>` : ""}</div>`;
+    return `<div class="yp-dept-toolbar"><label class="yp-small">范围 <select class="yp-scope-select" data-work-scope aria-label="部门范围">${options.join("")}</select></label></div>`;
   }
 
   function departmentComposer(department, data, board) {
@@ -884,6 +884,33 @@
     const guidanceBusy = Boolean(state.guidanceSubmitting[`${focusedRunId()}/${department}`]);
     const disabled = board == null || TERMINAL.has(phase) || guidanceBusy || (state.workItemId && state.workItemId !== state.project.active_work_item_id);
     return `<form class="dw-compose" id="dw-dept-form" data-department-form="${escapeHtml(department)}"><div class="dw-compose-meta"><span>当前接收方</span><strong>发给${text(departmentName(department))}</strong></div><textarea class="dw-textarea" rows="3" data-dept-draft="${escapeHtml(department)}" aria-label="发给${escapeHtml(departmentName(department))}" placeholder="追加对话或指导" ${disabled ? "disabled" : ""}>${escapeHtml(currentDraft(state.deptDrafts, key))}</textarea><div class="dw-compose-actions"><span>${TERMINAL.has(phase) ? "事项已结束，不会自动新建" : guidanceBusy ? "正在保存指导" : "保存后由目标部门在下一次安全激活中处理"}</span><button class="dw-primary" type="submit" ${disabled ? "disabled" : ""}><i data-lucide="send" aria-hidden="true"></i>发送指导</button></div></form>`;
+  }
+
+  function roomBubble(data, status) {
+    const latest = ((data && data.messages) || []).at(-1);
+    if (!latest) return status;
+    const parsed = parseMessageText(latest.text).text || status;
+    return parsed.length > 28 ? `${parsed.slice(0, 28)}…` : parsed;
+  }
+
+  function roomLogMarkup(data) {
+    const messages = (data && data.messages) || [];
+    if (!messages.length) return `<div class="pixel-log-row"><span class="pixel-log-time">—</span><span class="pixel-log-msg">暂无部门消息</span></div>`;
+    return messages.map(message => {
+      const parsed = parseMessageText(message.text);
+      const link = message.event_id ? legacyLink(message.event_id, "", "查看事件") : "";
+      return `<div class="pixel-log-row"><span class="pixel-log-time">${text(formatTime(message.created_at || message.time))}</span><span class="pixel-log-msg">${text(message.source)} ${text(parsed.text, "")}</span>${link}</div>`;
+    }).join("");
+  }
+
+  function deptSettingsMarkup(department) {
+    const promptButton = isWritable() ? `<button type="button" data-prompt-edit="${escapeHtml(department)}"><i data-lucide="file-text" aria-hidden="true"></i><span>部门 Prompt 设置</span></button>` : "";
+    return `<div class="dept-settings-menu-wrap"><button class="yp-btn" type="button" data-action="toggle-dept-menu" aria-expanded="${state.deptMenu ? "true" : "false"}"><i data-lucide="settings" aria-hidden="true"></i><span>部门设置</span></button><div class="dept-settings-menu" ${state.deptMenu ? "" : "hidden"}><button type="button" data-inspector-tab="provider"><i data-lucide="cpu" aria-hidden="true"></i><span>本次模型</span></button>${promptButton}<button type="button" data-inspector-tab="context"><i data-lucide="file-search" aria-hidden="true"></i><span>Context</span></button><button type="button" data-action="providers"><i data-lucide="sliders-horizontal" aria-hidden="true"></i><span>模型与 Provider</span></button></div></div>`;
+  }
+
+  function roomInspectMarkup(department, data) {
+    const panel = state.inspectorTab === "provider" ? providerMarkup(data?.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data);
+    return `<section class="pixel-room-inspect" aria-label="${departmentName(department)}检查"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${panel}</section>`;
   }
 
   function renderDepartment(department) {
@@ -899,9 +926,12 @@
     const item = focusedWorkItem() || activeWorkItem();
     const status = data ? departmentStatusLabel(data.status, phaseLabel(board?.phase)) : (item ? workStatusLabel(item.status) : "空闲");
     const departmentTask = item ? departmentTitle(department, data || {}, board || { task: item.title }) : departmentName(department);
-    const messages = ((data && data.messages) || []).map(messageMarkup).join("");
-    const body = data ? `<div class="dw-task-strip"><i data-lucide="route" aria-hidden="true"></i><span>当前范围</span><strong>${text(item ? item.title : "整个项目")}</strong></div><div class="dw-work-grid ${state.inspectorCollapsed ? "has-collapsed-inspector" : ""}"><section class="dw-conversation" aria-labelledby="conversation-title"><div class="dw-conversation-head"><h2 id="conversation-title">工作消息</h2><p>${number((data.messages || []).length, "0")} 条记录 · ${text(status)}</p></div><div class="dw-timeline" aria-live="polite">${messages || '<p class="dw-small">暂无部门消息</p>'}</div>${departmentComposer(department, data, board)}</section>${inspectorMarkup(department, data)}</div>` : `<div class="dw-load-state">${hasInProgress() || item ? "正在读取部门消息与检查区…" : "当前没有事项。可以用下面的输入作为新事项开始，或记录原文。"}</div>${departmentComposer(department, data, board)}`;
-    main.innerHTML = `<div class="dw-page dw-department-page">${projectTabsMarkup()}${scopeSelectMarkup()}<header class="dw-dept-header"><div class="dw-dept-header-top"><button class="dw-back" type="button" data-view="overview"><i data-lucide="arrow-left" aria-hidden="true"></i>回到概览</button><span class="dw-current-state"><span class="dw-status-dot ${statusTone(status)}"></span>${text(departmentName(department))} · ${text(status)}</span></div><div><div class="dw-eyebrow"><span class="dw-status-dot ${statusTone(status) === "waiting" ? "waiting" : ""}"></span><strong>${text(departmentName(department))}</strong><span>·</span><span>${text(DEPARTMENTS[department].role)}</span></div><h1>${text(departmentTask)}</h1><p class="dw-subtitle">${text(state.project.name)} · 部门工作区</p></div></header>${body}<p class="dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p></div>`;
+    const provider = data?.provider || {};
+    const modelLabel = provider.model || "未上报";
+    const providerLabel = provider.provider || "未上报";
+    const room = data ? `<div class="pixel-room-boundary"><div class="pixel-room-header"><strong>ROOM_${escapeHtml(department.toUpperCase())}</strong><span>${text(status)} · ${text(providerLabel)}</span></div><div class="pixel-room-stage"><div class="pixel-room-topwall"><div class="crt-monitor-board"><div class="crt-monitor-text">&gt; TARGET: ${text(departmentTask)}<br>&gt; MODEL: ${text(modelLabel)}<br>&gt; PROTOCOL: ${text(provider.protocol, "未上报")}<br>&gt; STATUS: ${text(status)}</div></div></div><div class="pixel-room-floor"></div><div class="pixel-desk-lane"><div class="pixel-workstation"><div class="pixel-bubble">${text(roomBubble(data, status))}</div><div class="pixel-agent" aria-hidden="true"><div class="pixel-agent-head"><div class="pixel-agent-eye-l"></div><div class="pixel-agent-eye-r"></div></div><div class="pixel-agent-body">${text(departmentName(department))}</div></div><div class="pixel-desk"><div class="pixel-computer"></div></div><span class="pixel-workstation-label">${text(departmentName(department))}主 Agent</span></div></div></div><div class="pixel-room-log dw-timeline" aria-live="polite">${roomLogMarkup(data)}</div></div>` : `<div class="dw-load-state">${hasInProgress() || item ? "正在读取部门消息…" : "当前没有事项。可以用下面的输入作为新事项开始，或记录原文。"}</div>`;
+    const input = `<div class="pixel-room-input-box"><div class="pixel-input-head"><strong><i data-lucide="message-square" aria-hidden="true"></i>向${text(departmentName(department))}下达指令或追加人类反馈</strong><span class="yp-small">输入将作为人类指导进入本部门下一次安全激活</span></div>${departmentComposer(department, data, board)}</div>`;
+    main.innerHTML = `<div class="dw-page dw-department-page">${projectTabsMarkup()}${scopeSelectMarkup()}<header class="yp-heading dw-dept-header"><div><div class="yp-eyebrow">三部门工作区</div><h1>${text(departmentName(department))}工作间</h1><p class="yp-subtitle">${text(DEPARTMENTS[department].role)} · 运行目标：<strong>${text(modelLabel)}</strong>（${text(providerLabel)}） · ${text(status)}</p></div><div class="yp-heading-actions">${deptSettingsMarkup(department)}</div></header>${room}${input}${roomInspectMarkup(department, data)}<p class="dw-action-error" role="alert" ${state.error ? "" : "hidden"}>${text(state.error, "")}</p></div>`;
     if (data) {
       const timeline = main.querySelector?.(".dw-timeline");
       timeline?.insertAdjacentHTML?.("afterend", guidanceMarkup(data));
@@ -1127,10 +1157,14 @@
       const current = activeWorkItem() && boardColumn(activeWorkItem()) === key;
       return `<div class="yp-flow-step ${current ? "current" : ""}"><div class="yp-flow-head"><span class="yp-flow-marker">${index + 1}</span><strong>${label}</strong></div><div class="yp-flow-items">${columns[key].map(item => `<button class="yp-flow-item" type="button" data-work-item="${escapeHtml(item.work_item_id)}" data-work-department="${escapeHtml(item.department || key)}"><strong>${text(item.title)}</strong><p>${text(workStatusLabel(item.status))}</p></button>`).join("") || '<div class="yp-empty-col">暂无</div>'}</div></div>`;
     }).join("")}</div>`;
-    const recent = (state.project?.overview?.recent || []).slice(0, 12).map(item => `<div class="yp-handoff"><span class="yp-handoff-time">${text(formatTime(item.at || item.created_at, true))}</span><div><strong>${text(item.title || item.type)}</strong><p>${text(item.summary || item.body || "")}</p></div><span class="yp-handoff-status">${text(item.status || "")}</span></div>`).join("");
     const toggle = `<div class="yp-board-tools"><div class="yp-view-toggle"><button type="button" data-board-mode="flow" class="${state.boardMode === "flow" ? "is-selected" : ""}">流程</button><button type="button" data-board-mode="board" class="${state.boardMode === "board" ? "is-selected" : ""}">看板</button></div><span class="yp-small">卡片不可拖拽，点击进入事项</span></div>`;
     const board = `<div class="yp-board">${col("product", "产品", "需求与方案")}${col("engineering", "工程", "实现与交付")}${col("quality", "质检", "验证与反馈")}${col("done", "完成", "采纳或停止")}</div>`;
-    return `<section class="yp-section"><div class="yp-section-title"><h2>协作总览</h2></div>${toggle}${state.boardMode === "board" ? board : flow}</section><section class="yp-section"><div class="yp-section-title"><h2>最近记录</h2></div><div class="yp-handoff-list">${recent || '<p class="yp-small">还没有项目事件</p>'}</div></section>`;
+    return `<section class="yp-section"><div class="yp-section-title"><h2>协作总览</h2></div>${toggle}${state.boardMode === "board" ? board : flow}</section>`;
+  }
+
+  function handoffListMarkup() {
+    const recent = (state.project?.overview?.recent || []).slice(0, 12).map(item => `<div class="yp-handoff"><span class="yp-handoff-time">${text(formatTime(item.at || item.created_at, true))}</span><div><strong>${text(item.title || item.type)}</strong><p>${text(item.summary || item.body || "")}</p></div><span class="yp-handoff-status">${text(item.status || "")}</span></div>`).join("");
+    return `<section class="yp-section"><div class="yp-section-title"><div><h2>跨部门流转交接</h2><p class="yp-small">需求交接、版本交付与缺陷返工记录</p></div></div><div class="yp-handoff-list">${recent || '<p class="yp-small">还没有项目事件</p>'}</div></section>`;
   }
 
   function materialsMarkup() {
@@ -1167,7 +1201,8 @@
     const adoption = project.current_adoption;
     const pending = project.overview?.pending || [];
     const summary = `<div class="yp-project-summary"><div><div class="yp-eyebrow">项目概览</div><h1>${text(project.name)}</h1><p>${text(project.goal)}</p></div><div class="yp-summary-side"><div class="yp-summary-item"><span>当前成果</span><strong>${text(adoption?.summary, "尚未采纳")}</strong></div><div class="yp-summary-item"><span>进行中</span><strong>${text(activeWorkItem()?.title, "无")}</strong></div><div class="yp-summary-item"><span>待决</span><strong>${pending.length ? text(pending[0].summary || pending[0].title) : "无"}</strong></div></div></div>`;
-    let body = collaborationMarkup() + overviewComposer();
+    let body = handoffListMarkup() + overviewComposer();
+    if (state.overviewPane === "board") body = collaborationMarkup() + overviewComposer();
     if (state.overviewPane === "materials") body = materialsMarkup();
     if (state.overviewPane === "settings") body = settingsMarkup();
     if (project.archived) body = `<div class="yp-notice"><div><strong>归档只读</strong><p>查询仍可用，写命令会返回冲突。</p></div></div>` + body;
@@ -1787,6 +1822,8 @@
   function goDepartment(department, { push = true } = {}) {
     state.view = "department";
     state.department = department;
+    state.deptMenu = false;
+    state.roomInspect = false;
     state.observationDetail = null;
     state.selectedAttemptId = null;
     const token = ++state.routeToken;
@@ -1826,6 +1863,7 @@
     if (!target) return;
     const scope = workbench || root;
     if (scope && !scope.contains(target) && !target.closest("dialog")) return;
+    if (target.dataset.action === "toggle-dept-menu") { state.deptMenu = !state.deptMenu; renderDepartment(state.department); return; }
     if (target.dataset.action === "toggle-sidebar") { state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); icons(); return; }
     if (target.dataset.action === "toggle-mobile-nav") { state.mobileNav = !state.mobileNav; renderChrome(); icons(); return; }
     if (target.dataset.action === "toggle-project-menu") { state.projectMenu = !state.projectMenu; renderChrome(); icons(); return; }
@@ -1934,6 +1972,8 @@
     }
     if (target.dataset.inspectorTab) {
       state.inspectorTab = target.dataset.inspectorTab;
+      state.roomInspect = true;
+      state.deptMenu = false;
       updateRoute({ push: false });
       renderDepartment(state.department);
       return;
@@ -1959,6 +1999,7 @@
       return;
     }
     if (target.dataset.promptEdit) {
+      state.deptMenu = false;
       const department = target.dataset.promptEdit.includes("/") ? target.dataset.promptEdit.split("/").pop() : target.dataset.promptEdit;
       loadPromptConfig(department).then(() => openPromptDialog(department));
       return;

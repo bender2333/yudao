@@ -186,6 +186,57 @@ test("visual contract tokens remain for department internals and third-version c
   assert.match(STYLES_CSS, /#yudao-workbench/);
 });
 
+test("department room uses the v5 stage and keeps real guidance contracts", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.projectId = "proj_a";
+  web.state.project = sampleProject("proj_a", {
+    name: "货物装载",
+    active_work_item_id: "wi_1",
+    work_items: [{ work_item_id: "wi_1", title: "实现导出", run_id: "run_1", status: "in_progress", department: "engineering" }],
+  });
+  web.state.department = "engineering";
+  web.state.workItemId = "wi_1";
+  web.state.runId = "run_1";
+  web.state.runPayload = { board: { phase: "ENGINEERING", task: "实现导出", active_department: "engineering" } };
+  web.state.departmentData.set("run_1/engineering", {
+    department: "engineering",
+    status: "running",
+    messages: [{ source: "工程", text: "正在读取计划", created_at: "2026-09-22T02:00:00Z", event_id: "evt_1" }],
+    provider: { provider: "opencode-go", model: "glm-5.1", protocol: "chat_completions" },
+    guidance: [],
+  });
+  web.renderDepartment("engineering");
+  const html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /pixel-room-boundary/);
+  assert.match(html, /crt-monitor-board/);
+  assert.match(html, /glm-5\.1/);
+  assert.match(html, /id="dw-dept-form"/);
+  assert.match(html, /data-dept-draft="engineering"/);
+  assert.match(html, /发送指导/);
+  assert.match(html, /data-prompt-edit="engineering"/);
+  assert.match(html, /data-work-scope/);
+  assert.match(html, /data-inspector-tab="context"/);
+  assert.doesNotMatch(html, /派发协作者|SubAgent|动作步进/);
+  assert.doesNotMatch(html, /class="dw-inspector /);
+});
+
+test("overview leads with handoffs and keeps the idle composer", () => {
+  const { document, nodes } = uiDocument();
+  const web = loadApp(async () => response({}), document);
+  web.state.projectId = "proj_a";
+  web.state.project = sampleProject("proj_a", {
+    overview: { pending: [], recent: [{ title: "工程 → 产品", summary: "需要产品明确", at: "2026-09-22T02:00:00Z", status: "等待决定" }] },
+  });
+  web.state.overviewPane = "handoffs";
+  web.renderOverview();
+  const html = nodes.get("dw-main").innerHTML;
+  assert.match(html, /跨部门流转交接/);
+  assert.match(html, /工程 → 产品/);
+  assert.match(html, /作为新事项开始/);
+  assert.doesNotMatch(html, /class="yp-board"/);
+});
+
 test("UI source contains no prototype sample state and keeps D-H plus guidance controls", () => {
   assert.doesNotMatch(APP_JS, /const modelRequests\s*=\s*\[/);
   assert.doesNotMatch(APP_JS, /new Tweak|globalThis\.Tweak/);
