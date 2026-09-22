@@ -1,0 +1,1923 @@
+<!-- Yudao 综合工作台原型 v5 · 完整移植 model-management 原型的全部结构与细节，并在最底部接入三部门全局模型与 Effort 分配 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 项目工作台与协作</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { margin: 0; min-width: 0; min-height: 100%; background: light-dark(#f7f8f7, #171918); }
+    body { overflow-x: hidden; }
+
+    #yudao-project-prototype {
+      --yp-bg: light-dark(#f7f8f7, #171918);
+      --yp-side: light-dark(#eef1ef, #1c201d);
+      --yp-surface: light-dark(#fff, #212522);
+      --yp-soft: light-dark(#f1f4f2, #292e2a);
+      --yp-text: light-dark(#29312d, #e7eee9);
+      --yp-muted: light-dark(#68766e, #a4b1a8);
+      --yp-line: light-dark(#dce4de, #37443b);
+      --yp-green: light-dark(#087f69, #6bd8ba);
+      --yp-tint: light-dark(#e4f2eb, #243e32);
+      --yp-amber: light-dark(#96680e, #e2be71);
+      --yp-amber-bg: light-dark(#faf1dc, #3a3223);
+      --yp-red: light-dark(#b44338, #ee9e92);
+      --yp-blue: light-dark(#39658c, #95bde3);
+      font: 14px/1.6 "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+      color: var(--yp-text);
+      background: var(--yp-bg);
+      position: relative;
+      min-width: 0;
+      text-align: left;
+    }
+
+    #yudao-project-prototype * { box-sizing: border-box; }
+    #yudao-project-prototype [hidden] { display: none !important; }
+    #yudao-project-prototype button,
+    #yudao-project-prototype input,
+    #yudao-project-prototype textarea,
+    #yudao-project-prototype select { font: inherit; color: inherit; }
+    #yudao-project-prototype button { cursor: pointer; }
+    #yudao-project-prototype button:disabled { cursor: default; opacity: .55; }
+    #yudao-project-prototype h1,
+    #yudao-project-prototype h2,
+    #yudao-project-prototype h3,
+    #yudao-project-prototype p { margin: 0; }
+    #yudao-project-prototype h1 { font-size: 24px; font-weight: 500; line-height: 1.4; letter-spacing: -.4px; }
+    #yudao-project-prototype h2 { font-size: 16px; font-weight: 500; }
+    #yudao-project-prototype h3 { font-size: 14px; font-weight: 500; }
+    #yudao-project-prototype strong { font-weight: 500; }
+    #yudao-project-prototype svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+    /* 外壳骨架 */
+    #yudao-project-prototype .yp-shell { display: grid; grid-template-columns: 218px minmax(0, 1fr); min-height: 100vh; }
+    #yudao-project-prototype .yp-sidebar { background: var(--yp-side); border-right: 1px solid var(--yp-line); padding: 20px 13px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    #yudao-project-prototype .yp-brand { display: flex; align-items: center; gap: 9px; padding: 0 8px; font-size: 17px; font-weight: 500; letter-spacing: .3px; }
+    #yudao-project-prototype .yp-brand svg { color: var(--yp-green); width: 21px; height: 21px; }
+    #yudao-project-prototype .yp-proto { font-size: 10px; color: var(--yp-muted); border: 1px solid var(--yp-line); border-radius: 4px; padding: 1px 4px; letter-spacing: 1px; margin-left: auto; }
+    #yudao-project-prototype .yp-muted { color: var(--yp-muted); }
+    #yudao-project-prototype .yp-small { font-size: 12px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-row { display: flex; align-items: center; gap: 9px; min-width: 0; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-between { justify-content: space-between; }
+    #yudao-project-prototype .yp-side-label { display: flex; align-items: center; justify-content: space-between; padding: 0 9px; margin: 0 0 8px; font-size: 11px; letter-spacing: 1px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; border-radius: 6px; padding: 7px; min-width: 30px; min-height: 30px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--yp-line); background: var(--yp-surface); border-radius: 7px; padding: 7px 9px; margin-top: 10px; }
+    #yudao-project-prototype .yp-search input { width: 100%; min-width: 0; border: 0; background: transparent; font-size: 12px; padding: 0; outline: none; }
+    #yudao-project-prototype .yp-project-list { display: grid; gap: 3px; }
+    #yudao-project-prototype .yp-project { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 7px; display: flex; gap: 8px; text-align: left; align-items: center; padding: 9px 8px; margin-top: 2px; }
+    #yudao-project-prototype .yp-project:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-project.is-selected { background: var(--yp-tint); color: var(--yp-green); border-color: color-mix(in srgb, var(--yp-green) 15%, transparent); }
+    #yudao-project-prototype .yp-project span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    #yudao-project-prototype .yp-project .yp-project-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--yp-muted); flex: none; }
+    #yudao-project-prototype .yp-project.is-selected .yp-project-mark { background: var(--yp-green); }
+    #yudao-project-prototype .yp-side-bottom { margin-top: auto; display: grid; gap: 6px; border-top: 1px solid var(--yp-line); padding-top: 14px; }
+    #yudao-project-prototype .yp-sidebar-link { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 0; background: transparent; padding: 8px 9px; border-radius: 6px; color: var(--yp-muted); font-size: 12px; }
+    #yudao-project-prototype .yp-sidebar-link:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-sidebar-link.is-active { background: var(--yp-soft); color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-sidebar-link .yp-count { margin-left: auto; font-size: 11px; }
+
+    /* 顶栏 */
+    #yudao-project-prototype .yp-main { min-width: 0; display: flex; flex-direction: column; }
+    #yudao-project-prototype .yp-topbar { padding: 12px 28px; min-height: 56px; border-bottom: 1px solid var(--yp-line); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--yp-surface); position: sticky; top: 0; z-index: 20; }
+    #yudao-project-prototype .yp-breadcrumb { display: flex; gap: 8px; align-items: center; min-width: 0; font-size: 12px; color: var(--yp-muted); flex-wrap: wrap; }
+    #yudao-project-prototype .yp-breadcrumb button { padding: 0; border: 0; background: none; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-breadcrumb strong { color: var(--yp-text); }
+    #yudao-project-prototype .yp-auto { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--yp-muted); white-space: nowrap; }
+    #yudao-project-prototype .yp-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yp-green); flex-shrink: 0; }
+
+    /* 主内容区 */
+    #yudao-project-prototype .yp-content { padding: 24px 28px 48px; max-width: 1200px; margin: 0 auto; width: 100%; min-width: 0; }
+    #yudao-project-prototype .yp-eyebrow { font-size: 11px; letter-spacing: 1.3px; color: var(--yp-muted); margin-bottom: 6px; }
+    #yudao-project-prototype .yp-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    #yudao-project-prototype .yp-heading-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; position: relative; }
+    #yudao-project-prototype .yp-subtitle { font-size: 13px; color: var(--yp-muted); margin-top: 6px; max-width: 75ch; overflow-wrap: anywhere; }
+
+    /* 按钮 */
+    #yudao-project-prototype .yp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--yp-line); border-radius: 6px; background: var(--yp-surface); font-size: 13px; min-height: 33px; white-space: nowrap; }
+    #yudao-project-prototype .yp-btn:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-btn.primary { background: var(--yp-green); color: light-dark(#fff, #102b20); border-color: var(--yp-green); }
+    #yudao-project-prototype .yp-btn.primary:hover { filter: brightness(1.07); }
+    #yudao-project-prototype .yp-btn.quiet { background: transparent; }
+    #yudao-project-prototype .yp-btn.small { padding: 4px 10px; min-height: 26px; font-size: 12px; }
+    #yudao-project-prototype .yp-btn.danger-text { border: none; background: transparent; color: var(--yp-red); padding: 4px 8px; }
+    #yudao-project-prototype .yp-btn.danger-text:hover { background: light-dark(#feecec, #3b1e1e); }
+
+    /* 标签与选项卡 */
+    #yudao-project-prototype .yp-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--yp-line); margin-top: 18px; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-tab { padding: 8px 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--yp-muted); font-size: 13px; min-height: 34px; }
+    #yudao-project-prototype .yp-tab:hover { color: var(--yp-text); }
+    #yudao-project-prototype .yp-tab.is-selected { color: var(--yp-green); border-bottom-color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-secondary-tabs { display: flex; gap: 16px; margin-top: 12px; }
+    #yudao-project-prototype .yp-secondary-tabs .yp-tab { font-size: 12px; min-height: 28px; padding: 4px 0; }
+    #yudao-project-prototype .yp-tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; background: var(--yp-soft); color: var(--yp-muted); padding: 2px 6px; font-size: 11px; white-space: nowrap; }
+    #yudao-project-prototype .yp-tag.green { color: var(--yp-green); background: var(--yp-tint); }
+    #yudao-project-prototype .yp-tag.amber { color: var(--yp-amber); background: var(--yp-amber-bg); }
+    #yudao-project-prototype .yp-tag.blue { color: var(--yp-blue); background: color-mix(in srgb, var(--yp-blue) 12%, transparent); }
+
+    /* 区块 */
+    #yudao-project-prototype .yp-section { margin-top: 24px; }
+    #yudao-project-prototype .yp-section-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+
+    /* 概览：项目简要与流转 */
+    #yudao-project-prototype .yp-project-summary { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--yp-line); }
+    #yudao-project-prototype .yp-project-summary p { font-size: 13px; margin-top: 6px; }
+    #yudao-project-prototype .yp-summary-side { border-left: 1px solid var(--yp-line); padding-left: 20px; display: grid; gap: 10px; }
+    #yudao-project-prototype .yp-summary-item { display: grid; gap: 2px; }
+    #yudao-project-prototype .yp-summary-item strong { font-size: 13px; }
+    #yudao-project-prototype .yp-summary-item span { font-size: 12px; color: var(--yp-muted); }
+
+    #yudao-project-prototype .yp-handoff-list { border-top: 1px solid var(--yp-line); }
+    #yudao-project-prototype .yp-handoff { display: grid; grid-template-columns: 85px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--yp-line); font-size: 12px; }
+    #yudao-project-prototype .yp-handoff-time { font-size: 11px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-handoff p { font-size: 11px; color: var(--yp-muted); margin-top: 3px; }
+    #yudao-project-prototype .yp-handoff-status { font-size: 11px; color: var(--yp-green); }
+    #yudao-project-prototype .yp-handoff-status.rework { color: var(--yp-amber); }
+
+    /* ========================================================
+       2D 像素风房间与动态 Agent 舞台设计 (全宽纯净布局，无右侧检查栏)
+       ======================================================== */
+    .pixel-room-boundary {
+      border: 3px solid light-dark(#2b322e, #101211);
+      border-radius: 8px;
+      background: light-dark(#dbe2de, #1a1e1b);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12), inset 0 0 0 2px light-dark(#f4f7f5, #2f3632);
+      overflow: hidden;
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .pixel-room-header {
+      background: light-dark(#2e3632, #111412);
+      color: #e5ece8;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid light-dark(#1f2522, #080a09);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .pixel-room-header strong { display: flex; align-items: center; gap: 8px; color: light-dark(#8ae2cb, #6bd8ba); font-family: ui-monospace, monospace; }
+
+    .pixel-room-stage {
+      position: relative;
+      height: 350px;
+      background: repeating-linear-gradient(
+        0deg,
+        light-dark(#cdd5d1, #1e2421) 0px,
+        light-dark(#cdd5d1, #1e2421) 20px,
+        light-dark(#c5cdc9, #1a201d) 20px,
+        light-dark(#c5cdc9, #1a201d) 40px
+      );
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 18px 24px;
+    }
+
+    .pixel-room-topwall {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 2;
+    }
+
+    .crt-monitor-board {
+      background: #0d1411;
+      border: 4px solid #3d4742;
+      border-radius: 8px;
+      box-shadow: inset 0 0 10px #043828, 0 3px 8px rgba(0,0,0,0.3);
+      padding: 10px 14px;
+      width: 320px;
+      color: #55f3be;
+      font-family: Consolas, "Courier New", monospace;
+      position: relative;
+    }
+    .crt-monitor-board::before {
+      content: "TASK MONITOR // CRT-01";
+      font-size: 9px;
+      color: #2e8b6e;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 4px;
+      border-bottom: 1px dashed #1d4d3c;
+      padding-bottom: 2px;
+    }
+    .crt-monitor-text {
+      font-size: 12px;
+      line-height: 1.5;
+      text-shadow: 0 0 4px rgba(85, 243, 190, 0.4);
+    }
+
+    .pixel-room-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 115px;
+      background: repeating-linear-gradient(
+        45deg,
+        light-dark(#aeb9b3, #151a17),
+        light-dark(#aeb9b3, #151a17) 16px,
+        light-dark(#a2aea8, #121614) 16px,
+        light-dark(#a2aea8, #121614) 32px
+      );
+      border-top: 4px solid light-dark(#6e7a73, #2a312c);
+      box-shadow: inset 0 6px 12px rgba(0,0,0,0.1);
+    }
+
+    .pixel-desk-lane {
+      position: absolute;
+      bottom: 42px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 64px;
+      z-index: 4;
+    }
+
+    .pixel-workstation {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .pixel-bubble {
+      position: absolute;
+      bottom: 100px;
+      background: #ffffff;
+      color: #191c1a;
+      border: 2px solid #1a1e1b;
+      box-shadow: 2px 2px 0px #1a1e1b;
+      padding: 4px 10px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 10;
+      animation: floatPixel 2s steps(4) infinite alternate;
+    }
+    .pixel-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid #1a1e1b;
+    }
+    @keyframes floatPixel {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-4px); }
+    }
+
+    .pixel-agent {
+      width: 34px;
+      height: 50px;
+      position: relative;
+      margin-bottom: -10px;
+    }
+    .pixel-agent-head {
+      width: 26px;
+      height: 24px;
+      background: var(--yp-green);
+      border: 2px solid #161b18;
+      box-shadow: 2px 2px 0px rgba(0,0,0,0.25);
+      margin: 0 auto;
+      position: relative;
+      animation: headBob 1.6s steps(2) infinite;
+    }
+    .pixel-agent-eye-l, .pixel-agent-eye-r {
+      width: 3px;
+      height: 4px;
+      background: #111;
+      position: absolute;
+      top: 9px;
+    }
+    .pixel-agent-eye-l { left: 4px; }
+    .pixel-agent-eye-r { right: 4px; }
+    .pixel-agent-body {
+      width: 30px;
+      height: 28px;
+      background: #2b332f;
+      border: 2px solid #161b18;
+      margin: -2px auto 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      font-family: monospace;
+    }
+
+    .pixel-workstation.subagent .pixel-agent-head { background: var(--yp-blue); }
+    .pixel-workstation.subagent .pixel-agent-body { background: #3d4a56; }
+
+    .pixel-desk {
+      width: 96px;
+      height: 40px;
+      background: light-dark(#8c694a, #523e2b);
+      border: 3px solid #231b14;
+      border-radius: 2px;
+      box-shadow: 3px 3px 0px rgba(0,0,0,0.3);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 3px;
+    }
+    .pixel-computer {
+      width: 38px;
+      height: 24px;
+      background: #39423d;
+      border: 2px solid #111412;
+      box-shadow: inset 0 0 6px #55f3be;
+      position: relative;
+    }
+    .pixel-workstation-label {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      color: var(--yp-text);
+      background: var(--yp-surface);
+      padding: 1px 8px;
+      border: 1px solid var(--yp-line);
+      border-radius: 4px;
+    }
+
+    @keyframes headBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    .pixel-stage-toolbar {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      z-index: 5;
+      display: flex;
+      gap: 6px;
+    }
+
+    .pixel-room-log {
+      background: var(--yp-surface);
+      border-top: 1px solid var(--yp-line);
+      padding: 12px 16px;
+      max-height: 140px;
+      overflow-y: auto;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pixel-log-row { display: flex; gap: 8px; line-height: 1.4; }
+    .pixel-log-time { color: var(--yp-muted); font-family: monospace; font-size: 11px; white-space: nowrap; }
+    .pixel-log-msg { color: var(--yp-text); }
+    .pixel-log-msg.highlight { color: var(--yp-green); font-weight: 500; }
+
+    /* 底部人类输入容器 (完全固定在最底端) */
+    .pixel-room-input-box {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      padding: 14px 16px;
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pixel-input-head { display: flex; justify-content: space-between; align-items: center; }
+    .pixel-input-head strong { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .pixel-input-row { display: flex; gap: 10px; align-items: flex-end; }
+    .pixel-input-row textarea {
+      flex: 1;
+      min-height: 60px;
+      resize: vertical;
+      border: 1px solid var(--yp-line);
+      background: var(--yp-bg);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      outline: none;
+    }
+    .pixel-input-row textarea:focus { border-color: var(--yp-green); }
+
+    /* 部门设置下拉菜单 (原返回概览位置) */
+    .dept-settings-menu-wrap { position: relative; display: inline-block; }
+    .dept-settings-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 7px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      min-width: 170px;
+      z-index: 50;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .dept-settings-menu button {
+      border: none;
+      background: transparent;
+      padding: 8px 12px;
+      font-size: 12px;
+      text-align: left;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dept-settings-menu button:hover { background: var(--yp-soft); color: var(--yp-green); }
+
+    /* 全局弹窗 Modal (用于模型配置与 Prompt 设置) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-head {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--yp-line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--yp-soft);
+    }
+    .modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+    .modal-foot {
+      padding: 12px 20px;
+      border-top: 1px solid var(--yp-line);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--yp-soft);
+    }
+
+    /* ========================================================
+       模型管理样式（完整移植 model-management.html 的完整设计）
+       ======================================================== */
+    .pm-editor-panel {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      border: 1px solid var(--yp-line);
+      background: var(--yp-surface);
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-top: 16px;
+    }
+    .pm-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--yp-line);
+    }
+    .pm-panel-title { font-size: 15px; font-weight: 600; }
+    .pm-preset-pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pm-preset-pill {
+      border: 1px solid var(--yp-line);
+      background: var(--yp-surface);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 500;
+    }
+    .pm-preset-pill.active {
+      border-color: var(--yp-green);
+      background: var(--yp-tint);
+      color: var(--yp-green);
+    }
+    .pm-form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pm-form-field { display: flex; flex-direction: column; gap: 6px; }
+    .pm-form-field label { font-size: 13px; font-weight: 500; color: var(--yp-text); display: flex; justify-content: space-between; align-items: center; }
+    .pm-field-hint { font-size: 12px; color: var(--yp-muted); font-weight: 400; }
+    .pm-info-box {
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: var(--yp-amber-bg);
+      color: var(--yp-amber);
+      border: 1px solid color-mix(in srgb, var(--yp-amber) 30%, transparent);
+      line-height: 1.6;
+    }
+    details.pm-advanced-details {
+      border: 1px solid var(--yp-line);
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: var(--yp-soft);
+    }
+    details.pm-advanced-details summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--yp-muted); user-select: none; }
+    .pm-remote-models-box {
+      border: 1px solid var(--yp-line);
+      background: var(--yp-surface);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pm-candidate-chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    .pm-candidate-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--yp-line);
+      background: var(--yp-soft);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: Consolas, monospace;
+    }
+    .pm-candidate-chip:hover { border-color: var(--yp-green); background: var(--yp-tint); }
+    .pm-model-mapping-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+    .pm-model-mapping-table th { text-align: left; padding: 8px 10px; color: var(--yp-muted); font-weight: 500; border-bottom: 1px solid var(--yp-line); }
+    .pm-model-mapping-table td { padding: 10px; border-bottom: 1px solid var(--yp-line); vertical-align: middle; }
+    .pm-model-row-name { font-weight: 600; font-family: Consolas, monospace; }
+
+    /* Provider 折叠卡片列表 */
+    .pm-provider-accordion-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+    .pm-provider-card {
+      border: 1px solid var(--yp-line);
+      border-radius: 10px;
+      background: var(--yp-surface);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .pm-provider-card.expanded {
+      border-color: var(--yp-green);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+    }
+    .pm-provider-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: var(--yp-surface);
+      border-radius: 10px;
+    }
+    .pm-provider-header:hover { background: var(--yp-soft); }
+    .pm-provider-main-meta { display: flex; align-items: center; gap: 14px; }
+    .pm-provider-icon-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--yp-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--yp-text);
+    }
+    .pm-provider-titles { display: flex; flex-direction: column; gap: 2px; }
+    .pm-provider-name { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .pm-protocol-tag { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; background: var(--yp-soft); color: var(--yp-muted); }
+    .pm-provider-endpoint { font-size: 12px; color: var(--yp-muted); font-family: Consolas, monospace; }
+    .pm-provider-indicators { display: flex; align-items: center; gap: 16px; }
+    .pm-status-pill { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+    .pm-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .pm-dot.ok { background: var(--yp-green); }
+    .pm-dot.warn { background: var(--yp-amber); }
+    .pm-chevron-icon { font-size: 12px; color: var(--yp-muted); transition: transform 0.2s ease; }
+    .pm-provider-card.expanded .pm-chevron-icon { transform: rotate(180deg); }
+    .pm-provider-body {
+      border-top: 1px solid var(--yp-line);
+      padding: 20px;
+      background: var(--yp-soft);
+      border-bottom-left-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+
+    /* 最底部三部门全局模型与 Effort 分配网格 */
+    .global-dept-bind-box {
+      margin-top: 36px;
+      padding: 22px;
+      border: 1px solid var(--yp-line);
+      background: var(--yp-surface);
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .global-dept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .global-dept-card {
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--yp-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .global-dept-card.product { border-top: 3px solid var(--yp-blue); }
+    .global-dept-card.engineering { border-top: 3px solid var(--yp-green); }
+    .global-dept-card.quality { border-top: 3px solid var(--yp-amber); }
+    .global-dept-head { display: flex; justify-content: space-between; align-items: center; }
+    .global-dept-head strong { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+    .global-dept-field { display: flex; flex-direction: column; gap: 4px; }
+    .global-dept-field label { font-size: 11px; color: var(--yp-muted); font-weight: 500; }
+    .global-dept-field select {
+      width: 100%;
+      border: 1px solid var(--yp-line);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: var(--yp-surface);
+    }
+    .global-effort-wrap { display: flex; align-items: center; gap: 10px; }
+    .global-effort-wrap input[type="range"] { flex: 1; padding: 0; cursor: pointer; accent-color: var(--yp-green); }
+    .global-effort-tag { font-size: 12px; font-weight: 600; color: var(--yp-green); min-width: 32px; text-align: right; }
+
+    /* Toast */
+    #yudao-project-prototype .yp-toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 120;
+      background: var(--yp-text);
+      color: var(--yp-surface);
+      padding: 9px 15px;
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .pm-form-grid-2 { grid-template-columns: 1fr; }
+      .global-dept-grid { grid-template-columns: 1fr; }
+      .pixel-desk-lane { gap: 24px; }
+    }
+    @media (max-width: 740px) {
+      #yudao-project-prototype .yp-shell { grid-template-columns: 1fr; }
+      #yudao-project-prototype .yp-sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="yudao-project-prototype">
+  <div class="yp-shell">
+    <!-- 保持原有完整的左侧导航与项目列表 -->
+    <aside class="yp-sidebar" aria-label="项目导航">
+      <div class="yp-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        <span>Yudao</span>
+        <span class="yp-proto">原型</span>
+      </div>
+
+      <button class="yp-btn primary" type="button" onclick="toast('新建项目向导')">+ 新建项目</button>
+
+      <label class="yp-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input data-search type="search" placeholder="搜索项目" value="" aria-label="搜索项目">
+      </label>
+
+      <div>
+        <div class="yp-side-label"><span>项目</span><span>2</span></div>
+        <div class="yp-project-list">
+          <button class="yp-project is-selected" type="button" data-project="cargo" onclick="navigateProject('cargo')">
+            <span class="yp-project-mark"></span>
+            <span>货物装载规划</span>
+          </button>
+          <button class="yp-project" type="button" data-project="lab" onclick="navigateProject('lab')">
+            <span class="yp-project-mark"></span>
+            <span>实验记录助手</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="yp-side-bottom">
+        <button class="yp-sidebar-link" id="linkModelManagement" type="button" onclick="navigate('model-management')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><path d="M12 6v6l4 2"></path></svg>
+          <span>模型管理</span>
+        </button>
+        <button class="yp-sidebar-link" type="button" onclick="toast('打开已归档项目')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>已归档项目</span>
+          <span class="yp-count">1</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主展示区 -->
+    <main class="yp-main">
+      <header class="yp-topbar">
+        <div class="yp-breadcrumb">
+          <button type="button" onclick="navigate('overview')">项目</button>
+          <span>/</span>
+          <strong id="topbarProjectTitle">货物装载规划</strong>
+          <span id="topbarSubpath">/ 项目概览</span>
+        </div>
+        <div class="yp-row">
+          <span class="yp-auto"><span class="yp-dot"></span><span>自动推进 · 关键问题再介入</span></span>
+        </div>
+      </header>
+
+      <div class="yp-content" id="mainContent">
+        <!-- 动态页面内容由 JavaScript 渲染 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 弹窗层 -->
+  <div id="modalContainer" class="modal-overlay" style="display: none;"></div>
+
+  <div class="yp-toast" id="toastBox" hidden></div>
+</div>
+
+<script>
+(function() {
+  const roles = {
+    product: { name: '产品', icon: '📋', text: '目标、需求与取舍', roomTask: '整理货物混装需求与体积优先级' },
+    engineering: { name: '工程', icon: '⚙️', text: '方案、实现与自检', roomTask: '实现订单导出并修复窄屏布局' },
+    quality: { name: '质检', icon: '🔍', text: '验收依据与独立检查', roomTask: '验证导出的字段边界及异常流程' }
+  };
+
+  const projectData = {
+    id: 'cargo',
+    name: '货物装载规划',
+    goal: '让计划员快速生成可执行的装载方案，兼顾空间利用与操作稳定性。',
+    baseline: '装载工作台 v0.3',
+    path: 'C:/project/cargo_project',
+    material: '产品说明、交互原型、代码与测试'
+  };
+
+  // 完整移植自 model-management.html 的 PRESETS
+  const PRESETS = {
+    "opencode-go": {
+      name: "OpenCode Go",
+      protocol: "responses",
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      docUrl: "https://opencode.ai/docs/go",
+      credRef: "OPENCODE_GO_KEY",
+      models: [
+        { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+        { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" }
+      ],
+      remoteCandidates: ["gpt-5.6-terra", "claude-3-7-sonnet", "deepseek-v3", "glm-5.1-chat", "gemini-2.5-pro"]
+    },
+    "anyrouter": {
+      name: "AnyRouter 集成",
+      protocol: "chat_completions",
+      baseUrl: "https://anyrouter.top/v1",
+      docUrl: "https://anyrouter.top",
+      credRef: "ANYROUTER_API_KEY",
+      models: [
+        { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+        { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "候选" }
+      ],
+      remoteCandidates: ["deepseek-chat", "deepseek-reasoner", "qwen-2.5-72b", "llama-3.3-70b", "kimi-k1.5"]
+    },
+    "stepfun": {
+      name: "StepFun (阶跃星辰)",
+      protocol: "chat_completions",
+      baseUrl: "https://api.stepfun.com/v1",
+      docUrl: "https://platform.stepfun.com",
+      credRef: "STEPFUN_API_KEY",
+      models: [
+        { id: "step-2-16k", window: 16000, maxOutput: 4096, status: "已准入" }
+      ],
+      remoteCandidates: ["step-1-8k", "step-2-16k", "step-1-32k", "step-1-128k"]
+    },
+    "anthropic": {
+      name: "Anthropic 原生服务",
+      protocol: "messages",
+      baseUrl: "https://api.anthropic.com/v1",
+      docUrl: "https://docs.anthropic.com",
+      credRef: "ANTHROPIC_API_KEY",
+      models: [
+        { id: "claude-3-5-sonnet-20241022", window: 200000, maxOutput: 8192, status: "已准入" }
+      ],
+      remoteCandidates: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+    },
+    "custom": {
+      name: "自定义模型网关",
+      protocol: "chat_completions",
+      baseUrl: "https://",
+      docUrl: "",
+      credRef: "CUSTOM_API_KEY",
+      models: [],
+      remoteCandidates: ["custom-gpt-4o", "custom-model-fast", "custom-reasoner"]
+    }
+  };
+
+  // 全局 Provider 配置库
+  let modelState = {
+    providers: [
+      {
+        id: "p-opencode-01",
+        name: "OpenCode Go 主线路",
+        protocol: "responses",
+        baseUrl: "https://opencode.ai/zen/go/v1",
+        docUrl: "https://opencode.ai/docs/go",
+        credRef: "OPENCODE_GO_KEY",
+        timeout: 600,
+        expanded: true,
+        models: [
+          { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+          { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" }
+        ]
+      },
+      {
+        id: "p-anyrouter-02",
+        name: "AnyRouter 备用网关",
+        protocol: "chat_completions",
+        baseUrl: "https://anyrouter.top/v1",
+        docUrl: "https://anyrouter.top",
+        credRef: "ANYROUTER_API_KEY",
+        timeout: 300,
+        expanded: false,
+        models: [
+          { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+          { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "候选" }
+        ]
+      }
+    ],
+    editingProviderId: null,
+    currentFormModels: []
+  };
+
+  // 全局三部门模型分配与 Effort 设置 (保存在模型管理底部，作为全机基线)
+  const globalDeptBindings = {
+    product: {
+      providerId: 'p-opencode-01',
+      modelId: 'gpt-5.6-terra',
+      effortValue: 2,
+      subagentActive: false,
+      prompt: '你是产品部。持续维护项目目标、需求与取舍。保留用户原话，重要且无法推断的产品决定向用户提出。'
+    },
+    engineering: {
+      providerId: 'p-opencode-01',
+      modelId: 'gpt-5.6-terra',
+      effortValue: 3,
+      subagentActive: false,
+      prompt: '你是工程部。依据有效需求与项目当前成果工作，维护整体架构、实现方案和技术决定。优先复用项目已有能力与成熟组件。'
+    },
+    quality: {
+      providerId: 'p-anyrouter-02',
+      modelId: 'deepseek-chat',
+      effortValue: 3,
+      subagentActive: false,
+      prompt: '你是质检部。依据项目要求独立检查交付，保留实际验证范围和证据。业务取舍交产品明确，工程问题附复现依据。'
+    }
+  };
+
+  const effortTexts = { 1: '低 (low)', 2: '中 (medium)', 3: '深 (high)', 4: '极 (max)' };
+
+  let currentPage = 'overview'; // 'overview' | 'product' | 'engineering' | 'quality' | 'model-management' | 'sources' | 'settings'
+  let showDeptMenu = false;
+
+  function toast(msg) {
+    const box = document.getElementById('toastBox');
+    box.textContent = msg;
+    box.hidden = false;
+    setTimeout(() => { box.hidden = true; }, 2400);
+  }
+
+  function protocolLabel(val) {
+    if (val === "responses") return "OpenAI Responses";
+    if (val === "messages") return "Anthropic Messages";
+    if (val === "chat_completions") return "Chat Completions";
+    return val;
+  }
+
+  // 顶层导航 Tabs
+  function renderNavTabs() {
+    return `
+      <nav class="yp-tabs" role="tablist" aria-label="项目工作区">
+        <button class="yp-tab ${currentPage === 'overview' ? 'is-selected' : ''}" type="button" onclick="navigate('overview')">项目概览</button>
+        <button class="yp-tab ${currentPage === 'product' ? 'is-selected' : ''}" type="button" onclick="navigate('product')">产品部</button>
+        <button class="yp-tab ${currentPage === 'engineering' ? 'is-selected' : ''}" type="button" onclick="navigate('engineering')">工程部</button>
+        <button class="yp-tab ${currentPage === 'quality' ? 'is-selected' : ''}" type="button" onclick="navigate('quality')">质检部</button>
+      </nav>
+      ${currentPage === 'overview' ? `
+        <div class="yp-secondary-tabs">
+          <button class="yp-tab" type="button" onclick="navigate('sources')">📁 资料与依据</button>
+          <button class="yp-tab" type="button" onclick="navigate('settings')">⚙️ 项目设置</button>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  // ================= 1. 项目概览页 (只保留目标、现状与流转) =================
+  function renderOverview() {
+    document.getElementById('topbarSubpath').textContent = '/ 项目概览';
+    document.getElementById('linkModelManagement').classList.remove('is-active');
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">货物装载规划</div>
+          <h1>项目概览</h1>
+          <p class="yp-subtitle">从项目目标、当前成果和跨部门流转了解下一步演化进程。</p>
+        </div>
+      </header>
+
+      <section class="yp-project-summary">
+        <div>
+          <h2>当前目标</h2>
+          <p>${projectData.goal}</p>
+          <p class="yp-small">${projectData.path} · ${projectData.material}</p>
+        </div>
+        <div class="yp-summary-side">
+          <div class="yp-summary-item"><span>当前成果</span><strong>${projectData.baseline}</strong></div>
+          <div class="yp-summary-item"><span>工作项</span><strong>4 个 · 1 个已采纳</strong></div>
+          <div class="yp-summary-item"><span>项目状态</span><strong><span class="yp-tag green">持续演化</span></strong></div>
+        </div>
+      </section>
+
+      <!-- 跨部门流转交接 -->
+      <section class="yp-section">
+        <div class="yp-section-title">
+          <div>
+            <h2>跨部门流转交接</h2>
+            <p class="yp-small" style="margin-top:2px">需求交接、版本交付与缺陷返工记录</p>
+          </div>
+        </div>
+        <div class="yp-handoff-list">
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">今天 10:24</span>
+            <div><strong>工程 → 产品</strong><p>混装方案比较已完成，数量与体积的优先级需要由产品明确。</p></div>
+            <span class="yp-handoff-status">等待决定</span>
+          </div>
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">昨天 16:40</span>
+            <div><strong>质检 → 工程</strong><p>保存后恢复场景仍有一个窄屏折行边界条件需要修复。</p></div>
+            <span class="yp-handoff-status rework">返工</span>
+          </div>
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">周一 14:05</span>
+            <div><strong>工程 → 质检</strong><p>导出结果已附上自动化单测检查材料。</p></div>
+            <span class="yp-handoff-status">提交质检</span>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  // ================= 2. 部门房间页 (2D 像素小人舞台 + 部门设置按钮菜单 + 最底端输入框) =================
+  function renderDepartment(deptKey) {
+    const r = roles[deptKey];
+    const bind = globalDeptBindings[deptKey];
+    const provider = modelState.providers.find(p => p.id === bind.providerId) || modelState.providers[0];
+    document.getElementById('topbarSubpath').textContent = `/ ${r.name}部工作间`;
+    document.getElementById('linkModelManagement').classList.remove('is-active');
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">三部门工作区 · 2D 像素工位</div>
+          <h1>${r.name}部工作间</h1>
+          <p class="yp-subtitle">${r.text} · 运行目标：<strong>${bind.modelId}</strong> (${provider.name}) · Effort: ${effortTexts[bind.effortValue]}</p>
+        </div>
+
+        <!-- 部门设置按钮与下拉菜单 -->
+        <div class="yp-heading-actions">
+          <div class="dept-settings-menu-wrap">
+            <button class="yp-btn" type="button" onclick="toggleDeptMenu(event)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>部门设置</span>
+              <span style="font-size: 10px;">▼</span>
+            </button>
+
+            ${showDeptMenu ? `
+              <div class="dept-settings-menu">
+                <button type="button" onclick="openDeptModelModal('${deptKey}')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path></svg>
+                  <span>模型与 Effort 配置</span>
+                </button>
+                <button type="button" onclick="openDeptPromptModal('${deptKey}')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <span>部门 Prompt 设置</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </header>
+
+      <!-- 2D 像素风房间容器 -->
+      <div class="pixel-room-boundary">
+        <div class="pixel-room-header">
+          <strong>ROOM_${deptKey.toUpperCase()} // AGENT WORKSPACE</strong>
+          <span>HOST: LOCAL_RUNNER · EFFORT: ${effortTexts[bind.effortValue]}</span>
+        </div>
+
+        <div class="pixel-room-stage">
+          <div class="pixel-stage-toolbar">
+            <button class="yp-btn small" type="button" onclick="toggleSubagent('${deptKey}')">${bind.subagentActive ? '- 召回子 Agent' : '+ 派发协作者 (SubAgent)'}</button>
+            <button class="yp-btn small" type="button" onclick="simulatePixelAction('${deptKey}')">动作步进</button>
+          </div>
+
+          <!-- 顶墙：CRT 显示屏风格的任务看板 -->
+          <div class="pixel-room-topwall">
+            <div class="crt-monitor-board">
+              <div class="crt-monitor-text">
+                &gt; TARGET: ${r.roomTask}<br>
+                &gt; MODEL: ${bind.modelId}<br>
+                &gt; EFFORT: ${effortTexts[bind.effortValue]}<br>
+                &gt; CYCLE: #03 [RUNNING]
+              </div>
+            </div>
+          </div>
+
+          <!-- 地板与工位小人 -->
+          <div class="pixel-room-floor"></div>
+
+          <div class="pixel-desk-lane">
+            <!-- 核心责任小人 -->
+            <div class="pixel-workstation">
+              <div class="pixel-bubble" id="bubble-${deptKey}">正在解析代码 AST...</div>
+              <div class="pixel-agent">
+                <div class="pixel-agent-head">
+                  <div class="pixel-agent-eye-l"></div>
+                  <div class="pixel-agent-eye-r"></div>
+                </div>
+                <div class="pixel-agent-body">MAIN</div>
+              </div>
+              <div class="pixel-desk">
+                <div class="pixel-computer"></div>
+              </div>
+              <span class="pixel-workstation-label">${r.name}主 Agent</span>
+            </div>
+
+            <!-- 动态加入的 SubAgent -->
+            ${bind.subagentActive ? `
+              <div class="pixel-workstation subagent">
+                <div class="pixel-bubble" style="bottom: 90px;">正在检索测试案例...</div>
+                <div class="pixel-agent">
+                  <div class="pixel-agent-head">
+                    <div class="pixel-agent-eye-l"></div>
+                    <div class="pixel-agent-eye-r"></div>
+                  </div>
+                  <div class="pixel-agent-body">SUB</div>
+                </div>
+                <div class="pixel-desk">
+                  <div class="pixel-computer"></div>
+                </div>
+                <span class="pixel-workstation-label">Scout 子 Agent</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- 房间事件流式日志 -->
+        <div class="pixel-room-log" id="roomLog-${deptKey}">
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:47:02</span>
+            <span class="pixel-log-msg highlight">[系统] 部门工作区就绪，载入 ${bind.modelId} (${effortTexts[bind.effortValue]}) 上下文。</span>
+          </div>
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:47:18</span>
+            <span class="pixel-log-msg">${r.name}主 Agent 调用工具：workspace_search (查找到 8 处相关文件)。</span>
+          </div>
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:48:02</span>
+            <span class="pixel-log-msg">${r.name}主 Agent 正在生成第 1 轮实施成果。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最底端：人类输入与操作框 -->
+      <div class="pixel-room-input-box">
+        <div class="pixel-input-head">
+          <strong>💬 向${r.name}部下达指令或追加人类反馈</strong>
+          <span class="yp-small">输入将作为人类指导直接注入本部门下一次模型调用的 Context</span>
+        </div>
+        <div class="pixel-input-row">
+          <textarea id="humanInput-${deptKey}" placeholder="给${r.name}部追加具体约束、需求确认或修改建议..."></textarea>
+          <button class="yp-btn primary" style="height: 60px; padding: 0 18px;" type="button" onclick="sendHumanInput('${deptKey}')">
+            发送指导
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ================= 3. 完整移植模型管理页 (含 Provider 编辑表单、候选池、折叠卡片 + 底部全局三部门分配) =================
+  function renderModelManagement() {
+    document.getElementById('topbarSubpath').textContent = '/ 模型管理';
+    document.getElementById('linkModelManagement').classList.add('is-active');
+
+    // 渲染折叠卡片列表
+    const providerCardsHtml = modelState.providers.map(item => {
+      const isExpanded = item.expanded;
+      const initial = item.name.slice(0, 1).toUpperCase();
+      const modelCount = item.models.length;
+
+      const modelRows = item.models.map(m => `
+        <tr>
+          <td class="pm-model-row-name">${m.id}</td>
+          <td>${m.window.toLocaleString()}</td>
+          <td>${m.maxOutput.toLocaleString()}</td>
+          <td>
+            <span class="yp-tag ${m.status === '已准入' ? 'green' : 'amber'}">${m.status}</span>
+          </td>
+          <td style="text-align: right;">
+            <button type="button" class="yp-btn small" onclick="testSingleModel('${item.id}', '${m.id}', event)">单项测试</button>
+          </td>
+        </tr>
+      `).join("");
+
+      return `
+        <div class="pm-provider-card ${isExpanded ? 'expanded' : ''}" id="card-${item.id}">
+          <div class="pm-provider-header" onclick="toggleExpand('${item.id}')">
+            <div class="pm-provider-main-meta">
+              <div class="pm-provider-icon-badge">${initial}</div>
+              <div class="pm-provider-titles">
+                <div class="pm-provider-name">
+                  <span>${item.name}</span>
+                  <span class="pm-protocol-tag">${protocolLabel(item.protocol)}</span>
+                </div>
+                <div class="pm-provider-endpoint">${item.baseUrl}</div>
+              </div>
+            </div>
+            <div class="pm-provider-indicators">
+              <div class="pm-status-pill">
+                <span class="pm-dot ok"></span>
+                <span>凭据就绪 (${item.credRef})</span>
+              </div>
+              <div style="font-size: 13px; color: var(--yp-muted);">
+                包含 <strong>${modelCount}</strong> 个模型
+              </div>
+              <div class="pm-chevron-icon">▼</div>
+            </div>
+          </div>
+
+          ${isExpanded ? `
+            <div class="pm-provider-body">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 13px; font-weight: 600;">已映射模型清单</div>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="yp-btn small" onclick="openEditProvider('${item.id}', event)">编辑服务</button>
+                  <button type="button" class="yp-btn small danger-text" onclick="deleteProvider('${item.id}', event)">删除</button>
+                </div>
+              </div>
+
+              <table class="pm-model-mapping-table">
+                <thead>
+                  <tr>
+                    <th style="width: 32%;">模型标识 (ID)</th>
+                    <th style="width: 25%;">上下文窗口 (Tokens)</th>
+                    <th style="width: 25%;">最大输出限制</th>
+                    <th style="width: 18%;">准入状态</th>
+                    <th style="text-align: right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${modelRows || '<tr><td colspan="5" style="color: var(--yp-muted);">暂无配置模型</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join("");
+
+    // 渲染底部全局三部门分配卡片
+    const globalDeptCardsHtml = Object.keys(roles).map(deptKey => {
+      const r = roles[deptKey];
+      const bind = globalDeptBindings[deptKey];
+      return `
+        <div class="global-dept-card ${deptKey}">
+          <div class="global-dept-head">
+            <strong>${r.icon} ${r.name}部</strong>
+            <span class="yp-tag green">全局生效</span>
+          </div>
+
+          <div class="global-dept-field">
+            <label>指定 Provider 配置</label>
+            <select onchange="updateGlobalProvider('${deptKey}', this.value)">
+              ${modelState.providers.map(p => `<option value="${p.id}" ${p.id === bind.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="global-dept-field">
+            <label>模型访问定义 (仅限已准入)</label>
+            <select onchange="updateGlobalModel('${deptKey}', this.value)">
+              ${getAdmittedModels(bind.providerId).map(m => `<option value="${m.id}" ${m.id === bind.modelId ? 'selected' : ''}>${m.id} (窗 ${m.window.toLocaleString()} · 出 ${m.maxOutput.toLocaleString()})</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="global-dept-field">
+            <label>思考 / 努力程度 (Effort: <span id="effort-txt-global-${deptKey}">${effortTexts[bind.effortValue]}</span>)</label>
+            <div class="global-effort-wrap">
+              <input type="range" min="1" max="4" value="${bind.effortValue}" oninput="updateGlobalEffort('${deptKey}', this.value)">
+              <span class="global-effort-tag" id="effort-tag-global-${deptKey}">${bind.effortValue === 1 ? '低' : bind.effortValue === 2 ? '中' : bind.effortValue === 3 ? '深' : '极'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <header class="yp-heading">
+        <div>
+          <div class="yp-eyebrow">配置中心 · 资源视角</div>
+          <h1>模型管理</h1>
+          <p class="yp-subtitle">在此统一维护系统 Provider 连接库，并在页面底部为产品、工程、质检三部门进行全局模型分配。</p>
+        </div>
+        <div class="yp-heading-actions">
+          <button type="button" class="yp-btn" onclick="exportModelsJson()">导出 JSON</button>
+          <button type="button" class="yp-btn primary" onclick="openAddProviderForm()">+ 添加模型服务</button>
+        </div>
+      </header>
+
+      <!-- 添加 / 编辑服务面板 (完整移植自 model-management.html) -->
+      <div class="pm-editor-panel" id="providerEditor" style="display: none;">
+        <div class="pm-panel-header">
+          <div class="pm-panel-title" id="editorTitle">添加模型服务</div>
+          <button type="button" class="yp-btn small" onclick="cancelEditProvider()">关闭</button>
+        </div>
+
+        <!-- 供应商预置方案选择 -->
+        <div class="pm-form-field">
+          <label>
+            <span>服务方案模板</span>
+            <span class="pm-field-hint">选择预置供应商可自动填写协议、端点与凭据格式</span>
+          </label>
+          <div class="pm-preset-pill-group" id="presetGroup">
+            <div class="pm-preset-pill active" data-preset="opencode-go">OpenCode Go</div>
+            <div class="pm-preset-pill" data-preset="anyrouter">AnyRouter</div>
+            <div class="pm-preset-pill" data-preset="stepfun">StepFun (阶跃星辰)</div>
+            <div class="pm-preset-pill" data-preset="anthropic">Anthropic (原生)</div>
+            <div class="pm-preset-pill" data-preset="custom">自定义服务 (Custom)</div>
+          </div>
+        </div>
+
+        <!-- 供应商核心表单 -->
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputProviderName">供应商名称</label>
+            <input type="text" id="inputProviderName" placeholder="例如：OpenCode Go 主连接" value="OpenCode Go">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputProtocol">
+              <span>上游协议格式</span>
+              <span class="pm-field-hint">单个 Provider 只支持一种协议</span>
+            </label>
+            <select id="inputProtocol">
+              <option value="responses" selected>OpenAI Responses 规范 (流式 & 工具调用)</option>
+              <option value="messages">Anthropic Messages 规范 (原生 Claude)</option>
+              <option value="chat_completions">OpenAI Chat Completions 规范</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputBaseUrl">服务请求地址 (Base URL)</label>
+            <input type="text" id="inputBaseUrl" placeholder="https://api.example.com/v1" value="https://opencode.ai/zen/go/v1">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputDocUrl">官方网站或文档</label>
+            <input type="text" id="inputDocUrl" placeholder="https://..." value="https://opencode.ai/docs/go">
+          </div>
+        </div>
+
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputApiKey">
+              <span>API 凭据 (Key)</span>
+              <span class="pm-field-hint">凭据保存在本地环境变量引用中</span>
+            </label>
+            <input type="password" id="inputApiKey" placeholder="输入密钥（仅用于测试连通与拉取模型）" value="sk-demo-live-key-928472">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputCredRef">环境变量引用标识</label>
+            <input type="text" id="inputCredRef" placeholder="例如：OPENCODE_GO_KEY" value="OPENCODE_GO_KEY">
+          </div>
+        </div>
+
+        <div class="pm-info-box">
+          💡 提示：依据 CC SWITCH 设计规范，每个服务实例仅对应一种上游协议格式。若需使用相同供应商的另一协议，可通过多次添加服务独立管理。
+        </div>
+
+        <!-- 高级选项折叠 -->
+        <details class="pm-advanced-details">
+          <summary>高级选项 (超时时间、模型列表地址覆盖)</summary>
+          <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="pm-form-grid-2">
+              <div class="pm-form-field">
+                <label for="inputTimeout">超时限制 (秒)</label>
+                <input type="number" id="inputTimeout" value="600">
+              </div>
+              <div class="pm-form-field">
+                <label for="inputModelsUrl">模型列表请求地址 (可覆写)</label>
+                <input type="text" id="inputModelsUrl" placeholder="留空则自动按上游协议规则推导 /models" value="">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 模型映射与获取 -->
+        <div class="pm-remote-models-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600;">模型映射列表</div>
+              <div class="pm-field-hint">从远端供应商自动获取可用模型，或手动指定所需模型</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="yp-btn small primary" id="btnFetchRemoteModels">⬇️ 获取模型列表</button>
+              <button type="button" class="yp-btn small" id="btnAddManualModel">+ 手动添加模型</button>
+            </div>
+          </div>
+
+          <!-- 候选池 -->
+          <div id="remoteCandidateContainer" style="display: none; border-top: 1px dashed var(--yp-line); padding-top: 10px;">
+            <div style="font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--yp-green);">
+              上游返回模型 (点击即可添加到下方映射列表)：
+            </div>
+            <div class="pm-candidate-chip-grid" id="candidateChipGrid"></div>
+          </div>
+
+          <!-- 模型映射表格 -->
+          <table class="pm-model-mapping-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">模型标识 (ID)</th>
+                <th style="width: 24%;">上下文窗口 (Tokens)</th>
+                <th style="width: 24%;">最大输出限制</th>
+                <th style="width: 14%;">准入状态</th>
+                <th style="width: 10%; text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="editorModelTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+          <button type="button" class="yp-btn" id="btnTestConnection">测试连接</button>
+          <button type="button" class="yp-btn primary" id="btnSaveProvider">保存服务配置</button>
+        </div>
+      </div>
+
+      <!-- 已配置服务列表 (折叠卡片库) -->
+      <section class="yp-section">
+        <div class="yp-section-title">
+          <div>
+            <h2>已配置的模型服务</h2>
+            <span class="yp-small" id="providerCountLabel">(共 ${modelState.providers.length} 个服务实例)</span>
+          </div>
+          <div style="font-size: 12px; color: var(--yp-muted);">点击卡片任意区域可展开详情与模型映射</div>
+        </div>
+        <div class="pm-provider-accordion-list" id="providerListContainer">
+          ${providerCardsHtml}
+        </div>
+      </section>
+
+      <!-- 页面最底端：全局三部门模型与 Effort 分配 -->
+      <div class="global-dept-bind-box">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 style="font-size: 15px; margin: 0;">🌐 三部门全局模型与 Effort 分配</h2>
+            <p class="yp-small" style="margin-top: 2px;">此处的配置对整个系统新事项生效。创建新事项时将冻结所选 Provider、模型及推理深度。</p>
+          </div>
+          <button class="yp-btn primary" type="button" onclick="toast('三部门全局模型绑定已保存！')">保存全局分配</button>
+        </div>
+
+        <div class="global-dept-grid">
+          ${globalDeptCardsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // 辅助函数与模型管理完整操作
+  function getAdmittedModels(providerId) {
+    const p = modelState.providers.find(item => item.id === providerId);
+    if (!p) return [];
+    return p.models.filter(m => m.status === '已准入');
+  }
+
+  window.toggleExpand = function(id) {
+    const item = modelState.providers.find(p => p.id === id);
+    if (item) {
+      item.expanded = !item.expanded;
+      render();
+    }
+  };
+
+  window.testSingleModel = function(pId, mId, e) {
+    e.stopPropagation();
+    toast(`正在对模型 [${mId}] 执行准入测试...`);
+    setTimeout(() => {
+      toast(`模型 [${mId}] 响应正常，验证通过！`);
+    }, 600);
+  };
+
+  window.deleteProvider = function(pId, e) {
+    e.stopPropagation();
+    const dependentDept = Object.keys(roles).find(k => globalDeptBindings[k].providerId === pId);
+    if (dependentDept) {
+      alert(`无法删除此 Provider：${roles[dependentDept].name}部 当前已绑定此连接！请先在底部更改绑定后再删除。`);
+      return;
+    }
+    const item = modelState.providers.find(p => p.id === pId);
+    if (!confirm(`确定要移除服务提供商「${item ? item.name : pId}」及其包含的所有模型吗？`)) return;
+    modelState.providers = modelState.providers.filter(p => p.id !== pId);
+    render();
+    toast("服务已移除");
+  };
+
+  window.openEditProvider = function(pId, e) {
+    if (e) e.stopPropagation();
+    const item = modelState.providers.find(p => p.id === pId);
+    if (!item) return;
+
+    modelState.editingProviderId = pId;
+    const panel = document.getElementById("providerEditor");
+    panel.style.display = "flex";
+    document.getElementById("editorTitle").textContent = `编辑模型服务：${item.name}`;
+    document.getElementById("inputProviderName").value = item.name;
+    document.getElementById("inputProtocol").value = item.protocol;
+    document.getElementById("inputBaseUrl").value = item.baseUrl;
+    document.getElementById("inputDocUrl").value = item.docUrl || "";
+    document.getElementById("inputCredRef").value = item.credRef;
+    document.getElementById("inputTimeout").value = item.timeout || 600;
+
+    modelState.currentFormModels = JSON.parse(JSON.stringify(item.models));
+    renderEditorModelTable();
+    panel.scrollIntoView({ behavior: "smooth" });
+  };
+
+  window.openAddProviderForm = function() {
+    modelState.editingProviderId = null;
+    const panel = document.getElementById("providerEditor");
+    panel.style.display = "flex";
+    document.getElementById("editorTitle").textContent = "添加模型服务";
+    document.getElementById("inputProviderName").value = "OpenCode Go";
+    document.getElementById("inputProtocol").value = "responses";
+    document.getElementById("inputBaseUrl").value = "https://opencode.ai/zen/go/v1";
+    document.getElementById("inputDocUrl").value = "https://opencode.ai/docs/go";
+    document.getElementById("inputCredRef").value = "OPENCODE_GO_KEY";
+    document.getElementById("inputTimeout").value = 600;
+
+    modelState.currentFormModels = JSON.parse(JSON.stringify(PRESETS["opencode-go"].models));
+    renderEditorModelTable();
+    document.getElementById("remoteCandidateContainer").style.display = "none";
+    panel.scrollIntoView({ behavior: "smooth" });
+  };
+
+  window.cancelEditProvider = function() {
+    document.getElementById("providerEditor").style.display = "none";
+  };
+
+  function renderEditorModelTable() {
+    const tbody = document.getElementById("editorModelTableBody");
+    if (!tbody) return;
+    if (modelState.currentFormModels.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--yp-muted); padding: 14px;">暂未添加模型，请点击上方“获取模型列表”或“手动添加模型”</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = modelState.currentFormModels.map((m, idx) => `
+      <tr>
+        <td><input type="text" value="${m.id}" onchange="updateFormModel(${idx}, 'id', this.value)" style="font-family: Consolas, monospace; border: 1px solid var(--yp-line); padding: 4px 6px; border-radius: 4px; width: 100%;"></td>
+        <td><input type="number" value="${m.window}" onchange="updateFormModel(${idx}, 'window', this.value)" style="border: 1px solid var(--yp-line); padding: 4px 6px; border-radius: 4px; width: 100%;"></td>
+        <td><input type="number" value="${m.maxOutput}" onchange="updateFormModel(${idx}, 'maxOutput', this.value)" style="border: 1px solid var(--yp-line); padding: 4px 6px; border-radius: 4px; width: 100%;"></td>
+        <td>
+          <span class="yp-tag ${m.status === '已准入' ? 'green' : 'amber'}">${m.status}</span>
+        </td>
+        <td style="text-align: right;">
+          <button type="button" class="yp-btn small danger-text" onclick="removeFormModel(${idx})">移除</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  window.updateFormModel = function(idx, key, val) {
+    if (key === 'window' || key === 'maxOutput') {
+      modelState.currentFormModels[idx][key] = parseInt(val, 10) || 0;
+    } else {
+      modelState.currentFormModels[idx][key] = val;
+    }
+  };
+
+  window.removeFormModel = function(idx) {
+    modelState.currentFormModels.splice(idx, 1);
+    renderEditorModelTable();
+  };
+
+  window.exportModelsJson = function() {
+    const json = JSON.stringify(modelState.providers, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "models-config.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("配置已导出为 JSON 文件");
+  };
+
+  // 全局三部门分配变更
+  window.updateGlobalProvider = function(deptKey, providerId) {
+    globalDeptBindings[deptKey].providerId = providerId;
+    const admitted = getAdmittedModels(providerId);
+    if (admitted.length) globalDeptBindings[deptKey].modelId = admitted[0].id;
+    render();
+    toast(`${roles[deptKey].name}部 Provider 调整为 ${providerId}`);
+  };
+
+  window.updateGlobalModel = function(deptKey, modelId) {
+    globalDeptBindings[deptKey].modelId = modelId;
+    toast(`${roles[deptKey].name}部 模型调整为 ${modelId}`);
+  };
+
+  window.updateGlobalEffort = function(deptKey, val) {
+    globalDeptBindings[deptKey].effortValue = parseInt(val, 10);
+    const tag = document.getElementById(`effort-tag-global-${deptKey}`);
+    const txt = document.getElementById(`effort-txt-global-${deptKey}`);
+    if (tag) tag.textContent = val == 1 ? '低' : val == 2 ? '中' : val == 3 ? '深' : '极';
+    if (txt) txt.textContent = effortTexts[val];
+  };
+
+  // 弹窗与部门操作
+  window.openDeptModelModal = function(deptKey) {
+    showDeptMenu = false;
+    const r = roles[deptKey];
+    const bind = globalDeptBindings[deptKey];
+    const modal = document.getElementById('modalContainer');
+
+    modal.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-head">
+          <strong>${r.icon} ${r.name}部 · 模型与 Effort 配置</strong>
+          <button class="yp-btn small" type="button" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="yp-small">针对当前部门选择要使用的 Provider 配置与模型访问定义。只有通过模型测试（已准入）的模型才可被选用。</p>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; color: var(--yp-muted);">指定 Provider 配置</label>
+            <select id="modalProvSelect" onchange="modalProviderChanged('${deptKey}', this.value)" style="width:100%; border:1px solid var(--yp-line); padding:6px; border-radius:4px; font-size:12px; background:var(--yp-surface);">
+              ${modelState.providers.map(p => `<option value="${p.id}" ${p.id === bind.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; color: var(--yp-muted);">模型访问定义 (仅限已准入)</label>
+            <select id="modalModelSelect" style="width:100%; border:1px solid var(--yp-line); padding:6px; border-radius:4px; font-size:12px; background:var(--yp-surface);">
+              ${getAdmittedModels(bind.providerId).map(m => `<option value="${m.id}" ${m.id === bind.modelId ? 'selected' : ''}>${m.id} (窗 ${m.window.toLocaleString()} · 出 ${m.maxOutput.toLocaleString()})</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; color: var(--yp-muted);">思考 / 努力程度 (Effort: <span id="modalEffortTxt">${effortTexts[bind.effortValue]}</span>)</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="range" min="1" max="4" value="${bind.effortValue}" oninput="modalEffortChanged(this.value)" style="flex:1; accent-color: var(--yp-green);">
+              <span style="font-size: 11px; font-weight: 600; color: var(--yp-green); min-width: 32px; text-align: right;" id="modalEffortTag">${bind.effortValue === 1 ? '低' : bind.effortValue === 2 ? '中' : bind.effortValue === 3 ? '深' : '极'}</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="yp-btn small" type="button" onclick="closeModal()">取消</button>
+          <button class="yp-btn small primary" type="button" onclick="saveDeptModelModal('${deptKey}')">保存部门配置</button>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+  };
+
+  window.openDeptPromptModal = function(deptKey) {
+    showDeptMenu = false;
+    const r = roles[deptKey];
+    const bind = globalDeptBindings[deptKey];
+    const modal = document.getElementById('modalContainer');
+
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width: 640px;">
+        <div class="modal-head">
+          <strong>${r.icon} ${r.name}部 · 部门 Prompt 设置</strong>
+          <button class="yp-btn small" type="button" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="yp-small">编辑本部门执行 Agent 的 System Prompt 规则。修改后将在该部门下一次激活工作时载入。</p>
+          <textarea id="modalPromptText" style="width: 100%; min-height: 180px; border: 1px solid var(--yp-line); border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.6; background: var(--yp-bg); font-family: monospace;">${bind.prompt}</textarea>
+        </div>
+        <div class="modal-foot">
+          <button class="yp-btn small" type="button" onclick="closeModal()">取消</button>
+          <button class="yp-btn small primary" type="button" onclick="saveDeptPromptModal('${deptKey}')">保存 Prompt</button>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+  };
+
+  window.closeModal = function() {
+    document.getElementById('modalContainer').style.display = 'none';
+  };
+
+  window.modalProviderChanged = function(deptKey, providerId) {
+    const sel = document.getElementById('modalModelSelect');
+    sel.innerHTML = getAdmittedModels(providerId).map(m => `<option value="${m.id}">${m.id} (窗 ${m.window.toLocaleString()} · 出 ${m.maxOutput.toLocaleString()})</option>`).join('');
+  };
+
+  window.modalEffortChanged = function(val) {
+    document.getElementById('modalEffortTxt').textContent = effortTexts[val];
+    document.getElementById('modalEffortTag').textContent = val == 1 ? '低' : val == 2 ? '中' : val == 3 ? '深' : '极';
+  };
+
+  window.saveDeptModelModal = function(deptKey) {
+    const pId = document.getElementById('modalProvSelect').value;
+    const mId = document.getElementById('modalModelSelect').value;
+    globalDeptBindings[deptKey].providerId = pId;
+    globalDeptBindings[deptKey].modelId = mId;
+    closeModal();
+    render();
+    toast(`${roles[deptKey].name}部模型配置已更新`);
+  };
+
+  window.saveDeptPromptModal = function(deptKey) {
+    const text = document.getElementById('modalPromptText').value.trim();
+    if (!text) {
+      alert('Prompt 内容不能为空！');
+      return;
+    }
+    globalDeptBindings[deptKey].prompt = text;
+    closeModal();
+    toast(`${roles[deptKey].name}部 Prompt 规则已更新`);
+  };
+
+  window.toggleDeptMenu = function(e) {
+    e.stopPropagation();
+    showDeptMenu = !showDeptMenu;
+    render();
+  };
+
+  document.addEventListener('click', () => {
+    if (showDeptMenu) {
+      showDeptMenu = false;
+      render();
+    }
+  });
+
+  window.navigate = function(page) {
+    currentPage = page;
+    showDeptMenu = false;
+    render();
+  };
+
+  window.navigateProject = function(id) {
+    toast(`切换到项目：${id === 'cargo' ? '货物装载规划' : '实验记录助手'}`);
+  };
+
+  window.toggleSubagent = function(deptKey) {
+    globalDeptBindings[deptKey].subagentActive = !globalDeptBindings[deptKey].subagentActive;
+    render();
+    toast(globalDeptBindings[deptKey].subagentActive ? '已派发 SubAgent 协同就座！' : 'SubAgent 已完成任务离场');
+  };
+
+  window.simulatePixelAction = function(deptKey) {
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (!bubble) return;
+    const old = bubble.textContent;
+    bubble.textContent = '执行工具：run_check...';
+    setTimeout(() => { bubble.textContent = old; }, 1400);
+    toast('小人执行工具操作');
+  };
+
+  window.sendHumanInput = function(deptKey) {
+    const input = document.getElementById(`humanInput-${deptKey}`);
+    const val = input.value.trim();
+    if (!val) {
+      alert('请输入要下达的指导内容！');
+      return;
+    }
+    const log = document.getElementById(`roomLog-${deptKey}`);
+    if (log) {
+      const now = new Date().toTimeString().slice(0, 8);
+      const row = document.createElement('div');
+      row.className = 'pixel-log-row';
+      row.innerHTML = `<span class="pixel-log-time">${now}</span><span class="pixel-log-msg">[人类指导] ${val}</span>`;
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+    input.value = '';
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (bubble) bubble.textContent = '收到人类指令，正在重算任务！';
+    toast('指导已注入部门下轮 Context！');
+  };
+
+  function bindModelManagementEvents() {
+    if (currentPage !== 'model-management') return;
+
+    // 绑定预置药丸点击
+    document.querySelectorAll(".pm-preset-pill").forEach(pill => {
+      pill.onclick = () => {
+        document.querySelectorAll(".pm-preset-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+
+        const presetKey = pill.dataset.preset;
+        const config = PRESETS[presetKey];
+        if (!config) return;
+
+        document.getElementById("inputProviderName").value = config.name;
+        document.getElementById("inputProtocol").value = config.protocol;
+        document.getElementById("inputBaseUrl").value = config.baseUrl;
+        document.getElementById("inputDocUrl").value = config.docUrl;
+        document.getElementById("inputCredRef").value = config.credRef;
+
+        modelState.currentFormModels = JSON.parse(JSON.stringify(config.models));
+        renderEditorModelTable();
+
+        const candidateArea = document.getElementById("remoteCandidateContainer");
+        if (candidateArea) candidateArea.style.display = "none";
+        toast(`已加载 [${config.name}] 推荐预置`);
+      };
+    });
+
+    // 绑定获取模型列表
+    const fetchBtn = document.getElementById("btnFetchRemoteModels");
+    if (fetchBtn) {
+      fetchBtn.onclick = () => {
+        const activePill = document.querySelector(".pm-preset-pill.active");
+        const presetKey = activePill ? activePill.dataset.preset : "custom";
+        const config = PRESETS[presetKey] || PRESETS.custom;
+
+        toast("正在连接上游 /models 接口拉取可用模型...");
+        setTimeout(() => {
+          const grid = document.getElementById("candidateChipGrid");
+          grid.innerHTML = config.remoteCandidates.map(candidateId => `
+            <div class="pm-candidate-chip" onclick="addCandidateToModels('${candidateId}')">
+              <span>+</span> <span>${candidateId}</span>
+            </div>
+          `).join("");
+
+          document.getElementById("remoteCandidateContainer").style.display = "block";
+          toast(`成功获取到 ${config.remoteCandidates.length} 个远端模型，点击即可勾选添加`);
+        }, 600);
+      };
+    }
+
+    // 绑定手动添加一行
+    const addManualBtn = document.getElementById("btnAddManualModel");
+    if (addManualBtn) {
+      addManualBtn.onclick = () => {
+        modelState.currentFormModels.push({
+          id: "new-custom-model",
+          window: 64000,
+          maxOutput: 4096,
+          status: "待核验"
+        });
+        renderEditorModelTable();
+      };
+    }
+
+    // 绑定测试连接
+    const testConnBtn = document.getElementById("btnTestConnection");
+    if (testConnBtn) {
+      testConnBtn.onclick = () => {
+        const url = document.getElementById("inputBaseUrl").value;
+        toast(`正在向 ${url} 发起连通性探针探测...`);
+        setTimeout(() => {
+          toast("连接成功！端点握手正常 (耗时 142ms)");
+        }, 600);
+      };
+    }
+
+    // 绑定保存 Provider
+    const saveProvBtn = document.getElementById("btnSaveProvider");
+    if (saveProvBtn) {
+      saveProvBtn.onclick = () => {
+        const name = document.getElementById("inputProviderName").value.trim();
+        const protocol = document.getElementById("inputProtocol").value;
+        const baseUrl = document.getElementById("inputBaseUrl").value.trim();
+        const credRef = document.getElementById("inputCredRef").value.trim();
+        const timeout = parseInt(document.getElementById("inputTimeout").value, 10) || 600;
+
+        if (!name || !baseUrl) {
+          alert("请填写供应商名称与服务地址！");
+          return;
+        }
+
+        if (modelState.currentFormModels.length === 0) {
+          if (!confirm("当前尚未映射任何模型，是否继续保存？")) return;
+        }
+
+        if (modelState.editingProviderId) {
+          const target = modelState.providers.find(p => p.id === modelState.editingProviderId);
+          if (target) {
+            target.name = name;
+            target.protocol = protocol;
+            target.baseUrl = baseUrl;
+            target.credRef = credRef;
+            target.timeout = timeout;
+            target.models = JSON.parse(JSON.stringify(modelState.currentFormModels));
+          }
+          toast("服务配置已更新");
+        } else {
+          const newId = "p-" + Date.now().toString(36);
+          modelState.providers.unshift({
+            id: newId,
+            name: name,
+            protocol: protocol,
+            baseUrl: baseUrl,
+            docUrl: document.getElementById("inputDocUrl").value.trim(),
+            credRef: credRef,
+            timeout: timeout,
+            expanded: true,
+            models: JSON.parse(JSON.stringify(modelState.currentFormModels))
+          });
+          toast("新增服务已保存并折叠归档");
+        }
+
+        document.getElementById("providerEditor").style.display = "none";
+        render();
+      };
+    }
+  }
+
+  window.addCandidateToModels = function(modelId) {
+    const exists = modelState.currentFormModels.some(m => m.id === modelId);
+    if (exists) {
+      toast(`模型 ${modelId} 已存在于映射列表中`);
+      return;
+    }
+    modelState.currentFormModels.push({
+      id: modelId,
+      window: 128000,
+      maxOutput: 8192,
+      status: "待核验"
+    });
+    renderEditorModelTable();
+    toast(`已添加模型：${modelId}`);
+  };
+
+  // 主渲染
+  function render() {
+    const container = document.getElementById('mainContent');
+    if (currentPage === 'overview') {
+      container.innerHTML = renderOverview();
+    } else if (roles[currentPage]) {
+      container.innerHTML = renderDepartment(currentPage);
+    } else if (currentPage === 'model-management') {
+      container.innerHTML = renderModelManagement();
+      bindModelManagementEvents();
+    } else if (currentPage === 'sources') {
+      container.innerHTML = `${renderNavTabs()}<div class="yp-section"><h2>资料与依据</h2><p class="yp-small">这里是项目长期保留的资料说明与三部门依据。</p></div>`;
+    } else if (currentPage === 'settings') {
+      container.innerHTML = `${renderNavTabs()}<div class="yp-section"><h2>项目设置</h2><p class="yp-small">调整项目名称、目标及关联位置。</p></div>`;
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

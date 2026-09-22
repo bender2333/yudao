@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 模型管理</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --font-sans: "Microsoft YaHei UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --color-primary: light-dark(#087f69, #56d1b3);
+      --color-primary-hover: light-dark(#066b58, #48b89e);
+      --color-primary-text: light-dark(#ffffff, #10231d);
+      --color-bg-page: light-dark(#f4f5f5, #141615);
+      --color-bg-card: light-dark(#ffffff, #1d201e);
+      --color-bg-subtle: light-dark(#f9faf9, #242826);
+      --color-border: light-dark(#dfe2e0, #363b38);
+      --color-border-subtle: light-dark(#ebedec, #2c302e);
+      --color-text-main: light-dark(#1f2321, #ecedeb);
+      --color-text-muted: light-dark(#6b726f, #9ba19e);
+      --color-text-dim: light-dark(#9aa09d, #6c7370);
+      --color-status-ok: light-dark(#087f69, #56d1b3);
+      --color-status-warn: light-dark(#b25e00, #f5a623);
+      --color-status-danger: light-dark(#d03a3a, #ff6b6b);
+      --color-tag-bg: light-dark(#e6f4f0, #16362e);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      background-color: var(--color-bg-page);
+      color: var(--color-text-main);
+    }
+
+    /* 顶部导航 */
+    header {
+      background: var(--color-bg-card);
+      border-bottom: 1px solid var(--color-border);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-eyebrow {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span.badge {
+      font-size: 11px;
+      background: var(--color-tag-bg);
+      color: var(--color-primary);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 主容器 */
+    main {
+      max-width: 1040px;
+      margin: 28px auto 80px;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* 按钮规范 */
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-main);
+      padding: 7px 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      font-weight: 500;
+    }
+
+    button:hover {
+      background: var(--color-bg-subtle);
+      border-color: var(--color-primary);
+    }
+
+    button.primary {
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      border-color: transparent;
+    }
+
+    button.primary:hover {
+      background: var(--color-primary-hover);
+    }
+
+    button.danger-text {
+      border: none;
+      background: transparent;
+      color: var(--color-status-danger);
+      padding: 4px 8px;
+    }
+
+    button.danger-text:hover {
+      background: light-dark(#feecec, #3b1e1e);
+    }
+
+    button.small {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    /* 表单控件 */
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-main);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px light-dark(rgba(8, 127, 105, 0.15), rgba(86, 209, 179, 0.2));
+    }
+
+    input[readonly] {
+      background: var(--color-bg-subtle);
+      color: var(--color-text-muted);
+      cursor: not-allowed;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-field label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .field-hint {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    .info-box {
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      background: light-dark(#fef9ed, #2a2213);
+      color: light-dark(#8a5400, #f3b949);
+      border: 1px solid light-dark(#faecc8, #42361c);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.6;
+    }
+
+    /* 卡片通用 */
+    .card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    /* 区域头部栏 */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-counter {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    /* 折叠卡片列表 */
+    .provider-accordion-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .provider-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-card);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .provider-card.expanded {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+    }
+
+    .provider-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: var(--color-bg-card);
+      border-radius: var(--radius-md);
+    }
+
+    .provider-header:hover {
+      background: var(--color-bg-subtle);
+    }
+
+    .provider-main-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .provider-icon-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: light-dark(#eef0ef, #272b29);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--color-text-main);
+    }
+
+    .provider-titles {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .provider-name {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .protocol-tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: light-dark(#ebedec, #2a2e2c);
+      color: var(--color-text-muted);
+    }
+
+    .provider-endpoint {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-family: Consolas, monospace;
+    }
+
+    .provider-indicators {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-pill {
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .dot.ok { background: var(--color-status-ok); }
+    .dot.warn { background: var(--color-status-warn); }
+    .dot.danger { background: var(--color-status-danger); }
+
+    .chevron-icon {
+      font-size: 12px;
+      color: var(--color-text-dim);
+      transition: transform 0.2s ease;
+    }
+
+    .provider-card.expanded .chevron-icon {
+      transform: rotate(180deg);
+    }
+
+    .provider-body {
+      border-top: 1px solid var(--color-border);
+      padding: 20px;
+      background: var(--color-bg-subtle);
+      border-bottom-left-radius: var(--radius-md);
+      border-bottom-right-radius: var(--radius-md);
+    }
+
+    /* 模型映射列表表格 */
+    .model-mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .model-mapping-table th {
+      text-align: left;
+      padding: 8px 10px;
+      color: var(--color-text-muted);
+      font-weight: 500;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .model-mapping-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--color-border-subtle);
+      vertical-align: middle;
+    }
+
+    .model-mapping-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .model-row-name {
+      font-weight: 600;
+      font-family: Consolas, monospace;
+    }
+
+    .model-row-meta {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    /* 添加/编辑表单面板 */
+    .editor-panel {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .preset-pill-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .preset-pill {
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 500;
+    }
+
+    .preset-pill.active {
+      border-color: var(--color-primary);
+      background: var(--color-tag-bg);
+      color: var(--color-primary);
+    }
+
+    /* 高级选项折叠 */
+    details.advanced-details {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      background: var(--color-bg-subtle);
+    }
+
+    details.advanced-details summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      user-select: none;
+    }
+
+    details.advanced-details summary:hover {
+      color: var(--color-text-main);
+    }
+
+    .advanced-content {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* 获取模型弹窗/面板 */
+    .remote-models-box {
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .remote-models-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .remote-models-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .candidate-chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .candidate-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-subtle);
+      border-radius: var(--radius-sm);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: Consolas, monospace;
+    }
+
+    .candidate-chip:hover {
+      border-color: var(--color-primary);
+      background: var(--color-tag-bg);
+    }
+
+    .candidate-chip.selected {
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      border-color: transparent;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      padding: 32px;
+      text-align: center;
+      color: var(--color-text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--color-text-main);
+      color: var(--color-bg-card);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 768px) {
+      .form-grid-2 { grid-template-columns: 1fr; }
+      header { padding: 14px 18px; }
+      main { padding: 0 16px; margin-top: 18px; }
+      .provider-indicators { flex-direction: column; align-items: flex-end; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-eyebrow">配置中心 · 资源视角</div>
+      <h1 class="brand-title">模型管理 <span class="badge">已连接 3 项服务</span></h1>
+    </div>
+    <div class="header-actions">
+      <button type="button" id="btnExport">导出 JSON</button>
+      <button type="button" class="primary" id="btnOpenAddForm">+ 添加模型服务</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- 添加 / 编辑服务面板 -->
+    <div class="card editor-panel" id="providerEditor" style="display: none;">
+      <div class="panel-header">
+        <div class="panel-title" id="editorTitle">添加模型服务</div>
+        <button type="button" class="small" id="btnCancelEdit">关闭</button>
+      </div>
+
+      <!-- 供应商预置方案选择 -->
+      <div class="form-field">
+        <label>
+          <span>服务方案模板</span>
+          <span class="field-hint">选择预置供应商可自动填写协议、端点与凭据格式</span>
+        </label>
+        <div class="preset-pill-group" id="presetGroup">
+          <div class="preset-pill active" data-preset="opencode-go">OpenCode Go</div>
+          <div class="preset-pill" data-preset="anyrouter">AnyRouter</div>
+          <div class="preset-pill" data-preset="stepfun">StepFun (阶跃星辰)</div>
+          <div class="preset-pill" data-preset="anthropic">Anthropic (原生)</div>
+          <div class="preset-pill" data-preset="custom">自定义服务 (Custom)</div>
+        </div>
+      </div>
+
+      <!-- 供应商核心表单 -->
+      <div class="form-grid-2">
+        <div class="form-field">
+          <label for="inputProviderName">供应商名称</label>
+          <input type="text" id="inputProviderName" placeholder="例如：OpenCode Go 主连接" value="OpenCode Go">
+        </div>
+        <div class="form-field">
+          <label for="inputProtocol">
+            <span>上游协议格式</span>
+            <span class="field-hint">单个 Provider 只支持一种协议</span>
+          </label>
+          <select id="inputProtocol">
+            <option value="responses" selected>OpenAI Responses 规范 (流式 & 工具调用)</option>
+            <option value="messages">Anthropic Messages 规范 (原生 Claude)</option>
+            <option value="chat_completions">OpenAI Chat Completions 规范</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-field">
+          <label for="inputBaseUrl">服务请求地址 (Base URL)</label>
+          <input type="text" id="inputBaseUrl" placeholder="https://api.example.com/v1" value="https://opencode.ai/zen/go/v1">
+        </div>
+        <div class="form-field">
+          <label for="inputDocUrl">官方网站或文档</label>
+          <input type="text" id="inputDocUrl" placeholder="https://..." value="https://opencode.ai/docs/go">
+        </div>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-field">
+          <label for="inputApiKey">
+            <span>API 凭据 (Key)</span>
+            <span class="field-hint">凭据保存在本地环境变量引用中</span>
+          </label>
+          <input type="password" id="inputApiKey" placeholder="输入密钥（仅用于测试连通与拉取模型）" value="sk-demo-live-key-928472">
+        </div>
+        <div class="form-field">
+          <label for="inputCredRef">环境变量引用标识</label>
+          <input type="text" id="inputCredRef" placeholder="例如：OPENCODE_GO_KEY" value="OPENCODE_GO_KEY">
+        </div>
+      </div>
+
+      <div class="info-box">
+        💡 提示：依据 CC SWITCH 设计规范，每个服务实例仅对应一种上游协议格式。若需使用相同供应商的另一协议，可通过多次添加服务独立管理。
+      </div>
+
+      <!-- 高级选项折叠 -->
+      <details class="advanced-details">
+        <summary>高级选项 (超时时间、模型列表地址覆盖)</summary>
+        <div class="advanced-content">
+          <div class="form-grid-2">
+            <div class="form-field">
+              <label for="inputTimeout">超时限制 (秒)</label>
+              <input type="number" id="inputTimeout" value="600">
+            </div>
+            <div class="form-field">
+              <label for="inputModelsUrl">模型列表请求地址 (可覆写)</label>
+              <input type="text" id="inputModelsUrl" placeholder="留空则自动按上游协议规则推导 /models" value="">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 模型映射与获取 -->
+      <div class="remote-models-box">
+        <div class="remote-models-header">
+          <div>
+            <div class="remote-models-title">模型映射列表</div>
+            <div class="field-hint">从远端供应商自动获取可用模型，或手动指定所需模型</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="primary small" id="btnFetchRemoteModels">⬇️ 获取模型列表</button>
+            <button type="button" class="small" id="btnAddManualModel">+ 手动添加模型</button>
+          </div>
+        </div>
+
+        <!-- 获取到的候选模型暂存池 -->
+        <div id="remoteCandidateContainer" style="display: none; border-top: 1px dashed var(--color-border); padding-top: 10px;">
+          <div style="font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--color-primary);">
+            上游返回模型 (点击即可添加到下方映射列表)：
+          </div>
+          <div class="candidate-chip-grid" id="candidateChipGrid">
+            <!-- 动态生成 -->
+          </div>
+        </div>
+
+        <!-- 模型列表表格 -->
+        <table class="model-mapping-table">
+          <thead>
+            <tr>
+              <th style="width: 28%;">模型标识 (ID)</th>
+              <th style="width: 24%;">上下文窗口 (Tokens)</th>
+              <th style="width: 24%;">最大输出限制</th>
+              <th style="width: 14%;">准入状态</th>
+              <th style="width: 10%; text-align: right;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="editorModelTableBody">
+            <!-- 动态行 -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+        <button type="button" id="btnTestConnection">测试连接</button>
+        <button type="button" class="primary" id="btnSaveProvider">保存服务配置</button>
+      </div>
+    </div>
+
+    <!-- 已配置服务列表 (折叠卡片库) -->
+    <div class="section-header">
+      <div class="section-title">
+        <span>已配置的模型服务</span>
+        <span class="section-counter" id="providerCountLabel">(共 2 个服务实例)</span>
+      </div>
+      <div style="font-size: 12px; color: var(--color-text-muted);">
+        点击卡片任意区域可展开详情与模型映射
+      </div>
+    </div>
+
+    <div class="provider-accordion-list" id="providerListContainer">
+      <!-- 动态卡片列表渲染 -->
+    </div>
+
+  </main>
+
+  <div class="toast-msg" id="toastMsg">操作成功</div>
+
+  <script>
+    // 预置方案定义
+    const PRESETS = {
+      "opencode-go": {
+        name: "OpenCode Go",
+        protocol: "responses",
+        baseUrl: "https://opencode.ai/zen/go/v1",
+        docUrl: "https://opencode.ai/docs/go",
+        credRef: "OPENCODE_GO_KEY",
+        models: [
+          { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+          { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" }
+        ],
+        remoteCandidates: ["gpt-5.6-terra", "claude-3-7-sonnet", "deepseek-v3", "glm-5.1-chat", "gemini-2.5-pro"]
+      },
+      "anyrouter": {
+        name: "AnyRouter 集成",
+        protocol: "chat_completions",
+        baseUrl: "https://anyrouter.top/v1",
+        docUrl: "https://anyrouter.top",
+        credRef: "ANYROUTER_API_KEY",
+        models: [
+          { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+          { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "待核验" }
+        ],
+        remoteCandidates: ["deepseek-chat", "deepseek-reasoner", "qwen-2.5-72b", "llama-3.3-70b", "kimi-k1.5"]
+      },
+      "stepfun": {
+        name: "StepFun (阶跃星辰)",
+        protocol: "chat_completions",
+        baseUrl: "https://api.stepfun.com/v1",
+        docUrl: "https://platform.stepfun.com",
+        credRef: "STEPFUN_API_KEY",
+        models: [
+          { id: "step-2-16k", window: 16000, maxOutput: 4096, status: "已准入" }
+        ],
+        remoteCandidates: ["step-1-8k", "step-2-16k", "step-1-32k", "step-1-128k"]
+      },
+      "anthropic": {
+        name: "Anthropic 原生服务",
+        protocol: "messages",
+        baseUrl: "https://api.anthropic.com/v1",
+        docUrl: "https://docs.anthropic.com",
+        credRef: "ANTHROPIC_API_KEY",
+        models: [
+          { id: "claude-3-5-sonnet-20241022", window: 200000, maxOutput: 8192, status: "已准入" }
+        ],
+        remoteCandidates: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+      },
+      "custom": {
+        name: "自定义模型网关",
+        protocol: "chat_completions",
+        baseUrl: "https://",
+        docUrl: "",
+        credRef: "CUSTOM_API_KEY",
+        models: [],
+        remoteCandidates: ["custom-gpt-4o", "custom-model-fast", "custom-reasoner"]
+      }
+    };
+
+    // 系统初始已配置 Provider 数据
+    let state = {
+      providers: [
+        {
+          id: "p-opencode-01",
+          name: "OpenCode Go 主线路",
+          protocol: "responses",
+          baseUrl: "https://opencode.ai/zen/go/v1",
+          docUrl: "https://opencode.ai/docs/go",
+          credRef: "OPENCODE_GO_KEY",
+          timeout: 600,
+          expanded: false,
+          models: [
+            { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+            { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" }
+          ]
+        },
+        {
+          id: "p-anyrouter-02",
+          name: "AnyRouter 备用网关",
+          protocol: "chat_completions",
+          baseUrl: "https://anyrouter.top/v1",
+          docUrl: "https://anyrouter.top",
+          credRef: "ANYROUTER_API_KEY",
+          timeout: 300,
+          expanded: false,
+          models: [
+            { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+            { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "待核验" }
+          ]
+        }
+      ],
+      editingProviderId: null,
+      currentFormModels: []
+    };
+
+    // 辅助工具：展示 Toast
+    function showToast(msg) {
+      const el = document.getElementById("toastMsg");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2500);
+    }
+
+    // 协议文本映射
+    function protocolLabel(val) {
+      if (val === "responses") return "OpenAI Responses";
+      if (val === "messages") return "Anthropic Messages";
+      if (val === "chat_completions") return "Chat Completions";
+      return val;
+    }
+
+    // 渲染卡片列表
+    function renderProviderList() {
+      const container = document.getElementById("providerListContainer");
+      document.getElementById("providerCountLabel").textContent = `(共 ${state.providers.length} 个服务实例)`;
+
+      if (state.providers.length === 0) {
+        container.innerHTML = `
+          <div class="card empty-state">
+            <div>暂无配置的模型服务</div>
+            <div style="font-size: 12px;">点击右上角“+ 添加模型服务”创建第一份连接</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = state.providers.map(item => {
+        const isExpanded = item.expanded;
+        const initial = item.name.slice(0, 1).toUpperCase();
+        const modelCount = item.models.length;
+
+        // 生成模型表格
+        const modelRows = item.models.map(m => `
+          <tr>
+            <td class="model-row-name">${m.id}</td>
+            <td>${m.window.toLocaleString()}</td>
+            <td>${m.maxOutput.toLocaleString()}</td>
+            <td>
+              <span class="status-pill">
+                <span class="dot ${m.status === '已准入' ? 'ok' : 'warn'}"></span>
+                <span>${m.status}</span>
+              </span>
+            </td>
+            <td style="text-align: right;">
+              <button type="button" class="small" onclick="testSingleModel('${item.id}', '${m.id}', event)">单项测试</button>
+            </td>
+          </tr>
+        `).join("");
+
+        return `
+          <div class="provider-card ${isExpanded ? 'expanded' : ''}" id="card-${item.id}">
+            <div class="provider-header" onclick="toggleExpand('${item.id}')">
+              <div class="provider-main-meta">
+                <div class="provider-icon-badge">${initial}</div>
+                <div class="provider-titles">
+                  <div class="provider-name">
+                    <span>${item.name}</span>
+                    <span class="protocol-tag">${protocolLabel(item.protocol)}</span>
+                  </div>
+                  <div class="provider-endpoint">${item.baseUrl}</div>
+                </div>
+              </div>
+              <div class="provider-indicators">
+                <div class="status-pill">
+                  <span class="dot ok"></span>
+                  <span>凭据就绪 (${item.credRef})</span>
+                </div>
+                <div style="font-size: 13px; color: var(--color-text-muted);">
+                  包含 <strong>${modelCount}</strong> 个模型
+                </div>
+                <div class="chevron-icon">▼</div>
+              </div>
+            </div>
+
+            ${isExpanded ? `
+              <div class="provider-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div style="font-size: 13px; font-weight: 600;">已映射模型清单</div>
+                  <div style="display: flex; gap: 8px;">
+                    <button type="button" class="small" onclick="openEditProvider('${item.id}', event)">编辑服务</button>
+                    <button type="button" class="small danger-text" onclick="deleteProvider('${item.id}', event)">删除</button>
+                  </div>
+                </div>
+
+                <table class="model-mapping-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 32%;">模型标识 (ID)</th>
+                      <th style="width: 25%;">上下文窗口 (Tokens)</th>
+                      <th style="width: 25%;">最大输出限制</th>
+                      <th style="width: 18%;">准入状态</th>
+                      <th style="text-align: right;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${modelRows || '<tr><td colspan="5" style="color: var(--color-text-muted);">暂无配置模型</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join("");
+    }
+
+    // 展开/收起
+    window.toggleExpand = function(id) {
+      const item = state.providers.find(p => p.id === id);
+      if (item) {
+        item.expanded = !item.expanded;
+        renderProviderList();
+      }
+    };
+
+    // 单个模型测试
+    window.testSingleModel = function(pId, mId, e) {
+      e.stopPropagation();
+      showToast(`正在对模型 [${mId}] 执行准入测试...`);
+      setTimeout(() => {
+        showToast(`模型 [${mId}] 响应正常，验证通过！`);
+      }, 700);
+    };
+
+    // 删除 Provider
+    window.deleteProvider = function(pId, e) {
+      e.stopPropagation();
+      const item = state.providers.find(p => p.id === pId);
+      if (!confirm(`确定要移除服务提供商「${item ? item.name : pId}」及其包含的所有模型吗？`)) return;
+      state.providers = state.providers.filter(p => p.id !== pId);
+      renderProviderList();
+      showToast("服务已移除");
+    };
+
+    // 打开编辑模式
+    window.openEditProvider = function(pId, e) {
+      if (e) e.stopPropagation();
+      const item = state.providers.find(p => p.id === pId);
+      if (!item) return;
+
+      state.editingProviderId = pId;
+      document.getElementById("editorTitle").textContent = `编辑模型服务：${item.name}`;
+      document.getElementById("inputProviderName").value = item.name;
+      document.getElementById("inputProtocol").value = item.protocol;
+      document.getElementById("inputBaseUrl").value = item.baseUrl;
+      document.getElementById("inputDocUrl").value = item.docUrl || "";
+      document.getElementById("inputCredRef").value = item.credRef;
+      document.getElementById("inputTimeout").value = item.timeout || 600;
+
+      // 模型深拷贝到当前工作区
+      state.currentFormModels = JSON.parse(JSON.stringify(item.models));
+      renderEditorModelTable();
+
+      document.getElementById("providerEditor").style.display = "flex";
+      document.getElementById("providerEditor").scrollIntoView({ behavior: "smooth" });
+    };
+
+    // 渲染编辑表单中的模型映射表格
+    function renderEditorModelTable() {
+      const tbody = document.getElementById("editorModelTableBody");
+      if (state.currentFormModels.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--color-text-muted); padding: 14px;">暂未添加模型，请点击上方“获取模型列表”或“手动添加模型”</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = state.currentFormModels.map((m, idx) => `
+        <tr>
+          <td><input type="text" value="${m.id}" onchange="updateFormModel(${idx}, 'id', this.value)" style="font-family: Consolas, monospace;"></td>
+          <td><input type="number" value="${m.window}" onchange="updateFormModel(${idx}, 'window', this.value)"></td>
+          <td><input type="number" value="${m.maxOutput}" onchange="updateFormModel(${idx}, 'maxOutput', this.value)"></td>
+          <td>
+            <span class="status-pill">
+              <span class="dot ${m.status === '已准入' ? 'ok' : 'warn'}"></span>
+              <span>${m.status}</span>
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button type="button" class="danger-text small" onclick="removeFormModel(${idx})">移除</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    window.updateFormModel = function(idx, key, val) {
+      if (key === 'window' || key === 'maxOutput') {
+        state.currentFormModels[idx][key] = parseInt(val, 10) || 0;
+      } else {
+        state.currentFormModels[idx][key] = val;
+      }
+    };
+
+    window.removeFormModel = function(idx) {
+      state.currentFormModels.splice(idx, 1);
+      renderEditorModelTable();
+    };
+
+    // 预置选项切换
+    document.querySelectorAll(".preset-pill").forEach(pill => {
+      pill.addEventListener("click", () => {
+        document.querySelectorAll(".preset-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+
+        const presetKey = pill.dataset.preset;
+        const config = PRESETS[presetKey];
+        if (!config) return;
+
+        document.getElementById("inputProviderName").value = config.name;
+        document.getElementById("inputProtocol").value = config.protocol;
+        document.getElementById("inputBaseUrl").value = config.baseUrl;
+        document.getElementById("inputDocUrl").value = config.docUrl;
+        document.getElementById("inputCredRef").value = config.credRef;
+
+        state.currentFormModels = JSON.parse(JSON.stringify(config.models));
+        renderEditorModelTable();
+
+        // 隐藏候选池
+        document.getElementById("remoteCandidateContainer").style.display = "none";
+        showToast(`已加载 [${config.name}] 推荐预置`);
+      });
+    });
+
+    // 获取远端模型列表按钮
+    document.getElementById("btnFetchRemoteModels").addEventListener("click", () => {
+      const activePill = document.querySelector(".preset-pill.active");
+      const presetKey = activePill ? activePill.dataset.preset : "custom";
+      const config = PRESETS[presetKey] || PRESETS.custom;
+
+      showToast("正在连接上游 /models 接口拉取可用模型...");
+      setTimeout(() => {
+        const grid = document.getElementById("candidateChipGrid");
+        grid.innerHTML = config.remoteCandidates.map(candidateId => `
+          <div class="candidate-chip" onclick="addCandidateToModels('${candidateId}')">
+            <span>+</span> <span>${candidateId}</span>
+          </div>
+        `).join("");
+
+        document.getElementById("remoteCandidateContainer").style.display = "block";
+        showToast(`成功获取到 ${config.remoteCandidates.length} 个远端模型，点击即可勾选添加`);
+      }, 600);
+    });
+
+    // 从候选池一键加入
+    window.addCandidateToModels = function(modelId) {
+      const exists = state.currentFormModels.some(m => m.id === modelId);
+      if (exists) {
+        showToast(`模型 ${modelId} 已存在于映射列表中`);
+        return;
+      }
+      state.currentFormModels.push({
+        id: modelId,
+        window: 128000,
+        maxOutput: 8192,
+        status: "待核验"
+      });
+      renderEditorModelTable();
+      showToast(`已添加模型：${modelId}`);
+    };
+
+    // 手动添加一行模型
+    document.getElementById("btnAddManualModel").addEventListener("click", () => {
+      state.currentFormModels.push({
+        id: "new-custom-model",
+        window: 64000,
+        maxOutput: 4096,
+        status: "待核验"
+      });
+      renderEditorModelTable();
+    });
+
+    // 开启新增表单
+    document.getElementById("btnOpenAddForm").addEventListener("click", () => {
+      state.editingProviderId = null;
+      document.getElementById("editorTitle").textContent = "添加模型服务";
+      document.getElementById("inputProviderName").value = "OpenCode Go";
+      document.getElementById("inputProtocol").value = "responses";
+      document.getElementById("inputBaseUrl").value = "https://opencode.ai/zen/go/v1";
+      document.getElementById("inputDocUrl").value = "https://opencode.ai/docs/go";
+      document.getElementById("inputCredRef").value = "OPENCODE_GO_KEY";
+      document.getElementById("inputTimeout").value = 600;
+
+      // 默认带入 OpenCode Go 模型
+      state.currentFormModels = JSON.parse(JSON.stringify(PRESETS["opencode-go"].models));
+      renderEditorModelTable();
+      document.getElementById("remoteCandidateContainer").style.display = "none";
+
+      const panel = document.getElementById("providerEditor");
+      panel.style.display = "flex";
+      panel.scrollIntoView({ behavior: "smooth" });
+    });
+
+    // 关闭表单
+    document.getElementById("btnCancelEdit").addEventListener("click", () => {
+      document.getElementById("providerEditor").style.display = "none";
+    });
+
+    // 测试连接
+    document.getElementById("btnTestConnection").addEventListener("click", () => {
+      const url = document.getElementById("inputBaseUrl").value;
+      showToast(`正在向 ${url} 发起连通性探针探测...`);
+      setTimeout(() => {
+        showToast("连接成功！端点握手正常 (耗时 142ms)");
+      }, 700);
+    });
+
+    // 保存 Provider
+    document.getElementById("btnSaveProvider").addEventListener("click", () => {
+      const name = document.getElementById("inputProviderName").value.trim();
+      const protocol = document.getElementById("inputProtocol").value;
+      const baseUrl = document.getElementById("inputBaseUrl").value.trim();
+      const credRef = document.getElementById("inputCredRef").value.trim();
+      const timeout = parseInt(document.getElementById("inputTimeout").value, 10) || 600;
+
+      if (!name || !baseUrl) {
+        alert("请填写供应商名称与服务地址！");
+        return;
+      }
+
+      if (state.currentFormModels.length === 0) {
+        if (!confirm("当前尚未映射任何模型，是否继续保存？")) return;
+      }
+
+      if (state.editingProviderId) {
+        // 更新已有项
+        const target = state.providers.find(p => p.id === state.editingProviderId);
+        if (target) {
+          target.name = name;
+          target.protocol = protocol;
+          target.baseUrl = baseUrl;
+          target.credRef = credRef;
+          target.timeout = timeout;
+          target.models = JSON.parse(JSON.stringify(state.currentFormModels));
+        }
+        showToast("服务配置已更新");
+      } else {
+        // 新建
+        const newId = "p-" + Date.now().toString(36);
+        state.providers.unshift({
+          id: newId,
+          name: name,
+          protocol: protocol,
+          baseUrl: baseUrl,
+          docUrl: document.getElementById("inputDocUrl").value.trim(),
+          credRef: credRef,
+          timeout: timeout,
+          expanded: true,
+          models: JSON.parse(JSON.stringify(state.currentFormModels))
+        });
+        showToast("新增服务已保存并折叠归档");
+      }
+
+      document.getElementById("providerEditor").style.display = "none";
+      renderProviderList();
+    });
+
+    // 导出 JSON
+    document.getElementById("btnExport").addEventListener("click", () => {
+      const json = JSON.stringify(state.providers, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "models-config.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("配置已导出为 JSON 文件");
+    });
+
+    // 初始化渲染
+    renderProviderList();
+  </script>
+</body>
+</html>
