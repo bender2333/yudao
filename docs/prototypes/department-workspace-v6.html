@@ -1,0 +1,2336 @@
+<!-- Yudao 综合工作台原型 v6 · 模型管理全局返回与 JSON 编辑器、卡片操作栏重构、三部门独立弹窗配置 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 项目工作台与协作 (v6)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { margin: 0; min-width: 0; min-height: 100%; background: light-dark(#f7f8f7, #171918); }
+    body { overflow-x: hidden; }
+
+    #yudao-project-prototype {
+      --yp-bg: light-dark(#f7f8f7, #171918);
+      --yp-side: light-dark(#eef1ef, #1c201d);
+      --yp-surface: light-dark(#fff, #212522);
+      --yp-soft: light-dark(#f1f4f2, #292e2a);
+      --yp-text: light-dark(#29312d, #e7eee9);
+      --yp-muted: light-dark(#68766e, #a4b1a8);
+      --yp-line: light-dark(#dce4de, #37443b);
+      --yp-green: light-dark(#087f69, #6bd8ba);
+      --yp-tint: light-dark(#e4f2eb, #243e32);
+      --yp-amber: light-dark(#96680e, #e2be71);
+      --yp-amber-bg: light-dark(#faf1dc, #3a3223);
+      --yp-red: light-dark(#b44338, #ee9e92);
+      --yp-blue: light-dark(#39658c, #95bde3);
+      font: 14px/1.6 "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+      color: var(--yp-text);
+      background: var(--yp-bg);
+      position: relative;
+      min-width: 0;
+      text-align: left;
+    }
+
+    #yudao-project-prototype * { box-sizing: border-box; }
+    #yudao-project-prototype [hidden] { display: none !important; }
+    #yudao-project-prototype button,
+    #yudao-project-prototype input,
+    #yudao-project-prototype textarea,
+    #yudao-project-prototype select { font: inherit; color: inherit; }
+    #yudao-project-prototype button { cursor: pointer; }
+    #yudao-project-prototype button:disabled { cursor: default; opacity: .55; }
+    #yudao-project-prototype h1,
+    #yudao-project-prototype h2,
+    #yudao-project-prototype h3,
+    #yudao-project-prototype p { margin: 0; }
+    #yudao-project-prototype h1 { font-size: 24px; font-weight: 500; line-height: 1.4; letter-spacing: -.4px; }
+    #yudao-project-prototype h2 { font-size: 16px; font-weight: 500; }
+    #yudao-project-prototype h3 { font-size: 14px; font-weight: 500; }
+    #yudao-project-prototype strong { font-weight: 500; }
+    #yudao-project-prototype svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+    /* 外壳骨架 */
+    #yudao-project-prototype .yp-shell { display: grid; grid-template-columns: 218px minmax(0, 1fr); min-height: 100vh; }
+    #yudao-project-prototype .yp-sidebar { background: var(--yp-side); border-right: 1px solid var(--yp-line); padding: 20px 13px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    #yudao-project-prototype .yp-brand { display: flex; align-items: center; gap: 9px; padding: 0 8px; font-size: 17px; font-weight: 500; letter-spacing: .3px; }
+    #yudao-project-prototype .yp-brand svg { color: var(--yp-green); width: 21px; height: 21px; }
+    #yudao-project-prototype .yp-proto { font-size: 10px; color: var(--yp-muted); border: 1px solid var(--yp-line); border-radius: 4px; padding: 1px 4px; letter-spacing: 1px; margin-left: auto; }
+    #yudao-project-prototype .yp-muted { color: var(--yp-muted); }
+    #yudao-project-prototype .yp-small { font-size: 12px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-row { display: flex; align-items: center; gap: 9px; min-width: 0; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-between { justify-content: space-between; }
+    #yudao-project-prototype .yp-side-label { display: flex; align-items: center; justify-content: space-between; padding: 0 9px; margin: 0 0 8px; font-size: 11px; letter-spacing: 1px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; border-radius: 6px; padding: 7px; min-width: 30px; min-height: 30px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--yp-line); background: var(--yp-surface); border-radius: 7px; padding: 7px 9px; margin-top: 10px; }
+    #yudao-project-prototype .yp-search input { width: 100%; min-width: 0; border: 0; background: transparent; font-size: 12px; padding: 0; outline: none; }
+    #yudao-project-prototype .yp-project-list { display: grid; gap: 3px; }
+    #yudao-project-prototype .yp-project { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 7px; display: flex; gap: 8px; text-align: left; align-items: center; padding: 9px 8px; margin-top: 2px; }
+    #yudao-project-prototype .yp-project:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-project.is-selected { background: var(--yp-tint); color: var(--yp-green); border-color: color-mix(in srgb, var(--yp-green) 15%, transparent); }
+    #yudao-project-prototype .yp-project span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    #yudao-project-prototype .yp-project .yp-project-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--yp-muted); flex: none; }
+    #yudao-project-prototype .yp-project.is-selected .yp-project-mark { background: var(--yp-green); }
+    #yudao-project-prototype .yp-side-bottom { margin-top: auto; display: grid; gap: 6px; border-top: 1px solid var(--yp-line); padding-top: 14px; }
+    #yudao-project-prototype .yp-sidebar-link { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 0; background: transparent; padding: 8px 9px; border-radius: 6px; color: var(--yp-muted); font-size: 12px; }
+    #yudao-project-prototype .yp-sidebar-link:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-sidebar-link.is-active { background: var(--yp-soft); color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-sidebar-link .yp-count { margin-left: auto; font-size: 11px; }
+
+    /* 顶栏 */
+    #yudao-project-prototype .yp-main { min-width: 0; display: flex; flex-direction: column; }
+    #yudao-project-prototype .yp-topbar { padding: 12px 28px; min-height: 56px; border-bottom: 1px solid var(--yp-line); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--yp-surface); position: sticky; top: 0; z-index: 20; }
+    #yudao-project-prototype .yp-breadcrumb { display: flex; gap: 8px; align-items: center; min-width: 0; font-size: 12px; color: var(--yp-muted); flex-wrap: wrap; }
+    #yudao-project-prototype .yp-breadcrumb button { padding: 0; border: 0; background: none; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-breadcrumb strong { color: var(--yp-text); }
+    #yudao-project-prototype .yp-auto { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--yp-muted); white-space: nowrap; }
+    #yudao-project-prototype .yp-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yp-green); flex-shrink: 0; }
+
+    /* 主内容区 */
+    #yudao-project-prototype .yp-content { padding: 24px 28px 48px; max-width: 1200px; margin: 0 auto; width: 100%; min-width: 0; }
+    #yudao-project-prototype .yp-eyebrow { font-size: 11px; letter-spacing: 1.3px; color: var(--yp-muted); margin-bottom: 6px; }
+    #yudao-project-prototype .yp-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    #yudao-project-prototype .yp-heading-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; position: relative; }
+    #yudao-project-prototype .yp-subtitle { font-size: 13px; color: var(--yp-muted); margin-top: 6px; max-width: 75ch; overflow-wrap: anywhere; }
+
+    /* 按钮 */
+    #yudao-project-prototype .yp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--yp-line); border-radius: 6px; background: var(--yp-surface); font-size: 13px; min-height: 33px; white-space: nowrap; }
+    #yudao-project-prototype .yp-btn:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-btn.primary { background: var(--yp-green); color: light-dark(#fff, #102b20); border-color: var(--yp-green); }
+    #yudao-project-prototype .yp-btn.small { padding: 4px 10px; font-size: 12px; min-height: 26px; }
+    #yudao-project-prototype .yp-btn.danger { color: var(--yp-red); border-color: color-mix(in srgb, var(--yp-red) 30%, transparent); }
+    #yudao-project-prototype .yp-btn.danger:hover { background: color-mix(in srgb, var(--yp-red) 10%, transparent); }
+
+    /* 标签页导航栏 */
+    #yudao-project-prototype .yp-tabs-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px solid var(--yp-line);
+      margin-top: 14px;
+      overflow: visible;
+    }
+    #yudao-project-prototype .yp-tabs {
+      display: flex;
+      gap: 6px;
+      overflow: visible;
+      margin-bottom: -1px;
+    }
+    #yudao-project-prototype .yp-tab {
+      padding: 9px 15px;
+      border: 0;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      font-size: 13px;
+      color: var(--yp-muted);
+      white-space: nowrap;
+    }
+    #yudao-project-prototype .yp-tab:hover { color: var(--yp-text); }
+    #yudao-project-prototype .yp-tab.is-selected { color: var(--yp-green); border-bottom-color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-tabs-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 6px;
+    }
+
+    /* 通用面板与列表 */
+    #yudao-project-prototype .yp-section { margin-top: 24px; }
+    #yudao-project-prototype .yp-section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-project-summary { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; border: 1px solid var(--yp-line); border-radius: 9px; padding: 16px 20px; background: var(--yp-surface); margin-top: 20px; }
+    #yudao-project-prototype .yp-summary-side { border-left: 1px solid var(--yp-line); padding-left: 18px; display: grid; gap: 10px; }
+    #yudao-project-prototype .yp-summary-item span { display: block; font-size: 11px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-summary-item strong { font-size: 13px; font-weight: 500; }
+    #yudao-project-prototype .yp-handoff-list { display: grid; gap: 8px; }
+    #yudao-project-prototype .yp-handoff { border: 1px solid var(--yp-line); border-radius: 8px; padding: 12px 16px; background: var(--yp-surface); display: flex; align-items: center; gap: 16px; }
+    #yudao-project-prototype .yp-handoff-time { font-size: 11px; color: var(--yp-muted); width: 85px; flex-shrink: 0; }
+    #yudao-project-prototype .yp-handoff-status { margin-left: auto; font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--yp-soft); color: var(--yp-muted); }
+    #yudao-project-prototype .yp-handoff-status.rework { background: var(--yp-amber-bg); color: var(--yp-amber); }
+    #yudao-project-prototype .yp-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    #yudao-project-prototype .yp-tag.green { background: var(--yp-tint); color: var(--yp-green); }
+    #yudao-project-prototype .yp-tag.amber { background: var(--yp-amber-bg); color: var(--yp-amber); }
+
+    /* ================= 2D 像素风部门房间样式 ================= */
+    .pixel-room-boundary {
+      border: 3px solid #23272a;
+      border-radius: 10px;
+      background: #1e2022;
+      color: #cad3f5;
+      padding: 16px;
+      margin-top: 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      position: relative;
+    }
+    .pixel-room-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 2px dashed #3a3f44;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+    .pixel-room-stage {
+      position: relative;
+      min-height: 250px;
+      background: #141618;
+      border: 2px solid #2f343a;
+      border-radius: 8px;
+      margin-top: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .pixel-stage-toolbar {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+    .pixel-stage-toolbar .yp-btn {
+      background: #24292e;
+      border-color: #3f464e;
+      color: #e1e7ec;
+    }
+    .pixel-room-topwall {
+      background: #191c1e;
+      border-bottom: 4px solid #0d0e10;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .crt-monitor-board {
+      background: #08110b;
+      border: 2px solid #1f3b25;
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #4eed7a;
+      font-family: "Courier New", Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      box-shadow: inset 0 0 10px rgba(78, 237, 122, 0.2);
+      min-width: 280px;
+      position: relative;
+    }
+    .crt-monitor-board::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+    .pixel-room-floor {
+      flex: 1;
+      background:
+        linear-gradient(45deg, #1b1d20 25%, transparent 25%),
+        linear-gradient(-45deg, #1b1d20 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #1b1d20 75%),
+        linear-gradient(-45deg, transparent 75%, #1b1d20 75%);
+      background-size: 32px 32px;
+      background-position: 0 0, 0 16px, 16px -16px, -16px 0px;
+      background-color: #17191b;
+      position: relative;
+      padding: 30px 40px 15px;
+      display: flex;
+      align-items: flex-end;
+      min-height: 140px;
+    }
+    .pixel-desk-lane {
+      display: flex;
+      gap: 48px;
+      align-items: flex-end;
+      width: 100%;
+    }
+    .pixel-workstation {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .pixel-bubble {
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      position: absolute;
+      bottom: 84px;
+      white-space: nowrap;
+      border: 2px solid #000;
+      font-weight: bold;
+      animation: floatBubble 2.5s ease-in-out infinite alternate;
+    }
+    .pixel-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px 6px 0;
+      border-style: solid;
+      border-color: #000 transparent;
+      display: block;
+      width: 0;
+    }
+    @keyframes floatBubble {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-4px); }
+    }
+    .pixel-agent {
+      width: 32px;
+      height: 44px;
+      position: relative;
+      margin-bottom: 2px;
+      z-index: 2;
+    }
+    .pixel-agent-head {
+      width: 24px;
+      height: 24px;
+      background: #ffcc80;
+      border: 2px solid #000;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+      animation: headBob 2s ease-in-out infinite;
+    }
+    @keyframes headBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(1px); }
+    }
+    .pixel-agent-eye-l, .pixel-agent-eye-r {
+      width: 4px;
+      height: 5px;
+      background: #000;
+      position: absolute;
+      top: 7px;
+    }
+    .pixel-agent-eye-l { left: 4px; }
+    .pixel-agent-eye-r { right: 4px; }
+    .pixel-agent-body {
+      width: 28px;
+      height: 18px;
+      background: #087f69;
+      border: 2px solid #000;
+      margin: -2px auto 0;
+      font-size: 8px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+      font-weight: bold;
+    }
+    .pixel-workstation.subagent .pixel-agent-body {
+      background: #39658c;
+    }
+    .pixel-desk {
+      width: 76px;
+      height: 26px;
+      background: #8d5b36;
+      border: 2px solid #000;
+      position: relative;
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+      z-index: 3;
+    }
+    .pixel-computer {
+      width: 26px;
+      height: 20px;
+      background: #2b3036;
+      border: 2px solid #000;
+      position: absolute;
+      top: -20px;
+      left: 24px;
+      box-shadow: 1px 1px 0 rgba(255,255,255,0.2) inset;
+    }
+    .pixel-computer::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      background: #11a37f;
+      animation: screenFlicker 3s infinite;
+    }
+    @keyframes screenFlicker {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.7; }
+      52% { opacity: 0.95; }
+    }
+    .pixel-workstation-label {
+      font-size: 10px;
+      font-family: monospace;
+      color: #8c97a4;
+      margin-top: 6px;
+    }
+    .pixel-room-log {
+      background: #101214;
+      border: 1px solid #2a2e33;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 11px;
+      max-height: 110px;
+      overflow-y: auto;
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pixel-log-row {
+      display: flex;
+      gap: 10px;
+      color: #8b949e;
+    }
+    .pixel-log-time { color: #565f69; flex-shrink: 0; }
+    .pixel-log-msg { color: #c9d1d9; }
+    .pixel-log-msg.highlight { color: #58a6ff; }
+
+    /* 人类指令下达输入区 */
+    .pixel-room-input-box {
+      margin-top: 14px;
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: var(--yp-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pixel-input-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pixel-input-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .pixel-input-row textarea {
+      flex: 1;
+      min-height: 60px;
+      resize: vertical;
+      border: 1px solid var(--yp-line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: var(--yp-bg);
+      font-size: 13px;
+      line-height: 1.5;
+      outline: none;
+    }
+    .pixel-input-row textarea:focus { border-color: var(--yp-green); }
+
+    /* 模态弹窗 */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(2px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 10px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      max-height: 90vh;
+    }
+    .modal-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--yp-line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .modal-body {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+    .modal-foot {
+      padding: 12px 18px;
+      border-top: 1px solid var(--yp-line);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: var(--yp-soft);
+    }
+
+    /* ================= 模型管理完整交互样式 ================= */
+    .pm-preset-pill-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .pm-preset-pill {
+      border: 1px solid var(--yp-line);
+      background: var(--yp-surface);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s ease;
+      color: var(--yp-text);
+    }
+    .pm-preset-pill:hover {
+      border-color: var(--yp-green);
+      background: var(--yp-soft);
+    }
+    .pm-preset-pill.active {
+      background: var(--yp-tint);
+      border-color: var(--yp-green);
+      color: var(--yp-green);
+      font-weight: 500;
+    }
+    .pm-editor-panel {
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      padding: 20px;
+      background: var(--yp-surface);
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .pm-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--yp-line);
+      padding-bottom: 12px;
+    }
+    .pm-panel-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .pm-form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .pm-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .pm-form-field label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--yp-text);
+      display: flex;
+      justify-content: space-between;
+    }
+    .pm-field-hint {
+      font-size: 11px;
+      color: var(--yp-muted);
+      font-weight: normal;
+    }
+    .pm-form-field input, .pm-form-field select {
+      border: 1px solid var(--yp-line);
+      border-radius: 5px;
+      padding: 7px 10px;
+      background: var(--yp-bg);
+      font-size: 13px;
+      outline: none;
+    }
+    .pm-form-field input:focus, .pm-form-field select:focus {
+      border-color: var(--yp-green);
+    }
+    .pm-info-box {
+      background: var(--yp-soft);
+      border-left: 3px solid var(--yp-green);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--yp-muted);
+      line-height: 1.5;
+    }
+    .pm-advanced-details {
+      border: 1px solid var(--yp-line);
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: var(--yp-soft);
+      font-size: 12px;
+    }
+    .pm-advanced-details summary {
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--yp-text);
+    }
+    .pm-remote-models-box {
+      border: 1px solid var(--yp-line);
+      border-radius: 6px;
+      padding: 14px;
+      background: var(--yp-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pm-candidate-chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .pm-candidate-chip {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pm-candidate-chip:hover {
+      border-color: var(--yp-green);
+      color: var(--yp-green);
+      background: var(--yp-tint);
+    }
+    .pm-model-mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .pm-model-mapping-table th, .pm-model-mapping-table td {
+      border-bottom: 1px solid var(--yp-line);
+      padding: 8px;
+      text-align: left;
+    }
+    .pm-model-mapping-table th {
+      color: var(--yp-muted);
+      font-weight: 500;
+    }
+    .pm-model-mapping-table input {
+      border: 1px solid var(--yp-line);
+      border-radius: 4px;
+      padding: 4px 6px;
+      background: var(--yp-surface);
+      font-size: 12px;
+      width: 100%;
+    }
+    .pm-provider-accordion-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .pm-provider-card {
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      background: var(--yp-surface);
+      overflow: hidden;
+      transition: border-color .15s ease;
+    }
+    .pm-provider-card:hover {
+      border-color: color-mix(in srgb, var(--yp-green) 40%, var(--yp-line));
+    }
+    .pm-card-summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .pm-card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .pm-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .pm-card-details {
+      border-top: 1px solid var(--yp-line);
+      padding: 16px 18px;
+      background: var(--yp-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .pm-card-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: var(--yp-surface);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--yp-line);
+    }
+    .pm-card-table th, .pm-card-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--yp-line);
+      text-align: left;
+    }
+    .pm-card-table th {
+      background: var(--yp-soft);
+      color: var(--yp-muted);
+      font-weight: 500;
+    }
+    .pm-card-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    /* 最底部三部门全局模型与 Effort 分配卡片 */
+    .global-dept-bind-box {
+      margin-top: 36px;
+      border-top: 2px dashed var(--yp-line);
+      padding-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .global-dept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .global-dept-card {
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      background: var(--yp-surface);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .global-dept-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--yp-line);
+      padding-bottom: 8px;
+    }
+    .global-dept-card-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .global-effort-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .global-effort-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--yp-green);
+    }
+    .global-effort-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--yp-green);
+      min-width: 24px;
+      text-align: right;
+    }
+
+    #toastBox {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #24292e;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+      z-index: 200;
+    }
+  </style>
+</head>
+<body>
+<div id="yudao-project-prototype">
+  <div class="yp-shell">
+    <!-- 左侧主侧边栏 -->
+    <aside class="yp-sidebar">
+      <div class="yp-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+        <span>Yudao</span>
+        <span class="yp-proto">v6</span>
+      </div>
+
+      <div>
+        <div class="yp-side-label">
+          <span>项目列表</span>
+          <button class="yp-icon" title="新建项目" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+        <div class="yp-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" placeholder="搜索项目..." />
+        </div>
+      </div>
+
+      <div class="yp-project-list" id="projectListNav">
+        <!-- 由 renderSidebarProjects 动态渲染 -->
+      </div>
+
+      <div class="yp-side-bottom">
+        <button class="yp-sidebar-link" type="button" id="linkModelManagement" onclick="navigate('model-management')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>模型管理</span>
+          <span class="yp-count">全机</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 右侧主体内容容器 -->
+    <div class="yp-main">
+      <header class="yp-topbar">
+        <div class="yp-breadcrumb">
+          <span>当前项目</span>
+          <span>/</span>
+          <strong id="topbarProjectName">货物装载规划</strong>
+          <span id="topbarSubpath">/ 项目概览</span>
+        </div>
+        <div class="yp-auto">
+          <span class="yp-dot"></span>
+          <span>系统状态：就绪</span>
+        </div>
+      </header>
+
+      <main class="yp-content" id="mainContent"></main>
+    </div>
+  </div>
+
+  <div id="modalContainer" style="display: none;" class="modal-backdrop"></div>
+  <div id="toastBox" hidden></div>
+</div>
+
+<script>
+(function() {
+  const projects = {
+    cargo: {
+      id: "cargo",
+      name: "货物装载规划",
+      eyebrow: "物流调度系统",
+      goal: "在既定运力约束下，计算最优的包裹分配与装载路线，并保持完整的验证依据与交付封存。",
+      path: "D:/codes/cargo-planner",
+      material: "intend.md",
+      prdPath: "docs/PRD.md",
+      planPath: "docs/PLAN.md",
+      acceptancePath: "docs/ACCEPTANCE.md",
+      baseline: "已完成初始算法原型并由质检部门独立放行",
+      itemCount: 4,
+      adoptedCount: 1,
+      status: "持续演化",
+      tasks: {
+        product: "维持货物装载有效 PRD 与体积边界决策合同",
+        engineering: "依据装载规划推进路线计算实现与单元测试",
+        quality: "执行包裹分配与运力硬约束的确定性验证"
+      },
+      handoffs: [
+        { time: "今天 10:24", fromTo: "工程 → 产品", desc: "混装方案比较已完成，数量与体积的优先级需要由产品明确。", status: "等待决定", rework: false },
+        { time: "昨天 16:40", fromTo: "质检 → 工程", desc: "保存后恢复场景仍有一个窄屏折行边界条件需要修复。", status: "返工", rework: true },
+        { time: "周一 14:05", fromTo: "工程 → 质检", desc: "导出结果已附上自动化单测检查材料。", status: "提交质检", rework: false }
+      ]
+    },
+    lab: {
+      id: "lab",
+      name: "实验记录助手",
+      eyebrow: "研发效能工具",
+      goal: "采集与结构化实验过程中的运行数据，自动生成对比基线并在多阶段复盘中提供审计依据。",
+      path: "D:/codes/lab-assistant",
+      material: "materials/intend.md",
+      prdPath: "PRD.md",
+      planPath: "PLAN.md",
+      acceptancePath: "QUALITY.md",
+      baseline: "已完成数据采集器模块封装并通过接口冒烟测试",
+      itemCount: 6,
+      adoptedCount: 3,
+      status: "就绪推进",
+      tasks: {
+        product: "梳理多阶段实验日志提取标准与指标对比协议",
+        engineering: "重构异步日志解析管道并减少解析耗时",
+        quality: "验证高吞吐采样场景下的数据完整性与零丢失"
+      },
+      handoffs: [
+        { time: "今天 14:15", fromTo: "产品 → 工程", desc: "实验基线指标对比需求已更新，加入耗时与成本双维度统计。", status: "交接实施", rework: false },
+        { time: "昨天 11:20", fromTo: "质检 → 工程", desc: "在高并发采样时存在临时缓冲区未释放的问题，已附重现脚本。", status: "返工", rework: true },
+        { time: "周二 09:30", fromTo: "工程 → 质检", desc: "异步写入管道重构完成，附带压力测试报告。", status: "提交质检", rework: false }
+      ]
+    }
+  };
+  let currentProjectId = "cargo";
+
+  const roles = {
+    product: { name: '产品', icon: '📋', text: '需求把控与业务决策升级', roomTask: '维持有效 PRD 与边界决策合同' },
+    engineering: { name: '工程', icon: '⚙️', text: '实施方案、技术分解与编码', roomTask: '依据有效合同推进代码实现与自测' },
+    quality: { name: '质检', icon: '🔍', text: '独立验收与交付放行', roomTask: '执行确定性验证与质量防线放行' }
+  };
+
+  // 预置供应商方案模板
+  const PRESETS = {
+    "opencode-go": {
+      name: "OpenCode Go",
+      protocol: "responses",
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      docUrl: "https://opencode.ai/docs/go",
+      credRef: "OPENCODE_GO_KEY",
+      models: [
+        { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+        { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" },
+        { id: "mimo-v2.5", window: 262144, maxOutput: 8192, status: "候选" }
+      ],
+      remoteCandidates: ["gpt-5.6-terra", "claude-3-7-sonnet", "mimo-v2.5", "deepseek-r1-zen", "qwen-2.5-coder"]
+    },
+    "anyrouter": {
+      name: "AnyRouter",
+      protocol: "chat_completions",
+      baseUrl: "https://anyrouter.top/v1",
+      docUrl: "https://anyrouter.top",
+      credRef: "ANYROUTER_API_KEY",
+      models: [
+        { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+        { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "候选" }
+      ],
+      remoteCandidates: ["deepseek-chat", "deepseek-reasoner", "qwen-2.5-72b", "llama-3.3-70b", "kimi-k1.5"]
+    },
+    "stepfun": {
+      name: "StepFun (阶跃星辰)",
+      protocol: "chat_completions",
+      baseUrl: "https://api.stepfun.com/v1",
+      docUrl: "https://platform.stepfun.com",
+      credRef: "STEPFUN_API_KEY",
+      models: [
+        { id: "step-2-16k", window: 16000, maxOutput: 4096, status: "已准入" }
+      ],
+      remoteCandidates: ["step-1-8k", "step-2-16k", "step-1-32k", "step-1-128k"]
+    },
+    "anthropic": {
+      name: "Anthropic 原生服务",
+      protocol: "messages",
+      baseUrl: "https://api.anthropic.com/v1",
+      docUrl: "https://docs.anthropic.com",
+      credRef: "ANTHROPIC_API_KEY",
+      models: [
+        { id: "claude-3-5-sonnet-20241022", window: 200000, maxOutput: 8192, status: "已准入" }
+      ],
+      remoteCandidates: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+    },
+    "custom": {
+      name: "自定义模型网关",
+      protocol: "chat_completions",
+      baseUrl: "https://",
+      docUrl: "",
+      credRef: "CUSTOM_API_KEY",
+      models: [],
+      remoteCandidates: ["custom-gpt-4o", "custom-model-fast", "custom-reasoner"]
+    }
+  };
+
+  // 全局 Provider 配置库
+  let modelState = {
+    providers: [
+      {
+        id: "p-opencode-01",
+        name: "OpenCode Go 主线路",
+        protocol: "responses",
+        baseUrl: "https://opencode.ai/zen/go/v1",
+        docUrl: "https://opencode.ai/docs/go",
+        credRef: "OPENCODE_GO_KEY",
+        timeout: 600,
+        expanded: true,
+        models: [
+          { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" },
+          { id: "claude-3-7-sonnet", window: 200000, maxOutput: 8192, status: "已准入" }
+        ]
+      },
+      {
+        id: "p-anyrouter-02",
+        name: "AnyRouter 备用网关",
+        protocol: "chat_completions",
+        baseUrl: "https://anyrouter.top/v1",
+        docUrl: "https://anyrouter.top",
+        credRef: "ANYROUTER_API_KEY",
+        timeout: 300,
+        expanded: false,
+        models: [
+          { id: "deepseek-chat", window: 64000, maxOutput: 4096, status: "已准入" },
+          { id: "qwen-2.5-72b", window: 128000, maxOutput: 8192, status: "候选" }
+        ]
+      }
+    ],
+    editingProviderId: null,
+    currentFormModels: []
+  };
+
+  // 全局三部门模型分配与 Effort 设置
+  const globalDeptBindings = {
+    product: {
+      providerId: 'p-opencode-01',
+      modelId: 'gpt-5.6-terra',
+      effortValue: 2,
+      subagentActive: false,
+      prompt: '你是产品部。持续维护项目目标、需求与取舍。保留用户原话，重要且无法推断的产品决定向用户提出。'
+    },
+    engineering: {
+      providerId: 'p-opencode-01',
+      modelId: 'gpt-5.6-terra',
+      effortValue: 3,
+      subagentActive: false,
+      prompt: '你是工程部。依据有效需求与项目当前成果工作，维护整体架构、实现方案和技术决定。优先复用项目已有能力与成熟组件。'
+    },
+    quality: {
+      providerId: 'p-anyrouter-02',
+      modelId: 'deepseek-chat',
+      effortValue: 3,
+      subagentActive: false,
+      prompt: '你是质检部。依据项目要求独立检查交付，保留实际验证范围和证据。业务取舍交产品明确，工程问题附复现依据。'
+    }
+  };
+
+  const effortTexts = { 1: '低 (low)', 2: '中 (medium)', 3: '深 (high)', 4: '极 (max)' };
+
+  let currentPage = 'overview'; // 'overview' | 'product' | 'engineering' | 'quality' | 'model-management' | 'sources' | 'settings'
+  let previousPage = 'overview'; // 记录进入模型管理前的来源页面，用于随时返回
+
+  function toast(msg) {
+    const box = document.getElementById('toastBox');
+    box.textContent = msg;
+    box.hidden = false;
+    setTimeout(() => { box.hidden = true; }, 2400);
+  }
+
+  function protocolLabel(val) {
+    if (val === "responses") return "OpenAI Responses";
+    if (val === "messages") return "Anthropic Messages";
+    if (val === "chat_completions") return "Chat Completions";
+    return val;
+  }
+
+  // 顶层导航 Tabs
+  function renderNavTabs() {
+    return `
+      <div class="yp-tabs-header-bar">
+        <nav class="yp-tabs" role="tablist" aria-label="项目工作区">
+          <button class="yp-tab ${currentPage === 'overview' ? 'is-selected' : ''}" type="button" onclick="navigate('overview')">项目概览</button>
+          <button class="yp-tab ${currentPage === 'product' ? 'is-selected' : ''}" type="button" onclick="navigate('product')">产品部</button>
+          <button class="yp-tab ${currentPage === 'engineering' ? 'is-selected' : ''}" type="button" onclick="navigate('engineering')">工程部</button>
+          <button class="yp-tab ${currentPage === 'quality' ? 'is-selected' : ''}" type="button" onclick="navigate('quality')">质检部</button>
+        </nav>
+        <div class="yp-tabs-actions">
+          <button class="yp-btn small" type="button" onclick="openProjectSourcesModal()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <span>资料与依据</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ================= 1. 项目概览页 =================
+  function renderOverview() {
+    const cur = projects[currentProjectId];
+    document.getElementById('topbarSubpath').textContent = '/ 项目概览';
+    document.getElementById('linkModelManagement').classList.remove('is-active');
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">${cur.eyebrow}</div>
+          <h1>${cur.name} · 项目概览</h1>
+          <p class="yp-subtitle">从项目目标、当前成果和跨部门流转了解下一步演化进程。</p>
+        </div>
+      </header>
+
+      <section class="yp-project-summary">
+        <div>
+          <h2>当前目标</h2>
+          <p>${cur.goal}</p>
+          <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+            <span class="yp-small" style="background: var(--yp-soft); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--yp-line);">📂 根目录: <code>${cur.path}</code></span>
+            <span class="yp-small" style="background: var(--yp-soft); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--yp-line);">📝 原始需求: <code>${cur.material}</code></span>
+            <span class="yp-small" style="background: var(--yp-soft); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--yp-line);">📋 PRD: <code>${cur.prdPath}</code></span>
+            <span class="yp-small" style="background: var(--yp-soft); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--yp-line);">📐 计划: <code>${cur.planPath}</code></span>
+            <span class="yp-small" style="background: var(--yp-soft); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--yp-line);">🔍 验收: <code>${cur.acceptancePath}</code></span>
+          </div>
+        </div>
+        <div class="yp-summary-side">
+          <div class="yp-summary-item"><span>当前成果</span><strong>${cur.baseline}</strong></div>
+          <div class="yp-summary-item"><span>工作项</span><strong>${cur.itemCount} 个 · ${cur.adoptedCount} 个已采纳</strong></div>
+          <div class="yp-summary-item"><span>项目状态</span><strong><span class="yp-tag green">${cur.status}</span></strong></div>
+        </div>
+      </section>
+
+      <!-- 跨部门流转交接 -->
+      <section class="yp-section">
+        <div class="yp-section-title">
+          <div>
+            <h2>跨部门流转交接</h2>
+            <p class="yp-small" style="margin-top:2px">需求交接、版本交付与缺陷返工记录</p>
+          </div>
+        </div>
+        <div class="yp-handoff-list">
+          ${cur.handoffs.map(h => `
+            <div class="yp-handoff">
+              <span class="yp-handoff-time">${h.time}</span>
+              <div><strong>${h.fromTo}</strong><p>${h.desc}</p></div>
+              <span class="yp-handoff-status ${h.rework ? 'rework' : ''}">${h.status}</span>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  // ================= 2. 部门房间页 (2D 像素工位 + 独立弹窗设置 + 底端输入框) =================
+  function renderDepartment(deptKey) {
+    const cur = projects[currentProjectId];
+    const r = roles[deptKey];
+    const bind = globalDeptBindings[deptKey];
+    const provider = modelState.providers.find(p => p.id === bind.providerId) || modelState.providers[0];
+    document.getElementById('topbarSubpath').textContent = `/ ${r.name}部工作间`;
+    document.getElementById('linkModelManagement').classList.remove('is-active');
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">${cur.name} · 三部门工作区</div>
+          <h1>${r.name}部工作间</h1>
+          <p class="yp-subtitle">${r.text} · 运行目标：<strong>${bind.modelId}</strong> (${provider.name}) · Effort: ${effortTexts[bind.effortValue]}</p>
+        </div>
+
+        <!-- 部门设置操作：直接呼出独立配置弹窗 -->
+        <div class="yp-heading-actions">
+          <button class="yp-btn primary" type="button" onclick="openDepartmentSettingsModal('${deptKey}')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>部门设置</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 2D 像素风房间容器 -->
+      <div class="pixel-room-boundary">
+        <div class="pixel-room-header">
+          <strong>ROOM_${deptKey.toUpperCase()} // AGENT WORKSPACE</strong>
+          <span>PROJECT: ${cur.name.toUpperCase()} · HOST: LOCAL_RUNNER · EFFORT: ${effortTexts[bind.effortValue]}</span>
+        </div>
+
+        <div class="pixel-room-stage">
+          <div class="pixel-stage-toolbar">
+            <button class="yp-btn small" type="button" onclick="toggleSubagent('${deptKey}')">${bind.subagentActive ? '- 召回子 Agent' : '+ 派发协作者 (SubAgent)'}</button>
+            <button class="yp-btn small" type="button" onclick="simulatePixelAction('${deptKey}')">动作步进</button>
+          </div>
+
+          <!-- 顶墙：CRT 显示屏风格的任务看板 -->
+          <div class="pixel-room-topwall">
+            <div class="crt-monitor-board">
+              <div class="crt-monitor-text">
+                &gt; TARGET: ${cur.tasks[deptKey]}<br>
+                &gt; PROJECT: ${cur.name}<br>
+                &gt; MODEL: ${bind.modelId}<br>
+                &gt; EFFORT: ${effortTexts[bind.effortValue]}<br>
+                &gt; CYCLE: #03 [RUNNING]
+              </div>
+            </div>
+          </div>
+
+          <!-- 地板与工位小人 -->
+          <div class="pixel-room-floor"></div>
+
+          <div class="pixel-desk-lane">
+            <!-- 核心责任小人 -->
+            <div class="pixel-workstation">
+              <div class="pixel-bubble" id="bubble-${deptKey}">正在解析代码 AST...</div>
+              <div class="pixel-agent">
+                <div class="pixel-agent-head">
+                  <div class="pixel-agent-eye-l"></div>
+                  <div class="pixel-agent-eye-r"></div>
+                </div>
+                <div class="pixel-agent-body">MAIN</div>
+              </div>
+              <div class="pixel-desk">
+                <div class="pixel-computer"></div>
+              </div>
+              <span class="pixel-workstation-label">${r.name}主 Agent</span>
+            </div>
+
+            <!-- 动态加入的 SubAgent -->
+            ${bind.subagentActive ? `
+              <div class="pixel-workstation subagent">
+                <div class="pixel-bubble" style="bottom: 90px;">正在检索测试案例...</div>
+                <div class="pixel-agent">
+                  <div class="pixel-agent-head">
+                    <div class="pixel-agent-eye-l"></div>
+                    <div class="pixel-agent-eye-r"></div>
+                  </div>
+                  <div class="pixel-agent-body">SUB</div>
+                </div>
+                <div class="pixel-desk">
+                  <div class="pixel-computer"></div>
+                </div>
+                <span class="pixel-workstation-label">Scout 子 Agent</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- 房间事件流式日志 -->
+        <div class="pixel-room-log" id="roomLog-${deptKey}">
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:47:02</span>
+            <span class="pixel-log-msg highlight">[系统] 部门工作区就绪，载入 ${bind.modelId} (${effortTexts[bind.effortValue]}) 上下文。</span>
+          </div>
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:47:18</span>
+            <span class="pixel-log-msg">${r.name}主 Agent 调用工具：workspace_search (查找到 8 处相关文件)。</span>
+          </div>
+          <div class="pixel-log-row">
+            <span class="pixel-log-time">10:48:02</span>
+            <span class="pixel-log-msg">${r.name}主 Agent 正在生成第 1 轮实施成果。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最底端：人类输入与操作框 -->
+      <div class="pixel-room-input-box">
+        <div class="pixel-input-head">
+          <strong>💬 向${r.name}部下达指令或追加人类反馈</strong>
+          <span class="yp-small">输入将作为人类指导直接注入本部门下一次模型调用的 Context</span>
+        </div>
+        <div class="pixel-input-row">
+          <textarea id="humanInput-${deptKey}" placeholder="给${r.name}部追加具体约束、需求确认或修改建议..."></textarea>
+          <button class="yp-btn primary" style="height: 60px; padding: 0 18px;" type="button" onclick="sendHumanInput('${deptKey}')">
+            发送指导
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ================= 3. 模型管理页 (全局设置 + 返回原界面 + 卡片工具栏操作) =================
+  function renderModelManagement() {
+    document.getElementById('topbarSubpath').textContent = '/ 全局配置 / 模型管理';
+    document.getElementById('linkModelManagement').classList.add('is-active');
+
+    // 生成已配置 Provider 折叠卡片 HTML
+    const providerCardsHtml = modelState.providers.map(p => {
+      const modelsHtml = p.models.map(m => `
+        <tr>
+          <td><strong style="font-family:monospace">${m.id}</strong></td>
+          <td>${m.window.toLocaleString()} Tokens</td>
+          <td>${m.maxOutput.toLocaleString()} Tokens</td>
+          <td>
+            <span class="yp-tag ${m.status === '已准入' ? 'green' : 'amber'}">${m.status}</span>
+          </td>
+          <td style="text-align: right;">
+            <button class="yp-btn small" type="button" onclick="testSingleModel('${p.id}', '${m.id}', event)">单项测试</button>
+            <button class="yp-btn small danger" type="button" onclick="removeModelFromProvider('${p.id}', '${m.id}', event)">移除</button>
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="pm-provider-card" id="card-${p.id}">
+          <div class="pm-card-summary" onclick="toggleExpand('${p.id}')">
+            <div class="pm-card-title-group">
+              <span style="font-size: 14px;">${p.expanded ? '▼' : '▶'}</span>
+              <strong>${p.name}</strong>
+              <span class="yp-tag">${protocolLabel(p.protocol)}</span>
+              <span class="yp-small" style="color: var(--yp-muted)">(${p.baseUrl})</span>
+            </div>
+            <div class="pm-card-meta">
+              <span class="yp-small">凭据引用: <code>${p.credRef}</code></span>
+              <span class="yp-tag green">${p.models.length} 个模型</span>
+              <button class="yp-btn small" type="button" onclick="editProvider('${p.id}', event)">编辑</button>
+              <button class="yp-btn small danger" type="button" onclick="deleteProvider('${p.id}', event)">删除</button>
+            </div>
+          </div>
+
+          ${p.expanded ? `
+            <div class="pm-card-details">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; font-weight: 600;">已挂载模型映射表</div>
+                <div class="yp-small">超时设置: ${p.timeout || 600} 秒 · 凭据引用: <code>${p.credRef}</code></div>
+              </div>
+              <table class="pm-card-table">
+                <thead>
+                  <tr>
+                    <th>模型标识</th>
+                    <th>上下文窗口</th>
+                    <th>最大输出</th>
+                    <th>准入状态</th>
+                    <th style="text-align: right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${modelsHtml || '<tr><td colspan="5" style="text-align:center;color:var(--yp-muted);padding:14px;">暂未映射任何模型，请点击上方编辑展开添加</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // 全局三部门模型分配卡片 HTML
+    const globalDeptCardsHtml = ['product', 'engineering', 'quality'].map(deptKey => {
+      const r = roles[deptKey];
+      const bind = globalDeptBindings[deptKey];
+      const admittedModels = getAdmittedModels(bind.providerId);
+
+      return `
+        <div class="global-dept-card">
+          <div class="global-dept-card-header">
+            <h3><span>${r.icon}</span> <span>${r.name}部</span></h3>
+            <span class="yp-tag green">全机默认</span>
+          </div>
+          <div class="pm-form-field">
+            <label>指定 Provider 供应商配置</label>
+            <select onchange="updateGlobalProvider('${deptKey}', this.value)">
+              ${modelState.providers.map(p => `<option value="${p.id}" ${p.id === bind.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="pm-form-field">
+            <label>模型访问定义 (仅限已准入)</label>
+            <select id="select-global-model-${deptKey}" onchange="updateGlobalModel('${deptKey}', this.value)">
+              ${admittedModels.map(m => `<option value="${m.id}" ${m.id === bind.modelId ? 'selected' : ''}>${m.id} (${(m.window/1000).toFixed(0)}k)</option>`).join('')}
+            </select>
+          </div>
+          <div class="pm-form-field">
+            <label>推理努力程度 (Effort: <span id="effort-txt-global-${deptKey}">${effortTexts[bind.effortValue]}</span>)</label>
+            <div class="global-effort-row">
+              <input type="range" min="1" max="4" value="${bind.effortValue}" oninput="updateGlobalEffort('${deptKey}', this.value)">
+              <span class="global-effort-tag" id="effort-tag-global-${deptKey}">${bind.effortValue === 1 ? '低' : bind.effortValue === 2 ? '中' : bind.effortValue === 3 ? '深' : '极'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <header class="yp-heading">
+        <div>
+          <div class="yp-eyebrow">配置中心 · 全局资源视角</div>
+          <h1>模型管理</h1>
+          <p class="yp-subtitle">在此统一维护系统 Provider 连接库，并在页面底部为产品、工程、质检三部门进行全局模型分配。</p>
+        </div>
+        <!-- 顶部操作：返回原界面（替换原有的添加模型服务与导出 JSON 按钮） -->
+        <div class="yp-heading-actions">
+          <button type="button" class="yp-btn primary" onclick="returnFromModelManagement()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <span>返回原界面</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 添加 / 编辑服务面板 -->
+      <div class="pm-editor-panel" id="providerEditor" style="display: none;">
+        <div class="pm-panel-header">
+          <div class="pm-panel-title" id="editorTitle">添加供应商服务</div>
+          <button type="button" class="yp-btn small" onclick="cancelEditProvider()">关闭</button>
+        </div>
+
+        <!-- 供应商预置方案选择 -->
+        <div class="pm-form-field">
+          <label>
+            <span>服务方案模板</span>
+            <span class="pm-field-hint">选择预置供应商可自动填写协议、端点与凭据格式</span>
+          </label>
+          <div class="pm-preset-pill-group" id="presetGroup">
+            <div class="pm-preset-pill active" data-preset="opencode-go">OpenCode Go</div>
+            <div class="pm-preset-pill" data-preset="anyrouter">AnyRouter</div>
+            <div class="pm-preset-pill" data-preset="stepfun">StepFun (阶跃星辰)</div>
+            <div class="pm-preset-pill" data-preset="anthropic">Anthropic (原生)</div>
+            <div class="pm-preset-pill" data-preset="custom">自定义服务 (Custom)</div>
+          </div>
+        </div>
+
+        <!-- 供应商核心表单 -->
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputProviderName">供应商名称</label>
+            <input type="text" id="inputProviderName" placeholder="例如：OpenCode Go 主连接" value="OpenCode Go">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputProtocol">
+              <span>上游协议格式</span>
+              <span class="pm-field-hint">单个 Provider 只支持一种协议</span>
+            </label>
+            <select id="inputProtocol">
+              <option value="responses" selected>OpenAI Responses 规范 (流式 & 工具调用)</option>
+              <option value="messages">Anthropic Messages 规范 (原生 Claude)</option>
+              <option value="chat_completions">OpenAI Chat Completions 规范</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputBaseUrl">服务请求地址 (Base URL)</label>
+            <input type="text" id="inputBaseUrl" placeholder="https://api.example.com/v1" value="https://opencode.ai/zen/go/v1">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputDocUrl">官方网站或文档</label>
+            <input type="text" id="inputDocUrl" placeholder="https://..." value="https://opencode.ai/docs/go">
+          </div>
+        </div>
+
+        <div class="pm-form-grid-2">
+          <div class="pm-form-field">
+            <label for="inputApiKey">
+              <span>API 凭据 (Key)</span>
+              <span class="pm-field-hint">凭据保存在本地环境变量引用中</span>
+            </label>
+            <input type="password" id="inputApiKey" placeholder="输入密钥（仅用于测试连通与拉取模型）" value="sk-demo-live-key-928472">
+          </div>
+          <div class="pm-form-field">
+            <label for="inputCredRef">环境变量引用标识</label>
+            <input type="text" id="inputCredRef" placeholder="例如：OPENCODE_GO_KEY" value="OPENCODE_GO_KEY">
+          </div>
+        </div>
+
+        <div class="pm-info-box">
+          💡 提示：依据设计规范，每个服务实例仅对应一种上游协议格式。若需使用相同供应商的另一协议，可通过多次添加服务独立管理。
+        </div>
+
+        <!-- 高级选项折叠 -->
+        <details class="pm-advanced-details">
+          <summary>高级选项 (超时时间、模型列表地址覆盖)</summary>
+          <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="pm-form-grid-2">
+              <div class="pm-form-field">
+                <label for="inputTimeout">超时限制 (秒)</label>
+                <input type="number" id="inputTimeout" value="600">
+              </div>
+              <div class="pm-form-field">
+                <label for="inputModelsUrl">模型列表请求地址 (可覆写)</label>
+                <input type="text" id="inputModelsUrl" placeholder="留空则自动按上游协议规则推导 /models" value="">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 模型映射与获取 -->
+        <div class="pm-remote-models-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600;">模型映射列表</div>
+              <div class="pm-field-hint">从远端供应商自动获取可用模型，或手动指定所需模型</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="yp-btn small primary" id="btnFetchRemoteModels">⬇️ 获取模型列表</button>
+              <button type="button" class="yp-btn small" id="btnAddManualModel">+ 手动添加模型</button>
+            </div>
+          </div>
+
+          <!-- 候选池 -->
+          <div id="remoteCandidateContainer" style="display: none; border-top: 1px dashed var(--yp-line); padding-top: 10px;">
+            <div style="font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--yp-green);">
+              上游返回模型 (点击即可添加到下方映射列表)：
+            </div>
+            <div class="pm-candidate-chip-grid" id="candidateChipGrid"></div>
+          </div>
+
+          <!-- 模型映射表格 -->
+          <table class="pm-model-mapping-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">模型标识 (ID)</th>
+                <th style="width: 24%;">上下文窗口 (Tokens)</th>
+                <th style="width: 24%;">最大输出限制</th>
+                <th style="width: 14%;">准入状态</th>
+                <th style="width: 10%; text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="editorModelTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+          <button type="button" class="yp-btn" id="btnTestConnection">测试连接</button>
+          <button type="button" class="yp-btn primary" id="btnSaveProvider">保存服务配置</button>
+        </div>
+      </div>
+
+      <!-- 已配置服务列表 (折叠卡片库) -->
+      <section class="yp-section">
+        <div class="yp-section-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2>已配置的模型服务</h2>
+              <span class="yp-small" id="providerCountLabel">(共 ${modelState.providers.length} 个服务实例)</span>
+            </div>
+            <div style="font-size: 12px; color: var(--yp-muted); margin-top: 2px;">点击卡片任意区域可展开详情与模型映射</div>
+          </div>
+          <!-- 编辑 JSON 与 添加供应商 按钮置于卡片说明栏右侧 -->
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="yp-btn small" onclick="openJsonEditorModal()">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path></svg>
+              <span>编辑 JSON</span>
+            </button>
+            <button type="button" class="yp-btn small primary" onclick="openAddProviderForm()">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>+ 添加供应商</span>
+            </button>
+          </div>
+        </div>
+        <div class="pm-provider-accordion-list" id="providerListContainer">
+          ${providerCardsHtml}
+        </div>
+      </section>
+
+      <!-- 页面最底端：全局三部门模型与 Effort 分配 -->
+      <div class="global-dept-bind-box">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 style="font-size: 15px; margin: 0;">🌐 三部门全局模型与 Effort 分配</h2>
+            <p class="yp-small" style="margin-top: 2px;">此处的配置对整个系统新事项生效。创建新事项时将冻结所选 Provider、模型及推理深度。</p>
+          </div>
+          <button class="yp-btn primary" type="button" onclick="toast('三部门全局模型绑定已保存！')">保存全局分配</button>
+        </div>
+
+        <div class="global-dept-grid">
+          ${globalDeptCardsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // 辅助函数与模型管理操作
+  function getAdmittedModels(providerId) {
+    const p = modelState.providers.find(item => item.id === providerId);
+    if (!p) return [];
+    return p.models.filter(m => m.status === '已准入');
+  }
+
+  window.toggleExpand = function(id) {
+    const item = modelState.providers.find(p => p.id === id);
+    if (item) {
+      item.expanded = !item.expanded;
+      render();
+    }
+  };
+
+  window.testSingleModel = function(pId, mId, e) {
+    e.stopPropagation();
+    toast(`正在对模型 [${mId}] 执行准入测试...`);
+    setTimeout(() => {
+      toast(`模型 [${mId}] 响应正常，验证通过！`);
+    }, 600);
+  };
+
+  window.removeModelFromProvider = function(pId, mId, e) {
+    e.stopPropagation();
+    const p = modelState.providers.find(item => item.id === pId);
+    if (!p) return;
+    const isBound = Object.values(globalDeptBindings).some(b => b.providerId === pId && b.modelId === mId);
+    if (isBound) {
+      alert(`无法移除模型 [${mId}]：该模型当前已被分配给部门作为全局运行基线！请先在页面下方调整部门模型绑定。`);
+      return;
+    }
+    if (confirm(`确定从服务 [${p.name}] 中移除模型 [${mId}] 吗？`)) {
+      p.models = p.models.filter(m => m.id !== mId);
+      render();
+      toast(`模型 [${mId}] 已移除`);
+    }
+  };
+
+  window.editProvider = function(id, e) {
+    e.stopPropagation();
+    const p = modelState.providers.find(item => item.id === id);
+    if (!p) return;
+
+    modelState.editingProviderId = id;
+    const panel = document.getElementById("providerEditor");
+    panel.style.display = "flex";
+    document.getElementById("editorTitle").textContent = "编辑供应商服务: " + p.name;
+    document.getElementById("inputProviderName").value = p.name;
+    document.getElementById("inputProtocol").value = p.protocol;
+    document.getElementById("inputBaseUrl").value = p.baseUrl;
+    document.getElementById("inputDocUrl").value = p.docUrl || "";
+    document.getElementById("inputCredRef").value = p.credRef;
+    document.getElementById("inputTimeout").value = p.timeout || 600;
+    document.getElementById("inputModelsUrl").value = p.modelsUrl || "";
+
+    modelState.currentFormModels = JSON.parse(JSON.stringify(p.models));
+    renderEditorModelTable();
+
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  window.deleteProvider = function(id, e) {
+    e.stopPropagation();
+    const isBound = Object.values(globalDeptBindings).some(b => b.providerId === id);
+    if (isBound) {
+      alert("无法删除该服务实例：该服务已被分配给部门作为全局运行基线！请先在页面底部解绑。");
+      return;
+    }
+    if (confirm("确定删除此服务配置吗？删除后不可恢复。")) {
+      modelState.providers = modelState.providers.filter(p => p.id !== id);
+      render();
+      toast("服务配置已删除");
+    }
+  };
+
+  window.cancelEditProvider = function() {
+    document.getElementById("providerEditor").style.display = "none";
+    modelState.editingProviderId = null;
+  };
+
+  window.openAddProviderForm = function() {
+    modelState.editingProviderId = null;
+    const panel = document.getElementById("providerEditor");
+    panel.style.display = "flex";
+    document.getElementById("editorTitle").textContent = "添加供应商服务";
+    document.getElementById("inputProviderName").value = "OpenCode Go";
+    document.getElementById("inputProtocol").value = "responses";
+    document.getElementById("inputBaseUrl").value = "https://opencode.ai/zen/go/v1";
+    document.getElementById("inputDocUrl").value = "https://opencode.ai/docs/go";
+    document.getElementById("inputCredRef").value = "OPENCODE_GO_KEY";
+    document.getElementById("inputTimeout").value = "600";
+    document.getElementById("inputModelsUrl").value = "";
+    document.getElementById("remoteCandidateContainer").style.display = "none";
+    modelState.currentFormModels = [
+      { id: "gpt-5.6-terra", window: 200000, maxOutput: 8192, status: "已准入" }
+    ];
+    renderEditorModelTable();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  function renderEditorModelTable() {
+    const tbody = document.getElementById("editorModelTableBody");
+    if (!tbody) return;
+    if (modelState.currentFormModels.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--yp-muted);padding:12px;">暂无映射模型，请点击右上角获取或手动添加</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = modelState.currentFormModels.map((m, idx) => `
+      <tr>
+        <td>
+          <input type="text" value="${m.id}" onchange="updateFormModelField(${idx}, 'id', this.value)" style="font-family:monospace">
+        </td>
+        <td>
+          <input type="number" value="${m.window}" step="1024" onchange="updateFormModelField(${idx}, 'window', parseInt(this.value, 10))">
+        </td>
+        <td>
+          <input type="number" value="${m.maxOutput}" step="512" onchange="updateFormModelField(${idx}, 'maxOutput', parseInt(this.value, 10))">
+        </td>
+        <td>
+          <select onchange="updateFormModelField(${idx}, 'status', this.value)">
+            <option value="已准入" ${m.status === '已准入' ? 'selected' : ''}>已准入</option>
+            <option value="候选" ${m.status === '候选' ? 'selected' : ''}>候选</option>
+            <option value="待核验" ${m.status === '待核验' ? 'selected' : ''}>待核验</option>
+          </select>
+        </td>
+        <td style="text-align: right;">
+          <button class="yp-btn small danger" type="button" onclick="deleteFormModel(${idx})">删除</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  window.updateFormModelField = function(idx, field, val) {
+    if (modelState.currentFormModels[idx]) {
+      modelState.currentFormModels[idx][field] = val;
+    }
+  };
+
+  window.deleteFormModel = function(idx) {
+    modelState.currentFormModels.splice(idx, 1);
+    renderEditorModelTable();
+  };
+
+  // 全局三部门绑定调整
+  window.updateGlobalProvider = function(deptKey, providerId) {
+    globalDeptBindings[deptKey].providerId = providerId;
+    const admitted = getAdmittedModels(providerId);
+    if (admitted.length > 0) {
+      globalDeptBindings[deptKey].modelId = admitted[0].id;
+    } else {
+      globalDeptBindings[deptKey].modelId = '';
+    }
+    render();
+    toast(`${roles[deptKey].name}部 服务供应商已调整`);
+  };
+
+  window.updateGlobalModel = function(deptKey, modelId) {
+    globalDeptBindings[deptKey].modelId = modelId;
+    toast(`${roles[deptKey].name}部 模型调整为 ${modelId}`);
+  };
+
+  window.updateGlobalEffort = function(deptKey, val) {
+    globalDeptBindings[deptKey].effortValue = parseInt(val, 10);
+    const tag = document.getElementById(`effort-tag-global-${deptKey}`);
+    const txt = document.getElementById(`effort-txt-global-${deptKey}`);
+    if (tag) tag.textContent = val == 1 ? '低' : val == 2 ? '中' : val == 3 ? '深' : '极';
+    if (txt) txt.textContent = effortTexts[val];
+  };
+
+  // ================= 4. 模型管理全局返回与 JSON 编辑器 =================
+  window.returnFromModelManagement = function() {
+    currentPage = previousPage || 'overview';
+    render();
+    toast('已返回原工作界面');
+  };
+
+  window.openJsonEditorModal = function() {
+    const modal = document.getElementById('modalContainer');
+    const exportData = {
+      providers: modelState.providers.map(p => ({
+        id: p.id,
+        name: p.name,
+        protocol: p.protocol,
+        baseUrl: p.baseUrl,
+        docUrl: p.docUrl || "",
+        credRef: p.credRef,
+        timeout: p.timeout || 600,
+        modelsUrl: p.modelsUrl || "",
+        models: p.models.map(m => ({
+          id: m.id,
+          window: m.window,
+          maxOutput: m.maxOutput,
+          status: m.status
+        }))
+      })),
+      globalDeptBindings: {
+        product: {
+          providerId: globalDeptBindings.product.providerId,
+          modelId: globalDeptBindings.product.modelId,
+          effortValue: globalDeptBindings.product.effortValue
+        },
+        engineering: {
+          providerId: globalDeptBindings.engineering.providerId,
+          modelId: globalDeptBindings.engineering.modelId,
+          effortValue: globalDeptBindings.engineering.effortValue
+        },
+        quality: {
+          providerId: globalDeptBindings.quality.providerId,
+          modelId: globalDeptBindings.quality.modelId,
+          effortValue: globalDeptBindings.quality.effortValue
+        }
+      }
+    };
+    const jsonStr = JSON.stringify(exportData, null, 2);
+
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width: 760px; width: 92%;">
+        <div class="modal-head">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path></svg>
+            <strong>编辑模型与 Provider JSON 配置</strong>
+          </div>
+          <button class="yp-btn small" type="button" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="yp-small" style="margin: 0; color: var(--yp-muted);">在此直接查看或修改当前全部供应商实例及其挂载的模型映射。支持就地格式化与快速失败语法校验，保存后立即全局生效。</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+            <span style="font-size: 11px; font-weight: 600; color: var(--yp-muted);">JSON 数据结构 (包含 providers[] 及 globalDeptBindings)</span>
+            <div style="display: flex; gap: 6px;">
+              <button class="yp-btn small" type="button" onclick="formatJsonEditor()">格式化 JSON</button>
+              <button class="yp-btn small" type="button" onclick="resetJsonEditor()">重置内容</button>
+              <button class="yp-btn small" type="button" onclick="copyJsonEditor()">复制内容</button>
+            </div>
+          </div>
+          <textarea id="jsonEditorTextarea" spellcheck="false" style="width: 100%; height: 380px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 12px; line-height: 1.5; background: #181926; color: #cad3f5; border: 1px solid var(--yp-line); border-radius: 6px; padding: 12px; resize: vertical; tab-size: 2; box-sizing: border-box;">${jsonStr}</textarea>
+          <div id="jsonEditorError" style="display: none; padding: 8px 12px; background: rgba(237, 135, 150, 0.15); border: 1px solid var(--yp-red); border-radius: 4px; color: var(--yp-red); font-size: 12px;"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="yp-btn small" type="button" onclick="closeModal()">取消</button>
+          <button class="yp-btn small primary" type="button" onclick="saveJsonEditor()">保存并应用 JSON</button>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+  };
+
+  window.formatJsonEditor = function() {
+    const area = document.getElementById('jsonEditorTextarea');
+    const errBox = document.getElementById('jsonEditorError');
+    try {
+      const obj = JSON.parse(area.value);
+      area.value = JSON.stringify(obj, null, 2);
+      errBox.style.display = 'none';
+      toast('JSON 格式化成功');
+    } catch (e) {
+      errBox.textContent = `JSON 语法解析失败: ${e.message}`;
+      errBox.style.display = 'block';
+    }
+  };
+
+  window.resetJsonEditor = function() {
+    openJsonEditorModal();
+    toast('已重置为当前系统配置');
+  };
+
+  window.copyJsonEditor = function() {
+    const area = document.getElementById('jsonEditorTextarea');
+    navigator.clipboard.writeText(area.value).then(() => {
+      toast('已复制 JSON 到剪贴板');
+    }).catch(() => {
+      area.select();
+      document.execCommand('copy');
+      toast('已复制 JSON 到剪贴板');
+    });
+  };
+
+  window.saveJsonEditor = function() {
+    const area = document.getElementById('jsonEditorTextarea');
+    const errBox = document.getElementById('jsonEditorError');
+    try {
+      const parsed = JSON.parse(area.value);
+      if (!parsed || !Array.isArray(parsed.providers)) {
+        throw new Error('配置顶层必须包含 "providers" 数组');
+      }
+      if (parsed.providers.length === 0) {
+        throw new Error('"providers" 数组不可为空');
+      }
+      for (let i = 0; i < parsed.providers.length; i++) {
+        const p = parsed.providers[i];
+        if (!p.id || !p.name || !p.protocol || !p.baseUrl) {
+          throw new Error(`供应商第 ${i + 1} 项缺少必要属性 (id, name, protocol, baseUrl)`);
+        }
+        if (!Array.isArray(p.models)) {
+          p.models = [];
+        }
+      }
+
+      // 更新 Provider 配置库
+      modelState.providers = parsed.providers.map(p => ({
+        ...p,
+        expanded: p.expanded !== undefined ? p.expanded : true
+      }));
+
+      // 若 JSON 包含全局部门配置则同步应用
+      if (parsed.globalDeptBindings) {
+        for (const k of ['product', 'engineering', 'quality']) {
+          if (parsed.globalDeptBindings[k]) {
+            globalDeptBindings[k] = { ...globalDeptBindings[k], ...parsed.globalDeptBindings[k] };
+          }
+        }
+      }
+
+      closeModal();
+      render();
+      toast('模型与 Provider JSON 配置已成功保存生效！');
+    } catch (e) {
+      errBox.textContent = `保存失败: ${e.message}`;
+      errBox.style.display = 'block';
+    }
+  };
+
+  // ================= 5. 三部门独立弹窗配置 =================
+  window.openDepartmentSettingsModal = function(deptKey) {
+    const r = roles[deptKey];
+    const bind = globalDeptBindings[deptKey];
+    const modal = document.getElementById('modalContainer');
+
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width: 660px; width: 92%;">
+        <div class="modal-head">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">${r.icon}</span>
+            <strong>${r.name}部 · 部门独立配置</strong>
+          </div>
+          <button class="yp-btn small" type="button" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+          <p class="yp-small" style="margin: 0; color: var(--yp-muted);">在此单独配置 ${r.name}部的运行模型、推理努力程度 (Effort) 与专属系统提示词 (Prompt)。保存后在当前工作区与下一次激活时立即生效。</p>
+
+          <!-- 模块一：运行模型与服务分配 -->
+          <div style="background: var(--yp-bg); border: 1px solid var(--yp-line); border-radius: 8px; padding: 14px;">
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <span>🤖</span> 运行服务与模型访问定义
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="pm-form-field">
+                <label style="font-size: 11px; color: var(--yp-muted);">指定 Provider 供应商配置</label>
+                <select id="deptModalProvSelect" onchange="deptModalProviderChanged('${deptKey}', this.value)" style="width:100%; border:1px solid var(--yp-line); padding:6px 8px; border-radius:4px; font-size:12px; background:var(--yp-surface);">
+                  ${modelState.providers.map(p => `<option value="${p.id}" ${p.id === bind.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                </select>
+              </div>
+              <div class="pm-form-field">
+                <label style="font-size: 11px; color: var(--yp-muted);">模型访问定义 (仅限已准入)</label>
+                <select id="deptModalModelSelect" style="width:100%; border:1px solid var(--yp-line); padding:6px 8px; border-radius:4px; font-size:12px; background:var(--yp-surface);">
+                  ${getAdmittedModels(bind.providerId).map(m => `<option value="${m.id}" ${m.id === bind.modelId ? 'selected' : ''}>${m.id} (窗 ${m.window.toLocaleString()} · 出 ${m.maxOutput.toLocaleString()})</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <!-- 推理深度滑块 -->
+            <div style="margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <label style="color: var(--yp-muted);">推理思考努力程度 (Effort: <span id="deptModalEffortTxt" style="font-weight: 600; color: var(--yp-green);">${effortTexts[bind.effortValue]}</span>)</label>
+                <span id="deptModalEffortTag" style="font-weight: 600; color: var(--yp-green);">${bind.effortValue === 1 ? '低' : bind.effortValue === 2 ? '中' : bind.effortValue === 3 ? '深' : '极'}</span>
+              </div>
+              <input type="range" id="deptModalEffortRange" min="1" max="4" value="${bind.effortValue}" oninput="deptModalEffortChanged(this.value)" style="width: 100%; accent-color: var(--yp-green);">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--yp-muted); margin-top: 2px;">
+                <span>1: 低 (低延迟响应)</span>
+                <span>2: 中 (常规思考)</span>
+                <span>3: 深 (复杂分析)</span>
+                <span>4: 极 (穷尽推理)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 模块二：部门系统提示词 Prompt -->
+          <div style="background: var(--yp-bg); border: 1px solid var(--yp-line); border-radius: 8px; padding: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span>📝</span> 部门专有系统提示词 (System Prompt)
+              </div>
+              <button class="yp-btn small" type="button" onclick="resetDeptPromptDefault('${deptKey}')">恢复默认</button>
+            </div>
+            <textarea id="deptModalPromptText" style="width: 100%; min-height: 110px; border: 1px solid var(--yp-line); border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.5; background: var(--yp-surface); font-family: monospace; resize: vertical; box-sizing: border-box;">${bind.prompt}</textarea>
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 4px;">规范本部门的工作职责、交接要求与动作边界。模型调用前作为第一系统提示装配。</div>
+          </div>
+
+          <!-- 模块三：协同机制与 SubAgent -->
+          <div style="background: var(--yp-bg); border: 1px solid var(--yp-line); border-radius: 8px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 12px; font-weight: 600; margin-bottom: 2px;">⚡ 协作者子 Agent 协同模式</div>
+              <div style="font-size: 11px; color: var(--yp-muted);">允许该部门在面对繁重分工时派发并发子 Agent (SubAgent) 分担检索与验证子任务</div>
+            </div>
+            <label style="position: relative; display: inline-block; width: 44px; height: 22px;">
+              <input type="checkbox" id="deptModalSubagentToggle" ${bind.subagentActive ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: ${bind.subagentActive ? 'var(--yp-green)' : 'var(--yp-line)'}; border-radius: 22px; transition: .2s;" id="subagentSwitchBg" onclick="toggleSubagentSwitchUI()">
+                <span style="position: absolute; content: ''; height: 16px; width: 16px; left: ${bind.subagentActive ? '25px' : '3px'}; bottom: 3px; background: white; border-radius: 50%; transition: .2s;" id="subagentSwitchThumb"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="yp-btn small" type="button" onclick="closeModal()">取消</button>
+          <button class="yp-btn small primary" type="button" onclick="saveDepartmentSettingsModal('${deptKey}')">保存部门设置</button>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+  };
+
+  window.deptModalProviderChanged = function(deptKey, providerId) {
+    const sel = document.getElementById('deptModalModelSelect');
+    const admitted = getAdmittedModels(providerId);
+    if (admitted.length === 0) {
+      sel.innerHTML = `<option value="">(该服务暂无已准入模型)</option>`;
+    } else {
+      sel.innerHTML = admitted.map(m => `<option value="${m.id}">${m.id} (窗 ${m.window.toLocaleString()} · 出 ${m.maxOutput.toLocaleString()})</option>`).join('');
+    }
+  };
+
+  window.deptModalEffortChanged = function(val) {
+    document.getElementById('deptModalEffortTxt').textContent = effortTexts[val];
+    document.getElementById('deptModalEffortTag').textContent = val == 1 ? '低' : val == 2 ? '中' : val == 3 ? '深' : '极';
+  };
+
+  window.toggleSubagentSwitchUI = function() {
+    const chk = document.getElementById('deptModalSubagentToggle');
+    chk.checked = !chk.checked;
+    const bg = document.getElementById('subagentSwitchBg');
+    const thumb = document.getElementById('subagentSwitchThumb');
+    if (chk.checked) {
+      bg.style.background = 'var(--yp-green)';
+      thumb.style.left = '25px';
+    } else {
+      bg.style.background = 'var(--yp-line)';
+      thumb.style.left = '3px';
+    }
+  };
+
+  window.resetDeptPromptDefault = function(deptKey) {
+    const defaults = {
+      product: '你是产品部。持续维护项目目标、需求与取舍。保留用户原话，重要且无法推断的产品决定向用户提出。',
+      engineering: '你是工程部。依据有效需求与项目当前成果工作，维护整体架构、实现方案和技术决定。优先复用项目已有能力与成熟组件。',
+      quality: '你是质检部。依据项目要求独立检查交付，保留实际验证范围和证据。业务取舍交产品明确，工程问题附复现依据。'
+    };
+    document.getElementById('deptModalPromptText').value = defaults[deptKey] || '';
+    toast('已恢复默认提示词');
+  };
+
+  window.saveDepartmentSettingsModal = function(deptKey) {
+    const pId = document.getElementById('deptModalProvSelect').value;
+    const mId = document.getElementById('deptModalModelSelect').value;
+    const promptText = document.getElementById('deptModalPromptText').value.trim();
+    const effortRange = document.getElementById('deptModalEffortRange');
+    const effortVal = effortRange ? parseInt(effortRange.value, 10) : 2;
+    const subagentActive = document.getElementById('deptModalSubagentToggle').checked;
+
+    if (!promptText) {
+      alert('Prompt 内容不能为空！');
+      return;
+    }
+
+    globalDeptBindings[deptKey].providerId = pId;
+    if (mId) globalDeptBindings[deptKey].modelId = mId;
+    globalDeptBindings[deptKey].effortValue = effortVal;
+    globalDeptBindings[deptKey].prompt = promptText;
+    globalDeptBindings[deptKey].subagentActive = subagentActive;
+
+    closeModal();
+    render();
+    toast(`${roles[deptKey].name}部设置已保存生效！`);
+  };
+
+  window.closeModal = function() {
+    document.getElementById('modalContainer').style.display = 'none';
+  };
+
+  // 导航操作
+  window.navigate = function(page) {
+    if (currentPage !== 'model-management') {
+      previousPage = currentPage;
+    }
+    currentPage = page;
+    render();
+  };
+
+  window.navigateProject = function(id) {
+    if (!projects[id]) return;
+    currentProjectId = id;
+    if (currentPage === 'model-management') {
+      currentPage = 'overview';
+    }
+    render();
+    toast(`已切换至项目：${projects[id].name}`);
+  };
+
+  function renderSidebarProjects() {
+    const list = document.getElementById('projectListNav');
+    if (!list) return;
+    list.innerHTML = Object.values(projects).map(p => `
+      <button class="yp-project ${p.id === currentProjectId ? 'is-selected' : ''}" type="button" onclick="navigateProject('${p.id}')">
+        <span class="yp-project-mark"></span>
+        <span>${p.name}</span>
+      </button>
+    `).join('');
+  }
+
+  // 资料与依据配置弹窗
+  window.openProjectSourcesModal = function() {
+    const cur = projects[currentProjectId];
+    const modal = document.getElementById('modalContainer');
+
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width: 660px; width: 92%;">
+        <div class="modal-head">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <strong>${cur.name} · 资料与依据配置</strong>
+          </div>
+          <button class="yp-btn small" type="button" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+          <p class="yp-small" style="margin: 0; color: var(--yp-muted);">在此配置项目需求原始文件与各阶段产出依据的放置路径。三部门 Agent 工作时将严格以配置路径作为输入上下文与交付依据。</p>
+
+          <div class="pm-form-field">
+            <label style="font-size: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>📝 原始用户需求放置位置 (User Intent / INTEND.MD)</span>
+              <span class="pm-field-hint">只读输入 · 保持用户原话</span>
+            </label>
+            <input type="text" id="cfgMaterial" value="${cur.material}" placeholder="例如：intend.md 或 materials/intend.md" style="font-family: monospace;">
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 2px;">保存用户初始自然语言诉求与原始背景材料，系统在任何阶段均禁止改写此文件。</div>
+          </div>
+
+          <div class="pm-form-field">
+            <label style="font-size: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>📋 产品需求规格说明书路径 (PRD.MD)</span>
+              <span class="pm-field-hint">产品部职责</span>
+            </label>
+            <input type="text" id="cfgPrd" value="${cur.prdPath}" placeholder="例如：docs/PRD.md 或 PRD.md" style="font-family: monospace;">
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 2px;">产品部根据原始需求整理并维护的有效需求合同，作为工程部实施的权威依据。</div>
+          </div>
+
+          <div class="pm-form-field">
+            <label style="font-size: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>📐 工程事前计划路径 (PLAN.MD)</span>
+              <span class="pm-field-hint">工程部职责</span>
+            </label>
+            <input type="text" id="cfgPlan" value="${cur.planPath}" placeholder="例如：docs/PLAN.md 或 PLAN.md" style="font-family: monospace;">
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 2px;">工程部在编写具体代码前必须提交并保存的事前实施步骤与技术分解方案。</div>
+          </div>
+
+          <div class="pm-form-field">
+            <label style="font-size: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>🔍 质检独立验收标准路径 (ACCEPTANCE.MD)</span>
+              <span class="pm-field-hint">质检部职责</span>
+            </label>
+            <input type="text" id="cfgAcceptance" value="${cur.acceptancePath}" placeholder="例如：docs/ACCEPTANCE.md" style="font-family: monospace;">
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 2px;">质检部执行自动化检查、代码复核与放行决策的判定规则依据。</div>
+          </div>
+
+          <div class="pm-form-field">
+            <label style="font-size: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>📂 本地工作区物理路径 (Workspace Root)</span>
+              <span class="pm-field-hint">宿主工作区</span>
+            </label>
+            <input type="text" id="cfgPath" value="${cur.path}" placeholder="例如：D:/codes/my-project" style="font-family: monospace;">
+            <div style="font-size: 11px; color: var(--yp-muted); margin-top: 2px;">项目代码与工件运行的真实宿主磁盘目录路径。</div>
+          </div>
+        </div>
+        <div class="modal-foot" style="display: flex; justify-content: space-between; align-items: center;">
+          <button class="yp-btn small" type="button" onclick="resetProjectSourcesDefault()">恢复默认规范路径</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="yp-btn small" type="button" onclick="closeModal()">取消</button>
+            <button class="yp-btn small primary" type="button" onclick="saveProjectSourcesModal()">保存配置</button>
+          </div>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+  };
+
+  window.resetProjectSourcesDefault = function() {
+    document.getElementById('cfgMaterial').value = 'intend.md';
+    document.getElementById('cfgPrd').value = 'docs/PRD.md';
+    document.getElementById('cfgPlan').value = 'docs/PLAN.md';
+    document.getElementById('cfgAcceptance').value = 'docs/ACCEPTANCE.md';
+    toast('已填入标准规范路径');
+  };
+
+  window.saveProjectSourcesModal = function() {
+    const cur = projects[currentProjectId];
+    const material = document.getElementById('cfgMaterial').value.trim();
+    const prd = document.getElementById('cfgPrd').value.trim();
+    const plan = document.getElementById('cfgPlan').value.trim();
+    const acceptance = document.getElementById('cfgAcceptance').value.trim();
+    const rootPath = document.getElementById('cfgPath').value.trim();
+
+    if (!material || !prd || !rootPath) {
+      alert('原始需求路径、PRD 路径与工作区目录不可为空！');
+      return;
+    }
+
+    cur.material = material;
+    cur.prdPath = prd;
+    cur.planPath = plan;
+    cur.acceptancePath = acceptance;
+    cur.path = rootPath;
+
+    closeModal();
+    render();
+    toast('资料与依据路径配置已保存！');
+  };
+
+  window.toggleSubagent = function(deptKey) {
+    globalDeptBindings[deptKey].subagentActive = !globalDeptBindings[deptKey].subagentActive;
+    render();
+    toast(globalDeptBindings[deptKey].subagentActive ? '已派发 SubAgent 协同就座！' : 'SubAgent 已完成任务离场');
+  };
+
+  window.simulatePixelAction = function(deptKey) {
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (!bubble) return;
+    const old = bubble.textContent;
+    bubble.textContent = '执行工具：run_check...';
+    setTimeout(() => { bubble.textContent = old; }, 1400);
+    toast('小人执行工具操作');
+  };
+
+  window.sendHumanInput = function(deptKey) {
+    const input = document.getElementById(`humanInput-${deptKey}`);
+    const val = input.value.trim();
+    if (!val) {
+      alert('请输入要下达的指导内容！');
+      return;
+    }
+    const log = document.getElementById(`roomLog-${deptKey}`);
+    if (log) {
+      const now = new Date().toTimeString().slice(0, 8);
+      const row = document.createElement('div');
+      row.className = 'pixel-log-row';
+      row.innerHTML = `<span class="pixel-log-time">${now}</span><span class="pixel-log-msg">[人类指导] ${val}</span>`;
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+    input.value = '';
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (bubble) bubble.textContent = '收到人类指令，正在重算任务！';
+    toast('指导已注入部门下轮 Context！');
+  };
+
+  function bindModelManagementEvents() {
+    if (currentPage !== 'model-management') return;
+
+    // 绑定预置模板选择
+    document.querySelectorAll(".pm-preset-pill").forEach(pill => {
+      pill.onclick = () => {
+        document.querySelectorAll(".pm-preset-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+
+        const presetKey = pill.dataset.preset;
+        const config = PRESETS[presetKey];
+        if (!config) return;
+
+        document.getElementById("inputProviderName").value = config.name;
+        document.getElementById("inputProtocol").value = config.protocol;
+        document.getElementById("inputBaseUrl").value = config.baseUrl;
+        document.getElementById("inputDocUrl").value = config.docUrl;
+        document.getElementById("inputCredRef").value = config.credRef;
+
+        modelState.currentFormModels = JSON.parse(JSON.stringify(config.models));
+        renderEditorModelTable();
+
+        const candidateArea = document.getElementById("remoteCandidateContainer");
+        if (candidateArea) candidateArea.style.display = "none";
+        toast(`已加载 [${config.name}] 推荐预置`);
+      };
+    });
+
+    // 绑定获取模型列表
+    const fetchBtn = document.getElementById("btnFetchRemoteModels");
+    if (fetchBtn) {
+      fetchBtn.onclick = () => {
+        const activePill = document.querySelector(".pm-preset-pill.active");
+        const presetKey = activePill ? activePill.dataset.preset : "custom";
+        const config = PRESETS[presetKey] || PRESETS.custom;
+
+        toast("正在连接上游 /models 接口拉取可用模型...");
+        setTimeout(() => {
+          const grid = document.getElementById("candidateChipGrid");
+          grid.innerHTML = config.remoteCandidates.map(candidateId => `
+            <div class="pm-candidate-chip" onclick="addCandidateToModels('${candidateId}')">
+              <span>+</span> <span>${candidateId}</span>
+            </div>
+          `).join("");
+
+          document.getElementById("remoteCandidateContainer").style.display = "block";
+          toast(`成功获取到 ${config.remoteCandidates.length} 个远端模型，点击即可勾选添加`);
+        }, 600);
+      };
+    }
+
+    // 绑定手动添加一行
+    const addManualBtn = document.getElementById("btnAddManualModel");
+    if (addManualBtn) {
+      addManualBtn.onclick = () => {
+        modelState.currentFormModels.push({
+          id: "new-custom-model",
+          window: 64000,
+          maxOutput: 4096,
+          status: "待核验"
+        });
+        renderEditorModelTable();
+      };
+    }
+
+    // 绑定测试连接
+    const testConnBtn = document.getElementById("btnTestConnection");
+    if (testConnBtn) {
+      testConnBtn.onclick = () => {
+        const url = document.getElementById("inputBaseUrl").value;
+        toast(`正在向 ${url} 发起连通性探针探测...`);
+        setTimeout(() => {
+          toast("连接成功！端点握手正常 (耗时 142ms)");
+        }, 600);
+      };
+    }
+
+    // 绑定保存 Provider
+    const saveProvBtn = document.getElementById("btnSaveProvider");
+    if (saveProvBtn) {
+      saveProvBtn.onclick = () => {
+        const name = document.getElementById("inputProviderName").value.trim();
+        const protocol = document.getElementById("inputProtocol").value;
+        const baseUrl = document.getElementById("inputBaseUrl").value.trim();
+        const credRef = document.getElementById("inputCredRef").value.trim();
+        const timeout = parseInt(document.getElementById("inputTimeout").value, 10) || 600;
+
+        if (!name || !baseUrl) {
+          alert("请填写供应商名称与服务地址！");
+          return;
+        }
+
+        if (modelState.currentFormModels.length === 0) {
+          if (!confirm("当前尚未映射任何模型，是否继续保存？")) return;
+        }
+
+        if (modelState.editingProviderId) {
+          const target = modelState.providers.find(p => p.id === modelState.editingProviderId);
+          if (target) {
+            target.name = name;
+            target.protocol = protocol;
+            target.baseUrl = baseUrl;
+            target.credRef = credRef;
+            target.timeout = timeout;
+            target.models = JSON.parse(JSON.stringify(modelState.currentFormModels));
+          }
+          toast("服务配置已更新");
+        } else {
+          const newId = "p-" + Date.now().toString(36);
+          modelState.providers.unshift({
+            id: newId,
+            name: name,
+            protocol: protocol,
+            baseUrl: baseUrl,
+            docUrl: document.getElementById("inputDocUrl").value.trim(),
+            credRef: credRef,
+            timeout: timeout,
+            expanded: true,
+            models: JSON.parse(JSON.stringify(modelState.currentFormModels))
+          });
+          toast("新增服务已保存并折叠归档");
+        }
+
+        document.getElementById("providerEditor").style.display = "none";
+        render();
+      };
+    }
+  }
+
+  window.addCandidateToModels = function(modelId) {
+    const exists = modelState.currentFormModels.some(m => m.id === modelId);
+    if (exists) {
+      toast(`模型 ${modelId} 已存在于映射列表中`);
+      return;
+    }
+    modelState.currentFormModels.push({
+      id: modelId,
+      window: 128000,
+      maxOutput: 8192,
+      status: "待核验"
+    });
+    renderEditorModelTable();
+    toast(`已添加模型：${modelId}`);
+  };
+
+  // 主渲染
+  function render() {
+    renderSidebarProjects();
+    const cur = projects[currentProjectId];
+    const topProject = document.getElementById('topbarProjectName');
+    if (topProject) topProject.textContent = cur.name;
+
+    const container = document.getElementById('mainContent');
+    if (currentPage === 'overview') {
+      container.innerHTML = renderOverview();
+    } else if (roles[currentPage]) {
+      container.innerHTML = renderDepartment(currentPage);
+    } else if (currentPage === 'model-management') {
+      container.innerHTML = renderModelManagement();
+      bindModelManagementEvents();
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
