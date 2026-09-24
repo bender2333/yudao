@@ -24,3 +24,7 @@ claude-opus-5-5 / 2026-09-24 17:10 / 用户确认 GitNexus 已停用，删除 CL
 claude-opus-5-5 / 2026-09-24 19:52 / 用户确认 docs 整理清单并执行：归档阶段已关闭、被取代与一次性的文档（明细见 docs/CHANGELOG.md 同时间条目）；新建 docs/design/ 保存模块设计、架构图与设计说明，计划与工单引用这里；活动文档中的失效链接清零；harness/compare.py 恢复原状（架构师不修改 harness/，该文件第 25 行的 PROTOCOL 仍指向已归档的 docs/stage-2-a4-protocol.md，留给执行者处理）。CLAUDE.md、AGENTS.md 同步写入 docs/design/。
 
 claude-opus-5-5 / 2026-09-24 19:52 / 待办的架构任务（用户确认单独进行）：编写总体架构说明，描述三层划分与模块关系，放入 docs/design/。原 docs/system-architecture.md 已在更早的提交中删除。
+
+claude-opus-5-5 / 2026-09-24 19:55 / 按用户选择整理分支：main 快进到 992d8da 并推送；GitHub 默认分支由 harness_1 改为 main；删除本地 346 个 mission/* 分支、core/loop-mvp、exp/loop-mvp、两个 tmp/m7-runner、work/v01a、dev、exp/native-harness、harness_1；删除远端 codex/framework-and-stage2、codex/stage2-workspace、work/v01a、stage-2.7-provider-layer、exp/native-harness、harness_1。现在本地与远端都只有 main。之后的工作基于 main，下一个任务是总体架构梳理与设计。
+
+claude-opus-5-5 / 2026-09-24 19:58 / 用户澄清：「UI、引擎、中间件」只是分层的例子，层数与层名按系统实际的职责与依赖关系确定。经用户确认修改 CLAUDE.md「角色」第一条。总体架构说明的「层次与模块划分」由现有代码的职责与依赖推导后再与用户讨论；现状梳理的主要事实：providers/ 边界独立；orchestrator.py 2124 行、引用 21 个内部模块、一个类约 50 个方法；写操作经 LoopSystem，Web 读取直接引用 7 个模块；部门会话与凭据快照只在内存，Web 单工作线程；项目与单次运行各有一套事件与投影；验证与实验工具在运行包内。
