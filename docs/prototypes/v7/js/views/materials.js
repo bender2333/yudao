@@ -62,11 +62,15 @@
     });
   });
 
+  // 可选参数 department：给出时返回项目共享单元与该部门的私有单元（部门工作间的语义面板使用），冲突与更替链按同一范围过滤；
+  // 不给时只返回项目共享单元（资料页使用）
   Y7.queries.register('semantic.records', (params) => {
     if (!Y7.atLeast('s4')) return null;
     const projectId = params.projectId || Y7.state.projectId;
+    const department = params.department || null;
+    const privateScope = department ? Y7.deptLabel(department) + '私有' : null;
     const records = Y7.resolve(Y7.data.semantic)[projectId];
-    if (!records) return { units: [], privateCount: 0, conflicts: [], dataflow: [], chains: [] };
+    if (!records) return { department, units: [], privateCount: 0, conflicts: [], dataflow: [], chains: [] };
     const units = records.units.map((unit) => {
       const item = unit.workItemId ? Y7.workItem(unit.workItemId) : null;
       return Object.assign({}, unit, { workItemTitle: item ? item.title : null });
@@ -77,7 +81,8 @@
       if (!byId[id]) throw new Error('语义记录引用的单元不存在：' + id);
       return byId[id];
     };
-    // 更替链：从没有被别的单元指向的最旧单元开始，沿 supersededBy 走到最新的单元
+    const inScope = (unit) => unit.scope === '项目共享' || (privateScope !== null && unit.scope === privateScope);
+    // 更替链：从没有被别的单元指向的最旧单元开始，沿 supersededBy 走到最新的单元；只保留范围内的单元，少于两个时不成链
     const chains = units.filter((unit) => unit.supersededBy && !units.some((other) => other.supersededBy === unit.id)).map((start) => {
       const steps = [start];
       let current = start;
@@ -85,13 +90,14 @@
         current = need(current.supersededBy);
         steps.push(current);
       }
-      return steps;
-    });
-    const shared = units.filter((unit) => unit.scope === '项目共享');
+      return steps.filter(inScope);
+    }).filter((steps) => steps.length >= 2);
+    const visible = units.filter(inScope);
     return {
-      units: shared,
-      privateCount: units.length - shared.length,
-      conflicts: records.conflicts.map((c) => ({ a: need(c.a), b: need(c.b), text: c.text })),
+      department,
+      units: visible,
+      privateCount: units.filter((unit) => unit.scope !== '项目共享' && !inScope(unit)).length,
+      conflicts: records.conflicts.map((c) => ({ a: need(c.a), b: need(c.b), text: c.text })).filter((c) => inScope(c.a) && inScope(c.b)),
       dataflow: records.dataflow,
       chains
     };

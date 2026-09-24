@@ -451,34 +451,6 @@
     };
   });
 
-  // 集成事项使用的空 run：结构与新建事项的 run 相同；部门 Prompt 取本项目的配置，生效模型由 Y7.model.refreshRuns 解析
-  function blankRun(runId, workItemId, projectId, template) {
-    const settings = Y7.data.projectSettings[projectId];
-    if (!settings) throw new Error('找不到项目设置：' + projectId);
-    const prompt = (dept) => {
-      const s = settings.departments[dept];
-      return { configVersion: s.promptVersion, requestVersion: null, text: s.promptText };
-    };
-    const roles = Y7.clone(template.roles);
-    ['product', 'engineering', 'quality'].forEach((dept) => (roles[dept] || []).forEach((role) => { role.status = 'idle'; role.task = null; }));
-    return {
-      id: runId, workItemId, phase: 'PRODUCT_SPEC', department: null, lastDepartment: null, cycle: 0,
-      startedAt: null, elapsedSec: 0, limitSec: 7200, stopReason: null,
-      recovery: {
-        level: 's3', state: 'running', reason: null, unusable: null, lastConfirmed: null, canResume: false,
-        resumeBlockedReason: '事项正在运行，已有有效执行者', owner: null, lateResults: [], verifications: [], nextActions: [], unfinished: [],
-        limits: { activations: 0, modelSteps: 0, retries: 0 }
-      },
-      inputs: [], flow: [], requests: [], guidance: [],
-      messages: { product: [], engineering: [], quality: [], operations: [] },
-      actions: [], contexts: { product: [], engineering: [], quality: [] },
-      prompts: { product: prompt('product'), engineering: prompt('engineering'), quality: prompt('quality') },
-      compactions: [],
-      effectiveModel: { level: 's3', product: null, engineering: null, quality: null },
-      roles, ledger: { level: 's4' }, attempts: [], source: null
-    };
-  }
-
   // 以候选开始集成事项（3.4B）：集成事项有自己的合同与质检，不自动合并冲突
   Y7.commands.register('startIntegration', (params) => {
     if (!Y7.atLeast('s3')) return { ok: false, message: '以候选开始集成事项属于 3.4B，切换到「Stage 3 与 D24」档后使用' };
@@ -502,7 +474,7 @@
       id: workItemId, projectId: project.id, title: '集成「' + candidate.title + '」到 ' + (baseline || '当前成果'),
       colorIndex: free === undefined ? used.length % 6 : free, status: 'in_progress', runId, queuePos: null, heldReason: null, fromCandidate: candidate.id
     };
-    const run = blankRun(runId, workItemId, project.id, Y7.raw.run(candidate.runId));
+    const run = Y7.emptyRun(runId, workItemId, project.id);
     run.inputs.push({ version: 1, kind: 'user', text, at: Y7.data.now, progress: 'received', bytes: [0, new TextEncoder().encode(text).length] });
     const runtime = Y7.data.runtime;
     const slots = Y7.runtime.slots();
@@ -524,8 +496,7 @@
     Y7.data.workItems.push(item);
     Y7.data.runs.push(run);
     project.workItemIds.push(workItemId);
-    const paths = ['workItems', 'runs', 'projects[id=' + project.id + '].workItemIds', 'runtime'].concat(Y7.model.refreshRuns());
-    return { ok: true, message, paths, workItemId };
+    return { ok: true, message, paths: ['workItems', 'runs', 'projects[id=' + project.id + '].workItemIds', 'runtime'], workItemId };
   });
 
   // ===========================================================================
