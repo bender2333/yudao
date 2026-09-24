@@ -426,14 +426,16 @@
       ]);
     },
     // 某项目某部门某角色的选择与调用目标（多角色草案第 12 节）：项目角色设置、角色默认、项目部门设置、部门默认。
-    // 返回值与 resolve 相同，另有 roleId、levelSource、角色 Prompt 与来源；Stage 4 之前角色层不存在，按部门解析
-    resolveRole(projectId, department, roleId) {
+    // 返回值与 resolve 相同，另有 roleId、levelSource、角色 Prompt 与来源；Stage 4 之前角色层不存在，按部门解析。
+    // options.skipProjectRole 为 true 时跳过项目角色设置这一层，返回「跟随」时继承下来的值（角色默认、项目部门设置、部门默认）
+    resolveRole(projectId, department, roleId, options) {
       const roles = Y7.data.catalog.roleCatalog[department] || [];
       if (!roles.some((role) => role.id === roleId)) throw new Error('部门「' + department + '」没有角色：' + roleId);
+      const skipProjectRole = Boolean(options && options.skipProjectRole);
       const catalog = Y7.resolve(Y7.data.catalog);
       const project = projectId && Y7.data.projectSettings[projectId] ? Y7.resolve(Y7.data.projectSettings[projectId]) : null;
       const roleList = project && project.roles && Array.isArray(project.roles[department]) ? project.roles[department] : [];
-      const roleSetting = roleList.find((entry) => entry.roleId === roleId) || null;
+      const roleSetting = skipProjectRole ? null : roleList.find((entry) => entry.roleId === roleId) || null;
       const roleDefault = catalog.roleDefaults ? catalog.roleDefaults[roleId] || null : null;
       const deptSetting = project ? project.departments[department] || null : null;
       const deptDefault = catalog.departmentDefaults[department] || null;
