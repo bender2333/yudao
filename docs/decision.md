@@ -8,6 +8,7 @@
   - Yudao 自身支持拆分部署到不同的服务器与平台（[D29](requirements/distributed-deployment.md)）；为此从现在起遵守六条边界（[ADR-0007](adr/0007-boundaries-for-distributed-deployment.md)）。
   - 语义系统、部门内多角色、记忆、可观测性、前端优化放入 Stage 4。语义系统承担两项职责：整理事实与事件，随时进行语义压缩与分发；整理知识图谱与语义工程，供演化使用（[D25](requirements/semantic-system.md)）。
   - 技能移入 Stage 4，3.8 运维并入 Stage 5。
+  - CLAUDE.md、AGENTS.md 与 README 的项目表述等到进入 Stage 5 时再修改，防止影响当前的工作。
 - 决策：阶段改为 Stage 3 通用工具、可靠恢复与并行；Stage 4 部门内协作、上下文与界面；Stage 5 运维部门与元观察；Stage 6 分布式部署；Stage 7 受治理的系统演化（原 Stage 4）。各阶段定义见[总体路线图](program-roadmap.md)第 5 节，JEV 的能力边界见 [JEV 决策模型调研](research/jev-decision-model.md)。
 
 ## 2026-09-24 - 模型管理：部门默认加项目部门设置，调用目标按请求解析

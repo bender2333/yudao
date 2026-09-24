@@ -32,3 +32,5 @@ claude-opus-5-5 / 2026-09-24 21:40 / docs/stage-3-plan.md 改名为「通用工�
 claude-opus-5-5 / 2026-09-24 21:40 / 新增 docs/requirements/operations-department.md（D27）、meta-observer.md（D28）、distributed-deployment.md（D29）；docs/requirements/semantic-system.md（D25）与 department-roles.md（D26）写入放入 Stage 4 的原话与决定，D25 写入语义系统的两项职责；docs/requirements/README.md 登记 D27 至 D29；新增 docs/research/jev-decision-model.md 并在 docs/research/README.md 登记 / 按需求记录规则单独保存用户原话与确认结论；保存 JEV 七个一手来源的核对结果，供 Stage 5 设计使用
 
 claude-opus-5-5 / 2026-09-24 21:48 / docs/adr/0007-boundaries-for-distributed-deployment.md 的「后果」补充一条：现有三个部门共用一个 run 工作目录，新的设计不增加对共享目录的依赖，其余部分在 Stage 6 改为快照传递 / 如实说明第 4 条边界与现有实现的差距
+
+claude-opus-5-5 / 2026-09-24 21:54 / docs/program-roadmap.md 第 5.2 节与 docs/decision.md 2026-09-24 路线图条目写明：进入 Stage 5 时再修改 CLAUDE.md、AGENTS.md 与 README 的项目表述 / 用户决定等到 Stage 5 再修改，防止影响当前的工作
