@@ -26,31 +26,16 @@
     return String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   }
 
-  // ---------------------------------------------------------------------------
-  // 角色的模型选择（多角色草案第 12 节）：项目角色设置、角色默认、项目部门设置、部门默认，取第一个写入了的
-
-  function roleResolve(raw, catalog, dept, roleId, skipOwn) {
-    const own = !skipOwn && raw.roles && Array.isArray(raw.roles[dept]) ? raw.roles[dept].find((entry) => entry.roleId === roleId) || null : null;
-    const roleDefault = catalog.roleDefaults ? catalog.roleDefaults[roleId] || null : null;
-    const deptSetting = raw.departments[dept] || null;
-    const deptDefault = catalog.departmentDefaults[dept] || null;
-    const chain = [
-      ['项目角色设置', own ? own.model : null, own ? own.level : null],
-      ['角色默认', roleDefault ? roleDefault.definition : null, roleDefault ? roleDefault.level : null],
-      ['项目设置', deptSetting ? deptSetting.model : null, deptSetting ? deptSetting.level : null],
-      ['部门默认', deptDefault ? deptDefault.definition : null, deptDefault ? deptDefault.level : null]
-    ];
-    const modelHit = chain.find((entry) => entry[1]);
-    const levelHit = chain.find((entry) => entry[2]);
-    const definition = modelHit ? modelHit[1] : null;
-    const def = definition ? Y7.model.definition(definition) : null;
-    const requestLevel = levelHit ? levelHit[2] : null;
+  // 本项目角色设置写入了的项之外，其余项继承的值：来自 Y7.model.resolveRole 的结果，来源为项目角色设置的项在清除之前不可知
+  function inheritedOf(resolved) {
+    const ownModel = resolved.source === '项目角色设置';
+    const ownLevel = resolved.levelSource === '项目角色设置';
     return {
-      definition,
-      source: modelHit ? modelHit[0] : null,
-      requestLevel,
-      sentLevel: def ? Y7.model.clampLevel(requestLevel, def.reasoning) : null,
-      problem: definition ? Y7.model.problemOf(definition) : '未设置'
+      modelKnown: !ownModel,
+      definition: ownModel ? null : resolved.definition,
+      source: ownModel ? null : resolved.source,
+      levelKnown: !ownLevel,
+      requestLevel: ownLevel ? null : resolved.requestLevel
     };
   }
 
@@ -86,11 +71,8 @@
       DEPTS3.forEach((dept) => {
         roles[dept] = catalog.roleCatalog[dept].map((role) => {
           const setting = raw.roles && Array.isArray(raw.roles[dept]) ? raw.roles[dept].find((entry) => entry.roleId === role.id) || null : null;
-          return Object.assign({}, role, {
-            setting,
-            resolved: roleResolve(raw, catalog, dept, role.id, false),
-            inherited: roleResolve(raw, catalog, dept, role.id, true)
-          });
+          const resolved = Y7.model.resolveRole(projectId, dept, role.id);
+          return Object.assign({}, role, { setting, resolved, inherited: inheritedOf(resolved) });
         });
       });
     }
@@ -243,7 +225,8 @@
       const e = entry.effective;
       rows.push(['模型', (entry.model ? '' : '<small class="y7-muted y7-block-line">跟随部门默认</small>') + effectiveHtml(e)]);
       rows.push(['推理档位', e.definition
-        ? esc((entry.level ? '请求 ' + entry.level : '跟随（' + (e.requestLevel || '模型默认') + '）') + ' · 发送 ' + (e.sentLevel || '不带推理参数'))
+        ? esc((e.requestLevel ? '请求 ' + e.requestLevel : '请求档位为空（模型默认）') + ' · 发送 ' + (e.sentLevel || '不带推理参数')) +
+          '<small class="y7-muted y7-block-line">档位来源：' + esc(e.levelSource || '模型默认档位') + '</small>'
         : '']);
     }
     rows.push(['部门 Prompt', ui.tag(promptLabel) + '<small class="y7-muted y7-block-line y7-set-clip">' + esc(preview) + '</small>']);
@@ -272,8 +255,8 @@
         columns: [
           { key: 'name', label: '角色', render: (row) => '<div class="y7-cell-stack"><strong>' + esc(row.name) + '</strong><small class="y7-muted">' + esc(row.duty) + '</small></div>' },
           { key: 'model', label: '模型', render: (row) => effectiveHtml(row.resolved) },
-          { key: 'level', label: '推理档位', render: (row) => row.resolved.definition ? esc((row.resolved.requestLevel ? '请求 ' + row.resolved.requestLevel : '请求档位为空') + ' · 发送 ' + (row.resolved.sentLevel || '不带推理参数')) : '' },
-          { key: 'prompt', label: '角色 Prompt', render: (row) => row.setting && row.setting.promptText ? '<span class="y7-set-clip">' + esc(row.setting.promptText) + '</span>' : '<span class="y7-muted">内置角色 Prompt</span>' },
+          { key: 'level', label: '推理档位', render: (row) => row.resolved.definition ? '<div class="y7-cell-stack"><span>' + esc((row.resolved.requestLevel ? '请求 ' + row.resolved.requestLevel : '请求档位为空') + ' · 发送 ' + (row.resolved.sentLevel || '不带推理参数')) + '</span><small class="y7-muted">来源：' + esc(row.resolved.levelSource || '模型默认档位') + '</small></div>' : '' },
+          { key: 'prompt', label: '角色 Prompt', render: (row) => row.resolved.promptText ? '<span class="y7-set-clip">' + esc(row.resolved.promptText) + '</span>' : '<span class="y7-muted">' + esc(row.resolved.promptSource) + '</span>' },
           { key: 'own', label: '本项目写入', render: (row) => row.setting ? ui.status('done', '已写入') : '<span class="y7-muted">跟随</span>' }
         ],
         rows: s.roles[dept]

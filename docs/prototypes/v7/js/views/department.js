@@ -34,7 +34,6 @@
 
   // 页面自己的界面状态：房间画面、最近事件、所选 Context、弹窗草稿
   const st = { room: null, onEvent: null, view: null, lastEvent: null, contextSel: {}, showInactive: false, modal: null };
-  const defaultPromptCache = {};
 
   // ---------------------------------------------------------------------------
   // 工具函数
@@ -86,14 +85,6 @@
     Object.keys(run.messages).forEach((dept) => run.messages[dept].forEach((msg) => { max = Math.max(max, msg.seq || 0); }));
     run.flow.forEach((entry) => { max = Math.max(max, entry.seq || 0); });
     return max + 1;
-  }
-
-  // 内置默认 Prompt（版本 0）的原文：取自示例数据中未配置 Prompt 的请求
-  function builtInPrompt(dept) {
-    if (dept in defaultPromptCache) return defaultPromptCache[dept];
-    const hit = Y7.resolve(Y7.data.runs).map((run) => run.prompts && run.prompts[dept]).find((p) => p && p.configVersion === 0 && p.text);
-    defaultPromptCache[dept] = hit ? hit.text : null;
-    return defaultPromptCache[dept];
   }
 
   function managerName(dept) {
@@ -306,7 +297,7 @@
       config: {
         version: deptSettings.promptVersion,
         isDefault: deptSettings.promptText === null,
-        text: deptSettings.promptText === null ? builtInPrompt(dept) : deptSettings.promptText
+        text: deptSettings.promptText === null ? Y7.defaultPrompt(dept) : deptSettings.promptText
       },
       request: attempts.length && reqPrompt && reqPrompt.requestVersion !== null && reqPrompt.requestVersion !== undefined
         ? { version: reqPrompt.requestVersion, text: reqPrompt.text, attemptId: attempts[0].id } : null,
@@ -324,18 +315,8 @@
         return Object.assign({}, role, { status: live.status, task: live.task });
       });
       ledger = run && run.ledger && run.ledger[dept] ? run.ledger[dept] : null;
-      const records = Y7.resolve(Y7.data.semantic)[projectId] || null;
-      if (records) {
-        const scopeName = Y7.deptLabel(dept) + '私有';
-        const units = records.units.filter((unit) => unit.scope === '项目共享' || unit.scope === scopeName);
-        const ids = new Set(units.map((unit) => unit.id));
-        semantic = {
-          units,
-          conflicts: records.conflicts.filter((pair) => ids.has(pair.a) && ids.has(pair.b)),
-          dataflow: records.dataflow,
-          privateScope: scopeName
-        };
-      }
+      // 本部门可见的语义记录：项目共享单元与本部门私有单元，冲突与更替链已按范围过滤
+      semantic = Object.assign({ privateScope: Y7.deptLabel(dept) + '私有' }, Y7.query('semantic.records', { projectId, department: dept }));
     }
 
     const view = {
@@ -390,9 +371,27 @@
     const projectId = params.projectId || Y7.state.projectId;
     const ops = Y7.resolve(Y7.data.ops)[projectId];
     if (!ops) return null;
+    const releases = ops.releases.map((rel) => Object.assign({
+      digestMatch: rel.adoptionDigest === rel.releaseDigest,
+      accepted: /运维已接收/.test(rel.state),
+      superseded: /已被/.test(rel.state)
+    }, rel));
+    // 每个环境的运行责任：取该环境最近一次没有被取代的发布；运维接收之前，责任留在发布者
+    const envs = [];
+    releases.forEach((rel) => { if (!rel.superseded && !envs.includes(rel.env)) envs.push(rel.env); });
+    const environments = envs.map((env) => {
+      const rel = releases.filter((entry) => entry.env === env && !entry.superseded).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0];
+      const primary = ops.responsibility.env === env && ops.responsibility.version === rel.version;
+      return {
+        env, release: rel, accepted: rel.accepted,
+        acceptedAt: rel.acceptedAt || (primary ? ops.responsibility.acceptedAt : null),
+        owner: rel.accepted ? '运维部门' : '发布者（' + rel.releasedBy.split(' · ')[0] + '）'
+      };
+    });
     return {
       responsibility: ops.responsibility,
-      releases: ops.releases.map((rel) => Object.assign({ digestMatch: rel.adoptionDigest === rel.releaseDigest, awaiting: !/运维已接收|已被/.test(rel.state) }, rel)),
+      environments,
+      releases,
       incidents: ops.incidents.map((inc) => {
         const current = inc.steps.find((step) => step.state === 'current') || null;
         const open = inc.steps.some((step) => step.state !== 'done');
@@ -512,12 +511,18 @@
   Y7.commands.register('acceptResponsibility', (params) => {
     const ops = Y7.data.ops[params.projectId];
     if (!ops) throw new Error('项目没有运维记录：' + params.projectId);
-    const release = ops.releases.find((entry) => entry.version === params.version);
-    if (!release) throw new Error('找不到发布记录：' + params.version);
-    if (/运维已接收/.test(release.state)) return { ok: false, message: '运维部门已经接收 ' + release.version };
+    const release = ops.releases.find((entry) => entry.id === params.releaseId);
+    if (!release) throw new Error('找不到发布记录：' + params.releaseId);
+    if (/已被/.test(release.state)) return { ok: false, message: '发布记录 ' + release.id + ' 已被取代，不能接收' };
+    if (/运维已接收/.test(release.state)) return { ok: false, message: '运维部门已经接收 ' + release.id };
     release.state = '已发布 · 运维已接收';
-    ops.responsibility = Object.assign({}, ops.responsibility, { version: release.version, acceptedAt: Y7.data.now, owner: '运维部门' });
-    return { ok: true, message: '运维部门已接收 ' + release.version + ' 的运行责任', paths: ['ops.' + params.projectId + '.responsibility', 'ops.' + params.projectId + '.releases'] };
+    release.acceptedAt = Y7.data.now;
+    release.note = '运维在 ' + Y7.ui.time(Y7.data.now) + ' 接收';
+    return {
+      ok: true,
+      message: '运维部门已接收「' + release.env + '」的 ' + release.version + '（' + release.id + '）：这个环境的运行责任从发布者转到运维部门',
+      paths: ['ops.' + params.projectId + '.releases[id=' + release.id + ']']
+    };
   });
 
   // ---------------------------------------------------------------------------
@@ -552,7 +557,8 @@
         (t.problem ? ui.status('unusable', '无法使用：' + t.problem) : ui.status('admitted', '已准入')) + '</span>';
     }
     const level = t.definition
-      ? esc(t.requestLevel ? '请求 ' + t.requestLevel : '请求档位为空（使用模型默认档位）') + ' · ' + esc('发送 ' + (t.sentLevel || '不带推理参数'))
+      ? esc(t.requestLevel ? '请求 ' + t.requestLevel : '请求档位为空（使用模型默认档位）') + ' · ' + esc('发送 ' + (t.sentLevel || '不带推理参数')) +
+        '<small class="y7-muted y7-block-line">档位来源：' + esc(t.levelSource || '模型默认档位') + '</small>'
       : '';
     const pairs = [
       ['当前生效的模型', current],
@@ -755,7 +761,7 @@
   function promptPanel(v) {
     const p = v.prompt;
     const configLabel = p.config.isDefault ? '默认 v0' : '配置 v' + p.config.version;
-    const configText = p.config.text || '内置默认 Prompt（版本 0），内容随系统版本发布。';
+    const configText = p.config.text;
     const left = '<section class="y7-ws-prompt"><h3 class="y7-h3">项目当前配置 ' + ui.tag(configLabel) +
       (p.request ? (p.pending ? ui.status('queued', '待下次激活') : ui.status('running', '生效中')) : '') + '</h3>' + ui.pre(configText) +
       '<div class="y7-row">' + ui.button({ label: '配置 Prompt', kind: 'small', act: 'dept.openSettings', data: { projectId: v.project.id, department: v.department.id } }) + '</div></section>';
@@ -836,7 +842,7 @@
     const extra = [];
     if (unit.status === 'superseded' && unit.supersededBy) extra.push('已被 ' + unit.supersededBy + ' 取代' + (unit.reason ? '：' + unit.reason : ''));
     if (unit.status === 'invalid' && unit.reason) extra.push('已失效：' + unit.reason);
-    if (unit.fromHeld) extra.push('来自未采纳事项');
+    if (unit.fromHeld) extra.push('来自未采纳事项' + (unit.workItemTitle ? '「' + unit.workItemTitle + '」' : ''));
     const next = unit.supersededBy ? all.find((u) => u.id === unit.supersededBy) : null;
     return '<li class="y7-ws-unit is-' + esc(unit.status) + '"><div class="y7-ws-unit-head">' + ui.code(unit.id) + '<span class="y7-ws-unit-type">' + esc(unit.type) + '</span>' + ui.status(s[0], s[1]) +
       '<span class="y7-muted y7-small">' + esc(unit.scope) + '</span></div><p>' + esc(unit.text) + '</p>' +
@@ -846,19 +852,20 @@
 
   function semanticPanel(v) {
     const s = v.semantic;
-    if (!s) return ui.empty('本项目还没有语义记录');
+    if (!s || !s.units.length) return ui.empty('本项目还没有语义记录');
     const active = s.units.filter((unit) => unit.status === 'valid' || unit.status === 'conflict');
     const inactive = s.units.filter((unit) => unit.status === 'superseded' || unit.status === 'invalid');
     const types = [];
     active.forEach((unit) => { if (!types.includes(unit.type)) types.push(unit.type); });
     const groups = types.map((type) => '<section class="y7-ws-unit-group"><h3 class="y7-h3">' + esc(type) + '</h3><ul>' + active.filter((unit) => unit.type === type).map((unit) => unitRow(unit, s.units)).join('') + '</ul></section>').join('');
     const conflicts = s.conflicts.length
-      ? '<h3 class="y7-h3">冲突</h3>' + s.conflicts.map((pair) => ui.note(ui.code(pair.a) + ' ↔ ' + ui.code(pair.b) + ' ' + esc(pair.text), 'warn')).join('')
+      ? '<h3 class="y7-h3">冲突</h3>' + s.conflicts.map((pair) => ui.note(ui.code(pair.a.id) + ' ↔ ' + ui.code(pair.b.id) + ' ' + esc(pair.text), 'warn')).join('')
       : '';
-    const chain = inactive.filter((unit) => unit.status === 'superseded').map((unit) => {
-      const next = s.units.find((u) => u.id === unit.supersededBy);
-      return '<li><span class="y7-muted">' + esc(Y7.ui.time(unit.at)) + '</span>' + ui.code(unit.id) + '<span>' + esc(unit.text) + '</span><span class="y7-ws-arrow">→</span>' + ui.code(unit.supersededBy) + '<span>' + esc(next ? next.text : '') + '</span><small class="y7-muted">原因：' + esc(unit.reason || '—') + '</small></li>';
-    }).join('');
+    // 更替链：每条链从旧到新，被取代的单元写明日期与原因
+    const chain = s.chains.map((steps) => '<li>' + steps.map((unit, index) =>
+      (index ? '<span class="y7-ws-arrow">→</span>' : '') + '<span class="y7-ws-chain-step">' + ui.code(unit.id) + '<span>' + esc(unit.text) + '</span>' +
+      (unit.supersededBy ? '<small class="y7-muted">' + esc(Y7.ui.time(unit.at)) + ' · 原因：' + esc(unit.reason || '—') + '</small>' : '') + '</span>'
+    ).join('') + '</li>').join('');
     const toggle = '<label class="y7-ws-toggle"><input type="checkbox" data-act="dept.toggleInactive"' + (st.showInactive ? ' checked' : '') + '> 显示已取代与已失效的单元（' + inactive.length + '）</label>';
     return '<p class="y7-muted y7-small">本部门可见的单元：项目共享，以及' + esc(s.privateScope) + '。质检各角色看不到工程私有单元。</p>' + conflicts +
       '<div class="y7-ws-units">' + groups + '</div>' +
@@ -959,25 +966,31 @@
         body: ui.empty('本项目还没有交给运维部门的运行责任：项目采纳的交付物发布后，由运维部门接收并长期负责运行。')
       });
     }
-    const r = ops.responsibility;
-    const awaiting = ops.releases.filter((rel) => rel.awaiting);
-    const resp = ui.kv([
-      ['交付物版本', ui.code(r.version)],
-      ['环境', esc(r.env)],
-      ['接收时间', esc(Y7.ui.time(r.acceptedAt))],
-      ['责任方', esc(r.owner)]
-    ]) + ui.note(esc(r.platform), 'info') +
-      (awaiting.length
-        ? '<div class="y7-row y7-ws-accept">' + awaiting.map((rel) => '<span>已发布版本 ' + esc(rel.version) + '，运维未接收</span>' + ui.button({ label: '接收 ' + rel.version + ' 的运行责任', kind: 'small primary', cmd: 'acceptResponsibility', data: { projectId: pid, version: rel.version } })).join('') + '</div>'
-        : '<p class="y7-muted y7-small">没有等待接收的发布；发布成功与运维接收分别记录。</p>');
+    const envCards = ops.environments.map((entry) => {
+      const rel = entry.release;
+      return '<article class="y7-ws-env' + (entry.accepted ? '' : ' is-awaiting') + '"><header><strong>' + esc(entry.env) + '</strong>' +
+        (entry.accepted ? ui.status('done', '运维已接收') : ui.status('pending', '运维未接收')) + '</header>' +
+        ui.kv([
+          ['交付物版本', ui.code(rel.version) + ' ' + ui.tag(rel.id)],
+          ['责任方', esc(entry.owner)],
+          [entry.accepted ? '接收时间' : '发布时间', esc(Y7.ui.time(entry.accepted ? entry.acceptedAt : rel.at))]
+        ]) +
+        (entry.accepted ? '' : '<p class="y7-muted y7-small">' + esc(rel.note || '运维接收之前，这个环境的运行责任留在发布者') + '</p><div class="y7-row">' +
+          ui.button({ label: '接收运行责任', kind: 'small primary', cmd: 'acceptResponsibility', data: { projectId: pid, releaseId: rel.id } }) + '</div>') +
+        '</article>';
+    }).join('');
+    const resp = '<div class="y7-ws-envs">' + envCards + '</div>' + ui.note(esc(ops.responsibility.platform), 'info') +
+      '<p class="y7-muted y7-small">发布成功与运维接收分别记录；每个环境单独接收。</p>';
     const releases = ui.table({
       columns: [
+        { key: 'id', label: '发布记录', className: 'y7-col-status', render: (row) => ui.code(row.id) },
         { key: 'version', label: '版本', className: 'y7-col-status', render: (row) => ui.code(row.version) },
+        { key: 'env', label: '环境' },
         { key: 'adoptionDigest', label: '采纳 digest', render: (row) => ui.code(row.adoptionDigest) },
         { key: 'releaseDigest', label: '发布 digest', render: (row) => ui.code(row.releaseDigest) },
         { key: 'digestMatch', label: '对照', className: 'y7-col-status', render: (row) => row.digestMatch ? ui.status('succeeded', '一致') : ui.status('failed', '不一致') },
         { key: 'at', label: '发布时间', className: 'y7-col-status', render: (row) => esc(Y7.ui.time(row.at)) },
-        { key: 'state', label: '状态' }
+        { key: 'state', label: '状态', render: (row) => '<div class="y7-cell-stack"><span>' + esc(row.state) + '</span><small class="y7-muted">' + esc(row.releasedBy) + '</small>' + (row.note ? '<small class="y7-muted">' + esc(row.note) + '</small>' : '') + '</div>' }
       ],
       rows: ops.releases
     });
@@ -1008,10 +1021,8 @@
     const decidedRows = decided.length
       ? '<h3 class="y7-h3">已处理</h3><ul class="y7-ws-decided">' + decided.map((act) => '<li>' + ui.status(act.state === 'approved' ? 'succeeded' : 'cancelled', act.state === 'approved' ? '已授权一次' : '已拒绝') + '<span>' + esc(act.kind + ' · ' + act.target) + '</span><span class="y7-muted">' + esc(Y7.ui.time(act.decidedAt)) + '</span></li>').join('') + '</ul>'
       : '';
-    return '<div class="y7-ws-ops-grid">' +
-        ui.block({ title: '运行责任', tag: 'Stage 5', level: 's5', query: 'ops.status', command: 'acceptResponsibility', body: resp }) +
-        ui.block({ title: '发布记录', tag: 'Stage 5', level: 's5', query: 'ops.status', command: '无', subtitle: '发布 digest 与项目采纳 digest 对照', body: releases }) +
-      '</div>' +
+    return ui.block({ title: '运行责任', tag: 'Stage 5', level: 's5', query: 'ops.status', command: 'acceptResponsibility', subtitle: '平台运行责任与交付物运行责任分开；交付物按环境由运维部门接收。', body: resp }) +
+      ui.block({ title: '发布记录', tag: 'Stage 5', level: 's5', query: 'ops.status', command: '无', subtitle: '发布 digest 与项目采纳 digest 对照', body: releases }) +
       ui.block({ title: '故障链路', tag: 'Stage 5', level: 's5', query: 'ops.status', command: '无', body: incidents || ui.empty('没有故障记录') }) +
       ui.block({ title: '运行指标', tag: 'Stage 5', level: 's5', query: 'ops.status', command: '无', body: indicators }) +
       ui.block({ title: '待授权的外部动作', tag: 'Stage 5', level: 's5', query: 'ops.status', command: 'authorizeOpsAction', subtitle: '部署、回滚、重启逐项授权；缓解只在登记过的清单内执行，授权一次不作为永久授权。', body: actionRows + decidedRows });
@@ -1158,17 +1169,28 @@
     return '<option value=""' + (selected ? '' : ' selected') + '>' + esc(followLabel) + '</option>' + orphan + groups;
   }
 
-  function levelFieldHtml(definitionId, selected, inheritedLevel, attrs) {
+  // inherit：{ known, level } 为选择「跟随」时继承的请求档位；known 为 false 表示继承的值要等清除本项目角色设置之后才能确定
+  function levelFieldHtml(definitionId, selected, inherit, attrs, noModelText) {
     const def = definitionId ? Y7.model.definition(definitionId) : null;
-    if (!def) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">没有生效的模型：先选择模型</small>';
+    if (!def) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">' + esc(noModelText || '没有生效的模型：先选择模型') + '</small>';
     const levels = def.reasoning ? def.reasoning.levels : [];
     if (!levels.length) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">该模型未声明推理档位，请求不带推理参数</small>';
-    const inherited = inheritedLevel ? inheritedLevel : '模型默认 ' + def.reasoning.defaultLevel;
+    const followText = inherit.known ? '跟随（当前：' + (inherit.level || '模型默认 ' + def.reasoning.defaultLevel) + '）' : '跟随（清除本项目的角色设置）';
     const value = selected && levels.includes(selected) ? selected : '';
-    const sent = Y7.model.clampLevel(value || inheritedLevel || null, def.reasoning);
-    return '<select class="y7-select" ' + attrs + '><option value=""' + (value ? '' : ' selected') + '>跟随（当前：' + esc(inherited) + '）</option>' +
+    const sent = value || inherit.known ? Y7.model.clampLevel(value || inherit.level || null, def.reasoning) : '保存后按继承的档位确定';
+    return '<select class="y7-select" ' + attrs + '><option value=""' + (value ? '' : ' selected') + '>' + esc(followText) + '</option>' +
       levels.map((level) => '<option value="' + esc(level) + '"' + (level === value ? ' selected' : '') + '>' + esc(level) + '</option>').join('') + '</select>' +
       '<small class="y7-muted">支持 ' + esc(levels.join('、')) + ' · 实际发送 ' + esc(sent) + (selected && !levels.includes(selected) ? ' · 原选择 ' + esc(selected) + ' 不在支持范围内，已改为跟随' : '') + '</small>';
+  }
+
+  // 角色行「跟随」时的模型：本项目角色设置写入了模型时，清除之后才能确定
+  function roleEffective(role, draftModel) {
+    return draftModel || (role.inherited.modelKnown ? role.inherited.definition : null);
+  }
+
+  function roleLevelField(role, draft) {
+    return levelFieldHtml(roleEffective(role, draft.model), draft.level, { known: role.inherited.levelKnown, level: role.inherited.requestLevel },
+      'data-act="dept.roleLevel" data-role-id="' + esc(role.id) + '"', '清除本项目的模型设置后，保存时按继承的层次重新选择模型；之后可以再设置档位');
   }
 
   function deptModelSection(c) {
@@ -1180,14 +1202,13 @@
     const status = problem ? ui.status(problem === '未设置' ? 'idle' : 'unusable', problem === '未设置' ? '未设置' : '无法使用：' + problem) : ui.status('admitted', '已准入');
     return '<label class="y7-field"><span>模型</span><select class="y7-select" id="y7-dm-model" data-act="dept.modalModel">' + modelOptions(cat, m.model, followLabel) + '</select>' +
         '<small class="y7-ws-inline"><span class="y7-muted">生效：' + esc(effective ? Y7.model.label(effective) : '未设置') + '</span>' + status + '</small></label>' +
-      '<div class="y7-field" id="y7-dm-level-field"><span>推理档位</span>' + levelFieldHtml(effective, m.level, deptDefault ? deptDefault.level : null, 'id="y7-dm-level" data-act="dept.modalLevel"') + '</div>';
+      '<div class="y7-field" id="y7-dm-level-field"><span>推理档位</span>' + levelFieldHtml(effective, m.level, { known: true, level: deptDefault ? deptDefault.level : null }, 'id="y7-dm-level" data-act="dept.modalLevel"') + '</div>';
   }
 
   function promptSection(c) {
     const { m, entry } = c;
     const label = entry.promptText === null ? '默认 v0' : '配置 v' + entry.promptVersion;
-    const def = builtInPrompt(m.dept);
-    const value = entry.promptText === null ? (def || '') : entry.promptText;
+    const value = entry.promptText === null ? Y7.defaultPrompt(m.dept) : entry.promptText;
     return '<div class="y7-field"><span>部门 Prompt</span>' +
       '<p class="y7-ws-inline y7-small"><span class="y7-muted">当前</span>' + ui.tag(label) + (Y7.atLeast('s3') ? '<span class="y7-muted">设置版本 v' + esc(entry.version) + '</span>' : '') + '</p>' +
       '<textarea class="y7-textarea" rows="7" id="y7-dm-prompt" data-draft="' + esc(m.draftKey) + '" placeholder="内置默认 Prompt（版本 0）">' + esc(value) + '</textarea>' +
@@ -1201,13 +1222,16 @@
     const rows = roles.map((role) => {
       const draft = m.roles[role.id];
       const inherited = role.inherited;
-      const followLabel = '跟随（当前：' + (inherited.definition ? Y7.model.label(inherited.definition) + ' · ' + inherited.source : '未设置') + '）';
-      const effective = draft.model || inherited.definition;
+      const followLabel = inherited.modelKnown
+        ? '跟随（当前：' + (inherited.definition ? Y7.model.label(inherited.definition) + ' · ' + inherited.source : '未设置') + '）'
+        : '跟随（清除本项目的角色设置）';
+      const r = role.resolved;
       return '<div class="y7-dm-role" data-role-id="' + esc(role.id) + '">' +
         '<div class="y7-dm-role-name"><strong>' + esc(role.name) + '</strong><small class="y7-muted">' + esc(role.duty) + '</small>' +
-        '<small class="y7-ws-inline"><span class="y7-muted">生效：' + esc(role.resolved.definition ? Y7.model.label(role.resolved.definition) : '未设置') + ' · ' + esc(role.resolved.source || '—') + '</span></small></div>' +
+        '<small class="y7-ws-inline"><span class="y7-muted">生效：' + esc(r.definition ? Y7.model.label(r.definition) : '未设置') + ' · ' + esc(r.source || '—') +
+          ' · 档位 ' + esc((r.requestLevel || '模型默认') + '（' + (r.levelSource || '模型默认档位') + '）') + '</span></small></div>' +
         '<label class="y7-field"><span>模型</span><select class="y7-select" data-act="dept.roleModel" data-role-id="' + esc(role.id) + '">' + modelOptions(cat, draft.model, followLabel) + '</select></label>' +
-        '<div class="y7-field" data-role-level="' + esc(role.id) + '"><span>推理档位</span>' + levelFieldHtml(effective, draft.level, inherited.requestLevel, 'data-act="dept.roleLevel" data-role-id="' + esc(role.id) + '"') + '</div>' +
+        '<div class="y7-field" data-role-level="' + esc(role.id) + '"><span>推理档位</span>' + roleLevelField(role, draft) + '</div>' +
         '<label class="y7-field y7-dm-role-prompt"><span>角色 Prompt</span><textarea class="y7-textarea" rows="2" data-role-prompt="' + esc(role.id) + '" data-draft="' + esc(m.draftKey + '.role.' + role.id) + '" placeholder="内置角色 Prompt">' + esc(role.setting && role.setting.promptText ? role.setting.promptText : '') + '</textarea></label>' +
         '</div>';
     }).join('');
@@ -1319,18 +1343,18 @@
     const c = modalCtx();
     const deptDefault = c.cat.departmentDefaults[st.modal.dept] || null;
     const effective = st.modal.model || (deptDefault ? deptDefault.definition : null);
-    Y7.dom.modal.querySelector('#y7-dm-level-field').innerHTML = '<span>推理档位</span>' + levelFieldHtml(effective, st.modal.level, deptDefault ? deptDefault.level : null, 'id="y7-dm-level" data-act="dept.modalLevel"');
+    Y7.dom.modal.querySelector('#y7-dm-level-field').innerHTML = '<span>推理档位</span>' + levelFieldHtml(effective, st.modal.level, { known: true, level: deptDefault ? deptDefault.level : null }, 'id="y7-dm-level" data-act="dept.modalLevel"');
   });
 
   Y7.actions.register('dept.roleModel', (el) => {
     const roleId = el.dataset.roleId;
     st.modal.roles[roleId].model = el.value;
     const role = modalCtx().settings.roles[st.modal.dept].find((entry) => entry.id === roleId);
-    const effective = el.value || role.inherited.definition;
+    const effective = roleEffective(role, el.value);
     const def = effective ? Y7.model.definition(effective) : null;
     const draft = st.modal.roles[roleId];
     if (draft.level && !(def && def.reasoning && def.reasoning.levels.includes(draft.level))) draft.level = '';
-    Y7.dom.modal.querySelector('[data-role-level="' + CSS.escape(roleId) + '"]').innerHTML = '<span>推理档位</span>' + levelFieldHtml(effective, draft.level, role.inherited.requestLevel, 'data-act="dept.roleLevel" data-role-id="' + esc(roleId) + '"');
+    Y7.dom.modal.querySelector('[data-role-level="' + CSS.escape(roleId) + '"]').innerHTML = '<span>推理档位</span>' + roleLevelField(role, draft);
   });
 
   Y7.actions.register('dept.roleLevel', (el) => {
@@ -1339,7 +1363,7 @@
 
   Y7.actions.register('dept.promptDefault', () => {
     const area = Y7.dom.modal.querySelector('#y7-dm-prompt');
-    area.value = builtInPrompt(st.modal.dept) || '';
+    area.value = Y7.defaultPrompt(st.modal.dept);
     Y7.setDraft(st.modal.draftKey, area.value);
     area.focus();
   });
@@ -1366,8 +1390,7 @@
   function promptValue(text) {
     const trimmed = text.trim();
     if (!trimmed) return null;
-    const def = builtInPrompt(st.modal.dept);
-    return def && trimmed === def.trim() ? null : trimmed;
+    return trimmed === Y7.defaultPrompt(st.modal.dept).trim() ? null : trimmed;
   }
 
   Y7.actions.register('dept.saveSettings', () => {

@@ -103,6 +103,7 @@
 .y7-ws-unit-type { font-size: 11.5px; color: var(--ws-accent); font-weight: 600; }
 .y7-ws-chain li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; padding: 7px 10px; border-radius: 8px; background: var(--soft); min-width: 0; }
 .y7-ws-chain li span { overflow-wrap: anywhere; min-width: 0; }
+.y7-ws-chain-step { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; }
 .y7-ws-toggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; cursor: pointer; }
 .y7-ws-toggle input { accent-color: var(--green); }
 .y7-ws-inactive { margin-top: 8px; }
@@ -130,9 +131,11 @@
 .y7-ws-reply .y7-muted { font-size: 11.5px; }
 
 /* 运维部门工作间 */
-.y7-ws-ops-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 16px; }
-.y7-ws-ops-grid > .y7-block { margin-top: 16px; }
-.y7-ws-accept { margin-top: 10px; }
+.y7-ws-envs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.y7-ws-env { display: grid; gap: 10px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.y7-ws-env.is-awaiting { border-color: color-mix(in srgb, var(--amber) 50%, var(--line)); background: var(--amber-bg); }
+.y7-ws-env header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.y7-ws-env .y7-kv { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px 16px; }
 .y7-ws-incident { display: grid; gap: 12px; }
 .y7-ws-incident + .y7-ws-incident { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .y7-ws-incident header { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; }
@@ -247,7 +250,6 @@
 
 @media (max-width: 1100px) {
   .y7-ws-comms-grid { grid-template-columns: minmax(0, 1fr); }
-  .y7-ws-ops-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .y7-ws-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
   .y7-ws-steps li:nth-child(3)::before { display: none; }
 }

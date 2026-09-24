@@ -241,11 +241,10 @@
       : [];
     let semantic = null;
     if (Y7.atLeast('s4')) {
-      const records = Y7.resolve(Y7.data.semantic)[projectId] || null;
-      const units = records ? records.units : [];
-      const listed = (att.semanticUnits || []).map((ref) => Object.assign({ version: ref.version }, units.find((unit) => unit.id === ref.id) || { id: ref.id, type: '—', text: '（语义记录中没有这个单元）', status: 'invalid' }));
-      const visibleScope = Y7.deptLabel(att.department) + '私有';
-      const notListed = units.filter((unit) => (unit.status === 'valid' || unit.status === 'conflict') && (unit.scope === '项目共享' || unit.scope === visibleScope) && !listed.some((entry) => entry.id === unit.id)).length;
+      // 这次请求所属部门可见的语义单元：项目共享与该部门私有
+      const units = Y7.query('semantic.records', { projectId, department: att.department }).units;
+      const listed = (att.semanticUnits || []).map((ref) => Object.assign({ version: ref.version }, units.find((unit) => unit.id === ref.id) || { id: ref.id, type: '—', text: '（本部门可见的语义记录中没有这个单元）', status: 'invalid' }));
+      const notListed = units.filter((unit) => (unit.status === 'valid' || unit.status === 'conflict') && !listed.some((entry) => entry.id === unit.id)).length;
       semantic = { listed, notListed, compaction: att.kind === 'compaction' };
     }
     const prompt = run.prompts ? run.prompts[att.department] || null : null;
