@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yudao 界面原型 v7</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/system.css">
+  <link rel="stylesheet" href="styles/project.css">
+  <link rel="stylesheet" href="styles/department.css">
+  <link rel="stylesheet" href="styles/gallery.css">
+</head>
+<body>
+  <div class="y7-banner" role="note">
+    <strong>原型示例数据</strong>
+    <span class="y7-banner-text">界面内容全部为示例数据，不连接后端；底部工具条切换阶段、标注与场景</span>
+  </div>
+
+  <div class="y7-app">
+    <aside id="y7-sidebar" class="y7-sidebar" aria-label="项目与系统"></aside>
+    <div class="y7-scrim" data-act="shell.drawer" aria-hidden="true"></div>
+    <div class="y7-main">
+      <header id="y7-topbar" class="y7-topbar"></header>
+      <nav id="y7-tabs" class="y7-tabbar" aria-label="项目页面" hidden></nav>
+      <main id="y7-content" class="y7-content"></main>
+    </div>
+  </div>
+
+  <div id="y7-toolbar" class="y7-toolbar" aria-label="原型工具条"></div>
+  <div id="y7-modal-root"></div>
+  <div id="y7-toast-root" class="y7-toast-root" aria-live="polite"></div>
+
+  <script src="js/core.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/pixel/sprites.js"></script>
+  <script src="js/pixel/engine.js"></script>
+  <script src="js/pixel/room.js"></script>
+  <script src="js/pixel/loop.js"></script>
+  <script src="js/views/shell.js"></script>
+  <script src="js/views/overview.js"></script>
+  <script src="js/views/recovery.js"></script>
+  <script src="js/views/materials.js"></script>
+  <script src="js/views/department.js"></script>
+  <script src="js/views/observe.js"></script>
+  <script src="js/views/settings.js"></script>
+  <script src="js/views/system.js"></script>
+  <script src="js/views/gallery.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
