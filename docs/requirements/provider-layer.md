@@ -2,6 +2,8 @@
 
 确认时间：2026-09-19。状态：需求已确认，设计待实施。所属新增阶段：[Stage 2.7](../stage-2-provider-plan.md)。
 
+> 2026-09-24：任务冻结目标、协议归属与连接地址以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../model-management-design.md)为准：调用目标按每次模型请求解析，协议属于 Provider 配置，地址保存该协议的请求基址。
+
 ## 1. 用户原话与首批范围
 
 > 这是只改了无provider启动，我还想要在provider设置中，能够支持opencode go这种订阅。让provider更加独立，就像OMP的provider那样，做一个独立的provider层，后续应该统一使用。

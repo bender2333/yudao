@@ -28,6 +28,7 @@
 | D20 | [部门定向追加指导](department-guidance.md) | 用户场景已确认；处理时机、原文范围及放行关系待设计，尚未实现 |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件，完整采集及新查询/页面待实现 |
 | D22 | [启动与 Provider 热生效](startup-provider-reload.md) | 已实现；无参空态启动、统一模块重载、仅新任务生效、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务 |
+| D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../model-management-design.md)已确认，未实施；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
 | D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通；真实 Go 覆盖 Responses 与 Chat Completions 并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制，见 [执行报告](../stage-2-7-provider-report.md) |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

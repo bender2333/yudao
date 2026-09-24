@@ -118,7 +118,7 @@ Yudao 基线：当前 HEAD `735e120`（分支 `harness_1`）。
 | 协议种类 | `catalog/src/types.ts:9-23`：`openai-completions`、`openai-responses`、`anthropic-messages`、`google-generative-ai` 等 14 个 KnownApi | 各协议有独立 stream 实现（`packages/ai/src/providers/`） | `ResolvedProviderTarget.create_adapter`：仅 `responses` 与 `fake` | 采用 | 3.3 | 第二协议适配器 |
 | OAuth / 凭据运行时 | `ai/src/registry/oauth/index.ts:35` `registerOAuthProvider`；`:67` `refreshOAuthToken`；各 `login*` | 登录、刷新、按 provider 存凭据 | `provider_catalog.py::resolve_snapshot` 经宿主 `CredentialSource`；无 OAuth | 不采用 | — | S4-A |
 | 宿主 API key | `ai` 的 `getEnvApiKey`（fetch 等处引用） | 环境变量/存储解析 | `runtime.py::environment_credentials`；`provider_catalog.py::_resolve_credential` | Yudao 已有等价 | — | |
-| 会话内换模型 | `modes/rpc/rpc-types.ts:52` `set_model` / `cycle_model` | 同一会话改 provider/model | run 创建时冻结快照；无 run 内换模 | 不采用 | 3.3 | 计划：事项级换模 = 新 run 绑定 |
+| 会话内换模型 | `modes/rpc/rpc-types.ts:52` `set_model` / `cycle_model` | 同一会话改 provider/model | run 创建时冻结快照；无 run 内换模 | 采用 | D24 | 调用目标按每次模型请求解析，见 [模型管理设计说明](../model-management-design.md) |
 | 思考等级 / 推理预算 | `agent/src/thinking.ts:8-17` `ThinkingLevel`（`off`/`inherit`/`minimal`…`max`）；`catalog/src/effort.ts:2` `Effort`；`catalog/src/types.ts:27-32` `ThinkingControlMode`（`effort`/`budget`/`google-level`/Anthropic 变体）；wire：`ai/src/providers/openai-shared.ts` `reasoning_effort`；`ai/src/stream.ts:2273` Gemini `thinkingLevel` | 用户等级映射到协议字段；有的按 token budget，有的按离散 level | 无绑定级思考设置。`compaction.py::plan_compaction` `:200-205` 已注明思考 token 计入 `max_output_tokens` | 采用 | 3.3 | Stage 2 截断的直接缺口 |
 | 适配器内重试 | `ai/src/utils/openai-http.ts` `fetchWithRetry`；`providers/openai-responses.ts` replay-safe 再试 | 传输层与未提交输出可重发 | `adapters/responses.py:134,339` `max_retries=0`；`engine.py` D17 有界尝试 | 不采用 | — | S4-A |
 | key 轮换 | `ai/src/auth-storage.ts:6666` `rotateSessionCredential`；`auth-retry.ts` | 401/403/额度错误换兄弟凭据 | 无 | 不采用 | — | S4-A |
@@ -251,9 +251,9 @@ Yudao 基线：当前 HEAD `735e120`（分支 `harness_1`）。
 
 | 差距类型 | 表内 11 域 | 含额外包 |
 | --- | ---: | ---: |
-| 采用 | 37 | 37 |
+| 采用 | 38 | 38 |
 | Yudao 已有等价 | 18 | 18 |
-| 不采用 | 17 | 21 |
+| 不采用 | 16 | 20 |
 | 待决 | 6 | 6 |
 
-表内 11 域 78 条 = 37 + 18 + 17 + 6。额外包 4 条均 `不采用`。分域（采用/已有/不采用/待决）：工具 12/4/4/2；技能 6/0/1/1；会话 4/3/2/1；并行 2/1/2/0；部门 1/2/0/0；Provider 2/2/6/0；扩展 5/0/0/0；接口 2/2/0/1；权限 2/1/1/1；运维 1/0/0/0；观测 0/3/1/0。
+表内 11 域 78 条 = 38 + 18 + 16 + 6。额外包 4 条均 `不采用`。分域（采用/已有/不采用/待决）：工具 12/4/4/2；技能 6/0/1/1；会话 4/3/2/1；并行 2/1/2/0；部门 1/2/0/0；Provider 3/2/5/0；扩展 5/0/0/0；接口 2/2/0/1；权限 2/1/1/1；运维 1/0/0/0；观测 0/3/1/0。

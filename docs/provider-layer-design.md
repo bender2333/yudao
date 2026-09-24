@@ -2,6 +2,8 @@
 
 日期：2026-09-19。状态：设计中，未实现。所属阶段：[Stage 2.7](stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](requirements/startup-provider-reload.md)、[D23 统一 Provider 层](requirements/provider-layer.md)。
 
+> 2026-09-24：模型目录、部门选择、调用目标解析、推理档位与配置生效时机以[模型管理设计说明](model-management-design.md)为准。本文中「冻结目标」「新任务取得有效修订，旧任务保留原目标」「协议归于模型访问定义」的内容由它取代；模块边界、统一调用、取消与观测部分继续有效。
+
 用户选择：Provider 层支持多厂商与自定义接入，OpenCode Go 是第一个落地的服务方案；模型列表负责发现，测试负责准入。词汇以 [CONTEXT.md](../CONTEXT.md) 为准，已定决策见 [ADR](adr/0001-endpoints-by-protocol-not-vendor.md)。本说明同时覆盖模块职责、处理逻辑、用户交互和模块交互图；不在本轮编写运行代码。
 
 ## 1. 要解决的问题
