@@ -139,7 +139,7 @@ Y7.command(name, params)          // 执行命令，修改 Y7.data，发出 data
 | 注册者 | 命令 |
 | --- | --- |
 | `core.js` | `createProject` 新建项目、`renameProject` 重命名、`pinProject` 置顶、`archiveProject` 归档、`restoreProject` 恢复项目、`recordMaterial` 记录原文、`createWorkItem` 新建事项、`addInput` 追加需求、`cancelWorkItem` 取消事项 |
-| `views/recovery.js` | `resumeRun` 继续执行 |
+| `views/recovery.js` | `resumeRun` 继续执行、`decideUnknownAction` 对结果未知的动作作出决定（参数 `actionId`、`choice`：`rerun` 重新执行、`accept_current` 按当前实际状态继续、`stop` 停止事项） |
 | `views/overview.js` | `retrieveCandidate` 取回未采纳候选、`startIntegration` 以候选开始集成事项 |
 | `views/department.js` | `sendGuidance` 发送部门指导、`saveDepartmentSettings` 保存项目部门设置、`authorizeOpsAction` 授权外部动作、`acceptResponsibility` 接收运行责任 |
 | `views/settings.js` | `saveCommand` 登记与修改命令、`authorizeTool` 授权网络与工具、`approveOnce` 逐次批准、`saveRoleSettings` 保存角色设置 |
@@ -161,6 +161,11 @@ Y7.ui.toast(message)                           // 提示条
 Y7.ui.empty(text)                              // 空状态
 Y7.ui.time(iso)、Y7.ui.duration(sec)           // 时间与时长显示
 ```
+
+页面之间共用的函数：
+
+- `Y7.emptyRun(id, workItemId)`（core.js）：新建事项使用的空 run 结构。
+- `Y7.projectKit`（views/overview.js 定义，recovery.js 与 materials.js 使用）：结果标记、流转类型标记、循环画面的挂载与文字列表、原始事件弹窗、取消确认弹窗、局部刷新。
 
 事件委托：元素上的 `data-go="#/..."` 点击后跳转；`data-cmd="名称"` 点击后调用 `Y7.command(名称, 元素的 dataset)`；`data-act="名称"` 调用页面自己用 `Y7.actions.register(名称, (el, ev) => {})` 注册的处理函数。
 
@@ -190,7 +195,9 @@ Y7.data = {
     status,        // 'not_started'|'queued'|'in_progress'|'adopted'|'held'|'released_unsettled'|'stopped'
     runId,
     queuePos,      // level s3，排队中时的顺序
-    heldReason     // level s3，未采纳候选的原因
+    heldReason,    // level s3，未采纳候选的原因
+    fromCandidate, // level s3，以候选开始的集成事项所依据的候选事项
+    retrieved      // level s3，取回的候选 { at, delivery, commit, files }
   }],
 
   runs: [{
