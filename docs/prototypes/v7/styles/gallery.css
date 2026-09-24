@@ -16,10 +16,8 @@
   border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); overflow: hidden;
 }
 .y7-g-card[hidden] { display: none; }
-.y7-g-stage {
-  display: flex; justify-content: center; align-items: center; padding: 8px 0;
-  background: #262338; border-bottom: 1px solid var(--line);
-}
+/* 小画面与预览画面填满容器宽度，由画面脚本设置宽度与 pixelated 缩放 */
+.y7-g-stage { display: block; padding: 0; background: #262338; border-bottom: 1px solid var(--line); }
 .y7-g-stage canvas, .y7-g-canvas canvas, .y7-g-strip canvas { display: block; image-rendering: pixelated; }
 .y7-g-card figcaption { padding: 9px 11px 11px; display: grid; gap: 6px; min-width: 0; }
 .y7-g-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; font-size: 13.5px; }
@@ -38,7 +36,7 @@
 /* 房间与循环画面预览 */
 .y7-g-preview { display: grid; gap: 12px; }
 .y7-g-canvas {
-  display: flex; justify-content: center; padding: 10px; border-radius: 9px;
+  display: block; padding: 8px; border-radius: 9px;
   background: #262338; border: 1px solid var(--line); min-width: 0; overflow: hidden;
 }
 .y7-g-canvas.is-wide { margin-bottom: 12px; }

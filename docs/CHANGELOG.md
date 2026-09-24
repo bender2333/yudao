@@ -38,3 +38,5 @@ claude-opus-5-5 / 2026-09-24 21:54 / docs/program-roadmap.md 第 5.2 节与 docs
 claude-opus-5-5 / 2026-09-24 22:57 / docs/design/model-management.md 第 5.5 节、第 6 节时序图与第 10 节运行层改为模型引用无法使用时事项进入待恢复，删除第 12 节「未结束事项继续执行」TODO；docs/design/recovery-contract-and-fault-matrix.md 第 1、2 节与故障矩阵第 10 行、docs/stage-3-plan.md 第 5.1、5.3 节改为按请求解析调用目标，并写入待恢复规则；docs/design/department-roles.md 第 4 节与 docs/requirements/department-roles.md 的产品部门协调角色改为「产品部门经理」；docs/decision.md 新增 2026-09-24 条目 / 用户决定模型引用无法使用时进入待恢复、协调角色名称，以及开始设计界面原型 v7
 
 claude-opus-5-5 / 2026-09-24 23:20 / 新增 docs/prototypes/v7/design.md（v7 信息结构、各页面、循环画面、部门房间与小人动作对照、界面数据合同、阶段显示、已处理的文档冲突）与 docs/prototypes/v7/BUILD.md（原型文件结构、模块接口、示例数据形状、事件与场景、测试方法） / v6 落后于七个阶段的路线图，用户要求结合后续各阶段能力设计新版原型
+
+claude-opus-5-5 / 2026-09-25 06:30 / 新增 docs/prototypes/v7/ 原型（index.html、styles/、js/，含外壳与核心、示例数据与十二个场景、像素小人与部门房间、循环画面、动作图鉴、概览、恢复与动作核实、资料、部门工作间、观测、设置、系统页）；design.md 第 4.3、6.3、7.2 节补充对结果未知的动作作出决定；BUILD.md 补充共用函数、事项字段、画面数量字段与事件字段；docs/prototypes/CHANGELOG.md 新增 v7 条目 / 按已确认的 v7 信息结构完成原型制作

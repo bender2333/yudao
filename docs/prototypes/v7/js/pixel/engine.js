@@ -800,24 +800,25 @@
       lastDraw: -1e9, spec
     };
 
+    // 画面填满容器宽度：按不小于显示尺寸（设备像素）的整数倍渲染，再用 pixelated 缩放到容器宽度
     scene.resize = function resize() {
       const parent = canvas.parentElement;
       if (!parent) throw new Error('像素画面的 canvas 需要放在容器里');
       const cs = getComputedStyle(parent);
       const avail = Math.max(40, parent.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       const dpr = window.devicePixelRatio || 1;
-      let k = Math.floor((avail * dpr) / scene.W);
-      if (k < 1) k = (avail * dpr) / scene.W;
-      if (spec.maxScale) k = Math.min(k, spec.maxScale * dpr);
-      const bw = Math.round(scene.W * k), bh = Math.round(scene.H * k);
+      const k = Math.max(1, Math.ceil((avail * dpr) / scene.W - 1e-6));
+      const bw = scene.W * k, bh = scene.H * k;
       if (canvas.width !== bw || canvas.height !== bh) {
         canvas.width = bw;
         canvas.height = bh;
       }
-      canvas.style.width = (bw / dpr) + 'px';
-      canvas.style.height = (bh / dpr) + 'px';
+      canvas.style.display = 'block';
+      canvas.style.width = '100%';
+      canvas.style.height = 'auto';
+      canvas.style.imageRendering = 'pixelated';
       scene.scale = k;
-      scene.cssScale = k / dpr;
+      scene.cssScale = avail / scene.W;
       scene.lastDraw = -1e9;
     };
 
@@ -1939,14 +1940,16 @@
   paint.archive = function archive(c, x, y, o, t) {
     const opt = o || {};
     x = Math.round(x); y = Math.round(y);
-    const w = 28, h = 14;
+    const w = 30, h = 14;
     RB(c, x, y - h, w, h, PAL.card2);
     R(c, x, y - h, w, 3, PAL.card1);
     R(c, x, y - 1, w, 1, PAL.card3);
     R(c, x + 2, y - h + 4, 14, 8, PAL.white);
     P.text(c, '摘要', x + 9, y - h + 8, { size: 5.5, weight: 700, align: 'center', color: PAL.ink2 });
-    R(c, x + 17, y - h + 4, 9, 8, PAL.paper);
-    P.pixText(c, '#' + (opt.n || 0), x + 21.5, y - h + 5.5, PAL.red3, 'center');
+    // 编号用文字绘制：「#2」
+    const label = '#' + (opt.n || 0);
+    R(c, x + 17, y - h + 4, 11, 8, PAL.paper);
+    P.text(c, label, x + 22.5, y - h + 8.2, { size: label.length > 2 ? 5 : 6, weight: 800, align: 'center', color: PAL.red3 });
     if (opt.flash && Math.floor(t / 150) % 2 === 0) { R(c, x - 2, y - h - 2, w + 4, 1, PAL.yellow2); R(c, x - 2, y + 1, w + 4, 1, PAL.yellow2); }
   };
 
@@ -2033,8 +2036,8 @@
       }
     }
     if (opt.label) {
-      RB(c, x + 5, y - h - 8, 18, 6, PAL.paper);
-      P.pixText(c, opt.label, x + 14, y - h - 8 + 0.5, PAL.ink, 'center');
+      RB(c, x + 5, y - h - 9, 18, 7, PAL.paper);
+      P.text(c, opt.label, x + 14, y - h - 5.3, { size: 6, weight: 800, align: 'center', color: PAL.ink });
     }
     if (opt.blink && Math.floor(t / 300) % 2 === 0) blinkFrame(c, x, y - h, w, h);
   };
@@ -2448,7 +2451,7 @@
     let v = null;
     let restartAt = null;
 
-    const scene = P.createScene(canvas, { W: VW, H: VH, draw, update, maxScale: opts.maxScale || 3, interval: 33 });
+    const scene = P.createScene(canvas, { W: VW, H: VH, draw, update, interval: 33 });
 
     function build() {
       scene.actors.slice().forEach((a) => scene.removeActor(a));

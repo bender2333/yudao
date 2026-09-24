@@ -89,7 +89,8 @@ a { color: var(--green); }
   background: linear-gradient(to right, var(--side) calc(var(--side-w) - 1px), var(--line) calc(var(--side-w) - 1px), var(--line) var(--side-w), transparent var(--side-w));
 }
 .y7-main { min-width: 0; display: flex; flex-direction: column; }
-.y7-content { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px 32px 170px; min-width: 0; }
+/* 内容区底部留出工具条占用的高度（--tb-space 由 core.js 按工具条实际位置写入）再加一段空白 */
+.y7-content { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px 32px calc(var(--tb-space, 120px) + 40px); min-width: 0; }
 .y7-scrim { display: none; }
 
 /* 左侧栏 */
@@ -292,7 +293,7 @@ html.is-annotate .y7-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
 .y7-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 11px 18px; border-top: 1px solid var(--line); background: var(--soft); flex-wrap: wrap; }
 
 /* 提示条 */
-.y7-toast-root { position: fixed; left: 16px; bottom: 112px; z-index: 120; display: grid; gap: 8px; justify-items: start; pointer-events: none; }
+.y7-toast-root { position: fixed; left: 16px; bottom: calc(var(--tb-space, 100px) + 12px); z-index: 120; display: grid; gap: 8px; justify-items: start; pointer-events: none; }
 .y7-toast {
   max-width: min(460px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 9px; font-size: 13px; line-height: 1.5;
   background: light-dark(#233029, #e7eee9); color: light-dark(#f2f7f4, #1a211d); box-shadow: 0 10px 26px var(--shadow-color);
@@ -401,7 +402,7 @@ html.is-annotate .y7-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
 /* ---------------------------------------------------------------- 窄屏 */
 
 @media (max-width: 1100px) {
-  .y7-content { padding: 20px 22px 170px; }
+  .y7-content { padding: 20px 22px calc(var(--tb-space, 120px) + 40px); }
   .y7-topbar, .y7-tabbar { padding-left: 22px; padding-right: 22px; }
 }
 
@@ -419,7 +420,7 @@ html.is-annotate .y7-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
   .y7-drawer-close { margin-left: 4px; }
   .y7-topbar { padding: 8px 12px; gap: 8px; }
   .y7-tabbar { padding: 0 12px; }
-  .y7-content { padding: 16px 16px 150px; }
+  .y7-content { padding: 16px 16px calc(var(--tb-space, 120px) + 32px); }
   .y7-grid-2 { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 

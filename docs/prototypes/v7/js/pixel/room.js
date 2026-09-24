@@ -104,7 +104,7 @@
     let bg = null;
     let bgKey = '';
 
-    const scene = P.createScene(canvas, { W, H, draw, update, maxScale: 6 });
+    const scene = P.createScene(canvas, { W, H, draw, update });
 
     // -------------------------------------------------------------------------
     // 角色与工位

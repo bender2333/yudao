@@ -54,7 +54,7 @@
       mailFlash: 0, slotFlash: 0, alarmUntil: 0, rackFlash: 0, rackBox: false,
       observerSign: null, arrows: [], doorOpen: {}, n: 0, lastHandoffX: null, queueArrivals: new Set(), decisions: {}
     };
-    const scene = P.createScene(canvas, { W, H, draw, update, maxScale: 5 });
+    const scene = P.createScene(canvas, { W, H, draw, update });
     let bg = null, bgKey = '';
 
     // -------------------------------------------------------------------------
@@ -603,7 +603,7 @@
         const bx = x + 9 + i * 18;
         P.drawBitmap(c, 'box_sealed', bx, 103);
         RB(c, bx + 1, 116, 13, 7, PAL.white);
-        P.pixText(c, v, bx + 7.5, 117, PAL.green3, 'center');
+        P.text(c, v, bx + 7.5, 119.8, { size: 6, weight: 800, align: 'center', color: PAL.green3, max: 13 });
         if (i === arr.length - 1 && st.shelfFlash.adopted > scene.realT) paint.blinkFrame(c, bx - 1, 101, 15, 23);
       });
       // 未采纳候选架（3.4B）

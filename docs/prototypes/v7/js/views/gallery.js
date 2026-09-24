@@ -320,7 +320,7 @@
       });
     }, { rootMargin: '120px' });
     root.querySelectorAll('canvas[data-vig]').forEach((cv) => {
-      const v = P.createVignette(cv, { action: cv.dataset.vig, sprite: cv.dataset.sprite, maxScale: 2 });
+      const v = P.createVignette(cv, { action: cv.dataset.vig, sprite: cv.dataset.sprite });
       v.canvas = cv;
       v.pause(true);
       live.vigs.push(v);

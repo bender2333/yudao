@@ -854,8 +854,59 @@
     mounted = { name: ctx.route.name, view, ctx };
     if (view.mount) view.mount(ctx, dom.content);
     window.scrollTo(0, keepScroll ? scrollY : 0);
+    if (pendingSceneHash && ctx.route.hash === pendingSceneHash) {
+      pendingSceneHash = null;
+      scheduleSceneScroll();
+    }
   }
   Y7.renderContent = renderContent;
+
+  // 场景跳转到的页面渲染完成后，把内容区中的第一个像素画面滚动到可见位置：
+  // 画面顶部在顶栏下方，底部不被工具条遮住；画面比可见区域高时让画面顶部对齐
+  let pendingSceneHash = null;
+  const SCENE_MARGIN = 12;
+
+  function markSceneScroll(hash) {
+    pendingSceneHash = parseHash(hash).hash;
+  }
+
+  // 工具条在窗口中的最高点：窄屏展开时收起按钮位于工具条上方，一并计入
+  function toolbarTop() {
+    const tops = [dom.toolbar.getBoundingClientRect().top];
+    const toggle = dom.toolbar.querySelector('.y7-tb-toggle');
+    if (toggle) tops.push(toggle.getBoundingClientRect().top);
+    return Math.min.apply(null, tops);
+  }
+
+  function scrollSceneIntoView() {
+    const canvas = dom.content.querySelector('canvas');
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.height) return false;
+    const topLimit = dom.topbar.getBoundingClientRect().bottom + SCENE_MARGIN;
+    const bottomLimit = toolbarTop() - SCENE_MARGIN;
+    let delta = 0;
+    if (rect.height > bottomLimit - topLimit || rect.top < topLimit) delta = rect.top - topLimit;
+    else if (rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
+    if (Math.abs(delta) >= 1) window.scrollTo(0, window.scrollY + delta);
+    return true;
+  }
+  Y7.scrollSceneIntoView = scrollSceneIntoView;
+
+  // 画面在 mount 之后才确定尺寸：等两帧布局完成再滚动，稍后再核对一次
+  function scheduleSceneScroll() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      scrollSceneIntoView();
+      setTimeout(scrollSceneIntoView, 250);
+    }));
+  }
+
+  // 工具条占用的窗口底部高度：内容区底部与提示条按它留出空白
+  function updateToolbarSpace() {
+    if (!dom.toolbar) return;
+    const space = Math.max(0, Math.ceil(window.innerHeight - toolbarTop()));
+    document.documentElement.style.setProperty('--tb-space', space + 'px');
+  }
 
   function renderAll(keepScroll) {
     renderShell();
@@ -1284,8 +1335,13 @@
       }
       Y7.bus.emit('scenario-changed', Y7.state.scenario);
       Y7.bus.emit('data-changed', ['*']);
-      if (sc) Y7.go(scenarioHash(sc));
-      else renderAll(true);
+      if (sc) {
+        const hash = scenarioHash(sc);
+        markSceneScroll(hash);
+        Y7.go(hash);
+      } else {
+        renderAll(true);
+      }
     },
     reset() {
       Y7.scenario.select(Y7.state.scenario.id);
@@ -1300,7 +1356,10 @@
       }
       const step = sc.steps[Y7.state.scenario.step];
       if (!step.event || !step.event.type) throw new Error('场景「' + sc.name + '」第 ' + (Y7.state.scenario.step + 1) + ' 步缺少事件');
-      if (step.go) Y7.go(step.go);
+      if (step.go) {
+        markSceneScroll(step.go);
+        Y7.go(step.go);
+      }
       const paths = (step.patch || []).map((patch) => Y7.applyPatch(patch));
       eventSeq += 1;
       const event = Object.assign({
@@ -1754,7 +1813,10 @@
     Y7.bus.on('data-changed', onDataChanged);
     Y7.bus.on('level-changed', () => renderAll(true));
     Y7.bus.on('annotate-changed', () => renderAll(true));
+    new ResizeObserver(updateToolbarSpace).observe(dom.toolbar);
+    window.addEventListener('resize', updateToolbarSpace);
     handleRoute();
+    updateToolbarSpace();
   };
 
   registerCoreActions();

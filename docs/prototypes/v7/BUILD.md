@@ -349,7 +349,7 @@ Y7.pixel.ACTIONS             // 动作名称到 { label, fact, level } 的说明
 Y7.pixel.renderSprite(canvas, spriteId, action, frame) // 动作图鉴用的单个小人渲染
 ```
 
-画布的逻辑尺寸：房间 480×240，循环画面 640×300。按容器宽度取整数倍缩放，小于 1 倍时按比例缩小；处理 `devicePixelRatio`；`imageSmoothingEnabled = false`。画面下方由页面提供同样内容的文字列表（窄屏与读屏使用）。
+画布的逻辑尺寸：房间 480×240，循环画面 640×300。画面按容器宽度缩放并填满容器，允许非整数倍；绘制时按不小于显示尺寸的整数倍渲染，再用 `image-rendering: pixelated` 显示到容器宽度；处理 `devicePixelRatio`；`imageSmoothingEnabled = false`。画面下方由页面提供同样内容的文字列表（窄屏与读屏使用）。
 
 ### 5.2 模型
 
