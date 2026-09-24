@@ -4,7 +4,7 @@
 > 原文：[The AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook)，Louis Claxton；页面日期 2026-08-21。
 > 阅读范围：浏览器读取全文正文，含六个环节、实践项、前置依赖、治理说明、度量和示例。未逐项打开其外链文档、检查产品源码或独立核验客户成效。
 > 配套：[原生项目演化设计](native-project-evolution-design.md)、[已有上下文设计](evolutionary-development-context-design.md)、[领域补全](domain-completion-design.md)。
-> 后续核对第一阶段最新用户要求后的调整见[第一阶段设计复核与 prompt](../stage-1-design-alignment.md)。既有任务内持续输入和专家协作需要在第一阶段完成，跨 run 项目连续性仍在 2.E。
+> 后续核对第一阶段最新用户要求后的调整见第一阶段设计复核与 prompt。既有任务内持续输入和专家协作需要在第一阶段完成，跨 run 项目连续性仍在 2.E。
 
 ## 1. 总体判断
 

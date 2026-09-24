@@ -9,7 +9,7 @@
 - **Stage 3（通用工具、可靠恢复与持续运行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
 - **持续改进工作线 / Stage 4 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/provider-layer-design.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/mvp-acceptance.md) 与 [Stage 2 进度](docs/stage-2-progress.md)。
+当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/archive/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/design/provider-layer.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
 
 ## 分层
 
@@ -245,8 +245,6 @@ Prompt 在下次该部门激活时生效，当前激活不受影响。
 | GET | `/api/runs/{id}/departments/{dept}` | 部门视图 |
 | GET | `/api/runs/{id}/model-attempts` | 模型请求列表 |
 | GET | `/api/runs/{id}/model-attempts/{id}` | 请求详情（Context/Trace） |
-
-详见 [API 文档](docs/api.md)（如有）。
 
 ## 任务内 Git 版本
 

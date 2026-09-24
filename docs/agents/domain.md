@@ -12,7 +12,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 ## Layout in this repo
 
-**Single-context.** One `CONTEXT.md` + `docs/adr/` at the repo root — not yet created; `/domain-modeling` creates them when the first term or decision gets settled.
+**Single-context.** One `CONTEXT.md` + `docs/adr/` at the repo root; both exist. `/domain-modeling` adds terms and ADRs as they get settled.
 
 ## File structure
 

@@ -20,7 +20,7 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 This repo keeps two surfaces; don't collapse them:
 
 - **GitHub issues** — the work queue: what is open, claimed, blocked, done. Anything a skill publishes goes here.
-- **`docs/`** — design and evidence: requirement docs (`docs/requirements/`), stage plans and acceptance criteria (`docs/*.md`), journal (`docs/journal/`, `jour.md`). Long-form reasoning stays here and is linked from the issue, not copied into it.
+- **`docs/`** — design and evidence: requirement docs (`docs/requirements/`), module designs and architecture (`docs/design/`), stage plans and acceptance criteria (`docs/*.md`, `docs/stage-3/`). Long-form reasoning stays here and is linked from the issue, not copied into it. Journals live at the repo root: `claude_jour.md` (architect) and `agents_jour.md` (executors).
 
 ## Pull requests as a triage surface
 

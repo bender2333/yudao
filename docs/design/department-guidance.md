@@ -1,6 +1,6 @@
 # 部门指导的处理设计
 
-日期：2026-09-06。对应 [D20](requirements/department-guidance.md) 与 Web 计划 W0/W6。以下是本轮架构选择，不冒称用户已逐项指定；当前尚无部门指导运行实现。
+日期：2026-09-06。对应 [D20](../requirements/department-guidance.md) 与 Web 计划 W0/W6。以下是本轮架构选择，不冒称用户已逐项指定；当前尚无部门指导运行实现。
 
 ## 三类职责
 

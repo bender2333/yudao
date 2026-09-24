@@ -2,7 +2,7 @@
 
 > 日期：2026-09-06。范围：第二阶段 2.1 的离线证据、复核、批次统计和来源查询。
 > 状态：研究与开发准备，本文不代表新增能力已经实现，也不代表第一阶段验收完成。
-> 详细开发合同及验收矩阵见[离线证据、复核与批次分析设计](offline-review-design.md)；阶段依赖见[第二阶段计划](../stage-2-plan.md)。
+> 详细开发合同及验收矩阵见[离线证据、复核与批次分析设计](offline-review-design.md)；阶段依赖见[第二阶段计划](../archive/stage-2-plan.md)。
 > 配套资料：[可观测性设计](observability-design.md)、[实验约定](experiment-protocol.md)。
 
 ## 1. 研究结论与近期选择

@@ -7,7 +7,7 @@
 - [组织与持续运行研究](../research/organization-runtime-evolution.md) 第 5 节（交接以接收为准；重复/乱序/迟到）、第 11 节（交接协议样例）
 - [第三阶段计划](../stage-3-plan.md) 第 5 节 3.0 / 3.6
 - [总体路线图](../program-roadmap.md) 第 4 节（部门间协议：交接承诺、澄清、变更影响、责任转移、等待、失败和取消）
-- [项目工作台合同](../project-workbench-contract.md)（B0：事项创建与采纳结算的事件顺序与幂等）
+- [项目工作台合同](../archive/project-workbench-contract.md)（B0：事项创建与采纳结算的事件顺序与幂等）
 
 研究 §5.1：交接至少有提出和接收两段；**只有接收决定生效后才改变责任归属**。本文用当前事件核对哪些交接其实是「提出即生效」（宿主接纳发送方提案后立刻改 `phase` / `active_department`），标为 3.6 要改的点。
 

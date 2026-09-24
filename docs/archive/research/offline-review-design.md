@@ -2,7 +2,7 @@
 
 > 日期：2026-09-06。设计对象：第二阶段 2.1-A/B 的下一批独立交付。
 > 状态：开发设计，本文新增能力尚未实现。当前可运行入口仍只有 `python -m harness.analysis demo`。
-> 上位依据：[第二阶段计划](../stage-2-plan.md)、[总体架构](../system-architecture.md)。调研依据见[证据与评价](evidence-evaluation.md)。
+> 上位依据：[第二阶段计划](../archive/stage-2-plan.md)、[总体架构](../system-architecture.md)。调研依据见[证据与评价](evidence-evaluation.md)。
 
 ## 1. 要交付的完整使用过程
 

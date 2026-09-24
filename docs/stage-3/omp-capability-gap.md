@@ -5,7 +5,7 @@
 OMP 底本：`fdfeef1f78`（`C:\project\codes\oh-my-pi`，`git log --oneline -1`：`fdfeef1f78 test(tui): isolated terminal color environment`）  
 旧审查底本：`e3106be`（`docs/research/omp-stage2-system-review.md`）。本机没有该提交；本文不以旧审查行号为准，全部按 `fdfeef1f78` 重核。  
 Yudao 基线：当前 HEAD `735e120`（分支 `harness_1`）。  
-上位依据：[第三阶段计划](../stage-3-plan.md) 第 3 节对照表、第 5 节 3.0；[S4-A 采用映射](../s4a-omp-adoption-evidence-2026-09-08.md) 未采用归档。
+上位依据：[第三阶段计划](../stage-3-plan.md) 第 3 节对照表、第 5 节 3.0；[S4-A 采用映射](../archive/s4a-omp-adoption-evidence-2026-09-08.md) 未采用归档。
 
 差距类型只取：`采用` / `Yudao 已有等价` / `不采用` / `待决`。  
 `不采用` 沿用 S4-A 与计划第 3 / 7 节：OAuth 运行时、自动发现、适配器内重试、key 轮换、`previous_response_id`、远端压缩回退、Snapcompact、OTEL 作为领域事实、并行工具批次/steering/IRC 的原样照搬、computer-use、`xd://` 设备目录、宽松参数校验。
@@ -118,7 +118,7 @@ Yudao 基线：当前 HEAD `735e120`（分支 `harness_1`）。
 | 协议种类 | `catalog/src/types.ts:9-23`：`openai-completions`、`openai-responses`、`anthropic-messages`、`google-generative-ai` 等 14 个 KnownApi | 各协议有独立 stream 实现（`packages/ai/src/providers/`） | `ResolvedProviderTarget.create_adapter`：仅 `responses` 与 `fake` | 采用 | 3.3 | 第二协议适配器 |
 | OAuth / 凭据运行时 | `ai/src/registry/oauth/index.ts:35` `registerOAuthProvider`；`:67` `refreshOAuthToken`；各 `login*` | 登录、刷新、按 provider 存凭据 | `provider_catalog.py::resolve_snapshot` 经宿主 `CredentialSource`；无 OAuth | 不采用 | — | S4-A |
 | 宿主 API key | `ai` 的 `getEnvApiKey`（fetch 等处引用） | 环境变量/存储解析 | `runtime.py::environment_credentials`；`provider_catalog.py::_resolve_credential` | Yudao 已有等价 | — | |
-| 会话内换模型 | `modes/rpc/rpc-types.ts:52` `set_model` / `cycle_model` | 同一会话改 provider/model | run 创建时冻结快照；无 run 内换模 | 采用 | D24 | 调用目标按每次模型请求解析，见 [模型管理设计说明](../model-management-design.md) |
+| 会话内换模型 | `modes/rpc/rpc-types.ts:52` `set_model` / `cycle_model` | 同一会话改 provider/model | run 创建时冻结快照；无 run 内换模 | 采用 | D24 | 调用目标按每次模型请求解析，见 [模型管理设计说明](../design/model-management.md) |
 | 思考等级 / 推理预算 | `agent/src/thinking.ts:8-17` `ThinkingLevel`（`off`/`inherit`/`minimal`…`max`）；`catalog/src/effort.ts:2` `Effort`；`catalog/src/types.ts:27-32` `ThinkingControlMode`（`effort`/`budget`/`google-level`/Anthropic 变体）；wire：`ai/src/providers/openai-shared.ts` `reasoning_effort`；`ai/src/stream.ts:2273` Gemini `thinkingLevel` | 用户等级映射到协议字段；有的按 token budget，有的按离散 level | 无绑定级思考设置。`compaction.py::plan_compaction` `:200-205` 已注明思考 token 计入 `max_output_tokens` | 采用 | 3.3 | Stage 2 截断的直接缺口 |
 | 适配器内重试 | `ai/src/utils/openai-http.ts` `fetchWithRetry`；`providers/openai-responses.ts` replay-safe 再试 | 传输层与未提交输出可重发 | `adapters/responses.py:134,339` `max_retries=0`；`engine.py` D17 有界尝试 | 不采用 | — | S4-A |
 | key 轮换 | `ai/src/auth-storage.ts:6666` `rotateSessionCredential`；`auth-retry.ts` | 401/403/额度错误换兄弟凭据 | 无 | 不采用 | — | S4-A |

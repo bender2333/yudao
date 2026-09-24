@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 三部门协作工作台</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --font-sans: "Microsoft YaHei UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --color-primary: light-dark(#087f69, #56d1b3);
+      --color-primary-hover: light-dark(#066b58, #48b89e);
+      --color-primary-text: light-dark(#ffffff, #10231d);
+      --color-bg-page: light-dark(#f4f5f5, #141615);
+      --color-bg-card: light-dark(#ffffff, #1d201e);
+      --color-bg-subtle: light-dark(#f9faf9, #242826);
+      --color-border: light-dark(#dfe2e0, #363b38);
+      --color-border-subtle: light-dark(#ebedec, #2c302e);
+      --color-text-main: light-dark(#1f2321, #ecedeb);
+      --color-text-muted: light-dark(#6b726f, #9ba19e);
+      --color-text-dim: light-dark(#9aa09d, #6c7370);
+      --color-status-ok: light-dark(#087f69, #56d1b3);
+      --color-status-warn: light-dark(#b25e00, #f5a623);
+      --color-status-danger: light-dark(#d03a3a, #ff6b6b);
+      --color-tag-bg: light-dark(#e6f4f0, #16362e);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      background-color: var(--color-bg-page);
+      color: var(--color-text-main);
+      overflow-x: hidden;
+    }
+
+    /* 顶栏 */
+    header.app-header {
+      background: var(--color-bg-card);
+      border-bottom: 1px solid var(--color-border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--color-bg-subtle);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+    }
+
+    .nav-tab-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab-btn:hover {
+      color: var(--color-text-main);
+    }
+
+    .nav-tab-btn.active {
+      background: var(--color-bg-card);
+      color: var(--color-text-main);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* 主容器 */
+    main.workspace-main {
+      max-width: 1140px;
+      margin: 24px auto 60px;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* 按钮规范 */
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-main);
+      padding: 7px 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--color-bg-subtle);
+      border-color: var(--color-primary);
+    }
+
+    button.primary {
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      border-color: transparent;
+    }
+
+    button.primary:hover {
+      background: var(--color-primary-hover);
+    }
+
+    button.small {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    /* 表单控件 */
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-main);
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px light-dark(rgba(8, 127, 105, 0.15), rgba(86, 209, 179, 0.2));
+    }
+
+    /* 概览页 - 三部门卡片看板 */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .dept-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .dept-card:hover {
+      border-color: var(--color-primary);
+    }
+
+    .dept-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .dept-title-box h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dept-desc {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-badge.ok {
+      background: var(--color-tag-bg);
+      color: var(--color-primary);
+    }
+
+    .status-badge.warn {
+      background: light-dark(#fef3e2, #2e2213);
+      color: var(--color-status-warn);
+    }
+
+    .config-block {
+      background: var(--color-bg-subtle);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .config-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .config-field label {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+
+    .effort-slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .effort-slider-wrap input[type="range"] {
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .effort-value-tag {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-primary);
+      min-width: 44px;
+      text-align: right;
+    }
+
+    .dept-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--color-border-subtle);
+    }
+
+    /* 部门独立房间页面 (动态小人与底部输入) */
+    .room-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: calc(100vh - 180px);
+    }
+
+    .room-stage-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .room-stage-topbar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--color-border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--color-bg-subtle);
+    }
+
+    .room-stage-title {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 房间动画舞台 */
+    .animation-stage {
+      position: relative;
+      height: 380px;
+      background: light-dark(#f8faf9, #181b19);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+
+    /* 房间背景环境：地板线与墙壁装饰 */
+    .stage-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 70px;
+      background: light-dark(#ebefed, #1f2321);
+      border-top: 2px solid light-dark(#dbe2df, #2e3431);
+    }
+
+    .stage-wall-decor {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 1;
+    }
+
+    .room-whiteboard {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      width: 200px;
+      box-shadow: var(--shadow-sm);
+      line-height: 1.6;
+    }
+
+    .room-whiteboard-title {
+      font-weight: 600;
+      color: var(--color-text-main);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .room-desk-area {
+      position: absolute;
+      bottom: 45px;
+      display: flex;
+      align-items: flex-end;
+      gap: 40px;
+      z-index: 2;
+      width: calc(100% - 48px);
+      justify-content: center;
+    }
+
+    /* 抽象小人 (Agent Worker) 样式与关键帧动画 */
+    .agent-figure {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .agent-figure:hover {
+      transform: translateY(-4px);
+    }
+
+    .agent-bubble {
+      position: absolute;
+      bottom: 115px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      white-space: nowrap;
+      box-shadow: var(--shadow-md);
+      color: var(--color-text-main);
+      animation: floatBubble 2.5s ease-in-out infinite alternate;
+    }
+
+    .agent-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px 6px 0;
+      border-style: solid;
+      border-color: var(--color-bg-card) transparent;
+      display: block;
+      width: 0;
+    }
+
+    @keyframes floatBubble {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-5px); }
+    }
+
+    /* 小人头身 */
+    .agent-head {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      border: 2px solid light-dark(#ffffff, #1d201e);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      position: relative;
+      animation: bobHead 2s ease-in-out infinite;
+    }
+
+    .agent-face {
+      position: absolute;
+      top: 10px;
+      left: 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .agent-eye {
+      width: 3px;
+      height: 4px;
+      background: var(--color-primary-text);
+      border-radius: 2px;
+      animation: blinkEye 4s infinite;
+    }
+
+    @keyframes blinkEye {
+      0%, 96%, 100% { transform: scaleY(1); }
+      98% { transform: scaleY(0.1); }
+    }
+
+    @keyframes bobHead {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .agent-body {
+      width: 44px;
+      height: 52px;
+      background: light-dark(#2e3431, #3a403d);
+      border-radius: 12px 12px 4px 4px;
+      margin-top: -4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      position: relative;
+    }
+
+    .agent-figure.subagent .agent-body {
+      background: light-dark(#5a6360, #67706d);
+      width: 36px;
+      height: 44px;
+    }
+
+    .agent-figure.subagent .agent-head {
+      width: 26px;
+      height: 26px;
+    }
+
+    .agent-desk {
+      width: 90px;
+      height: 36px;
+      background: light-dark(#c8cfcc, #323735);
+      border-radius: 4px;
+      margin-top: -10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--color-border);
+      position: relative;
+      z-index: 3;
+    }
+
+    .desk-laptop {
+      width: 38px;
+      height: 22px;
+      background: var(--color-text-main);
+      border-radius: 3px;
+      position: relative;
+      box-shadow: 0 0 8px rgba(8, 127, 105, 0.4);
+    }
+
+    .agent-label {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      color: var(--color-text-muted);
+    }
+
+    .stage-controls {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 5;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* 历史与对话记录日志区 */
+    .room-stream-log {
+      padding: 16px 20px;
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--color-bg-card);
+      font-size: 13px;
+    }
+
+    .log-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+
+    .log-time {
+      color: var(--color-text-dim);
+      font-size: 11px;
+      font-family: Consolas, monospace;
+      margin-top: 2px;
+      white-space: nowrap;
+    }
+
+    .log-sender {
+      font-weight: 600;
+      color: var(--color-text-main);
+      white-space: nowrap;
+    }
+
+    .log-text {
+      color: var(--color-text-muted);
+    }
+
+    .log-text.system {
+      color: var(--color-primary);
+    }
+
+    /* 底部人的输入区 (指令与反馈固定在最底) */
+    .room-input-container {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .room-input-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .room-input-title {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .input-row textarea {
+      flex: 1;
+      resize: vertical;
+      min-height: 54px;
+    }
+
+    .toast-tip {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--color-text-main);
+      color: var(--color-bg-card);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toast-tip.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px) {
+      .overview-grid { grid-template-columns: 1fr; }
+      .room-desk-area { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部导航 -->
+  <header class="app-header">
+    <div class="brand-wrap">
+      <div class="brand-logo">Y</div>
+      <div class="brand-title">
+        <span>Yudao 协作台</span>
+        <span style="font-size: 12px; font-weight: 400; color: var(--color-text-muted);">· 部门视图与配置</span>
+      </div>
+    </div>
+
+    <!-- 顶部四项视图切换 -->
+    <div class="nav-tabs" id="navTabs">
+      <button type="button" class="nav-tab-btn active" data-tab="overview">📊 三部门概览</button>
+      <button type="button" class="nav-tab-btn" data-tab="product">📋 产品部</button>
+      <button type="button" class="nav-tab-btn" data-tab="engineering">⚙️ 工程部</button>
+      <button type="button" class="nav-tab-btn" data-tab="quality">🔍 质检部</button>
+    </div>
+  </header>
+
+  <main class="workspace-main">
+
+    <!-- ================= 视图 1：三部门概览 (模型选择、绑定与 Effort 配置) ================= -->
+    <div id="viewOverview" style="display: flex; flex-direction: column; gap: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 600;">三部门调用配置与目标绑定</h2>
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--color-text-muted);">
+            在此为每个部门分配指定的 Provider 配置、已准入模型及思考/尝试强度 (Effort)。此处为全机基线设置，新事项创建时将冻结此配置。
+          </p>
+        </div>
+        <button type="button" class="primary" id="btnSaveAllBindings">保存全部部门绑定</button>
+      </div>
+
+      <div class="overview-grid">
+        <!-- 产品部绑定卡片 -->
+        <div class="dept-card">
+          <div class="dept-card-header">
+            <div class="dept-title-box">
+              <h3>📋 产品部</h3>
+              <div class="dept-desc">负责需求澄清、合同维护与规格确认</div>
+            </div>
+            <span class="status-badge ok" id="badge-product">已就绪</span>
+          </div>
+
+          <div class="config-block">
+            <div class="config-field">
+              <label for="select-provider-product">指定 Provider 配置</label>
+              <select id="select-provider-product" onchange="onProviderChanged('product')">
+                <option value="p-opencode-01" selected>OpenCode Go 主线路 (Responses)</option>
+                <option value="p-anyrouter-02">AnyRouter 备用网关 (Chat Completions)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label for="select-model-product">模型访问定义 (仅列出已准入)</label>
+              <select id="select-model-product">
+                <option value="gpt-5.6-terra" selected>gpt-5.6-terra (窗口 200k · 输出 8k)</option>
+                <option value="claude-3-7-sonnet">claude-3-7-sonnet (窗口 200k · 输出 8k)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label>思考 / 推理努力程度 (Effort: <span id="effort-val-product">medium</span>)</label>
+              <div class="effort-slider-wrap">
+                <input type="range" min="1" max="4" value="2" id="slider-product" oninput="onEffortChanged('product', this.value)">
+                <span class="effort-value-tag" id="effort-tag-product">中等</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dept-card-footer">
+            <span style="font-size: 12px; color: var(--color-text-muted);">当前状态：已交付 PRD</span>
+            <button type="button" class="small" onclick="switchTab('product')">进入产品房间 →</button>
+          </div>
+        </div>
+
+        <!-- 工程部绑定卡片 -->
+        <div class="dept-card">
+          <div class="dept-card-header">
+            <div class="dept-title-box">
+              <h3>⚙️ 工程部</h3>
+              <div class="dept-desc">负责任务拆解、编码实现与交付验证</div>
+            </div>
+            <span class="status-badge ok" id="badge-engineering">已就绪</span>
+          </div>
+
+          <div class="config-block">
+            <div class="config-field">
+              <label for="select-provider-engineering">指定 Provider 配置</label>
+              <select id="select-provider-engineering" onchange="onProviderChanged('engineering')">
+                <option value="p-opencode-01" selected>OpenCode Go 主线路 (Responses)</option>
+                <option value="p-anyrouter-02">AnyRouter 备用网关 (Chat Completions)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label for="select-model-engineering">模型访问定义 (仅列出已准入)</label>
+              <select id="select-model-engineering">
+                <option value="gpt-5.6-terra" selected>gpt-5.6-terra (窗口 200k · 输出 8k)</option>
+                <option value="claude-3-7-sonnet">claude-3-7-sonnet (窗口 200k · 输出 8k)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label>思考 / 推理努力程度 (Effort: <span id="effort-val-engineering">high</span>)</label>
+              <div class="effort-slider-wrap">
+                <input type="range" min="1" max="4" value="3" id="slider-engineering" oninput="onEffortChanged('engineering', this.value)">
+                <span class="effort-value-tag" id="effort-tag-engineering">深入</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dept-card-footer">
+            <span style="font-size: 12px; color: var(--color-text-muted);">当前状态：处理中 (迭代 3)</span>
+            <button type="button" class="small" onclick="switchTab('engineering')">进入工程房间 →</button>
+          </div>
+        </div>
+
+        <!-- 质检部绑定卡片 -->
+        <div class="dept-card">
+          <div class="dept-card-header">
+            <div class="dept-title-box">
+              <h3>🔍 质检部</h3>
+              <div class="dept-desc">负责独立验证、缺陷阻断与放行签发</div>
+            </div>
+            <span class="status-badge ok" id="badge-quality">已就绪</span>
+          </div>
+
+          <div class="config-block">
+            <div class="config-field">
+              <label for="select-provider-quality">指定 Provider 配置</label>
+              <select id="select-provider-quality" onchange="onProviderChanged('quality')">
+                <option value="p-opencode-01">OpenCode Go 主线路 (Responses)</option>
+                <option value="p-anyrouter-02" selected>AnyRouter 备用网关 (Chat Completions)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label for="select-model-quality">模型访问定义 (仅列出已准入)</label>
+              <select id="select-model-quality">
+                <option value="deepseek-chat" selected>deepseek-chat (窗口 64k · 输出 4k)</option>
+              </select>
+            </div>
+
+            <div class="config-field">
+              <label>思考 / 推理努力程度 (Effort: <span id="effort-val-quality">high</span>)</label>
+              <div class="effort-slider-wrap">
+                <input type="range" min="1" max="4" value="3" id="slider-quality" oninput="onEffortChanged('quality', this.value)">
+                <span class="effort-value-tag" id="effort-tag-quality">深入</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dept-card-footer">
+            <span style="font-size: 12px; color: var(--color-text-muted);">当前状态：待验收版本 2</span>
+            <button type="button" class="small" onclick="switchTab('quality')">进入质检房间 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 视图 2：部门房间独立页 (动态小人房间舞台 + 底部输入框) ================= -->
+    <div id="viewDepartmentRoom" style="display: none;" class="room-container">
+      
+      <!-- 房间舞台卡片 -->
+      <div class="room-stage-card">
+        <div class="room-stage-topbar">
+          <div class="room-stage-title">
+            <span id="currentDeptIcon">⚙️</span>
+            <span id="currentDeptTitle">工程部工作间</span>
+            <span class="status-badge ok" id="currentDeptBadge">正在专注执行</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="small" id="btnToggleSubagent">+ 派发协作者 (SubAgent)</button>
+            <button type="button" class="small" onclick="switchTab('overview')">← 返回概览</button>
+          </div>
+        </div>
+
+        <!-- 中间抽象动画舞台 -->
+        <div class="animation-stage" id="animationStage">
+          <div class="stage-controls">
+            <button type="button" class="small" onclick="simulateActivity()">模拟一次动作思考</button>
+          </div>
+
+          <div class="stage-wall-decor">
+            <div class="room-whiteboard">
+              <div class="room-whiteboard-title">📌 当前任务目标板</div>
+              <div id="roomWhiteboardText">根据产品部需求，接入 CSV 导出组件，并优化窄屏自适应响应。</div>
+            </div>
+          </div>
+
+          <!-- 房间工作区：办公桌与小人形象 -->
+          <div class="room-desk-area" id="deskArea">
+            <!-- 核心责任小人 -->
+            <div class="agent-figure" id="primaryAgent">
+              <div class="agent-bubble" id="primaryBubble">正在编译测试用例...</div>
+              <div class="agent-head">
+                <div class="agent-face">
+                  <div class="agent-eye"></div>
+                  <div class="agent-eye"></div>
+                </div>
+              </div>
+              <div class="agent-body">主干</div>
+              <div class="agent-desk">
+                <div class="desk-laptop"></div>
+              </div>
+              <div class="agent-label" id="primaryAgentLabel">工程主 Agent</div>
+            </div>
+
+            <!-- 动态生成的 Subagent (可按需增减) -->
+            <div class="agent-figure subagent" id="subAgent1" style="display: none;">
+              <div class="agent-bubble" style="bottom: 100px;">正在扫描样式文件...</div>
+              <div class="agent-head">
+                <div class="agent-face">
+                  <div class="agent-eye"></div>
+                  <div class="agent-eye"></div>
+                </div>
+              </div>
+              <div class="agent-body">Sub</div>
+              <div class="agent-desk">
+                <div class="desk-laptop"></div>
+              </div>
+              <div class="agent-label">Scout 子 Agent</div>
+            </div>
+          </div>
+
+          <div class="stage-floor"></div>
+        </div>
+
+        <!-- 房间内部事件与流式信息记录 -->
+        <div class="room-stream-log" id="roomStreamLog">
+          <div class="log-item">
+            <span class="log-time">10:47:02</span>
+            <span class="log-sender">[系统事件]</span>
+            <span class="log-text system">已激活工程部，使用目标 Provider: OpenCode Go / gpt-5.6-terra</span>
+          </div>
+          <div class="log-item">
+            <span class="log-time">10:47:11</span>
+            <span class="log-sender">工程主 Agent:</span>
+            <span class="log-text">正在检查 package.json 依赖，开始构建 CSV 导出原型。</span>
+          </div>
+          <div class="log-item">
+            <span class="log-time">10:48:05</span>
+            <span class="log-sender">工程主 Agent:</span>
+            <span class="log-text">单测通过 12 项，正在准备与质检部交接证据。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最底部的操作与人类输入框 -->
+      <div class="room-input-container">
+        <div class="room-input-header">
+          <div class="room-input-title">
+            <span>💬 向本部门下达指令或追加人类反馈</span>
+          </div>
+          <span style="font-size: 12px; color: var(--color-text-muted);">
+            输入将直接注入当前部门的下一轮模型上下文
+          </span>
+        </div>
+        <div class="input-row">
+          <textarea id="humanInputText" placeholder="在此输入给当前部门的具体需求、修改意见或边界提醒..."></textarea>
+          <button type="button" class="primary" id="btnSendHumanInput" style="height: 54px; padding: 0 20px;">
+            发送指令
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <div class="toast-tip" id="toastTip">已保存配置</div>
+
+  <script>
+    // 部门定义与状态
+    const DEPARTMENTS = {
+      product: {
+        id: "product",
+        name: "产品部",
+        icon: "📋",
+        task: "围绕订单列表 CSV 导出输出完整验收规格",
+        primaryLabel: "产品主 Agent",
+        bubble: "正在整理 PRD 字段规范...",
+        providerId: "p-opencode-01",
+        modelId: "gpt-5.6-terra",
+        effort: "medium"
+      },
+      engineering: {
+        id: "engineering",
+        name: "工程部",
+        icon: "⚙️",
+        task: "实现订单列表 CSV 导出按钮及接口联调",
+        primaryLabel: "工程主 Agent",
+        bubble: "正在编写 CSV 导出组件...",
+        providerId: "p-opencode-01",
+        modelId: "gpt-5.6-terra",
+        effort: "high"
+      },
+      quality: {
+        id: "quality",
+        name: "质检部",
+        icon: "🔍",
+        task: "在窄屏及异常边界下独立复核交付物",
+        primaryLabel: "质检主 Agent",
+        bubble: "正在执行窄屏断言与回归测试...",
+        providerId: "p-anyrouter-02",
+        modelId: "deepseek-chat",
+        effort: "high"
+      }
+    };
+
+    let currentDeptKey = "engineering";
+    let subagentActive = false;
+
+    const effortNames = { "1": "low (较低)", "2": "medium (中等)", "3": "high (深入)", "4": "max (极致)" };
+    const effortTags = { "1": "低", "2": "中等", "3": "深入", "4": "极致" };
+
+    function showToast(msg) {
+      const el = document.getElementById("toastTip");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2200);
+    }
+
+    // 切换顶栏 Tab
+    function switchTab(tabKey) {
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tab === tabKey);
+      });
+
+      if (tabKey === "overview") {
+        document.getElementById("viewOverview").style.display = "flex";
+        document.getElementById("viewDepartmentRoom").style.display = "none";
+      } else {
+        document.getElementById("viewOverview").style.display = "none";
+        document.getElementById("viewDepartmentRoom").style.display = "flex";
+        loadDepartmentRoom(tabKey);
+      }
+    }
+
+    document.querySelectorAll(".nav-tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+
+    // 加载具体部门房间
+    function loadDepartmentRoom(deptKey) {
+      currentDeptKey = deptKey;
+      const dept = DEPARTMENTS[deptKey];
+
+      document.getElementById("currentDeptIcon").textContent = dept.icon;
+      document.getElementById("currentDeptTitle").textContent = `${dept.name}工作间`;
+      document.getElementById("roomWhiteboardText").textContent = dept.task;
+      document.getElementById("primaryAgentLabel").textContent = dept.primaryLabel;
+      document.getElementById("primaryBubble").textContent = dept.bubble;
+
+      // 重置 subagent 状态
+      subagentActive = false;
+      document.getElementById("subAgent1").style.display = "none";
+      document.getElementById("btnToggleSubagent").textContent = "+ 派发协作者 (SubAgent)";
+    }
+
+    // 切换 SubAgent 进出房间
+    document.getElementById("btnToggleSubagent").addEventListener("click", () => {
+      subagentActive = !subagentActive;
+      const sub = document.getElementById("subAgent1");
+      const btn = document.getElementById("btnToggleSubagent");
+      if (subagentActive) {
+        sub.style.display = "flex";
+        btn.textContent = "- 召回协作者";
+        showToast("已派发 SubAgent 进入房间协同处理！");
+        appendLog(`[调度] 派发子 Agent 进入房间协助进行上下文与文件分析`);
+      } else {
+        sub.style.display = "none";
+        btn.textContent = "+ 派发协作者 (SubAgent)";
+        showToast("已召回 SubAgent");
+        appendLog(`[调度] 子 Agent 完成工作并退场`);
+      }
+    });
+
+    // 发送人类输入
+    document.getElementById("btnSendHumanInput").addEventListener("click", () => {
+      const input = document.getElementById("humanInputText");
+      const val = input.value.trim();
+      if (!val) {
+        alert("请输入具体的指令内容！");
+        return;
+      }
+
+      appendLog(`人类用户: ${val}`);
+      input.value = "";
+      showToast("指令已注入部门上下文！");
+
+      // 小人思考响应气泡
+      const bubble = document.getElementById("primaryBubble");
+      bubble.textContent = `收到指令，重新校准分析中...`;
+      setTimeout(() => {
+        bubble.textContent = `正在根据用户要求推进下一步...`;
+      }, 2000);
+    });
+
+    function appendLog(text) {
+      const log = document.getElementById("roomStreamLog");
+      const div = document.createElement("div");
+      div.className = "log-item";
+      const now = new Date().toTimeString().slice(0, 8);
+      div.innerHTML = `
+        <span class="log-time">${now}</span>
+        <span class="log-text">${text}</span>
+      `;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // 模拟动作动画
+    window.simulateActivity = function() {
+      const bubble = document.getElementById("primaryBubble");
+      const original = bubble.textContent;
+      bubble.textContent = "执行工具：workspace_search...";
+      showToast("Agent 正在调用工具执行环境操作");
+      setTimeout(() => {
+        bubble.textContent = original;
+      }, 1500);
+    };
+
+    // Effort 滑块联动
+    window.onEffortChanged = function(dept, val) {
+      document.getElementById(`effort-val-${dept}`).textContent = effortNames[val];
+      document.getElementById(`effort-tag-${dept}`).textContent = effortTags[val];
+    };
+
+    // Provider 变更时级联改变模型下拉
+    window.onProviderChanged = function(dept) {
+      const pSel = document.getElementById(`select-provider-${dept}`);
+      const mSel = document.getElementById(`select-model-${dept}`);
+      mSel.innerHTML = "";
+      if (pSel.value === "p-opencode-01") {
+        mSel.innerHTML = `
+          <option value="gpt-5.6-terra">gpt-5.6-terra (窗口 200k · 输出 8k)</option>
+          <option value="claude-3-7-sonnet">claude-3-7-sonnet (窗口 200k · 输出 8k)</option>
+        `;
+      } else {
+        mSel.innerHTML = `
+          <option value="deepseek-chat">deepseek-chat (窗口 64k · 输出 4k)</option>
+        `;
+      }
+      showToast(`${DEPARTMENTS[dept].name} 所选 Provider 已调整`);
+    };
+
+    // 保存绑定
+    document.getElementById("btnSaveAllBindings").addEventListener("click", () => {
+      showToast("三部门绑定与 Effort 设置已成功保存，并在全机生效！");
+    });
+  </script>
+</body>
+</html>

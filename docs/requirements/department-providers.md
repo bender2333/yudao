@@ -1,7 +1,7 @@
 # D18 统一 Provider 管理与部门绑定
 
 > 2026-09-19：本文保留首版需求与证据。新增设计以 [D22](startup-provider-reload.md) / [D23](provider-layer.md) 为准：无配置可启动控制台，创建任务才要求所选目标就绪；配置 UI 已存在，不能按本页旧“待原型”重复立项。
-> 2026-09-24：部门选择、任务冻结与协议归属以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../model-management-design.md)为准：部门默认加项目部门设置，调用目标按每次模型请求解析，协议属于 Provider 配置。部门隔离，以及一次请求内的重试不更换调用目标，继续有效。
+> 2026-09-24：部门选择、任务冻结与协议归属以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../design/model-management.md)为准：部门默认加项目部门设置，调用目标按每次模型请求解析，协议属于 Provider 配置。部门隔离，以及一次请求内的重试不更换调用目标，继续有效。
 
 ## 用户原话
 
@@ -21,11 +21,11 @@ OMP 的实际职责和调用方式已通过下述固定版本源码核对。以�
 
 | 源码入口 | 已核对的机制 | Yudao 的借鉴 |
 | --- | --- | --- |
-| [Provider registry](D:/codes/oh-my-pi/packages/ai/src/registry/registry.ts:21) | 统一生成 Provider 注册表并按身份查找，承载认证及传输能力；此处不分配角色 | 统一管理 Provider，部门不复制认证和网络配置 |
-| [Model](D:/codes/oh-my-pi/packages/catalog/src/types.ts:1053) | 具体模型同时携带模型身份、Provider、接口协议及服务地址 | 以解析后的完整模型配置作为实际请求目标 |
-| [buildCustomModelOverlay](D:/codes/oh-my-pi/packages/coding-agent/src/config/custom-models.ts:65) | Provider 配置与模型配置在一处合成，模型级协议及地址可以覆盖 Provider 默认 | 在统一装配处得到最终配置，循环只使用解析结果 |
-| [模型与角色解析](D:/codes/oh-my-pi/packages/coding-agent/src/config/model-resolver.ts:1506) | 精确解析 `provider/model`，角色选择展开后指向可用模型 | 部门绑定具体模型，允许同 Provider 不同模型及不同 Provider |
-| [子 Agent 模型选择](D:/codes/oh-my-pi/packages/coding-agent/src/task/structured-subagent.ts:299) | 请求、任务、Agent 和会话选择按优先关系统一解析 | 选择来源应可追溯；Yudao 首批保留任务创建时的明确绑定 |
+| Provider registry（`packages/ai/src/registry/registry.ts:21`） | 统一生成 Provider 注册表并按身份查找，承载认证及传输能力；此处不分配角色 | 统一管理 Provider，部门不复制认证和网络配置 |
+| Model（`packages/catalog/src/types.ts:1053`） | 具体模型同时携带模型身份、Provider、接口协议及服务地址 | 以解析后的完整模型配置作为实际请求目标 |
+| buildCustomModelOverlay（`packages/coding-agent/src/config/custom-models.ts:65`） | Provider 配置与模型配置在一处合成，模型级协议及地址可以覆盖 Provider 默认 | 在统一装配处得到最终配置，循环只使用解析结果 |
+| 模型与角色解析（`packages/coding-agent/src/config/model-resolver.ts:1506`） | 精确解析 `provider/model`，角色选择展开后指向可用模型 | 部门绑定具体模型，允许同 Provider 不同模型及不同 Provider |
+| 子 Agent 模型选择（`packages/coding-agent/src/task/structured-subagent.ts:299`） | 请求、任务、Agent 和会话选择按优先关系统一解析 | 选择来源应可追溯；Yudao 首批保留任务创建时的明确绑定 |
 
 OMP 的角色是模型选择关系，不等同 Yudao 的产品、工程、质检职责。借鉴的是统一 Provider、具体模型、角色绑定的关系；不照搬其多级选择优先链、OAuth、自动发现、扩展和认证回退。部门选定 Provider 下的具体模型，实际连接使用解析后模型的协议和地址。
 

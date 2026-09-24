@@ -7,8 +7,8 @@
 ## [v6] - 2026-09-23
 
 ### 原型交付
-- 原型文件：[department-workspace-v6.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v6.html)
-- 设计文档：[department-workspace-v6-design.md](file:///C:/project/yudao/docs/prototypes/department-workspace-v6-design.md)
+- 原型文件：[department-workspace-v6.html](department-workspace-v6.html)
+- 设计文档：[department-workspace-v6-design.md](department-workspace-v6-design.md)
 
 ### 变更明细
 1. **模型管理全局返回导航**
@@ -54,8 +54,8 @@
 ## [v5] - 2026-09-22
 
 ### 原型交付
-- 原型文件：[department-workspace-v5.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v5.html)
-- 设计文档：[department-workspace-v5-design.md](file:///C:/project/yudao/docs/prototypes/department-workspace-v5-design.md)
+- 原型文件：[department-workspace-v5.html](../archive/prototypes/department-workspace-v5.html)
+- 设计文档：[department-workspace-v5-design.md](../archive/prototypes/department-workspace-v5-design.md)
 
 ### 变更明细
 1. **单连接单协议规则**
@@ -73,7 +73,7 @@
 ## [v4] - 2026-09-22
 
 ### 原型交付
-- 原型文件：[department-workspace-v4.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v4.html)
+- 原型文件：[department-workspace-v4.html](../archive/prototypes/department-workspace-v4.html)
 
 ### 变更明细
 1. **模型管理独立承接**
@@ -88,7 +88,7 @@
 ## [v3] - 2026-09-22
 
 ### 原型交付
-- 原型文件：[department-workspace-v3.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v3.html)
+- 原型文件：[department-workspace-v3.html](../archive/prototypes/department-workspace-v3.html)
 
 ### 变更明细
 1. **2D 像素风工作间设计**
@@ -103,7 +103,7 @@
 ## [v2] - 2026-09-22
 
 ### 原型交付
-- 原型文件：[department-workspace-v2.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v2.html)
+- 原型文件：[department-workspace-v2.html](../archive/prototypes/department-workspace-v2.html)
 
 ### 变更明细
 1. **部门绑定与底层配置解耦**
@@ -116,7 +116,8 @@
 ## [v1] - 2026-09-06 ~ 2026-09-09
 
 ### 原型交付
-- 归档目录：`docs/prototypes/2026-09-06/`、`docs/prototypes/2026-09-08/`、`docs/prototypes/2026-09-09/`
+- 归档目录：`docs/archive/prototypes/2026-09-06/`、`docs/archive/prototypes/2026-09-08/`、`docs/archive/prototypes/2026-09-09/`
+- Provider 配置原型（2026-09-15 至 2026-09-22）：`docs/archive/prototypes/provider-config/`
 
 ### 变更明细
 1. **三部门循环闭环展示**

@@ -1,18 +1,18 @@
 # 后续开发设计与调研资料
 
-> 2026-09-19 新资料：[OpenCode Go 与统一 Provider 层一手核对](opencode-go-provider-integration.md)。支持当前 [Stage 2.7](../stage-2-provider-plan.md)，含 Go API Key、三协议、会话身份、模型发现限制和固定 OMP 源码依据；下文保留旧研究导入背景。
+> 2026-09-19 新资料：[OpenCode Go 与统一 Provider 层一手核对](opencode-go-provider-integration.md)。支持 [Stage 2.7](../archive/stage-2-provider-plan.md)，含 Go API Key、三协议、会话身份、模型发现限制和固定 OMP 源码依据；下文保留旧研究导入背景。
 
 > 日期：2026-09-06。工作树：`D:/codes/yudao-stage2`；分支：`codex/framework-and-stage2`。
 > 本轮交付是细化设计、论文与成熟实现研究。没有新增运行能力，没有完成正式收益实验，也没有改变第一阶段验收状态。
-> 上位入口：[总体路线图](../program-roadmap.md)、[总体架构](../system-architecture.md)、[实施准备](../implementation-readiness.md)。
+> 上位入口：[总体路线图](../program-roadmap.md)、总体架构、实施准备。
 
 ### 当前来源与设计状态
 
 2026-09-06 本轮对齐依据第一阶段工作树 `D:/codes/yudao` 的 `fff4b7d` 及正在进行的未提交原生改造。最新用户决定以该树 `docs/requirements/` 的 D01-D11、`docs/confirmed-requirements.md` 和 `docs/native-loop-design.md` 为准；本目录的旧基线描述、OMP 接入与上下文方案不能覆盖它们。原 OMP 版 MVP 成功是历史验收，原生循环和新增流程须用新证据验收。
 
-本轮结论先读[第一阶段设计对齐](../stage-1-design-alignment.md)及[供原会话使用的实施提示](../prompts/stage-1-alignment-prompt.md)。后者要求自主核对原工作树最新实现与决定，不直接 cherry-pick 本分支旧运行代码；本轮只形成设计和资料对齐。
+本轮结论先读第一阶段设计对齐及供原会话使用的实施提示。后者要求自主核对原工作树最新实现与决定，不直接 cherry-pick 本分支旧运行代码；本轮只形成设计和资料对齐。
 
-后续进展见 [第一阶段独立验收](../stage-1-acceptance-2026-09-06.md)。当前新增 D17/R21 的模型重试正在第一阶段实施，相关责任、失败历史与只读用量边界见 [重试设计核对](provider-retry-design-review.md)；本目录旧基线不能覆盖新的确认要求。
+后续进展见 第一阶段独立验收。当前新增 D17/R21 的模型重试正在第一阶段实施，相关责任、失败历史与只读用量边界见 [重试设计核对](../archive/research/provider-retry-design-review.md)；本目录旧基线不能覆盖新的确认要求。
 
 ## 1. 阅读路径
 
@@ -20,14 +20,14 @@
 
 | 资料 | 解决什么问题 | 建议使用时机 |
 | --- | --- | --- |
-| [第一阶段设计对齐](../stage-1-design-alignment.md) | 最新原生循环与 SDLC、演化式设计如何合并，哪些缺口本阶段完成 | 审查第一阶段范围及给原会话补充任务前 |
+| 第一阶段设计对齐 | 最新原生循环与 SDLC、演化式设计如何合并，哪些缺口本阶段完成 | 审查第一阶段范围及给原会话补充任务前 |
 | [领域知识与专家补全](domain-completion-design.md) | 怎样把想法对应到成熟知识体系，自动补齐常规缺口，只澄清关键取舍 | 理解用户意图及各工作阶段准备时 |
 | [演化式开发与上下文管理](evolutionary-development-context-design.md) | 需求和架构持续变化时，怎样重构解耦、更新现状、保留原因并按需查历史 | 每项变更、重构和任务接续时 |
 | [原生项目演化设计](native-project-evolution-design.md) | Yudao 怎样登记已有项目、接续变更、核对并采纳新代码，让新会话继续开发 | 2.E 设计、E0 校准与真实接入前 |
 | [AI 原生 SDLC 参考与洞见](ai-native-sdlc-insights.md) | 用户提供的 SDLC playbook 对三部门职责、连续项目与评价有何启发 | 复核循环架构与吸收边界时 |
-| [离线证据、复核与批次分析](offline-review-design.md) | 证据如何保存、搬移、核验，怎样从显式本地材料复核，如何诚实汇总 | 下一批开发前完整阅读 |
-| [证据与独立评价研究](evidence-evaluation.md) | 来源标准、成熟评价平台、评价局限和统计方法支持哪些设计 | 复核近期合同及准备正式基线 |
-| [记忆与局部控制研究](memory-and-control.md) | 如何从事实形成候选，如何验证、检索、采用、处理冲突和失效 | 2.2/2.3 设计与隔离实验 |
+| [离线证据、复核与批次分析](../archive/research/offline-review-design.md) | 证据如何保存、搬移、核验，怎样从显式本地材料复核，如何诚实汇总 | 下一批开发前完整阅读 |
+| [证据与独立评价研究](../archive/research/evidence-evaluation.md) | 来源标准、成熟评价平台、评价局限和统计方法支持哪些设计 | 复核近期合同及准备正式基线 |
+| [记忆与局部控制研究](../archive/research/memory-and-control.md) | 如何从事实形成候选，如何验证、检索、采用、处理冲突和失效 | 2.2/2.3 设计与隔离实验 |
 | [组织、运行与演化研究](organization-runtime-evolution.md) | 子循环、技能、协议、持久恢复、运维和规则维护怎样分工 | 第三/四阶段与恢复选型实验 |
 | [可观测性详细设计](observability-design.md) | 每阶段显示什么、来源如何关联、命令和状态如何区分 | 各阶段界面接入前 |
 | [改善验证与选型实验规约](experiment-protocol.md) | 怎样区分校准、选型、收益与采用；如何控制泄漏、分母和成本 | 每次正式实验之前 |
@@ -124,4 +124,4 @@ flowchart TB
 
 L1-L3 是 2.1-A/B 内部离线续批，不是新增大阶段，也不是正式基线。建议第一阶段保存每轮完整交付，不等于将可搬移证据包、重算、外部清单和批次统计前移。之后再接真实来源、Web 分析和固定基线。主代理负责设计、评审与验收，Codex 子代理实施，按可独立核验的小交付提交和推送。
 
-与 L1-L3 并行可先准备 2.E 的 E0 固定项目故事和来源合同。E1-E3 待第一阶段稳定后接入，验收同一项目三个变更任务及新会话接续；具体顺序见[实施准备](../implementation-readiness.md)。本轮仅完成新增设计，L1-L3 与 E0-E3 均不预填通过。
+与 L1-L3 并行可先准备 2.E 的 E0 固定项目故事和来源合同。E1-E3 待第一阶段稳定后接入，验收同一项目三个变更任务及新会话接续；具体顺序见实施准备。本轮仅完成新增设计，L1-L3 与 E0-E3 均不预填通过。

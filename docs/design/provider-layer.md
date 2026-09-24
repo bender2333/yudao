@@ -1,10 +1,10 @@
 # Provider 设计说明：统一调用、多厂商接入与配置生效
 
-日期：2026-09-19。状态：设计中，未实现。所属阶段：[Stage 2.7](stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](requirements/startup-provider-reload.md)、[D23 统一 Provider 层](requirements/provider-layer.md)。
+日期：2026-09-19。状态：设计中，未实现。所属阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](../requirements/startup-provider-reload.md)、[D23 统一 Provider 层](../requirements/provider-layer.md)。
 
-> 2026-09-24：模型目录、部门选择、调用目标解析、推理档位与配置生效时机以[模型管理设计说明](model-management-design.md)为准。本文中「冻结目标」「新任务取得有效修订，旧任务保留原目标」「协议归于模型访问定义」的内容由它取代；模块边界、统一调用、取消与观测部分继续有效。
+> 2026-09-24：模型目录、部门选择、调用目标解析、推理档位与配置生效时机以[模型管理设计说明](model-management.md)为准。本文中「冻结目标」「新任务取得有效修订，旧任务保留原目标」「协议归于模型访问定义」的内容由它取代；模块边界、统一调用、取消与观测部分继续有效。
 
-用户选择：Provider 层支持多厂商与自定义接入，OpenCode Go 是第一个落地的服务方案；模型列表负责发现，测试负责准入。词汇以 [CONTEXT.md](../CONTEXT.md) 为准，已定决策见 [ADR](adr/0001-endpoints-by-protocol-not-vendor.md)。本说明同时覆盖模块职责、处理逻辑、用户交互和模块交互图；不在本轮编写运行代码。
+用户选择：Provider 层支持多厂商与自定义接入，OpenCode Go 是第一个落地的服务方案；模型列表负责发现，测试负责准入。词汇以 [CONTEXT.md](../../CONTEXT.md) 为准，已定决策见 [ADR](../adr/0001-endpoints-by-protocol-not-vendor.md)。本说明同时覆盖模块职责、处理逻辑、用户交互和模块交互图；不在本轮编写运行代码。
 
 ## 1. 要解决的问题
 
@@ -203,11 +203,11 @@ sequenceDiagram
 - Go 官方有“Use balance”设置，用户开启后可能在同一 Go 端点消耗 Zen 余额。Yudao 不调整该设置，也不承诺“订阅请求必然不再付费”；缺少响应证据时不能把费用标零。
 - 不建立新的计费系统，不用月费推算每次调用价格，不把套餐剩余额度变成 D09 的本地 token 预算。
 
-事实依据和限制见 [一手资料报告](research/opencode-go-provider-integration.md)。
+事实依据和限制见 [一手资料报告](../research/opencode-go-provider-integration.md)。
 
 ## 8. Provider 设置页交互说明
 
-沿用当前“模型与 Provider”入口、三部门绑定和响应式布局；不另建管理站点。原型新增交互合同在 [配置页说明](prototypes/provider-config/README.md) 中登记，未实现前不把示意当真实页面。
+沿用当前“模型与 Provider”入口、三部门绑定和响应式布局；不另建管理站点。原型新增交互合同在 [配置页说明](../archive/prototypes/provider-config/README.md) 中登记，未实现前不把示意当真实页面。
 
 ### 8.1 首次接入
 

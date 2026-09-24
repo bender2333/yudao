@@ -2,7 +2,7 @@
 
 更新：2026-09-19。用途：区分已验收的历史版本、当前代码及尚待执行的验收。本页统一报告口径，不代替真实运行报告。路线以 [总体路线图](program-roadmap.md) 为准。
 
-最新补充：用户新增 [Stage 2.7](stage-2-provider-plan.md)，先做 D22 启动/重载与 D23 独立 Provider / Go 接入。该阶段代码与应用侧验收已完成，结果见 [执行报告](stage-2-7-provider-report.md)；真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制。本页 3.0B 在 2.7 后的新冻结版本上完成；同版本已覆盖证据可直接引用。
+最新补充：用户新增 [Stage 2.7](archive/stage-2-provider-plan.md)，先做 D22 启动/重载与 D23 独立 Provider / Go 接入。该阶段代码与应用侧验收已完成，结果见 [执行报告](archive/stage-2-7-provider-report.md)；真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制。本页 3.0B 在 2.7 后的新冻结版本上完成；同版本已覆盖证据可直接引用。
 
 ## 1. 代码与证据身份
 
@@ -29,7 +29,7 @@
 | 学习基础 | LessonCandidate 待验证记录、harness.analysis L1–L3 | 跨任务经验采用、失效或学习收益 |
 | 通用工具、恢复、并行 | 设计中；当前只有文件工具、预绑定检查、单活动 run | replay/SSE 具有执行恢复能力 |
 
-历史依据：[Stage 2 进度](stage-2-progress.md)、[十场验收](stage-2-real-task-validation.md)、[学习基线](stage-2-21-baseline.md)、[日记](../jour.md)。
+历史依据：[Stage 2 进度](archive/stage-2-progress.md)、[十场验收](archive/stage-2-real-task-validation.md)、[学习基线](archive/stage-2-21-baseline.md)、[设计日记](archive/jour.md)。
 
 十场任务以 echo 变体为主。取消应单独列为按计划停止，不作为模型或系统失败的样本，也不从分母中悄悄删掉。工具/服务恢复成功的尝试仍保留失败事实。
 

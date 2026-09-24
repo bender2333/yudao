@@ -6,7 +6,7 @@
 
 > 非常好，这是我想要的用户界面，但是除此之外，我们还要添加可观测性，你可以参考omp的dashboard，这部分通常用于展示原始的请求，raw data，llm token统计等等信息
 
-随后指定 Oh My Pi 的状态 Web 页面。本轮以已完成的 [原型](../prototypes/2026-09-06/README.md) 安排真实数据接入。
+随后指定 Oh My Pi 的状态 Web 页面。本轮以已完成的 [原型](../archive/prototypes/2026-09-06/README.md) 安排真实数据接入。
 
 ## 用户需要的查看路径
 
@@ -41,4 +41,4 @@
 
 验收覆盖成功、部分返回后失败、无返回失败、重试恢复、取消、准备后未发出、压缩、不同 Provider、部分用量及刷新重连。请求列表、详情、Context、汇总及导出必须能按同一来源核对。统计覆盖全部筛选结果，不能只计算当前可见的一页。
 
-实施工作包及与其他阶段的关系见 [Web 原型实施计划](../web-prototype-implementation-plan.md)。
+实施工作包及与其他阶段的关系见 [Web 原型实施计划](../archive/web-prototype-implementation-plan.md)。

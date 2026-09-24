@@ -14,7 +14,7 @@
 - 产品、工程、质检各有独立工作区，工作消息与追加指导占主区，Context、Provider、Prompt 位于检查区。
 - 独立观测入口包含模型请求记录、请求详情、原始数据及用量统计，可以从部门工作追到一次模型尝试。
 - Provider 配置及尚未完成原型的相关配置界面预留。当前示例字段不表示已确认编辑、保存、连接测试或模型切换交互。
-- 原型来源和冻结快照见 [原型基线](../prototypes/2026-09-06/README.md)，工作包见 [实施计划](../web-prototype-implementation-plan.md)。
+- 原型来源和冻结快照见 [原型基线](../archive/prototypes/2026-09-06/README.md)，工作包见 [实施计划](../archive/web-prototype-implementation-plan.md)。
 
 ## 实施依据
 

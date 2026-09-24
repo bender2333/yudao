@@ -1,8 +1,8 @@
 # D23 统一 Provider 层与 OpenCode Go 接入
 
-确认时间：2026-09-19。状态：需求已确认，设计待实施。所属新增阶段：[Stage 2.7](../stage-2-provider-plan.md)。
+确认时间：2026-09-19。状态：需求已确认，设计待实施。所属新增阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。
 
-> 2026-09-24：任务冻结目标、协议归属与连接地址以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../model-management-design.md)为准：调用目标按每次模型请求解析，协议属于 Provider 配置，地址保存该协议的请求基址。
+> 2026-09-24：任务冻结目标、协议归属与连接地址以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../design/model-management.md)为准：调用目标按每次模型请求解析，协议属于 Provider 配置，地址保存该协议的请求基址。
 
 ## 1. 用户原话与首批范围
 
@@ -12,7 +12,7 @@
 
 > 趁着这次的机会，我需要你补充下，provider设计说明，逻辑和交互说明，模块交互图。
 
-完整说明与图见 [Provider 设计说明](../provider-layer-design.md)，一手依据见 [OpenCode Go / OMP 研究](../research/opencode-go-provider-integration.md)。
+完整说明与图见 [Provider 设计说明](../design/provider-layer.md)，一手依据见 [OpenCode Go / OMP 研究](../research/opencode-go-provider-integration.md)。
 
 ## 2. 产品结果
 

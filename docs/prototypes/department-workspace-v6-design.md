@@ -108,6 +108,6 @@ graph TD
 
 ## 4. 原型交付物
 
-- 原型单文件：[department-workspace-v6.html](file:///C:/project/yudao/docs/prototypes/department-workspace-v6.html)
-- 原型设计变更记录：[CHANGELOG.md](file:///C:/project/yudao/docs/prototypes/CHANGELOG.md)
+- 原型单文件：[department-workspace-v6.html](department-workspace-v6.html)
+- 原型设计变更记录：[CHANGELOG.md](CHANGELOG.md)
 - 运行方式：直接在任意现代主流浏览器中打开该 HTML 文件，无任何外部编译、服务端口或第三方脚本依赖。

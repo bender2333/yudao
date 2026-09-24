@@ -1,0 +1,1010 @@
+<!-- Yudao 综合工作台原型 · 继承原有项目管理、资料与依据、观测及三部门协作架构，融入全新 2D 像素风动态房间与三部门模型/Effort配置 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yudao · 项目工作台与三部门协作</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { margin: 0; min-width: 0; min-height: 100%; background: light-dark(#f7f8f7, #171918); }
+    body { overflow-x: hidden; }
+
+    #yudao-project-prototype {
+      --yp-bg: light-dark(#f7f8f7, #171918);
+      --yp-side: light-dark(#eef1ef, #1c201d);
+      --yp-surface: light-dark(#fff, #212522);
+      --yp-soft: light-dark(#f1f4f2, #292e2a);
+      --yp-text: light-dark(#29312d, #e7eee9);
+      --yp-muted: light-dark(#68766e, #a4b1a8);
+      --yp-line: light-dark(#dce4de, #37443b);
+      --yp-green: light-dark(#087f69, #6bd8ba);
+      --yp-tint: light-dark(#e4f2eb, #243e32);
+      --yp-amber: light-dark(#96680e, #e2be71);
+      --yp-amber-bg: light-dark(#faf1dc, #3a3223);
+      --yp-red: light-dark(#b44338, #ee9e92);
+      --yp-blue: light-dark(#39658c, #95bde3);
+      font: 14px/1.6 "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+      color: var(--yp-text);
+      background: var(--yp-bg);
+      position: relative;
+      min-width: 0;
+      text-align: left;
+    }
+
+    #yudao-project-prototype * { box-sizing: border-box; }
+    #yudao-project-prototype [hidden] { display: none !important; }
+    #yudao-project-prototype button,
+    #yudao-project-prototype input,
+    #yudao-project-prototype textarea,
+    #yudao-project-prototype select { font: inherit; color: inherit; }
+    #yudao-project-prototype button { cursor: pointer; }
+    #yudao-project-prototype button:disabled { cursor: default; opacity: .55; }
+    #yudao-project-prototype h1,
+    #yudao-project-prototype h2,
+    #yudao-project-prototype h3,
+    #yudao-project-prototype p { margin: 0; }
+    #yudao-project-prototype h1 { font-size: 24px; font-weight: 500; line-height: 1.4; letter-spacing: -.4px; }
+    #yudao-project-prototype h2 { font-size: 16px; font-weight: 500; }
+    #yudao-project-prototype h3 { font-size: 14px; font-weight: 500; }
+    #yudao-project-prototype strong { font-weight: 500; }
+    #yudao-project-prototype svg, #yudao-project-prototype i[data-lucide] { width: 17px; height: 17px; flex-shrink: 0; }
+
+    /* 外壳骨架 */
+    #yudao-project-prototype .yp-shell { display: grid; grid-template-columns: 218px minmax(0, 1fr); min-height: 100vh; }
+    #yudao-project-prototype .yp-sidebar { background: var(--yp-side); border-right: 1px solid var(--yp-line); padding: 20px 13px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    #yudao-project-prototype .yp-brand { display: flex; align-items: center; gap: 9px; padding: 0 8px; font-size: 17px; font-weight: 500; letter-spacing: .3px; }
+    #yudao-project-prototype .yp-brand svg { color: var(--yp-green); width: 21px; height: 21px; }
+    #yudao-project-prototype .yp-proto { font-size: 10px; color: var(--yp-muted); border: 1px solid var(--yp-line); border-radius: 4px; padding: 1px 4px; letter-spacing: 1px; margin-left: auto; }
+    #yudao-project-prototype .yp-muted { color: var(--yp-muted); }
+    #yudao-project-prototype .yp-small { font-size: 12px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-row { display: flex; align-items: center; gap: 9px; min-width: 0; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-between { justify-content: space-between; }
+    #yudao-project-prototype .yp-side-label { display: flex; align-items: center; justify-content: space-between; padding: 0 9px; margin: 0 0 8px; font-size: 11px; letter-spacing: 1px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; border-radius: 6px; padding: 7px; min-width: 30px; min-height: 30px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-icon:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--yp-line); background: var(--yp-surface); border-radius: 7px; padding: 7px 9px; margin-top: 10px; }
+    #yudao-project-prototype .yp-search input { width: 100%; min-width: 0; border: 0; background: transparent; font-size: 12px; padding: 0; outline: none; }
+    #yudao-project-prototype .yp-project-list { display: grid; gap: 3px; }
+    #yudao-project-prototype .yp-project { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 7px; display: flex; gap: 8px; text-align: left; align-items: center; padding: 9px 8px; margin-top: 2px; }
+    #yudao-project-prototype .yp-project:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-project.is-selected { background: var(--yp-tint); color: var(--yp-green); border-color: color-mix(in srgb, var(--yp-green) 15%, transparent); }
+    #yudao-project-prototype .yp-project span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    #yudao-project-prototype .yp-project .yp-project-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--yp-muted); flex: none; }
+    #yudao-project-prototype .yp-project.is-selected .yp-project-mark { background: var(--yp-green); }
+    #yudao-project-prototype .yp-side-bottom { margin-top: auto; display: grid; gap: 8px; border-top: 1px solid var(--yp-line); padding-top: 16px; }
+    #yudao-project-prototype .yp-sidebar-link { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 0; background: transparent; padding: 8px 9px; border-radius: 6px; color: var(--yp-muted); font-size: 12px; }
+    #yudao-project-prototype .yp-sidebar-link:hover { background: var(--yp-soft); color: var(--yp-text); }
+    #yudao-project-prototype .yp-sidebar-link.is-active { background: var(--yp-soft); color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-sidebar-link .yp-count { margin-left: auto; font-size: 11px; }
+
+    /* 顶栏 */
+    #yudao-project-prototype .yp-main { min-width: 0; display: flex; flex-direction: column; }
+    #yudao-project-prototype .yp-topbar { padding: 12px 28px; min-height: 56px; border-bottom: 1px solid var(--yp-line); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--yp-surface); position: sticky; top: 0; z-index: 20; }
+    #yudao-project-prototype .yp-breadcrumb { display: flex; gap: 8px; align-items: center; min-width: 0; font-size: 12px; color: var(--yp-muted); flex-wrap: wrap; }
+    #yudao-project-prototype .yp-breadcrumb button { padding: 0; border: 0; background: none; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-breadcrumb strong { color: var(--yp-text); }
+    #yudao-project-prototype .yp-auto { font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--yp-muted); white-space: nowrap; }
+    #yudao-project-prototype .yp-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yp-green); flex-shrink: 0; }
+    #yudao-project-prototype .yp-dot.waiting { background: var(--yp-amber); }
+    #yudao-project-prototype .yp-dot.muted { background: var(--yp-muted); }
+
+    /* 主内容区 */
+    #yudao-project-prototype .yp-content { padding: 24px 28px 48px; max-width: 1200px; margin: 0 auto; width: 100%; min-width: 0; }
+    #yudao-project-prototype .yp-eyebrow { font-size: 11px; letter-spacing: 1.3px; color: var(--yp-muted); margin-bottom: 6px; }
+    #yudao-project-prototype .yp-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    #yudao-project-prototype .yp-heading-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    #yudao-project-prototype .yp-subtitle { font-size: 13px; color: var(--yp-muted); margin-top: 6px; max-width: 70ch; overflow-wrap: anywhere; }
+
+    /* 按钮样式 */
+    #yudao-project-prototype .yp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--yp-line); border-radius: 6px; background: var(--yp-surface); font-size: 12px; min-height: 33px; white-space: nowrap; }
+    #yudao-project-prototype .yp-btn:hover { background: var(--yp-soft); }
+    #yudao-project-prototype .yp-btn.primary { background: var(--yp-green); color: light-dark(#fff, #102b20); border-color: var(--yp-green); }
+    #yudao-project-prototype .yp-btn.primary:hover { filter: brightness(1.07); }
+    #yudao-project-prototype .yp-btn.quiet { background: transparent; }
+    #yudao-project-prototype .yp-btn.small { padding: 4px 8px; min-height: 26px; font-size: 11px; }
+
+    /* 标签与导航选项卡 */
+    #yudao-project-prototype .yp-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--yp-line); margin-top: 18px; flex-wrap: wrap; }
+    #yudao-project-prototype .yp-tab { padding: 8px 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--yp-muted); font-size: 13px; min-height: 34px; }
+    #yudao-project-prototype .yp-tab:hover { color: var(--yp-text); }
+    #yudao-project-prototype .yp-tab.is-selected { color: var(--yp-green); border-bottom-color: var(--yp-green); font-weight: 500; }
+    #yudao-project-prototype .yp-secondary-tabs { display: flex; gap: 16px; margin-top: 12px; }
+    #yudao-project-prototype .yp-secondary-tabs .yp-tab { font-size: 12px; min-height: 28px; padding: 4px 0; }
+    #yudao-project-prototype .yp-tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 4px; background: var(--yp-soft); color: var(--yp-muted); padding: 2px 6px; font-size: 11px; white-space: nowrap; }
+    #yudao-project-prototype .yp-tag.green { color: var(--yp-green); background: var(--yp-tint); }
+    #yudao-project-prototype .yp-tag.amber { color: var(--yp-amber); background: var(--yp-amber-bg); }
+    #yudao-project-prototype .yp-tag.blue { color: var(--yp-blue); background: color-mix(in srgb, var(--yp-blue) 12%, transparent); }
+    #yudao-project-prototype .yp-tag.red { color: var(--yp-red); background: color-mix(in srgb, var(--yp-red) 12%, transparent); }
+
+    /* 区域与卡片布局 */
+    #yudao-project-prototype .yp-section { margin-top: 24px; }
+    #yudao-project-prototype .yp-section-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+
+    /* 概览：项目简要 */
+    #yudao-project-prototype .yp-project-summary { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--yp-line); }
+    #yudao-project-prototype .yp-project-summary p { font-size: 13px; margin-top: 6px; }
+    #yudao-project-prototype .yp-summary-side { border-left: 1px solid var(--yp-line); padding-left: 20px; display: grid; gap: 10px; }
+    #yudao-project-prototype .yp-summary-item { display: grid; gap: 2px; }
+    #yudao-project-prototype .yp-summary-item strong { font-size: 13px; }
+    #yudao-project-prototype .yp-summary-item span { font-size: 12px; color: var(--yp-muted); }
+
+    /* 三部门模型与 Effort 配置卡片网格 (嵌入概览) */
+    .yp-dept-config-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .yp-dept-config-card {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .yp-dept-config-card.product { border-top: 3px solid var(--yp-blue); }
+    .yp-dept-config-card.engineering { border-top: 3px solid var(--yp-green); }
+    .yp-dept-config-card.quality { border-top: 3px solid var(--yp-amber); }
+    .yp-dept-config-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .yp-dept-config-head strong { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+    .yp-dept-config-field { display: flex; flex-direction: column; gap: 4px; }
+    .yp-dept-config-field label { font-size: 11px; color: var(--yp-muted); font-weight: 500; }
+    .yp-dept-config-field select { width: 100%; border: 1px solid var(--yp-line); background: var(--yp-soft); border-radius: 5px; padding: 5px 8px; font-size: 12px; outline: none; }
+    .yp-dept-config-field select:focus { border-color: var(--yp-green); }
+    .yp-effort-slider-wrap { display: flex; align-items: center; gap: 8px; }
+    .yp-effort-slider-wrap input[type="range"] { flex: 1; padding: 0; cursor: pointer; accent-color: var(--yp-green); }
+    .yp-effort-tag { font-size: 11px; font-weight: 600; color: var(--yp-green); min-width: 32px; text-align: right; }
+    .yp-dept-config-foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--yp-line); font-size: 11px; }
+
+    /* 流转与交接列表 */
+    #yudao-project-prototype .yp-handoff-list { border-top: 1px solid var(--yp-line); }
+    #yudao-project-prototype .yp-handoff { display: grid; grid-template-columns: 85px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--yp-line); font-size: 12px; }
+    #yudao-project-prototype .yp-handoff-time { font-size: 11px; color: var(--yp-muted); }
+    #yudao-project-prototype .yp-handoff p { font-size: 11px; color: var(--yp-muted); margin-top: 3px; }
+    #yudao-project-prototype .yp-handoff-status { font-size: 11px; color: var(--yp-green); }
+    #yudao-project-prototype .yp-handoff-status.rework { color: var(--yp-amber); }
+
+    /* ========================================================
+       全新 2D 像素风房间与动态 Agent 舞台设计 (有清晰界限与区域感)
+       ======================================================== */
+    .pixel-room-boundary {
+      border: 3px solid light-dark(#2b322e, #101211);
+      border-radius: 8px;
+      background: light-dark(#dbe2de, #1a1e1b);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12), inset 0 0 0 2px light-dark(#f4f7f5, #2f3632);
+      overflow: hidden;
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .pixel-room-header {
+      background: light-dark(#2e3632, #111412);
+      color: #e5ece8;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid light-dark(#1f2522, #080a09);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .pixel-room-header strong { display: flex; align-items: center; gap: 8px; color: light-dark(#8ae2cb, #6bd8ba); font-family: ui-monospace, monospace; }
+
+    /* 房间内部二维场景 */
+    .pixel-room-stage {
+      position: relative;
+      height: 330px;
+      background: repeating-linear-gradient(
+        0deg,
+        light-dark(#cdd5d1, #1e2421) 0px,
+        light-dark(#cdd5d1, #1e2421) 20px,
+        light-dark(#c5cdc9, #1a201d) 20px,
+        light-dark(#c5cdc9, #1a201d) 40px
+      );
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    /* 房间顶层墙壁区域与复古显像管显示屏任务看板 */
+    .pixel-room-topwall {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 2;
+    }
+
+    .crt-monitor-board {
+      background: #0d1411;
+      border: 4px solid #3d4742;
+      border-radius: 8px;
+      box-shadow: inset 0 0 10px #043828, 0 3px 8px rgba(0,0,0,0.3);
+      padding: 8px 12px;
+      width: 280px;
+      color: #55f3be;
+      font-family: Consolas, "Courier New", monospace;
+      position: relative;
+    }
+    .crt-monitor-board::before {
+      content: "TASK MONITOR // CRT-01";
+      font-size: 9px;
+      color: #2e8b6e;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 4px;
+      border-bottom: 1px dashed #1d4d3c;
+      padding-bottom: 2px;
+    }
+    .crt-monitor-text {
+      font-size: 11px;
+      line-height: 1.45;
+      text-shadow: 0 0 4px rgba(85, 243, 190, 0.4);
+    }
+
+    /* 房间地板界限 (透视斜格砖效果) */
+    .pixel-room-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 110px;
+      background: repeating-linear-gradient(
+        45deg,
+        light-dark(#aeb9b3, #151a17),
+        light-dark(#aeb9b3, #151a17) 16px,
+        light-dark(#a2aea8, #121614) 16px,
+        light-dark(#a2aea8, #121614) 32px
+      );
+      border-top: 4px solid light-dark(#6e7a73, #2a312c);
+      box-shadow: inset 0 6px 12px rgba(0,0,0,0.1);
+    }
+
+    /* 2D 像素小人舞台中央区域 */
+    .pixel-desk-lane {
+      position: absolute;
+      bottom: 42px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 56px;
+      z-index: 4;
+    }
+
+    /* 单个工位与像素小人实体 */
+    .pixel-workstation {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    /* 对话/动作思考气泡 (像素边框) */
+    .pixel-bubble {
+      position: absolute;
+      bottom: 95px;
+      background: #ffffff;
+      color: #191c1a;
+      border: 2px solid #1a1e1b;
+      box-shadow: 2px 2px 0px #1a1e1b;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: inherit;
+      white-space: nowrap;
+      z-index: 10;
+      animation: floatPixel 2s steps(4) infinite alternate;
+    }
+    .pixel-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid #1a1e1b;
+    }
+    @keyframes floatPixel {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-4px); }
+    }
+
+    /* 2D 像素风格小人 */
+    .pixel-agent {
+      width: 32px;
+      height: 48px;
+      position: relative;
+      margin-bottom: -10px;
+    }
+    /* 像素头部 */
+    .pixel-agent-head {
+      width: 24px;
+      height: 22px;
+      background: var(--yp-green);
+      border: 2px solid #161b18;
+      box-shadow: 2px 2px 0px rgba(0,0,0,0.25);
+      margin: 0 auto;
+      position: relative;
+      animation: headBob 1.6s steps(2) infinite;
+    }
+    /* 像素双眼 (简单黑点，偶尔闪烁) */
+    .pixel-agent-eye-l, .pixel-agent-eye-r {
+      width: 3px;
+      height: 4px;
+      background: #111;
+      position: absolute;
+      top: 8px;
+    }
+    .pixel-agent-eye-l { left: 4px; }
+    .pixel-agent-eye-r { right: 4px; }
+    /* 像素躯干 */
+    .pixel-agent-body {
+      width: 28px;
+      height: 26px;
+      background: #2b332f;
+      border: 2px solid #161b18;
+      margin: -2px auto 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      font-family: monospace;
+    }
+
+    .pixel-workstation.subagent .pixel-agent-head { background: var(--yp-blue); }
+    .pixel-workstation.subagent .pixel-agent-body { background: #3d4a56; }
+
+    /* 办公桌与复古终端机 */
+    .pixel-desk {
+      width: 90px;
+      height: 38px;
+      background: light-dark(#8c694a, #523e2b);
+      border: 3px solid #231b14;
+      border-radius: 2px;
+      box-shadow: 3px 3px 0px rgba(0,0,0,0.3);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 3px;
+    }
+    .pixel-computer {
+      width: 36px;
+      height: 22px;
+      background: #39423d;
+      border: 2px solid #111412;
+      box-shadow: inset 0 0 6px #55f3be;
+      position: relative;
+    }
+    .pixel-workstation-label {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      color: var(--yp-text);
+      background: var(--yp-surface);
+      padding: 1px 6px;
+      border: 1px solid var(--yp-line);
+      border-radius: 4px;
+    }
+
+    @keyframes headBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    /* 房间控制工具栏 */
+    .pixel-stage-toolbar {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      z-index: 5;
+      display: flex;
+      gap: 6px;
+    }
+
+    /* 房间内流式事件日志 */
+    .pixel-room-log {
+      background: var(--yp-surface);
+      border-top: 1px solid var(--yp-line);
+      padding: 12px 16px;
+      max-height: 140px;
+      overflow-y: auto;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pixel-log-row { display: flex; gap: 8px; line-height: 1.4; }
+    .pixel-log-time { color: var(--yp-muted); font-family: monospace; font-size: 11px; white-space: nowrap; }
+    .pixel-log-msg { color: var(--yp-text); }
+    .pixel-log-msg.highlight { color: var(--yp-green); font-weight: 500; }
+
+    /* 底部人类输入容器 (完全固定在最底端) */
+    .pixel-room-input-box {
+      background: var(--yp-surface);
+      border: 1px solid var(--yp-line);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      padding: 14px 16px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pixel-input-head { display: flex; justify-content: space-between; align-items: center; }
+    .pixel-input-head strong { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .pixel-input-row { display: flex; gap: 10px; align-items: flex-end; }
+    .pixel-input-row textarea {
+      flex: 1;
+      min-height: 60px;
+      resize: vertical;
+      border: 1px solid var(--yp-line);
+      background: var(--yp-bg);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      outline: none;
+    }
+    .pixel-input-row textarea:focus { border-color: var(--yp-green); }
+
+    /* 右侧检查区 (复用原有架构) */
+    #yudao-project-prototype .yp-dept-layout { display: grid; grid-template-columns: minmax(0, 1fr) 258px; gap: 24px; margin-top: 16px; }
+    #yudao-project-prototype .yp-inspector { background: var(--yp-surface); border: 1px solid var(--yp-line); border-radius: 7px; padding: 14px; align-self: start; min-width: 0; }
+    #yudao-project-prototype .yp-inspector h3 { font-size: 13px; }
+    #yudao-project-prototype .yp-inspector p { font-size: 12px; color: var(--yp-muted); margin-top: 8px; }
+    #yudao-project-prototype .yp-inspector details { margin-top: 12px; font-size: 12px; border-top: 1px solid var(--yp-line); padding-top: 8px; }
+    #yudao-project-prototype .yp-inspector summary { cursor: pointer; }
+    #yudao-project-prototype .yp-inspector .yp-tabs { margin-top: 6px; }
+
+    /* Toast */
+    #yudao-project-prototype .yp-toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 100;
+      background: var(--yp-text);
+      color: var(--yp-surface);
+      padding: 9px 15px;
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .yp-dept-config-grid { grid-template-columns: 1fr; }
+      #yudao-project-prototype .yp-dept-layout { grid-template-columns: 1fr; }
+      .pixel-desk-lane { gap: 20px; }
+    }
+    @media (max-width: 740px) {
+      #yudao-project-prototype .yp-shell { grid-template-columns: 1fr; }
+      #yudao-project-prototype .yp-sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="yudao-project-prototype">
+  <div class="yp-shell">
+    <!-- 保持原有完整的左侧导航与项目列表 -->
+    <aside class="yp-sidebar" aria-label="项目导航">
+      <div class="yp-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        <span>Yudao</span>
+        <span class="yp-proto">原型</span>
+      </div>
+
+      <button class="yp-btn primary" type="button" data-action="new-project">+ 新建项目</button>
+
+      <label class="yp-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input data-search type="search" placeholder="搜索项目" value="" aria-label="搜索项目">
+      </label>
+
+      <div>
+        <div class="yp-side-label"><span>项目</span><span>2</span></div>
+        <div class="yp-project-list">
+          <button class="yp-project is-selected" type="button" data-project="cargo">
+            <span class="yp-project-mark"></span>
+            <span>货物装载规划</span>
+          </button>
+          <button class="yp-project" type="button" data-project="lab">
+            <span class="yp-project-mark"></span>
+            <span>实验记录助手</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="yp-side-bottom">
+        <button class="yp-sidebar-link" type="button" data-nav="model-management">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><path d="M12 6v6l4 2"></path></svg>
+          <span>模型管理</span>
+        </button>
+        <button class="yp-sidebar-link" type="button" data-page="archives">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>已归档项目</span>
+          <span class="yp-count">1</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主展示区 -->
+    <main class="yp-main">
+      <header class="yp-topbar">
+        <div class="yp-breadcrumb">
+          <button type="button" data-page="overview">项目</button>
+          <span>/</span>
+          <strong id="topbarProjectTitle">货物装载规划</strong>
+          <span id="topbarSubpath">/ 项目概览</span>
+        </div>
+        <div class="yp-row">
+          <span class="yp-auto"><span class="yp-dot"></span><span>自动推进 · 关键问题再介入</span></span>
+        </div>
+      </header>
+
+      <div class="yp-content" id="mainContent">
+        <!-- 动态页面内容由下方 JavaScript 渲染 -->
+      </div>
+    </main>
+  </div>
+
+  <div class="yp-toast" id="toastBox" hidden></div>
+</div>
+
+<script>
+(function() {
+  // 全局数据状态
+  const roles = {
+    product: { name: '产品', icon: '📋', text: '目标、需求与取舍', roomTask: '整理货物混装需求与体积优先级' },
+    engineering: { name: '工程', icon: '⚙️', text: '方案、实现与自检', roomTask: '实现订单导出并修复窄屏布局' },
+    quality: { name: '质检', icon: '🔍', text: '验收依据与独立检查', roomTask: '验证导出的字段边界及异常流程' }
+  };
+
+  const projectData = {
+    id: 'cargo',
+    name: '货物装载规划',
+    goal: '让计划员快速生成可执行的装载方案，兼顾空间利用与操作稳定性。',
+    baseline: '装载工作台 v0.3',
+    path: 'C:/project/cargo_project',
+    material: '产品说明、交互原型、代码与测试'
+  };
+
+  // 三部门全局模型与 Effort 绑定配置
+  const deptBindings = {
+    product: {
+      provider: 'p-opencode-01',
+      providerLabel: 'OpenCode Go 主线路 (Responses)',
+      model: 'gpt-5.6-terra',
+      effort: 'medium',
+      effortValue: 2,
+      subagentActive: false
+    },
+    engineering: {
+      provider: 'p-opencode-01',
+      providerLabel: 'OpenCode Go 主线路 (Responses)',
+      model: 'gpt-5.6-terra',
+      effort: 'high',
+      effortValue: 3,
+      subagentActive: false
+    },
+    quality: {
+      provider: 'p-anyrouter-02',
+      providerLabel: 'AnyRouter 备用网关 (Chat Completions)',
+      model: 'deepseek-chat',
+      effort: 'high',
+      effortValue: 3,
+      subagentActive: false
+    }
+  };
+
+  const effortTexts = { 1: '低 (low)', 2: '中 (medium)', 3: '深 (high)', 4: '极 (max)' };
+
+  let currentPage = 'overview'; // 'overview' | 'product' | 'engineering' | 'quality' | 'sources' | 'settings'
+  let currentInspectTab = 'context'; // 'context' | 'provider' | 'prompt'
+
+  function toast(msg) {
+    const box = document.getElementById('toastBox');
+    box.textContent = msg;
+    box.hidden = false;
+    setTimeout(() => { box.hidden = true; }, 2400);
+  }
+
+  // 顶层导航 Tabs
+  function renderNavTabs() {
+    return `
+      <nav class="yp-tabs" role="tablist" aria-label="项目工作区">
+        <button class="yp-tab ${currentPage === 'overview' ? 'is-selected' : ''}" type="button" onclick="navigate('overview')">项目概览</button>
+        <button class="yp-tab ${currentPage === 'product' ? 'is-selected' : ''}" type="button" onclick="navigate('product')">产品部</button>
+        <button class="yp-tab ${currentPage === 'engineering' ? 'is-selected' : ''}" type="button" onclick="navigate('engineering')">工程部</button>
+        <button class="yp-tab ${currentPage === 'quality' ? 'is-selected' : ''}" type="button" onclick="navigate('quality')">质检部</button>
+      </nav>
+      ${currentPage === 'overview' ? `
+        <div class="yp-secondary-tabs">
+          <button class="yp-tab" type="button" onclick="navigate('sources')">📁 资料与依据</button>
+          <button class="yp-tab" type="button" onclick="navigate('settings')">⚙️ 项目设置</button>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  // 1. 概览页渲染 (保留原有风格，并将三部门模型分配与Effort作为顶层卡片呈现)
+  function renderOverview() {
+    document.getElementById('topbarSubpath').textContent = '/ 项目概览';
+
+    const deptCards = Object.keys(roles).map(deptKey => {
+      const r = roles[deptKey];
+      const cfg = deptBindings[deptKey];
+      return `
+        <div class="yp-dept-config-card ${deptKey}">
+          <div class="yp-dept-config-head">
+            <strong>${r.icon} ${r.name}部</strong>
+            <span class="yp-tag green">已准入就绪</span>
+          </div>
+          <div class="yp-dept-config-field">
+            <label>指定 Provider 配置</label>
+            <select onchange="updateDeptProvider('${deptKey}', this.value)">
+              <option value="p-opencode-01" ${cfg.provider === 'p-opencode-01' ? 'selected' : ''}>OpenCode Go 主线路 (Responses)</option>
+              <option value="p-anyrouter-02" ${cfg.provider === 'p-anyrouter-02' ? 'selected' : ''}>AnyRouter 备用网关 (Chat Completions)</option>
+            </select>
+          </div>
+          <div class="yp-dept-config-field">
+            <label>模型访问定义 (仅已准入)</label>
+            <select id="sel-model-${deptKey}" onchange="updateDeptModel('${deptKey}', this.value)">
+              ${cfg.provider === 'p-opencode-01' ? `
+                <option value="gpt-5.6-terra" ${cfg.model === 'gpt-5.6-terra' ? 'selected' : ''}>gpt-5.6-terra (200k / 8k)</option>
+                <option value="claude-3-7-sonnet" ${cfg.model === 'claude-3-7-sonnet' ? 'selected' : ''}>claude-3-7-sonnet (200k / 8k)</option>
+              ` : `
+                <option value="deepseek-chat" ${cfg.model === 'deepseek-chat' ? 'selected' : ''}>deepseek-chat (64k / 4k)</option>
+              `}
+            </select>
+          </div>
+          <div class="yp-dept-config-field">
+            <label>思考 / 推理努力程度 (Effort: <span id="effort-txt-${deptKey}">${effortTexts[cfg.effortValue]}</span>)</label>
+            <div class="yp-effort-slider-wrap">
+              <input type="range" min="1" max="4" value="${cfg.effortValue}" oninput="updateDeptEffort('${deptKey}', this.value)">
+              <span class="yp-effort-tag" id="effort-tag-${deptKey}">${cfg.effortValue === 1 ? '低' : cfg.effortValue === 2 ? '中' : cfg.effortValue === 3 ? '深' : '极'}</span>
+            </div>
+          </div>
+          <div class="yp-dept-config-foot">
+            <span class="yp-muted">新事项创建时冻结</span>
+            <button class="yp-btn small" type="button" onclick="navigate('${deptKey}')">进入${r.name}房间 →</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">货物装载规划</div>
+          <h1>项目概览</h1>
+          <p class="yp-subtitle">从项目目标、部门模型配置和跨部门流转了解下一步。</p>
+        </div>
+        <div class="yp-heading-actions">
+          <button class="yp-btn primary" type="button" onclick="toast('三部门模型配置已保存为全机基线！')">保存三部门绑定</button>
+        </div>
+      </header>
+
+      <section class="yp-project-summary">
+        <div>
+          <h2>当前目标</h2>
+          <p>${projectData.goal}</p>
+          <p class="yp-small">${projectData.path} · ${projectData.material}</p>
+        </div>
+        <div class="yp-summary-side">
+          <div class="yp-summary-item"><span>当前成果</span><strong>${projectData.baseline}</strong></div>
+          <div class="yp-summary-item"><span>工作项</span><strong>4 个 · 1 个已采纳</strong></div>
+          <div class="yp-summary-item"><span>项目状态</span><strong><span class="yp-tag green">持续演化</span></strong></div>
+        </div>
+      </section>
+
+      <!-- 三部门模型与 Effort 配置卡片 -->
+      <section class="yp-section">
+        <div class="yp-section-title">
+          <div>
+            <h2>三部门调用模型与努力程度 (Effort) 分配</h2>
+            <p class="yp-small" style="margin-top:3px">为产品、工程、质检独立绑定 Provider、已准入模型及思考深度，新事项创建时锁定</p>
+          </div>
+        </div>
+        <div class="yp-dept-config-grid">
+          ${deptCards}
+        </div>
+      </section>
+
+      <!-- 原有跨部门流转记录 -->
+      <section class="yp-section">
+        <div class="yp-section-title">
+          <h2>最近流转交接</h2>
+          <span class="yp-small">需求交接、版本交付与缺陷返工</span>
+        </div>
+        <div class="yp-handoff-list">
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">今天 10:24</span>
+            <div><strong>工程 → 产品</strong><p>混装方案比较已完成，数量与体积的优先级需要由您明确。</p></div>
+            <span class="yp-handoff-status">等待决定</span>
+          </div>
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">昨天 16:40</span>
+            <div><strong>质检 → 工程</strong><p>保存后恢复场景仍有一个窄屏折行边界条件需要修复。</p></div>
+            <span class="yp-handoff-status rework">返工</span>
+          </div>
+          <div class="yp-handoff">
+            <span class="yp-handoff-time">周一 14:05</span>
+            <div><strong>工程 → 质检</strong><p>导出结果已附上自动化单测检查材料。</p></div>
+            <span class="yp-handoff-status">提交质检</span>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  // 2. 部门房间渲染 (融入 2D 像素风小人、CRT 任务监视器、工作日志与最底端输入框)
+  function renderDepartment(deptKey) {
+    const r = roles[deptKey];
+    const cfg = deptBindings[deptKey];
+    document.getElementById('topbarSubpath').textContent = `/ ${r.name}部工作间`;
+
+    return `
+      ${renderNavTabs()}
+      <header class="yp-heading" style="margin-top:20px">
+        <div>
+          <div class="yp-eyebrow">三部门独立房间 · 2D 像素工位</div>
+          <h1>${r.name}部工作间</h1>
+          <p class="yp-subtitle">${r.text} · 当前使用模型：<strong>${cfg.model}</strong> (${cfg.providerLabel}) · Effort: ${effortTexts[cfg.effortValue]}</p>
+        </div>
+        <div class="yp-heading-actions">
+          <button class="yp-btn quiet" type="button" onclick="navigate('overview')">← 返回概览</button>
+        </div>
+      </header>
+
+      <div class="yp-dept-layout">
+        <!-- 房间主体内容：中间为 2D 像素动画舞台与 CRT 屏，最底部为人类输入框 -->
+        <section style="display:flex; flex-direction:column; min-width:0;">
+          
+          <!-- 2D 像素风房间容器 (界限分明) -->
+          <div class="pixel-room-boundary">
+            <div class="pixel-room-header">
+              <strong>ROOM_${deptKey.toUpperCase()} // AGENT WORKSPACE</strong>
+              <span>HOST: LOCAL_RUNNER · STATUS: ACTIVE</span>
+            </div>
+
+            <!-- 房间内部舞台 -->
+            <div class="pixel-room-stage">
+              <div class="pixel-stage-toolbar">
+                <button class="yp-btn small" type="button" onclick="toggleSubagent('${deptKey}')">${cfg.subagentActive ? '- 召回子 Agent' : '+ 派发协作者 (SubAgent)'}</button>
+                <button class="yp-btn small" type="button" onclick="simulatePixelAction('${deptKey}')">动作步进</button>
+              </div>
+
+              <!-- 顶墙：CRT 显示屏风格的任务看板 -->
+              <div class="pixel-room-topwall">
+                <div class="crt-monitor-board">
+                  <div class="crt-monitor-text" id="crt-task-text">
+                    &gt; CURRENT TARGET:<br>
+                    ${r.roomTask}<br>
+                    &gt; EFFORT: ${effortTexts[cfg.effortValue]}<br>
+                    &gt; CYCLE: #03 [RUNNING]
+                  </div>
+                </div>
+              </div>
+
+              <!-- 地板界限与 2D 像素工位 -->
+              <div class="pixel-room-floor"></div>
+
+              <div class="pixel-desk-lane">
+                <!-- 核心责任小人 -->
+                <div class="pixel-workstation">
+                  <div class="pixel-bubble" id="bubble-${deptKey}">正在解析代码 AST...</div>
+                  <div class="pixel-agent">
+                    <div class="pixel-agent-head">
+                      <div class="pixel-agent-eye-l"></div>
+                      <div class="pixel-agent-eye-r"></div>
+                    </div>
+                    <div class="pixel-agent-body">MAIN</div>
+                  </div>
+                  <div class="pixel-desk">
+                    <div class="pixel-computer"></div>
+                  </div>
+                  <span class="pixel-workstation-label">${r.name}主 Agent</span>
+                </div>
+
+                <!-- 动态加入的 SubAgent (多个小人) -->
+                ${cfg.subagentActive ? `
+                  <div class="pixel-workstation subagent">
+                    <div class="pixel-bubble" style="bottom: 90px;">正在检索测试案例...</div>
+                    <div class="pixel-agent">
+                      <div class="pixel-agent-head">
+                        <div class="pixel-agent-eye-l"></div>
+                        <div class="pixel-agent-eye-r"></div>
+                      </div>
+                      <div class="pixel-agent-body">SUB</div>
+                    </div>
+                    <div class="pixel-desk">
+                      <div class="pixel-computer"></div>
+                    </div>
+                    <span class="pixel-workstation-label">Scout 子 Agent</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- 房间流式事件日志 -->
+            <div class="pixel-room-log" id="roomLog-${deptKey}">
+              <div class="pixel-log-row">
+                <span class="pixel-log-time">10:47:02</span>
+                <span class="pixel-log-msg highlight">[系统] 部门房间已激活，已就绪 ${cfg.model} 模型上下文。</span>
+              </div>
+              <div class="pixel-log-row">
+                <span class="pixel-log-time">10:47:18</span>
+                <span class="pixel-log-msg">${r.name}主 Agent 开始执行工具：workspace_search (查找到 8 处文件)。</span>
+              </div>
+              <div class="pixel-log-row">
+                <span class="pixel-log-time">10:48:02</span>
+                <span class="pixel-log-msg">${r.name}主 Agent 正在生成第 1 轮实施成果。</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 最底端：人类输入与操作框 (固定在房间下方) -->
+          <div class="pixel-room-input-box">
+            <div class="pixel-input-head">
+              <strong>💬 向${r.name}部下达指令或追加人类反馈</strong>
+              <span class="yp-small">输入将作为人类指导注入本部门下一次模型调用的 Context</span>
+            </div>
+            <div class="pixel-input-row">
+              <textarea id="humanInput-${deptKey}" placeholder="给${r.name}部追加具体约束、需求确认或修改建议..."></textarea>
+              <button class="yp-btn primary" style="height: 60px; padding: 0 18px;" type="button" onclick="sendHumanInput('${deptKey}')">
+                发送指导
+              </button>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- 右侧：工作依据检查区 (继承原系统架构) -->
+        <aside class="yp-inspector" aria-label="部门检查区">
+          <div class="yp-row yp-between">
+            <h3>工作依据检查</h3>
+            <span class="yp-tag green">${r.name}部</span>
+          </div>
+          <nav class="yp-tabs">
+            <button class="yp-tab ${currentInspectTab === 'context' ? 'is-selected' : ''}" type="button" onclick="switchInspect('context')">Context</button>
+            <button class="yp-tab ${currentInspectTab === 'provider' ? 'is-selected' : ''}" type="button" onclick="switchInspect('provider')">Provider</button>
+            <button class="yp-tab ${currentInspectTab === 'prompt' ? 'is-selected' : ''}" type="button" onclick="switchInspect('prompt')">Prompt</button>
+          </nav>
+
+          <div style="margin-top: 10px;">
+            ${currentInspectTab === 'context' ? `
+              <div class="yp-small">版本：ctx-${deptKey}-mix-v3 · 刚刚载入</div>
+              <details open>
+                <summary>当次输入正文</summary>
+                <p>${projectData.goal}</p>
+              </details>
+              <details open>
+                <summary>来源与版本</summary>
+                <p><strong>项目目标</strong><br>project-goal-v2 · 项目级</p>
+              </details>
+            ` : currentInspectTab === 'provider' ? `
+              <p><strong>Provider：</strong>${cfg.providerLabel}</p>
+              <p><strong>Model：</strong>${cfg.model}</p>
+              <p><strong>努力程度 (Effort)：</strong>${effortTexts[cfg.effortValue]}</p>
+              <p><strong>上限：</strong>窗口 200,000 · 最大输出 8,192</p>
+            ` : `
+              <p class="yp-small">当前生效 Prompt 规则：</p>
+              <pre style="background:var(--yp-soft); padding:8px; border-radius:4px; font-size:11px; white-space:pre-wrap; font-family:monospace;">你是${r.name}部。围绕项目目标推进当前职责，遇到需要确认的重大取舍保留问题并请求用户决定。</pre>
+            `}
+          </div>
+        </aside>
+      </div>
+    `;
+  }
+
+  // 路由跳转
+  window.navigate = function(page) {
+    currentPage = page;
+    render();
+  };
+
+  window.switchInspect = function(tab) {
+    currentInspectTab = tab;
+    render();
+  };
+
+  window.updateDeptEffort = function(deptKey, val) {
+    deptBindings[deptKey].effortValue = parseInt(val, 10);
+    const tag = document.getElementById(`effort-tag-${deptKey}`);
+    const txt = document.getElementById(`effort-txt-${deptKey}`);
+    if (tag) tag.textContent = val == 1 ? '低' : val == 2 ? '中' : val == 3 ? '深' : '极';
+    if (txt) txt.textContent = effortTexts[val];
+  };
+
+  window.updateDeptProvider = function(deptKey, providerId) {
+    deptBindings[deptKey].provider = providerId;
+    if (providerId === 'p-opencode-01') {
+      deptBindings[deptKey].providerLabel = 'OpenCode Go 主线路 (Responses)';
+      deptBindings[deptKey].model = 'gpt-5.6-terra';
+    } else {
+      deptBindings[deptKey].providerLabel = 'AnyRouter 备用网关 (Chat Completions)';
+      deptBindings[deptKey].model = 'deepseek-chat';
+    }
+    render();
+    toast(`${roles[deptKey].name}部所选 Provider 已更新`);
+  };
+
+  window.updateDeptModel = function(deptKey, modelId) {
+    deptBindings[deptKey].model = modelId;
+    toast(`${roles[deptKey].name}部绑定模型已切换为 ${modelId}`);
+  };
+
+  // 切换 SubAgent 派发
+  window.toggleSubagent = function(deptKey) {
+    deptBindings[deptKey].subagentActive = !deptBindings[deptKey].subagentActive;
+    render();
+    toast(deptBindings[deptKey].subagentActive ? '已派发 SubAgent 协同就座！' : 'SubAgent 已完成任务离场');
+  };
+
+  // 模拟像素小人思考动作
+  window.simulatePixelAction = function(deptKey) {
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (!bubble) return;
+    const old = bubble.textContent;
+    bubble.textContent = '执行工具：run_check...';
+    setTimeout(() => { bubble.textContent = old; }, 1400);
+    toast('小人执行工具操作');
+  };
+
+  // 发送人类输入
+  window.sendHumanInput = function(deptKey) {
+    const input = document.getElementById(`humanInput-${deptKey}`);
+    const val = input.value.trim();
+    if (!val) {
+      alert('请输入要下达的指导内容！');
+      return;
+    }
+    const log = document.getElementById(`roomLog-${deptKey}`);
+    if (log) {
+      const now = new Date().toTimeString().slice(0, 8);
+      const row = document.createElement('div');
+      row.className = 'pixel-log-row';
+      row.innerHTML = `<span class="pixel-log-time">${now}</span><span class="pixel-log-msg">[人类指导] ${val}</span>`;
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+    input.value = '';
+    const bubble = document.getElementById(`bubble-${deptKey}`);
+    if (bubble) bubble.textContent = '收到人类指令，正在重算任务！';
+    toast('指导已注入部门下轮 Context！');
+  };
+
+  // 主渲染
+  function render() {
+    const container = document.getElementById('mainContent');
+    if (currentPage === 'overview') {
+      container.innerHTML = renderOverview();
+    } else if (roles[currentPage]) {
+      container.innerHTML = renderDepartment(currentPage);
+    } else if (currentPage === 'sources') {
+      container.innerHTML = `${renderNavTabs()}<div class="yp-section"><h2>资料与依据</h2><p class="yp-small">这里是项目长期保留的资料说明与三部门依据。</p></div>`;
+    } else if (currentPage === 'settings') {
+      container.innerHTML = `${renderNavTabs()}<div class="yp-section"><h2>项目设置</h2><p class="yp-small">调整项目名称、目标及路径。</p></div>`;
+    }
+  }
+
+  // 初始化
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-日期：2026-09-24。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](requirements/model-management.md)。术语以 [CONTEXT.md](../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](adr/0006-reasoning-levels-declared-per-model.md)。界面原型：[department-workspace-v6.html](prototypes/department-workspace-v6.html)，第 9 节列出需要按本说明修改的地方。
+日期：2026-09-24。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](../adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)。界面原型：[department-workspace-v6.html](../prototypes/department-workspace-v6.html)，第 9 节列出需要按本说明修改的地方。
 
 本说明是模型目录、部门模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
@@ -96,13 +96,13 @@ flowchart TB
 
 ### 4.1 服务方案预置表
 
-预置表是 Provider 模块内的一份数据文件（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)）。每个服务方案一行，包含名称、按协议列出的请求基址、认证方式、模型列表地址、文档链接、必需请求头（OpenCode Go 需要真实 User-Agent 与 `x-opencode-session`）和来源链接。整张表带 revision，界面显示 revision 与来源。
+预置表是 Provider 模块内的一份数据文件（[ADR-0003](../adr/0003-versioned-preset-table-no-remote-refresh.md)）。每个服务方案一行，包含名称、按协议列出的请求基址、认证方式、模型列表地址、文档链接、必需请求头（OpenCode Go 需要真实 User-Agent 与 `x-opencode-session`）和来源链接。整张表带 revision，界面显示 revision 与来源。
 
 表中目前只有 OpenCode Go，它的三种协议使用同一个请求基址 `https://opencode.ai/zen/go/v1`。「自定义」表示不使用预置表，所有字段由用户填写。服务方案只描述接入规则，不带模型、容量、推理档位或准入。新增服务方案等于在文件中新增一行，随新版本发布生效；不做远端自动更新。
 
 ### 4.2 Provider 配置
 
-一份 Provider 配置只声明一种协议（Responses、Chat Completions、Anthropic Messages）；同一服务方案要使用另一种协议时，另建一份配置，默认沿用同一凭据引用（[ADR-0004](adr/0004-one-protocol-per-connection.md)）。
+一份 Provider 配置只声明一种协议（Responses、Chat Completions、Anthropic Messages）；同一服务方案要使用另一种协议时，另建一份配置，默认沿用同一凭据引用（[ADR-0004](../adr/0004-one-protocol-per-connection.md)）。
 
 地址保存该协议的请求基址，请求路径由各协议适配器按协议规范拼接，与 OMP、opencode 和官方 SDK 的用法相同：Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`。选中服务方案与协议后，地址取预置表中该协议的请求基址；自定义服务由用户填写。连接保存它所属的服务方案，编辑时据此恢复方案选择，请求时据此取得必需请求头。
 
@@ -126,7 +126,7 @@ stateDiagram-v2
 - **容量**：加入时窗口与输出上限可以预填；每一行在用户修改或点击「接受」之前不能保存。确认后的容量就是运行时使用的限制。
 - **连接测试**：只对已保存的连接进行，发送一次真实请求，证明地址与凭据可用，不改变任何准入。
 - **模型测试**：对一个访问定义发送一次真实的最小推理请求；该定义声明了推理档位时，按它的默认档位发送推理参数。测试通过且容量已确认时，写入准入记录。结果只影响这一个定义。
-- **准入记录**只由模型测试写入。目录文档的编辑、导入与导出都不含准入记录（[ADR-0002](adr/0002-candidates-need-test-to-admit.md)）。
+- **准入记录**只由模型测试写入。目录文档的编辑、导入与导出都不含准入记录（[ADR-0002](../adr/0002-candidates-need-test-to-admit.md)）。
 
 ### 4.4 修改与准入
 
@@ -236,7 +236,7 @@ sequenceDiagram
 
 ### 7.1 档位与声明
 
-档位全集为 minimal、low、medium、high、xhigh、max，由低到高排列，与 OMP 相同（[ADR-0006](adr/0006-reasoning-levels-declared-per-model.md)）。模型访问定义可以声明三项：
+档位全集为 minimal、low、medium、high、xhigh、max，由低到高排列，与 OMP 相同（[ADR-0006](../adr/0006-reasoning-levels-declared-per-model.md)）。模型访问定义可以声明三项：
 
 - 支持档位：档位全集的一个子集，只包含上游接受的取值；
 - 默认档位：支持档位中的一个；
@@ -388,12 +388,12 @@ sequenceDiagram
 
 ## 11. 被本说明取代的内容
 
-- D18、D22、D23 与 [Provider 设计说明](provider-layer-design.md) 中的「任务创建时冻结目标」「仅新任务生效」「在途冻结」「任务期间不热切换」凭据。
+- D18、D22、D23 与 [Provider 设计说明](provider-layer.md) 中的「任务创建时冻结目标」「仅新任务生效」「在途冻结」「任务期间不热切换」凭据。
 - D18 与 CONTEXT.md 原有的「部门绑定全机一份、不按项目分开」。
 - D02 的「默认修改当前任务，目标部门下一次激活生效」与事项内 Prompt 编辑。
-- D10 与[决策记录](decision.md)中「摘要请求不带推理参数」「摘要输出上限固定 4096」，以及按字符数估算用量。
+- D10 与[决策记录](../decision.md)中「摘要请求不带推理参数」「摘要输出上限固定 4096」，以及按字符数估算用量。
 - D23 与 ADR-0004 原有的「连接地址为完整端点」。
-- [OMP 能力差距清单](stage-3/omp-capability-gap.md)中「会话内换模型：不采用」。
+- [OMP 能力差距清单](../stage-3/omp-capability-gap.md)中「会话内换模型：不采用」。
 
 ## 12. TODO
 

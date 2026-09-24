@@ -2,8 +2,8 @@
 
 > 日期：2026-09-06。覆盖第一至第四阶段的视图职责，当前只形成设计资料。
 > 第一阶段三部门状态图是 MVP 必需交付，仍由原会话实现和验收；本文件不在本分支改造 Web，也不改变第一阶段已约定范围。
-> 配套：[总体架构](../system-architecture.md)、[离线证据设计](offline-review-design.md)、[组织与运行](organization-runtime-evolution.md)。
-> 第一阶段范围按[最新设计复核](../stage-1-design-alignment.md)对齐：同任务持续输入、有效 PRD、事前计划、相互咨询与动作请求、prompt 编辑和部门历史压缩都随第一阶段交付；本分支不改另一会话 Web。
+> 配套：总体架构、[离线证据设计](../archive/research/offline-review-design.md)、[组织与运行](organization-runtime-evolution.md)。
+> 第一阶段范围按最新设计复核对齐：同任务持续输入、有效 PRD、事前计划、相互咨询与动作请求、prompt 编辑和部门历史压缩都随第一阶段交付；本分支不改另一会话 Web。
 
 ## 1. 用户要看清的四件事
 
@@ -158,4 +158,4 @@ QA 记录显示当时决定、来源和受审对象。外评显示后来采用�
 - 可借鉴：用户可见行为检查与内部指标各有职责；延迟、流量、错误、饱和度帮助运维定位；告警应能指向需要处理的明确问题。
 - 限制：四种运行信号不能替代任务正确性、经验收益或独立评价。显示更多监控曲线也不构成组织能力进步。
 
-OTel、Langfuse 与 MLflow 的来源及边界见[证据评价调研](evidence-evaluation.md)。本文件规定视图如何消费这些事实，不因调研产品而提前替换第一阶段控制台。
+OTel、Langfuse 与 MLflow 的来源及边界见[证据评价调研](../archive/research/evidence-evaluation.md)。本文件规定视图如何消费这些事实，不因调研产品而提前替换第一阶段控制台。
