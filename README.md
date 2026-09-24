@@ -6,8 +6,8 @@
 
 - **Stage 1（可信交付）**: ✅ 已完成。三部门循环、压缩、Git 版本、重试、完整封存已验收通过。
 - **Stage 2（三部门 Harness 基线）**: 2.1–2.6 按 2026-09-15 合同关闭；**2.7 统一 Provider 层、无配置启动与 OpenCode Go 接入**已实现并通过本地回归，真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务（Anthropic Messages 对当前两个模型受区域与端点限制）。历史十场为 9 次完成、1 次计划取消，不外推复杂任务成功率。
-- **Stage 3（通用工具、可靠恢复与持续运行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
-- **持续改进工作线 / Stage 4 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
+- **Stage 3（通用工具、可靠恢复与并行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
+- **持续改进工作线 / Stage 7 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
 
 当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/archive/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/design/provider-layer.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
 

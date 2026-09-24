@@ -49,7 +49,7 @@ flowchart TB
 
 ## 4. 角色清单
 
-角色是固定的，随系统版本发布。用户可以修改角色的 Prompt 与模型（第 12 节），不能增删角色。角色清单的变化属于第四阶段的组织演化。本节的角色清单已由用户确认（2026-09-24）。
+角色是固定的，随系统版本发布。用户可以修改角色的 Prompt 与模型（第 12 节），不能增删角色。角色清单的变化属于 Stage 7 的组织演化。本节的角色清单已由用户确认（2026-09-24）。
 
 | 部门 | 角色 | 职责 | 类型 | 可以写入的范围 | 同时进行的任务 |
 | --- | --- | --- | --- | --- | --- |
@@ -273,5 +273,5 @@ stateDiagram-v2
 | [D02](../requirements/department-prompts.md) | 部门 Prompt 的含义为全部门规则，另有角色 Prompt |
 | [D07](../requirements/expert-ask-react.md)、[D11](../requirements/three-department-loop.md)、[D20](../requirements/department-guidance.md) | 开头补充说明：部门由部门经理代表 |
 | [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md) | 增加角色任务的恢复规则 |
-| [Stage 3 计划](../stage-3-plan.md) | 3.6 改为本设计 |
+| [总体路线图](../program-roadmap.md) | Stage 4（部门内协作、上下文与界面）包含本设计 |
 | ADR | 用户确认后新增两项：部门经理是部门唯一的对外接口，角色经工具调用接受分派；模型选择中角色设置优先于部门设置 |
