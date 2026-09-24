@@ -187,13 +187,13 @@ sequenceDiagram
   actor User as 用户
   participant UI as 部门设置弹窗
   participant Proj as 项目层
-  participant Loop as 进行中的部门循环
+  participant DeptLoop as 进行中的部门循环
   User->>UI: 修改本部门的模型、推理档位或部门 Prompt 并保存
   UI->>Proj: 写入项目部门设置（带版本校验）
-  Note over Loop: 正在进行的请求照常完成
-  Loop->>Proj: 下一次模型请求读取设置
-  Proj-->>Loop: 新设置
-  Loop->>Loop: 按新的调用目标发送，并记录选择来源与版本
+  Note over DeptLoop: 正在进行的请求照常完成
+  DeptLoop->>Proj: 下一次模型请求读取设置
+  Proj-->>DeptLoop: 新设置
+  DeptLoop->>DeptLoop: 按新的调用目标发送，并记录选择来源与版本
 ```
 
 ### 5.5 引用无法使用时
@@ -204,25 +204,25 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  participant Loop as 部门循环
+  participant DeptLoop as 部门循环
   participant Src as 部门设置来源（项目层）
   participant PM as Provider 模块
   participant Up as 上游服务
-  Loop->>Src: 读取本项目该部门的设置
-  Src-->>Loop: 模型引用、请求档位、部门 Prompt 与版本（未写入的项为空）
-  Loop->>PM: 解析调用目标（项目选择或部门默认、请求档位）
+  DeptLoop->>Src: 读取本项目该部门的设置
+  Src-->>DeptLoop: 模型引用、请求档位、部门 Prompt 与版本（未写入的项为空）
+  DeptLoop->>PM: 解析调用目标（项目选择或部门默认、请求档位）
   PM->>PM: 检查引用存在、准入有效、窗口已知、凭据可用；把档位限制到支持范围
   alt 解析失败
-    PM-->>Loop: 部门、模型与原因
-    Loop->>Loop: 事项以该原因失败结束
+    PM-->>DeptLoop: 部门、模型与原因
+    DeptLoop->>DeptLoop: 事项以该原因失败结束
   else 解析成功
-    PM-->>Loop: 调用目标
-    Loop->>Loop: 按调用目标的窗口计算阈值，需要时先压缩
-    Loop->>PM: 发送请求
+    PM-->>DeptLoop: 调用目标
+    DeptLoop->>DeptLoop: 按调用目标的窗口计算阈值，需要时先压缩
+    DeptLoop->>PM: 发送请求
     PM->>Up: 按协议编码，带推理参数与必需请求头
     Up-->>PM: 响应与用量
-    PM-->>Loop: 统一结果
-    Loop->>Loop: 请求事件记录调用目标、选择来源与部门 Prompt 版本
+    PM-->>DeptLoop: 统一结果
+    DeptLoop->>DeptLoop: 请求事件记录调用目标、选择来源与部门 Prompt 版本
   end
 ```
 
@@ -400,9 +400,9 @@ sequenceDiagram
 | 项 | 内容 | 本设计中需要保持的前提 |
 | --- | --- | --- |
 | 能力目录 | 参考 OMP 内置目录与 models.dev，为模型提供带来源的窗口、输出上限与推理档位提示，并处理数据缺失（OMP 内置目录有 764 个模型没有窗口数据） | 提示只用于预填，准入仍要求用户确认容量并通过模型测试 |
-| 部门内 SubAgent 与角色 | 参考 OMP 的 vibe 模式（fast 与 good 两类工作者，按 OMP 文档分别对应 smol 与 task 角色的模型），以及 slow、task 等角色配置 | 角色选择沿用「部门默认 + 项目部门设置」的解析与引用规则 |
-| 部门知识图谱、语义压缩与事实检索 | 每个部门各自的知识图谱、语义压缩与事实检索系统，替代长期记忆 | 部门之间只传递主机接纳的结构化结果，对话不跨部门 |
-| 固定材料上限 | 项目上下文随已采纳事项增长，没有上限；目前超过阈值时事项以上下文超限失败结束（第 8.7 节） | 固定材料不进入摘要 |
+| 部门内 SubAgent 与角色 | 设计见[部门内多角色设计说明](department-roles.md)（D26）：部门经理与固定角色，角色默认与项目角色设置；参考 OMP 的 vibe 模式（fast 与 good 两类工作者，按 OMP 文档分别对应 smol 与 task 角色的模型） | 角色选择沿用「部门默认 + 项目部门设置」的解析与引用规则 |
+| 部门知识图谱、语义压缩与事实检索 | 每个部门各自的知识图谱、语义压缩与事实检索系统，替代长期记忆；草案见[语义系统设计说明](semantic-system.md)（D25），单独讨论 | 部门之间只传递主机接纳的结构化结果，对话不跨部门 |
+| 固定材料上限 | 项目上下文随已采纳事项增长，没有上限；目前超过阈值时事项以上下文超限失败结束（第 8.7 节）。[语义系统设计说明](semantic-system.md)第 9 节提出由语义视图提供已采纳事项与有效决定 | 固定材料不进入摘要 |
 | 切换到小窗口模型 | 当前只使用 1M 窗口的模型。OMP 的做法：切换前历史超过目标窗口时，先用当前模型压缩 | 有效窗口按每次请求的调用目标计算 |
 | 工具能力检查 | 一次无副作用的工具往返，证明模型能参与 Agent 循环 | 准入定义保持第 4.3 节 |
 | 更多推理参数方式 | 开关型、GLM 的 `thinking`、Qwen 的 `enable_thinking`、Gemini 的 `thinkingLevel`，以及「关闭推理」；按模型的兼容规则处理，例如 DeepSeek 在请求带 `tool_choice` 时由上游关闭推理 | 档位限制与请求事件记录保持第 7 节 |

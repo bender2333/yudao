@@ -16,7 +16,7 @@
   - 需求：[D20](../requirements/department-guidance.md)。
 - [语义系统](semantic-system.md)
   - 内容：语义单元与关系、材料投影、语义整理、语义视图、查回、数据流核对，与压缩及跨事项的关系，含模块关系图。
-  - 状态：2026-09-24 设计草案，第 11 节的规则待用户确认，未实施。
+  - 状态：2026-09-24 设计草案，未实施；语义系统作为单独的项讨论，检索方式为 TODO，第 11 节的规则待用户确认。
   - 需求：[D25](../requirements/semantic-system.md)。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)。
 - [部门内多角色](department-roles.md)
   - 内容：部门经理、固定角色清单、角色任务、部门账本、并行与执行槽位、角色模型设置，含模块关系图与角色任务状态图。
