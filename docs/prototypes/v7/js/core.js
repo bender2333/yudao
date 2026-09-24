@@ -267,6 +267,16 @@
   };
   Y7.departments = () => Y7.DEPARTMENTS.filter((item) => Y7.atLeast(item.level));
 
+  // 部门的内置默认 Prompt（版本 0）原文；运维部门从 Stage 5 起才有
+  Y7.defaultPrompt = function defaultPrompt(department) {
+    const dept = Y7.DEPARTMENTS.find((item) => item.id === department);
+    if (!dept) throw new Error('未知部门：' + department);
+    if (!Y7.atLeast(dept.level)) throw new Error(Y7.deptLabel(department) + '部门从「' + Y7.LEVEL_LABELS[dept.level] + '」档起才有内置默认 Prompt');
+    const text = Y7.data.defaultPrompts[department];
+    if (typeof text !== 'string') throw new Error('示例数据缺少内置默认 Prompt：' + department);
+    return text;
+  };
+
   Y7.PHASE_LABELS = {
     PRODUCT_SPEC: '产品处理中', ENGINEERING: '工程处理中', DELIVERY: '工程交付中', QUALITY: '质检处理中',
     REWORK_PRODUCT: '返工 · 产品', REWORK_ENGINEERING: '返工 · 工程', DONE: '已完成', PAUSED: '已暂停', FAILED: '执行失败'
@@ -372,20 +382,22 @@
       }
       return null;
     },
-    // 某项目某部门的选择与调用目标
-    resolve(projectId, department) {
-      const catalog = Y7.resolve(Y7.data.catalog);
-      const settings = projectId && Y7.data.projectSettings[projectId] ? Y7.data.projectSettings[projectId].departments[department] : null;
-      const deptDefault = catalog.departmentDefaults[department] || null;
-      let definitionId = settings && settings.model ? settings.model : null;
-      let source = definitionId ? '项目设置' : null;
-      if (!definitionId && deptDefault && deptDefault.definition) {
-        definitionId = deptDefault.definition;
-        source = '部门默认';
-      }
-      const requestLevel = settings && settings.level ? settings.level : (deptDefault && deptDefault.level ? deptDefault.level : null);
+    // 按层次取得选择：layers 为 [[来源, 设置项, 模型字段名], …]，模型与请求档位分别取第一个写入了的层
+    pick(layers) {
+      const modelLayer = layers.find((layer) => layer[1] && layer[1][layer[2]]);
+      const levelLayer = layers.find((layer) => layer[1] && layer[1].level);
+      const target = Y7.model.targetOf(
+        modelLayer ? modelLayer[1][modelLayer[2]] : null,
+        modelLayer ? modelLayer[0] : null,
+        levelLayer ? levelLayer[1].level : null
+      );
+      target.levelSource = levelLayer ? levelLayer[0] : null;
+      return target;
+    },
+    // 由选择得到调用目标的公开部分，或无法使用的具体原因
+    targetOf(definitionId, source, requestLevel) {
       if (!definitionId) {
-        return { ok: false, definition: null, source: null, requestLevel, sentLevel: null, problem: '未设置' };
+        return { ok: false, definition: null, model: null, connection: null, connectionName: null, protocol: null, source: null, requestLevel, sentLevel: null, problem: '未设置' };
       }
       const def = Y7.model.definition(definitionId);
       const problem = Y7.model.problemOf(definitionId);
@@ -402,6 +414,39 @@
         sentLevel: def ? Y7.model.clampLevel(requestLevel, def.reasoning) : null,
         problem
       };
+    },
+    // 某项目某部门的选择与调用目标（D24 第 5.3 节）：项目部门设置、部门默认
+    resolve(projectId, department) {
+      const catalog = Y7.resolve(Y7.data.catalog);
+      const settings = projectId && Y7.data.projectSettings[projectId] ? Y7.data.projectSettings[projectId].departments[department] || null : null;
+      const deptDefault = catalog.departmentDefaults[department] || null;
+      return Y7.model.pick([
+        ['项目设置', settings, 'model'],
+        ['部门默认', deptDefault, 'definition']
+      ]);
+    },
+    // 某项目某部门某角色的选择与调用目标（多角色草案第 12 节）：项目角色设置、角色默认、项目部门设置、部门默认。
+    // 返回值与 resolve 相同，另有 roleId、levelSource、角色 Prompt 与来源；Stage 4 之前角色层不存在，按部门解析
+    resolveRole(projectId, department, roleId) {
+      const roles = Y7.data.catalog.roleCatalog[department] || [];
+      if (!roles.some((role) => role.id === roleId)) throw new Error('部门「' + department + '」没有角色：' + roleId);
+      const catalog = Y7.resolve(Y7.data.catalog);
+      const project = projectId && Y7.data.projectSettings[projectId] ? Y7.resolve(Y7.data.projectSettings[projectId]) : null;
+      const roleList = project && project.roles && Array.isArray(project.roles[department]) ? project.roles[department] : [];
+      const roleSetting = roleList.find((entry) => entry.roleId === roleId) || null;
+      const roleDefault = catalog.roleDefaults ? catalog.roleDefaults[roleId] || null : null;
+      const deptSetting = project ? project.departments[department] || null : null;
+      const deptDefault = catalog.departmentDefaults[department] || null;
+      const target = Y7.model.pick([
+        ['项目角色设置', roleSetting, 'model'],
+        ['角色默认', roleDefault, 'definition'],
+        ['项目设置', deptSetting, 'model'],
+        ['部门默认', deptDefault, 'definition']
+      ]);
+      target.roleId = roleId;
+      target.promptText = roleSetting && roleSetting.promptText ? roleSetting.promptText : null;
+      target.promptSource = target.promptText ? '项目角色设置' : '内置角色 Prompt';
+      return target;
     },
     // 目录或设置修改后，未结束的 run 的生效模型按新的选择重新解析（从下一次模型请求起生效）
     refreshRuns() {
@@ -1438,11 +1483,20 @@
     return project;
   }
 
-  function emptyRun(id, workItemId) {
-    return {
+  // 新建事项使用的空 run 结构（尚未开始：没有部门、第 0 轮）。给出 projectId 时，按该项目的设置与模型目录
+  // 填入部门 Prompt 版本、各部门的生效模型与 Stage 4 的角色名单；不给时只返回结构（data.js 在加载时使用）
+  Y7.emptyRun = function emptyRun(id, workItemId, projectId) {
+    if (!id || !workItemId) throw new Error('emptyRun 需要 id 与 workItemId');
+    const ledger = () => ({ items: [], facts: [], questions: [], progress: [] });
+    const run = {
       id, workItemId, phase: 'PRODUCT_SPEC', department: null, lastDepartment: null, cycle: 0,
       startedAt: null, elapsedSec: 0, limitSec: 7200, stopReason: null,
-      recovery: { level: 's3', state: 'running', reason: null, unusable: null, lastConfirmed: null, canResume: false, resumeBlockedReason: '事项正在运行', owner: null, lateResults: [], verifications: [], nextActions: [], unfinished: [], limits: { activations: 0, modelSteps: 0, retries: 0 } },
+      recovery: {
+        level: 's3', state: 'running', reason: null, unusable: null, lastConfirmed: null,
+        canResume: false, resumeBlockedReason: '事项正在运行，已有有效执行者', owner: null,
+        lateResults: [], verifications: [], decisions: [], nextActions: [], unfinished: [],
+        limits: { activations: 0, modelSteps: 0, retries: 0 }
+      },
       inputs: [], flow: [], requests: [], guidance: [],
       messages: { product: [], engineering: [], quality: [], operations: [] },
       actions: [], contexts: { product: [], engineering: [], quality: [] },
@@ -1451,11 +1505,33 @@
         engineering: { configVersion: 0, requestVersion: null, text: null },
         quality: { configVersion: 0, requestVersion: null, text: null }
       },
-      effectiveModel: { level: 's3' },
+      compactions: [],
+      effectiveModel: { level: 's3', product: null, engineering: null, quality: null },
       roles: { level: 's4', product: [], engineering: [], quality: [] },
-      ledger: { level: 's4' },
-      attempts: []
+      ledger: { level: 's4', product: ledger(), engineering: ledger(), quality: ledger() },
+      attempts: [],
+      source: null
     };
+    if (projectId) initRunFromProject(run, projectId);
+    return run;
+  };
+
+  function initRunFromProject(run, projectId) {
+    const settings = Y7.data.projectSettings[projectId];
+    if (!settings) throw new Error('项目没有项目设置：' + projectId);
+    ['product', 'engineering', 'quality'].forEach((dept) => {
+      const entry = settings.departments[dept];
+      run.prompts[dept] = { configVersion: entry.promptText ? entry.promptVersion : 0, requestVersion: null, text: entry.promptText || Y7.defaultPrompt(dept) };
+      const target = Y7.model.resolve(projectId, dept);
+      run.effectiveModel[dept] = {
+        definition: target.definition, connection: target.connection, protocol: target.protocol,
+        source: target.source, level: target.requestLevel, sentLevel: target.sentLevel, unusable: target.problem
+      };
+      run.roles[dept] = (Y7.data.catalog.roleCatalog[dept] || []).map((role) => ({
+        id: role.id, name: role.name, kind: role.kind, status: 'idle',
+        model: Y7.model.resolveRole(projectId, dept, role.id).definition, task: null
+      }));
+    });
   }
 
   function titleFrom(text) {
@@ -1558,7 +1634,7 @@
       }
       const workItemId = Y7.uid('w-new');
       const runId = Y7.uid('r-new');
-      const run = emptyRun(runId, workItemId);
+      const run = Y7.emptyRun(runId, workItemId, project.id);
       run.inputs.push({ version: 1, kind: 'user', text, at: Y7.data.now, progress: 'received', bytes: [0, new TextEncoder().encode(text).length] });
       if (params.sourceDir) run.source = { dir: params.sourceDir, digest: null, files: null };
       const usedColors = items.map((item) => item.colorIndex);

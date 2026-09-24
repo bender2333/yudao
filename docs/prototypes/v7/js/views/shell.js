@@ -135,7 +135,7 @@
         : '<button type="button" role="menuitem" data-cmd="archiveProject" data-project-id="' + esc(p.id) + '">归档</button>',
       '<button type="button" role="menuitem" data-go="' + Y7.paths.settings(p.id) + '">项目设置</button>'
     ];
-    return '<div class="y7-menu-wrap"><button type="button" class="y7-icon-btn" data-act="shell.menu" aria-haspopup="menu" aria-expanded="' + menuOpen + '" aria-label="项目菜单">' + Y7.ui.icon('more') + '</button>' +
+    return '<div class="y7-menu-wrap y7-top-menu"><button type="button" class="y7-icon-btn" data-act="shell.menu" aria-haspopup="menu" aria-expanded="' + menuOpen + '" aria-label="项目菜单">' + Y7.ui.icon('more') + '</button>' +
       (menuOpen ? '<div class="y7-menu" role="menu">' + items.join('') + '</div>' : '') + '</div>';
   }
 
@@ -154,9 +154,10 @@
       if (ctx.workItem) crumbs.push('<button type="button" class="y7-crumb" data-go="' + Y7.paths.overview(ctx.project.id, ctx.workItem.id) + '">' + esc(ctx.workItem.title) + '</button>');
     }
     crumbs.push('<strong>' + esc(pageTitle(ctx)) + '</strong>');
+    // 项目菜单放在操作区之外：宽屏时排在最右，窄屏时与路径同一行
     return drawerButton +
       '<nav class="y7-crumbs" aria-label="路径">' + crumbs.join('<span class="y7-crumb-sep">/</span>') + '</nav>' +
-      '<div class="y7-top-actions">' + scopeSelect(ctx) + serviceStatus() + projectMenu(ctx) + '</div>';
+      '<div class="y7-top-actions">' + scopeSelect(ctx) + serviceStatus() + '</div>' + projectMenu(ctx);
   }
 
   // ---------------------------------------------------------------------------
@@ -255,7 +256,7 @@
 
   document.addEventListener('click', (ev) => {
     if (!menuOpen) return;
-    if (ev.target.closest('.y7-menu-wrap > .y7-icon-btn')) return;
+    if (ev.target.closest('.y7-top-menu > .y7-icon-btn')) return;
     menuOpen = false;
     Y7.renderShell();
   });

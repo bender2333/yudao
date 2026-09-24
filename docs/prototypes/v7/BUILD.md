@@ -395,7 +395,7 @@ loopModel = {
 `label` 是一句中文说明，工具条显示它。`type` 取值：
 
 - 事件库中已有的：`user_input_received`、`work_item_created`、`department_activated`、`context_assembled`、`model_requested`、`model_request_serialized`、`model_stream_progress`、`model_attempt_finished`、`model_retry_scheduled`、`model_attempt_failed`、`tool_started`、`tool_called`、`tool_skipped`、`proposal_submitted`、`proposal_rejected`、`spec_accepted`、`contract_accepted`、`plan_accepted`、`delivery_accepted`、`qa_submitted`、`collaboration_requested`、`collaboration_responded`、`collaboration_closed`、`department_guidance_received`、`department_guidance_applied`、`department_guidance_responded`、`compaction_recorded`、`compaction_failed`、`transition`、`run_paused`、`run_failed`、`run_done`、`deliverable_adopted`、`adoption_held`。
-- 原型临时名称（以 `x_` 开头，事件名由对应工作包的设计确定）：`x_run_interrupted`、`x_action_unknown`、`x_waiting_resume`、`x_resume_accepted`（3.1）；`x_queued`、`x_slot_acquired`、`x_queue_cancelled`（3.4A）；`x_role_task_assigned`、`x_role_result_returned`、`x_explorer_fetch`、`x_replanned`、`x_semantic_recorded`（Stage 4）；`x_ops_released`、`x_ops_alarm`、`x_ops_action_requested`（Stage 5 运维）；`x_judgment_recorded`（Stage 5 元观察）。
+- 原型临时名称（以 `x_` 开头，事件名由对应工作包的设计确定）：`x_run_interrupted`、`x_action_unknown`、`x_action_decided`、`x_waiting_resume`、`x_resume_accepted`（3.1）；`x_queued`、`x_slot_acquired`、`x_queue_cancelled`（3.4A）；`x_role_task_assigned`、`x_role_result_returned`、`x_explorer_fetch`、`x_replanned`、`x_semantic_recorded`（Stage 4）；`x_ops_released`、`x_ops_alarm`、`x_ops_action_requested`（Stage 5 运维）；`x_judgment_recorded`（Stage 5 元观察）。
 
 `transition` 的 `payload` 为 `{ from, to, artifact }`，`artifact` 取 `prd`、`box`、`defect`、`release`。`qa_submitted` 的 `payload.verdict` 取 `release`、`rework_engineering`、`rework_product`。
 

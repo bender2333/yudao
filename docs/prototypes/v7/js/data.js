@@ -87,17 +87,25 @@
     };
   }
 
+  // 各部门的内置默认 Prompt（版本 0，随系统版本发布）：项目部门设置没有写入部门 Prompt 时使用。运维部门从 Stage 5 起使用
+  const DEFAULT_PROMPTS = {
+    product: '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的需求咨询时，只依据有效要求与用户原文；需要取舍时写明理由。',
+    engineering: '你是工程部门。依据有效 PRD 先写工程计划，计划项逐条对应要求；再按计划实现代码、编写单元测试，并用登记命令自测。交付说明逐条写明完成的计划项与处理的缺陷；实现有疑问时向产品咨询，不自行改变要求。',
+    quality: '你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。发现问题时写明复现步骤与违反的验收条件，给出返工结论；全部验收条件都有通过的检查时给出放行结论。',
+    operations: '你是运维部门。接收已采纳交付物的运行责任后，按运行目标观察运行指标，指标都带分母；发现故障时依次确认影响、执行登记过的缓解动作，把修复写成新事项交给产品。部署、回滚、重启等外部动作逐项申请用户授权。'
+  };
+
+  // 项目当前配置的部门 Prompt（文本报表工具的工程 v2、质检 v1 等）
   const PROMPTS = {
-    product: '（内置默认 Prompt）你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标；回答其他部门的需求咨询时，只依据有效要求与用户原文。',
     engineering: '修改代码前先按区间阅读相关代码；每次修改后运行登记命令 unit_tests；只修改与当前计划有关的文件；交付说明逐条对应计划项。',
     quality: '在独立副本中运行检查；逐条对照验收条件记录证据与主机回执；发现问题时写明复现步骤与违反的验收条件。'
   };
 
   function prompts(engineeringVersion, qualityVersion) {
     return {
-      product: { configVersion: 0, requestVersion: 0, text: PROMPTS.product },
-      engineering: { configVersion: engineeringVersion, requestVersion: engineeringVersion, text: engineeringVersion ? PROMPTS.engineering : '（内置默认 Prompt）你是工程部门。依据有效 PRD 先写工程计划，再实现、自测并提交交付。' },
-      quality: { configVersion: qualityVersion, requestVersion: qualityVersion, text: qualityVersion ? PROMPTS.quality : '（内置默认 Prompt）你是质检部门。依据有效 PRD 独立验证交付，给出缺陷或放行。' }
+      product: { configVersion: 0, requestVersion: 0, text: DEFAULT_PROMPTS.product },
+      engineering: { configVersion: engineeringVersion, requestVersion: engineeringVersion, text: engineeringVersion ? PROMPTS.engineering : DEFAULT_PROMPTS.engineering },
+      quality: { configVersion: qualityVersion, requestVersion: qualityVersion, text: qualityVersion ? PROMPTS.quality : DEFAULT_PROMPTS.quality }
     };
   }
 
@@ -112,19 +120,19 @@
     qualityDefault: { definition: 'opencode-go-responses/mimo-v2.5', connection: 'opencode-go-responses', protocol: 'Responses', source: '部门默认', level: null, sentLevel: 'medium', unusable: null }
   };
 
-  // 场景中新建的集成事项使用的空 run
-  function emptyRun(id, workItemId) {
-    return {
-      id, workItemId, phase: 'PRODUCT_SPEC', department: 'product', lastDepartment: null, cycle: 1,
-      startedAt: T('15:30'), elapsedSec: 0, limitSec: 7200, stopReason: null,
-      recovery: { level: 's3', state: 'running', reason: null, unusable: null, lastConfirmed: null, canResume: false, resumeBlockedReason: '事项正在运行', owner: { id: 'exec-5d20', since: T('15:30') }, lateResults: [], verifications: [], nextActions: [], unfinished: [], limits: { activations: 1, modelSteps: 0, retries: 0 } },
-      inputs: [], flow: [], requests: [], guidance: [],
-      messages: { product: [], engineering: [], quality: [], operations: [] },
-      actions: [], contexts: { product: [], engineering: [], quality: [] },
-      prompts: prompts(2, 1), compactions: [],
+  // 场景中新建的文本报表工具事项：在 Y7.emptyRun 的结构上填入本项目的部门 Prompt、生效模型与角色名单；
+  // started 为 true 时表示已取得执行槽位、产品部门已开始
+  function reportRun(id, workItemId, started) {
+    const run = Object.assign(Y7.emptyRun(id, workItemId), {
+      prompts: prompts(2, 1),
       effectiveModel: effective({ product: EM.productDefault, engineering: EM.engineeringProject, quality: EM.qualityDefault }),
-      roles: roleSet(), ledger: { level: 's4' }, attempts: [], source: null
-    };
+      roles: roleSet()
+    });
+    if (started) {
+      Object.assign(run, { department: 'product', cycle: 1, startedAt: T('15:30') });
+      Object.assign(run.recovery, { owner: { id: 'exec-5d20', since: T('15:30') }, limits: { activations: 1, modelSteps: 0, retries: 0 } });
+    }
+    return run;
   }
 
   // ---------------------------------------------------------------------------
@@ -485,16 +493,37 @@
     levels: { s3: { elapsedSec: 2441 } },
     recovery: {
       level: 's3', state: 'pending_verification',
-      reason: '服务在 15:01 重启时，工程部门的登记命令 unit_tests 已开始但没有回执，结果未知',
+      reason: '服务在 15:01 重启时，工程部门的登记命令 unit_tests 已开始但没有回执；主机核实后仍无法确定结果，等待你作出决定',
       unusable: null,
       lastConfirmed: { seq: 57, text: '工程按区间编辑 planner.py 第 12–40 行（已完成，快照 71c0de）' },
-      canResume: false, resumeBlockedReason: '有结果未知的动作，需要先核实',
+      canResume: false, resumeBlockedReason: '有结果未知的动作：unit_tests 的结果无法确定，需要你先作出决定',
       owner: { id: 'exec-2c91', since: T('15:02:14') },
       lateResults: [],
-      verifications: [],
+      verifications: [
+        { at: T('15:02:40'), actionId: 'a-w4', basis: '主机按恢复契约第 4 节检查登记命令：执行副本 ws-71c0de 的进程树、主机回执文件 receipts.jsonl 与执行副本的快照', result: '无法确定结果：进程树已不存在，退出记录没有保存；执行副本 ws-71c0de 可以丢弃' }
+      ],
+      // 结果未知的动作与可选的决定项：可选项由服务端按动作契约给出
+      decisions: [
+        {
+          actionId: 'a-w4',
+          hostCheck: {
+            at: T('15:02:40'),
+            findings: ['进程树已不存在', '退出记录没有保存', '执行副本 ws-71c0de 可以丢弃'],
+            result: '主机无法确定 unit_tests 的结果'
+          },
+          contract: { command: 'unit_tests', repeatable: true, text: 'unit_tests 是可丢弃执行副本上的检查，不改动工作区，没有外部副作用，可以重复执行' },
+          choices: [
+            { choice: 'rerun', label: '重新执行', detail: '丢弃执行副本 ws-71c0de，在编辑后的快照 71c0de 上重新运行 unit_tests，以新的回执为准' },
+            { choice: 'accept_current', label: '按当前实际状态继续', detail: '把你的决定记为核实依据，不补造原来的执行回执；工程部门在下一次模型请求中看到「unit_tests 结果未知」' },
+            { choice: 'stop', label: '停止事项', detail: '事项以停止结束，已完成的工作与已用限额保留' }
+          ],
+          decided: null
+        }
+      ],
       nextActions: [
-        { id: 'verify-a-w4', label: '核实 unit_tests 的结果' },
-        { id: 'rerun-a-w4', label: '确认未产生副作用后重新执行' }
+        { id: 'decide-a-w4-rerun', label: '重新执行 unit_tests', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'rerun' },
+        { id: 'decide-a-w4-accept_current', label: '按当前实际状态继续', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'accept_current' },
+        { id: 'decide-a-w4-stop', label: '停止事项', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'stop' }
       ],
       unfinished: ['a-w4'],
       limits: { activations: 2, modelSteps: 19, retries: 0 }
@@ -873,11 +902,12 @@
   S.push({
     id: 'sc-interrupt', name: '中断与待核实', level: 's3', projectId: 'p-cargo', workItemId: 'w-weight', view: 'recovery',
     steps: [
-      { delay: 1400, event: { type: 'tool_started', department: 'engineering', tool: 'run_command', label: '工程拉下拉杆，开始执行 unit_tests（15:00:41）' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'running' }, { path: 'runs[id=r-weight].recovery.reason', value: null }, { path: 'runs[id=r-weight].recovery.owner', value: { id: 'exec-7f3a', since: T('14:20') } }] },
-      { delay: 1800, event: { type: 'x_run_interrupted', department: 'engineering', label: '服务进程在 15:01 停止：整层变暗，墙上时钟停住，门上挂「中断」牌' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-weight].recovery.reason', value: '服务进程在 15:01 停止，执行者 exec-7f3a 失去联系' }, { path: 'service.restartedAt', value: T('15:02:10') }] },
-      { delay: 1800, event: { type: 'x_action_unknown', department: 'engineering', label: '服务重启后核对：unit_tests 已开始、没有回执，结果未知；房间亮黄灯，终端闪烁' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'pending_verification' }, { path: 'runs[id=r-weight].recovery.reason', value: '服务在 15:01 重启时，工程部门的登记命令 unit_tests 已开始但没有回执，结果未知' }, { path: 'runs[id=r-weight].recovery.owner', value: { id: 'exec-2c91', since: T('15:02:14') } }] },
-      { delay: 1600, event: { type: 'tool_called', department: 'engineering', tool: 'run_command', label: '旧执行者 exec-7f3a 送回 unit_tests 输出：作为迟到结果记录，不推进状态' }, patch: [{ path: 'runs[id=r-weight].recovery.lateResults', push: { at: T('15:03:40'), text: '旧执行者 exec-7f3a 送回的 unit_tests 输出（退出 0）。迟到结果只作历史事实，不推进状态。' } }] },
-      { delay: 1800, event: { type: 'tool_called', department: 'engineering', tool: 'run_command', label: '核实：在工作区找到 unit_tests 的主机回执，动作改为已完成' }, patch: [{ path: 'runs[id=r-weight].recovery.verifications', push: { at: T('15:04:20'), actionId: 'a-w4', basis: '比对工作区快照 71c0de 与主机回执文件 receipts.jsonl 第 4 行', result: '命令已执行完毕：退出 0，18 条通过；工作区未被改动' } }, { path: 'runs[id=r-weight].actions[id=a-w4].state', value: 'done' }, { path: 'runs[id=r-weight].actions[id=a-w4].receipt', value: { command: 'unit_tests', argv: ['python', '-m', 'pytest', '-q'], exitCode: 0, output: '.................. [100%]\n18 passed in 0.71s', truncated: false, timedOut: false, durationMs: 2140, snapshot: 'ws-71c0de' } }, { path: 'runs[id=r-weight].actions[id=a-w4].after', value: '工作区 71c0de（未改动）' }, { path: 'runs[id=r-weight].actions[id=a-w4].result', value: '退出 0 · 18 条通过（核实后确认）' }, { path: 'runs[id=r-weight].recovery.unfinished', value: [] }, { path: 'runs[id=r-weight].recovery.canResume', value: true }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: null }, { path: 'runs[id=r-weight].recovery.lastConfirmed', value: { seq: 61, text: '工程执行 unit_tests（核实后确认已完成，退出 0）' } }, { path: 'runs[id=r-weight].recovery.nextActions', value: [{ id: 'resume', label: '继续执行' }] }] },
+      { delay: 1400, event: { type: 'tool_started', department: 'engineering', tool: 'run_command', label: '工程拉下拉杆，开始执行 unit_tests（15:00:41）' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'running' }, { path: 'runs[id=r-weight].recovery.reason', value: null }, { path: 'runs[id=r-weight].recovery.owner', value: { id: 'exec-7f3a', since: T('14:20') } }, { path: 'runs[id=r-weight].recovery.verifications', value: [] }, { path: 'runs[id=r-weight].recovery.decisions', value: [] }, { path: 'runs[id=r-weight].recovery.nextActions', value: [] }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: '事项正在运行，已有有效执行者' }] },
+      { delay: 1800, event: { type: 'x_run_interrupted', department: 'engineering', label: '服务进程在 15:01 停止：整层变暗，墙上时钟停住，门上挂「中断」牌' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-weight].recovery.reason', value: '服务进程在 15:01 停止，执行者 exec-7f3a 失去联系' }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: '服务尚未重启' }, { path: 'service.restartedAt', value: T('15:02:10') }] },
+      { delay: 2000, event: { type: 'x_action_unknown', department: 'engineering', tool: 'run_command', label: '服务重启后主机核实 unit_tests：进程树已不存在，退出记录没有保存，结果无法确定；房间亮黄灯，终端闪烁，小人头顶出现问号', payload: { actionId: 'a-w4' } }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'pending_verification' }, { path: 'runs[id=r-weight].recovery.reason', value: '服务在 15:01 重启时，工程部门的登记命令 unit_tests 已开始但没有回执；主机核实后仍无法确定结果，等待你作出决定' }, { path: 'runs[id=r-weight].recovery.owner', value: { id: 'exec-2c91', since: T('15:02:14') } }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: '有结果未知的动作：unit_tests 的结果无法确定，需要你先作出决定' }, { path: 'runs[id=r-weight].recovery.verifications', push: { at: T('15:02:40'), actionId: 'a-w4', basis: '主机按恢复契约第 4 节检查登记命令：执行副本 ws-71c0de 的进程树、主机回执文件 receipts.jsonl 与执行副本的快照', result: '无法确定结果：进程树已不存在，退出记录没有保存；执行副本 ws-71c0de 可以丢弃' } }, { path: 'runs[id=r-weight].recovery.decisions', value: [{ actionId: 'a-w4', hostCheck: { at: T('15:02:40'), findings: ['进程树已不存在', '退出记录没有保存', '执行副本 ws-71c0de 可以丢弃'], result: '主机无法确定 unit_tests 的结果' }, contract: { command: 'unit_tests', repeatable: true, text: 'unit_tests 是可丢弃执行副本上的检查，不改动工作区，没有外部副作用，可以重复执行' }, choices: [{ choice: 'rerun', label: '重新执行', detail: '丢弃执行副本 ws-71c0de，在编辑后的快照 71c0de 上重新运行 unit_tests，以新的回执为准' }, { choice: 'accept_current', label: '按当前实际状态继续', detail: '把你的决定记为核实依据，不补造原来的执行回执；工程部门在下一次模型请求中看到「unit_tests 结果未知」' }, { choice: 'stop', label: '停止事项', detail: '事项以停止结束，已完成的工作与已用限额保留' }], decided: null }] }, { path: 'runs[id=r-weight].recovery.nextActions', value: [{ id: 'decide-a-w4-rerun', label: '重新执行 unit_tests', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'rerun' }, { id: 'decide-a-w4-accept_current', label: '按当前实际状态继续', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'accept_current' }, { id: 'decide-a-w4-stop', label: '停止事项', command: 'decideUnknownAction', actionId: 'a-w4', choice: 'stop' }] }] },
+      { delay: 1800, event: { type: 'x_action_decided', department: 'engineering', tool: 'run_command', label: '你选择「重新执行」：决定追加到核实记录，unit_tests 的原始观察保持「结果未知」', payload: { actionId: 'a-w4', choice: 'rerun' } }, patch: [{ path: 'runs[id=r-weight].recovery.decisions[actionId=a-w4].decided', value: { choice: 'rerun', at: T('15:04:05'), by: '用户' } }, { path: 'runs[id=r-weight].recovery.verifications', push: { at: T('15:04:05'), actionId: 'a-w4', basis: '用户决定：重新执行（契约声明 unit_tests 可以重复）', result: '丢弃执行副本 ws-71c0de；重新执行记为动作 a-w5，原动作保持结果未知' } }, { path: 'runs[id=r-weight].recovery.nextActions', value: [] }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: '正在按你的决定重新执行 unit_tests' }] },
+      { delay: 1400, event: { type: 'tool_started', department: 'engineering', tool: 'run_command', label: '主机在快照 71c0de 的新执行副本上重新运行 unit_tests：工程走到终端拉下拉杆' } },
+      { delay: 1600, event: { type: 'tool_called', department: 'engineering', tool: 'run_command', label: '重新执行得到回执：退出 0，18 条通过，终端亮绿灯；可以继续执行' }, patch: [{ path: 'runs[id=r-weight].actions', push: { id: 'a-w5', department: 'engineering', role: null, tool: 'run_command', summary: '重新执行登记命令 unit_tests（按用户对 a-w4 的决定）', input: '用户对结果未知的动作 a-w4 作出的决定：重新执行', state: 'done', rerunOf: 'a-w4', receipt: { command: 'unit_tests', argv: ['python', '-m', 'pytest', '-q'], exitCode: 0, output: '.................. [100%]\n18 passed in 0.71s', truncated: false, timedOut: false, durationMs: 2140, snapshot: 'ws-71c0de-2' }, before: '工作区 71c0de（新执行副本 ws-71c0de-2）', after: '工作区 71c0de（未改动）', result: '退出 0 · 18 条通过', at: T('15:04:30') } }, { path: 'runs[id=r-weight].recovery.verifications', push: { at: T('15:04:32'), actionId: 'a-w4', basis: '动作 a-w5 的主机回执', result: '重新执行完成：退出 0，18 条通过；a-w4 的原始观察保留为结果未知' } }, { path: 'runs[id=r-weight].recovery.unfinished', value: [] }, { path: 'runs[id=r-weight].recovery.canResume', value: true }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: null }, { path: 'runs[id=r-weight].recovery.reason', value: '结果未知的动作已按你的决定处理，可以继续执行' }, { path: 'runs[id=r-weight].recovery.lastConfirmed', value: { seq: 63, text: '重新执行 unit_tests（动作 a-w5，退出 0）' } }, { path: 'runs[id=r-weight].recovery.nextActions', value: [{ id: 'resume', label: '继续执行' }] }] },
       { delay: 1800, event: { type: 'x_resume_accepted', department: 'engineering', label: '继续执行被接受：小人伸懒腰回到工位，灯亮起，时钟继续走' }, patch: [{ path: 'runs[id=r-weight].recovery.state', value: 'running' }, { path: 'runs[id=r-weight].recovery.reason', value: null }, { path: 'runs[id=r-weight].recovery.canResume', value: false }, { path: 'runs[id=r-weight].recovery.resumeBlockedReason', value: '事项正在运行，已有有效执行者' }, { path: 'runs[id=r-weight].recovery.nextActions', value: [] }, { path: 'service.pendingResumeCount', value: 1 }] },
       { delay: 1200, event: { type: 'department_activated', department: 'engineering', label: '工程从核实后的位置接着工作，已用限额保留' } },
       { delay: 1200, event: { type: 'context_assembled', department: 'engineering', label: '工程装配上下文，包含核实结果' } },
@@ -897,7 +927,7 @@
       { delay: 1200, event: { type: 'context_assembled', department: 'quality', label: '质检取出 PRD r1 与交付 r1' } },
       { delay: 1200, event: { type: 'model_requested', department: 'quality', label: '质检按项目设置向 opencode-go-chat 的 mimo-v2.5 发出请求' }, patch: [{ path: 'runs[id=r-export].attempts[id=att-rx-06].status', value: 'requesting' }] },
       { delay: 1500, event: { type: 'model_attempt_failed', department: 'quality', label: '上游返回 HTTP 401：凭据被上游拒绝，桌上红灯亮' }, patch: [{ path: 'runs[id=r-export].attempts[id=att-rx-06].status', value: 'failed' }] },
-      { delay: 1800, event: { type: 'x_waiting_resume', department: 'quality', label: '事项进入待恢复：质检门口挂「待恢复」牌，写明「凭据被上游拒绝：OPENCODE_GO_LAB_KEY」' }, patch: [{ path: 'runs[id=r-export].recovery.state', value: 'waiting_resume' }, { path: 'runs[id=r-export].recovery.canResume', value: false }, { path: 'workItems[id=w-export].status', value: 'stopped' }, { path: 'runs[id=r-export].phase', value: 'FAILED' }, { path: 'runs[id=r-export].department', value: null }, { path: 'runs[id=r-export].stopReason', value: { code: 'provider_error', text: '质检部门模型请求失败：HTTP 401，凭据被上游拒绝' } }] },
+      { delay: 1800, event: { type: 'x_waiting_resume', department: 'quality', label: '事项进入待恢复：质检门口挂「待恢复」牌，写明「凭据被上游拒绝：OPENCODE_GO_LAB_KEY」', payload: { missing: '凭据被上游拒绝：OPENCODE_GO_LAB_KEY' } }, patch: [{ path: 'runs[id=r-export].recovery.state', value: 'waiting_resume' }, { path: 'runs[id=r-export].recovery.canResume', value: false }, { path: 'workItems[id=w-export].status', value: 'stopped' }, { path: 'runs[id=r-export].phase', value: 'FAILED' }, { path: 'runs[id=r-export].department', value: null }, { path: 'runs[id=r-export].stopReason', value: { code: 'provider_error', text: '质检部门模型请求失败：HTTP 401，凭据被上游拒绝' } }] },
       { delay: 1800, go: '#/sys/models', event: { type: 'x_waiting_resume', department: 'quality', label: '用户在模型管理为 OPENCODE_GO_LAB_KEY 保存新的 Key（只在本进程有效）' }, patch: [{ path: 'catalog.credentials[ref=OPENCODE_GO_LAB_KEY].rejected', value: false }, { path: 'catalog.credentials[ref=OPENCODE_GO_LAB_KEY].state', value: 'memory' }, { path: 'catalog.credentials[ref=OPENCODE_GO_LAB_KEY].version', value: 'k2' }, { path: 'catalog.credentials[ref=OPENCODE_GO_LAB_KEY].note', value: '进程内存（临时 Key，优先于 .env）' }] },
       { delay: 1600, event: { type: 'x_waiting_resume', department: 'quality', label: '连接测试通过；服务端重新判断：原因已修复，可以继续执行' }, patch: [{ path: 'catalog.connectionTests.opencode-go-chat', value: { at: T('15:31'), ok: true, text: '连接测试通过 · 388 ms' } }, { path: 'runs[id=r-export].recovery.canResume', value: true }, { path: 'runs[id=r-export].recovery.resumeBlockedReason', value: null }, { path: 'runs[id=r-export].recovery.nextActions', value: [{ id: 'resume', label: '继续执行' }] }] },
       { delay: 1800, go: '#/p/p-lab/w/w-export/recovery', event: { type: 'x_resume_accepted', department: 'quality', label: '继续执行被接受：从这次请求接着进行，已完成的工作与已用限额保留' }, patch: [{ path: 'runs[id=r-export].recovery.state', value: 'running' }, { path: 'runs[id=r-export].recovery.reason', value: null }, { path: 'runs[id=r-export].recovery.unusable', value: null }, { path: 'runs[id=r-export].recovery.owner', value: { id: 'exec-9a41', since: T('15:32') } }, { path: 'runs[id=r-export].recovery.nextActions', value: [] }, { path: 'runs[id=r-export].phase', value: 'QUALITY' }, { path: 'runs[id=r-export].department', value: 'quality' }, { path: 'runs[id=r-export].stopReason', value: null }, { path: 'workItems[id=w-export].status', value: 'in_progress' }, { path: 'runs[id=r-export].effectiveModel.quality.unusable', value: null }, { path: 'service.pendingResumeCount', value: 1 }] },
@@ -918,7 +948,7 @@
     id: 'sc-queue', name: '并行排队', level: 's3', projectId: 'p-report', workItemId: 'w-empty', view: 'overview',
     steps: [
       { delay: 1400, event: { type: 'x_queued', workItemId: 'w-empty', label: '执行槽位 3/3 已占满：「空输入时给出提示」在大厅排队，手持 1 号牌' }, patch: [{ path: 'runtime.queue.0.since', value: T('15:18') }] },
-      { delay: 1500, event: { type: 'x_queued', workItemId: 'w-md', label: '用户新建事项「汇总另存为 Markdown」：排在第 2 位，手持 2 号牌' }, patch: [{ path: 'workItems', push: { id: 'w-md', projectId: 'p-report', title: '汇总另存为 Markdown', colorIndex: 5, status: 'queued', runId: 'r-md', queuePos: 2, heldReason: null } }, { path: 'runs', push: Object.assign(emptyRun('r-md', 'w-md'), { department: null, cycle: 0, startedAt: null, inputs: [{ version: 1, kind: 'user', text: '汇总结果另存一份 Markdown 表格。', at: T('15:30'), progress: 'received', bytes: [0, 45] }] }) }, { path: 'projects[id=p-report].workItemIds', push: 'w-md' }, { path: 'runtime.queue', push: { workItemId: 'w-md', since: T('15:30'), position: 2 } }] },
+      { delay: 1500, event: { type: 'x_queued', workItemId: 'w-md', label: '用户新建事项「汇总另存为 Markdown」：排在第 2 位，手持 2 号牌' }, patch: [{ path: 'workItems', push: { id: 'w-md', projectId: 'p-report', title: '汇总另存为 Markdown', colorIndex: 5, status: 'queued', runId: 'r-md', queuePos: 2, heldReason: null } }, { path: 'runs', push: Object.assign(reportRun('r-md', 'w-md', false), { inputs: [{ version: 1, kind: 'user', text: '汇总结果另存一份 Markdown 表格。', at: T('15:30'), progress: 'received', bytes: [0, 45] }] }) }, { path: 'projects[id=p-report].workItemIds', push: 'w-md' }, { path: 'runtime.queue', push: { workItemId: 'w-md', since: T('15:30'), position: 2 } }] },
       { delay: 1500, event: { type: 'x_queue_cancelled', workItemId: 'w-md', label: '用户取消排队中的「汇总另存为 Markdown」：离开队伍，运行中的事项不受影响' }, patch: [{ path: 'workItems[id=w-md].status', value: 'stopped' }, { path: 'workItems[id=w-md].queuePos', value: null }, { path: 'runs[id=r-md].phase', value: 'FAILED' }, { path: 'runs[id=r-md].stopReason', value: { code: 'cancelled', text: '用户取消排队' } }, { path: 'runs[id=r-md].recovery.state', value: 'terminated' }, { path: 'runtime.queue', remove: { key: 'workItemId', value: 'w-md' } }] },
       { delay: 1200, event: { type: 'model_attempt_finished', workItemId: 'w-cat', department: 'engineering', label: '「类别按首次出现顺序输出」工程的模型请求完成' }, patch: [{ path: 'runs[id=r-cat].attempts[id=att-rcat-12].status', value: 'succeeded' }] },
       { delay: 1400, event: { type: 'tool_called', workItemId: 'w-cat', department: 'engineering', tool: 'run_command', label: 'report_categorized 退出 0' } },
@@ -950,7 +980,7 @@
       { delay: 1500, event: { type: 'qa_submitted', workItemId: 'w-head', department: 'quality', label: '「表头改为中文」质检放行', payload: { verdict: 'release' } }, patch: [{ path: 'workItems[id=w-head].status', value: 'released_unsettled' }, { path: 'runs[id=r-head].phase', value: 'DONE' }, { path: 'runs[id=r-head].department', value: null }] },
       { delay: 1800, event: { type: 'adoption_held', workItemId: 'w-head', label: '基线已变：箱子放上「未采纳候选」架，贴「基线已变」标签' }, patch: [{ path: 'workItems[id=w-head].status', value: 'held' }, { path: 'workItems[id=w-head].heldReason', value: '基线已变：开始时的基线为 r1，r2（按类别汇总）已在 17:40 被采纳；本成果没有包含 r2 的改动' }] },
       { delay: 1200, event: { type: 'run_done', workItemId: 'w-head', label: '「表头改为中文」完成，成果保留为未采纳候选，可以取回' } },
-      { delay: 1800, event: { type: 'work_item_created', workItemId: 'w-merge', label: '用户以候选开始集成事项：「集成表头改为中文到 r2」有自己的合同与质检，不自动合并冲突' }, patch: [{ path: 'workItems', push: { id: 'w-merge', projectId: 'p-report', title: '集成「表头改为中文」到 r2', colorIndex: 5, status: 'in_progress', runId: 'r-merge', queuePos: null, heldReason: null, fromCandidate: 'w-head' } }, { path: 'runs', push: emptyRun('r-merge', 'w-merge') }, { path: 'projects[id=p-report].workItemIds', push: 'w-merge' }] },
+      { delay: 1800, event: { type: 'work_item_created', workItemId: 'w-merge', label: '用户以候选开始集成事项：「集成表头改为中文到 r2」有自己的合同与质检，不自动合并冲突' }, patch: [{ path: 'workItems', push: { id: 'w-merge', projectId: 'p-report', title: '集成「表头改为中文」到 r2', colorIndex: 5, status: 'in_progress', runId: 'r-merge', queuePos: null, heldReason: null, fromCandidate: 'w-head' } }, { path: 'runs', push: reportRun('r-merge', 'w-merge', true) }, { path: 'projects[id=p-report].workItemIds', push: 'w-merge' }] },
       { delay: 1200, event: { type: 'user_input_received', workItemId: 'w-merge', department: 'product', label: '集成事项的输入：以未采纳候选「表头改为中文」为材料' }, patch: [{ path: 'runs[id=r-merge].inputs', push: { version: 1, kind: 'user', text: '把未采纳候选「表头改为中文」的改动集成到当前采纳 r2 上。', at: T('15:30'), progress: 'received', bytes: [0, 84] } }] },
       { delay: 1200, event: { type: 'department_activated', workItemId: 'w-merge', department: 'product', label: '产品房间亮灯，小旗换成集成事项的颜色' } },
       { delay: 1200, event: { type: 'context_assembled', workItemId: 'w-merge', department: 'product', label: '产品取出候选的交付 r1 与当前采纳 r2' }, patch: [{ path: 'runs[id=r-merge].contexts.product', push: { id: 'ctx-m-p1', at: T('15:30'), title: '产品激活 1', attemptId: null, sources: [{ label: '用户原文', version: 'v1', included: true }, { label: '未采纳候选', version: '表头改为中文 · 交付 r1', included: true }, { label: '项目上下文', version: '采纳 r2', included: true }] } }] }
@@ -1022,7 +1052,8 @@
 
   Y7.data = {
     now: T('15:30'),
-    service: { level: 's3', restartedAt: T('15:02:10'), pendingResumeCount: 2 },
+    defaultPrompts: DEFAULT_PROMPTS,
+    service:{ level: 's3', restartedAt: T('15:02:10'), pendingResumeCount: 2 },
 
     projects: [
       { id: 'p-report', name: '文本报表工具', goal: '把门店的 CSV 销售记录整理成按类别汇总的文本报表，命令行运行，输出稳定、可以逐字节核对。', pinned: true, archived: false, adoption: { version: 'r2', summary: '按类别汇总金额与笔数，输出纯文本表格', adoptedAt: T('17:40', '23'), workItemId: 'w-sum' }, adoptions: [{ version: 'r1', workItemId: 'w-base', at: T('11:02', '22') }, { version: 'r2', workItemId: 'w-sum', at: T('17:40', '23') }], workItemIds: ['w-base', 'w-sum', 'w-cat', 'w-empty', 'w-head'], kind: 'code' },
@@ -1324,9 +1355,10 @@
       'p-shift': {
         responsibility: { version: 'r3', env: '门店生产环境', acceptedAt: T('20:10', '23'), owner: '运维部门', platform: '平台运行责任在 Yudao 服务；交付物运行责任在运维部门' },
         releases: [
-          { version: 'r3', adoptionDigest: 'sha256:9c1e4b…', releaseDigest: 'sha256:9c1e4b…', at: T('20:05', '23'), state: '已发布 · 运维已接收' },
-          { version: 'r2', adoptionDigest: 'sha256:47d0a2…', releaseDigest: 'sha256:47d0a2…', at: T('16:40', '21'), state: '已被 r3 取代' },
-          { version: 'r1', adoptionDigest: 'sha256:0b93fe…', releaseDigest: 'sha256:0b93fe…', at: T('10:55', '20'), state: '已被 r2 取代' }
+          { id: 'REL-9', version: 'r3', env: '华南试点门店环境', adoptedAt: T('19:55', '23'), adoptionDigest: 'sha256:9c1e4b…', releaseDigest: 'sha256:9c1e4b…', at: T('14:35'), releasedBy: '工程部门 · 登记命令 deploy_pilot', state: '已发布 · 运维未接收', note: '运维接收之前，这个环境的运行责任留在发布者（工程部门）' },
+          { id: 'REL-8', version: 'r3', env: '门店生产环境', adoptedAt: T('19:55', '23'), adoptionDigest: 'sha256:9c1e4b…', releaseDigest: 'sha256:9c1e4b…', at: T('20:05', '23'), releasedBy: '工程部门 · 登记命令 deploy_prod', state: '已发布 · 运维已接收', note: '运维在 9 月 23 日 20:10 接收' },
+          { id: 'REL-5', version: 'r2', env: '门店生产环境', adoptedAt: T('16:05', '21'), adoptionDigest: 'sha256:47d0a2…', releaseDigest: 'sha256:47d0a2…', at: T('16:40', '21'), releasedBy: '工程部门 · 登记命令 deploy_prod', state: '已被 r3 取代', note: null },
+          { id: 'REL-2', version: 'r1', env: '门店生产环境', adoptedAt: T('10:20', '20'), adoptionDigest: 'sha256:0b93fe…', releaseDigest: 'sha256:0b93fe…', at: T('10:55', '20'), releasedBy: '工程部门 · 登记命令 deploy_prod', state: '已被 r2 取代', note: null }
         ],
         incidents: [
           { id: 'INC-7', title: '排班页面加载超时', workItemId: 'w-timeout', steps: [
