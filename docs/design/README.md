@@ -14,6 +14,14 @@
   - 内容：部门指导的处理时机、原文范围与放行关系。
   - 状态：2026-09-06 设计；指导接口已在 `harness/web/server.py` 实现。
   - 需求：[D20](../requirements/department-guidance.md)。
+- [语义系统](semantic-system.md)
+  - 内容：语义单元与关系、材料投影、语义整理、语义视图、查回、数据流核对，与压缩及跨事项的关系，含模块关系图。
+  - 状态：2026-09-24 设计草案，第 11 节的规则待用户确认，未实施。
+  - 需求：[D25](../requirements/semantic-system.md)。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)。
+- [部门内多角色](department-roles.md)
+  - 内容：部门经理、固定角色清单、角色任务、部门账本、并行与执行槽位、角色模型设置，含模块关系图与角色任务状态图。
+  - 状态：2026-09-24 设计草案，第 15 节的规则待用户确认，未实施。
+  - 需求：[D26](../requirements/department-roles.md)。前置设计：语义系统、模型管理。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、故障矩阵与产品边界。
   - 状态：2026-09-19 设计合同，未实现；对应工单 #16、#17、#18。

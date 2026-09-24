@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-24 新资料：[语义系统与部门内多角色：参照调研](semantic-system-and-department-roles.md)。支持 [语义系统](../design/semantic-system.md) 与 [部门内多角色](../design/department-roles.md) 两份设计，含 OMP、OpenCode 的子 Agent 与记忆实现，以及 Graphiti、Mem0、Letta、Anthropic、Magentic-One、MetaGPT、MAST 等一手来源。
+
 > 2026-09-19 新资料：[OpenCode Go 与统一 Provider 层一手核对](opencode-go-provider-integration.md)。支持 [Stage 2.7](../archive/stage-2-provider-plan.md)，含 Go API Key、三协议、会话身份、模型发现限制和固定 OMP 源码依据；下文保留旧研究导入背景。
 
 > 日期：2026-09-06。工作树：`D:/codes/yudao-stage2`；分支：`codex/framework-and-stage2`。
