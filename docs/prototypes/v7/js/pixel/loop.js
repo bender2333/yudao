@@ -23,7 +23,7 @@
     running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, paused: PAL.blue1, failed: PAL.red2, done: PAL.green1,
     cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2, waiting_resume: PAL.yellow2, adopted: PAL.green3, held: PAL.orange2
   };
-  const DOOR_SIGN = { paused: '已暂停', failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', waiting_resume: '待恢复' };
+  const DOOR_SIGN = { paused: '已暂停', failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复' };
   const IN_ROOM = ['running', 'asking', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume'];
 
   function layoutFor(level) {
@@ -50,7 +50,7 @@
     const st = {
       clock: 15.5 * 3600000,
       flash: {}, eventSign: {}, eventStatus: {}, interrupted: false,
-      extraAdopted: [], extraHeld: [], shelfFlash: { adopted: 0, held: 0 },
+      shelfFlash: { adopted: 0, held: 0 },
       mailFlash: 0, slotFlash: 0, alarmUntil: 0, rackFlash: 0, rackBox: false,
       observerSign: null, arrows: [], doorOpen: {}, n: 0, lastHandoffX: null, queueArrivals: new Set(), decisions: {}
     };
@@ -292,19 +292,14 @@
           return;
         case 'collaboration_closed':
           return;
-        case 'deliverable_adopted': {
-          const v = pl.version;
-          if (v && !(model.shelves.adopted || []).includes(v) && !st.extraAdopted.includes(v)) st.extraAdopted.push(v);
+        // 架子上的版本与候选取自 loopModel.shelves，事件只让最新的一件闪一下
+        case 'deliverable_adopted':
           st.shelfFlash.adopted = scene.realT + 1800;
           scene.emit('spark', lay.lib.x + lay.lib.w / 2, 108, 16);
           return;
-        }
-        case 'adoption_held': {
-          const label = pl.label || wid || '候选';
-          if (!(model.shelves.held || []).some((h) => h.label === label || h.id === wid)) st.extraHeld.push({ id: wid, label });
+        case 'adoption_held':
           st.shelfFlash.held = scene.realT + 1800;
           return;
-        }
         case 'x_queued':
           st.eventStatus[wid] = 'queued';
           st.queueArrivals.add(wid);
@@ -600,7 +595,7 @@
       const x = r.x;
       P.sign(c, x + r.w / 2, TOP + 20, '成果库', { size: 7, bg: PAL.paper, stripe: PAL.green3 });
       // 已采纳架
-      const adopted = (model.shelves && model.shelves.adopted || []).concat(st.extraAdopted);
+      const adopted = model.shelves.adopted || [];
       P.text(c, '已采纳', x + 8, TOP + 32, { size: 6, weight: 700, color: PAL.green3 });
       paint.shelf(c, x + 6, 112, r.w - 12);
       const per = Math.max(1, Math.floor((r.w - 16) / 18));
@@ -613,7 +608,7 @@
       });
       // 未采纳候选架（3.4B）
       if (P.levelAtLeast(level, 's3')) {
-        const held = (model.shelves && model.shelves.held || []).concat(st.extraHeld);
+        const held = model.shelves.held || [];
         P.text(c, '未采纳候选', x + 8, 132, { size: 6, weight: 700, color: PAL.orange2 });
         paint.shelf(c, x + 6, 168, r.w - 12);
         const per2 = Math.max(1, Math.floor((r.w - 16) / 30));
@@ -706,17 +701,20 @@
           P.drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !sc.reduced ? 'flag2' : 'flag', fx, ROOM_B + 4, { recolor: { X: P.ITEM_COLORS[it.colorIndex], x: P.ITEM_SHADES[it.colorIndex] } });
           c.globalAlpha = 1;
         });
-        let sx = r.door + 12;
+        // 门牌：优先使用事项的 sign，放不下时截短并加省略号；挂在门的右边，同一个房间有几块时向下叠放
+        const sx = r.door + 12;
+        const maxW = lay.s5 ? 58 : 76;
+        let row = 0;
         here.forEach((it) => {
           const s = statusOf(it);
-          let text = st.eventSign[it.id] || it.sign || DOOR_SIGN[s];
-          if (s === 'waiting_resume' && !st.eventSign[it.id] && it.sign) text = it.sign;
-          if (!text || !DOOR_SIGN[s]) return;
+          if (!DOOR_SIGN[s]) return;
+          const text = it.sign || st.eventSign[it.id] || DOOR_SIGN[s];
           const ss = P.signStyle(text);
+          const w = Math.min(maxW, Math.max(18, P.measure(c, text, 6, 600) + 8));
           c.globalAlpha = dimFor(it.id);
-          const box = P.sign(c, sx + 18, ROOM_B + 17, text, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW: lay.s5 ? 58 : 76, nail: ROOM_B + 3 });
+          P.sign(c, sx + w / 2, ROOM_B + 17 + row * 12, text, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW, nail: row === 0 ? ROOM_B + 3 : undefined });
           c.globalAlpha = 1;
-          sx += box.w + 3;
+          row += 1;
         });
       });
 
@@ -843,8 +841,6 @@
       }
       if (m.focusId !== undefined && focusId === null) focusId = m.focusId;
       st.eventStatus = {}; st.eventSign = {}; st.interrupted = false;
-      st.extraAdopted = st.extraAdopted.filter((v) => !(model.shelves.adopted || []).includes(v));
-      st.extraHeld = st.extraHeld.filter((h) => !(model.shelves.held || []).some((x) => x.id === h.id || x.label === h.label));
       applyFreeze();
     }
 

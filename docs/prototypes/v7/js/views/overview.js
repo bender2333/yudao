@@ -13,12 +13,6 @@
 
   const PLACE_LABELS = { user: '用户', product: '产品', engineering: '工程', quality: '质检', operations: '运维', adoption: '成果库' };
   const RECOVERING = ['interrupted', 'pending_verification', 'waiting_resume'];
-  const STOP_SHORT = {
-    cancelled: '已取消', provider_error: '模型请求失败', provider_timeout: '模型请求超时', provider_unavailable: '模型服务不可用',
-    time_limit: '时间用完', max_cycles: '轮次用完', model_steps_exhausted: '模型步骤用完', context_overflow: '上下文超限',
-    compaction_failed: '压缩未生效', host_commit_error: '提交失败'
-  };
-
   function place(id) {
     if (!(id in PLACE_LABELS)) throw new Error('未知的流转位置：' + id);
     return PLACE_LABELS[id];
@@ -36,11 +30,6 @@
 
   function swatch(index) {
     return '<span class="y7-pp-swatch" style="--item:' + itemColor(index) + '" aria-hidden="true"></span>';
-  }
-
-  function stopShort(stopReason) {
-    if (!stopReason) return '';
-    return STOP_SHORT[stopReason.code] || stopReason.code;
   }
 
   function isRecovering(run) {
@@ -299,7 +288,7 @@
   }
 
   Y7.projectKit = {
-    place, direction, itemColor, swatch, stopShort, isRecovering, outcome, receiptOutcome, flowKind, flowLabel,
+    place, direction, itemColor, swatch, isRecovering, outcome, receiptOutcome, flowKind, flowLabel,
     pageHead, slot, fillSlots, fullTime, bytes, openFlowEvent, confirmCancel, loopBlock, mountLoop, loopListHtml, judgmentText,
     RECOVERING
   };
@@ -326,10 +315,32 @@
     }
   }
 
+  // 待核实的动作写登记名（登记命令）或工具名：登记名取主机回执或动作契约中的命令名
+  function pendingActionName(run) {
+    const rec = run.recovery;
+    const unfinished = rec.unfinished || [];
+    const action = run.actions.find((a) => unfinished.includes(a.id)) || run.actions.find((a) => a.state === 'unknown');
+    if (!action) return null;
+    if (action.tool !== 'run_command') return action.tool;
+    if (action.receipt && action.receipt.command) return action.receipt.command;
+    const decision = (rec.decisions || []).find((d) => d.actionId === action.id && d.contract);
+    return decision ? decision.contract.command : action.tool;
+  }
+
+  // 门牌文字（BUILD.md 第 5.2 节）：待恢复、失败、暂停、中断、待核实、已取消写明原因，其他状态没有门牌
   function loopSign(status, run) {
-    if (status === 'waiting_resume') return '待恢复：' + (run.recovery.unusable ? run.recovery.unusable.problem : '原因见恢复页');
-    if (status === 'failed' && run.stopReason) return '失败：' + stopShort(run.stopReason);
-    return null;
+    switch (status) {
+      case 'waiting_resume': return run.recovery.unusable ? '待恢复：' + run.recovery.unusable.problem : '待恢复';
+      case 'failed': return run.stopReason ? '失败：' + run.stopReason.text : '失败';
+      case 'paused': return run.stopReason ? '已暂停：' + run.stopReason.text : '已暂停';
+      case 'interrupted': return '中断';
+      case 'pending_verification': {
+        const name = pendingActionName(run);
+        return name ? '待核实：' + name : '待核实';
+      }
+      case 'cancelled': return '已取消';
+      default: return null;
+    }
   }
 
   // 已采纳的版本：到当前采纳为止（场景回放较早的采纳时，架子上只放到那一版）

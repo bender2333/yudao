@@ -364,12 +364,20 @@ roomModel = {
   holdCard: '凭据被上游拒绝：OPENCODE_GO_KEY' | null,
   pendingTool: 'run_command' | null,          // 待核实时闪烁的物件
   mailbox: 0,                                 // 未读指导数量
-  summaries: 0                                // 摘要档案盒编号
+  summaries: 0,                               // 摘要档案盒编号
+  scrolls: 0,                                 // 产品卷轴架上的卷轴数：PRD 的版本数
+  pinnedNotes: 0,                             // 墙上钉着的指导纸条数：已进入模型输入的指导数
+  semanticCards: 0,                           // level s4，语义记录柜中的卡片数：本部门可见的有效语义单元数
+  version: 'r3' | null,                       // level s5，运维机柜上的版本标签
+  alarm: false                                // level s5，运维持续告警
 };
+// 提案托盘里的纸只在提案事件的动作中出现，提案被接纳或退回后清空，不需要数量字段。
+// 画面上的数量一律以 setModel 为准，事件动画只播放动作，不累加数量。
 
 loopModel = {
   level,
-  items: [{ id, title, colorIndex, status, department, cycle, elapsedSec, limitSec, queuePos }],
+  items: [{ id, title, colorIndex, status, department, cycle, elapsedSec, limitSec, queuePos, sign }],
+  // sign：门牌文字，例如「待恢复：凭据被上游拒绝」「失败：provider_error」；没有时为 null
   // status: 'queued'|'running'|'asking'|'paused'|'failed'|'done'|'cancelled'|'interrupted'|'pending_verification'|'waiting_resume'|'adopted'|'held'
   focusId,
   slots: { total, used },
@@ -397,7 +405,25 @@ loopModel = {
 - 事件库中已有的：`user_input_received`、`work_item_created`、`department_activated`、`context_assembled`、`model_requested`、`model_request_serialized`、`model_stream_progress`、`model_attempt_finished`、`model_retry_scheduled`、`model_attempt_failed`、`tool_started`、`tool_called`、`tool_skipped`、`proposal_submitted`、`proposal_rejected`、`spec_accepted`、`contract_accepted`、`plan_accepted`、`delivery_accepted`、`qa_submitted`、`collaboration_requested`、`collaboration_responded`、`collaboration_closed`、`department_guidance_received`、`department_guidance_applied`、`department_guidance_responded`、`compaction_recorded`、`compaction_failed`、`transition`、`run_paused`、`run_failed`、`run_done`、`deliverable_adopted`、`adoption_held`。
 - 原型临时名称（以 `x_` 开头，事件名由对应工作包的设计确定）：`x_run_interrupted`、`x_action_unknown`、`x_action_decided`、`x_waiting_resume`、`x_resume_accepted`（3.1）；`x_queued`、`x_slot_acquired`、`x_queue_cancelled`（3.4A）；`x_role_task_assigned`、`x_role_result_returned`、`x_explorer_fetch`、`x_replanned`、`x_semantic_recorded`（Stage 4）；`x_ops_released`、`x_ops_alarm`、`x_ops_action_requested`（Stage 5 运维）；`x_judgment_recorded`（Stage 5 元观察）。
 
-`transition` 的 `payload` 为 `{ from, to, artifact }`，`artifact` 取 `prd`、`box`、`defect`、`release`。`qa_submitted` 的 `payload.verdict` 取 `release`、`rework_engineering`、`rework_product`。
+`tool_started` 与 `tool_called` 的 `tool` 取现有工具名：`search`、`read_file`、`read_range`、`list_files`、`edit_range`、`write_file`、`delete_file`、`move_file`、`run_check`（质检的主机检查）、`run_command`（登记命令）。取消用 `run_failed` 加 `payload.reason: 'cancelled'` 表示。
+
+`payload` 中画面会读取的字段：
+
+| 事件 | 字段 |
+| --- | --- |
+| `transition` | `from`、`to`、`artifact`（`prd`、`box`、`defect`、`release`） |
+| `qa_submitted` | `verdict`（`release`、`rework_engineering`、`rework_product`） |
+| `model_stream_progress` | `text`（没有时取 `label` 中「」括起的部分） |
+| `model_retry_scheduled` | `n`、`of` |
+| `tool_called` | `exitCode`、`timedOut` |
+| `run_failed` | `reason` |
+| `x_waiting_resume` | `missing` |
+| `x_action_decided` | `actionId`、`choice` |
+| `x_role_task_assigned` | `to` |
+| `x_ops_action_requested` | `kind` |
+| `x_judgment_recorded` | `result`、`confidence`、`from`、`to` |
+| `deliverable_adopted` | `version` |
+| `adoption_held` | `label` |
 
 ### 6.2 场景
 

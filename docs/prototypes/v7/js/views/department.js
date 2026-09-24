@@ -30,6 +30,8 @@
   const UNIT_STATUS = { valid: ['admitted', '有效'], superseded: ['held', '已取代'], invalid: ['cancelled', '已失效'], conflict: ['unusable', '有冲突'] };
   const ACTION_STATE_KIND = { not_sent: 'idle', done: 'succeeded', unknown: 'unknown' };
   const RECOVERING = ['interrupted', 'pending_verification', 'waiting_resume'];
+  // 已进入模型输入的指导：纸条从信箱取出、钉在墙上
+  const PINNED_GUIDANCE = ['in_input', 'explained', 'completed', 'declined', 'needs_work'];
   const TERMINAL_EVENTS = ['run_done', 'run_failed', 'run_paused', 'cancellation_recorded'];
 
   // 页面自己的界面状态：房间画面、最近事件、所选 Context、弹窗草稿
@@ -259,13 +261,23 @@
       holdCard: status === 'waiting_resume' ? holdCardOf(run) : null,
       pendingTool: pendingAction ? pendingAction.tool : null,
       mailbox: v.guidance.filter((g) => g.status === 'received').length,
-      summaries: v.compactions.reduce((max, entry) => Math.max(max, entry.n), 0)
+      summaries: v.compactions.reduce((max, entry) => Math.max(max, entry.n), 0),
+      scrolls: dept === 'product' ? v.prdVersions : 0,
+      pinnedNotes: v.guidance.filter((g) => PINNED_GUIDANCE.includes(g.status)).length
     };
+    if (Y7.atLeast('s4')) model.semanticCards = v.semantic ? v.semantic.units.filter((unit) => unit.status === 'valid').length : 0;
     if (dept === 'operations') {
       model.alarm = Boolean(v.ops && v.ops.incidents.some((inc) => inc.alarm));
       model.version = v.ops ? v.ops.responsibility.version : null;
     }
     return model;
+  }
+
+  // 事项 PRD 的版本数：卷轴架上的卷轴
+  function prdCount(projectId, workItemId) {
+    const entry = Y7.query('work_item.materials', { projectId }).items.find((row) => row.item.id === workItemId);
+    if (!entry) throw new Error('资料中没有这个事项：' + workItemId);
+    return entry.counts.prd;
   }
 
   // ---------------------------------------------------------------------------
@@ -341,6 +353,7 @@
       semantic,
       ops,
       unknownActions: run ? unknownActions(run) : [],
+      prdVersions: dept === 'product' && focus.item ? prdCount(projectId, focus.item.id) : 0,
       composer: run && isActiveRun(run)
         ? { mode: 'guidance', runId: run.id, receiver: s4 && dept !== 'operations' ? managerName(dept) : Y7.deptLabel(dept) + '部门' }
         : { mode: 'new', ended: Boolean(run) }
@@ -644,6 +657,9 @@
       ['信箱', m.mailbox ? esc(m.mailbox + ' 条指导待进入模型输入') : '<span class="y7-muted">没有未读指导</span>'],
       ['摘要档案盒', m.summaries ? esc('编号 ' + m.summaries) : '<span class="y7-muted">还没有压缩</span>']
     ];
+    pairs.push(['墙上的指导', m.pinnedNotes ? esc(m.pinnedNotes + ' 张（已进入模型输入）') : '<span class="y7-muted">没有</span>']);
+    if (v.department.id === 'product') pairs.push(['卷轴架', esc(m.scrolls + ' 卷（PRD 版本）')]);
+    if ('semanticCards' in m) pairs.push(['语义记录柜', esc(m.semanticCards + ' 张有效单元')]);
     if (m.holdCard) pairs.push(['举牌', esc(m.holdCard)]);
     if (m.pendingTool) pairs.push(['闪烁的物件', esc((TOOL_LABELS[m.pendingTool] || m.pendingTool) + '（结果未知，等待核实）')]);
     if (v.department.id === 'operations') {
@@ -1169,28 +1185,33 @@
     return '<option value=""' + (selected ? '' : ' selected') + '>' + esc(followLabel) + '</option>' + orphan + groups;
   }
 
-  // inherit：{ known, level } 为选择「跟随」时继承的请求档位；known 为 false 表示继承的值要等清除本项目角色设置之后才能确定
-  function levelFieldHtml(definitionId, selected, inherit, attrs, noModelText) {
+  // inherit：{ level, source } 为选择「跟随」时继承的请求档位及其来源；都为空时使用模型的默认档位
+  function levelFieldHtml(definitionId, selected, inherit, attrs) {
     const def = definitionId ? Y7.model.definition(definitionId) : null;
-    if (!def) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">' + esc(noModelText || '没有生效的模型：先选择模型') + '</small>';
+    if (!def) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">没有生效的模型：先选择模型</small>';
     const levels = def.reasoning ? def.reasoning.levels : [];
     if (!levels.length) return '<select class="y7-select" ' + attrs + ' disabled><option>跟随</option></select><small class="y7-muted">该模型未声明推理档位，请求不带推理参数</small>';
-    const followText = inherit.known ? '跟随（当前：' + (inherit.level || '模型默认 ' + def.reasoning.defaultLevel) + '）' : '跟随（清除本项目的角色设置）';
+    const followText = '跟随（当前：' + (inherit.level ? inherit.level + ' · ' + inherit.source : '模型默认 ' + def.reasoning.defaultLevel) + '）';
     const value = selected && levels.includes(selected) ? selected : '';
-    const sent = value || inherit.known ? Y7.model.clampLevel(value || inherit.level || null, def.reasoning) : '保存后按继承的档位确定';
+    const sent = Y7.model.clampLevel(value || inherit.level || null, def.reasoning);
     return '<select class="y7-select" ' + attrs + '><option value=""' + (value ? '' : ' selected') + '>' + esc(followText) + '</option>' +
       levels.map((level) => '<option value="' + esc(level) + '"' + (level === value ? ' selected' : '') + '>' + esc(level) + '</option>').join('') + '</select>' +
       '<small class="y7-muted">支持 ' + esc(levels.join('、')) + ' · 实际发送 ' + esc(sent) + (selected && !levels.includes(selected) ? ' · 原选择 ' + esc(selected) + ' 不在支持范围内，已改为跟随' : '') + '</small>';
   }
 
-  // 角色行「跟随」时的模型：本项目角色设置写入了模型时，清除之后才能确定
+  // 角色行选择「跟随」时的模型与档位：跳过本项目角色设置之后继承的值
   function roleEffective(role, draftModel) {
-    return draftModel || (role.inherited.modelKnown ? role.inherited.definition : null);
+    return draftModel || role.inherited.definition;
   }
 
   function roleLevelField(role, draft) {
-    return levelFieldHtml(roleEffective(role, draft.model), draft.level, { known: role.inherited.levelKnown, level: role.inherited.requestLevel },
-      'data-act="dept.roleLevel" data-role-id="' + esc(role.id) + '"', '清除本项目的模型设置后，保存时按继承的层次重新选择模型；之后可以再设置档位');
+    return levelFieldHtml(roleEffective(role, draft.model), draft.level, { level: role.inherited.requestLevel, source: role.inherited.levelSource },
+      'data-act="dept.roleLevel" data-role-id="' + esc(role.id) + '"');
+  }
+
+  // 部门的推理档位选择「跟随」时继承部门默认的请求档位
+  function deptLevelInherit(deptDefault) {
+    return { level: deptDefault ? deptDefault.level : null, source: '部门默认' };
   }
 
   function deptModelSection(c) {
@@ -1202,7 +1223,7 @@
     const status = problem ? ui.status(problem === '未设置' ? 'idle' : 'unusable', problem === '未设置' ? '未设置' : '无法使用：' + problem) : ui.status('admitted', '已准入');
     return '<label class="y7-field"><span>模型</span><select class="y7-select" id="y7-dm-model" data-act="dept.modalModel">' + modelOptions(cat, m.model, followLabel) + '</select>' +
         '<small class="y7-ws-inline"><span class="y7-muted">生效：' + esc(effective ? Y7.model.label(effective) : '未设置') + '</span>' + status + '</small></label>' +
-      '<div class="y7-field" id="y7-dm-level-field"><span>推理档位</span>' + levelFieldHtml(effective, m.level, { known: true, level: deptDefault ? deptDefault.level : null }, 'id="y7-dm-level" data-act="dept.modalLevel"') + '</div>';
+      '<div class="y7-field" id="y7-dm-level-field"><span>推理档位</span>' + levelFieldHtml(effective, m.level, deptLevelInherit(deptDefault), 'id="y7-dm-level" data-act="dept.modalLevel"') + '</div>';
   }
 
   function promptSection(c) {
@@ -1222,9 +1243,7 @@
     const rows = roles.map((role) => {
       const draft = m.roles[role.id];
       const inherited = role.inherited;
-      const followLabel = inherited.modelKnown
-        ? '跟随（当前：' + (inherited.definition ? Y7.model.label(inherited.definition) + ' · ' + inherited.source : '未设置') + '）'
-        : '跟随（清除本项目的角色设置）';
+      const followLabel = '跟随（当前：' + (inherited.definition ? Y7.model.label(inherited.definition) + ' · ' + inherited.source : '未设置') + '）';
       const r = role.resolved;
       return '<div class="y7-dm-role" data-role-id="' + esc(role.id) + '">' +
         '<div class="y7-dm-role-name"><strong>' + esc(role.name) + '</strong><small class="y7-muted">' + esc(role.duty) + '</small>' +
@@ -1343,7 +1362,7 @@
     const c = modalCtx();
     const deptDefault = c.cat.departmentDefaults[st.modal.dept] || null;
     const effective = st.modal.model || (deptDefault ? deptDefault.definition : null);
-    Y7.dom.modal.querySelector('#y7-dm-level-field').innerHTML = '<span>推理档位</span>' + levelFieldHtml(effective, st.modal.level, { known: true, level: deptDefault ? deptDefault.level : null }, 'id="y7-dm-level" data-act="dept.modalLevel"');
+    Y7.dom.modal.querySelector('#y7-dm-level-field').innerHTML = '<span>推理档位</span>' + levelFieldHtml(effective, st.modal.level, deptLevelInherit(deptDefault), 'id="y7-dm-level" data-act="dept.modalLevel"');
   });
 
   Y7.actions.register('dept.roleModel', (el) => {

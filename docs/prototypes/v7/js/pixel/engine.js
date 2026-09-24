@@ -1768,7 +1768,8 @@
     const n = Math.min(opt.notes || 0, 6);
     for (let i = 0; i < n; i++) {
       const nx = x + 3 + (i % 3) * 9, ny = y + 3 + Math.floor(i / 3) * 13;
-      const done = i < (opt.done || 0);
+      // done 为前几张已回复；doneIndex 为某一张刚写完回复
+      const done = i < (opt.done || 0) || i === opt.doneIndex;
       P.drawBitmap(c, done ? 'note_done' : 'note', nx, ny + 1);
       R(c, nx + 2, ny, 2, 2, done ? PAL.green2 : PAL.red2);
     }

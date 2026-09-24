@@ -223,6 +223,18 @@
 .y7-rc-cannot strong { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
 .y7-rc-resume.is-ready { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
 .y7-rc-resume .y7-row { margin-bottom: 10px; }
+.y7-rc-decide-block { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 12%, transparent); }
+.y7-rc-decision { padding: 12px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0; }
+.y7-rc-decision + .y7-rc-decision { margin-top: 10px; }
+.y7-rc-decision.is-pending { border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); background: var(--amber-bg); }
+.y7-rc-host { padding: 8px 12px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--amber); font-size: 13px; overflow-wrap: anywhere; }
+.y7-rc-host ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); display: grid; gap: 1px; }
+.y7-rc-contract { margin-top: 8px; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; overflow-wrap: anywhere; }
+.y7-rc-choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.y7-rc-choices li { display: grid; grid-template-columns: minmax(150px, auto) minmax(0, 1fr); align-items: center; gap: 4px 12px; padding: 6px 10px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.y7-rc-choices li .y7-btn { justify-self: start; white-space: normal; text-align: left; }
+.y7-rc-decided { font-size: 13px; overflow-wrap: anywhere; margin-top: 8px; }
+.y7-rc-checks li.is-user { border-left-color: var(--violet); }
 .y7-rc-actions { display: grid; gap: 10px; }
 .y7-rc-action { padding: 12px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0; }
 .y7-rc-action.is-unknown { border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); background: var(--amber-bg); }
@@ -376,6 +388,7 @@
   }
   .y7-ov-flow-event { justify-self: start; }
   .y7-pp .y7-kv.is-rows > div { grid-template-columns: 6.5em minmax(0, 1fr); gap: 10px; }
+  .y7-rc-choices li { grid-template-columns: minmax(0, 1fr); }
   .y7-pp .y7-rc-action .y7-kv.is-rows > div, .y7-pp .y7-mt-doc .y7-kv.is-rows > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .y7-mt-files li { grid-template-columns: minmax(0, 1fr) auto; }
   .y7-mt-files li .y7-muted { grid-column: 1 / 2; }

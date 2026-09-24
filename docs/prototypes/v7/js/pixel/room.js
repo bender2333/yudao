@@ -83,19 +83,24 @@
     let level = o.level || 'now';
     P.levelAtLeast(level, 'now');
 
-    let model = { department: dept, level, status: 'idle', crt: {}, roles: [], pose: null, door: null, holdCard: null, pendingTool: null, mailbox: 0, summaries: 0 };
+    // 画面上的数量（信箱、档案盒编号、卷轴、钉着的纸条、语义卡片）一律取自 roomModel；
+    // st 只保存动作过程中的临时状态，动作结束后画面回到只由数据决定的样子
+    let model = { department: dept, level, status: 'idle', crt: {}, roles: [], pose: null, door: null, holdCard: null, pendingTool: null, mailbox: 0, summaries: 0, scrolls: 0, pinnedNotes: 0, semanticCards: 0 };
     const st = {
       dark: 0.36, darkTarget: 0.36, yellow: false,
       clock: 15.5 * 3600000, crtBoot: 1,
       drawer: 0, lever: 0, exit: null, termRun: false, smokeUntil: 0,
-      tray: 1, scrolls: 3, scrollFlash: 0, notes: 0, notesDone: 0, cards: 3, cardFlash: 0,
+      // scrollHide、noteHide、cardHide：新加的一件在动作放上去之前先不显示，值为最迟恢复显示的时间
+      trayPaper: false, scrollFlash: 0, scrollHide: 0, noteHide: 0, replyUntil: 0, cardHide: 0, cardFlash: 0,
       archiveFlash: 0,
       door: 0, doorEvent: null, eventStatus: null, eventCard: null, eventTool: null, lastPendingTool: null,
-      bench: { item: dept === 'product' ? 'scroll' : dept === 'quality' ? null : null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0 },
-      wbSheet: false, wbErase: 0, wbSeed: 1, wbTags: {}, wbDone: {},
-      binCount: 0, rackOn: true, rackFlash: 0, alarmUntil: 0, cart: { x: 296, box: null },
+      bench: { item: null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0, until: 0 },
+      wbSheetUntil: 0, wbErase: 0, wbSeed: 1, wbTags: {}, wbDone: {},
+      binUntil: 0, rackOn: true, rackFlash: 0, alarmUntil: 0, cart: { x: 296, box: null },
       desks: [], deskState: {}, confettiAt: 0, courierN: 0
     };
+    // 动作留在桌上、工作台上的物件在动作结束后保留一段时间
+    const PROP_KEEP = 7000;
     let bg = null;
     let bgKey = '';
 
@@ -142,7 +147,8 @@
         a.data.role = r;
         a.data.desk = d;
         if (a.seat && a.seat.roleId === r.id) a.seat = d;
-        if (!st.deskState[r.id]) st.deskState[r.id] = { papers: 3 + (i % 3), folder: false, doc: false, box: false, card: false, cardResult: false, redLamp: false, scroll: false, plane: false };
+        // papers 为桌上固定的纸堆；folder、doc 等为动作放在桌上的物件，值为保留到的时间
+        if (!st.deskState[r.id]) st.deskState[r.id] = { papers: 3 + (i % 3), hidePapers: false, folder: 0, doc: 0, box: 0, card: 0, cardResult: 0, scroll: 0, plane: 0, redLamp: false };
         return d;
       });
       const prim = primary();
@@ -165,6 +171,16 @@
     }
     function byKind(kind) { return roleActors().find((a) => a.data.role.kind === kind); }
     function ds(a) { return st.deskState[a.id]; }
+    function keep(a, key) { ds(a)[key] = scene.realT + PROP_KEEP; }
+    function drop(a, key) { ds(a)[key] = 0; }
+    function shown(s, key) { return s[key] > scene.realT; }
+    // 工作台上的物件：每次改动后保留 12 秒，之后工作台回到空的样子
+    function tickBench() {
+      const b = st.bench;
+      const sig = [b.item, b.mark && b.mark.text, b.slip, b.slipMark && b.slipMark.text, b.ticks, b.tape].join('|');
+      if (sig !== b.sig) { b.sig = sig; b.until = scene.realT + 12000; }
+      if ((b.item || b.slip) && b.until <= scene.realT) Object.assign(b, { item: null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0 });
+    }
 
     // -------------------------------------------------------------------------
     // 路线：工作台前板是障碍，其余地面可以直接走
@@ -419,6 +435,7 @@
         }
         if (!a.script) applyRest(a);
       });
+      tickBench();
       if (st.smokeUntil > scene.realT && !scene.reduced && Math.random() < 0.3) scene.emit('smoke', L.terminal.x + 14, L.terminal.base - 38, 1);
       if (!scene.frozen && Math.random() < 0.035) scene.emit('steam', 413, ROW_B - 15, 1);
       // 喝茶时杯口冒热气
@@ -487,7 +504,7 @@
         const p = plan(a);
         p.spot('cabinet');
         let placed = false;
-        const place = () => { if (!placed) { placed = true; const s = ds(a); s.folder = true; s.papers += 2; } };
+        const place = () => { if (!placed) { placed = true; keep(a, 'folder'); } };
         p.add(S.call(() => scene.tween(st, 'drawer', 1, 300, 'out')), S.anim('rummage', 1100), S.anim('grab_folder', 700, true),
           S.call(() => scene.tween(st, 'drawer', 0, 300, 'inOut')), S.hold('folder'));
         p.sit('carry');
@@ -544,7 +561,7 @@
         setPersist(a, null);
         const p = plan(a);
         p.spot('cabinet');
-        p.add(S.call(() => scene.tween(st, 'drawer', 1, 300, 'out')), S.anim('rummage', 1300), S.call(() => { ds(a).papers += 1; }), S.anim('magnify', 1600, true),
+        p.add(S.call(() => scene.tween(st, 'drawer', 1, 300, 'out')), S.anim('rummage', 1300), S.anim('magnify', 1600, true),
           S.call(() => scene.tween(st, 'drawer', 0, 320, 'inOut')));
         p.back();
         p.run(() => { st.drawer = 0; });
@@ -560,7 +577,7 @@
         setPersist(a, { anim: 'write', write: true });
         const p = plan(a);
         p.sit();
-        p.add(S.call(() => { ds(a).doc = true; }), S.anim('write', 1800, true));
+        p.add(S.call(() => { keep(a, 'doc'); }), S.anim('write', 1800, true));
         p.run();
       },
       run_command(ev, a) {
@@ -584,7 +601,7 @@
         p.stand();
         p.add(S.anim('shake', undefined), S.anim('fold', 600), S.hold('paperball'), S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
           a.hold = null;
-          scene.fly({ bmp: 'paperball', from: [a.x + 6, a.y - 20], to: [st.bin.x + 5, st.bin.y - 10], ms: 650, arc: 22, ease: 'linear', onDone: () => { st.binCount += 1; } });
+          scene.fly({ bmp: 'paperball', from: [a.x + 6, a.y - 20], to: [st.bin.x + 5, st.bin.y - 10], ms: 650, arc: 22, ease: 'linear', onDone: () => { st.binUntil = scene.realT + 3500; } });
         })), S.anim('throw', 1000, true));
         p.back();
         p.run(() => { a.hold = null; });
@@ -592,10 +609,11 @@
       submit(ev, a) {
         setPersist(a, null);
         let placed = false;
-        const place = () => { if (!placed) { placed = true; st.tray += 1; a.hold = null; } };
+        // 托盘里的纸只在提案送进去之后出现，提案被接纳或退回时清空
+        const place = () => { if (!placed) { placed = true; st.trayPaper = true; a.hold = null; } };
         const p = plan(a);
         p.stand();
-        p.add(S.hold('doc'), S.call(() => { ds(a).doc = false; }));
+        p.add(S.hold('doc'), S.call(() => { drop(a, 'doc'); }));
         p.spot('tray', 'carry');
         p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, place)), S.anim('side_place', 700, true), S.anim('side', 300));
         p.back();
@@ -604,18 +622,19 @@
       returned(ev, a) {
         setPersist(a, null);
         const d = a.data.desk;
-        st.tray = Math.max(0, st.tray - 1);
-        scene.fly({ bmp: 'doc', from: [L.tray.x + 13, L.tray.base - 24], to: [d.x + d.w / 2 - 8, ROW_B - 6], ms: 800, arc: 26, onDone: () => { ds(a).doc = true; } });
+        st.trayPaper = false;
+        scene.fly({ bmp: 'doc', from: [L.tray.x + 13, L.tray.base - 24], to: [d.x + d.w / 2 - 8, ROW_B - 6], ms: 800, arc: 26, onDone: () => { keep(a, 'doc'); } });
         const p = plan(a);
         p.sit();
         p.add(S.anim('sit_up', 700), S.icon({ kind: 'question' }), S.anim('sit_scratch', 1800, true), S.icon(null));
-        p.run(() => { ds(a).doc = true; });
+        p.run(() => { keep(a, 'doc'); });
       },
       stamp_valid(ev, a) {
         setPersist(a, null);
         // 盖章之后卷轴要放上卷轴架；被下一个动作打断时直接放上去
         let shelved = false;
-        const shelve = () => { if (!shelved) { shelved = true; st.scrolls = Math.min(12, st.scrolls + 1); st.scrollFlash = scene.realT + 1500; st.bench.item = null; st.bench.mark = null; } };
+        // 卷轴数取自 roomModel.scrolls；新卷轴在放上架子之前先不显示
+        const shelve = () => { if (!shelved) { shelved = true; st.scrollHide = 0; st.scrollFlash = scene.realT + 1500; st.bench.item = null; st.bench.mark = null; } };
         const p = plan(a);
         p.add(S.call(() => { st.bench.item = 'scroll_open'; st.bench.mark = null; }));
         p.spot('bench');
@@ -635,9 +654,9 @@
         p.stand();
         p.add(S.hold('doc'));
         p.spot('wb', 'carry');
-        p.add(S.anim('board_pin', undefined, true), S.call(() => { st.wbSheet = true; }), S.hold(null), S.anim('back', 500), S.anim('idle_happy', 400));
+        p.add(S.anim('board_pin', undefined, true), S.call(() => { st.wbSheetUntil = scene.realT + PROP_KEEP; }), S.hold(null), S.anim('back', 500), S.anim('idle_happy', 400));
         p.back();
-        p.run(() => { st.wbSheet = true; a.hold = null; });
+        p.run(() => { if (st.wbSheetUntil < scene.realT) st.wbSheetUntil = scene.realT + PROP_KEEP; a.hold = null; });
       },
       seal(ev, a) {
         setPersist(a, null);
@@ -707,7 +726,7 @@
           const pa = primary();
           const d = pa.data.desk;
           openDoor();
-          scene.fly({ bmp: 'plane', frames: ['plane', 'plane2'], from: [L.door.x + 18, L.door.base - 30], to: [d.x + d.w / 2, ROW_B - 8], ms: 1100, arc: 18, flip: true, onDone: () => { ds(pa).plane = true; closeDoor(); } });
+          scene.fly({ bmp: 'plane', frames: ['plane', 'plane2'], from: [L.door.x + 18, L.door.base - 30], to: [d.x + d.w / 2, ROW_B - 8], ms: 1100, arc: 18, flip: true, onDone: () => { keep(pa, 'plane'); closeDoor(); } });
           if (scene.inTail(pa)) scene.run(pa, [S.anim(pa.seat ? 'sit_up' : 'look_up', 1200, true)], { tail: 0 });
           return;
         }
@@ -741,7 +760,7 @@
         const p = plan(a);
         p.stand();
         p.add(S.call(() => {
-          if (ds(a).plane) { ds(a).plane = false; scene.fly({ bmp: 'plane', from: [d.x + d.w / 2, ROW_B - 8], to: [a.x, a.y - 22], ms: 400, arc: 6 }); } else {
+          if (shown(ds(a), 'plane')) { drop(a, 'plane'); scene.fly({ bmp: 'plane', from: [d.x + d.w / 2, ROW_B - 8], to: [a.x, a.y - 22], ms: 400, arc: 6 }); } else {
             openDoor();
             scene.fly({ bmp: 'plane', frames: ['plane', 'plane2'], from: [L.door.x + 18, L.door.base - 30], to: [a.x, a.y - 22], ms: 900, arc: 14, flip: true, onDone: closeDoor });
           }
@@ -751,33 +770,35 @@
         p.to(SPOT.door[0] - 14, SPOT.door[1] + 2);
         p.add(S.turn(1), S.hold('plane'), S.call(openDoor), ...throwSteps(a), S.call(closeDoor));
         p.back();
-        p.run(() => { ds(a).plane = false; st.door = 0; a.hold = null; });
+        p.run(() => { drop(a, 'plane'); st.door = 0; a.hold = null; });
       },
       // 信箱数字以 roomModel.mailbox 为准，这里只播放纸条从门缝滑进信箱
       guidance_in() {
         const slot = [L.door.x + 18, L.door.base - 9];
         scene.fly({ bmp: 'note', from: slot, to: [L.mailbox.x + 7, L.mailbox.base - 9], ms: 700, arc: 2, ease: 'out' });
       },
+      // 钉着的纸条数取自 roomModel.pinnedNotes；读完的纸条在钉上之前先不显示
       guidance_read(ev, a) {
         setPersist(a, null);
-        let pinned = false;
-        const pin = () => { if (!pinned) { pinned = true; st.notes += 1; } };
+        const pin = () => { st.noteHide = 0; };
         const p = plan(a);
         p.spot('mailbox');
         p.add(S.anim('crouch', 700), S.hold('note'), S.anim('read_stand', 1400));
         p.spot('cork');
         p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
           a.hold = null;
-          scene.fly({ bmp: 'note', from: [SPOT.cork[0], SPOT.cork[1] - 24], to: [L.cork.x + 5 + (st.notes % 3) * 9, L.cork.y + 6 + Math.floor((st.notes % 6) / 3) * 13], ms: 350, arc: 4, onDone: pin });
+          const k = Math.max(0, (model.pinnedNotes || 1) - 1) % 6;
+          scene.fly({ bmp: 'note', from: [SPOT.cork[0], SPOT.cork[1] - 24], to: [L.cork.x + 3 + (k % 3) * 9, L.cork.y + 4 + Math.floor(k / 3) * 13], ms: 350, arc: 4, onDone: pin });
         })), S.anim('note_pin', undefined, true), S.hold(null), S.anim('back', 500));
         p.back();
         p.run(() => { a.hold = null; pin(); });
       },
+      // 在最新的纸条上写回复：写完时纸条上出现勾，过一会儿恢复
       guidance_reply(ev, a) {
         setPersist(a, null);
         const p = plan(a);
         p.spot('cork');
-        p.add(S.anim('board_write', 1700, true), S.call(() => { st.notesDone = Math.min(Math.max(st.notes, 1), st.notesDone + 1); if (!st.notes) st.notes = 1; }), S.anim('back', 400));
+        p.add(S.anim('board_write', 1700, true), S.call(() => { st.replyUntil = scene.realT + 3000; }), S.anim('back', 400));
         p.back();
         p.run();
       },
@@ -786,30 +807,29 @@
         const p = plan(a);
         p.stand();
         // 档案盒编号以 roomModel.summaries 为准，这里只播放整理纸堆、放进档案盒
-        p.add(S.anim('gather', 1000), S.call(() => { ds(a).papers = 0; ds(a).folder = false; }), S.hold('docs'));
+        p.add(S.anim('gather', 1000), S.call(() => { ds(a).hidePapers = true; drop(a, 'folder'); }), S.hold('docs'));
         p.spot('archive', 'carry');
         p.add(S.call(() => {
           a.hold = null;
           scene.fly({ bmp: 'docs', from: [a.x - 8, a.y - 22], to: [L.cabinet.x + 12, L.cabinet.base - 50], ms: 450, arc: 10, onDone: () => { st.archiveFlash = scene.realT + 1600; } });
         }), S.anim('side_place', 900, true), S.anim('idle_happy', 600));
         p.back();
-        p.run(() => { a.hold = null; ds(a).papers = 0; });
+        p.run(() => { a.hold = null; ds(a).hidePapers = false; });
       },
       compact_fail(ev, a) {
         setPersist(a, null);
         const d = a.data.desk;
-        const n = Math.max(3, ds(a).papers);
-        ds(a).papers = 0;
-        scene.emit('paper', d.x + 10, ROW_B - 8, n * 2, { floor: ROW_B - 12 });
+        ds(a).hidePapers = true;
+        scene.emit('paper', d.x + 10, ROW_B - 8, ds(a).papers * 2, { floor: ROW_B - 12 });
         const p = plan(a);
         p.stand();
         p.add(S.anim('shock', 500));
         p.to(d.seatX - 14, ROW_B - 12);
         p.add(S.anim('crouch', 900, true));
         p.to(d.seatX + 16, ROW_B - 14);
-        p.add(S.anim('crouch', 900), S.hold('docs'), S.anim('gather', 700), S.call(() => { ds(a).papers = n; }), S.hold(null));
+        p.add(S.anim('crouch', 900), S.hold('docs'), S.anim('gather', 700), S.call(() => { ds(a).hidePapers = false; }), S.hold(null));
         p.back();
-        p.run(() => { ds(a).papers = n; a.hold = null; });
+        p.run(() => { ds(a).hidePapers = false; a.hold = null; });
       },
       paused(ev, a) {
         st.doorEvent = '已暂停';
@@ -844,12 +864,11 @@
         st.doorEvent = '已取消';
         st.eventStatus = 'cancelled';
         applyLights();
+        // 已取消时桌上的纸收进箱子：桌面的样子由取消状态决定
         const p = plan(a);
         p.stand();
-        p.add(S.call(() => { ds(a).box = true; }), S.anim('tidy', 1800, true), S.call(() => {
-          const s = ds(a); s.papers = 0; s.folder = false; s.doc = false;
-        }), S.anim('idle', 400));
-        p.run(() => { const s = ds(a); s.papers = 0; s.folder = false; s.doc = false; s.box = true; });
+        p.add(S.anim('tidy', 1800, true), S.anim('idle', 400));
+        p.run();
       },
       freeze() {
         st.eventStatus = 'interrupted';
@@ -874,8 +893,6 @@
         if (choice === 'stop') st.doorEvent = '已停止';
         applyLights();
         setPersist(a, null);
-        let tidied = false;
-        const tidy = () => { if (!tidied) { tidied = true; const s = ds(a); s.papers = 0; s.folder = false; s.doc = false; s.box = true; } };
         const p = plan(a);
         p.to(SPOT.door[0] - 14, SPOT.door[1] + 2);
         p.add(S.turn(1), S.call(() => {
@@ -899,12 +916,12 @@
           p.back();
         } else if (choice === 'stop') {
           p.to(a.data.desk.seatX, a.data.desk.seatY);
-          p.add(S.call(() => { ds(a).box = true; }), S.anim('tidy', 1600), S.call(tidy));
+          p.add(S.anim('tidy', 1600));
         } else {
           p.back();
           p.add(S.anim('type', 800));
         }
-        p.run(() => { a.hold = null; if (choice === 'stop') tidy(); });
+        p.run(() => { a.hold = null; });
       },
       hold_card(ev) {
         const pl = ev.payload || {};
@@ -940,11 +957,11 @@
         p.add(S.hold('card_task'));
         p.to(gs[0], gs[1]);
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
-          ds(target).card = true;
+          keep(target, 'card');
           st.wbTags[target.id] = true;
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
-        p.run(() => { mgr.hold = null; ds(target).card = true; st.wbTags[target.id] = true; });
+        p.run(() => { mgr.hold = null; if (!shown(ds(target), 'card')) keep(target, 'card'); st.wbTags[target.id] = true; });
         if (scene.inTail(target)) scene.run(target, [S.anim('sit_up', 1600)], { tail: 0 });
       },
       hand_back(ev, a) {
@@ -954,21 +971,21 @@
         const gs = giveSpot(mgr.data.desk);
         const p = plan(worker);
         p.stand();
-        p.add(S.call(() => { ds(worker).card = false; }), S.hold('card_result'));
+        p.add(S.call(() => { drop(worker, 'card'); }), S.hold('card_result'));
         p.to(gs[0], gs[1]);
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
-          ds(mgr).cardResult = true;
+          keep(mgr, 'cardResult');
           st.wbDone[worker.id] = true;
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
-        p.run(() => { worker.hold = null; ds(mgr).cardResult = true; st.wbDone[worker.id] = true; });
+        p.run(() => { worker.hold = null; if (!shown(ds(mgr), 'cardResult')) keep(mgr, 'cardResult'); st.wbDone[worker.id] = true; });
         if (scene.inTail(mgr)) scene.run(mgr, [S.anim(mgr.seat ? 'sit_happy' : 'idle_happy', 1800)], { tail: 0 });
       },
       explore(ev, a) {
         const ex = byKind('explorer') || a;
         setPersist(ex, null);
         let filed = false;
-        const file = () => { if (!filed) { filed = true; ds(ex).papers += 3; } };
+        const file = () => { if (!filed) { filed = true; keep(ex, 'folder'); } };
         const p = plan(ex);
         p.stand();
         p.to(SPOT.door[0], SPOT.door[1]);
@@ -985,7 +1002,7 @@
         const mgr = byKind('manager') || primary();
         // 擦掉后重写：被打断时直接换成新的计划
         let rewritten = false;
-        const rewrite = () => { if (!rewritten) { rewritten = true; st.wbErase = 0; st.wbSeed += 1; st.wbSheet = false; st.wbTags = {}; st.wbDone = {}; } };
+        const rewrite = () => { if (!rewritten) { rewritten = true; st.wbErase = 0; st.wbSeed += 1; st.wbSheetUntil = 0; st.wbTags = {}; st.wbDone = {}; } };
         const p = plan(mgr);
         p.spot('wb');
         p.add(S.call(() => { st.wbErase = 0; scene.tween(st, 'wbErase', 1, 1400, 'linear'); }), S.anim('board_erase', 1500, true),
@@ -995,7 +1012,9 @@
       },
       semantic(ev, a) {
         const d = a.data.desk;
-        scene.fly({ bmp: 'card', from: [d.seatX, ROW_B - 22], to: [L.cards.x + 12, L.cards.base - 32], ms: 900, arc: 30, onDone: () => { st.cards += 1; st.cardFlash = scene.realT + 1600; } });
+        // 卡片数取自 roomModel.semanticCards；新卡片在飞进柜子之前先不显示
+        if ((model.semanticCards || 0) > 0) st.cardHide = scene.realT + 5000;
+        scene.fly({ bmp: 'card', from: [d.seatX, ROW_B - 22], to: [L.cards.x + 12, L.cards.base - 32], ms: 900, arc: 30, onDone: () => { st.cardHide = 0; st.cardFlash = scene.realT + 1600; } });
         if (scene.inTail(a)) scene.run(a, [S.anim(a.seat ? 'sit_up' : 'look_l', 1200)], { tail: 0 });
       },
       push_cart(ev, a) {
@@ -1065,10 +1084,10 @@
       } else if (pl.to === dept) {
         const pa = primary();
         const d = pa.data.desk;
-        if (art === 'prd') courier({ at: [d.x - 8, ROW_B, 1], bring: 'scroll', colorIndex: ci, onArrive: () => { ds(pa).scroll = true; } });
+        if (art === 'prd') courier({ at: [d.x - 8, ROW_B, 1], bring: 'scroll', colorIndex: ci, onArrive: () => { keep(pa, 'scroll'); } });
         else if (art === 'box') courier({ at: SPOT.benchSide, bring: 'box_sealed', colorIndex: ci, onArrive: () => { st.bench.item = 'box_sealed'; st.bench.mark = { text: '封存', color: PAL.blue2 }; st.bench.slip = null; st.bench.slipMark = null; st.bench.ticks = 0; } });
-        else if (art === 'defect') courier({ at: isOps() ? [d.x - 8, ROW_B, 1] : SPOT.benchSide, bring: 'box_rework', colorIndex: ci, onArrive: () => { if (isOps()) ds(pa).box = true; else { st.bench.item = 'box_rework'; st.bench.slip = 'defect'; st.bench.slipMark = { text: '返工', color: PAL.red2 }; } } });
-        else if (art === 'release' && isOps()) courier({ at: [d.x - 8, ROW_B, 1], bring: 'box_sealed', colorIndex: ci, onArrive: () => { ds(pa).box = true; } });
+        else if (art === 'defect') courier({ at: isOps() ? [d.x - 8, ROW_B, 1] : SPOT.benchSide, bring: 'box_rework', colorIndex: ci, onArrive: () => { if (isOps()) keep(pa, 'box'); else { st.bench.item = 'box_rework'; st.bench.slip = 'defect'; st.bench.slipMark = { text: '返工', color: PAL.red2 }; } } });
+        else if (art === 'release' && isOps()) courier({ at: [d.x - 8, ROW_B, 1], bring: 'box_sealed', colorIndex: ci, onArrive: () => { keep(pa, 'box'); } });
       }
     }
 
@@ -1077,6 +1096,11 @@
       const pl = ev.payload || {};
       const related = !ev.department || ev.department === dept || pl.from === dept || pl.to === dept;
       if (!related) return;
+      // 提案被接纳或退回后托盘清空
+      if (PROPOSAL_DONE.has(ev.type)) st.trayPaper = false;
+      // 数据中已经加上的卷轴与纸条，在动作把它们放上去之前先不显示
+      if ((ev.type === 'spec_accepted' || ev.type === 'contract_accepted') && dept === 'product' && (model.scrolls || 0) > 0) st.scrollHide = scene.realT + 15000;
+      if (ev.type === 'department_guidance_applied' && (model.pinnedNotes || 0) > 0) st.noteHide = scene.realT + 15000;
       if (ev.type === 'transition') { transition(ev); return; }
       if (ev.type === 'collaboration_closed') {
         roleActors().forEach((x) => { if (x.script && x.anim === 'wait') scene.cancel(x); });
@@ -1123,6 +1147,7 @@
       if (a.data.queue.length > 3) a.data.queue.shift();
     }
     const SIDE_ONLY = new Set(['guidance_in', 'semantic', 'freeze']);
+    const PROPOSAL_DONE = new Set(['spec_accepted', 'contract_accepted', 'plan_accepted', 'delivery_accepted', 'qa_submitted', 'proposal_rejected']);
     const IMMEDIATE = new Set(['paused', 'failed', 'done', 'cancelled', 'puzzled', 'hold_card', 'resume']);
 
     // -------------------------------------------------------------------------
@@ -1228,7 +1253,8 @@
       if (!isOps()) paint.window(c, L.window.x, L.window.y, { w: L.window.w, h: L.window.h, night: off }, t);
       paint.clock(c, L.clock.x, L.clock.y, st.clock, { stopped: off });
       paint.whiteboard(c, L.wb.x, L.wb.y, whiteboardOpts(), t);
-      paint.corkboard(c, L.cork.x, L.cork.y, { w: L.cork.w, h: L.cork.h, notes: st.notes, done: st.notesDone, label: '部门指导' });
+      const pinned = Math.max(0, (model.pinnedNotes || 0) - (st.noteHide > sc.realT ? 1 : 0));
+      paint.corkboard(c, L.cork.x, L.cork.y, { w: L.cork.w, h: L.cork.h, notes: pinned, doneIndex: st.replyUntil > sc.realT ? Math.min(pinned, 6) - 1 : -1, label: '部门指导' });
       const doorInfo = paint.door(c, L.door.x, L.door.base, { w: L.door.w, h: L.door.h, open: st.door });
       R(c, L.door.x + 4, L.door.base - L.door.h - 12, L.door.w - 8, 8, PAL.ink);
       R(c, L.door.x + 5, L.door.base - L.door.h - 11, L.door.w - 10, 6, D.main);
@@ -1239,9 +1265,9 @@
       // 地面物件与小人：按深度排序
       const items = [];
       items.push({ y: BASE, draw: () => { paint.cabinet(c, L.cabinet.x, L.cabinet.base, { open: st.drawer, blink: blinkTool('search') }, t); paint.archive(c, L.cabinet.x + 2, L.cabinet.base - 40, { n: model.summaries || 0, flash: sc.realT < st.archiveFlash }, t); } });
-      if (P.levelAtLeast(level, 's4')) items.push({ y: BASE, draw: () => paint.cardCabinet(c, L.cards.x, L.cards.base, { cards: st.cards, flash: sc.realT < st.cardFlash, label: '语义记录' }, t) });
+      if (P.levelAtLeast(level, 's4')) items.push({ y: BASE, draw: () => paint.cardCabinet(c, L.cards.x, L.cards.base, { cards: Math.max(0, (model.semanticCards || 0) - (st.cardHide > sc.realT ? 1 : 0)), flash: sc.realT < st.cardFlash, label: '语义记录' }, t) });
       items.push({ y: BASE, draw: () => { st.termInfo = paint.terminal(c, L.terminal.x, L.terminal.base, termOpts(), t); } });
-      items.push({ y: BASE + 2, draw: () => paint.tray(c, L.tray.x, L.tray.base, { count: st.tray }) });
+      items.push({ y: BASE + 2, draw: () => paint.tray(c, L.tray.x, L.tray.base, { count: st.trayPaper ? 1 : 0 }) });
       items.push({ y: BASE, draw: () => drawBackPiece(c, t) });
       items.push({ y: BASE + 2, draw: () => { st.mailInfo = paint.mailbox(c, L.mailbox.x, L.mailbox.base, { count: mailCount() }, t); } });
       items.push({ y: BASE + 4, draw: () => paint.plant(c, L.plant.x, L.plant.base) });
@@ -1255,7 +1281,7 @@
         items.push({ y: ROW_B - 1, draw: () => paint.chair(c, d.seatX, ROW_B, { color: D.shade }) });
         items.push({ y: ROW_B + 0.5, draw: () => drawDesk(c, d, t) });
       });
-      items.push({ y: st.bin.y, draw: () => paint.bin(c, st.bin.x, st.bin.y, { count: st.binCount }) });
+      items.push({ y: st.bin.y, draw: () => paint.bin(c, st.bin.x, st.bin.y, { count: st.binUntil > sc.realT ? 1 : 0 }) });
       items.push({ y: ROW_B + 12, draw: () => drawTeaStation(c, t) });
       sc.actors.forEach((a) => { if (!a.seat) items.push({ y: a.y, draw: () => P.drawActor(c, sc, a) }); });
       items.sort((p, q) => p.y - q.y);
@@ -1376,13 +1402,13 @@
       } else {
         lines = [0, 1, 2, 3].map((i) => ({ color: [PAL.blue3, PAL.ink2, PAL.red3, PAL.ink2][(i + st.wbSeed) % 4] }));
       }
-      return { w: L.wb.w, h: L.wb.h, floor: L.wb.floor, title: s4 ? '部门账本' : '工作计划', lines, sheet: st.wbSheet, erase: st.wbErase, blink: false };
+      return { w: L.wb.w, h: L.wb.h, floor: L.wb.floor, title: s4 ? '部门账本' : '工作计划', lines, sheet: st.wbSheetUntil > scene.realT, erase: st.wbErase, blink: false };
     }
 
     function drawBackPiece(c, t) {
       const x = L.back.x;
       if (dept === 'product') {
-        paint.scrollRack(c, x, BASE, { count: st.scrolls, flash: scene.realT < st.scrollFlash, label: '卷轴架' }, t);
+        paint.scrollRack(c, x, BASE, { count: Math.max(0, (model.scrolls || 0) - (st.scrollHide > scene.realT ? 1 : 0)), flash: scene.realT < st.scrollFlash, label: '卷轴架' }, t);
       } else if (dept === 'engineering') {
         RB(c, x, BASE - 50, 60, 50, PAL.metal3);
         R(c, x, BASE - 50, 60, 2, PAL.metal2);
@@ -1470,13 +1496,17 @@
       const seated = a && a.seat === d && a.visible;
       if (seated) P.drawActor(c, scene, a, 'base');
       paint.desk(c, d.x, d.y, { w: d.w, wood: dept === 'operations' ? [PAL.grey2, PAL.grey3, PAL.grey4, PAL.grey5] : dept === 'quality' ? [PAL.white, PAL.white2, PAL.white3, PAL.grey3] : null });
+      // 已取消时纸收进箱子；其余桌上物件是动作留下的，过一段时间收走
+      const cancelled = effStatus() === 'cancelled';
+      const writing = a && a.data.persist && a.data.persist.write;
       paint.deskItems(c, d.x, d.y, {
-        w: d.w, papers: s.papers, folder: s.folder, docOnDesk: s.doc, box: s.box, card: s.card, cardResult: s.cardResult,
+        w: d.w, papers: cancelled || s.hidePapers ? 0 : s.papers, folder: !cancelled && shown(s, 'folder'), docOnDesk: !cancelled && (shown(s, 'doc') || writing),
+        box: cancelled || shown(s, 'box'), card: shown(s, 'card'), cardResult: shown(s, 'cardResult'),
         cup: !(a && (a.anim === 'tea' || a.anim === 'tea0')), monitor: null, lamp: s.redLamp ? 'red' : null, nameplate: d.role.name,
         plateColor: D.light, seed: d.i
       }, t);
-      if (s.scroll) P.drawBitmap(c, 'scroll', d.x + 6, d.y - 5);
-      if (s.plane) P.drawBitmap(c, 'plane', d.x + d.w / 2 - 12, d.y - 6);
+      if (shown(s, 'scroll')) P.drawBitmap(c, 'scroll', d.x + 6, d.y - 5);
+      if (shown(s, 'plane')) P.drawBitmap(c, 'plane', d.x + d.w / 2 - 12, d.y - 6);
       if (seated) {
         c.save();
         c.beginPath(); c.rect(0, 0, W, d.y); c.clip();
@@ -1521,6 +1551,8 @@
       st.eventStatus = null; st.eventCard = null; st.eventTool = null;
       if (m.pendingTool) st.lastPendingTool = m.pendingTool;
       if (m.door !== undefined) st.doorEvent = null;
+      // 白板上的分派标记以角色状态为准
+      st.wbTags = {}; st.wbDone = {};
       syncRoles();
       const s = effStatus();
       if (s !== prevStatus) {
@@ -1530,8 +1562,6 @@
           if (s !== 'working') { a.data.persist = null; a.data.queue = []; }
         });
         if (s !== 'failed') roleActors().forEach((a) => { if (!a.data.persist) ds(a).redLamp = false; });
-        if (s === 'cancelled') roleActors().forEach((a) => { const x = ds(a); x.papers = 0; x.folder = false; x.doc = false; x.box = true; });
-        if (prevStatus === 'cancelled' && s !== 'cancelled') roleActors().forEach((a) => { ds(a).box = false; });
       }
       applyLights();
     }

@@ -26,19 +26,6 @@
     return String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   }
 
-  // 本项目角色设置写入了的项之外，其余项继承的值：来自 Y7.model.resolveRole 的结果，来源为项目角色设置的项在清除之前不可知
-  function inheritedOf(resolved) {
-    const ownModel = resolved.source === '项目角色设置';
-    const ownLevel = resolved.levelSource === '项目角色设置';
-    return {
-      modelKnown: !ownModel,
-      definition: ownModel ? null : resolved.definition,
-      source: ownModel ? null : resolved.source,
-      levelKnown: !ownLevel,
-      requestLevel: ownLevel ? null : resolved.requestLevel
-    };
-  }
-
   // ---------------------------------------------------------------------------
   // 查询：基本信息、项目部门设置、项目角色设置（s4）、登记命令（s3）、工具授权与待批准（s3）
 
@@ -71,8 +58,12 @@
       DEPTS3.forEach((dept) => {
         roles[dept] = catalog.roleCatalog[dept].map((role) => {
           const setting = raw.roles && Array.isArray(raw.roles[dept]) ? raw.roles[dept].find((entry) => entry.roleId === role.id) || null : null;
-          const resolved = Y7.model.resolveRole(projectId, dept, role.id);
-          return Object.assign({}, role, { setting, resolved, inherited: inheritedOf(resolved) });
+          // resolved 为生效的值；inherited 为跳过本项目角色设置之后继承的值，用于「跟随」一项
+          return Object.assign({}, role, {
+            setting,
+            resolved: Y7.model.resolveRole(projectId, dept, role.id),
+            inherited: Y7.model.resolveRole(projectId, dept, role.id, { skipProjectRole: true })
+          });
         });
       });
     }
@@ -210,6 +201,13 @@
     return ui.block({ title: '基本信息', tag: '当前', level: 'now', query: 'project.settings', command: ['renameProject', 'pinProject', 'archiveProject', 'restoreProject'], body });
   }
 
+  // 角色「跟随」时继承的模型与推理档位（跳过本项目角色设置）
+  function followText(inherited) {
+    const model = inherited.definition ? Y7.model.label(inherited.definition) + ' · ' + inherited.source : '未设置';
+    const level = inherited.requestLevel ? inherited.requestLevel + ' · ' + inherited.levelSource : '模型默认档位';
+    return '跟随（当前：' + model + '）；档位跟随（当前：' + level + '）';
+  }
+
   function effectiveHtml(e) {
     if (!e.definition) return ui.status('idle', '未设置');
     return '<span class="y7-set-stack"><strong>' + esc(Y7.model.label(e.definition)) + '</strong><small class="y7-muted">来源：' + esc(e.source) + '</small>' +
@@ -257,7 +255,8 @@
           { key: 'model', label: '模型', render: (row) => effectiveHtml(row.resolved) },
           { key: 'level', label: '推理档位', render: (row) => row.resolved.definition ? '<div class="y7-cell-stack"><span>' + esc((row.resolved.requestLevel ? '请求 ' + row.resolved.requestLevel : '请求档位为空') + ' · 发送 ' + (row.resolved.sentLevel || '不带推理参数')) + '</span><small class="y7-muted">来源：' + esc(row.resolved.levelSource || '模型默认档位') + '</small></div>' : '' },
           { key: 'prompt', label: '角色 Prompt', render: (row) => row.resolved.promptText ? '<span class="y7-set-clip">' + esc(row.resolved.promptText) + '</span>' : '<span class="y7-muted">' + esc(row.resolved.promptSource) + '</span>' },
-          { key: 'own', label: '本项目写入', render: (row) => row.setting ? ui.status('done', '已写入') : '<span class="y7-muted">跟随</span>' }
+          { key: 'own', label: '本项目写入', render: (row) => '<div class="y7-cell-stack">' + (row.setting ? ui.status('done', '已写入') : '') +
+            '<small class="y7-muted">' + esc(followText(row.inherited)) + '</small></div>' }
         ],
         rows: s.roles[dept]
       });

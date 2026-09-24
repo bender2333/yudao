@@ -77,7 +77,8 @@
       department: dept, level, status, crt: CRT[dept], roles, pose: null, door,
       holdCard: status === 'waiting_resume' ? '凭据被上游拒绝：OPENCODE_GO_KEY' : null,
       pendingTool: status === 'pending_verification' ? 'run_command' : null,
-      mailbox: 1, summaries: 2
+      mailbox: 1, summaries: 2, scrolls: dept === 'product' ? 3 : 0, pinnedNotes: 1, semanticCards: s4 ? 4 : 0,
+      version: dept === 'operations' ? 'r3' : null, alarm: false
     };
   }
   function roomEvents() {
@@ -346,14 +347,18 @@
   // 与真实页面一样先改数据再播放事件：信箱与摘要档案盒的数字以 roomModel 为准
   const ROOM_COUNT_PATCH = {
     department_guidance_received: (m) => { m.mailbox += 1; },
-    department_guidance_applied: (m) => { m.mailbox = Math.max(0, m.mailbox - 1); },
-    compaction_recorded: (m) => { m.summaries += 1; }
+    department_guidance_applied: (m) => { m.mailbox = Math.max(0, m.mailbox - 1); m.pinnedNotes += 1; },
+    compaction_recorded: (m) => { m.summaries += 1; },
+    spec_accepted: (m) => { if (m.department === 'product') m.scrolls += 1; },
+    contract_accepted: (m) => { if (m.department === 'product') m.scrolls += 1; },
+    x_semantic_recorded: (m) => { if (m.level === 's4' || m.level === 's5') m.semanticCards += 1; }
   };
 
   function mountLoop(root) {
     if (live.loop) live.loop.destroy();
     const m = loopModel();
     live.loop = P.createLoopScene(root.querySelector('canvas[data-g-loop]'), { level: m.level });
+    live.loopModel = m;
     live.loop.setModel(m);
     live.loop.focus(sel.focus || null);
     live.loopEvents = loopEvents();
@@ -423,6 +428,11 @@
     const L = need();
     const item = L.loopEvents[Number(el.dataset.i)];
     if (!item) throw new Error('没有这个事件按钮：' + el.dataset.i);
+    // 架子上的版本与候选取自 loopModel：先改数据再播放事件
+    const ev = item[1];
+    const sh = L.loopModel.shelves;
+    if (ev.type === 'deliverable_adopted' && ev.payload && ev.payload.version && !sh.adopted.includes(ev.payload.version)) { sh.adopted.push(ev.payload.version); L.loop.setModel(L.loopModel); }
+    if (ev.type === 'adoption_held' && !sh.held.some((h) => h.id === ev.workItemId)) { sh.held.push({ id: ev.workItemId, label: (ev.payload && ev.payload.label) || ev.workItemId }); L.loop.setModel(L.loopModel); }
     L.loop.playEvent(Object.assign({ seq: Date.now(), at: new Date().toISOString(), projectId: 'p-report' }, item[1]));
   });
 
