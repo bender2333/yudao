@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-25 新资料：[惊讶与预测误差：参照调研](surprise-and-prediction-error.md)。支持 [D25 语义系统](../requirements/semantic-system.md)「TODO：惊讶机制」专题，含自由能原理与贝叶斯惊讶的定义，EM-LLM、Titans、Nemori 用惊讶决定记什么的做法，PreAct 等先写预期再比较的做法，Reflexion、ExpeL、CLIN 从失败中提取教训的做法，各家 API 是否返回 token 概率，以及 OMP 按「摩擦」写入记忆的规则。
+
 > 2026-09-25 新资料：[Semantica 参照调研](semantica-reference.md)。支持 [D25 语义系统](../requirements/semantic-system.md)的整理部分，含 Semantica 0.7.0 的本体、来源与证据、冲突、上下文与决定模块，与 Yudao 七类内容和轨迹的对照，与事件溯源、状态主权、就地失败原则的冲突，可以借用的做法，以及 refact 的集成设计与同类项目。
 
 > 2026-09-25 新资料：[游戏化 Web 界面的技术调研](web-frontend-technology.md)。支持 [D30 游戏化的 Web 界面与界面实现](../requirements/web-game-frontend.md)，含 Pixel Agents、AI Town、《缺氧》的覆盖层与状态管理，PixiJS、Phaser、XState、GSAP、中文像素字体的现状与许可，以及 OpenCode 的接口定义、SDK 生成与事件流补齐。

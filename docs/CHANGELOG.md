@@ -70,3 +70,5 @@ claude-opus-5-5 / 2026-09-25 18:05 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-25 18:25 / docs/requirements/semantic-system.md（D25）写入用户关于惊讶值的原话，「已确认」增加第 22 条（压缩不再生成文字摘要）与第 23 条（实体身份）；docs/requirements/stage-requirements-overview.md 第 3.2 节同步，待讨论改为惊讶值；docs/decision.md 增加第五轮决定 / 用户按推荐回答压缩与实体身份两个问题，并补充惊讶值的需求
 
 claude-opus-5-5 / 2026-09-25 18:40 / docs/requirements/semantic-system.md（D25）写入用户关于惊讶机制的纠正原话，「已确认」增加第 24 条（保留由惊讶得出的知识与教训），新增「TODO：惊讶机制」一节；docs/requirements/stage-requirements-overview.md 第 3.2 节增加第 17 条与惊讶机制 TODO，写明整理部分讨论完成；docs/decision.md 同步 / 用户决定惊讶的发现与处理单独专题讨论，语义系统只保留由惊讶得出的内容
+
+claude-opus-5-5 / 2026-09-25 18:55 / 新增 docs/research/surprise-and-prediction-error.md（自由能原理与贝叶斯惊讶、EM-LLM、Titans、Nemori、PreAct、Reflexion、ExpeL、CLIN、各家 API 的 token 概率、OMP 的记忆写入规则），docs/research/README.md 增加索引，D25「TODO：惊讶机制」一节链接该调研 / 为惊讶机制专题讨论准备一手参照
