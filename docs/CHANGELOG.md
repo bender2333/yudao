@@ -42,3 +42,5 @@ claude-opus-5-5 / 2026-09-24 23:20 / 新增 docs/prototypes/v7/design.md（v7 �
 claude-opus-5-5 / 2026-09-25 06:30 / 新增 docs/prototypes/v7/ 原型（index.html、styles/、js/，含外壳与核心、示例数据与十二个场景、像素小人与部门房间、循环画面、动作图鉴、概览、恢复与动作核实、资料、部门工作间、观测、设置、系统页）；design.md 第 4.3、6.3、7.2 节补充对结果未知的动作作出决定；BUILD.md 补充共用函数、事项字段、画面数量字段与事件字段；docs/prototypes/CHANGELOG.md 新增 v7 条目 / 按已确认的 v7 信息结构完成原型制作
 
 claude-opus-5-5 / 2026-09-25 07:25 / docs/prototypes/v7/BUILD.md 第 5.1 节改为画面按容器宽度缩放并填满容器（非整数倍，用 pixelated 显示）；原型的画面缩放、场景播放时的画面滚动与工具条留白随之修改 / 整体测试截图中循环画面只占容器宽度的六成，画面文字过小
+
+claude-opus-5-5 / 2026-09-25 15:29 / 用 git mv 把 docs/prototypes/department-workspace-v6.html 与 department-workspace-v6-design.md 移到 docs/archive/prototypes/，修改 docs/design/model-management.md（开头的原型链接、第 9 节标题与说明）、docs/prototypes/CHANGELOG.md、docs/prototypes/v7/design.md 中指向它们的链接；docs/design/model-management.md 第 10 节「目录与校验」补上协议从模型访问定义移到 Provider 配置；新增 docs/requirements/web-game-frontend.md（D30）并登记到需求索引；新增 docs/research/web-frontend-technology.md 并登记到调研索引 / v6 已被 v7 取代，用户确认归档与补充；D30 记录用户对游戏化界面与界面实现的要求，调研支撑界面技术决定

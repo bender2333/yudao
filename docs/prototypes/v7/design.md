@@ -1,6 +1,6 @@
 # 界面原型 v7 设计说明
 
-日期：2026-09-24。状态：设计已确认结构，原型制作中。取代 [v6 原型](../department-workspace-v6.html)。
+日期：2026-09-24。状态：原型已完成（2026-09-25）。取代 [v6 原型](../../archive/prototypes/department-workspace-v6.html)。
 
 依据：[总体路线图](../../program-roadmap.md)、[Stage 3 计划](../../stage-3-plan.md)、[模型管理设计说明](../../design/model-management.md)第 9 节、[恢复契约](../../design/recovery-contract-and-fault-matrix.md)、[部门内多角色设计说明](../../design/department-roles.md)（草案）、[语义系统设计说明](../../design/semantic-system.md)（草案）、[D19 按原型建设 Web 工作台](../../requirements/web-workspace-prototype.md)、D27 与 D28 需求记录、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条。用词以 [CONTEXT.md](../../../CONTEXT.md) 为准。
 
@@ -381,7 +381,7 @@ flowchart LR
 
 | 冲突 | 处理 |
 | --- | --- |
-| 协议放在 Provider 配置上（ADR-0004、D24）与现有实现放在模型访问定义上 | 原型按 ADR-0004 画；实现的改动已由 D24 第 10 节覆盖的部分之外，协议层级的迁移需要补进 D24 第 10 节 |
+| 协议放在 Provider 配置上（ADR-0004、D24）与现有实现放在模型访问定义上 | 原型按 ADR-0004 画；协议层级的迁移已写入 D24 第 10 节「目录与校验」 |
 | 模型引用无法使用时失败结束（D24 原第 5.5 节）与待恢复（Stage 3 计划、恢复契约） | 用户决定进入待恢复，文档已修改（2026-09-24 决策记录） |
 | v6 废除导出与 D24 第 4.6 节保留导出 | 按 D24，编辑 JSON 弹窗保留导入与导出 |
 | v6「资料与依据」配置文件路径与受控工件 | 用户决定改为按事项只读查看（第 4.4 节） |

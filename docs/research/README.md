@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-25 新资料：[游戏化 Web 界面的技术调研](web-frontend-technology.md)。支持 [D30 游戏化的 Web 界面与界面实现](../requirements/web-game-frontend.md)，含 Pixel Agents、AI Town、《缺氧》的覆盖层与状态管理，PixiJS、Phaser、XState、GSAP、中文像素字体的现状与许可，以及 OpenCode 的接口定义、SDK 生成与事件流补齐。
+
 > 2026-09-24 新资料：[JEV 决策模型：能力边界与在 Yudao 中的用法](jev-decision-model.md)。支持 [D28 元观察与规则检查部门](../requirements/meta-observer.md)，含接口与费用、擅长与不擅长的判断、中文未经验证、状态注入与选项顺序的风险，以及论文与使用者建议的做法。
 
 > 2026-09-24 新资料：[语义系统与部门内多角色：参照调研](semantic-system-and-department-roles.md)。支持 [语义系统](../design/semantic-system.md) 与 [部门内多角色](../design/department-roles.md) 两份设计，含 OMP、OpenCode 的子 Agent 与记忆实现，以及 Graphiti、Mem0、Letta、Anthropic、Magentic-One、MetaGPT、MAST 等一手来源。

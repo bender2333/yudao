@@ -35,5 +35,6 @@
 | D27 | [运维部门](operations-department.md) | 需求已记录，未实施；路线位置 Stage 5 |
 | D28 | [元观察与规则检查部门](meta-observer.md) | 需求已记录，未实施；路线位置 Stage 5；调研见 [JEV 决策模型](../research/jev-decision-model.md) |
 | D29 | [分布式部署](distributed-deployment.md) | 需求已记录；六条边界见 [ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)，未实施；路线位置 Stage 6 |
+| D30 | [游戏化的 Web 界面与界面实现](web-game-frontend.md) | 需求已记录；[原型 v7](../prototypes/v7/design.md) 已完成，技术设计进行中，未实施 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

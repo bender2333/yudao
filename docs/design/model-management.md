@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-日期：2026-09-24。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](../adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)。界面原型：[department-workspace-v6.html](../prototypes/department-workspace-v6.html)，第 9 节列出需要按本说明修改的地方。
+日期：2026-09-24。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](../adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)。界面原型：[v7 原型](../prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。
 
 本说明是模型目录、部门模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
@@ -316,7 +316,9 @@ sequenceDiagram
 - 上游返回上下文超限：按错误码与错误文本识别（例如 `context_length_exceeded`、`prompt is too long`、`maximum context length`、`exceeds the context window`、`model_context_window_exceeded`）。识别后移除失败的请求，压缩一次，重新发送一次；重新发送后仍超限时，事项以上下文超限失败结束。
 - 固定材料本身已超过阈值时，事项以上下文超限失败结束。
 
-## 9. 界面（以 v6 原型为基础）
+## 9. 界面
+
+本节以 [v6 原型](../archive/prototypes/department-workspace-v6.html)为基础写成，列出按本说明修改的地方；[v7 原型](../prototypes/v7/design.md)已按本节制作。
 
 ### 9.1 模型管理页
 
@@ -377,7 +379,7 @@ sequenceDiagram
 | 模块 | 改动 |
 | --- | --- |
 | 预置表 | Python 元组改为数据文件；OpenCode Go 按协议列出请求基址 |
-| 目录与校验 | 模型访问定义增加推理档位声明；目录文档不含准入记录；准入按字段判断；部门默认保存时检查准入；删除按第 4.5 节检查两层引用 |
+| 目录与校验 | 协议从模型访问定义移到 Provider 配置（ADR-0004），在模型上声明协议的目录读取时直接报错；模型访问定义增加推理档位声明；目录文档不含准入记录；准入按字段判断；部门默认保存时检查准入；删除按第 4.5 节检查两层引用 |
 | 候选与测试 | 获取模型列表时带上凭据；连接测试对三种协议发送真实请求 |
 | 调用目标解析 | 统一的「解析 + 准入检查 + 档位限制」入口，按实际选中的定义检查准入 |
 | 协议适配器 | 三种协议的推理参数编码；保存并按同模型规则回放推理内容；界面汇总用的观测不进入历史 |

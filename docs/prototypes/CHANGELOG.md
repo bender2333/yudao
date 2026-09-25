@@ -34,8 +34,8 @@
 ## [v6] - 2026-09-23
 
 ### 原型交付
-- 原型文件：[department-workspace-v6.html](department-workspace-v6.html)
-- 设计文档：[department-workspace-v6-design.md](department-workspace-v6-design.md)
+- 原型文件：[department-workspace-v6.html](../archive/prototypes/department-workspace-v6.html)
+- 设计文档：[department-workspace-v6-design.md](../archive/prototypes/department-workspace-v6-design.md)
 
 ### 变更明细
 1. **模型管理全局返回导航**
