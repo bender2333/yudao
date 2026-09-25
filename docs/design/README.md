@@ -15,9 +15,9 @@
   - 状态：2026-09-06 设计；指导接口已在 `harness/web/server.py` 实现。
   - 需求：[D20](../requirements/department-guidance.md)。
 - [语义系统](semantic-system.md)
-  - 内容：语义单元与关系、材料投影、语义整理、语义视图、查回、数据流核对，与压缩及跨事项的关系，含模块关系图。
-  - 状态：2026-09-24 设计草案，未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。语义系统作为单独的项讨论，检索方式为 TODO，第 11 节的规则待用户确认。用户补充的第二项职责（整理知识图谱与语义工程，供演化使用）尚未写入草案，见 D25。
-  - 需求：[D25](../requirements/semantic-system.md)。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)。
+  - 内容：整理（轨迹、七类图谱内容与抽象层、写入与证据核对）与上下文组装（栏目、目录、接触时附加、通知、查询、各角色的上下文、长度控制、提示缓存）。
+  - 状态：2026-09-26 设计说明，规则已由用户确认，未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。惊讶机制放到后面，设计中保留扩展点。
+  - 需求：[D25](../requirements/semantic-system.md)。ADR：0008、0009。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)、[Semantica 参照调研](../research/semantica-reference.md)、[上下文组装：参照调研](../research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)。
 - [部门内多角色](department-roles.md)
   - 内容：中心型协作（中心角色、经理、探索者、主程、审查者）、角色清单、内部循环、角色任务、预测性探索与执行槽位、部门账本与交出检查、角色模型设置，含概念图、模块关系图、内部循环图与角色任务状态图。
   - 状态：2026-09-25 设计草案，规则已由用户确认，未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。
