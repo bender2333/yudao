@@ -72,3 +72,5 @@ claude-opus-5-5 / 2026-09-25 18:25 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-25 18:40 / docs/requirements/semantic-system.md（D25）写入用户关于惊讶机制的纠正原话，「已确认」增加第 24 条（保留由惊讶得出的知识与教训），新增「TODO：惊讶机制」一节；docs/requirements/stage-requirements-overview.md 第 3.2 节增加第 17 条与惊讶机制 TODO，写明整理部分讨论完成；docs/decision.md 同步 / 用户决定惊讶的发现与处理单独专题讨论，语义系统只保留由惊讶得出的内容
 
 claude-opus-5-5 / 2026-09-25 18:55 / 新增 docs/research/surprise-and-prediction-error.md（自由能原理与贝叶斯惊讶、EM-LLM、Titans、Nemori、PreAct、Reflexion、ExpeL、CLIN、各家 API 的 token 概率、OMP 的记忆写入规则），docs/research/README.md 增加索引，D25「TODO：惊讶机制」一节链接该调研 / 为惊讶机制专题讨论准备一手参照
+
+claude-opus-5-5 / 2026-09-25 19:10 / docs/requirements/semantic-system.md（D25）写入用户原话，「已确认」增加第 25 条，惊讶机制 TODO 改为「惊讶机制与事件系统整理（放到后面）」；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步 / 用户决定惊讶机制与事件系统整理放到后面，当前设计要让它们以后能正常接入
