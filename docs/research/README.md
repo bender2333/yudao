@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-25 新资料：[Loop engineering 调研](loop-engineering-2026.md)、[Graph engineering 与 2026 年基于图的 agent 编排](graph-engineering-2026.md)、[Anthropic 2026 年发布的 AI-native SDLC：一手来源调研](anthropic-ai-native-sdlc-sources.md)。三份资料核对 2026 年确定性流程工程化的三条动向，重点记录每种做法中下一步、完成与事实接纳、每次调用的上下文、持久性分别由代码还是 LLM 决定；AI-native SDLC 的架构比较见 [AI 原生 SDLC 对 Yudao 的启示](ai-native-sdlc-insights.md)。
+
 > 2026-09-25 新资料：[游戏化 Web 界面的技术调研](web-frontend-technology.md)。支持 [D30 游戏化的 Web 界面与界面实现](../requirements/web-game-frontend.md)，含 Pixel Agents、AI Town、《缺氧》的覆盖层与状态管理，PixiJS、Phaser、XState、GSAP、中文像素字体的现状与许可，以及 OpenCode 的接口定义、SDK 生成与事件流补齐。
 
 > 2026-09-24 新资料：[JEV 决策模型：能力边界与在 Yudao 中的用法](jev-decision-model.md)。支持 [D28 元观察与规则检查部门](../requirements/meta-observer.md)，含接口与费用、擅长与不擅长的判断、中文未经验证、状态注入与选项顺序的风险，以及论文与使用者建议的做法。

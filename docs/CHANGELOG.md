@@ -48,3 +48,5 @@ claude-opus-5-5 / 2026-09-25 15:29 / 用 git mv 把 docs/prototypes/department-w
 claude-opus-5-5 / 2026-09-25 15:35 / docs/research/web-frontend-technology.md 第 4 节表格新增镜头（pixi-viewport）、声音（@pixi/sound）、无障碍基础组件（Base UI）三行 / 补充游戏手法中镜头平移与缩放、声音，以及界面外壳基础组件的选型依据
 
 claude-opus-5-5 / 2026-09-25 22:32 / 新增 docs/requirements/outsourced-agent-roles.md（D31）并登记到需求索引 / 用户确认部门内需要由外部 agent 担任的外包角色，按需求记录规则保存原话、确认结论与待确认规则
+
+claude-opus-5-5 / 2026-09-25 23:36 / 新增 docs/research/loop-engineering-2026.md、graph-engineering-2026.md、anthropic-ai-native-sdlc-sources.md 三份调研，并在 docs/research/README.md 登记 / 用户要求调研 2026 年的 loop 工程、graph 工程与 Anthropic 发布的 AI-native SDLC，作为讨论 Yudao 架构意义的依据
