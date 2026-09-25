@@ -2,6 +2,10 @@
 
 本目录保存模块设计、架构图与设计说明。计划与工单引用这里的文档；设计变化时直接修改对应文件，并在 `docs/CHANGELOG.md` 记录。需求原文见 [requirements](../requirements/README.md)，难以撤销的决定见 [adr](../adr/)。
 
+- [系统架构原理：控制核心与可替换的材料](architecture-core-and-materials.md)
+  - 内容：出发点、核心公式与部门的身份、三个控制层次、确定性流程能消除什么、循环系统（Ralph 与 GPT-6 Astra）与控制的位置、与 2026 年 loop 工程、graph 工程、AI-native SDLC 的对照、原生核心与材料、分布式部署、外包角色、界面与后端的技术方向、项目的意义，含两张架构图。
+  - 状态：2026-09-26 架构讨论记录；用户陈述与确认单独标注，第 11 节的事项待用户确认。
+  - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)。需求：[D29](../requirements/distributed-deployment.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、调用目标按每次请求解析、推理档位、压缩参数。
   - 状态：2026-09-24 设计已确认，未实施。
