@@ -86,3 +86,5 @@ claude-opus-5-5 / 2026-09-26 00:12 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-26 00:31 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 9–14 条（通知、目录的选择、各角色的上下文、轨迹节录、查询方式、栏目上限），第 6 条当前状态栏目的内容按第 9 条修改；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md 新增焦点、通知、轨迹节录 / 用户采纳上下文组装专题第三轮 Q8–Q13 的推荐
 
 claude-opus-5-5 / 2026-09-26 00:44 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 15–17 条（跨事项、JEV 校准样本、界面要求）；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步 / 用户采纳上下文组装专题第四轮 Q14–Q16 的推荐
+
+claude-opus-5-5 / 2026-09-26 00:58 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 17、18 条（当前有效要求的范围、部门账本的显示），界面要求改为第 19 条，第 4、14 条接触时附加的内容与排列加入要求；docs/requirements/stage-requirements-overview.md 第 3.2 节、docs/decision.md 与 CONTEXT.md「接触时附加」同步 / 用户采纳上下文组装专题第五轮 Q17、Q18 的推荐
