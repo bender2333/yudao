@@ -60,3 +60,5 @@ claude-opus-5-5 / 2026-09-25 16:18 / 改写 docs/design/department-roles.md：�
 claude-opus-5-5 / 2026-09-25 16:52 / docs/requirements/semantic-system.md（D25）写入用户 2026-09-25 的两段原话，「已确认」增加两条（语义系统参照 Semantica、是给 Agent 做上下文的知识图谱；分为整理与上下文组装两部分），新增「重点 TODO：上下文组装」一节；docs/requirements/stage-requirements-overview.md 第 3.2 节同步，第 3.1 节写明设计草案已按 D26 修改 / 用户声明语义系统的定位，并要求把上下文组装作为重点 TODO 标出、专题讨论
 
 claude-opus-5-5 / 2026-09-25 17:05 / docs/requirements/semantic-system.md（D25）「已确认」增加整理部分的七条决定，「设计中待用户确认的规则」一节改为「设计草案的状态」；docs/requirements/stage-requirements-overview.md 第 1 节 Stage 4 的需求状态改为当前状态，第 3.1 节角色清单改为主程并补上三个部门的审查者、删除已被中心型协作取代的「设计草案已写的」一行，第 3.2 节改写为已确认、重点 TODO、设计草案状态与待讨论；docs/decision.md 新增 2026-09-25 语义系统条目；CONTEXT.md 新增「语义系统」一节术语 / 用户确认整理部分的第二轮问题（轨迹、七类图谱内容、随时记录、事件投影、稳定编号），并同意改正需求概览中已被 D26 取代的内容
+
+claude-opus-5-5 / 2026-09-25 17:30 / docs/requirements/semantic-system.md（D25）写入用户关于语义工程的原话，「已确认」增加第 8–13 条（尝试的名称、待复核规则、可见范围、知识的范围、查看与纠正、第二项职责）；docs/requirements/stage-requirements-overview.md 第 3.2 节同步并更新待讨论；docs/decision.md 2026-09-25 语义系统条目增加第三轮决定；CONTEXT.md 增加「尝试」「待复核」，「调用尝试」增加 _Avoid_ / 用户回答整理部分第三轮问题，指出语义工程还包括教训、洞见等语义
