@@ -1,7 +1,7 @@
 # JEV 决策模型：能力边界与在 Yudao 中的用法
 
 > 日期：2026-09-24。用途：支持 [D28 元观察与规则检查部门](../requirements/meta-observer.md) 与 [总体路线图](../program-roadmap.md) Stage 5：运维部门与元观察。
-> 阅读范围：只通过网页读取第 8 节的七个来源（论文读取了摘要页与 HTML 全文，其余读取网页正文）；没有调用 JEV 的接口，没有复现任何实验。下文数字都是来源报告的结果，全部在英文材料上得到，中文材料上的表现没有公开数据；TypeSafe 自己报告的数字没有独立复现。
+> 阅读范围：通过网页读取第 9 节的七个来源（论文读取了摘要页与 HTML 全文，其余读取网页正文），没有复现任何实验；第 1 至 7 节的数字都是来源报告的结果，全部在英文材料上得到，中文材料上的表现没有公开数据；TypeSafe 自己报告的数字没有独立复现。第 8 节是 2026-09-26 的本地实测，只有 4 条样本。
 > 仓库与 Obsidian 笔记中此前没有 JEV 的记录。
 
 ## 1. 基本情况
@@ -80,7 +80,22 @@
 - 接入方式：systemone 接口作为 Provider 模块的一种新协议（按协议划分地址见 ADR-0001，一个连接一种协议见 ADR-0004），在 Stage 4 随证据核对接入；准入以判定点为单位，依靠样本校准。
 - 需求与路线：[D28 元观察与规则检查部门](../requirements/meta-observer.md)、[D25 语义系统](../requirements/semantic-system.md)；[总体路线图](../program-roadmap.md) Stage 4 与 Stage 5。
 
-## 8. 来源
+## 8. 本地实测（2026-09-26）
+
+通过用户提供的中转服务调用，路径 `/v1/systemone`，模型 ID `oc/jev-1.13-free`（响应中的模型为 `jev-1.13-free`），请求带 `Authorization: Bearer` 凭据。地址与凭据由用户在 Provider 配置中填写，不写入仓库。
+
+请求：`{"model", "state", "questions": {"<名称>": {"type": "noul", "instructions": "<问题>"}}}`；一次请求可以带多个问题。响应：`{"model", "answers": {"<名称>": {"type": "noul", "noul": <概率>}}, "usage": {"input_tokens", "output_tokens"}, "cost"}`。Noul 只返回陈述为真的概率，没有单独的置信度字段。
+
+| 测试 | 结果 | 用量与耗时 |
+| --- | --- | --- |
+| 英文：「付款失败三天、正在损失销售」是否紧急 | 0.96 | 输入 290、输出 23 token，1.6 秒（含网络往返） |
+| 中文证据（pytest 输出：4 个测试，3 个通过、1 个失败）：「空输入的测试通过了」 | 0.96 | 三个问题同一次请求：输入 500、输出 58 token，1.6 秒 |
+| 同上：「全部 4 个测试都通过了」 | 0.01 | 同上 |
+| 同上：「报表按金额从高到低排序」（证据没有提到） | 0.26 | 同上 |
+
+三条中文陈述的结果方向正确；证据没有提到的陈述落在中间区域，校准需要选出「支持」与「不支持」两个阈值，中间为不确定。样本只有 4 条，不能代替校准。
+
+## 9. 来源
 
 - [A] JEV-as-a-Judge: Accept When Confident, Escalate When Unsure，arXiv 2609.26550：<https://arxiv.org/abs/2609.26550>，HTML 全文 <https://arxiv.org/html/2609.26550>
 - [B] Benchmarking Jev: what a decision model can (and can't) do in an agent harness，DEV Community：<https://dev.to/aitejiu/benchmarking-jev-what-a-decision-model-can-and-cant-do-in-an-agent-harness-20po>
