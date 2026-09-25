@@ -58,3 +58,5 @@ claude-opus-5-5 / 2026-09-25 16:12 / docs/requirements/department-roles.md（D26
 claude-opus-5-5 / 2026-09-25 16:18 / 改写 docs/design/department-roles.md：中心型协作（中心角色与经理分为两节）、角色清单（增加审查者、「开发者」改为「主程」）、新增内部循环（含流程图）与预测性探索、执行槽位的优先级与让出、交出检查表，删除一次性角色的请求数与任务数上限，删除已确定的待确认规则，章节重新编号，更新验收反例与对现有设计的影响；docs/design/README.md 更新该条目；四张 mermaid 图经 mermaid 解析器检查通过 / 用户确认按 D26 2026-09-25 的决定修改设计草案
 
 claude-opus-5-5 / 2026-09-25 16:52 / docs/requirements/semantic-system.md（D25）写入用户 2026-09-25 的两段原话，「已确认」增加两条（语义系统参照 Semantica、是给 Agent 做上下文的知识图谱；分为整理与上下文组装两部分），新增「重点 TODO：上下文组装」一节；docs/requirements/stage-requirements-overview.md 第 3.2 节同步，第 3.1 节写明设计草案已按 D26 修改 / 用户声明语义系统的定位，并要求把上下文组装作为重点 TODO 标出、专题讨论
+
+claude-opus-5-5 / 2026-09-25 17:05 / docs/requirements/semantic-system.md（D25）「已确认」增加整理部分的七条决定，「设计中待用户确认的规则」一节改为「设计草案的状态」；docs/requirements/stage-requirements-overview.md 第 1 节 Stage 4 的需求状态改为当前状态，第 3.1 节角色清单改为主程并补上三个部门的审查者、删除已被中心型协作取代的「设计草案已写的」一行，第 3.2 节改写为已确认、重点 TODO、设计草案状态与待讨论；docs/decision.md 新增 2026-09-25 语义系统条目；CONTEXT.md 新增「语义系统」一节术语 / 用户确认整理部分的第二轮问题（轨迹、七类图谱内容、随时记录、事件投影、稳定编号），并同意改正需求概览中已被 D26 取代的内容
