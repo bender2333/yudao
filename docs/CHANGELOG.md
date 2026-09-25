@@ -74,3 +74,9 @@ claude-opus-5-5 / 2026-09-25 18:40 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-25 18:55 / 新增 docs/research/surprise-and-prediction-error.md（自由能原理与贝叶斯惊讶、EM-LLM、Titans、Nemori、PreAct、Reflexion、ExpeL、CLIN、各家 API 的 token 概率、OMP 的记忆写入规则），docs/research/README.md 增加索引，D25「TODO：惊讶机制」一节链接该调研 / 为惊讶机制专题讨论准备一手参照
 
 claude-opus-5-5 / 2026-09-25 19:10 / docs/requirements/semantic-system.md（D25）写入用户原话，「已确认」增加第 25 条，惊讶机制 TODO 改为「惊讶机制与事件系统整理（放到后面）」；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步 / 用户决定惊讶机制与事件系统整理放到后面，当前设计要让它们以后能正常接入
+
+claude-opus-5-5 / 2026-09-25 23:14 / docs/requirements/semantic-system.md（D25）「重点 TODO：上下文组装」一节写入专题讨论开始时的用户原话（上下文组帧；参考 OMP 与 opencode） / 上下文组装专题讨论开始，记录用户的出发点
+
+claude-opus-5-5 / 2026-09-25 23:32 / docs/requirements/semantic-system.md（D25）重点 TODO 一节增加「专题中已确认」第 1 条（术语只用上下文组装，每次请求由固定栏目组成）；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md「上下文组装」的 Avoid 增加「组帧」 / 用户按推荐回答上下文组装专题第一轮 Q1
+
+claude-opus-5-5 / 2026-09-25 23:58 / 新增 docs/research/context-assembly-reference.md（Yudao 现行上下文装配事实，OMP fdfeef1f78 与 opencode 0027387 的上下文组装，Anthropic、Manus、Letta、Zep、Cognition、ExpeL、ACE 等公开做法与上下文长度研究，共同做法与现状差距），docs/research/README.md 增加索引 / 为上下文组装专题提供参照，用户要求参考 OMP 与 opencode
