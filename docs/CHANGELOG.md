@@ -52,3 +52,5 @@ claude-opus-5-5 / 2026-09-25 22:32 / 新增 docs/requirements/outsourced-agent-r
 claude-opus-5-5 / 2026-09-25 23:36 / 新增 docs/research/loop-engineering-2026.md、graph-engineering-2026.md、anthropic-ai-native-sdlc-sources.md 三份调研，并在 docs/research/README.md 登记 / 用户要求调研 2026 年的 loop 工程、graph 工程与 Anthropic 发布的 AI-native SDLC，作为讨论 Yudao 架构意义的依据
 
 claude-opus-5-5 / 2026-09-26 00:20 / 新增 docs/design/architecture-core-and-materials.md（系统架构原理：控制核心与可替换的材料），并在 docs/design/README.md 登记 / 用户要求把近期关于系统架构设计与项目原理的讨论保存到 docs，作为回到架构整体设计的起点
+
+claude-opus-5-5 / 2026-09-26 01:13 / 新建 docs/design/architecture/ 作为总体架构设计的目录：用 git mv 把 docs/design/architecture-core-and-materials.md 移为 docs/design/architecture/core-and-materials.md 并修改其中的相对链接；新增 docs/design/architecture/overall-architecture.md（分层图、各层职责与边界、待讨论事项、控制核心与执行者合同中需要先确定的问题）；docs/design/README.md 改为「总体架构设计」一组 / 用户认可分层图与职责分层表，要求保存到总体架构设计的目录，下一次会话继续讨论

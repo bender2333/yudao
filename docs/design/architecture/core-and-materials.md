@@ -2,7 +2,7 @@
 
 更新：2026-09-26。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。
 
-依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、[D29 分布式部署](../requirements/distributed-deployment.md)、[D31 部门内的外包角色](../requirements/outsourced-agent-roles.md)、[恢复契约](recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../research/loop-engineering-2026.md)、[Graph engineering](../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../research/anthropic-ai-native-sdlc-sources.md)。
+依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 分布式部署](../../requirements/distributed-deployment.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
 ## 1. 出发点
 
@@ -130,7 +130,7 @@ Astra 把循环放进模型内部，代价是过程不可见。Yudao 的控制�
 
 - 手册：「A skill is a control, though an advisory one … the hook makes them close to impossible」，对应规则由代码执行、不靠提示词。
 - 手册总结的一次内部事故：事故响应 agent 通过 Slack 请另一个能写代码的 Claude 推送修复；教训是「draw the boundary around access and actions, not around a model's instructions」，对应权威拓扑是设计时的常量、执行者之间没有直接通道。
-- 手册的交接文件链 intent → spec → plan，对应 Yudao 的 intend → PRD → PLAN（2026-09-06 的比较见 [AI 原生 SDLC 对 Yudao 的启示](../research/ai-native-sdlc-insights.md)）。
+- 手册的交接文件链 intent → spec → plan，对应 Yudao 的 intend → PRD → PLAN（2026-09-06 的比较见 [AI 原生 SDLC 对 Yudao 的启示](../../research/ai-native-sdlc-insights.md)）。
 - loop 工程中 Ralph 与 routines 每轮全新会话、从文件装配，以及 maker 与 checker 分开，对应会话可以丢弃与独立核验。
 - graph 工程中由脚本决定下一步，对应编排器不调用 LLM。
 - Proof-or-Stop：「Agent outputs may propose lifecycle claims, but do not themselves constitute lifecycle state」，对应 U ≠ f。
@@ -196,7 +196,7 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 
 会话可以丢弃，恢复时丢弃旧会话、从已提交的状态重新装配，从来不需要恢复会话的内存。控制核心本身就是按事件重放的确定性状态机。外部工作流引擎的核心能力是让执行到一半的代码接着运行，Yudao 用不上；引擎的执行历史还会成为事件库之外的第二份事实，违背「事件库是唯一的事实来源」。
 
-分布式派发用事件库中的派发记录与执行权编号实现，执行者领取派发、交回提案与证据。[恢复契约](recovery-contract-and-fault-matrix.md)第 3 节的执行权与一致边界是正确的基础；执行权编号需要在不同机器之间也能核对（ADR-0007 第 3 条）。
+分布式派发用事件库中的派发记录与执行权编号实现，执行者领取派发、交回提案与证据。[恢复契约](../recovery-contract-and-fault-matrix.md)第 3 节的执行权与一致边界是正确的基础；执行权编号需要在不同机器之间也能核对（ADR-0007 第 3 条）。
 
 ```mermaid
 flowchart LR
@@ -217,7 +217,7 @@ flowchart LR
 
 ## 8. 外包角色
 
-用户确认（2026-09-25）：部门内会有外包角色，由外部 agent 担任，例如 Claude、pi；这项需求一定要做。需求记录见 [D31](../requirements/outsourced-agent-roles.md)。
+用户确认（2026-09-25）：部门内会有外包角色，由外部 agent 担任，例如 Claude、pi；这项需求一定要做。需求记录见 [D31](../../requirements/outsourced-agent-roles.md)。
 
 原理第 2 节：ReAct 被限定作用域，成为被调用组件的内部实现。外部 agent 是这个内部实现的另一种写法，U ≠ f 照样成立。外包角色与自有角色使用同一个角色定义，接在同一个派发边界上，通过 ACP 接入（Claude 经 `@agentclientprotocol/claude-agent-acp`，pi 经 `pi-acp`，OMP 与 OpenCode 自带 ACP 支持）。
 
