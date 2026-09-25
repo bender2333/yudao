@@ -66,6 +66,9 @@ a16z 的开源虚拟小镇，AI 角色在其中生活与交谈（[架构说明](
 | 补间动画 | GSAP | 2025 年 4 月起全部免费，含原来收费的插件；许可为 Standard「No Charge」License，禁止用于与 Webflow 竞争的无代码动画制作工具，其他网站与 Web 应用都可以使用（[许可](https://gsap.com/community/standard-license/)） |
 | 中文像素字体 | Fusion Pixel Font（缝合像素字体） | 字体为 SIL OFL 1.1，构建脚本为 MIT；8、10、12 像素三种尺寸，覆盖《通用规范汉字表》（[仓库](https://github.com/TakWolf/fusion-pixel-font)） |
 | 网格寻路 | — | 常用的 `pathfinding` 最后一次发布在十年前（0.4.18），其余 TypeScript 库处于早期阶段；Pixel Agents 自己实现广度优先搜索 |
+| 镜头 | pixi-viewport | PixiJS 社区维护，已迁移到 PixiJS v8，提供拖动、缩放、跟随与边界（[仓库](https://github.com/pixijs-userland/pixi-viewport)） |
+| 声音 | @pixi/sound | PixiJS 官方，6.0.1 支持 v8，基于 WebAudio；最近一次发布在两年前（[仓库](https://github.com/pixijs/sound)） |
+| 无障碍基础组件 | Base UI | MUI 团队维护，2025 年 12 月发布 1.0 稳定版，35 个无障碍组件；部分 Radix 原作者在该团队；shadcn/ui 自 2026 年 7 月起新项目默认使用它（[发布记录](https://github.com/mui/base-ui/releases)、[shadcn/ui 说明](https://ui.shadcn.com/docs/changelog/2026-07-base-ui-default)） |
 
 ## 5. 界面与后端解耦：OpenCode 的做法
 
