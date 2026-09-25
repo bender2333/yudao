@@ -64,3 +64,5 @@ claude-opus-5-5 / 2026-09-25 17:05 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-25 17:30 / docs/requirements/semantic-system.md（D25）写入用户关于语义工程的原话，「已确认」增加第 8–13 条（尝试的名称、待复核规则、可见范围、知识的范围、查看与纠正、第二项职责）；docs/requirements/stage-requirements-overview.md 第 3.2 节同步并更新待讨论；docs/decision.md 2026-09-25 语义系统条目增加第三轮决定；CONTEXT.md 增加「尝试」「待复核」，「调用尝试」增加 _Avoid_ / 用户回答整理部分第三轮问题，指出语义工程还包括教训、洞见等语义
 
 claude-opus-5-5 / 2026-09-25 17:50 / 新增 docs/research/semantica-reference.md（Semantica 0.7.0 提交 2173308 的维护状况、本体、来源与证据、冲突、上下文与决定模块，与 Yudao 七类内容和轨迹的对照，与架构原则的冲突，可以借用的做法，refact 集成设计，同类项目），docs/research/README.md 增加索引 / 用户要求语义系统参照 Semantica，需要以一手源码判断能否作为依赖、借用哪些做法
+
+claude-opus-5-5 / 2026-09-25 18:05 / docs/requirements/semantic-system.md（D25）「已确认」增加第 14–21 条（抽象层、复盘、教训的约束力与范围、Semantica 不作为依赖、本体、关系八组、不记录置信度），第 13 条指向第 14–17 条，重点 TODO 增加可靠程度判断与变更推送两项；docs/requirements/stage-requirements-overview.md 第 3.2 节同步；docs/decision.md 增加第四轮决定；CONTEXT.md 增加教训、洞见、画像、复盘、本体 / 用户按推荐回答整理部分第四轮问题
