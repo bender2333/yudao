@@ -4,7 +4,7 @@
 
 > 2026-09-25 新资料：[上下文组装：参照调研](context-assembly-reference.md)。支持 [D25 语义系统](../requirements/semantic-system.md)「重点 TODO：上下文组装」专题，含 Yudao 现行上下文装配、清单、压缩与提示缓存的事实，OMP 与 opencode 的系统提示构造、规则的放入与按路径附加、按需取得、旧工具结果裁剪、提示缓存与子 Agent 上下文，以及 Anthropic、Manus、Letta、Zep、Cognition、ExpeL、ACE 的做法与上下文长度研究。
 
-> 2026-09-25 新资料：[惊讶与预测误差：参照调研](surprise-and-prediction-error.md)。支持 [D25 语义系统](../requirements/semantic-system.md)「TODO：惊讶机制」专题，含自由能原理与贝叶斯惊讶的定义，EM-LLM、Titans、Nemori 用惊讶决定记什么的做法，PreAct 等先写预期再比较的做法，Reflexion、ExpeL、CLIN 从失败中提取教训的做法，各家 API 是否返回 token 概率，以及 OMP 按「摩擦」写入记忆的规则。
+> 2026-09-25 新资料：[惊讶与预测误差：参照调研](surprise-and-prediction-error.md)。支持 [D25 语义系统](../requirements/semantic-system.md)「TODO：惊讶机制与教训发现模块」专题，含自由能原理与贝叶斯惊讶的定义，EM-LLM、Titans、Nemori 用惊讶决定记什么的做法，PreAct 等先写预期再比较的做法，Reflexion、ExpeL、CLIN 从失败中提取教训的做法，各家 API 是否返回 token 概率，以及 OMP 按「摩擦」写入记忆的规则。
 
 > 2026-09-25 新资料：[Semantica 参照调研](semantica-reference.md)。支持 [D25 语义系统](../requirements/semantic-system.md)的整理部分，含 Semantica 0.7.0 的本体、来源与证据、冲突、上下文与决定模块，与 Yudao 七类内容和轨迹的对照，与事件溯源、状态主权、就地失败原则的冲突，可以借用的做法，以及 refact 的集成设计与同类项目。
 
