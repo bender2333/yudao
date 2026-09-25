@@ -75,19 +75,27 @@ claude-opus-5-5 / 2026-09-25 18:55 / 新增 docs/research/surprise-and-predictio
 
 claude-opus-5-5 / 2026-09-25 19:10 / docs/requirements/semantic-system.md（D25）写入用户原话，「已确认」增加第 25 条，惊讶机制 TODO 改为「惊讶机制与事件系统整理（放到后面）」；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步 / 用户决定惊讶机制与事件系统整理放到后面，当前设计要让它们以后能正常接入
 
+claude-opus-5-5 / 2026-09-25 22:32 / 新增 docs/requirements/outsourced-agent-roles.md（D31）并登记到需求索引 / 用户确认部门内需要由外部 agent 担任的外包角色，按需求记录规则保存原话、确认结论与待确认规则
+
 claude-opus-5-5 / 2026-09-25 23:14 / docs/requirements/semantic-system.md（D25）「重点 TODO：上下文组装」一节写入专题讨论开始时的用户原话（上下文组帧；参考 OMP 与 opencode） / 上下文组装专题讨论开始，记录用户的出发点
 
 claude-opus-5-5 / 2026-09-25 23:32 / docs/requirements/semantic-system.md（D25）重点 TODO 一节增加「专题中已确认」第 1 条（术语只用上下文组装，每次请求由固定栏目组成）；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md「上下文组装」的 Avoid 增加「组帧」 / 用户按推荐回答上下文组装专题第一轮 Q1
 
+claude-opus-5-5 / 2026-09-25 23:36 / 新增 docs/research/loop-engineering-2026.md、graph-engineering-2026.md、anthropic-ai-native-sdlc-sources.md 三份调研，并在 docs/research/README.md 登记 / 用户要求调研 2026 年的 loop 工程、graph 工程与 Anthropic 发布的 AI-native SDLC，作为讨论 Yudao 架构意义的依据
+
 claude-opus-5-5 / 2026-09-25 23:58 / 新增 docs/research/context-assembly-reference.md（Yudao 现行上下文装配事实，OMP fdfeef1f78 与 opencode 0027387 的上下文组装，Anthropic、Manus、Letta、Zep、Cognition、ExpeL、ACE 等公开做法与上下文长度研究，共同做法与现状差距），docs/research/README.md 增加索引 / 为上下文组装专题提供参照，用户要求参考 OMP 与 opencode
 
 claude-opus-5-5 / 2026-09-26 00:12 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 2–8 条（状态与可靠程度、JEV 证据核对、四种放入方式、组装不调用模型、顺序与缓存、工作上限、旧工具结果），并整理该节的结构；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md 新增栏目、上下文清单、目录、接触时附加、工作上限、证据核对 / 用户按推荐回答上下文组装专题 Q2–Q7
+
+claude-opus-5-5 / 2026-09-26 00:20 / 新增 docs/design/architecture-core-and-materials.md（系统架构原理：控制核心与可替换的材料），并在 docs/design/README.md 登记 / 用户要求把近期关于系统架构设计与项目原理的讨论保存到 docs，作为回到架构整体设计的起点
 
 claude-opus-5-5 / 2026-09-26 00:31 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 9–14 条（通知、目录的选择、各角色的上下文、轨迹节录、查询方式、栏目上限），第 6 条当前状态栏目的内容按第 9 条修改；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md 新增焦点、通知、轨迹节录 / 用户采纳上下文组装专题第三轮 Q8–Q13 的推荐
 
 claude-opus-5-5 / 2026-09-26 00:44 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 15–17 条（跨事项、JEV 校准样本、界面要求）；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步 / 用户采纳上下文组装专题第四轮 Q14–Q16 的推荐
 
 claude-opus-5-5 / 2026-09-26 00:58 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 17、18 条（当前有效要求的范围、部门账本的显示），界面要求改为第 19 条，第 4、14 条接触时附加的内容与排列加入要求；docs/requirements/stage-requirements-overview.md 第 3.2 节、docs/decision.md 与 CONTEXT.md「接触时附加」同步 / 用户采纳上下文组装专题第五轮 Q17、Q18 的推荐
+
+claude-opus-5-5 / 2026-09-26 01:13 / 新建 docs/design/architecture/ 作为总体架构设计的目录：用 git mv 把 docs/design/architecture-core-and-materials.md 移为 docs/design/architecture/core-and-materials.md 并修改其中的相对链接；新增 docs/design/architecture/overall-architecture.md（分层图、各层职责与边界、待讨论事项、控制核心与执行者合同中需要先确定的问题）；docs/design/README.md 改为「总体架构设计」一组 / 用户认可分层图与职责分层表，要求保存到总体架构设计的目录，下一次会话继续讨论
 
 claude-opus-5-5 / 2026-09-26 01:38 / docs/requirements/semantic-system.md（D25）专题第 11 条审查者接触时附加加入要求与验收条件，更新开头状态、上下文组装一节的说明与已不存在的草案引用，删去「设计草案的状态」一节；整篇改写 docs/design/semantic-system.md（整理与上下文组装：本体、轨迹、写入与证据核对、抽象层与复盘、可见范围与跨事项、栏目与顺序、焦点与目录、接触时附加、通知、查询工具、各角色的上下文、上限、长度控制、提示缓存、数据流核对、界面、惊讶机制的扩展点、验收）；新增 docs/adr/0008-trajectory-and-graph-as-event-projections.md 与 docs/adr/0009-deterministic-context-assembly.md；docs/design/model-management.md 第 1、7.5、8.3–8.7、10、12 节按工作上限、旧工具结果清理、整理请求与轨迹节录修改；docs/design/department-roles.md 第 3、4、5、6.1、6.2、7.1、9.1、9.3、10、11.2、12.1、12.4、12.5、13、15、16、17 节按新的语义系统修改；docs/requirements/context-compaction.md（D10）、department-history.md（D08）增加开头说明；docs/requirements/meta-observer.md（D28）增加 JEV 用于证据核对一节并同步校准样本与实现状态；docs/requirements/web-game-frontend.md（D30）增加上下文的界面要求；docs/requirements/department-roles.md（D26）改正一处旧用词；docs/program-roadmap.md 第 3、4、5 节同步语义系统、JEV 在 Stage 4 接入与部门内中心型协作；docs/requirements/stage-requirements-overview.md 第 1、3.2、3.4、4.2、7 节同步；docs/design/README.md、docs/research/jev-decision-model.md 第 7 节、docs/research/README.md 同步 / 用户确认上下文组装专题的全部决定与设计改写方案
 
