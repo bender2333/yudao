@@ -80,3 +80,5 @@ claude-opus-5-5 / 2026-09-25 23:14 / docs/requirements/semantic-system.md（D25�
 claude-opus-5-5 / 2026-09-25 23:32 / docs/requirements/semantic-system.md（D25）重点 TODO 一节增加「专题中已确认」第 1 条（术语只用上下文组装，每次请求由固定栏目组成）；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md「上下文组装」的 Avoid 增加「组帧」 / 用户按推荐回答上下文组装专题第一轮 Q1
 
 claude-opus-5-5 / 2026-09-25 23:58 / 新增 docs/research/context-assembly-reference.md（Yudao 现行上下文装配事实，OMP fdfeef1f78 与 opencode 0027387 的上下文组装，Anthropic、Manus、Letta、Zep、Cognition、ExpeL、ACE 等公开做法与上下文长度研究，共同做法与现状差距），docs/research/README.md 增加索引 / 为上下文组装专题提供参照，用户要求参考 OMP 与 opencode
+
+claude-opus-5-5 / 2026-09-26 00:12 / docs/requirements/semantic-system.md（D25）「专题中已确认」增加第 2–8 条（状态与可靠程度、JEV 证据核对、四种放入方式、组装不调用模型、顺序与缓存、工作上限、旧工具结果），并整理该节的结构；docs/requirements/stage-requirements-overview.md 第 3.2 节与 docs/decision.md 同步；CONTEXT.md 新增栏目、上下文清单、目录、接触时附加、工作上限、证据核对 / 用户按推荐回答上下文组装专题 Q2–Q7
