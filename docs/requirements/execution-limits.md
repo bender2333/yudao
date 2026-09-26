@@ -16,7 +16,9 @@
 
 原生循环采用运行时间限制（`run_time_limit_sec`，默认 7200 秒）作为主要收敛保证。部门激活次数上限（`max_cycles`，默认 999999）和每次激活模型步数上限（`MAX_MODEL_STEPS`，默认 999999）保留，但在实际运行中不再成为有效约束。调用方仍可显式配置较小值以恢复旧行为。单次模型请求保留超时处理。删除任务 token 预算配置及由此触发的暂停，不保留旧配置回退。
 
-达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；达到 `max_cycles` 上限进入 `PAUSED`（停止原因为 `max_cycles`）；达到 `MAX_MODEL_STEPS` 上限进入 `PAUSED`（停止原因为 `model_steps_exhausted`）。时间限制在每次激活准备和每步之间检查，使用单调时钟，不受系统时钟调整影响。停止原因只有一份封闭的清单，属于带版本的定义（[ADR-0014](../adr/0014-versioned-definitions.md)）。
+达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；达到 `max_cycles` 上限进入 `PAUSED`（停止原因为 `max_cycles`）；达到 `MAX_MODEL_STEPS` 上限进入 `PAUSED`（停止原因为 `model_steps_exhausted`）。工作步骤连续第 4 次回复仍没有工具调用时进入 `PAUSED`（停止原因为 `no_tool_call`，见 [语义系统设计说明](../design/semantic-system.md)第 10.6 节的主机提示）。工作区出现公开树无法表示的条目（链接、特殊文件等，不含项目忽略规则排除的路径）时进入 `PAUSED`（停止原因为 `workspace_unrepresentable`），停止说明列出这些条目在工作区内的相对路径，人工处理说明是把这些路径加入项目的忽略规则或者删除它们。时间限制在每次激活准备和每步之间检查，使用单调时钟，不受系统时钟调整影响。停止原因只有一份封闭的清单，属于带版本的定义（[ADR-0014](../adr/0014-versioned-definitions.md)）。
+
+单次模型请求的时限只计算等待模型提供方的时间：从请求发出开始，到收到最后一段输出为止。主机自己的工作不计入，包括 SDK 的一次性初始化（在服务启动时完成）、请求发出前的落盘与输出片段的落盘。
 
 SDK 返回的用量可作为只读事实保存，但不影响任务推进，也不猜算价格。上下文容量检查属于请求能否发送的约束，与 provider 用量预算分开；旧历史按 D10 自动压缩，固定原文和当前工作无法容纳时明确停止。
 
