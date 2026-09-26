@@ -314,16 +314,6 @@ class _ChatInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
-        invocation.observer.on_event({
-            "kind": "message",
-            "id": response_id or _observation_id(invocation),
-            "session_id": invocation.session_id,
-            "attempt_id": invocation.attempt_id,
-            "provider": invocation.frozen_target.provider_id,
-            "model": actual_model,
-            "text": text,
-            "payload": {"text": text, "tool_calls": list(tool_calls.values())},
-        })
         deadline.stop()
         return InvokeResult(
             output=output, text=text, usage=usage, finish_reason="completed",
@@ -385,12 +375,13 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
                 role = str(item.get("role") or "user")
                 messages.append({"role": role, "content": _message_text(item.get("content"))})
         _flush_tool_calls(messages, pending_calls)
-    else:
-        for message in provider_input.messages:
-            entry: dict[str, Any] = {"role": message.role, "content": message.content}
-            if message.name:
-                entry["name"] = message.name
-            messages.append(entry)
+        return messages
+    # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
+    for message in provider_input.messages:
+        entry: dict[str, Any] = {"role": message.role, "content": message.content}
+        if message.name:
+            entry["name"] = message.name
+        messages.append(entry)
     for result in provider_input.tool_results:
         messages.append({
             "role": "tool",

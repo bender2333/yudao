@@ -329,16 +329,6 @@ class _MessagesInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
-        invocation.observer.on_event({
-            "kind": "message",
-            "id": response_id or _observation_id(invocation),
-            "session_id": invocation.session_id,
-            "attempt_id": invocation.attempt_id,
-            "provider": invocation.frozen_target.provider_id,
-            "model": actual_model,
-            "text": text,
-            "payload": {"text": text, "tool_uses": list(tool_blocks.values())},
-        })
         deadline.stop()
         return InvokeResult(
             output=output, text=text, usage=usage,
@@ -406,15 +396,16 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
                     system_parts.append(text)
                     continue
                 messages.append({"role": "assistant" if role == "assistant" else "user", "content": text})
-    else:
-        for message in provider_input.messages:
-            if message.role in {"system", "developer"}:
-                system_parts.append(message.content)
-                continue
-            messages.append({
-                "role": "assistant" if message.role == "assistant" else "user",
-                "content": message.content,
-            })
+        return "\n".join(part for part in system_parts if part), messages
+    # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
+    for message in provider_input.messages:
+        if message.role in {"system", "developer"}:
+            system_parts.append(message.content)
+            continue
+        messages.append({
+            "role": "assistant" if message.role == "assistant" else "user",
+            "content": message.content,
+        })
     for result in provider_input.tool_results:
         messages.append({
             "role": "user",
