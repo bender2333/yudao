@@ -8,7 +8,7 @@
 
 | 编号 | 细节 | 状态 |
 | --- | --- | --- |
-| D01 | [Web 持续输入任务与命令](web-continuous-input.md) | 已实现；桌面/手机追加、命令与终态新任务通过 |
+| D01 | [客户端持续输入任务与命令](web-continuous-input.md) | 产品入口为桌面客户端（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)），客户端随 D30 实施；现有浏览器页面已实现持续输入，1440/390 宽度的追加、命令与终态新任务通过 |
 | D02 | [三部门 prompt 展示与修改](department-prompts.md) | 已实现；编辑、实际采用与版本审计通过 |
 | D03 | [intend.md 原文保存](intend-original.md) | 首次及逐次原文已验证；首批文本，附件未支持 |
 | D04 | [产品维护 PRD.md](product-prd.md) | 同源 PRD 与持续变更已实现并验证 |
@@ -17,27 +17,27 @@
 | D07 | [三部门相互专家问答](expert-ask-react.md) | C 通用请求已替换单向路径，六方向及动作接续已验证 |
 | D08 | [部门完整历史与逐次上下文](department-history.md) | 已实现，自动压缩的真实运行验收中 |
 | D09 | [循环次数与超时限制](execution-limits.md) | 已实现 |
-| D10 | [上下文窗口、记忆与自动压缩](context-compaction.md) | 已实现，真实运行验收中 |
-| D11 | [三部门循环的整体定义](three-department-loop.md) | 已确认，分工作包落实 |
+| D10 | [上下文窗口、记忆与自动压缩](context-compaction.md) | 文字摘要压缩已实现，真实运行验收中，3.0B 场景 C 完成 4 次压缩并到达 release；本页的压缩做法由 D25 的工单 #26、#35 实施 |
+| D11 | [三部门循环的整体定义](three-department-loop.md) | 原生三部门循环已实现；多方向专家问答与动作请求由批次 C 实现，见 D07 |
 | D12 | [部门专业补全](domain-completion.md) | 部门规则与默认依据已实现 |
 | D13 | [完整交付封存与恢复](delivery-archive.md) | 独立恢复及 Web 下载已验证；QA 最终接纳前复验持久封存，缺失或损坏不放行 |
 | D14 | [受控删除与移动](workspace-refactoring.md) | 已实现，E 整体验证通过 |
 | D15 | [有效变化与执行依据](effective-contract-changes.md) | 合同、专家请求及在途输入适用性已验证 |
 | D16 | [使用 Git 管理任务内变化](git-change-management.md) | 已实现，真实 Git、同任务方向调整及桌面手机差异查看通过确定性验收 |
 | D17 | [模型等待与失败重试](provider-retries.md) | H 已实现；慢响应、重试边界及桌面手机已验证，真实完整流程仍有连续连接失败 |
-| D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 底层及原生循环已接入；本地多连接验证，真实跨 Provider 最终 QA 待验收，配置 UI 待原型 |
+| D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 底层目录、三部门绑定与原生循环已接入，本地多连接回归通过；配置 UI 已随 D22/D23 实现；真实跨 Provider 完整验收未完成；按每次模型请求解析由 #45 实施 |
 | D19 | [按原型建设 Web 工作台](web-workspace-prototype.md) | 原型已归档、任务已规划；Provider 等配置原型预留 |
-| D20 | [部门定向追加指导](department-guidance.md) | 用户场景已确认；处理时机、原文范围及放行关系待设计，尚未实现 |
+| D20 | [部门定向追加指导](department-guidance.md) | 已实现（`fe78667`、`fcb06ab`）；接收、进入模型输入与部门回应分别记录，处理时机与放行关系按[处理设计](../design/department-guidance.md)；3.0B 场景 B 的真实运行中指导完成处理 |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件，完整采集及新查询/页面待实现 |
-| D22 | [启动与 Provider 热生效](startup-provider-reload.md) | 已实现；无参空态启动、统一模块重载、仅新任务生效、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务 |
+| D22 | [启动与 Provider 热生效](startup-provider-reload.md) | Stage 2.7 已实现；无参空态启动、统一模块重载、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务；现有实现只对新任务生效，按每次模型请求生效由 #45 实施 |
 | D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../design/model-management.md)已确认，未实施；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
-| D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通；真实 Go 覆盖 Responses 与 Chat Completions 并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制，见 [执行报告](../archive/stage-2-7-provider-report.md) |
-| D25 | [语义系统](semantic-system.md) | 需求已记录；[设计草案](../design/semantic-system.md)待用户确认，未实施；路线位置 Stage 4 |
-| D26 | [部门内多角色与多循环](department-roles.md) | 需求已记录；[设计草案](../design/department-roles.md)待用户确认，未实施；路线位置 Stage 4 |
+| D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通；真实 Go 覆盖 Responses 与 Chat Completions 并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制，见 [执行报告](../archive/stage-2-7-provider-report.md)；按每次模型请求解析调用目标由 #45 实施 |
+| D25 | [语义系统](semantic-system.md) | 需求已确认；[设计说明](../design/semantic-system.md)已按需求记录写成（2026-09-26），未实施；路线位置 Stage 4 |
+| D26 | [部门内多角色与多循环](department-roles.md) | 需求已记录，规则已由用户确认；[设计说明](../design/department-roles.md)已按 2026-09-25 与 2026-09-26 的决定修改，未实施；路线位置 Stage 4 |
 | D27 | [运维部门](operations-department.md) | 需求已记录，未实施；路线位置 Stage 5 |
 | D28 | [元观察与规则检查部门](meta-observer.md) | 需求已记录，未实施；路线位置 Stage 5；调研见 [JEV 决策模型](../research/jev-decision-model.md) |
-| D29 | [分布式部署](distributed-deployment.md) | 需求已记录；六条边界见 [ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)，未实施；路线位置 Stage 6 |
-| D30 | [游戏化的 Web 界面与界面实现](web-game-frontend.md) | 需求已记录；[原型 v7](../prototypes/v7/design.md) 已完成，技术设计进行中，未实施 |
+| D29 | [分布式部署](distributed-deployment.md) | 需求已记录；部署形态见 [ADR-0012](../adr/0012-single-control-core-scalable-execution.md)，六条边界见 [ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)，未实施；路线位置 Stage 6 |
+| D30 | [游戏化的桌面客户端界面与界面实现](web-game-frontend.md) | 需求已记录；客户端为 Electron 桌面程序（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）；[原型 v7](../prototypes/v7/design.md) 已完成，技术设计进行中，未实施 |
 | D31 | [部门内的外包角色](outsourced-agent-roles.md) | 需求已记录，未实施；路线位置待定 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
