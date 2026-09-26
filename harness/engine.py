@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Any, Protocol
 
-from .actions import Action, FactsQuery, Preconditions, WorkspaceFacts
+from .actions import Action, ActionReceipt, FactsQuery, Preconditions, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
@@ -128,13 +128,18 @@ class StepDriver:
         self._cancelled = cancelled
         self._limits = limits
         self._request: ModelRequest | None = None
+        self._action: Action | None = None
         self._step: StepRequest | None = None
         self._task: asyncio.Task[StepResult] | None = None
 
     def cancel(self) -> None:
-        # 之后的核对都得到停止；这一步已经准备了请求时按尝试身份取消这次调用尝试，尝试还没有开始时开始即取消。
+        # 之后的核对都得到停止；正在进行的动作按动作身份取消（进程类动作结束整个进程树，回执记为已取消）；
+        # 这一步已经准备了请求时按尝试身份取消这次调用尝试，尝试还没有开始时开始即取消。
         # 取消落在正在进行的这一项上，步骤循环在下一个安全节点停止，记录与没有取消时走同一条路径
         self._cancelled.set()
+        action = self._action
+        if action is not None:
+            self._environment.cancel(action.action_id)
         request = self._request
         if request is not None and request.attempt_id:
             self._adapter.cancel(request.attempt_id)
@@ -284,7 +289,7 @@ class StepDriver:
                         ok, output, error = True, _run_host_tool(name, args), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要
-                        receipt = await self._environment.perform(Action(
+                        receipt = await self._perform(Action(
                             action_id=f"{request.activation_id}:{step_id}:{identity}", kind=TOOL_DEFS[name]["action"],
                             tool=name, department=request.department, input=args,
                             preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
@@ -420,6 +425,17 @@ class StepDriver:
             if permission.allowed:
                 self._recorder.tool_started(projection.phase, request, call, permission.command_basis)
             return permission, facts
+
+    async def _perform(self, action: Action) -> ActionReceipt:
+        # 先登记正在进行的动作，再看取消信号：取消落在登记之前时在这里交给执行环境，动作不开始；
+        # 落在登记之后时由 cancel() 交给执行环境
+        self._action = action
+        try:
+            if self._cancelled.is_set():
+                self._environment.cancel(action.action_id)
+            return await self._environment.perform(action)
+        finally:
+            self._action = None
 
     def _skip(self, request: ModelRequest, output: list[dict[str, Any]], error: str) -> None:
         for item in output:

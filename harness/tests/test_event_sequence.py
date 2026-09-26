@@ -315,6 +315,60 @@ def run_command_is_not_a_check_receipt(data_dir):
     return system, run_id, {}
 
 
+def _running(label: str) -> str:
+    # 运行中的进程（argv 的一项）：输出一行，在第一个参数给出的位置写下标记文件以后一直等待
+    return (f"import pathlib, sys, time; print('{label} started', flush=True); "
+            "pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)")
+
+
+def _cancel_when_running(system: LoopSystem, run_id: str, marker) -> threading.Thread:
+    # 进程写下标记文件（确实在运行）以后，另一个线程取消运行
+    def cancel() -> None:
+        for _ in range(1200):
+            if marker.exists():
+                break
+            time.sleep(0.05)
+        system.cancel(run_id)
+
+    canceller = threading.Thread(target=cancel)
+    canceller.start()
+    return canceller
+
+
+def _delivery_call(identity: str) -> dict[str, Any]:
+    return _call(identity, "submit_delivery", {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"]})
+
+
+def cancel_while_check_runs(data_dir):
+    # 标记文件的路径写成正斜杠形式，规整以后各平台相同
+    marker = (data_dir / "check-running").as_posix()
+    argv = ["python", "-c", _running("check"), marker]
+    system, _, run_id = _system(data_dir, [
+        product_spec(), plan_turn(),
+        ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
+                              _call("check-1", "run_check", {"name": "smoke", "argv": argv}),
+                              _delivery_call("submit-1")]),
+    ])
+    canceller = _cancel_when_running(system, run_id, data_dir / "check-running")
+    system.run_until_stop(run_id)
+    canceller.join(60)
+    return system, run_id, {}
+
+
+def cancel_while_command_runs(data_dir):
+    marker = (data_dir / "command-running").as_posix()
+    registry = {"serve": {"argv": ["python", "-c", _running("command"), marker], "args": [], "timeout_sec": 60,
+                          "output_limit": 4000}}
+    system, _, run_id = _system(data_dir, [
+        product_spec(), plan_turn(),
+        ModelResponse(output=[_call("command-1", "run_command", {"name": "serve"}), _delivery_call("submit-1")]),
+    ], registered_commands=registry, command_versions={"serve": 1})
+    canceller = _cancel_when_running(system, run_id, data_dir / "command-running")
+    system.run_until_stop(run_id)
+    canceller.join(60)
+    return system, run_id, {}
+
+
 # 真实 Provider 模块：三个部门绑定同一个本机 HTTP 服务，服务按请求顺序回放脚本中的工具调用
 def _submission(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key != "kind"}
@@ -604,6 +658,14 @@ SCENARIOS: dict[str, Scenario] = {
     "run_command_is_not_a_check_receipt": Scenario(
         "只运行登记命令就提交交付被拒绝（#103）；运行检查后又修改文件再次被拒绝；重新调用 run_check 后交付被接纳，质检放行。",
         run_command_is_not_a_check_receipt),
+    "cancel_while_check_runs": Scenario(
+        "工程部门的检查进程运行中另一个线程取消运行：运行以 cancelled 结束；检查的进程树结束，回执记为已取消"
+        "（exit 130，带截至结束时的输出），之后的提交记为跳过，不再激活部门。",
+        cancel_while_check_runs),
+    "cancel_while_command_runs": Scenario(
+        "工程部门的登记命令运行中另一个线程取消运行：运行以 cancelled 结束；命令的进程树结束，回执记为已取消"
+        "（status cancelled、exit 130，带截至结束时的输出），之后的提交记为跳过，不再激活部门。",
+        cancel_while_command_runs),
     "http_responses_handoff": Scenario(
         "经真实 Provider 模块与测试内启动的 HTTP 服务（Responses 协议）走完交接与放行：记录序列化请求、流式进度、响应与用量。",
         _http_scenario("responses")),
