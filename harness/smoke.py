@@ -11,8 +11,8 @@ from typing import Any
 
 from .adjudication import offered_tools
 from .artifacts import ArtifactStore
-from .compaction import SUMMARY_PREFACE, SUMMARY_RULES, CompactionCheckpoint, plan_compaction
-from .context import ContextAssembler, department_work_text
+from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
+from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
 from .contracts import current_contract_hash, current_plan_hash
 from .engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
 from .event_store import EventStore
@@ -287,13 +287,6 @@ def _archive_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
         return {"status": "unverified", "notes": [str(exc)]}
 
 
-def _history_record(event: Any, item: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "event_id": event.event_id, "seq": event.seq, "activation_id": event.payload["activation_id"],
-        "step_id": event.payload["step_id"], "type": event.type, "item": item, "item_digest": canonical_hash(item),
-    }
-
-
 def _summary_material(record: dict[str, Any]) -> dict[str, Any]:
     material = dict(record["item"])
     encrypted = material.get("encrypted_content") if material.get("type") == "reasoning" else None
@@ -348,21 +341,6 @@ def _checkpoint_cursor(records: list[dict[str, Any]], previous: dict[str, Any] |
     if {**checkpoint, "summary": ""} != _coverage(records, index, offset):
         raise ValueError("summary coverage does not match this department's original history")
     return index, offset
-
-
-def _audited_visible_history(records: list[dict[str, Any]], previous: dict[str, Any] | None) -> list[dict[str, Any]]:
-    index, offset = _checkpoint_cursor(records, previous)
-    result = []
-    if previous is not None:
-        checkpoint = previous["checkpoint"]
-        if offset or not checkpoint["boundary"]:
-            raise ValueError("work resumed inside an incomplete compressed message/tool round")
-        result.append({"role": "user", "content": "[department_memory]\n" + json_dumps({
-            "summary": checkpoint["summary"], "covered_through_event_id": checkpoint["covered_through_event_id"],
-            "covered_digest": checkpoint["covered_digest"],
-        })})
-    result.extend(record["item"] for record in records[index:])
-    return result
 
 
 def _audit_compaction_input(request: dict[str, Any], records: list[dict[str, Any]],
@@ -426,14 +404,10 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     summary = artifacts.get_for_run(event.run_id, ArtifactRef(**payload["summary_ref"])).decode("utf-8")
     plan = _read_artifact(artifacts, event.run_id, payload["plan_ref"])
     limit = plan["summary_token_limit"]
-    expected_effective = _response_output_limit(
-        audit["effective_context_window"], audit["configured_max_output_tokens"], plan["input_token_estimate"],
-    )
     if ((payload.get("effective_context_window") is not None
          and payload.get("effective_context_window") != audit["effective_context_window"])
             or payload.get("configured_max_output_tokens") != audit["configured_max_output_tokens"]
             or payload.get("context_window") != audit["target_context_window"]
-            or expected_effective != audit["effective_max_output_tokens"]
             or plan["input_items"] != audit["request"]["input"] or plan["source_refs"] != audit["source_refs"]
             or payload["source_refs"] != audit["source_refs"] or plan["next_checkpoint"] != audit["next_checkpoint"]
             or plan["previous_summary_digest"] != audit["previous_summary_digest"]
@@ -462,21 +436,6 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     if payload["checkpoint"] != expected:
         raise ValueError("summary checkpoint coverage differs from its original sources")
     return expected
-
-
-def _response_output_limit(effective_window: int, configured_output_limit: int | None,
-                           input_token_estimate: int) -> int:
-    """每个模型请求把窗口内输入之外的全部余量留给输出（含思考），再受模型声明的输出上限约束。"""
-    available = effective_window - input_token_estimate
-    return available if configured_output_limit is None else min(configured_output_limit, available)
-
-
-PENDING_GUIDANCE = frozenset({"received", "in_input"})
-
-
-def _pending_guidance(projection: RunProjection, department: str) -> list[Any]:
-    return [item for item in projection.department_guidance
-            if item.department == department and item.status in PENDING_GUIDANCE]
 
 
 def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
@@ -509,8 +468,8 @@ def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
 
 
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
+    # 逐条核对事件的绑定与顺序；每个请求由上下文装配（P）按它之前的事件重新装配，与记录下来的请求比较
     notes: list[str] = []
-    histories: dict[str, list[dict[str, Any]]] = {}
     activations: dict[str, tuple[str, str, str]] = {}
     activation_bases: dict[str, dict[str, Any]] = {}
     activation_prompts = {}
@@ -532,7 +491,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     received_version = 0
     prompt_versions: dict[str, int] = {}
     current_work = RunProjection()
-    assembler = ContextAssembler(artifacts)
+    assembly = ContextAssembly(artifacts)
     events = store.list_events(run_id)
     has_retry_evidence = any(event.type in RETRY_EVENTS for event in events)
     for index, event in enumerate(events):
@@ -591,7 +550,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 activation_bases[activation] = basis
                 guidance_only = _expected_guidance_only(current_work, event.role)
                 activation_guidance_only[activation] = guidance_only
-                expected_guidance = {"guidance_ids": [item.id for item in _pending_guidance(current_work, event.role)],
+                expected_guidance = {"guidance_ids": [item.id for item in pending_guidance(current_work, event.role)],
                                      "guidance_only": guidance_only}
                 for field, value in {**basis, **expected_guidance}.items():
                     if field not in payload or payload[field] != value:
@@ -667,11 +626,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     failed_steps.add(key)
                     failed_attempts[key] = {**payload, "_context_digest": event.context_digest}
                     compacting.pop(key, None)
-                    histories[event.role] = [
-                        record for record in histories.get(event.role, [])
-                        if record["type"] == EventType.DEPARTMENT_INPUT
-                        or (record["activation_id"], record["step_id"]) != key
-                    ]
                     if payload.get("retryable") not in {True, False}:
                         raise ValueError("attempt failure must record retryable")
                 else:
@@ -702,37 +656,29 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError(f"{field} does not match the activation and current work")
             checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"],
                               basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
+            # 按记录下来的事件由 P 重新装配：调用目标按冻结的部门模型，部门身份、提示词与只能回应指导按激活时的记录，
+            # guidance_results 使用装配时已有的事件与记录下来的工作区快照
             frozen_binding = current_work.provider_bindings.get(event.role or "")
             target_window = frozen_binding.get("context_window") if frozen_binding else None
             configured_output_limit = frozen_binding.get("max_output_tokens") if frozen_binding else None
-            effective_window = current_work.context_window
-            if isinstance(target_window, int) and target_window > 0:
-                effective_window = min(effective_window, target_window)
-            # 装配器按"模型声明上限 与 窗口减输入估算 取小"决定每个请求的 max_output_tokens。
-            effective_output_limit = configured_output_limit
-            # 指导原文只在该激活的第一步注入目标部门；guidance_results 依赖装配时已有的事件与记录下来的工作区快照。
-            guidance_context = {
-                "guidance": _pending_guidance(current_work, event.role) if payload.get("step_id", 1) == 1 else [],
-                "guidance_only": activation_guidance_only[activation],
-                "events": events[:index],
-                "snapshot_hash": _assembly_snapshot_hash(events, index),
-            }
-            pinned = assembler.assemble(
-                current_work, department=event.role, session_id=event.session_id,
-                activation_id=activation, step_id=payload.get("step_id", 1),
-                prompt=activation_prompts[activation], context_window=effective_window,
-                max_output_tokens=effective_output_limit, **guidance_context,
+            limits = model_limits(current_work.context_window, target_window, configured_output_limit)
+            frame = StepFrame(
+                department=event.role, session_id=event.session_id, activation_id=activation,
+                prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
+                effective_contract_hash=basis["effective_contract_hash"],
+                engineering_plan_hash=basis["engineering_plan_hash"], input_version=basis["input_version"],
             )
+            before = events[:index]
+            pinned = assembly.pin(current_work, frame, limits, step_id=payload.get("step_id", 1), events=before,
+                                  snapshot_hash=_assembly_snapshot_hash(events, index))
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:
                     raise ValueError("department input does not belong to its activation start")
                 item = _read_artifact(artifacts, run_id, payload["input_ref"])
                 if item.get("role") != "user":
                     raise ValueError("department input must be a work message")
-                expected_work = department_work_text(pinned)
-                if item.get("content") != expected_work:
+                if item != pinned.department_input:
                     raise ValueError("department input differs from the current allowed work materials")
-                histories.setdefault(event.role, []).append(_history_record(event, item))
             elif event.type == EventType.CONTEXT_ASSEMBLED:
                 if (payload.get("department") != event.role or payload.get("session_id") != event.session_id
                         or payload.get("run_id") != run_id):
@@ -776,9 +722,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if purpose not in {"work", "compaction"}:
                     raise ValueError("unknown model request purpose")
                 purposes[activation] = purpose
-                # Every request's output limit depends on its own input size; it is settled
-                # below once the request has been rebuilt from the recorded history.
-                expected_output_limit = effective_output_limit
                 allowed = {"input", "tools"}
                 limit = payload.get("max_output_tokens")
                 if limit is not None:
@@ -798,88 +741,57 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if (not isinstance(instructions, str)
                         or not instructions.startswith(f"[intend]\n{activation_intends[activation]}\n\n[current_work]\n")):
                     raise ValueError("model input does not carry the verbatim task followed by current work")
-                if items[pinned_index] != pinned.input_items[0]:
+                if items[pinned_index] != pinned.context.input_items[0]:
                     raise ValueError("pinned developer input differs from current allowed materials")
-                previous = checkpoints.get(checkpoint_key)
-                if payload.get("compaction_event_id") != (previous or {}).get("event_id"):
+                records = assembly.department_history(before, event.role)
+                expected = assembly.request(pinned, records)
+                manifest = expected.context.manifest
+                if payload.get("compaction_event_id") != manifest.compaction_event_id:
                     raise ValueError("model request uses an unrelated compaction checkpoint")
-                if event.type == EventType.CONTEXT_ASSEMBLED:
-                    if payload.get("effective_context_window") != effective_window:
-                        raise ValueError("effective context window does not match the frozen department model")
-                    if payload.get("configured_max_output_tokens") != configured_output_limit:
-                        raise ValueError("configured output limit does not match the frozen department model")
-                records = histories.get(event.role, [])
+                if payload.get("effective_context_window") != limits.context_window:
+                    raise ValueError("effective context window does not match the frozen department model")
+                if payload.get("configured_max_output_tokens") != configured_output_limit:
+                    raise ValueError("configured output limit does not match the frozen department model")
                 if purpose == "compaction":
                     if schemas or limit is None:
                         raise ValueError("compaction must have no tools and an explicit output limit")
-                    checkpoint = CompactionCheckpoint(**previous["checkpoint"]) if previous else None
-                    plan = plan_compaction(
-                        records, checkpoint, effective_window, pinned.input_items, pinned.tools,
-                        output_limit=configured_output_limit,
-                    )
+                    plan = expected.compaction_plan
                     if plan is None or request["input"] != plan.input_items or limit != plan.max_output_tokens:
                         raise ValueError("compaction input differs from its allowed source assembly")
-                    if limit != _response_output_limit(effective_window, configured_output_limit, plan.input_token_estimate):
-                        raise ValueError("compaction output limit does not match the window left after its input")
-                    expected_output_limit = plan.max_output_tokens
-                    compacting[(activation, step)] = _audit_compaction_input(request, records, previous)
+                    compacting[(activation, step)] = _audit_compaction_input(request, records,
+                                                                             checkpoints.get(checkpoint_key))
                     compacting[(activation, step)].update(
-                        effective_context_window=effective_window,
+                        effective_context_window=limits.context_window,
                         target_context_window=target_window,
                         configured_max_output_tokens=configured_output_limit,
-                        effective_max_output_tokens=expected_output_limit,
-                    )
-                    expected_context = assembler.assemble_compaction(
-                        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
-                        max_output_tokens=plan.max_output_tokens, compaction_event_id=(previous or {}).get("event_id"),
+                        effective_max_output_tokens=plan.max_output_tokens,
                     )
                 else:
-                    visible = _audited_visible_history(records, previous)
-                    if items[1:] != visible:
+                    if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    expected = set(offered_tools(current_work, event.role,
-                                                 guidance_only=guidance_context["guidance_only"]))
-                    if len(names) != len(set(names)) or set(names) != expected:
+                    offered = set(offered_tools(current_work, event.role, guidance_only=frame.guidance_only))
+                    if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")
-                    expected_context = assembler.assemble(
-                        current_work, department=event.role, session_id=event.session_id, activation_id=activation,
-                        step_id=step, history=visible, compaction_event_id=(previous or {}).get("event_id"),
-                        prompt=activation_prompts[activation], context_window=effective_window,
-                        max_output_tokens=effective_output_limit, **guidance_context,
-                    )
-                    if schemas != expected_context.tools:
+                    if schemas != expected.context.tools:
                         raise ValueError("actual tool schemas differ from the allowed definitions")
-                    expected_output_limit = expected_context.manifest.max_output_tokens
-                    if event.type == EventType.CONTEXT_ASSEMBLED and limit != expected_output_limit:
+                    if limit != manifest.max_output_tokens:
                         raise ValueError("effective output limit does not match the frozen department model")
-                    if limit is not None and limit != _response_output_limit(
-                            effective_window, configured_output_limit, expected_context.manifest.input_token_estimate):
-                        raise ValueError("work request output limit does not match the window left after its input")
-                if event.type == EventType.CONTEXT_ASSEMBLED:
-                    input_estimate = estimate_tokens(json_dumps({"input": items, "tools": schemas}))
-                    request_estimate = estimate_tokens(json_dumps(request))
-                    output_reserve = expected_output_limit or 0
-                    if (payload.get("input_token_estimate") != input_estimate
-                            or payload.get("token_estimate") != request_estimate
-                            or payload.get("output_reserve_tokens") != output_reserve
-                            or payload.get("budget") != effective_window
-                            or payload.get("admitted") != (input_estimate + output_reserve <= effective_window)):
-                        raise ValueError("context token accounting or admission differs from the effective model limits")
-                if (payload.get("guidance_ids") != expected_context.manifest.guidance_ids
-                        or payload.get("guidance_only") != expected_context.manifest.guidance_only):
+                if request != expected.payload:
+                    raise ValueError("model request differs from the request rebuilt from the recorded events")
+                if (payload.get("input_token_estimate") != expected.input_token_estimate
+                        or payload.get("token_estimate") != manifest.token_estimate
+                        or payload.get("output_reserve_tokens") != expected.output_reserve_tokens
+                        or payload.get("budget") != limits.context_window
+                        or payload.get("admitted") != expected.admitted):
+                    raise ValueError("context token accounting or admission differs from the effective model limits")
+                if (payload.get("guidance_ids") != manifest.guidance_ids
+                        or payload.get("guidance_only") != manifest.guidance_only):
                     raise ValueError("guidance metadata differs from the department's pending guidance")
-                if payload.get("injected") != [asdict(item) for item in expected_context.manifest.injected]:
+                if payload.get("injected") != [asdict(item) for item in manifest.injected]:
                     raise ValueError("injected source metadata differs from current allowed materials")
-                if payload.get("excluded") != [asdict(item) for item in expected_context.manifest.excluded]:
+                if payload.get("excluded") != [asdict(item) for item in manifest.excluded]:
                     raise ValueError("excluded source metadata differs from current allowed materials")
-                if event.type == EventType.CONTEXT_ASSEMBLED:
-                    manifest = expected_context.manifest
-                    if (manifest.budget != effective_window
-                            or manifest.max_output_tokens != expected_output_limit
-                            or manifest.input_token_estimate != input_estimate
-                            or manifest.output_reserve_tokens != (expected_output_limit or 0)):
-                        raise ValueError("rebuilt context manifest differs from the effective model limits")
             elif event.type == EventType.MODEL_REQUESTED:
                 key = (activation, payload.get("step_id"))
                 if (activation not in steps or key[1] != steps[activation]
@@ -941,7 +853,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     output = _read_artifact(artifacts, run_id, payload["output_ref"]) if payload.get("output_ref") else None
                     if json.loads(item["output"]) != {"ok": payload.get("ok"), "output": output, "error": payload.get("error")}:
                         raise ValueError("tool input item does not match its recorded result")
-                histories.setdefault(event.role, []).append(_history_record(event, item))
         except (AttributeError, IndexError, KeyError, TypeError, ValueError, OSError) as exc:
             notes.append(f"event {event.seq}: {exc}")
     prepared_keys = set(step_meta)
