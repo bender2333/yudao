@@ -110,3 +110,5 @@ claude-opus-5-5 / 2026-09-26 02:52 / docs/design/semantic-system.md 开头状态
 claude-opus-5-5 / 2026-09-26 09:30 / docs/program-roadmap.md 第 2 节控制核心重构一条链接工单 #43；docs/decision.md 写入 #43 的工单号与重构计划的四项决定（事件序列对照、并发不在范围内、测试只经公开接口、smoke 审计改用 P）/ 用户采纳重构计划的推荐，按 /request-refactor-plan 发布 #43
 
 claude-opus-5-5 / 2026-09-26 09:58 / 新增 docs/research/prompt-audit-2026-09-26.md（提示词审计：范围与目标模型、提示词清单、21 项结果与 5 项只登记的条目、逐段补丁、验证方法），docs/research/README.md 登记 / 用户运行 /claude-api prompt-audit
+
+claude-opus-5-5 / 2026-09-26 10:57 / docs/research/prompt-audit-2026-09-26.md 开头写入状态（规则文件的补丁已采用，harness/ 部分待写成工单），第 5 节去掉「需要用户确认」一句；docs/research/README.md 对应条目同步 / 用户确认规则文件的补丁，CLAUDE.md 与 AGENTS.md 已按 P1 至 P7、R1、A1 至 A7 修改
