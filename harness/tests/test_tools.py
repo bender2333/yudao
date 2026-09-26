@@ -38,6 +38,13 @@ def test_submit_delivery_description_states_that_check_receipts_come_from_run_ch
     assert "run_command results do not count" in names
 
 
+def test_run_command_description_separates_action_receipts_from_delivery_check_receipts():
+    text = HOST_TOOL_SCHEMAS["run_command"]["description"]
+    assert "The host-observed exit status is the evidence; a self-reported exit_code is never read." in text
+    assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in text
+    assert "run the checks a delivery needs with run_check" in text
+
+
 def test_write_tool_descriptions_state_the_plan_requirement():
     write = HOST_TOOL_SCHEMAS["write_file"]["description"]
     assert "replace its entire content" in write and "missing parent directories are created" in write

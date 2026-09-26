@@ -266,6 +266,28 @@ def test_delivery_accepts_only_run_check_receipts_from_this_activation_on_the_cu
     assert projection.canonical_state() == system.replay(run_id).canonical_state()
 
 
+def test_engineering_request_separates_action_receipts_from_delivery_check_receipts(data_dir):
+    registry = {"probe": {"argv": ["python", "-c", "print('probe-ok')"], "args": [],
+                          "timeout_sec": 30, "output_limit": 4000}}
+    adapter = FakeAdapter(happy_script())
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("回执说法", registered_commands=registry, command_versions={"probe": 1})
+    assert system.run_until_stop(run_id).phase == "DONE"
+    engineering = [item for item in adapter.invocations if item.department == "engineering"]
+    assert engineering
+    for item in engineering:
+        [command] = [tool for tool in item.tools if tool["name"] == "run_command"]
+        assert command["description"] == HOST_TOOL_SCHEMAS["run_command"]["description"]
+        assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in command["description"]
+        [contract] = [json.loads(part.text) for part in item.context.parts if part.source == "proposal_contract"]
+        bind = contract["kinds"]["delivery_spec"]["bind"]
+        assert "run_check receipts from this activation on the current workspace" in bind
+        assert not any("host check receipts" in entry for entry in bind)
+        assert ("check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；"
+                "run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。") in contract["notes"]
+        assert not any("主机回执" in note for note in contract["notes"])
+
+
 def test_registry_freezes_at_work_item_creation(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter([*happy_script(), *happy_script()]))
     project_id = system.projects.register("Cmd", GOAL)

@@ -786,7 +786,7 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "run_command": {
         "name": "run_command",
         "label": "run_command",
-        "description": "Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read.",
+        "description": "Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read. run_command results are action receipts and cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
         "parameters": _object_schema(
             {
                 "name": {"type": "string", "description": "Registered command name frozen for this run"},

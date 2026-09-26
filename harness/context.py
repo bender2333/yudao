@@ -66,14 +66,14 @@ PROPOSAL_CONTRACTS: dict[str, dict[str, Any]] = {
                 "bind": [
                     "current_contract.content_hash", "current_engineering_plan.content_hash",
                     "workspace files must exist",
-                    "engineering host check receipts on the current snapshot",
+                    "run_check receipts from this activation on the current workspace",
                 ],
             },
         },
         "notes": [
             "先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。",
             "已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。",
-            "check_names 必须对应主机回执，模型自报 exit_code 无效。",
+            "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。",
         ],
     },
     "quality": {
