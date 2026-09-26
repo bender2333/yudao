@@ -934,12 +934,12 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "submit_delivery": {
         "name": "submit_delivery",
         "label": "submit_delivery",
-        "description": "Submit a DeliverySpec after writing files and host-running checks. check_names must match host receipts on the current snapshot.",
+        "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. run_command results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
         "parameters": _object_schema(
             {
                 "summary": {"type": "string"},
                 "files": _string_list_schema("Workspace-relative files included in the delivery"),
-                "check_names": _string_list_schema("Names of host-executed engineering checks"),
+                "check_names": _string_list_schema("Names passed to run_check in this activation on the current workspace; run_command results do not count"),
                 "known_risks": _string_list_schema("Optional"),
             },
             ["summary", "files", "check_names"],

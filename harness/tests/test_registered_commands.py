@@ -10,11 +10,11 @@ from harness.adapters.base import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projects import CommandConfigConflict
-from harness.proposals import delivery_turn, engineering_plan, product_spec, review_turn
+from harness.proposals import delivery_turn, engineering_plan, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.test_web import get_json, request, running_server
-from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, ToolRuntime
+from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, HOST_TOOL_SCHEMAS, ToolRuntime
 from harness.workspace import Workspace
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -205,6 +205,65 @@ def test_finished_receipt_binds_command_snapshot_status_output_and_attempt(data_
     assert output["attempt"] == 1
     # 回执绑定的是执行前快照：后续交付写入后工作区摘要已经不同
     assert output["snapshot_hash"] != system.workspace(run_id).digest()
+
+
+def _call(identity, tool, **arguments):
+    return {"id": identity, "call_id": identity, "type": "function_call", "name": tool,
+            "arguments": json_dumps(arguments)}
+
+
+def _submit(identity):
+    return _call(identity, "submit_delivery", summary="echo CLI", files=["src/echo.py"], check_names=["unit-tests"])
+
+
+def test_delivery_accepts_only_run_check_receipts_from_this_activation_on_the_current_workspace(data_dir):
+    argv = ["python", "src/echo.py", "hello"]
+    registry = {"unit-tests": {"argv": argv, "args": [], "timeout_sec": 30, "output_limit": 4000}}
+    source = "import sys\nprint(sys.argv[1])\n"
+    adapter = FakeAdapter([
+        product_spec(),
+        plan_turn(),
+        # 登记命令在主机上成功运行，它的结果是动作回执
+        ModelResponse(output=[_call("write-1", "write_file", path="src/echo.py", content=source),
+                              _call("command-1", "run_command", name="unit-tests"), _submit("submit-1")]),
+        # 检查之后又修改了文件，回执不再对应当前工作区
+        ModelResponse(output=[_call("check-2", "run_check", name="unit-tests", argv=argv),
+                              _call("write-2", "write_file", path="src/echo.py", content=source + "\n"),
+                              _submit("submit-2")]),
+        ModelResponse(output=[_call("check-3", "run_check", name="unit-tests", argv=argv), _submit("submit-3")]),
+        review_turn("release", "verified the delivered echo CLI"),
+    ])
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("命令与检查回执", registered_commands=registry, command_versions={"unit-tests": 1})
+    projection = system.run_until_stop(run_id)
+    assert projection.phase == "DONE", projection.error
+    events = system.store.list_events(run_id)
+    [command] = [event for event in events
+                 if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_command"]
+    assert command.payload["ok"] is True
+    output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**command.payload["output_ref"])))
+    assert output["exit_code"] == 0 and output["output"] == "hello"
+    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
+    assert [event.payload["kind"] for event in rejected] == ["delivery_spec", "delivery_spec"]
+    for event in rejected:
+        [error] = event.payload["errors"]
+        assert error["field"] == "check_names"
+        assert "Call run_check with the name unit-tests on the current workspace" in error["message"]
+        assert "run_command results are action receipts and do not count as check receipts" in error["message"]
+    engineering = [item for item in adapter.invocations if item.department == "engineering"]
+    for item in engineering:
+        [tool] = [tool for tool in item.tools if tool["name"] == "submit_delivery"]
+        assert tool["description"] == HOST_TOOL_SCHEMAS["submit_delivery"]["description"]
+    # 每次拒绝的原因都进入工程部门下一次激活的请求
+    feedback = [part for item in engineering for part in item.context.parts if part.source == "validation_feedback"]
+    assert [part.version for part in feedback] == [event.event_id for event in rejected]
+    assert all("Call run_check with the name unit-tests" in part.text for part in feedback)
+    delivery = projection.delivery_spec
+    assert delivery.check_names == ["unit-tests"]
+    [check] = delivery.checks
+    assert check["exit_code"] == 0 and check["snapshot_hash"] == delivery.code_tree_digest
+    assert check["activation_id"] == engineering[-1].activation_id
+    assert projection.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_registry_freezes_at_work_item_creation(data_dir):

@@ -27,6 +27,17 @@ def test_submit_review_description_rejects_engineering_receipts_as_quality_evide
     assert review["parameters"]["properties"]["checks"]["description"] == "Quality check names run via run_check"
 
 
+def test_submit_delivery_description_states_that_check_receipts_come_from_run_check():
+    delivery = HOST_TOOL_SCHEMAS["submit_delivery"]
+    text = delivery["description"]
+    assert "Every name in check_names must be a name you passed to run_check in this activation on the current workspace" in text
+    assert "if any file changes after a check, call run_check again before submitting" in text
+    assert "run_command results are action receipts and are not accepted as delivery check receipts" in text
+    names = delivery["parameters"]["properties"]["check_names"]["description"]
+    assert "Names passed to run_check in this activation on the current workspace" in names
+    assert "run_command results do not count" in names
+
+
 def test_write_tool_descriptions_state_the_plan_requirement():
     write = HOST_TOOL_SCHEMAS["write_file"]["description"]
     assert "replace its entire content" in write and "missing parent directories are created" in write
