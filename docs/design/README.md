@@ -12,7 +12,7 @@
   - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）。需求：[D29](../requirements/distributed-deployment.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
-  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017）。
+  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。工单：#45（调用目标每次请求解析，3.1 之前），父工单 #83（子工单 #84 至 #96）。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002 至 0006、[0017](../adr/0017-role-settings-override-department.md)。
 - [Provider 层](provider-layer.md)
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
