@@ -154,3 +154,5 @@ claude-opus-5-5 / 2026-09-26 20:52 / docs/requirements/execution-limits.md（D09
 claude-opus-5-5 / 2026-09-26 20:55 / docs/architecture-issues.md 为 2.7 核对登记的问题追加处理结论（由 #84、#48、#91 覆盖）；docs/current-baseline.md 第 5 节写明 2.7 工单的核对结果与 #7 等待 Messages 模型 / 2.7 工单核对完成
 
 claude-opus-5-5 / 2026-09-26 21:40 / 新增 docs/research/fermat-formalization-prove2me.md，docs/research/README.md 登记新资料 / 用户要求在 research 下补充 Anthropic 费马大定理形式化博客与 Prove2Me 项目的一手来源调研及与 Yudao 的对照
+
+claude-opus-5-5 / 2026-09-26 23:53 / docs/architecture-issues.md 登记裁决规则（U）直接读取工作区（路径解析与树摘要）与「控制核心不直接读写工作区文件」的冲突 / #43 第 4、5 个提交把工具许可与提案的提交判断搬入 U 时发现，需要架构师在动作合同之前决定这些依据的来源
