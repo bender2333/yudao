@@ -334,12 +334,12 @@ class ContextAssembler:
 
         prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
         input_items = [{"role": "developer", "content": prompt_text}, *deepcopy(history or [])]
-        from .tools import host_tool_definitions
+        from .tools import tool_definitions
 
         tools = [
             {"type": "function", "name": item["name"], "description": item["description"],
              "parameters": item["parameters"], "strict": False}
-            for item in host_tool_definitions(tool_names)
+            for item in tool_definitions(tool_names)
         ]
         if history:
             parts.append(ContextPart("department_history", department, json_dumps(history)))

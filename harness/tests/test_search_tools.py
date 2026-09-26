@@ -13,7 +13,7 @@ def _runtime(root):
 
 def test_search_tools_are_read_only_for_all_departments():
     for name in ("search", "read_range"):
-        assert TOOL_DEFS[name]["access"] == "read"
+        assert TOOL_DEFS[name]["kind"] == "environment" and TOOL_DEFS[name]["action"] == "read"
         assert set(TOOL_DEFS[name]["departments"]) == set(TOOL_DEFS["read_file"]["departments"])
         for department in ("product", "engineering", "quality"):
             assert name in tools_for(department)

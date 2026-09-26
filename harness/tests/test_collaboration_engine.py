@@ -169,11 +169,11 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
     before = _steps(system, run_id, 5)
     original_decision = before.product_decisions[0]
     original_spec = before.product_spec.content_hash
-    snapshot = system.workspace(run_id).snapshot()
+    facts = system.workspace(run_id).snapshot().facts
     for changes in ([], [{"decision_hash": "unknown", "disposition": "retain", "rationale": "Unknown"}],
                     [{"decision_hash": original_decision.content_hash, "disposition": "retain", "rationale": "Keep"}] * 2):
         decision = evaluate_proposal(phase=before.phase, department="product", projection=before,
-                                     snapshot=snapshot, proposal=product_spec(decision_changes=changes, change_record={
+                                     facts=facts, proposal=product_spec(decision_changes=changes, change_record={
                                          "changed": [], "retained": ["Echo behavior"], "retired": [], "rationale": "Review earlier decisions",
                                      }))
         assert not decision.accepted and decision.errors[0].field == "decision_changes"
@@ -249,7 +249,7 @@ def test_response_rejects_wrong_request_or_department_without_closing_current_re
     for department, request_id in (("quality", pending.pending_request.id), ("engineering", "another-request")):
         decision = evaluate_proposal(
             phase=pending.phase, department=department, projection=pending,
-            snapshot=system.workspace(run_id).snapshot(), events=system.store.list_events(run_id),
+            facts=system.workspace(run_id).snapshot().facts, events=system.store.list_events(run_id),
             proposal=collaboration_response(request_id, "answered", "Wrong recipient or request."),
         )
         assert not decision.accepted
@@ -326,7 +326,7 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
     external = replace(before, phase="PRODUCT_SPEC", pending_request=None)
     snapshot = system.workspace(run_id).snapshot()
     decision = evaluate_proposal(phase=external.phase, department="product", projection=external,
-                                 snapshot=snapshot, proposal=product_spec(requirements=["print the input in uppercase"], change_record={
+                                 facts=snapshot.facts, proposal=product_spec(requirements=["print the input in uppercase"], change_record={
                                      "changed": ["Uppercase output"], "retained": ["Read one argument"],
                                      "retired": ["Original casing"], "rationale": "The current product goal changed",
                                  }))

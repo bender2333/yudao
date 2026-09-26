@@ -34,7 +34,7 @@ def _commit_spec(system, run_id, proposal):
     projection = system.project(run_id)
     snapshot = system.workspace(run_id).snapshot()
     decision = evaluate_proposal(phase=projection.phase, department="product", projection=projection,
-                                 snapshot=snapshot, proposal=proposal, events=system.store.list_events(run_id))
+                                 facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
     assert decision.accepted, decision.error_dicts
     return system.orchestrator.submissions.commit(
         projection=projection, snapshot=snapshot, workspace_root=system.workspace(run_id).root,

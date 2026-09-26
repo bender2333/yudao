@@ -14,7 +14,7 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, recorded_context
 from harness.tests.test_web import get_json, request, running_server
-from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, HOST_TOOL_SCHEMAS, ToolRuntime
+from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, TOOL_SCHEMAS, ToolRuntime
 from harness.workspace import Workspace
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -253,7 +253,7 @@ def test_delivery_accepts_only_run_check_receipts_from_this_activation_on_the_cu
     engineering = [item for item in adapter.invocations if item.department == "engineering"]
     for item in engineering:
         [tool] = [tool for tool in item.tools if tool["name"] == "submit_delivery"]
-        assert tool["description"] == HOST_TOOL_SCHEMAS["submit_delivery"]["description"]
+        assert tool["description"] == TOOL_SCHEMAS["submit_delivery"]["description"]
     # 每次拒绝的原因都进入工程部门下一次激活的请求
     feedback = [part for item in engineering for part in recorded_context(system, item).parts
                 if part.source == "validation_feedback"]
@@ -278,7 +278,7 @@ def test_engineering_request_separates_action_receipts_from_delivery_check_recei
     assert engineering
     for item in engineering:
         [command] = [tool for tool in item.tools if tool["name"] == "run_command"]
-        assert command["description"] == HOST_TOOL_SCHEMAS["run_command"]["description"]
+        assert command["description"] == TOOL_SCHEMAS["run_command"]["description"]
         assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in command["description"]
         contract = json.loads(prompt_part(item, "proposal_contract"))
         bind = contract["kinds"]["delivery_spec"]["bind"]

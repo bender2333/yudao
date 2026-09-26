@@ -6,29 +6,29 @@ from pathlib import Path
 
 import pytest
 
-from harness.tools import HOST_TOOL_SCHEMAS, TOOL_DEFS, ToolRuntime, tools_for
+from harness.tools import TOOL_SCHEMAS, TOOL_DEFS, ToolRuntime, tools_for
 from harness.workspace import Workspace
 
 
 def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check(tmp_path):
-    assert set(HOST_TOOL_SCHEMAS) == set(TOOL_DEFS)
-    assert [name for name in tools_for("quality") if TOOL_DEFS[name]["access"] == "check"] == ["run_check"]
+    assert set(TOOL_SCHEMAS) == set(TOOL_DEFS)
+    assert [name for name in tools_for("quality") if TOOL_DEFS[name].get("action") == "check"] == ["run_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
     result = ToolRuntime(workspace).execute("quality", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
     assert result.ok is True and result.output["executor"] == "host"
-    assert workspace.snapshot().latest_check("quality", "smoke").exit_code == 0
-    assert workspace.snapshot().latest_check("engineering", "smoke") is None
+    assert workspace.snapshot().facts.latest_check("quality", "smoke").exit_code == 0
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 
 def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
-    review = HOST_TOOL_SCHEMAS["submit_review"]
+    review = TOOL_SCHEMAS["submit_review"]
     assert "Engineering receipts are not accepted as QA evidence." in review["description"]
     assert review["parameters"]["properties"]["checks"]["description"] == "Quality check names run via run_check"
 
 
 def test_submit_delivery_description_states_that_check_receipts_come_from_run_check():
-    delivery = HOST_TOOL_SCHEMAS["submit_delivery"]
+    delivery = TOOL_SCHEMAS["submit_delivery"]
     text = delivery["description"]
     assert "Every name in check_names must be a name you passed to run_check in this activation on the current workspace" in text
     assert "if any file changes after a check, call run_check again before submitting" in text
@@ -39,18 +39,18 @@ def test_submit_delivery_description_states_that_check_receipts_come_from_run_ch
 
 
 def test_run_command_description_separates_action_receipts_from_delivery_check_receipts():
-    text = HOST_TOOL_SCHEMAS["run_command"]["description"]
+    text = TOOL_SCHEMAS["run_command"]["description"]
     assert "The host-observed exit status is the evidence; a self-reported exit_code is never read." in text
     assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in text
     assert "run the checks a delivery needs with run_check" in text
 
 
 def test_write_tool_descriptions_state_the_plan_requirement():
-    write = HOST_TOOL_SCHEMAS["write_file"]["description"]
+    write = TOOL_SCHEMAS["write_file"]["description"]
     assert "replace its entire content" in write and "missing parent directories are created" in write
     assert "Use edit_range to change part of an existing file." in write
     for name in ("write_file", "edit_range"):
-        text = HOST_TOOL_SCHEMAS[name]["description"]
+        text = TOOL_SCHEMAS[name]["description"]
         assert "Requires an accepted engineering plan for the current effective contract" in text
         assert "the path must be inside that plan's scope" in text
 
@@ -64,7 +64,7 @@ def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
 
 
 def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_utf8(tmp_path):
-    description = HOST_TOOL_SCHEMAS["read_file"]["description"]
+    description = TOOL_SCHEMAS["read_file"]["description"]
     assert "entire content" in description and "without line numbers or truncation" in description
     assert "Files that are not valid UTF-8 are rejected." in description
     assert "Use read_range for large files" in description and "content_hash" in description
@@ -80,10 +80,10 @@ def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_u
 
 
 def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
-    description = HOST_TOOL_SCHEMAS["list_files"]["description"]
+    description = TOOL_SCHEMAS["list_files"]["description"]
     assert "recursively" in description and '"src2/a.py"' in description
     assert "end it with / to limit the list to one directory" in (
-        HOST_TOOL_SCHEMAS["list_files"]["parameters"]["properties"]["prefix"]["description"])
+        TOOL_SCHEMAS["list_files"]["parameters"]["properties"]["prefix"]["description"])
     workspace = Workspace(tmp_path)
     runtime = ToolRuntime(workspace)
     for path in ("src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"):
@@ -107,7 +107,7 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     assert result.ok is True
     assert result.output["exit_code"] == 3
     assert result.output["executor"] == "host"
-    receipt = workspace.snapshot().latest_check("engineering", "smoke")
+    receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
     assert receipt is not None
     assert receipt.exit_code == 3
     assert "host-executed" in receipt.summary
@@ -148,7 +148,7 @@ def test_check_cannot_persist_forged_receipt(tmp_path):
     rows = [json.loads(line) for line in text.splitlines() if line.strip()]
     assert rows
     assert all(row["name"] == "smoke" and row["department"] == "engineering" for row in rows)
-    assert workspace.snapshot().latest_check("engineering", "smoke") is not None
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is not None
 
 
 def test_check_does_not_keep_workspace_mutations(tmp_path):
@@ -196,7 +196,7 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
     assert workspace.digest() == original
     assert result.output["snapshot_hash"] != original
     assert result.output["tree_changed"] is True
-    assert workspace.snapshot().latest_check("engineering", "smoke") is None
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 
 def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
@@ -225,7 +225,7 @@ def test_failed_check_records_real_exit_code(tmp_path):
     result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "fail.py"]})
     assert result.ok is True
     assert result.output["exit_code"] == 7
-    receipt = workspace.snapshot().latest_check("engineering", "smoke")
+    receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
     assert receipt is not None
     assert receipt.exit_code == 7
     assert receipt.snapshot_hash == workspace.digest()
@@ -241,7 +241,7 @@ def test_timed_out_check_records_timeout_exit_code(tmp_path, monkeypatch):
     assert time.monotonic() - started < 10
     assert result.ok is True
     assert result.output["exit_code"] == 124
-    receipt = workspace.snapshot().latest_check("engineering", "smoke")
+    receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
     assert receipt is not None
     assert receipt.exit_code == 124
     assert "timed out" in receipt.summary
@@ -314,7 +314,7 @@ def test_module_import_check_preserves_complete_tree(tmp_path):
     assert result.ok and result.output["exit_code"] == 0
     assert result.output["tree_changed"] is False
     assert "42" in result.output["summary"]
-    assert workspace.snapshot().latest_check("engineering", "imports") is not None
+    assert workspace.snapshot().facts.latest_check("engineering", "imports") is not None
     assert workspace.list_files() == ["helper.py", "main.py"]
 
 
@@ -350,7 +350,7 @@ def test_check_records_source_workspace_change(tmp_path, monkeypatch):
     assert "checked original" in result.output["summary"]
     assert "source workspace changed" in result.output["summary"]
     assert len(workspace.receipts()) == 1
-    assert workspace.snapshot().latest_check("engineering", "source") is None
+    assert workspace.snapshot().facts.latest_check("engineering", "source") is None
 
 
 @pytest.mark.parametrize("failed_root", ["copy", "source"])
@@ -375,7 +375,7 @@ def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, mon
     assert "observed output" in result.output["summary"]
     assert "could not be verified: tree read failed" in result.output["summary"]
     assert len(workspace.receipts()) == 1
-    assert workspace.snapshot().latest_check("engineering", "unverified") is None
+    assert workspace.snapshot().facts.latest_check("engineering", "unverified") is None
 
 
 @pytest.mark.parametrize("department", ["product", "quality"])

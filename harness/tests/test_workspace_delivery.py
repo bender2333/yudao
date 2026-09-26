@@ -109,7 +109,7 @@ def test_workspace_snapshot_and_copy_derive_from_one_capture(tmp_path, monkeypat
     monkeypatch.setattr(workspaces, "capture_public_tree", change_after_capture)
     snapshot = workspace.snapshot()
     assert snapshot.tree is calls[0]
-    assert snapshot.files == ("file.txt",)
+    assert snapshot.facts.files == ("file.txt",)
     assert snapshot.digest == snapshot.tree.digest
     with workspace.check_copy(snapshot.tree) as copy_root:
         assert (copy_root / "file.txt").read_bytes() == b"captured"
@@ -127,7 +127,7 @@ def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(t
     snapshot = workspace.snapshot()
     assert snapshot.checks[-1].snapshot_hash == snapshot.digest
     assert snapshot.checks[-1].exit_code == 0
-    assert snapshot.latest_check(department, "changed-check") is None
+    assert snapshot.facts.latest_check(department, "changed-check") is None
 
 
 def test_move_and_delete_preserve_binary_bytes_and_do_not_delete_old_archives(tmp_path):

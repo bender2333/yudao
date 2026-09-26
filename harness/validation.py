@@ -18,8 +18,8 @@ from .models import (
     canonical_hash,
     spec_content_hash,
 )
+from .actions import TreeFacts
 from .projection import RunProjection
-from .workspace import WorkspaceSnapshot
 
 @dataclass
 class FieldError:
@@ -48,7 +48,7 @@ def evaluate_proposal(
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
-    snapshot: WorkspaceSnapshot,
+    facts: TreeFacts,
     events: list[Event] | None = None,
 ) -> ProposalDecision:
     try:
@@ -57,7 +57,7 @@ def evaluate_proposal(
             department=department,
             proposal=proposal,
             projection=projection,
-            snapshot=snapshot,
+            facts=facts,
             events=events or [],
         )
     except Exception as exc:
@@ -73,7 +73,7 @@ def _evaluate_proposal(
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
-    snapshot: WorkspaceSnapshot,
+    facts: TreeFacts,
     events: list[Event],
 ) -> ProposalDecision:
     if not proposal or not isinstance(proposal, dict):
@@ -98,15 +98,15 @@ def _evaluate_proposal(
     if kind == "collaboration_request":
         return _accept_request(proposal, projection, department)
     if kind == "collaboration_response":
-        return _accept_response(proposal, projection, department, events, snapshot)
+        return _accept_response(proposal, projection, department, events, facts)
     if kind == "department_guidance_response":
-        return _accept_guidance_response(proposal, projection, department, events, snapshot)
+        return _accept_guidance_response(proposal, projection, department, events, facts)
     if kind == "product_decision":
         return _accept_product_decision(proposal, projection)
     if kind == "delivery_spec":
-        return _accept_delivery(proposal, projection, snapshot)
+        return _accept_delivery(proposal, projection, facts)
     if kind == "qa_review":
-        return _accept_review(proposal, projection, snapshot)
+        return _accept_review(proposal, projection, facts)
     return ProposalDecision(False, [FieldError("kind", "unhandled kind")])
 
 
@@ -214,7 +214,7 @@ def _accept_plan(proposal: dict[str, Any], projection: RunProjection) -> Proposa
 
 def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjection,
                               department: str, events: list[Event],
-                              snapshot: WorkspaceSnapshot) -> ProposalDecision:
+                              facts: TreeFacts) -> ProposalDecision:
     guidance = next((item for item in projection.department_guidance
                      if item.id == proposal.get("guidance_id")), None)
     if guidance is None or guidance.department != department:
@@ -224,7 +224,7 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
     text = proposal.get("text")
     if not isinstance(text, str) or not text.strip():
         return ProposalDecision(False, [FieldError("text", "text must be a non-empty string")])
-    errors = guidance_response_errors(proposal, projection, department, events, snapshot_hash=snapshot.digest)
+    errors = guidance_response_errors(proposal, projection, department, events, snapshot_hash=facts.digest)
     if errors:
         return ProposalDecision(False, [FieldError(**item) for item in errors])
     payload = {
@@ -235,7 +235,7 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
         "status": proposal["status"],
         "text": text.strip(),
         "result_event_ids": guidance_bound_result_ids(
-            proposal, projection, department, events, snapshot_hash=snapshot.digest, guidance=guidance,
+            proposal, projection, department, events, snapshot_hash=facts.digest, guidance=guidance,
         ),
     }
     return ProposalDecision(True, artifact={
@@ -295,11 +295,11 @@ def _accept_request(proposal: dict[str, Any], projection: RunProjection, departm
 
 
 def _accept_response(proposal: dict[str, Any], projection: RunProjection, department: str,
-                     events: list[Event], snapshot: WorkspaceSnapshot) -> ProposalDecision:
-    errors = response_errors(proposal, projection, department, events, snapshot_hash=snapshot.digest)
+                     events: list[Event], facts: TreeFacts) -> ProposalDecision:
+    errors = response_errors(proposal, projection, department, events, snapshot_hash=facts.digest)
     if errors:
         return ProposalDecision(False, [FieldError(**item) for item in errors])
-    phase, valid = resume_phase(projection.pending_request, projection, events, snapshot_hash=snapshot.digest)
+    phase, valid = resume_phase(projection.pending_request, projection, events, snapshot_hash=facts.digest)
     payload = {"request_id": projection.pending_request.id, "status": proposal["status"], "text": proposal["text"].strip(),
                "result_event_ids": list(proposal.get("result_event_ids", [])), "return_phase": phase, "return_work_valid": valid}
     return ProposalDecision(True, artifact={**payload, "kind": "collaboration_response", "content_hash": canonical_hash(payload)})
@@ -318,7 +318,7 @@ def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection
     return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash}, transitions=transitions)
 
 
-def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapshot: WorkspaceSnapshot) -> ProposalDecision:
+def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     contract = projection.effective_contract
@@ -328,11 +328,11 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
     errors: list[FieldError] = []
     files = [item.replace("\\", "/") for item in proposal["files"]]
     for rel in files:
-        if not snapshot.has_file(rel):
+        if not facts.has_file(rel):
             errors.append(FieldError("files", f"missing workspace file: {rel}"))
     checks = []
     for name in proposal["check_names"]:
-        receipt = snapshot.latest_check(
+        receipt = facts.latest_check(
             "engineering",
             name,
             product_spec_hash=projection.product_spec.content_hash,
@@ -365,7 +365,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
         "product_spec_hash": projection.product_spec.content_hash,
         "effective_contract_hash": contract.content_hash,
         "engineering_plan_hash": plan.content_hash,
-        "code_tree_digest": snapshot.digest,
+        "code_tree_digest": facts.digest,
     }
     artifact = {
         **payload,
@@ -384,7 +384,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, snapsh
     )
 
 
-def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot: WorkspaceSnapshot) -> ProposalDecision:
+def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     if projection.delivery_spec is None:
@@ -400,13 +400,13 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
         errors.append(FieldError("effective_contract_hash", "delivery is not bound to the current effective contract"))
     if projection.delivery_spec.engineering_plan_hash != plan.content_hash:
         errors.append(FieldError("engineering_plan_hash", "delivery is not bound to the current engineering plan"))
-    if projection.delivery_spec.code_tree_digest != snapshot.digest:
+    if projection.delivery_spec.code_tree_digest != facts.digest:
         errors.append(FieldError("code_snapshot_hash", "workspace snapshot no longer matches the current delivery"))
     check_names, name_errors = _qa_check_names(proposal)
     errors.extend(name_errors)
     bound_checks = []
     for name in check_names:
-        receipt = snapshot.latest_check(
+        receipt = facts.latest_check(
             "quality",
             name,
             product_spec_hash=projection.product_spec.content_hash,
@@ -445,7 +445,7 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, snapshot
         "effective_contract_hash": contract.content_hash,
         "engineering_plan_hash": plan.content_hash,
         "delivery_spec_hash": projection.delivery_spec.content_hash,
-        "code_snapshot_hash": snapshot.digest,
+        "code_snapshot_hash": facts.digest,
         "verdict": verdict,
         "rationale": proposal["rationale"].strip(),
         "checks": bound_checks,

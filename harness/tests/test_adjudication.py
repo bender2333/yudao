@@ -1,7 +1,9 @@
 from dataclasses import replace
 
+from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
-from harness.adjudication import WorkBasis, commit_decision, proposal_decision, tool_permission
+from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
+from harness.environment import LocalEnvironment
 from harness.proposals import engineering_plan, plan_turn, product_spec
 from harness.runtime import LoopSystem
 
@@ -18,11 +20,17 @@ def _engineering(tmp_path):
     return system, projection
 
 
+def _environment(system, projection):
+    return LocalEnvironment(system.workspace(projection.run_id))
+
+
 def _permission(system, projection, name, args, *, basis=None, aborted=False, guidance_only=False):
+    # 工具许可依据的工作区事实由执行环境按 U 给出的查询取得
+    call = {"id": "call", "name": name, "args": args}
     return tool_permission(
-        projection, {"id": "call", "name": name, "args": args}, department="engineering",
+        projection, call, department="engineering",
         guidance_only=guidance_only, basis=basis or WorkBasis.current(projection, "engineering"),
-        aborted=aborted, workspace=system.workspace(projection.run_id),
+        aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
     )
 
 
@@ -54,22 +62,23 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
 
 def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_path):
     system, projection = _engineering(tmp_path)
-    workspace = system.workspace(projection.run_id)
+    environment = _environment(system, projection)
     proposal = engineering_plan(scope=["src/", "tests/"], reason="Tests need their own directory")
-    snapshot = workspace.snapshot()
+    facts = environment.query(FactsQuery(tree=True)).tree
     events = system.store.list_events(projection.run_id)
-    first = proposal_decision(projection, department="engineering", proposal=proposal, snapshot=snapshot,
+    first = proposal_decision(projection, department="engineering", proposal=proposal, facts=facts,
                               events=events)
     assert first.accepted, first.error_dicts
     arguments = dict(department="engineering", proposal=proposal,
                      basis=WorkBasis.current(projection, "engineering"), started=projection,
-                     evaluated=projection, snapshot=snapshot, events=events)
-    assert commit_decision(first, current=projection, current_snapshot=snapshot, **arguments).accepted
+                     evaluated=projection, facts=facts, events=events)
+    assert commit_decision(first, current=projection, current_facts=facts, **arguments).accepted
     newer_input = replace(projection, input_version=projection.input_version + 1)
-    stale = commit_decision(first, current=newer_input, current_snapshot=snapshot, **arguments)
+    stale = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
     assert [error.field for error in stale.errors] == ["execution_basis"]
-    workspace.write_file("src/echo.py", "print('changed after validation')\n")
-    changed = commit_decision(first, current=projection, current_snapshot=workspace.snapshot(), **arguments)
+    system.workspace(projection.run_id).write_file("src/echo.py", "print('changed after validation')\n")
+    changed = commit_decision(first, current=projection, current_facts=environment.query(FactsQuery(tree=True)).tree,
+                              **arguments)
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
 
@@ -81,5 +90,22 @@ def test_registered_command_permission_carries_its_execution_basis(tmp_path):
     assert permission.command_basis == {
         "registered_name": "unit",
         "registered_argv": ["python", "-c", "print('ok')", "--fast"],
-        "snapshot_hash": system.workspace(projection.run_id).snapshot().digest,
+        "snapshot_hash": _environment(system, projection).query(FactsQuery(tree=True)).tree.digest,
     }
+
+
+def test_write_permission_uses_the_canonical_path_from_the_environment(tmp_path):
+    system, projection = _engineering(tmp_path)
+    call = {"id": "call", "name": "move_file", "args": {"source": "src/a.py", "destination": "src/b.py", "reason": "r"}}
+    query = facts_query(call)
+    assert query == FactsQuery(paths=("src/a.py", "src/b.py"))
+    system.workspace(projection.run_id).write_file("src/a.py", "a\n")
+    facts = _environment(system, projection).query(query)
+    assert facts.paths["src/a.py"].canonical == "src/a.py" and facts.paths["src/a.py"].kind == "file"
+    assert facts.paths["src/b.py"].kind == "missing"
+    assert facts_query({"id": "call", "name": "read_file", "args": {"path": "src/a.py"}}) == FactsQuery()
+    # 祖先是文件的路径在工作区中不能表示：拒绝原因就是执行环境给出的原因
+    inner = _permission(system, projection, "write_file", {"path": "src/a.py/inner.py", "content": ""})
+    reason = _environment(system, projection).query(FactsQuery(paths=("src/a.py/inner.py",))).paths["src/a.py/inner.py"].error
+    assert reason is not None and "not a directory" in reason
+    assert inner.reason == reason and not inner.stopped

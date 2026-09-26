@@ -11,6 +11,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any
 
+from .actions import FactsQuery
 from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
@@ -18,6 +19,7 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
+from .environment import LocalEnvironment
 from .event_store import EventStore, NewEvent, WritePath
 from .engine import StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
@@ -318,6 +320,9 @@ class Orchestrator:
     def workspace(self, run_id: str) -> Workspace:
         return Workspace(self.workspace_root / run_id)
 
+    def _environment(self, run_id: str) -> LocalEnvironment:
+        return LocalEnvironment(self.workspace(run_id))
+
     def add_input(self, run_id: str, text: str) -> RunProjection:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("input must be a non-empty string")
@@ -485,7 +490,8 @@ class Orchestrator:
         events = self.store.list_events(run_id)
         if request_still_applicable(request, projection, events):
             return projection
-        phase, _valid = resume_phase(request, projection, events, snapshot_hash=self.workspace(run_id).digest())
+        tree = self._environment(run_id).query(FactsQuery(tree=True)).tree
+        phase, _valid = resume_phase(request, projection, events, snapshot_hash=tree.digest)
         return self._close_request(run_id, projection, status="superseded", reason="The request basis changed outside its authorized work.",
                                    return_phase=phase, return_work_valid=False)
 
@@ -750,6 +756,7 @@ class Orchestrator:
             activation.driver = StepDriver.start(
                 scope, activation.prompt, store=self.store, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, target=activation.target,
+                environment=LocalEnvironment(workspace),
                 runtime=ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
@@ -807,23 +814,25 @@ class Orchestrator:
         model: str | None,
         yielded_work: dict[str, Any] | None = None,
     ) -> None:
-        # 提案先在锁外校验；锁内关闭过时的协作请求以后，由 U 按最新的投影与工作区快照作提交判断
+        # 提案先在锁外校验；锁内关闭过时的协作请求以后，由 U 按最新的投影与工作区事实作提交判断。
+        # 工作区事实向执行环境查询；提交需要带文件内容的公开树（交付封存），提交判断使用同一次读取的事实
+        environment = self._environment(run_id)
         evaluated = self.project(run_id)
-        snapshot = self.workspace(run_id).snapshot()
-        decision = proposal_decision(evaluated, department=department, proposal=proposal, snapshot=snapshot,
+        facts = environment.query(FactsQuery(tree=True)).tree
+        decision = proposal_decision(evaluated, department=department, proposal=proposal, facts=facts,
                                      events=self.store.list_events(run_id))
         with self.writes.lock:
             current = self.project(run_id)
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 return
             current = self._close_obsolete_request(run_id, current)
-            fresh_snapshot = self.workspace(run_id).snapshot()
+            snapshot = environment.snapshot()
             decision = commit_decision(
                 decision, department=department, proposal=proposal, basis=basis, started=projection,
-                evaluated=evaluated, snapshot=snapshot, current=current, current_snapshot=fresh_snapshot,
+                evaluated=evaluated, facts=facts, current=current, current_facts=snapshot.facts,
                 events=self.store.list_events(run_id),
             )
-            projection, snapshot = current, fresh_snapshot
+            projection = current
             if proposal is not None:
                 self.writes.append(run_id, NewEvent(
                     EventType.PROPOSAL_SUBMITTED, role=department,

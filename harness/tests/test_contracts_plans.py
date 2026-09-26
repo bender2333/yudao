@@ -21,7 +21,7 @@ def _call(identity, name, **arguments):
 def _accept_new_spec(system, run_id):
     projection = system.project(run_id)
     decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=replace(projection, phase="PRODUCT_SPEC"),
-                                 snapshot=system.workspace(run_id).snapshot(),
+                                 facts=system.workspace(run_id).snapshot().facts,
                                  proposal=product_spec(requirements=["print the argument in uppercase"], change_record={
                                      "changed": ["Print the argument in uppercase"], "retained": ["Keep a single argument CLI"],
                                      "retired": ["Preserve the original case"], "rationale": "The product now requires uppercase output",
@@ -123,13 +123,13 @@ def test_supplementary_decision_invalidates_plan_and_old_receipts_without_new_sp
     assert new.engineering_plan is None
     assert new.engineering_plans[-1].status == "superseded"
     new = system.activate_once(run_id)
-    snapshot = system.workspace(run_id).snapshot()
+    facts = system.workspace(run_id).snapshot().facts
     for replacement in (
         replace(receipt, activation_id=new.last_activations["engineering"], engineering_plan_hash=new.engineering_plan.content_hash),
         replace(receipt, activation_id=new.last_activations["engineering"], effective_contract_hash=new.effective_contract.content_hash),
     ):
         decision = evaluate_proposal(phase=new.phase, department="engineering", projection=new,
-                                     snapshot=replace(snapshot, checks=(replacement,)), proposal=delivery())
+                                     facts=facts.model_copy(update={"checks": (replacement,)}), proposal=delivery())
         assert not decision.accepted
         assert any(error.field == "check_names" for error in decision.errors)
 
@@ -147,7 +147,7 @@ def test_plan_adjustment_requires_reason_and_current_contract(tmp_path):
         (engineering_plan(scope=["../materials/"], reason="Move files"), "scope"),
     ):
         decision = evaluate_proposal(phase=current.phase, department="engineering", projection=current,
-                                     snapshot=system.workspace(run_id).snapshot(), proposal=proposal)
+                                     facts=system.workspace(run_id).snapshot().facts, proposal=proposal)
         assert not decision.accepted
         assert any(error.field == field for error in decision.errors)
 

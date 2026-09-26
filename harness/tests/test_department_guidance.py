@@ -823,10 +823,10 @@ def test_one_write_cannot_complete_two_guidance_items(tmp_path):
 
 
 def test_guidance_tool_contract_lists_explained_and_requires_host_results_for_completed():
-    from harness.tools import HOST_TOOL_SCHEMAS
+    from harness.tools import TOOL_SCHEMAS
     from harness.context import PROPOSAL_CONTRACTS
 
-    tool = HOST_TOOL_SCHEMAS["submit_guidance_response"]
+    tool = TOOL_SCHEMAS["submit_guidance_response"]
     status = tool["parameters"]["properties"]["status"]["enum"]
     assert status == ["explained", "completed", "declined", "needs_work"]
     assert "empty is allowed" not in tool["description"]

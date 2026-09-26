@@ -109,7 +109,7 @@ def tool_error(projection: RunProjection, department: str, name: str,
         return None
     if request.status != "open" or department != request.recipient or projection.phase in TERMINAL_PHASES:
         return "Only the recipient of the open request may act."
-    if TOOL_DEFS.get(name, {}).get("access") == "write" and not (
+    if TOOL_DEFS.get(name, {}).get("action") == "write" and not (
         request.request_type == "action" and request.action == "revise_delivery"
     ):
         return "This request permits reading and checking, but does not authorize file changes."

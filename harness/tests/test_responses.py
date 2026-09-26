@@ -24,7 +24,7 @@ from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_by
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES
-from harness.tools import host_tool_definitions, tools_for
+from harness.tools import tool_definitions, tools_for
 
 
 KEY = "local-sdk-test-key"
@@ -902,7 +902,7 @@ def test_product_spec_change_record_schema_has_object_type_for_responses():
     tools = [
         {"type": "function", "name": item["name"], "description": item["description"],
          "parameters": item["parameters"], "strict": False}
-        for item in host_tool_definitions(tools_for("product"))
+        for item in tool_definitions(tools_for("product"))
     ]
 
     def inspect(handler, body):

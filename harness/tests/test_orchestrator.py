@@ -8,9 +8,9 @@ from harness.tests.helpers import department_history, happy_script, run_scripted
 
 def test_happy_path_requires_quality_release(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
-    snapshot = system.workspace(projection.run_id).snapshot()
-    engineering_check = snapshot.latest_check("engineering", "smoke")
-    quality_check = snapshot.latest_check("quality", "smoke")
+    facts = system.workspace(projection.run_id).snapshot().facts
+    engineering_check = facts.latest_check("engineering", "smoke")
+    quality_check = facts.latest_check("quality", "smoke")
     assert engineering_check is not None and engineering_check.exit_code == 0
     assert quality_check is not None and quality_check.exit_code == 0
     assert "host-executed" in engineering_check.summary

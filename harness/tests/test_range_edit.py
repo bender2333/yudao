@@ -40,7 +40,7 @@ def _edit_call(identity, path, start, end, expected, new, digest):
 
 
 def test_edit_range_is_an_engineering_only_write_tool():
-    assert TOOL_DEFS["edit_range"]["access"] == "write"
+    assert TOOL_DEFS["edit_range"]["kind"] == "environment" and TOOL_DEFS["edit_range"]["action"] == "write"
     assert TOOL_DEFS["edit_range"]["departments"] == ("engineering",)
     assert "edit_range" in tools_for("engineering")
     assert "edit_range" not in tools_for("product")
@@ -316,7 +316,7 @@ def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     workspace.write_file("check.py", "raise SystemExit(0)\n")
     passed = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "check.py"]})
     assert passed.ok and passed.output["exit_code"] == 0, passed.error
-    assert workspace.snapshot().latest_check("engineering", "smoke") is not None
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is not None
     content_hash = _read_content_hash(runtime, "app.py", 1, 1)
     edited = runtime.execute("engineering", "edit_range", {
         "path": "app.py", "start_line": 1, "end_line": 1,
@@ -325,7 +325,7 @@ def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     })
     assert edited.ok, edited.error
     # 树已变，绑定旧树的通过结论不能沿用
-    assert workspace.snapshot().latest_check("engineering", "smoke") is None
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 
 def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
@@ -347,7 +347,7 @@ def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
     assert workspace.read_file("app.py") == "BROKEN = True\n"
     assert workspace.digest() == original
     assert "hacked.txt" not in workspace.list_files()
-    assert workspace.snapshot().latest_check("engineering", "smoke") is None
+    assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 
 def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):

@@ -16,18 +16,20 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Any, Protocol
 
+from .actions import FactsQuery
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
-from .adjudication import ToolPermission, tool_permission
+from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
+from .environment import LocalEnvironment
 from .event_store import EventStore, WritePath
 from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
 from .projection import project_run
 from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget
 from .recording import ActivationScope, StepRecorder
-from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
+from .tools import SUBMIT_KINDS, TOOL_DEFS, ToolResult, ToolRuntime
 
 # 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
 TOOL_CALL_REQUIRED_LIMIT = 3
@@ -93,19 +95,19 @@ class StepDriver:
     @classmethod
     def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-              target: FrozenTarget | None, runtime: ToolRuntime, nodes: SafeNode, cancelled: Event,
-              limits: StepLimits) -> StepDriver:
+              target: FrozenTarget | None, environment: LocalEnvironment, runtime: ToolRuntime, nodes: SafeNode,
+              cancelled: Event, limits: StepLimits) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(scope, prompt, store=store, writes=writes, artifacts=artifacts, assembly=assembly,
-                     adapter=adapter, target=target, runtime=runtime, nodes=nodes, cancelled=cancelled,
-                     limits=limits)
+                     adapter=adapter, target=target, environment=environment, runtime=runtime, nodes=nodes,
+                     cancelled=cancelled, limits=limits)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-                 target: FrozenTarget | None, runtime: ToolRuntime, nodes: SafeNode, cancelled: Event,
-                 limits: StepLimits) -> None:
+                 target: FrozenTarget | None, environment: LocalEnvironment, runtime: ToolRuntime, nodes: SafeNode,
+                 cancelled: Event, limits: StepLimits) -> None:
         self._scope = scope
         basis = scope.basis
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
@@ -116,6 +118,7 @@ class StepDriver:
         self._recorder = StepRecorder(store, writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
         self._adapter = adapter
         self._target = target
+        self._environment = environment
         self._runtime = runtime
         self._nodes = nodes
         self._cancelled = cancelled
@@ -271,8 +274,12 @@ class StepDriver:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
                         return Stopped()
-                    result = (self._runtime.execute(request.department, name, args) if permission.allowed
-                              else ToolResult(name, False, None, permission.reason))
+                    if not permission.allowed:
+                        result = ToolResult(name, False, None, permission.reason)
+                    elif TOOL_DEFS[name]["kind"] == "host":
+                        result = ToolResult(name, True, _run_host_tool(name, args))
+                    else:
+                        result = self._runtime.execute(request.department, name, args)
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
                 call = {"id": identity, "name": name, "args": args, "ok": result.ok,
@@ -307,7 +314,7 @@ class StepDriver:
                                       None if target is None else target.context_window,
                                       None if target is None else target.max_output_tokens)
                 events = self._store.list_events(scope.run_id)
-                snapshot_hash = self._runtime.workspace.snapshot().digest
+                snapshot_hash = self._environment.query(FactsQuery(tree=True)).tree.digest
                 pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
                                             events=events, snapshot_hash=snapshot_hash)
             except ValueError as exc:
@@ -392,9 +399,11 @@ class StepDriver:
         scope = self._scope
         with self._writes.lock:
             projection = self._nodes.settle()
+            # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U
+            facts = self._environment.query(facts_query(call))
             permission = tool_permission(
                 projection, call, department=scope.department, guidance_only=scope.guidance_only,
-                basis=scope.basis, aborted=self._cancelled.is_set(), workspace=self._runtime.workspace,
+                basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
             if permission.allowed:
                 self._recorder.tool_started(projection.phase, request, call, permission.command_basis)
@@ -412,6 +421,14 @@ class StepDriver:
 
     def _project(self) -> RunProjection:
         return project_run(self._store, self._scope.run_id)
+
+
+def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
+    # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
+    payload = dict(args)
+    payload["kind"] = SUBMIT_KINDS[name]
+    payload.pop("exit_code", None)
+    return payload
 
 
 def _retry_delay(error: ProviderError, attempt: int, limits: StepLimits) -> float:

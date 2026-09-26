@@ -75,12 +75,12 @@ def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, m
     def mutate_after_validation(**arguments):
         decision = evaluate(**arguments)
         assert decision.accepted
-        captured.append(arguments["snapshot"])
+        captured.append(arguments["facts"])
         system.workspace(run_id).write_file("src/echo.py", "changed after validation")
         return decision
 
     def archive_validated_tree(store, run, tree):
-        assert tree is captured[0].tree
+        assert tree.digest == captured[0].digest
         ref = store_tree(store, run, tree)
         archived.append(ref)
         return ref
@@ -118,7 +118,7 @@ def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_pa
     def mutate_after_quality_validation(**arguments):
         decision = evaluate(**arguments)
         assert arguments["department"] == "quality" and decision.accepted
-        assert arguments["snapshot"].digest == accepted_tree_digest
+        assert arguments["facts"].digest == accepted_tree_digest
         system.workspace(run_id).write_file("src/unreviewed.py", "not part of the reviewed tree")
         return decision
 

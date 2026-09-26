@@ -26,25 +26,27 @@ SEARCH_DEFAULT_PAGE = 50
 # 单行过长时保留的片段长度，避免一行占满整页输出
 SEARCH_SNIPPET_LIMIT = 1000
 
+# kind：主机工具（host）由控制核心执行，现在只有提交类工具；环境工具（environment）的每次调用是一个动作，
+# 经过工具许可以后在执行环境中执行，action 是动作类别（读取、写入、检查、登记的本地命令）
 TOOL_DEFS = {
-    "read_file": {"access": "read", "departments": ("product", "engineering", "quality")},
-    "list_files": {"access": "read", "departments": ("product", "engineering", "quality")},
-    "search": {"access": "read", "departments": ("product", "engineering", "quality")},
-    "read_range": {"access": "read", "departments": ("product", "engineering", "quality")},
-    "write_file": {"access": "write", "departments": ("engineering",)},
-    "edit_range": {"access": "write", "departments": ("engineering",)},
-    "delete_file": {"access": "write", "departments": ("engineering",)},
-    "move_file": {"access": "write", "departments": ("engineering",)},
-    "run_check": {"access": "check", "departments": ("product", "engineering", "quality")},
-    "run_command": {"access": "check", "departments": ("engineering",)},
-    "submit_product_spec": {"access": "submit", "departments": ("product",)},
-    "submit_product_decision": {"access": "submit", "departments": ("product",)},
-    "submit_request": {"access": "submit", "departments": ("product", "engineering", "quality")},
-    "submit_response": {"access": "submit", "departments": ("product", "engineering", "quality")},
-    "submit_guidance_response": {"access": "submit", "departments": ("product", "engineering", "quality")},
-    "submit_plan": {"access": "submit", "departments": ("engineering",)},
-    "submit_delivery": {"access": "submit", "departments": ("engineering",)},
-    "submit_review": {"access": "submit", "departments": ("quality",)},
+    "read_file": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
+    "list_files": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
+    "search": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
+    "read_range": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
+    "write_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
+    "edit_range": {"kind": "environment", "action": "write", "departments": ("engineering",)},
+    "delete_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
+    "move_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
+    "run_check": {"kind": "environment", "action": "check", "departments": ("product", "engineering", "quality")},
+    "run_command": {"kind": "environment", "action": "command", "departments": ("engineering",)},
+    "submit_product_spec": {"kind": "host", "departments": ("product",)},
+    "submit_product_decision": {"kind": "host", "departments": ("product",)},
+    "submit_request": {"kind": "host", "departments": ("product", "engineering", "quality")},
+    "submit_response": {"kind": "host", "departments": ("product", "engineering", "quality")},
+    "submit_guidance_response": {"kind": "host", "departments": ("product", "engineering", "quality")},
+    "submit_plan": {"kind": "host", "departments": ("engineering",)},
+    "submit_delivery": {"kind": "host", "departments": ("engineering",)},
+    "submit_review": {"kind": "host", "departments": ("quality",)},
 }
 
 SUBMIT_KINDS = {
@@ -113,8 +115,8 @@ def has_tool(department: str, name: str) -> bool:
     return bool(spec and department in spec["departments"])
 
 
-def host_tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:
-    return [dict(HOST_TOOL_SCHEMAS[name]) for name in tool_names if name in HOST_TOOL_SCHEMAS]
+def tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:
+    return [dict(TOOL_SCHEMAS[name]) for name in tool_names if name in TOOL_SCHEMAS]
 
 
 class ToolRuntime:
@@ -133,14 +135,6 @@ class ToolRuntime:
             "move_file": self._move_file,
             "run_check": self._run_check,
             "run_command": self._run_command,
-            "submit_product_spec": self._submit,
-            "submit_product_decision": self._submit,
-            "submit_request": self._submit,
-            "submit_response": self._submit,
-            "submit_guidance_response": self._submit,
-            "submit_plan": self._submit,
-            "submit_delivery": self._submit,
-            "submit_review": self._submit,
         }
 
     def execute(self, department: str, name: str, args: dict[str, Any] | None = None) -> ToolResult:
@@ -151,11 +145,7 @@ class ToolRuntime:
         if handler is None:
             return ToolResult(name, False, None, f"unknown tool {name}")
         try:
-            if name in SUBMIT_KINDS:
-                output = handler(department, name, args)
-            else:
-                output = handler(department, args)
-            return ToolResult(name, True, output)
+            return ToolResult(name, True, handler(department, args))
         except Exception as exc:
             return ToolResult(name, False, None, str(exc))
 
@@ -399,12 +389,6 @@ class ToolRuntime:
             "executor": "host",
             "attempt": attempt,
         }
-
-    def _submit(self, department: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        payload = dict(args)
-        payload["kind"] = SUBMIT_KINDS[name]
-        payload.pop("exit_code", None)
-        return payload
 
     def _execute_check(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
         name = str(args.get("name") or "").strip()
@@ -671,7 +655,7 @@ def _string_list_schema(description: str) -> dict[str, Any]:
     return {"type": "array", "items": {"type": "string"}, "description": description}
 
 
-HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "read_file": {
         "name": "read_file",
         "label": "read_file",

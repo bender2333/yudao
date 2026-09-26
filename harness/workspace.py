@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
+from .actions import TreeFacts
 from .models import CheckReceipt, json_dumps
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree, resolve_public_path, validate_public_path
 
@@ -18,6 +19,7 @@ CHECKS_DIR = ".checks"
 
 @dataclass(frozen=True)
 class WorkspaceSnapshot:
+    # 一次读取的公开树（带文件内容，交付封存使用）与检查回执；facts 是同一次读取的工作区事实
     tree: CapturedTree
     checks: tuple[CheckReceipt, ...]
 
@@ -26,40 +28,9 @@ class WorkspaceSnapshot:
         return self.tree.digest
 
     @property
-    def files(self) -> tuple[str, ...]:
-        return tuple(item.path for item in self.tree.files)
-
-    def has_file(self, rel: str) -> bool:
-        return rel.replace("\\", "/") in self.files
-
-    def latest_check(
-        self,
-        department: str,
-        name: str,
-        *,
-        product_spec_hash: str | None = None,
-        delivery_spec_hash: str | None = None,
-        activation_id: str | None = None,
-        effective_contract_hash: str | None = None,
-        engineering_plan_hash: str | None = None,
-    ) -> CheckReceipt | None:
-        found = [
-            item
-            for item in self.checks
-            if item.department == department and item.name == name and item.snapshot_hash == self.digest
-            and not item.tree_changed
-        ]
-        if product_spec_hash is not None:
-            found = [item for item in found if item.product_spec_hash == product_spec_hash]
-        if delivery_spec_hash is not None:
-            found = [item for item in found if item.delivery_spec_hash == delivery_spec_hash]
-        if activation_id is not None:
-            found = [item for item in found if item.activation_id == activation_id]
-        if effective_contract_hash is not None:
-            found = [item for item in found if item.effective_contract_hash == effective_contract_hash]
-        if engineering_plan_hash is not None:
-            found = [item for item in found if item.engineering_plan_hash == engineering_plan_hash]
-        return found[-1] if found else None
+    def facts(self) -> TreeFacts:
+        return TreeFacts(digest=self.tree.digest, files=tuple(item.path for item in self.tree.files),
+                         checks=self.checks)
 
 
 class Workspace:
