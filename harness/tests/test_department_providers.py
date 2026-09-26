@@ -867,7 +867,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
         payload = review("release", "The delivery passes.", checks=["smoke"], defects=[])
         payload.pop("kind")
         return _stream([
-            _call("quality-check", "collect_evidence",
+            _call("quality-check", "run_check",
                   {"name": "smoke", "argv": [sys.executable, "-c", "print('quality')"]}),
             _call("quality-review", "submit_review", payload),
         ], response_id=f"q-review-{count}", model="q-model-actual")
