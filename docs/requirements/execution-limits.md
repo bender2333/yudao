@@ -16,7 +16,7 @@
 
 原生循环采用运行时间限制（`run_time_limit_sec`，默认 7200 秒）作为主要收敛保证。部门激活次数上限（`max_cycles`，默认 999999）和每次激活模型步数上限（`MAX_MODEL_STEPS`，默认 999999）保留，但在实际运行中不再成为有效约束。调用方仍可显式配置较小值以恢复旧行为。单次模型请求保留超时处理。删除任务 token 预算配置及由此触发的暂停，不保留旧配置回退。
 
-达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；达到 `max_cycles` 上限进入 `PAUSED`（停止原因为 `max_cycles`）；达到 `MAX_MODEL_STEPS` 上限进入 `PAUSED`（停止原因为 `model_steps_exhausted`）。时间限制在每次激活准备和每步之间检查，使用单调时钟，不受系统时钟调整影响。
+达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；达到 `max_cycles` 上限进入 `PAUSED`（停止原因为 `max_cycles`）；达到 `MAX_MODEL_STEPS` 上限进入 `PAUSED`（停止原因为 `model_steps_exhausted`）。时间限制在每次激活准备和每步之间检查，使用单调时钟，不受系统时钟调整影响。停止原因只有一份封闭的清单，属于带版本的定义（[ADR-0014](../adr/0014-versioned-definitions.md)）。
 
 SDK 返回的用量可作为只读事实保存，但不影响任务推进，也不猜算价格。上下文容量检查属于请求能否发送的约束，与 provider 用量预算分开；旧历史按 D10 自动压缩，固定原文和当前工作无法容纳时明确停止。
 

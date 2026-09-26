@@ -37,6 +37,6 @@
 
 ## 验收与状态
 
-状态：用户场景已确认，W0 的[处理设计](../design/department-guidance.md)已形成架构选择与反例，尚未实现。当前只有面向整体任务的持续输入；前端模拟追加不能计为完成。
+状态：已实现。接口 `POST /api/runs/{run_id}/departments/{department}/guidance`（`harness/web/server.py`）接收指导，`harness/interactions.py` 保存原文并写入 `department_guidance_received` 事件；指导进入部门模型输入与部门回应分别记为 `department_guidance_applied` 与 `department_guidance_responded`；非活动部门的调度、处理时机与放行关系按 W0 的[处理设计](../design/department-guidance.md)实现（`fe78667`，`fcb06ab` 把「已解释」与「已完成」分开）。定向测试见 `harness/tests/test_department_guidance.py` 与 `harness/tests/test_smoke_guidance_audit.py`。真实运行：3.0B 场景 B 中指导 `guidance_c0f7c8ea684b4e48` 在返工激活中处理，状态为 `explained`，事项完成到 release（[3.0B 场景报告](../stage-3/3.0b-scenarios-report-2026-09-21.md)）。
 
 验收至少覆盖三个部门的定向发送、活跃与非活跃接收、工具及模型在途、返工与咨询、终态边界、刷新重连、原文保真和处理来源审计。模型的实际输入必须含目标指导，其他部门不能收到未授权私有内容。
