@@ -10,26 +10,26 @@ import pytest
 from harness.providers import (
     CredentialChain,
     ProviderFacade,
-    ProviderInput,
-    ProviderMessage,
-    ToolSpec,
     anthropic_base_url,
     get_preset,
-    to_provider_input,
 )
 from harness.providers.errors import ProviderError
 from harness.tests.protocol_helpers import (
     bound_target,
     chat_responder,
     facade_with,
+    invoke,
     messages_responder,
+    model_call,
     responses_responder,
     serve,
     sse,
 )
 
+HI = [{"role": "user", "content": "hi"}]
 
-def _input_with_tool(*, follow_up_result: str | None = None) -> ProviderInput:
+
+def _call_with_tool(*, follow_up_result: str | None = None):
     items = [
         {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "请写文件"}]},
         {"type": "function_call", "call_id": "call-1", "name": "write_file",
@@ -37,25 +37,16 @@ def _input_with_tool(*, follow_up_result: str | None = None) -> ProviderInput:
     ]
     if follow_up_result is not None:
         items.append({"type": "function_call_output", "call_id": "call-1", "output": follow_up_result})
-    return ProviderInput(
-        messages=(ProviderMessage(role="user", content="请写文件"),),
-        tools=(ToolSpec(name="write_file", description="写文件",
-                        parameters={"type": "object", "properties": {}}),),
-        raw_request={"input": items, "tools": [{"name": "write_file", "description": "写文件",
-                                                "parameters": {"type": "object", "properties": {}}}]},
-        max_output_tokens=1024,
-    )
+    return model_call(items, [{"name": "write_file", "description": "写文件",
+                               "parameters": {"type": "object", "properties": {}}}],
+                      max_output_tokens=1024, session_id="run-1:engineering", attempt_id="a1")
 
 
 def test_chat_wire_format_tool_round_trip_and_identity_headers():
     server, capture, base = serve(chat_responder)
     try:
         facade = facade_with(base + "/v1", protocol="chat_completions")
-        target = bound_target(facade)
-        result = facade.invoke_once(
-            target, _input_with_tool(), session_id="run-1:engineering", attempt_id="a1",
-            abort_event=Event(),
-        )
+        result = invoke(facade, bound_target(facade), _call_with_tool())
     finally:
         server.shutdown()
         server.server_close()
@@ -72,21 +63,18 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
     assert call["call_id"] == "call-1"
     assert call["name"] == "write_file"
     assert json.loads(call["arguments"]) == {"path": "a.txt"}
-    assert result.actual_model == "target-model"
-    assert result.usage["reported"] is True
-    assert result.usage["input_tokens"] == 10
-    assert result.usage["cache_read_tokens"] == 2
-    assert result.usage["output_tokens"] == 5
+    assert result.model == "target-model"
+    assert result.usage.reported is True
+    assert result.usage.input_tokens == 10
+    assert result.usage.cache_read_tokens == 2
+    assert result.usage.output_tokens == 5
 
 
 def test_chat_sends_tool_result_paired_by_tool_call_id():
     server, capture, base = serve(chat_responder)
     try:
         facade = facade_with(base + "/v1", protocol="chat_completions")
-        facade.invoke_once(
-            bound_target(facade), _input_with_tool(follow_up_result="已写入 a.txt"),
-            session_id="run-1:engineering", attempt_id="a1", abort_event=Event(),
-        )
+        invoke(facade, bound_target(facade), _call_with_tool(follow_up_result="已写入 a.txt"))
     finally:
         server.shutdown()
         server.server_close()
@@ -105,18 +93,10 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
              "arguments": '{"path": "a.txt"}'},
             {"type": "function_call_output", "call_id": "call-1", "output": "已写入"},
         ]
-        provider_input = ProviderInput(
-            messages=(ProviderMessage(role="user", content="请写文件"),),
-            tools=(ToolSpec(name="write_file", description="写文件",
-                            parameters={"type": "object"}),),
-            raw_request={"input": input_items, "tools": [{"name": "write_file", "description": "写文件",
-                                                          "parameters": {"type": "object"}}]},
-            max_output_tokens=1024,
-        )
-        result = facade.invoke_once(
-            bound_target(facade), provider_input, session_id="run-1:product",
-            attempt_id="a1", abort_event=Event(),
-        )
+        call = model_call(input_items, [{"name": "write_file", "description": "写文件",
+                                         "parameters": {"type": "object"}}],
+                          max_output_tokens=1024, session_id="run-1:product", attempt_id="a1")
+        result = invoke(facade, bound_target(facade), call)
     finally:
         server.shutdown()
         server.server_close()
@@ -135,23 +115,17 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
     assert call["call_id"] == "toolu-1"
     assert json.loads(call["arguments"]) == {"path": "a.txt"}
     assert capture.headers[0]["x-opencode-session"] == "run-1:product"
-    assert result.usage["input_tokens"] == 11
-    assert result.usage["cache_read_tokens"] == 3
-    assert result.usage["cache_write_tokens"] == 2
+    assert result.usage.input_tokens == 11
+    assert result.usage.cache_read_tokens == 3
+    assert result.usage.cache_write_tokens == 2
 
 
 def test_messages_requires_max_output_tokens_before_connecting():
     server, capture, base = serve(messages_responder)
     try:
         facade = facade_with(base + "/v1", protocol="messages")
-        provider_input = ProviderInput(
-            messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=None,
-        )
         with pytest.raises(ProviderError) as exc_info:
-            facade.invoke_once(
-                bound_target(facade), provider_input, session_id="s", attempt_id="a",
-                abort_event=Event(),
-            )
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=None, session_id="s", attempt_id="a"))
         assert exc_info.value.reason == "provider_protocol"
         assert capture.requests == []
     finally:
@@ -163,16 +137,13 @@ def test_responses_requests_carry_identity_headers():
     server, capture, base = serve(responses_responder)
     try:
         facade = facade_with(base + "/v1", protocol="responses")
-        result = facade.invoke_once(
-            bound_target(facade), to_provider_input([{"role": "user", "content": "hi"}]),
-            session_id="run-2:quality", attempt_id="a1", abort_event=Event(),
-        )
+        result = invoke(facade, bound_target(facade), model_call(HI, session_id="run-2:quality", attempt_id="a1"))
     finally:
         server.shutdown()
         server.server_close()
     assert capture.headers[0]["x-opencode-session"] == "run-2:quality"
     assert capture.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
-    assert result.text == "ok"
+    assert result.output[0]["content"][0]["text"] == "ok"
 
 
 def test_facade_adapter_accepts_chat_targets():
@@ -189,7 +160,7 @@ def test_facade_adapter_accepts_chat_targets():
         server.server_close()
 
 
-def test_model_test_uses_the_matching_execution_scope_for_chat():
+def test_model_test_admits_a_chat_model():
     server, _capture, base = serve(chat_responder)
     try:
         facade = facade_with(base + "/v1", protocol="chat_completions")
@@ -216,11 +187,7 @@ def test_go_preset_base_url_reaches_the_official_protocol_path(protocol, respond
     try:
         local_base = urlunsplit(urlsplit(base)._replace(scheme="http", netloc=urlsplit(local).netloc))
         facade = facade_with(local_base, protocol=protocol)
-        facade.invoke_once(
-            bound_target(facade),
-            ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
-            session_id="s", attempt_id="a", abort_event=Event(),
-        )
+        invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
     finally:
         server.shutdown()
         server.server_close()
@@ -256,8 +223,7 @@ def test_one_preset_supports_independent_connections_with_own_address_and_key():
             {"key": "b", "provider_id": "go-b", "model_id": "m-b"},
         ])
         for key in ("a", "b"):
-            facade.invoke_once(snapshot.target(key), to_provider_input([{"role": "user", "content": "hi"}]),
-                               session_id=f"session-{key}", attempt_id=f"attempt-{key}", abort_event=Event())
+            invoke(facade, snapshot.target(key), model_call(HI, session_id=f"session-{key}", attempt_id=f"attempt-{key}"))
     finally:
         for server in (server_a, server_b):
             server.shutdown()
@@ -312,10 +278,8 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
 
         def held_call() -> None:
             try:
-                facade.invoke_once(
-                    target, ProviderInput(messages=(ProviderMessage(role="user", content="hold"),),
-                                          max_output_tokens=7),
-                    session_id="s", attempt_id="held", abort_event=Event())
+                invoke(facade, target, model_call([{"role": "user", "content": "hold"}], max_output_tokens=7,
+                                                  session_id="s", attempt_id="held"))
             except ProviderError as exc:
                 outcome["reason"] = exc.reason
 
@@ -325,9 +289,8 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
         assert facade.cancel("held") is True
         worker.join(5)
         assert not worker.is_alive()
-        result = facade.invoke_once(
-            target, ProviderInput(messages=(ProviderMessage(role="user", content="next"),), max_output_tokens=64),
-            session_id="s", attempt_id="next", abort_event=Event())
+        result = invoke(facade, target, model_call([{"role": "user", "content": "next"}], max_output_tokens=64,
+                                                   session_id="s", attempt_id="next"))
     finally:
         release.set()
         server.shutdown()
@@ -347,11 +310,7 @@ def test_stream_without_terminal_event_is_a_retryable_failure(protocol, first_ev
     try:
         facade = facade_with(base + "/v1", protocol=protocol)
         with pytest.raises(ProviderError) as exc_info:
-            facade.invoke_once(
-                bound_target(facade),
-                ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
-                session_id="s", attempt_id="a", abort_event=Event(),
-            )
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
     finally:
         server.shutdown()
         server.server_close()
@@ -369,11 +328,7 @@ def test_partial_stream_is_retryable():
     try:
         facade = facade_with(base + "/v1", protocol="messages")
         with pytest.raises(ProviderError) as exc_info:
-            facade.invoke_once(
-                bound_target(facade),
-                ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
-                session_id="s", attempt_id="a", abort_event=Event(),
-            )
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
         assert exc_info.value.reason in {"provider_error", "provider_protocol", "provider_timeout"}
     finally:
         server.shutdown()

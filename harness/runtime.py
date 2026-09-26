@@ -7,12 +7,12 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
-from .engine import StepLimits
+from .engine import ModelCallLoop, StepLimits
 from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .projection import RunProjection, project_run
 from .projects import ProjectService
-from .providers import ProviderFacade, ResponsesExecutionScope
+from .providers import ProviderFacade
 from .replay_check import verify_replay
 
 __all__ = [
@@ -111,13 +111,13 @@ class LoopSystem:
         return self.orchestrator.create_run(task, **kwargs)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
-        # 一次同步运行共享连接作用域，连接按端点与认证句柄复用隔离
-        with ResponsesExecutionScope() as execution_scope:
-            return self.orchestrator.run_until_stop(run_id, execution_scope)
+        # 一次同步运行的模型调用共用部门循环的事件循环，连接按端点与认证句柄复用隔离
+        with ModelCallLoop() as model_loop:
+            return self.orchestrator.run_until_stop(run_id, model_loop)
 
     def activate_once(self, run_id: str) -> RunProjection:
-        with ResponsesExecutionScope() as execution_scope:
-            return self.orchestrator.activate_once(run_id, execution_scope)
+        with ModelCallLoop() as model_loop:
+            return self.orchestrator.activate_once(run_id, model_loop)
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)

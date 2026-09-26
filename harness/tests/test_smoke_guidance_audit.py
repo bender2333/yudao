@@ -6,22 +6,22 @@ from dataclasses import asdict
 
 import pytest
 
-from harness.adapters.base import ModelResponse
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.context import GUIDANCE_ONLY_TOOLS
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
     collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec, response_turn, review_turn,
 )
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
+from harness.tests.helpers import recorded_context
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
 
 
 def _guidance_ids(request):
-    part = next(part for part in request.context.parts if part.source == "department_guidance")
-    return [item["id"] for item in json.loads(part.text)]
+    return [item["id"] for item in json.loads(prompt_part(request, "department_guidance"))]
 
 
 def _list_files(request):
@@ -95,13 +95,14 @@ def test_combined_run_shape(combined_run):
     assert [item.status for item in projection.responses] == ["answered"]
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.TOOL_SKIPPED for event in events)
-    guidance_only = [request for request in adapter.invocations if request.guidance_only]
+    guidance_only = [request for request in adapter.invocations
+                     if recorded_context(system, request).manifest.guidance_only]
     assert {request.department for request in guidance_only} == {"engineering"}
     assert len({request.activation_id for request in guidance_only}) == 2
     assert all({tool["name"] for tool in request.tools} <= GUIDANCE_ONLY_TOOLS for request in guidance_only)
-    results_part = next(part for request in guidance_only for part in request.context.parts
-                        if part.source == "guidance_results" and json.loads(part.text))
-    assert json.loads(results_part.text)[0]["name"] == "run_check"
+    results = next(json.loads(text) for request in guidance_only
+                   if (text := prompt_part(request, "guidance_results")) and json.loads(text))
+    assert results[0]["name"] == "run_check"
 
 
 def test_model_input_audit_verifies_combined_run(combined_run):
@@ -141,8 +142,8 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     result = system.activate_once(run_id)
     assert result.department_guidance[0].status == "explained"
     last = adapter.invocations[-1]
-    assert last.guidance_only is False and last.step_id == 3
-    results = json.loads(next(part.text for part in last.context.parts if part.source == "guidance_results"))
+    assert recorded_context(system, last).manifest.guidance_only is False and last.step_id == 3
+    results = json.loads(prompt_part(last, "guidance_results"))
     assert {item["name"] for item in results} == {"write_file", "run_check"}
     assembled = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
     assert all(isinstance(event.payload.get("snapshot_hash"), str) and event.payload["snapshot_hash"] for event in assembled)

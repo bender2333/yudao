@@ -3,7 +3,8 @@ from threading import Event
 
 import pytest
 
-from harness.adapters.base import ModelResponse, ProviderError
+from harness.adapters.base import ProviderError
+from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.engine import StepLimits
 from harness.models import EventType

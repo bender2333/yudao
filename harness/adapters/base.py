@@ -1,13 +1,12 @@
-"""Single model-call contract. Adapters cannot execute tools or advance departments."""
-
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from threading import Event
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from ..context import AssembledContext
 from ..models import Usage
+from ..providers.call import ModelCall, ModelResponse, ModelStreamEvent
 
 
 class ProviderError(Exception):
@@ -34,6 +33,7 @@ class Availability:
 
 @dataclass
 class ModelObservation:
+    # 编排器记录的一条观察：模型调用交回的流式输出，或者工具执行与跳过的结果
     id: str
     kind: str
     payload: dict[str, Any] = field(default_factory=dict)
@@ -44,9 +44,16 @@ class ModelObservation:
     source: str = "provider_sdk"
     sequence: int | None = None
 
+    @classmethod
+    def from_stream(cls, event: ModelStreamEvent) -> ModelObservation:
+        usage = None if event.usage is None else Usage(**event.usage.model_dump())
+        return cls(event.id, event.kind, dict(event.payload), event.text, usage, event.provider,
+                   event.model, event.source, event.sequence)
+
 
 @dataclass
 class ModelRequest:
+    # 编排器为一步准备的请求：装配结果与身份；交给模型接入的只是由它生成的模型调用合同
     run_id: str
     department: str
     session_id: str
@@ -54,9 +61,6 @@ class ModelRequest:
     step_id: int
     context: AssembledContext
     tools: list[dict[str, Any]]
-    abort_flag: Event
-    on_observation: Callable[[ModelObservation], None] | None = None
-    on_raw_observation: Callable[[ModelObservation], None] | None = None
     purpose: str = "work"
     max_output_tokens: int | None = None
     effective_contract_hash: str | None = None
@@ -82,33 +86,23 @@ class ModelRequest:
     def input_items(self) -> list[dict[str, Any]]:
         return self.context.input_items
 
-    def observe(self, observation: ModelObservation) -> None:
-        if self.on_observation is not None:
-            self.on_observation(observation)
-
-    def observe_raw(self, observation: ModelObservation) -> None:
-        if self.on_raw_observation is not None:
-            self.on_raw_observation(observation)
-
-
-@dataclass
-class ModelResponse:
-    output: list[dict[str, Any]] = field(default_factory=list)
-    usage: Usage = field(default_factory=lambda: Usage(reported=False))
-    finish_reason: str = "completed"
-    error: str | None = None
-    provider: str = "fake"
-    model: str = "fake-script"
-    response_id: str | None = None
-    sdk_response: dict[str, Any] | None = None
+    def model_call(self) -> ModelCall:
+        return ModelCall(
+            run_id=self.run_id, department=self.department, session_id=self.session_id,
+            activation_id=self.activation_id, step_id=self.step_id,
+            logical_call_id=self.logical_call_id, attempt=self.attempt, attempt_id=self.attempt_id,
+            purpose=self.purpose, input_items=self.input_items, tools=self.tools,
+            max_output_tokens=self.max_output_tokens,
+        )
 
 
 class ModelAdapter(Protocol):
+    # 部门循环看到的模型接入：一次调用尝试逐条交回流式输出，最后交回 ModelResponse；取消按调用尝试的身份生效
     name: str
     model: str
 
     def availability(self) -> Availability: ...
 
-    def complete(self, request: ModelRequest) -> ModelResponse: ...
+    def stream(self, call: ModelCall) -> AsyncIterator[ModelStreamEvent | ModelResponse]: ...
 
-    def abort(self, session_id: str) -> None: ...
+    def cancel(self, attempt_id: str) -> None: ...

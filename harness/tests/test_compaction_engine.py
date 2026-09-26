@@ -2,13 +2,13 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from harness.adapters.base import ModelObservation, ModelResponse
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, pending_request_id
 from harness.engine import StepLimits
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.proposals import collaboration_request, product_spec, response_turn
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, recorded_context
 
 
 def _message(request, text="Product memory: prior evidence was read; keep the original requirements."):
@@ -41,7 +41,7 @@ def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_l
         if reject_first_spec and not rejected_spec:
             rejected_spec = True
             return product_spec() | {"acceptance_criteria": []}
-        return product_spec() if request.request_id is None else response_turn("answered", "The original requirements remain applicable.")(request)
+        return product_spec() if pending_request_id(request) is None else response_turn("answered", "The original requirements remain applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
@@ -99,7 +99,7 @@ def test_compaction_checkpoint_survives_reactivation_and_new_controller(tmp_path
     assert later[0]["effective_contract_hash"] == first.compactions[-1]["effective_contract_hash"] is None
     assert later[0]["engineering_plan_hash"] == first.compactions[-1]["engineering_plan_hash"] is None
     assert later[-1]["checkpoint"]["boundary"]
-    assert adapter.invocations[-1].context.manifest.compaction_event_id == later[-1]["source_event_id"]
+    assert recorded_context(reloaded, adapter.invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
     assert "department_memory" in json_dumps(adapter.invocations[-1].input_items)
     assert result.canonical_state() == reloaded.replay(run_id).canonical_state()
 
@@ -130,7 +130,7 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     assert system.artifacts.get_text(source.payload["output_ref"]["content_hash"]) == original
     assert original.count("FIRST_TOOL_ORIGINAL") == 2200
     assert later[-1]["checkpoint"]["boundary"]
-    assert adapter.invocations[-1].context.manifest.compaction_event_id == later[-1]["source_event_id"]
+    assert recorded_context(reloaded, adapter.invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
     assert result.canonical_state() == reloaded.replay(run_id).canonical_state()
 
 
@@ -139,7 +139,7 @@ def test_cancelled_compaction_keeps_observed_summary_without_adopting_it(tmp_pat
 
     def late_summary(request):
         item = _message(request, "LATE_SUMMARY_MUST_NOT_BE_ADOPTED")
-        request.observe(ModelObservation(item["id"], "message", item, "LATE_SUMMARY_MUST_NOT_BE_ADOPTED"))
+        yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="LATE_SUMMARY_MUST_NOT_BE_ADOPTED")
         entered.set()
         assert release.wait(5)
         return ModelResponse(output=[item])
@@ -186,8 +186,12 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert attempts[0].tools == attempts[1].tools == []
     assert attempts[0].input_items == attempts[1].input_items
     assert (attempts[0].attempt, attempts[1].attempt) == (1, 2)
-    assert attempts[0].root_step_id == attempts[1].root_step_id and attempts[1].retry_of_step_id == attempts[0].step_id
     events = system.store.list_events(run_id)
+    requested = [event.payload for event in events
+                 if event.type == EventType.MODEL_REQUESTED and event.payload["purpose"] == "compaction"]
+    assert attempts[0].logical_call_id == attempts[1].logical_call_id
+    assert requested[0]["root_step_id"] == requested[1]["root_step_id"]
+    assert requested[1]["retry_of_step_id"] == attempts[0].step_id
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     assert len(failed) == 1
     assert failed[0].payload["purpose"] == "compaction"
@@ -219,7 +223,7 @@ def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_e
     assert not result.compactions
     attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
     assert [request.attempt for request in attempts] == [1, 2, 3]
-    assert len({request.root_step_id for request in attempts}) == 1
+    assert len({request.logical_call_id for request in attempts}) == 1
     events = system.store.list_events(run_id)
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     assert [event.payload["will_retry"] for event in failed] == [True, True, False]

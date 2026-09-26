@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from harness.adapters.base import ModelResponse
+from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import delivery, delivery_turn, plan_turn, product_spec, review, review_turn

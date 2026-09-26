@@ -1,6 +1,6 @@
 import json
 
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.artifacts import ArtifactStore
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
@@ -8,19 +8,17 @@ from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRe
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
-from harness.tests.helpers import happy_script, run_scripted
+from harness.tests.helpers import developer_text, happy_script, recorded_context, run_scripted
 from harness.tools import TOOL_DEFS
 
 
-def _part(request, source: str):
-    for item in request.context.parts:
-        if item.source == source:
-            return json.loads(item.text)
-    return None
+def _part(call, source: str):
+    text = prompt_part(call, source)
+    return None if text is None else json.loads(text)
 
 
-def _sources(request) -> list[str]:
-    return [item.source for item in request.context.manifest.injected]
+def _sources(call) -> list[str]:
+    return list(prompt_parts(call))
 
 
 def test_context_is_reassembled_from_projection_not_transcript(data_dir):
@@ -42,11 +40,12 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
     later = [item for item in adapter.invocations if item.department != "product"]
     assert later
     for item in later:
-        assert marker not in item.context.prompt_text
-        sources = [part.source for part in item.context.manifest.injected]
+        assert marker not in developer_text(item)
+        manifest = recorded_context(system, item).manifest
+        sources = [part.source for part in manifest.injected]
         assert "other_department_transcript" not in sources
         assert "historical_transcript" not in sources
-        excluded = {part.source for part in item.context.manifest.excluded}
+        excluded = {part.source for part in manifest.excluded}
         assert "other_department_transcript" in excluded
         assert "superseded_spec_as_current" in excluded
 
@@ -74,9 +73,9 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     assert projection.phase == "DONE"
     assert projection.product_spec.goal == "Build echo v2"
     engineering_after = [item for item in adapter.invocations if item.department == "engineering"][-1]
-    assert unique not in engineering_after.context.prompt_text
-    assert "Build echo v2" in engineering_after.context.prompt_text
-    injected = [part.source for part in engineering_after.context.manifest.injected]
+    assert unique not in developer_text(engineering_after)
+    assert "Build echo v2" in developer_text(engineering_after)
+    injected = [part.source for part in recorded_context(system, engineering_after).manifest.injected]
     assert injected.count("current_product_spec") == 1
 
 
@@ -123,7 +122,7 @@ def test_requests_carry_no_remaining_cycles_while_the_host_enforces_the_limit(da
     assert projection.phase == "PAUSED" and projection.stop_reason == "max_cycles"
     assert adapter.invocations
     for item in adapter.invocations:
-        assert "loop_limits" not in [part.source for part in item.context.parts]
+        assert "loop_limits" not in [part.source for part in recorded_context(system, item).parts]
         assert "cycles_remaining" not in json.dumps(item.input_items, ensure_ascii=False)
 
 
@@ -133,13 +132,14 @@ def test_proposal_contract_and_binding_refs_are_injected(data_dir):
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
     for item in adapter.invocations:
-        sources = [part.source for part in item.context.manifest.injected]
+        manifest = recorded_context(system, item).manifest
+        sources = [part.source for part in manifest.injected]
         assert "proposal_contract" in sources
         assert "binding_refs" in sources
-        assert "proposal_contract" in item.context.prompt_text
-        excluded = {part.source for part in item.context.manifest.excluded}
+        assert "proposal_contract" in developer_text(item)
+        excluded = {part.source for part in manifest.excluded}
         assert "other_department_transcript" in excluded
-        assert "internal JSON 实现协议" not in item.context.prompt_text
+        assert "internal JSON 实现协议" not in developer_text(item)
 
 
 def test_validation_feedback_is_injected_after_rejection(data_dir):
@@ -157,8 +157,8 @@ def test_validation_feedback_is_injected_after_rejection(data_dir):
     system.run_until_stop(run_id)
     product_calls = [item for item in adapter.invocations if item.department == "product"]
     assert len(product_calls) >= 2
-    assert "validation_feedback" in product_calls[1].context.prompt_text
-    assert "goal" in product_calls[1].context.prompt_text
+    assert "validation_feedback" in developer_text(product_calls[1])
+    assert "goal" in developer_text(product_calls[1])
 
 
 def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
@@ -198,8 +198,8 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
         assert "DECISION_CANARY_C" in texts
         assert "first requirement" in texts
         assert "second requirement" in texts
-        assert "DECISION_CANARY_A" in request.context.prompt_text
-        assert "DECISION_CANARY_C" in request.context.prompt_text
+        assert "DECISION_CANARY_A" in developer_text(request)
+        assert "DECISION_CANARY_C" in developer_text(request)
 
 
 def test_effective_decision_keeps_explicit_requirement_and_request_source(data_dir):
@@ -235,8 +235,8 @@ def test_effective_decision_keeps_explicit_requirement_and_request_source(data_d
         assert len(decisions) == 1
         assert decisions[0]["statement"] == decision.statement
         assert decisions[0]["request_id"] == decision.request_id
-        assert "BACKGROUND_CANARY" in request.context.prompt_text
-        assert "IMPACT_CANARY" in request.context.prompt_text
+        assert "BACKGROUND_CANARY" in developer_text(request)
+        assert "IMPACT_CANARY" in developer_text(request)
 
 
 def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
@@ -279,9 +279,9 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
     assert projection.product_spec.revision == 2
     assert projection.effective_decisions == []
     engineering_after = [item for item in adapter.invocations if item.department == "engineering"][-1]
-    assert stale not in engineering_after.context.prompt_text
+    assert stale not in developer_text(engineering_after)
     assert _part(engineering_after, "current_product_decisions") is None
-    excluded = {item.source for item in engineering_after.context.manifest.excluded}
+    excluded = {item.source for item in recorded_context(system, engineering_after).manifest.excluded}
     assert "expired_product_decisions" in excluded
 
 
@@ -319,7 +319,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     engineering_after_r2 = [
         item
         for item in adapter.invocations
-        if item.department == "engineering" and "new behavior" in item.context.prompt_text
+        if item.department == "engineering" and "new behavior" in developer_text(item)
     ][0]
     assert _part(engineering_after_r2, "current_delivery_spec") is None
     prior = _part(engineering_after_r2, "prior_delivery")
@@ -329,7 +329,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     assert prior["purpose"] == "repair_basis"
     assert prior["invalidation_reason"]
     assert "current_delivery_spec" not in _sources(engineering_after_r2)
-    excluded = {item.source for item in engineering_after_r2.context.manifest.excluded}
+    excluded = {item.source for item in recorded_context(system, engineering_after_r2).manifest.excluded}
     assert "invalid_delivery_as_current" in excluded
 
     quality = [item for item in adapter.invocations if item.department == "quality"][-1]
@@ -398,10 +398,10 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     engineering = [item for item in adapter.invocations if item.department == "engineering"]
-    assert "validation_feedback" in engineering[2].context.prompt_text
+    assert "validation_feedback" in developer_text(engineering[2])
     later = engineering[-1]
     assert "validation_feedback" not in _sources(later)
-    assert later.context.prompt_text.count("validation_feedback") == 0
+    assert developer_text(later).count("validation_feedback") == 0
 
 
 def test_assembler_records_budget_and_digest(tmp_path):
@@ -463,7 +463,7 @@ def _bound_system(tmp_path, monkeypatch, script, *, context_window, max_output_t
     from harness.providers import ProviderFacade
 
     adapter = FakeAdapter(script)
-    monkeypatch.setattr(FacadeAdapter, "complete", lambda self, request: adapter.complete(request))
+    monkeypatch.setattr(FacadeAdapter, "stream", lambda self, call: adapter.stream(call))
     facade = ProviderFacade()
     facade.store_document({
         "providers": [{"id": "fake", "name": "Fake"}],

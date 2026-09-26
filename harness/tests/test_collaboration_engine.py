@@ -3,13 +3,14 @@ from dataclasses import replace
 
 import pytest
 
-from harness.adapters.base import ModelResponse, ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.base import ProviderError
+from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id, prompt_parts
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn, plan_turn,
     product_decision, product_spec, response_turn, review, review_turn,
 )
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.validation import evaluate_proposal
 
@@ -29,22 +30,18 @@ def _events(system, run_id, event_type):
     return [event for event in system.store.list_events(run_id) if event.type == event_type]
 
 
-def _parts(request):
-    return {part.source: part.text for part in request.context.parts}
-
-
 @pytest.mark.parametrize("recipient", ["engineering", "quality"])
 def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp_path, recipient):
     def advise(request):
-        assert request.department == recipient and request.effective_contract_hash is None
-        parts = _parts(request)
+        assert request.department == recipient
+        parts = prompt_parts(request)
         assert "current_contract" not in parts and "current_product_spec" not in parts
         names = {tool["name"] for tool in request.tools}
         assert "write_file" not in names and "submit_response" in names
         assert not {"submit_plan", "submit_delivery", "submit_review", "submit_spec"} & names
         return ModelResponse(output=[
             _call("unauthorized-write", "write_file", path="src/bypass.py", content="no"),
-            _call("answer", "submit_response", request_id=request.request_id, status="answered",
+            _call("answer", "submit_response", request_id=pending_request_id(request), status="answered",
                   text="Keep the initial acceptance measurable.", result_event_ids=[]),
         ])
 
@@ -129,7 +126,7 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
     def partial(request):
         return ModelResponse(output=[
             _call("partial-change", mutation, **arguments),
-            _call("partial-answer", "submit_response", request_id=request.request_id, status=status,
+            _call("partial-answer", "submit_response", request_id=pending_request_id(request), status=status,
                   text="Files changed, but the requested revision still needs engineering work.", result_event_ids=[]),
         ])
 
@@ -152,7 +149,7 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
 @pytest.mark.parametrize("disposition", ["retain", "integrate", "retire"])
 def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_source(tmp_path, disposition):
     def revision(request):
-        decisions = json.loads(_parts(request)["current_product_decisions"])
+        decisions = json.loads(prompt_parts(request)["current_product_decisions"])
         return product_spec(requirements=["print the argument and reject unknown flags"], change_record={
             "changed": ["Make unknown flag behavior explicit"], "retained": ["Echo valid input"],
             "retired": [], "rationale": "Clarify argument validation",
@@ -310,7 +307,7 @@ def test_pending_request_is_closed_when_activation_limit_is_reached(tmp_path):
 def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(tmp_path):
     def cancel(request):
         system.cancel(request.run_id)
-        return collaboration_response(request.request_id, "answered", "Late answer")
+        return collaboration_response(pending_request_id(request), "answered", "Late answer")
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("quality"), cancel]))
     run_id = system.create_run("build echo")
@@ -359,7 +356,7 @@ def test_private_receiver_history_is_not_injected_into_requester_context(tmp_pat
     resumed_product = system.test_adapter.invocations[-1]
     assert resumed_product.department == "product"
     assert marker not in json_dumps(resumed_product.input_items)
-    assert "Use one clear output check." in _parts(resumed_product)["latest_response"]
+    assert "Use one clear output check." in prompt_parts(resumed_product)["latest_response"]
     system.activate_once(run_id)
     resumed_engineering = system.test_adapter.invocations[-1]
     assert marker in json_dumps(resumed_engineering.input_items)

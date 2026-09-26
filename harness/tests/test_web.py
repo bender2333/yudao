@@ -18,7 +18,7 @@ from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, run_scripted
+from harness.tests.helpers import happy_script, recorded_context, run_scripted
 from harness.web.server import serve
 from harness.views import retry_view
 from harness.models import EventType
@@ -396,7 +396,8 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
         finished = wait_terminal(host, port, run_id)
         assert finished["board"]["phase"] == "DONE", finished["board"]
         assert finished["board"]["processed_input_version"] == 2
-        assert [(item.input_version, item.prompt_version) for item in adapter.invocations[:2]] == [(1, 1), (2, 2)]
+        manifests = [recorded_context(system, item).manifest for item in adapter.invocations[:2]]
+        assert [(item.input_version, item.prompt_version) for item in manifests] == [(1, 1), (2, 2)]
         assert "PRODUCT_PROMPT_V2" not in adapter.invocations[0].input_items[0]["content"]
         assert prompt in adapter.invocations[1].input_items[0]["content"]
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
@@ -459,7 +460,7 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
             assert result["cancellation_recorded"] is record_cancellation
             assert "执行已取消" in result["error"] and "未形成正式 Git 版本" in result["error"]
             assert system.orchestrator._abort[run_id].is_set()
-            assert adapter._aborted == {before.sessions["product"].session_id}
+            assert adapter.cancelled == {adapter.invocations[0].attempt_id}
             current = system.project(run_id)
             assert current.input_version == before.input_version and current.git_version == before.git_version
             assert [item.text for item in current.inputs] == ["echo"]

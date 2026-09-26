@@ -3,18 +3,21 @@ from threading import Event
 
 import pytest
 
-from harness.adapters.base import ModelObservation, ModelResponse, ProviderError
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType, Usage, json_dumps
 from harness.proposals import product_spec
+from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 
 
-def _message(request, identity, usage):
-    request.observe(ModelObservation(
-        identity, "message", {"id": identity, "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "same complete response"}]},
-        "same complete response", usage, "test", "test-model",
-    ))
+def _message(identity, usage):
+    return ModelStreamEvent(
+        kind="message", id=identity,
+        payload={"id": identity, "type": "message", "role": "assistant",
+                 "content": [{"type": "output_text", "text": "same complete response"}]},
+        text="same complete response", usage=usage, provider="test", model="test-model",
+    )
 
 
 def test_cancel_between_validation_and_commit_preserves_terminal_state(tmp_path, monkeypatch):
@@ -76,14 +79,15 @@ def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
 @pytest.mark.parametrize("finish", ["success", "timeout", "cancelled"])
 def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish):
     observed, release = Event(), Event()
-    usage = Usage(input_tokens=20, output_tokens=30, cache_read_tokens=60, total_tokens=110, cost=0.25, cost_reported=True)
+    usage = CallUsage(input_tokens=20, output_tokens=30, cache_read_tokens=60, total_tokens=110, cost=0.25,
+                      cost_reported=True, reported=True)
     first = ModelResponse(output=[
         {"id": "first", "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "same complete response"}]},
         {"id": "read-1", "call_id": "read-1", "type": "function_call", "name": "read_file", "arguments": '{"path":"proof.txt"}'},
     ], usage=usage)
 
-    def turn(request):
-        _message(request, "second", usage)
+    def turn(call):
+        yield _message("second", usage)
         observed.set()
         assert release.wait(5)
         if finish == "timeout":
@@ -133,11 +137,11 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
     observed, release = Event(), Event()
     continued = []
 
-    def turn(request):
-        _message(request, "first", Usage(total_tokens=3000))
+    def turn(call):
+        yield _message("first", CallUsage(total_tokens=3000, reported=True))
         observed.set()
         assert release.wait(5)
-        if not request.abort_flag.is_set():
+        if call.attempt_id not in adapter.cancelled:
             continued.append("next model round")
         return product_spec()
 
@@ -152,7 +156,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
             assert current.phase == "PRODUCT_SPEC" and current.stop_reason is None
             assert current.token_used == 3000
             assert not future.done()
-            assert not adapter.invocations[0].abort_flag.is_set()
+            assert not adapter.cancelled
         finally:
             release.set()
         result = future.result(timeout=5)
@@ -175,10 +179,10 @@ def test_large_provider_usage_is_recorded_without_stopping_handoff(tmp_path):
 def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
     observed, release = Event(), Event()
 
-    def turn(request):
+    def turn(call):
         observed.set()
         assert release.wait(5)
-        assert not request.abort_flag.is_set()
+        assert call.attempt_id not in adapter.cancelled
         return product_spec()
 
     adapter = FakeAdapter([turn])
@@ -190,7 +194,7 @@ def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
         try:
             assert observed.wait(5)
             assert system.cancel(abandoned).stop_reason == "cancelled"
-            assert not adapter._aborted
+            assert not adapter.cancelled
         finally:
             release.set()
         assert future.result(timeout=5).phase == "ENGINEERING"
@@ -201,7 +205,7 @@ def test_stop_preserves_reported_vendor_and_model_separately_from_adapter(tmp_pa
     response = ModelResponse(
         output=[{"id": "submit", "call_id": "submit", "type": "function_call", "name": "submit_product_spec",
                  "arguments": json_dumps(product_spec())}],
-        usage=Usage(total_tokens=10000),
+        usage=CallUsage(total_tokens=10000, reported=True),
         provider="actual-vendor", model="actual-model",
     )
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([response, ProviderError("late failure")]))

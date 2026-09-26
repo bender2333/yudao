@@ -6,13 +6,13 @@ import time
 
 import pytest
 
-from harness.adapters.base import ModelResponse
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, prompt_part
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projects import CommandConfigConflict
 from harness.proposals import delivery_turn, engineering_plan, plan_turn, product_spec, review_turn
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, recorded_context
 from harness.tests.test_web import get_json, request, running_server
 from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, HOST_TOOL_SCHEMAS, ToolRuntime
 from harness.workspace import Workspace
@@ -255,7 +255,8 @@ def test_delivery_accepts_only_run_check_receipts_from_this_activation_on_the_cu
         [tool] = [tool for tool in item.tools if tool["name"] == "submit_delivery"]
         assert tool["description"] == HOST_TOOL_SCHEMAS["submit_delivery"]["description"]
     # 每次拒绝的原因都进入工程部门下一次激活的请求
-    feedback = [part for item in engineering for part in item.context.parts if part.source == "validation_feedback"]
+    feedback = [part for item in engineering for part in recorded_context(system, item).parts
+                if part.source == "validation_feedback"]
     assert [part.version for part in feedback] == [event.event_id for event in rejected]
     assert all("Call run_check with the name unit-tests" in part.text for part in feedback)
     delivery = projection.delivery_spec
@@ -279,7 +280,7 @@ def test_engineering_request_separates_action_receipts_from_delivery_check_recei
         [command] = [tool for tool in item.tools if tool["name"] == "run_command"]
         assert command["description"] == HOST_TOOL_SCHEMAS["run_command"]["description"]
         assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in command["description"]
-        [contract] = [json.loads(part.text) for part in item.context.parts if part.source == "proposal_contract"]
+        contract = json.loads(prompt_part(item, "proposal_contract"))
         bind = contract["kinds"]["delivery_spec"]["bind"]
         assert "run_check receipts from this activation on the current workspace" in bind
         assert not any("host check receipts" in entry for entry in bind)

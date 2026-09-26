@@ -345,7 +345,7 @@ def test_effective_limits_keep_the_wide_window_and_reserve_half_of_a_narrow_one(
 
 
 def test_truncated_work_response_is_terminal_without_retry(data_dir):
-    from harness.adapters.base import ModelResponse
+    from harness.providers.call import ModelResponse
     from harness.models import EventType, json_dumps
 
     truncated = ModelResponse(

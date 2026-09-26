@@ -6,13 +6,14 @@ from threading import Event
 import pytest
 
 import harness.engine as engine
-from harness.adapters.base import ModelObservation, ModelResponse, ProviderError
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.engine import StepLimits
-from harness.models import EventType, Usage, json_dumps
+from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
+from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, list_files_turn
+from harness.tests.helpers import FAST_RETRIES, list_files_turn, recorded_context
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -31,9 +32,12 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
     assert first.department == second.department == "product"
     assert first.activation_id == second.activation_id
     assert first.input_items == second.input_items and first.tools == second.tools
-    assert (first.attempt, first.root_step_id, first.retry_of_step_id) == (1, 1, None)
-    assert (second.attempt, second.root_step_id, second.retry_of_step_id) == (2, 1, 1)
+    assert (first.attempt, second.attempt) == (1, 2)
+    assert first.logical_call_id == second.logical_call_id == f"{first.activation_id}:root-1:work"
     events = system.store.list_events(run_id)
+    requested = [item.payload for item in events if item.type == EventType.MODEL_REQUESTED]
+    assert [(item["attempt"], item["root_step_id"], item["retry_of_step_id"]) for item in requested] == [
+        (1, 1, None), (2, 1, 1)]
     assert len([item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED]) == 1
     assert len([item for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED]) == 1
     assert result.canonical_state() == system.replay(run_id).canonical_state()
@@ -57,11 +61,10 @@ def test_retry_reassembles_context_before_each_attempt(tmp_path, monkeypatch):
     assert result.phase == "ENGINEERING"
     first, second = adapter.invocations
     assert assemble_calls == 4
-    assert first.context is not second.context
-    assert first.input_items is not second.input_items
-    assert first.tools is not second.tools
+    first_context, second_context = recorded_context(system, first), recorded_context(system, second)
+    assert first_context.manifest.source_event_id != second_context.manifest.source_event_id
     assert first.input_items == second.input_items and first.tools == second.tools
-    assert second.step_id == 2 and second.retry_of_step_id == 1
+    assert second.step_id == 2 and second.logical_call_id == first.logical_call_id
 
 
 def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path):
@@ -191,11 +194,9 @@ def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path):
     }
 
     def fail_after_partial(request):
-        request.observe(ModelObservation("failed-call", "message", partial, provider="stub", model="stub"))
-        request.observe(ModelObservation(
-            "failed-usage", "usage", {"usage": {"total_tokens": 7}}, usage=Usage(total_tokens=7),
-            provider="stub", model="stub",
-        ))
+        yield ModelStreamEvent(kind="message", id="failed-call", payload=partial, provider="stub", model="stub")
+        yield ModelStreamEvent(kind="usage", id="failed-usage", payload={"usage": {"total_tokens": 7}},
+                               usage=CallUsage(total_tokens=7, reported=True), provider="stub", model="stub")
         raise ProviderError("stream disconnected", retryable=True,
                             diagnostics={"error_type": "stream_incomplete"})
 
@@ -302,4 +303,4 @@ def test_compaction_uses_the_same_retry_path(tmp_path):
     assert len(attempts) >= 2
     assert attempts[0].input_items == attempts[1].input_items
     assert attempts[0].tools == attempts[1].tools == []
-    assert attempts[0].root_step_id == attempts[1].root_step_id
+    assert attempts[0].logical_call_id == attempts[1].logical_call_id

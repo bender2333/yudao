@@ -4,13 +4,14 @@ from threading import Event
 
 import pytest
 
-from harness.adapters.base import ModelRequest, ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
-from harness.models import EventType, RunProjection, Usage, canonical_hash, estimate_tokens, json_dumps
+from harness.models import EventType, RunProjection, canonical_hash, estimate_tokens, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, recorded_context
+from harness.tests.protocol_helpers import complete, model_call
 from harness.tools import ToolRuntime
 
 
@@ -30,10 +31,10 @@ def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
     run_id = system.create_run("echo")
     context = ContextAssembler().assemble(system.project(run_id), department="engineering",
                                           session_id="session", activation_id="activation")
-    request = ModelRequest("run", "engineering", "session", "activation", 1, context, context.tools, Event())
+    call = model_call(context.input_items, context.tools)
     adapter = FakeAdapter([FakeTurn(writes={"owned.txt": "content"})])
-    response = adapter.complete(request)
-    assert not hasattr(request, "workspace")
+    response = complete(adapter, call)
+    assert not hasattr(call, "workspace")
     assert not hasattr(adapter, "invoke")
     assert response.output[0]["name"] == "write_file"
     assert json.loads(response.output[0]["arguments"]) == {"path": "owned.txt", "content": "content"}
@@ -71,7 +72,7 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     for event, request in zip(contexts, adapter.invocations):
         saved = json.loads(system.artifacts.get_text(event.payload["request_ref"]["content_hash"]))
         assert saved == {"input": request.input_items, "tools": request.tools}
-        assert event.context_digest == canonical_hash(saved) == request.context.manifest.digest
+        assert event.context_digest == canonical_hash(saved) == recorded_context(system, request).manifest.digest
         assert event.payload["token_estimate"] == estimate_tokens(json_dumps(saved))
         assert event.payload["admitted"]
         assert event.payload["request_ref"]["content_hash"] in event.artifact_hashes
@@ -82,7 +83,8 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
     # A tool call in a tool-less summary request is malformed provider output: it is retried
     # within the attempt limit and never executed, so three of them fail the compaction.
     adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
-                                         usage=Usage(total_tokens=100)), product_spec(), product_spec(), product_spec()])
+                                         usage=CallUsage(total_tokens=100, reported=True)),
+                           product_spec(), product_spec(), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("proof.txt", "x" * 40000)

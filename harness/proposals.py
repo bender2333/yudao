@@ -6,8 +6,8 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from .adapters.base import ModelRequest
-from .adapters.fake import FakeTurn
+from .adapters.fake import FakeTurn, pending_request_id, prompt_part
+from .providers.call import ModelCall
 
 
 def product_spec(
@@ -78,19 +78,21 @@ def product_decision(statement: str, rationale: str) -> dict[str, Any]:
 
 def response_turn(status: str = "answered", text: str = "The existing contract already defines this behavior.",
                   *, result_event_ids: list[str] | None = None,
-                  result_types: list[str] | None = None) -> Callable[[ModelRequest], dict[str, Any]]:
-    def submit(request: ModelRequest) -> dict[str, Any]:
-        if request.request_id is None:
+                  result_types: list[str] | None = None) -> Callable[[ModelCall], dict[str, Any]]:
+    # 回应请求中写明的待处理请求；结果事件从请求中的 request_results 取得
+    def submit(call: ModelCall) -> dict[str, Any]:
+        request_id = pending_request_id(call)
+        if request_id is None:
             raise ValueError("response_turn requires an actual pending request")
         references = list(result_event_ids or [])
         if result_types:
-            results = next(json.loads(part.text) for part in request.context.parts if part.source == "request_results")
+            results = json.loads(prompt_part(call, "request_results") or "[]")
             for event_type in result_types:
                 matches = [item["event_id"] for item in results if item["type"] == event_type]
                 if not matches:
                     raise ValueError(f"response_turn has no accepted result of type {event_type}")
                 references.extend(matches)
-        return collaboration_response(request.request_id, status, text, references)
+        return collaboration_response(request_id, status, text, references)
 
     return submit
 
@@ -134,8 +136,8 @@ def engineering_plan(
     }
 
 
-def plan_turn(**kwargs: Any) -> Callable[[ModelRequest], dict[str, Any]]:
-    def submit(request: ModelRequest) -> dict[str, Any]:
+def plan_turn(**kwargs: Any) -> Callable[[ModelCall], dict[str, Any]]:
+    def submit(call: ModelCall) -> dict[str, Any]:
         return engineering_plan(**kwargs)
 
     return submit

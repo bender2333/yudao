@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Event, RLock
 from typing import Any
 
-from .adapters.base import ModelObservation, ModelResponse, ModelAdapter, ModelRequest, ProviderError
+from .adapters.base import ModelObservation, ModelAdapter, ModelRequest, ProviderError
 from .adapters.facade_adapter import FacadeAdapter
 from .artifacts import ArtifactStore
 from .context import ContextAssembler, GUIDANCE_ONLY_TOOLS, department_work_text
@@ -19,7 +19,7 @@ from .collaboration import guidance_resume_phase, request_basis, request_still_a
 from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
                          visible_history)
 from .event_store import EventStore
-from .engine import TOOL_CALL_REQUIRED_LIMIT, StepLimits, ToolAdmission, run_department
+from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, ToolAdmission, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -42,6 +42,7 @@ from .models import (
     utc_now,
 )
 from .providers import ProviderFacade
+from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
@@ -468,7 +469,7 @@ class Orchestrator:
                     self._abort.setdefault(run_id, Event()).set()
                     if activation is not None:
                         try:
-                            activation.adapter.abort(activation.session_id)
+                            self._cancel_model_call(activation)
                             abort_notified = True
                         except Exception as exc:
                             stop_error = exc
@@ -488,7 +489,7 @@ class Orchestrator:
         finally:
             if command and activation is not None and not abort_notified:
                 try:
-                    activation.adapter.abort(activation.session_id)
+                    self._cancel_model_call(activation)
                 except Exception as exc:
                     stop_error = stop_error or exc
         if save_error is not None:
@@ -595,37 +596,45 @@ class Orchestrator:
                 self._abort.setdefault(run_id, Event()).set()
                 activation = self._active.get(run_id)
                 if activation is not None:
-                    activation.adapter.abort(activation.session_id)
+                    self._cancel_model_call(activation)
                     abort_notified = True
                 self._fail(run_id, projection, "cancelled", "run cancelled")
         finally:
             if activation is not None and not abort_notified:
-                activation.adapter.abort(activation.session_id)
+                self._cancel_model_call(activation)
         return self.project(run_id)
 
-    def run_until_stop(self, run_id: str, execution_scope: Any | None = None) -> RunProjection:
+    @staticmethod
+    def _cancel_model_call(activation: _Activation) -> None:
+        # 取消按调用尝试的身份生效：当前步骤已经准备了请求时，通知模型接入取消这次尝试；
+        # 请求还没有开始时，模型接入记下这次取消，开始时立即取消
+        request = activation.request
+        if request is not None and request.attempt_id:
+            activation.adapter.cancel(request.attempt_id)
+
+    def run_until_stop(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
         while True:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return projection
             if self._abort.get(run_id) and self._abort[run_id].is_set():
                 return self.cancel(run_id)
-            self._activate_once(run_id, execution_scope)
+            self._activate_once(run_id, model_loop)
 
-    def activate_once(self, run_id: str, execution_scope: Any | None = None) -> RunProjection:
-        return self._activate_once(run_id, execution_scope)
+    def activate_once(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
+        return self._activate_once(run_id, model_loop)
 
-    def _activate_once(self, run_id: str, execution_scope: Any | None) -> RunProjection:
+    def _activate_once(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
         with self._state_lock:
             if run_id in self._active:
                 raise RuntimeError("run already has an active department invocation")
-            activation = self._prepare_activation(run_id, execution_scope)
+            activation = self._prepare_activation(run_id, model_loop)
             if activation is None:
                 return self.project(run_id)
             self._active[run_id] = activation
         started = time.monotonic()
         try:
-            self._invoke_activation(activation)
+            self._invoke_activation(activation, model_loop)
         finally:
             with self._state_lock:
                 current = self.project(run_id)
@@ -651,7 +660,7 @@ class Orchestrator:
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
-    def _prepare_activation(self, run_id: str, execution_scope: Any | None) -> _Activation | None:
+    def _prepare_activation(self, run_id: str, model_loop: ModelCallLoop) -> _Activation | None:
         if run_id not in self._run_start_times:
             self._run_start_times[run_id] = time.monotonic()
         projection = self.project(run_id)
@@ -700,7 +709,7 @@ class Orchestrator:
                 target = snapshot.target(department)
                 snapshot_id = canonical_hash(_snapshot_event_dict(snapshot))
                 # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
-                adapter = FacadeAdapter(self.facade, target, execution_scope=execution_scope)
+                adapter = FacadeAdapter(self.facade, target, connections=model_loop.connections)
             except (KeyError, ValueError) as exc:
                 self._fail(run_id, projection, "provider_unavailable", str(exc))
                 return None
@@ -842,7 +851,7 @@ class Orchestrator:
             raise ValueError("the effective context window leaves no room for model output")
         return effective_window, target.max_output_tokens, reserve
 
-    def _invoke_activation(self, activation: _Activation) -> None:
+    def _invoke_activation(self, activation: _Activation, model_loop: ModelCallLoop) -> None:
         request = activation
         run_id, department = request.run_id, request.department
         projection = self.project(run_id)
@@ -858,9 +867,11 @@ class Orchestrator:
             submission = run_department(
                 activation.adapter, ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
                 limits=self.step_limits,
+                model_loop=model_loop,
                 prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
                     activation, step, attempt, root, retry_of,
                 ),
+                record_stream=lambda event: self._record_observation(activation, ModelObservation.from_stream(event)),
                 record_response=lambda response: self._reconcile_response(activation, response),
                 record_tool=lambda call: self._record_observation(activation, ModelObservation(call["id"], "tool", call)),
                 record_skipped_tool=lambda call: self._record_observation(activation, ModelObservation(call["id"], "skipped_tool", call)),
@@ -1015,7 +1026,7 @@ class Orchestrator:
             )
             attempt_id = self._attempt_id(logical_call_id, attempt)
             request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
-                                   step_id, assembled, assembled.tools, identity.abort_flag,
+                                   step_id, assembled, assembled.tools,
                                    purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
                                    effective_contract_hash=activation.effective_contract_hash,
                                    engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id,
@@ -1024,8 +1035,6 @@ class Orchestrator:
                                    logical_call_id=logical_call_id,
                                    guidance_version=activation.guidance_version, **activation.versions())
             activation.request = request
-            request.on_observation = lambda observation: self._record_observation(activation, observation)
-            request.on_raw_observation = lambda observation: self._record_observation(activation, observation)
             activation.provider = None
             activation.model = None
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
@@ -1182,7 +1191,7 @@ class Orchestrator:
         with self._state_lock:
             current = self.project(request.run_id)
             current = self._close_obsolete_request(request.run_id, current)
-            if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
+            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return False
             if (current_contract_hash(current) != request.effective_contract_hash
                     or current_plan_hash(current) != request.engineering_plan_hash
@@ -1517,7 +1526,7 @@ class Orchestrator:
     ) -> bool:
         with self._state_lock:
             current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
-            if (current.phase in TERMINAL_PHASES or request.abort_flag.is_set()
+            if (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
                     or current_contract_hash(current) != request.effective_contract_hash
                     or current_plan_hash(current) != request.engineering_plan_hash
                     or self._request_id(current) != activation.request_id
@@ -1562,7 +1571,7 @@ class Orchestrator:
             request = activation.request
             current = self.project(request.run_id)
             current = self._close_obsolete_request(request.run_id, current)
-            if current.phase in TERMINAL_PHASES or request.abort_flag.is_set():
+            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return ToolAdmission(stopped=True)
             if (current_contract_hash(current) != activation.effective_contract_hash
                     or current_plan_hash(current) != activation.engineering_plan_hash
@@ -1864,8 +1873,8 @@ class Orchestrator:
                 str(item.get("id") or f"output-{index}"), "message", item, text,
                 provider=provider, model=model,
             ))
-        usage = result.usage
-        if not usage or not (usage.reported or usage.total_tokens or usage.cost):
+        usage = Usage(**result.usage.model_dump())
+        if not (usage.reported or usage.total_tokens or usage.cost):
             usage = activation.step_usage or Usage(reported=False)
         activation.step_usage = usage
         with self._state_lock:

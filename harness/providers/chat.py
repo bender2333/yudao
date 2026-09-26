@@ -4,7 +4,6 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass
-from threading import Event, Lock
 from typing import Any
 
 from openai import (
@@ -16,7 +15,7 @@ from openai import (
 )
 
 from .errors import CancelledError, ProviderError
-from .invoke import InvokeResult, Observer, ProviderInput
+from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
 from .responses import (
@@ -46,84 +45,24 @@ class _ChatInvocation:
     provider_input: ProviderInput
     session_id: str
     attempt_id: str
-    abort_event: Event
-    observer: Observer
+    emit: Emit
 
 
-class ChatExecutionScope:
-    # 一次同步运行内按端点与认证句柄复用 Chat 客户端
-    def __init__(self) -> None:
-        self._runner = asyncio.Runner()
-        self._clients: dict[tuple[str, str, float, str], AsyncOpenAI] = {}
-        self._closed = False
-
-    def __enter__(self) -> "ChatExecutionScope":
-        return self
-
-    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
-        self.close()
-
-    def run(self, awaitable: Any) -> Any:
-        if self._closed:
-            raise RuntimeError("Chat execution scope is closed")
-        return self._runner.run(awaitable)
-
-    async def client_for(self, frozen_target: FrozenTarget) -> AsyncOpenAI:
-        if self._closed:
-            raise RuntimeError("Chat execution scope is closed")
-        key = (frozen_target.provider_id, frozen_target.base_url,
-               float(frozen_target.timeout_sec), frozen_target.api_key)
-        client = self._clients.get(key)
-        if client is None:
-            client = AsyncOpenAI(
-                api_key=frozen_target.api_key,
-                base_url=frozen_target.base_url,
-                timeout=frozen_target.timeout_sec,
-                max_retries=0,
-            )
-            self._clients[key] = client
-        return client
-
-    async def _close_clients(self) -> None:
-        clients = tuple(self._clients.values())
-        self._clients.clear()
-        if clients:
-            await asyncio.gather(*(client.close() for client in clients), return_exceptions=False)
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        try:
-            self._runner.run(self._close_clients())
-        finally:
-            self._closed = True
-            self._runner.close()
-
-
-def invoke_chat(
+async def invoke_chat(
     frozen_target: FrozenTarget,
     provider_input: ProviderInput,
     session_id: str,
     attempt_id: str,
-    abort_event: Event,
-    observer: Observer,
-    *,
-    execution_scope: ChatExecutionScope | None = None,
+    emit: Emit,
 ) -> InvokeResult:
     # 单次 Chat Completions 调用，工具由内核执行
     _check_availability(frozen_target)
-    if abort_event.is_set():
-        raise CancelledError()
     invocation = _ChatInvocation(
         frozen_target=frozen_target, provider_input=provider_input,
-        session_id=session_id, attempt_id=attempt_id,
-        abort_event=abort_event, observer=observer,
+        session_id=session_id, attempt_id=attempt_id, emit=emit,
     )
-    invoker = _ChatInvoker(execution_scope=execution_scope)
     try:
-        if execution_scope is None:
-            return asyncio.run(invoker.complete(invocation))
-        return execution_scope.run(invoker.complete(invocation))
+        return await _ChatInvoker().complete(invocation)
     except ProviderError:
         raise
     except (TimeoutError, APITimeoutError) as exc:
@@ -173,47 +112,23 @@ def _check_availability(target: FrozenTarget) -> None:
 
 
 class _ChatInvoker:
-    def __init__(self, *, execution_scope: ChatExecutionScope | None = None) -> None:
-        self.execution_scope = execution_scope
-        self._lock = Lock()
-        self._active: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Task]] = {}
-
     async def complete(self, invocation: _ChatInvocation) -> InvokeResult:
-        loop = asyncio.get_running_loop()
+        # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
         trace = _TransportTrace()
         deadline = _CompletionDeadline()
-        with self._lock:
-            if invocation.attempt_id in self._active:
-                raise ProviderError("Chat invocation already active for this attempt")
-            task = asyncio.create_task(self._stream_once(invocation, trace, deadline))
-            self._active[invocation.attempt_id] = (loop, task)
-        watcher = asyncio.create_task(self._watch_abort(invocation, task))
         try:
             async with asyncio.timeout(invocation.frozen_target.timeout_sec) as timeout:
                 deadline.bind(timeout)
-                return await task
+                return await self._stream_once(invocation, trace, deadline)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
-        finally:
-            with self._lock:
-                self._active.pop(invocation.attempt_id, None)
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
-
-    @staticmethod
-    async def _watch_abort(invocation: _ChatInvocation, task: asyncio.Task) -> None:
-        while not task.done():
-            if invocation.abort_event.is_set():
-                task.cancel()
-                return
-            await asyncio.sleep(0.02)
 
     async def _stream_once(self, invocation: _ChatInvocation, trace: _TransportTrace,
                            deadline: _CompletionDeadline) -> InvokeResult:
         started = time.monotonic()
         target = invocation.frozen_target
         params = _chat_request_params(invocation, target)
-        invocation.observer.on_event({
+        await invocation.emit({
             "kind": "request",
             "id": _observation_id(invocation),
             "session_id": invocation.session_id,
@@ -225,11 +140,6 @@ class _ChatInvoker:
         })
         headers = build_identity_headers(target.header_profile, invocation.session_id)
         params["_request_headers"] = headers
-        # 只有本协议的执行作用域才用于连接复用，其他协议的 scope 不适用
-        scope = self.execution_scope if isinstance(self.execution_scope, ChatExecutionScope) else None
-        if scope is not None:
-            client = await scope.client_for(target)
-            return await self._stream_with_client(invocation, trace, client, params, started, deadline)
         async with AsyncOpenAI(
             api_key=target.api_key, base_url=target.base_url,
             timeout=target.timeout_sec, max_retries=0,
@@ -258,10 +168,8 @@ class _ChatInvoker:
             raise
         event_index = 0
         async for chunk in _provider_events(stream, trace):
-            if invocation.abort_event.is_set():
-                raise CancelledError()
             payload = _sdk_json(chunk, secrets=(invocation.frozen_target.api_key,))
-            invocation.observer.on_event({
+            await invocation.emit({
                 "kind": "stream_event",
                 "id": f"{_observation_id(invocation)}:stream-{event_index}",
                 "session_id": invocation.session_id,
@@ -304,7 +212,7 @@ class _ChatInvoker:
         text = "".join(text_parts)
         output = _chat_output(text, tool_calls)
         usage = _chat_usage(usage_raw, started)
-        invocation.observer.on_event({
+        await invocation.emit({
             "kind": "usage",
             "id": response_id or _observation_id(invocation),
             "session_id": invocation.session_id,
@@ -335,7 +243,7 @@ def _chat_request_params(invocation: _ChatInvocation, target: FrozenTarget) -> d
     tools = _chat_tools(invocation.provider_input)
     if tools:
         params["tools"] = tools
-        params["tool_choice"] = "auto"
+        params["tool_choice"] = invocation.provider_input.tool_choice
     limit = invocation.provider_input.max_output_tokens
     if limit is not None:
         params["max_tokens"] = int(limit)
@@ -470,4 +378,4 @@ def _observation_id(invocation: _ChatInvocation) -> str:
     return invocation.attempt_id
 
 
-__all__ = ["ChatExecutionScope", "invoke_chat"]
+__all__ = ["invoke_chat"]

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from .chat import ChatExecutionScope, invoke_chat
+from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial, load_dotenv_dict, parse_dotenv_text
 from .discovery import refresh_candidates
 from .errors import (
     CatalogValidationError,
     CancelledError,
     ProviderError,
-    RequestNotPersistedError,
     UnsupportedProtocolError,
     ValidationIssue,
 )
@@ -15,17 +14,14 @@ from .facade import ProviderFacade
 from .invoke import (
     CancelRegistry,
     InvokeResult,
-    NullObserver,
-    Observer,
     ProviderInput,
     ProviderMessage,
     ToolResult,
     ToolSpec,
     check_target_availability,
-    invoke_once,
     to_provider_input,
 )
-from .messages import MessagesExecutionScope, anthropic_base_url, invoke_messages
+from .messages import anthropic_base_url
 from .presets import (
     PRESET_TABLE_SOURCE,
     PRESET_TABLE_VERSION,
@@ -35,7 +31,7 @@ from .presets import (
     list_presets,
 )
 from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
-from .responses import ResponsesConfig, ResponsesExecutionScope, check_availability, invoke_responses
+from .responses import ProviderConnections, ResponsesConfig, check_availability
 from .store import ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
 
 __all__ = [
@@ -51,11 +47,11 @@ __all__ = [
     "get_preset",
     "build_identity_headers",
     "refresh_candidates",
-    "invoke_chat",
-    "invoke_messages",
-    "invoke_responses",
-    "ChatExecutionScope",
-    "MessagesExecutionScope",
+    "ModelCall",
+    "ModelStreamEvent",
+    "ModelResponse",
+    "CallUsage",
+    "ProviderConnections",
     "anthropic_base_url",
     "CredentialChain",
     "CredentialMaterial",
@@ -69,19 +65,14 @@ __all__ = [
     "ToolSpec",
     "ToolResult",
     "InvokeResult",
-    "Observer",
-    "NullObserver",
     "CancelRegistry",
-    "invoke_once",
     "to_provider_input",
     "check_target_availability",
     "ResponsesConfig",
-    "ResponsesExecutionScope",
     "check_availability",
     "ValidationIssue",
     "CatalogValidationError",
     "ProviderError",
     "CancelledError",
     "UnsupportedProtocolError",
-    "RequestNotPersistedError",
 ]

@@ -15,9 +15,10 @@ import pytest
 import httpx
 from openai import APIConnectionError, AsyncOpenAI, DefaultAsyncHttpxClient
 
-from harness.adapters.base import ModelRequest, ProviderError
-from harness.providers import ResponsesConfig, ResponsesExecutionScope
-from harness.tests.protocol_helpers import ResponsesAdapter
+from harness.adapters.base import ProviderError
+from harness.engine import ModelCallLoop
+from harness.providers import ResponsesConfig
+from harness.tests.protocol_helpers import ResponsesAdapter, model_call
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
@@ -54,7 +55,7 @@ def _submit_stream(response_id="resp-submit"):
     return _stream([call], response_id=response_id)
 
 
-def _request(*, session_id="session", observations=None, history=None):
+def _request(*, session_id="session", history=None, max_output_tokens=None, attempt_id="activation:1:attempt-1"):
     prompt_text = DEFAULT_PROMPTS["product"]
     prompt_hash = hash_bytes(prompt_text.encode("utf-8"))
     prompt_ref = ArtifactRef("department_prompt", prompt_hash, f"run/{prompt_hash[7:9]}/{prompt_hash[7:]}")
@@ -64,9 +65,13 @@ def _request(*, session_id="session", observations=None, history=None):
     context = ContextAssembler().assemble(
         projection, department="product", session_id=session_id, activation_id="activation",
     )
-    if history:
-        context.input_items.extend(history)
-    return ModelRequest("run", "product", session_id, "activation", 1, context, TOOLS, Event(), observations)
+    return model_call([*context.input_items, *(history or [])], TOOLS, session_id=session_id,
+                      max_output_tokens=max_output_tokens, attempt_id=attempt_id)
+
+
+def _decoded(observations):
+    # 请求、输出条目与用量；解码后的流事件与完整响应对象是原始证据，不在这里核对
+    return [event for event in observations if event.kind not in {"stream_event", "response"}]
 
 
 def _event(kind, **body):
@@ -423,7 +428,7 @@ def test_server_overloaded_stream_error_shapes_are_retryable_and_sanitized(neste
 def test_completed_items_and_final_usage_are_observed_once():
     observations = []
     with _server([_stream([REASONING, CALL, TEXT], duplicate=True)]) as (config, *_):
-        result = ResponsesAdapter(config).complete(_request(observations=observations.append))
+        result = ResponsesAdapter(config).complete(_request(), observations.append)
     assert [event.id for event in observations if event.kind == "message"] == ["rs-one", "fc-one", "msg-one"]
     reports = [event for event in observations if event.kind == "usage"]
     assert len(reports) == 1 and reports[0].usage == result.usage
@@ -440,10 +445,8 @@ def test_completed_items_and_final_usage_are_observed_once():
 
 def test_request_observation_matches_the_json_body_sent_by_httpx():
     observations = []
-    model_request = _request(observations=observations.append)
-    model_request.request_id = "logical-request"
     with _server([_stream([TEXT])]) as (config, captures, *_):
-        ResponsesAdapter(config).complete(model_request)
+        ResponsesAdapter(config).complete(_request(attempt_id="logical-request:1:attempt-1"), observations.append)
     requests = [event for event in observations if event.kind == "request"]
     assert len(requests) == 1
     assert requests[0].id == "logical-request:1:attempt-1"
@@ -459,7 +462,7 @@ def test_request_observation_failure_stops_before_network_send():
 
     with _server([_stream([TEXT])]) as (config, captures, *_):
         with pytest.raises(OSError, match="request evidence could not be persisted"):
-            ResponsesAdapter(config).complete(_request(observations=reject))
+            ResponsesAdapter(config).complete(_request(), reject)
     assert captures == []
 
 
@@ -562,11 +565,11 @@ def test_transport_trace_state_is_isolated_between_adapter_calls(monkeypatch):
     assert result.output == [TEXT]
 
 
-def test_execution_scope_reuses_http11_connection_across_adapters():
+def test_model_call_loop_reuses_http11_connection_across_adapters():
     with _keepalive_server() as (config, captures, client_ports, authorizations, meta, errors):
-        with ResponsesExecutionScope() as scope:
-            first = ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="first"))
-            second = ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="second"))
+        with ModelCallLoop() as loop:
+            first = ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
+            second = ResponsesAdapter(config, loop=loop).complete(_request(session_id="second"))
 
     assert not errors
     assert first.output == second.output == [TEXT]
@@ -575,15 +578,15 @@ def test_execution_scope_reuses_http11_connection_across_adapters():
     assert authorizations == [f"Bearer {KEY}", f"Bearer {KEY}"]
 
 
-def test_execution_scope_keeps_same_url_different_credentials_separate():
+def test_model_call_loop_keeps_same_url_different_credentials_separate():
     first_key = "first-provider-credential"
     second_key = "second-provider-credential"
     with _keepalive_server(key=first_key) as (config, captures, client_ports, authorizations, _meta, errors):
         second_config = replace(config, api_key=second_key, model="second-model")
-        with ResponsesExecutionScope() as scope:
-            ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="first"))
-            ResponsesAdapter(second_config, execution_scope=scope).complete(_request(session_id="second"))
-            assert len(scope._clients) == 2
+        with ModelCallLoop() as loop:
+            ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
+            ResponsesAdapter(second_config, loop=loop).complete(_request(session_id="second"))
+            assert len(loop.connections._clients) == 2
 
     assert not errors
     assert len(captures) == 2
@@ -591,7 +594,7 @@ def test_execution_scope_keeps_same_url_different_credentials_separate():
     assert authorizations == [f"Bearer {first_key}", f"Bearer {second_key}"]
 
 
-def test_execution_scope_drops_failed_keepalive_connection_before_next_request():
+def test_model_call_loop_drops_failed_keepalive_connection_before_next_request():
     def close_connection(handler, _body):
         handler.close_connection = True
         handler.connection.shutdown(socket.SHUT_RDWR)
@@ -600,10 +603,10 @@ def test_execution_scope_drops_failed_keepalive_connection_before_next_request()
     with _keepalive_server(replies=[close_connection, _stream([TEXT])]) as (
         config, captures, client_ports, _authorizations, _meta, errors,
     ):
-        with ResponsesExecutionScope() as scope:
+        with ModelCallLoop() as loop:
             with pytest.raises(ProviderError):
-                ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="failed"))
-            result = ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="recovered"))
+                ResponsesAdapter(config, loop=loop).complete(_request(session_id="failed"))
+            result = ResponsesAdapter(config, loop=loop).complete(_request(session_id="recovered"))
 
     assert result.output == [TEXT]
     assert len(captures) == 2
@@ -611,7 +614,7 @@ def test_execution_scope_drops_failed_keepalive_connection_before_next_request()
     assert errors
 
 
-def test_execution_scope_closes_clients_when_scope_exits(monkeypatch):
+def test_model_call_loop_closes_clients_when_it_closes(monkeypatch):
     closed = []
     original_close = AsyncOpenAI.close
 
@@ -621,40 +624,40 @@ def test_execution_scope_closes_clients_when_scope_exits(monkeypatch):
 
     monkeypatch.setattr(AsyncOpenAI, "close", close)
     with _keepalive_server() as (config, _captures, _client_ports, _authorizations, _meta, _errors):
-        scope = ResponsesExecutionScope()
-        ResponsesAdapter(config, execution_scope=scope).complete(_request())
+        loop = ModelCallLoop()
+        ResponsesAdapter(config, loop=loop).complete(_request())
         assert closed == []
-        scope.close()
+        loop.close()
     assert len(closed) == 1
 
 
 def test_completed_stream_with_segmented_eof_is_reused_and_does_not_observe_tail():
     first_observations, second_observations = [], []
     with _tail_server("delayed") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ResponsesExecutionScope() as scope:
-            first = ResponsesAdapter(config, execution_scope=scope).complete(
-                _request(session_id="first", observations=first_observations.append)
+        with ModelCallLoop() as loop:
+            first = ResponsesAdapter(config, loop=loop).complete(
+                _request(session_id="first"), first_observations.append,
             )
             assert terminal_sent.is_set()
-            second = ResponsesAdapter(config, execution_scope=scope).complete(
-                _request(session_id="second", observations=second_observations.append)
+            second = ResponsesAdapter(config, loop=loop).complete(
+                _request(session_id="second"), second_observations.append,
             )
 
     assert not errors
     assert first.output == second.output == [TEXT]
     assert len(captures) == 2
     assert len(set(client_ports)) == 1
-    assert [event.kind for event in first_observations] == ["request", "message", "usage"]
-    assert [event.kind for event in second_observations] == ["request", "message", "usage"]
+    assert [event.kind for event in _decoded(first_observations)] == ["request", "message", "usage"]
+    assert [event.kind for event in _decoded(second_observations)] == ["request", "message", "usage"]
 
 
 def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_connection():
     with _tail_server("done") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ResponsesExecutionScope() as scope:
+        with ModelCallLoop() as loop:
             started = time.monotonic()
-            first = ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="first"))
+            first = ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
             assert terminal_sent.is_set()
-            second = ResponsesAdapter(config, execution_scope=scope).complete(_request(session_id="second"))
+            second = ResponsesAdapter(config, loop=loop).complete(_request(session_id="second"))
 
     assert not errors
     assert first.output == second.output == [TEXT]
@@ -689,8 +692,8 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
     config = ResponsesConfig(model="local-model", api_key=KEY,
                              base_url="http://mock.test/v1", timeout_sec=0.3)
     started = time.monotonic()
-    with ResponsesExecutionScope() as scope:
-        result = ResponsesAdapter(config, execution_scope=scope).complete(_request())
+    with ModelCallLoop() as loop:
+        result = ResponsesAdapter(config, loop=loop).complete(_request())
 
     assert result.output == [TEXT]
     assert result.usage.reported is True
@@ -700,8 +703,8 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
 
 def test_completed_stream_tail_read_error_keeps_terminal_success_and_closes_connection():
     with _tail_server("truncated") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ResponsesExecutionScope() as scope:
-            result = ResponsesAdapter(config, execution_scope=scope).complete(_request())
+        with ModelCallLoop() as loop:
+            result = ResponsesAdapter(config, loop=loop).complete(_request())
 
     assert terminal_sent.is_set()
     assert result.output == [TEXT]
@@ -710,22 +713,22 @@ def test_completed_stream_tail_read_error_keeps_terminal_success_and_closes_conn
     assert not errors
 
 
-def test_cancel_during_completed_stream_drain_has_priority_and_closes_scope():
+def test_cancel_during_completed_stream_drain_has_priority_and_closes_the_loop():
     request = _request(session_id="tail-cancel")
-    result_holder = {}
 
     with _tail_server("hold") as (config, captures, _ports, terminal_sent, release, errors):
+        loop = ModelCallLoop()
+        adapter = ResponsesAdapter(config, loop=loop)
+
         def invoke():
-            with ResponsesExecutionScope() as scope:
-                adapter = ResponsesAdapter(config, execution_scope=scope)
-                result_holder["adapter"] = adapter
+            with loop:
                 return adapter.complete(request)
 
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(invoke)
                 assert terminal_sent.wait(3)
-                request.abort_flag.set()
+                adapter.cancel(request.attempt_id)
                 with pytest.raises(ProviderError) as caught:
                     future.result(timeout=2)
                 assert caught.value.reason == "cancelled"
@@ -739,7 +742,7 @@ def test_cancel_during_completed_stream_drain_has_priority_and_closes_scope():
 def test_stream_item_observation_does_not_invent_the_returned_model():
     observations = []
     with _server([_stream([TEXT])]) as (config, *_):
-        result = ResponsesAdapter(config).complete(_request(observations=observations.append))
+        result = ResponsesAdapter(config).complete(_request(), observations.append)
     messages = [event for event in observations if event.kind == "message"]
     usage = [event for event in observations if event.kind == "usage"]
     assert len(messages) == 1 and messages[0].model is None
@@ -755,10 +758,7 @@ def test_missing_usage_is_unknown_not_a_provider_estimate():
 
 def test_compaction_output_limit_is_sent_to_the_sdk_without_hidden_prompt_changes():
     with _server([_stream()]) as (config, captures, *_):
-        request = _request()
-        request.purpose = "compaction"
-        request.max_output_tokens = 320
-        request.tools = []
+        request = _request().model_copy(update={"purpose": "compaction", "max_output_tokens": 320, "tools": []})
         ResponsesAdapter(config).complete(request)
         assert captures[0] == {"model": "local-model", "input": request.input_items, "tools": [],
                                "store": False, "stream": True, "max_output_tokens": 320}
@@ -769,7 +769,7 @@ def test_nullable_reasoning_content_is_preserved_through_sdk_and_next_request():
     observations = []
     with _server([_stream([reasoning, CALL]), _stream([TEXT], response_id="resp-two")]) as (config, captures, *_):
         adapter = ResponsesAdapter(config)
-        result = adapter.complete(_request(observations=observations.append))
+        result = adapter.complete(_request(), observations.append)
         assert result.output == [reasoning, CALL]
         message = next(event for event in observations if event.kind == "message")
         assert message.payload == reasoning and message.text == ""
@@ -784,7 +784,7 @@ def test_null_terminal_output_is_explicit_error_and_preserves_usage(status):
     observations = []
     with _server([_event(f"response.{status}", response=response, sequence_number=0)]) as (config, *_):
         with pytest.raises(ProviderError) as caught:
-            ResponsesAdapter(config).complete(_request(observations=observations.append))
+            ResponsesAdapter(config).complete(_request(), observations.append)
         assert caught.value.reason == "provider_error"
         assert "output" in str(caught.value) or "failed" in str(caught.value)
     assert [event.usage.total_tokens for event in observations if event.kind == "usage"] == [130]
@@ -882,9 +882,8 @@ def test_http_400_keeps_bounded_redacted_error_identity():
         )
 
     with _server([failure]) as (config, *_):
-        request = _request(observations=observations.append)
         with pytest.raises(ProviderError) as caught:
-            ResponsesAdapter(config).complete(request)
+            ResponsesAdapter(config).complete(_request(), observations.append)
     diagnostics = caught.value.diagnostics
     request_obs = next(event for event in observations if event.kind == "request")
     assert caught.value.retryable is False
@@ -927,8 +926,7 @@ def test_product_spec_change_record_schema_has_object_type_for_responses():
         _send(handler, _stream())
 
     with _server([inspect]) as (config, captures, *_):
-        request = _request()
-        request.tools = tools
+        request = _request().model_copy(update={"tools": tools})
         result = ResponsesAdapter(config).complete(request)
     assert result.output
     spec = next(item for item in captures[0]["tools"] if item["name"] == "submit_product_spec")
@@ -976,7 +974,7 @@ def test_observation_host_io_error_is_not_reclassified_as_retryable_connection()
 
     with _server([_stream()]) as (config, *_):
         with pytest.raises(OSError, match="host persistence failed"):
-            ResponsesAdapter(config).complete(_request(observations=fail_observation))
+            ResponsesAdapter(config).complete(_request(), fail_observation)
 
 
 def test_sdk_connection_error_with_local_protocol_cause_is_not_retryable(monkeypatch):
@@ -1011,7 +1009,7 @@ def test_noncompleted_terminal_response_keeps_observations_but_cannot_complete(s
     observations = []
     with _server([_stream(status=status)]) as (config, *_):
         with pytest.raises(ProviderError, match=status):
-            ResponsesAdapter(config).complete(_request(observations=observations.append))
+            ResponsesAdapter(config).complete(_request(), observations.append)
     assert len([event for event in observations if event.kind == "message"]) == 1
     assert [event.usage.total_tokens for event in observations if event.kind == "usage"] == [130]
 
@@ -1020,12 +1018,12 @@ def test_stream_disconnect_does_not_turn_partial_output_into_success():
     observations = []
     with _server([_stream(terminal=False)]) as (config, captures, *_):
         with pytest.raises(ProviderError, match="ended before") as caught:
-            ResponsesAdapter(config).complete(_request(observations=observations.append))
+            ResponsesAdapter(config).complete(_request(), observations.append)
         assert len(captures) == 1
         assert caught.value.diagnostics["error_type"] == "stream_incomplete"
         assert caught.value.diagnostics["transport_phase"] == "response_closed"
         assert caught.value.diagnostics["trace_available"] is True
-    assert [event.id for event in observations if event.kind != "request"] == ["msg-one"]
+    assert [event.id for event in _decoded(observations) if event.kind != "request"] == ["msg-one"]
 
 
 @pytest.mark.parametrize("nested", [False, True])
@@ -1084,17 +1082,16 @@ def test_silent_network_times_out_and_keeps_completed_output(headers_sent):
     try:
         with _server([silence]) as (config, captures, *_):
             with pytest.raises(ProviderError, match="timed out") as caught:
-                ResponsesAdapter(replace(config, timeout_sec=0.8)).complete(_request(observations=observations.append))
+                ResponsesAdapter(replace(config, timeout_sec=0.8)).complete(_request(), observations.append)
             assert caught.value.reason == "provider_timeout"
             assert len(captures) == 1
-            assert len([event for event in observations if event.kind != "request"]) == int(headers_sent)
+            assert len([event for event in _decoded(observations) if event.kind != "request"]) == int(headers_sent)
     finally:
         release.set()
 
 
-@pytest.mark.parametrize("via_flag", [False, True])
 @pytest.mark.parametrize("headers_sent", [False, True])
-def test_cancel_interrupts_silent_network_only_for_the_active_request(via_flag, headers_sent):
+def test_cancel_interrupts_silent_network_only_for_the_active_request(headers_sent):
     release = Event()
 
     def silence(handler, _body):
@@ -1112,20 +1109,18 @@ def test_cancel_interrupts_silent_network_only_for_the_active_request(via_flag, 
             with ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(adapter.complete, request)
                 assert received.wait(3)
-                adapter.abort("unrelated-session")
+                adapter.cancel("unrelated-attempt")
                 assert not future.done()
                 started = time.monotonic()
-                if via_flag:
-                    request.abort_flag.set()
-                else:
-                    adapter.abort(request.session_id)
+                adapter.cancel(request.attempt_id)
                 with pytest.raises(ProviderError) as caught:
                     future.result(timeout=2)
                 assert caught.value.reason == "cancelled"
                 assert caught.value.diagnostics is None
                 assert time.monotonic() - started < 1.5
             release.set()
-            assert adapter.complete(_request(session_id="next-session")).output == [TEXT]
+            next_request = _request(session_id="next-session", attempt_id="activation:2:attempt-1")
+            assert adapter.complete(next_request).output == [TEXT]
             assert len(captures) == 2
     finally:
         release.set()
@@ -1134,9 +1129,10 @@ def test_cancel_interrupts_silent_network_only_for_the_active_request(via_flag, 
 def test_pre_cancelled_request_never_reaches_provider():
     with _server([]) as (config, captures, *_):
         request = _request()
-        request.abort_flag.set()
+        adapter = ResponsesAdapter(config)
+        adapter.cancel(request.attempt_id)
         with pytest.raises(ProviderError) as caught:
-            ResponsesAdapter(config).complete(request)
+            adapter.complete(request)
         assert caught.value.reason == "cancelled" and captures == []
 
 

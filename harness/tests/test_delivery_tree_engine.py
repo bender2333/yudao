@@ -4,7 +4,7 @@ import pytest
 
 import harness.orchestrator as orchestration
 import harness.submissions as submissions
-from harness.adapters.base import ModelResponse
+from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, review_turn

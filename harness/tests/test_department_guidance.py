@@ -6,7 +6,7 @@ from http.client import HTTPConnection
 
 import pytest
 
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.models import EventType
 from harness.observability import ObservabilityQuery
 from harness.proposals import (
@@ -14,16 +14,20 @@ from harness.proposals import (
     product_spec, response_turn, review_turn,
 )
 from harness.runtime import LoopSystem
+from harness.tests.helpers import recorded_context
 from harness.web.server import serve
 
 
 def _guidance_id(request):
-    part = next(part for part in request.context.parts if part.source == "department_guidance")
-    return json.loads(part.text)[0]["id"]
+    return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
 
 
 def _tool_names(request):
     return [item["name"] for item in request.tools]
+
+
+def _guidance_only(system, request):
+    return recorded_context(system, request).manifest.guidance_only
 
 
 def _last_activation(system, run_id):
@@ -32,8 +36,8 @@ def _last_activation(system, run_id):
 
 
 def _guidance_results(request):
-    part = next((part for part in request.context.parts if part.source == "guidance_results"), None)
-    return [] if part is None else json.loads(part.text)
+    part = prompt_part(request, "guidance_results")
+    return [] if part is None else json.loads(part)
 
 
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
@@ -52,8 +56,7 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
     assert guidance.department == "engineering"
     assert guidance.status == "explained"
     assert guidance.response_text == "已检查边界行为，当前指导不改变产品合同。"
-    assert any(part.source == "department_guidance" and guidance.text in part.text
-               for part in adapter.invocations[-1].context.parts)
+    assert guidance.text in prompt_part(adapter.invocations[-1], "department_guidance")
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED for event in events)
     applied = next(event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
@@ -225,7 +228,7 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     request = adapter.invocations[-1]
     names = _tool_names(request)
     assert request.department == "product"
-    assert request.guidance_only is False
+    assert _guidance_only(system, request) is False
     assert "submit_product_spec" in names
     assert "submit_guidance_response" in names
     assert names != ["read_file", "list_files", "run_check", "submit_guidance_response"]
@@ -327,7 +330,7 @@ def test_guidance_only_engineering_can_request_product(tmp_path):
     request = adapter.invocations[-1]
     names = _tool_names(request)
     assert request.department == "engineering"
-    assert request.guidance_only is True
+    assert _guidance_only(system, request) is True
     assert "submit_request" in names
     assert "write_file" not in names
     assert "submit_delivery" not in names
@@ -356,7 +359,7 @@ def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     result = system.activate_once(run_id)
     request = adapter.invocations[-1]
     assert request.department == "engineering"
-    assert request.guidance_only is True
+    assert _guidance_only(system, request) is True
     activation_id = request.activation_id
     write = next(event for event in system.store.list_events(run_id)
                  if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
@@ -456,7 +459,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert responded.last_review.verdict == "rework_engineering"
     assert responded.last_activations["quality"] != rework_activation
     assert adapter.invocations[-1].department == "quality"
-    assert adapter.invocations[-1].guidance_only is True
+    assert _guidance_only(system, adapter.invocations[-1]) is True
     assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
 
     adapter.script.append(plan_turn(reason="Fix empty-input handling after QA rework."))
@@ -521,7 +524,7 @@ def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path
     result = system.activate_once(run_id)
     request = adapter.invocations[-1]
     assert request.department == "engineering"
-    assert request.guidance_only is False
+    assert _guidance_only(system, request) is False
     write = next(event for event in system.store.list_events(run_id)
                  if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
                  and event.payload.get("activation_id") == request.activation_id)
@@ -788,11 +791,7 @@ def test_one_write_cannot_complete_two_guidance_items(tmp_path):
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-b.txt，内容为 B。")
     adapter.script.append(lambda request: FakeTurn(
         writes={"src/guidance-a.txt": "A\n"},
-        proposal=guidance_response(
-            json.loads(next(part.text for part in request.context.parts
-                            if part.source == "department_guidance"))[0]["id"],
-            text="已创建 src/guidance-a.txt。",
-        ),
+        proposal=guidance_response(_guidance_id(request), text="已创建 src/guidance-a.txt。"),
     ))
     first = system.activate_once(run_id)
     first_item = next(item for item in first.department_guidance if item.text.endswith("A。"))

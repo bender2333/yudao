@@ -3,7 +3,7 @@ from dataclasses import asdict, replace
 import pytest
 
 import harness.orchestrator as orchestration
-from harness.adapters.base import ModelResponse
+from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.contracts import contract_payload, normalize_scope, path_in_scope, render_plan, render_prd
 from harness.models import EventType, json_dumps

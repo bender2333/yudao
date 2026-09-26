@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
 import subprocess
 import sys
 import threading
+from contextlib import aclosing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Event
@@ -14,15 +16,38 @@ import pytest
 from harness.providers import (
     CatalogValidationError,
     CredentialChain,
+    ModelCall,
+    ModelResponse,
     ProviderError,
     ProviderFacade,
-    ProviderInput,
-    ProviderMessage,
     ProviderStore,
-    to_provider_input,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _call(content: str, attempt_id: str, *, session_id: str = "s1") -> ModelCall:
+    return ModelCall(run_id="run", department="product", session_id=session_id, activation_id="activation",
+                     step_id=1, logical_call_id="activation:root-1:work", attempt=1, attempt_id=attempt_id,
+                     purpose="work", input_items=[{"role": "user", "content": content}], tools=[])
+
+
+def _invoke(facade: ProviderFacade, target, call: ModelCall, events: list | None = None) -> ModelResponse:
+    # 独立宿主在自己的事件循环中完成一次调用：流式输出逐条取出，最后一条是结果
+    async def run() -> ModelResponse:
+        async with aclosing(facade.stream(target, call)) as items:
+            async for item in items:
+                if isinstance(item, ModelResponse):
+                    return item
+                if events is not None:
+                    events.append(item)
+        raise AssertionError("model call ended without a response")
+
+    return asyncio.run(run())
+
+
+def _text(response: ModelResponse) -> str:
+    return response.output[0]["content"][0]["text"]
 
 
 def _catalog(credential_ref: str = "TEST_REF", protocol: str = "responses") -> dict:
@@ -51,24 +76,10 @@ def _fake_catalog() -> dict:
     }
 
 
-class _RecordingObserver:
-    def __init__(self, confirm: bool = True) -> None:
-        self.confirm_result = confirm
-        self.confirms: list[dict] = []
-        self.events: list[dict] = []
-
-    def confirm_request(self, evidence) -> bool:
-        self.confirms.append(dict(evidence))
-        return self.confirm_result
-
-    def on_event(self, event) -> None:
-        self.events.append(dict(event))
-
-
 def test_facade_surface_usable():
     facade = ProviderFacade()
     for name in ("load", "store", "persist", "validate", "public_view",
-                 "resolve_snapshot", "invoke_once", "cancel",
+                 "resolve_snapshot", "stream", "cancel",
                  "test_connection", "model_test", "record_admission",
                  "presets_public_view", "refresh_candidates",
                  "describe_readiness", "providers_view"):
@@ -149,24 +160,14 @@ def test_cancel_only_affects_current_attempt():
     facade.store(_fake_catalog())
     snapshot = facade.resolve_snapshot([{"key": "k", "provider_id": "pf", "model_id": "mf"}])
     frozen = snapshot.target("k")
-    event_a = Event()
-    event_b = Event()
-    observer = _RecordingObserver()
+    # 调用开始之前收到的取消先记下，这次尝试开始时立即取消；其他尝试不受影响
     assert facade.cancel("attempt-a") is False
-    event_a.set()
     with pytest.raises(ProviderError) as exc_info:
-        facade.invoke_once(
-            frozen, ProviderInput(messages=(ProviderMessage(role="user", content="hi"),)),
-            session_id="s1", attempt_id="attempt-a", abort_event=event_a, observer=observer,
-        )
+        _invoke(facade, frozen, _call("hi", "attempt-a"))
     assert exc_info.value.reason == "cancelled"
-    assert not event_b.is_set()
-    result = facade.invoke_once(
-        frozen, ProviderInput(messages=(ProviderMessage(role="user", content="hi"),)),
-        session_id="s1", attempt_id="attempt-b", abort_event=event_b, observer=observer,
-    )
+    result = _invoke(facade, frozen, _call("hi", "attempt-b"))
     assert result.finish_reason == "completed"
-    assert result.text == "hi"
+    assert _text(result) == "hi"
 
 
 def test_unsupported_protocol_rejected_before_request():
@@ -175,29 +176,11 @@ def test_unsupported_protocol_rejected_before_request():
     snapshot = facade.resolve_snapshot([{"key": "k", "provider_id": "p1", "model_id": "m1"}])
     # 未知协议直接构造冻结目标，验证请求前拒绝而不是落到网络调用
     frozen = dataclasses.replace(snapshot.target("k"), protocol="bogus")
-    observer = _RecordingObserver()
+    events = []
     with pytest.raises(ProviderError) as exc_info:
-        facade.invoke_once(
-            frozen, ProviderInput(messages=(ProviderMessage(role="user", content="hi"),)),
-            session_id="s1", attempt_id="a1", abort_event=Event(), observer=observer,
-        )
+        _invoke(facade, frozen, _call("hi", "a1"), events)
     assert exc_info.value.reason == "unsupported_protocol"
-    assert observer.confirms == []
-
-
-def test_unpersisted_request_is_not_sent():
-    facade = ProviderFacade()
-    facade.store(_fake_catalog())
-    snapshot = facade.resolve_snapshot([{"key": "k", "provider_id": "pf", "model_id": "mf"}])
-    observer = _RecordingObserver(confirm=False)
-    with pytest.raises(ProviderError) as exc_info:
-        facade.invoke_once(
-            snapshot.target("k"),
-            ProviderInput(messages=(ProviderMessage(role="user", content="hi"),)),
-            session_id="s1", attempt_id="a1", abort_event=Event(), observer=observer,
-        )
-    assert exc_info.value.reason == "request_not_persisted"
-    assert observer.events == []
+    assert events == []
 
 
 def test_secret_never_in_public_view_or_logs():
@@ -289,37 +272,57 @@ def test_provider_module_imports_without_web_or_department_kernel():
     assert [name for name in loaded if name != "harness" and not name.startswith("harness.providers")] == []
 
 
+def _local_target(tmp_path, upstream: _LocalResponsesUpstream):
+    config = tmp_path / "providers.json"
+    config.write_text(json.dumps({
+        "providers": [{"id": "p1", "name": "本地服务", "base_url": upstream.base_url,
+                       "credential_ref": "LOCAL_REF", "timeout_sec": 10.0}],
+        "models": [{"id": "m1", "provider_id": "p1", "model": "model-a", "protocol": "responses",
+                    "context_window": 8000, "max_output_tokens": 256}],
+        "bindings": {},
+    }, ensure_ascii=False), encoding="utf-8")
+    facade = ProviderFacade(credentials=CredentialChain(overrides={"LOCAL_REF": "local-secret"}, use_env=False))
+    facade.load_document(config)
+    return facade, facade.resolve_snapshot([{"key": "k", "provider_id": "p1", "model_id": "m1"}]).target("k")
+
+
+def test_request_is_not_sent_when_the_caller_cannot_record_it(tmp_path):
+    # 请求先作为流式输出交给调用方记录，调用方取下一条时才发送；调用方记录失败时请求不发送
+    upstream = _LocalResponsesUpstream()
+    try:
+        facade, frozen = _local_target(tmp_path, upstream)
+
+        async def reject_request() -> None:
+            async with aclosing(facade.stream(frozen, _call("hi", "a1"))) as items:
+                async for item in items:
+                    assert item.kind == "request"
+                    raise OSError("request evidence could not be recorded")
+
+        with pytest.raises(OSError, match="could not be recorded"):
+            asyncio.run(reject_request())
+        assert upstream.requests == []
+    finally:
+        upstream.close()
+
+
 def test_standalone_host_reads_config_resolves_invokes_and_cancels(tmp_path):
     # 独立宿主：读取配置文件、解析并冻结目标、完成一次调用、取消一次进行中的调用
     upstream = _LocalResponsesUpstream()
     try:
-        config = tmp_path / "providers.json"
-        config.write_text(json.dumps({
-            "providers": [{"id": "p1", "name": "本地服务", "base_url": upstream.base_url,
-                           "credential_ref": "LOCAL_REF", "timeout_sec": 10.0}],
-            "models": [{"id": "m1", "provider_id": "p1", "model": "model-a", "protocol": "responses",
-                        "context_window": 8000, "max_output_tokens": 256}],
-            "bindings": {},
-        }, ensure_ascii=False), encoding="utf-8")
-        facade = ProviderFacade(credentials=CredentialChain(overrides={"LOCAL_REF": "local-secret"},
-                                                            use_env=False))
-        facade.load_document(config)
-        frozen = facade.resolve_snapshot([{"key": "k", "provider_id": "p1", "model_id": "m1"}]).target("k")
+        facade, frozen = _local_target(tmp_path, upstream)
         assert frozen.model == "model-a"
-        observer = _RecordingObserver()
-        result = facade.invoke_once(frozen, to_provider_input([{"role": "user", "content": "hi"}]),
-                                    session_id="host-session", attempt_id="attempt-1", observer=observer)
-        assert result.text == "ok"
-        assert result.actual_model == "model-a"
-        assert observer.confirms[0]["attempt_id"] == "attempt-1"
+        events = []
+        result = _invoke(facade, frozen, _call("hi", "attempt-1", session_id="host-session"), events)
+        assert _text(result) == "ok"
+        assert result.model == "model-a"
+        assert events[0].kind == "request" and events[0].id == "attempt-1"
         assert upstream.requests[0]["model"] == "model-a"
 
         outcome: dict[str, str] = {}
 
         def held_call() -> None:
             try:
-                facade.invoke_once(frozen, to_provider_input([{"role": "user", "content": "hold"}]),
-                                   session_id="host-session", attempt_id="attempt-2")
+                _invoke(facade, frozen, _call("hold", "attempt-2", session_id="host-session"))
             except ProviderError as exc:
                 outcome["reason"] = exc.reason
 

@@ -4,7 +4,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from harness.adapters.base import ModelResponse
+from harness.providers.call import ModelResponse
 from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps

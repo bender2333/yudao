@@ -6,8 +6,7 @@ import pytest
 
 import harness.interactions as interactions
 import harness.orchestrator as orchestration
-from harness.adapters.base import ModelResponse
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.compaction import visible_history
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
@@ -15,7 +14,9 @@ from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn, plan_turn,
     product_decision, product_spec, response_turn, review, review_turn,
 )
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
+from harness.tests.helpers import recorded_context
 from harness.tools import ToolRuntime
 
 
@@ -46,8 +47,12 @@ def _events(system, run_id, kind):
     return [event for event in system.store.list_events(run_id) if event.type == kind]
 
 
-def _parts(request):
-    return {part.source: part.text for part in request.context.parts}
+def _parts(system, request):
+    return {part.source: part.text for part in recorded_context(system, request).parts}
+
+
+def _manifest(system, request):
+    return recorded_context(system, request).manifest
 
 
 def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_path):
@@ -68,8 +73,8 @@ def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_pa
     assert (accepted.input_version, accepted.product_work_input_version, accepted.processed_input_version) == (3, 3, 3)
     assert accepted.product_spec.input_version == accepted.effective_contract.input_version == 3
     request = system.test_adapter.invocations[-1]
-    assert request.input_version == 3 and _parts(request)["intend"] == "".join(texts)
-    assert [item["text"] for item in json.loads(_parts(request)["pending_inputs"])] == texts
+    assert _manifest(system, request).input_version == 3 and _parts(system, request)["intend"] == "".join(texts)
+    assert [item["text"] for item in json.loads(_parts(system, request)["pending_inputs"])] == texts
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
 
 
@@ -154,7 +159,7 @@ def test_product_can_consult_while_current_inputs_still_wait_for_requirement_acc
 def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_response(tmp_path):
     def reply(request):
         system.add_input(request.run_id, "Make the output uppercase")
-        return collaboration_response(request.request_id, "answered", "Advice for the earlier input")
+        return collaboration_response(pending_request_id(request), "answered", "Advice for the earlier input")
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering"), reply, product_spec()]))
     run_id = system.create_run("build echo")
@@ -169,7 +174,7 @@ def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_respon
 
 def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_path):
     def old_spec(request):
-        assert request.input_version == 1
+        assert _manifest(system, request).input_version == 1
         system.add_input(request.run_id, "Also require uppercase output")
         return product_spec()
 
@@ -180,7 +185,7 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
     assert len(_events(system, run_id, EventType.TOOL_SKIPPED)) == 1
     current = system.activate_once(run_id)
     assert current.product_spec.revision == 1 and current.processed_input_version == 2
-    assert [request.input_version for request in system.test_adapter.invocations] == [1, 2]
+    assert [_manifest(system, request).input_version for request in system.test_adapter.invocations] == [1, 2]
 
 
 def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path, monkeypatch):
@@ -201,7 +206,7 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
     assert stopped.phase == "PRODUCT_SPEC" and not system.test_adapter.invocations
     assert not _events(system, run_id, EventType.MODEL_REQUESTED)
     assert system.activate_once(run_id).processed_input_version == 2
-    assert system.test_adapter.invocations[-1].input_version == 2
+    assert _manifest(system, system.test_adapter.invocations[-1]).input_version == 2
 
 
 def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path):
@@ -363,15 +368,17 @@ def test_prompt_changes_apply_next_activation_and_keep_all_current_steps_bound(t
     first, second = system.test_adapter.invocations[-2:]
     assert first.activation_id == second.activation_id
     for request in (first, second):
-        assert request.prompt_version == 1 and request.prompt_hash == initial.prompt_ref.content_hash
-        assert _parts(request)["department_rules"] == initial.text
+        manifest = _manifest(system, request)
+        assert manifest.prompt_version == 1 and manifest.prompt_hash == initial.prompt_ref.content_hash
+        assert _parts(system, request)["department_rules"] == initial.text
     assert current.department_prompts["engineering"].version == 2
     assert current.department_prompts["engineering"].text == replacement
     system.activate_once(run_id)
     next_request = system.test_adapter.invocations[-1]
-    assert next_request.activation_id != first.activation_id and next_request.prompt_version == 2
-    assert _parts(next_request)["department_rules"] == replacement
-    assert next_request.prompt_hash == system.project(run_id).department_prompts["engineering"].prompt_ref.content_hash
+    next_manifest = _manifest(system, next_request)
+    assert next_request.activation_id != first.activation_id and next_manifest.prompt_version == 2
+    assert _parts(system, next_request)["department_rules"] == replacement
+    assert next_manifest.prompt_hash == system.project(run_id).department_prompts["engineering"].prompt_ref.content_hash
     for event in system.store.list_events(run_id):
         if event.payload.get("activation_id") == first.activation_id and event.type != EventType.PROPOSAL_SUBMITTED:
             if event.type in {EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
@@ -389,7 +396,7 @@ def test_editable_prompt_does_not_grant_product_write_permission(tmp_path):
     assert current.input_version == 1 and current.processed_input_version == 0
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING" and system.workspace(run_id).list_files() == []
-    assert system.test_adapter.invocations[-1].prompt_version == 2
+    assert _manifest(system, system.test_adapter.invocations[-1]).prompt_version == 2
     assert not next(event for event in _events(system, run_id, EventType.TOOL_CALLED)
                     if event.payload.get("name") == "write_file").payload["ok"]
 
@@ -463,10 +470,11 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
     assert original.event_id in {ref["event_id"] for item in later for ref in item["source_refs"]}
     assert system.artifacts.get_text(original.payload["output_ref"]["content_hash"]).count("PRESERVED_TOOL_BYTES") == 1800
     for request in system.test_adapter.invocations:
+        manifest = _manifest(system, request)
         if request.activation_id == first_activation:
-            assert request.input_version == 1 and request.prompt_version == 1
+            assert manifest.input_version == 1 and manifest.prompt_version == 1
         else:
-            assert request.input_version == expected_input and request.prompt_version == expected_prompt
+            assert manifest.input_version == expected_input and manifest.prompt_version == expected_prompt
     assert second.canonical_state() == system.replay(run_id).canonical_state()
 
 

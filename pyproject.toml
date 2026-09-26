@@ -7,7 +7,7 @@ name = "yudao-harness"
 version = "0.1.0"
 description = "Yudao Loop System: a native product/engineering/quality model loop"
 requires-python = ">=3.11"
-dependencies = ["openai>=2.26,<3", "httpx>=0.23,<1", "anthropic>=1.7,<2"]
+dependencies = ["openai>=2.26,<3", "httpx>=0.23,<1", "anthropic>=1.7,<2", "pydantic>=2.7,<3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

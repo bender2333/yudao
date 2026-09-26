@@ -5,9 +5,10 @@ from typing import Any, Callable
 
 import pytest
 
-from harness.adapters.base import ModelResponse, ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.base import ProviderError
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.engine import StepLimits
+from harness.providers.call import ModelResponse
 from harness.models import DEPARTMENTS, json_dumps
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, engineering_plan, guidance_response, plan_turn,
@@ -154,9 +155,8 @@ def tool_denied_unregistered_command(data_dir):
     return system, run_id, {}
 
 
-def _guidance_id(request) -> str:
-    part = next(part for part in request.context.parts if part.source == "department_guidance")
-    return json.loads(part.text)[0]["id"]
+def _guidance_id(call) -> str:
+    return json.loads(prompt_part(call, "department_guidance"))[0]["id"]
 
 
 def tool_denied_guidance_only(data_dir):

@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .adapters.fake import FakeAdapter, FakeTurn
+from .adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from .department_prompts import DEFAULT_PROMPTS
 from .models import EventType
 from .projects import ProjectEventType
@@ -110,7 +110,7 @@ def comparison_script() -> list:
             return product_spec()
         prompt = _developer_text(request)
         files = _delivery_files(_task_key_from_text(prompt))
-        if request.engineering_plan_hash is None:
+        if prompt_part(request, "current_engineering_plan") is None:
             plan = engineering_plan()
             if all(paragraph in prompt for paragraph in CANDIDATE_PARAGRAPHS):
                 return plan

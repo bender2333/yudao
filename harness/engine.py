@@ -2,19 +2,47 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import time
-from collections.abc import Callable
-from dataclasses import dataclass, replace
-from typing import Any
+from collections.abc import Awaitable, Callable
+from contextlib import aclosing
+from dataclasses import dataclass
+from typing import Any, TypeVar
 
-from .adapters.base import ModelAdapter, ModelRequest, ModelResponse, ProviderError
+from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .models import json_dumps
+from .providers import ProviderConnections
+from .providers.call import ModelCall, ModelResponse, ModelStreamEvent
 from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
 # 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
 TOOL_CALL_REQUIRED_LIMIT = 3
+
+_Result = TypeVar("_Result")
+
+
+class ModelCallLoop:
+    # 部门循环自己的事件循环：一次运行期间的模型调用都在这里执行，同一个事件循环内复用提供方的连接
+    def __init__(self) -> None:
+        self._runner = asyncio.Runner()
+        self.connections = ProviderConnections()
+
+    def __enter__(self) -> ModelCallLoop:
+        return self
+
+    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
+        self.close()
+
+    def run(self, awaitable: Awaitable[_Result]) -> _Result:
+        return self._runner.run(awaitable)
+
+    def close(self) -> None:
+        try:
+            self._runner.run(self.connections.aclose())
+        finally:
+            self._runner.close()
 
 
 @dataclass(frozen=True)
@@ -52,7 +80,9 @@ def run_department(
     runtime: ToolRuntime,
     *,
     limits: StepLimits,
+    model_loop: ModelCallLoop,
     prepare_step: Callable[[int, int, int, int | None], ModelRequest | None],
+    record_stream: Callable[[ModelStreamEvent], None],
     record_response: Callable[[ModelResponse], None],
     record_tool: Callable[[dict[str, Any]], None],
     record_skipped_tool: Callable[[dict[str, Any]], None],
@@ -77,7 +107,7 @@ def run_department(
             return None
         request.attempt_started_monotonic = time.monotonic()
         try:
-            response = adapter.complete(request)
+            response = model_loop.run(_call_model(adapter, request.model_call(), record_stream))
             _validate_response(response)
             request.attempt_finished_monotonic = time.monotonic()
             undeclared = _undeclared_tool_calls(request, response)
@@ -208,6 +238,17 @@ def run_department(
     raise ProviderError("department reached the model step limit without submitting a proposal", reason="model_steps_exhausted")
 
 
+async def _call_model(adapter: ModelAdapter, call: ModelCall,
+                      record_stream: Callable[[ModelStreamEvent], None]) -> ModelResponse:
+    # 流式输出逐条记录以后再取下一条，最后一条是这次调用尝试的结果
+    async with aclosing(adapter.stream(call)) as items:
+        async for item in items:
+            if isinstance(item, ModelResponse):
+                return item
+            record_stream(item)
+    raise ProviderError("model call ended without a response", diagnostics={"error_type": "protocol"})
+
+
 def _retry_delay(error: ProviderError, attempt: int, limits: StepLimits) -> float:
     retry_after = _retry_after_seconds(error)
     if retry_after is not None:
@@ -309,7 +350,7 @@ def _sanitized_response(response: ModelResponse) -> ModelResponse:
         cleaned.append(item)
     if not changed:
         return response
-    return replace(response, output=cleaned)
+    return response.model_copy(update={"output": cleaned})
 
 
 def _undeclared_tool_calls(request: ModelRequest, response: ModelResponse) -> list[str]:

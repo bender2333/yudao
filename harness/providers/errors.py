@@ -51,9 +51,3 @@ class UnsupportedProtocolError(ProviderError):
             retryable=False,
             diagnostics={"protocol": protocol},
         )
-
-
-class RequestNotPersistedError(ProviderError):
-    # 请求证据未经观察方持久化确认时拒绝发送
-    def __init__(self, message: str = "Model request evidence was not persisted") -> None:
-        super().__init__(message, reason="request_not_persisted", retryable=False)

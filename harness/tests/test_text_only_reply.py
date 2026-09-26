@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
-from threading import Event
 
 import pytest
 
-from harness.adapters.base import ModelResponse
 from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import _model_input_audit
 from harness.tests.helpers import list_files_turn
 from harness.tests.protocol_helpers import (
     bound_target,
     chat_responder,
+    complete,
     facade_with,
     messages_responder,
     responses_responder,
@@ -131,12 +130,11 @@ def test_request_after_text_only_reply_ends_with_user_message_on_the_wire(tmp_pa
     system.activate_once(run_id)
     # 运行系统产生的第二次请求，经真实 Provider 模块按协议编码后发到本机捕获服务；
     # 测试装配没有冻结模型上限，这里补上 Messages 协议必需的 max_tokens
-    request = replace(adapter.invocations[1], on_observation=None, on_raw_observation=None,
-                      abort_flag=Event(), max_output_tokens=1024)
+    call = adapter.invocations[1].model_copy(update={"max_output_tokens": 1024})
     server, capture, base = serve(responder)
     try:
         facade = facade_with(base + "/v1", protocol=protocol)
-        FacadeAdapter(facade, bound_target(facade)).complete(request)
+        complete(FacadeAdapter(facade, bound_target(facade)), call)
     finally:
         server.shutdown()
         server.server_close()

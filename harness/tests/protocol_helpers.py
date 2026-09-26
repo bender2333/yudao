@@ -1,21 +1,63 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import threading
+from collections.abc import AsyncIterator, Callable
+from contextlib import aclosing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from harness.adapters.base import Availability, ModelAdapter, ModelRequest, ModelResponse, ProviderError
+from harness.adapters.base import Availability, ModelAdapter, ProviderError
 from harness.adapters.facade_adapter import FacadeAdapter
+from harness.engine import ModelCallLoop
 from harness.providers import (
     CredentialChain,
     FrozenTarget,
+    ModelCall,
+    ModelResponse,
+    ModelStreamEvent,
     ProviderFacade,
     ResponsesConfig,
-    ResponsesExecutionScope,
     check_availability,
 )
+
+
+def model_call(input_items: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None, *,
+               max_output_tokens: int | None = None, session_id: str = "session",
+               attempt_id: str = "activation:1:attempt-1", purpose: str = "work") -> ModelCall:
+    # 测试直接构造的一次调用尝试；身份字段取固定值，便于核对观察身份
+    return ModelCall(
+        run_id="run", department="product", session_id=session_id, activation_id="activation", step_id=1,
+        logical_call_id=attempt_id.rsplit(":attempt-", 1)[0], attempt=1, attempt_id=attempt_id,
+        purpose=purpose, input_items=input_items, tools=list(tools or []), max_output_tokens=max_output_tokens,
+    )
+
+
+async def _consume(items: AsyncIterator[ModelStreamEvent | ModelResponse],
+                   observe: Callable[[ModelStreamEvent], None] | None) -> ModelResponse:
+    async with aclosing(items):
+        async for item in items:
+            if isinstance(item, ModelResponse):
+                return item
+            if observe is not None:
+                observe(item)
+    raise AssertionError("model call ended without a response")
+
+
+def complete(adapter: ModelAdapter, call: ModelCall, *, observe: Callable[[ModelStreamEvent], None] | None = None,
+             loop: ModelCallLoop | None = None) -> ModelResponse:
+    # 测试直接完成一次调用：流式输出交给 observe；给出 loop 时在它的事件循环中执行（复用它的连接）
+    if loop is not None:
+        return loop.run(_consume(adapter.stream(call), observe))
+    return asyncio.run(_consume(adapter.stream(call), observe))
+
+
+def invoke(facade: ProviderFacade, target: FrozenTarget, call: ModelCall, *,
+           observe: Callable[[ModelStreamEvent], None] | None = None) -> ModelResponse:
+    # 测试直接经 Provider 模块完成一次调用，本次调用新建客户端
+    return asyncio.run(_consume(facade.stream(target, call), observe))
 
 
 # 本地捕获服务：记录真实请求体与请求头，按协议回放流式响应
@@ -149,12 +191,11 @@ def bound_target(facade: ProviderFacade) -> FrozenTarget:
 class ResponsesAdapter:
     name = "responses"
 
-    def __init__(self, config: ResponsesConfig, *,
-                 execution_scope: ResponsesExecutionScope | None = None) -> None:
+    def __init__(self, config: ResponsesConfig, *, loop: ModelCallLoop | None = None) -> None:
         self.config = config
         self.model = config.model or "unconfigured"
-        self.execution_scope = execution_scope
-        self._delegate = _build_delegate(config, execution_scope)
+        self.loop = loop
+        self._delegate = _build_delegate(config, loop)
 
     def availability(self) -> Availability:
         result = check_availability(self.config)
@@ -162,21 +203,25 @@ class ResponsesAdapter:
             return Availability(False, result["reason"], result["message"])
         return Availability(True)
 
-    def abort(self, session_id: str) -> None:
+    def cancel(self, attempt_id: str) -> None:
         if self._delegate is not None:
-            self._delegate.abort(session_id)
+            self._delegate.cancel(attempt_id)
 
-    def complete(self, request: ModelRequest) -> ModelResponse:
+    async def stream(self, call: ModelCall) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
         availability = self.availability()
         if not availability.available:
             raise ProviderError(availability.message, reason=availability.reason)
         if self._delegate is None:
             raise ProviderError("Provider target is not resolvable", reason="provider_unavailable")
-        return self._delegate.complete(request)
+        async with aclosing(self._delegate.stream(call)) as items:
+            async for item in items:
+                yield item
+
+    def complete(self, call: ModelCall, observe: Callable[[ModelStreamEvent], None] | None = None) -> ModelResponse:
+        return complete(self, call, observe=observe, loop=self.loop)
 
 
-def _build_delegate(config: ResponsesConfig,
-                    execution_scope: ResponsesExecutionScope | None) -> ModelAdapter | None:
+def _build_delegate(config: ResponsesConfig, loop: ModelCallLoop | None) -> ModelAdapter | None:
     # 配置本身不可用时返回空实现，由 availability()/complete() 报同样的错误，
     # 与旧适配器“构造不校验、可用性检查才报错”的行为一致
     if not config.api_key or not config.model or not config.base_url:
@@ -206,7 +251,7 @@ def _build_delegate(config: ResponsesConfig,
     snapshot = facade.resolve_snapshot([{
         "key": "test", "provider_id": config.provider or "test-provider", "model_id": "test-model",
     }])
-    return FacadeAdapter(facade, snapshot.target("test"), execution_scope=execution_scope)
+    return FacadeAdapter(facade, snapshot.target("test"), connections=None if loop is None else loop.connections)
 
 
 __all__ = [
@@ -214,8 +259,11 @@ __all__ = [
     "ResponsesAdapter",
     "bound_target",
     "chat_responder",
+    "complete",
     "facade_with",
+    "invoke",
     "messages_responder",
+    "model_call",
     "responses_responder",
     "serve",
     "sse",

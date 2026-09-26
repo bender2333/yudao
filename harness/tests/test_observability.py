@@ -11,7 +11,8 @@ from http.client import HTTPConnection
 import pytest
 
 from harness.artifacts import ArtifactStore
-from harness.adapters.base import Availability, ModelObservation, ModelResponse, ProviderError
+from harness.adapters.base import Availability, ProviderError
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, Usage
@@ -35,23 +36,21 @@ class _BlockingPartialAdapter:
     def availability(self):
         return Availability(True)
 
-    def abort(self, _session_id):
+    def cancel(self, _attempt_id):
         self.release.set()
 
-    def complete(self, request):
+    async def stream(self, call):
         item = {
             "id": "partial-message",
             "type": "message",
             "role": "assistant",
             "content": [{"type": "output_text", "text": "PARTIAL_OUTPUT"}],
         }
-        request.observe(ModelObservation(
-            item["id"], "message", item, "PARTIAL_OUTPUT",
-            provider=self.name, model=self.model,
-        ))
+        yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="PARTIAL_OUTPUT",
+                               provider=self.name, model=self.model)
         self.started.set()
         self.release.wait(5)
-        return ModelResponse(
+        yield ModelResponse(
             finish_reason="aborted", error="aborted",
             provider=self.name, model=self.model,
         )
@@ -187,10 +186,8 @@ def test_failed_partial_output_is_observation_only_but_detail_keeps_it(tmp_path:
             "role": "assistant",
             "content": [{"type": "output_text", "text": "FAILED_PARTIAL_OUTPUT"}],
         }
-        request.observe(ModelObservation(
-            item["id"], "message", item, "FAILED_PARTIAL_OUTPUT",
-            provider="stub", model="stub-model",
-        ))
+        yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="FAILED_PARTIAL_OUTPUT",
+                               provider="stub", model="stub-model")
         raise ProviderError("stream failed", retryable=False)
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([fail_after_message]))
@@ -402,14 +399,13 @@ def test_generic_adapter_failure_closes_raw_capture_and_keeps_stream_evidence(tm
         def availability(self):
             return Availability(True)
 
-        def abort(self, _session_id):
+        def cancel(self, _attempt_id):
             return None
 
-        def complete(self, request):
-            request.observe_raw(ModelObservation(
-                "raw-1", "stream_event", {"type": "response.created", "response": {"model": self.model}},
-                source="sdk_decoded_stream", sequence=0,
-            ))
+        async def stream(self, call):
+            yield ModelStreamEvent(kind="stream_event", id="raw-1",
+                                   payload={"type": "response.created", "response": {"model": self.model}},
+                                   source="sdk_decoded_stream", sequence=0)
             raise RuntimeError("decoder failed")
 
     system = LoopSystem.for_testing(tmp_path, BrokenAdapter())

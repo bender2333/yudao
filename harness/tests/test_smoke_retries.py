@@ -3,10 +3,11 @@ import json
 
 import pytest
 
-from harness.adapters.base import ModelObservation, ModelResponse, ProviderError
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import product_spec
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
 from harness.tests.helpers import FAST_RETRIES
@@ -97,7 +98,7 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
     }
 
     def fail_after_partial(request):
-        request.observe(ModelObservation("failed-partial", "message", partial, "partial output"))
+        yield ModelStreamEvent(kind="message", id="failed-partial", payload=partial, text="partial output")
         raise ProviderError("stream disconnected", retryable=True)
 
     adapter = FakeAdapter([fail_after_partial, product_spec()])

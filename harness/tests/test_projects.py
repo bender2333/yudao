@@ -5,8 +5,8 @@ import json
 import pytest
 
 from harness.__main__ import main
-from harness.adapters.base import ModelResponse, ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.base import ProviderError
+from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.engine import StepLimits
@@ -29,10 +29,11 @@ from harness.proposals import (
     review_turn,
 )
 from harness.projection import RunNotFoundError
+from harness.providers.call import ModelResponse
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
 from harness.smoke import _model_input_audit, summarize_run
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, recorded_context
 from harness.tree_archive import load_tree
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -50,8 +51,8 @@ def _v2_files():
     return {"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n", "src/extra.py": "EXTRA = True\n"}
 
 
-def _pinned_sources(request):
-    return [part.source for part in request.context.parts]
+def _pinned_sources(system, request):
+    return [part.source for part in recorded_context(system, request).parts]
 
 
 def _project_events(system, project_id, event_type):
@@ -344,14 +345,15 @@ def test_project_context_part_is_pinned_between_current_work_and_department_rule
         first_requests.setdefault(request.department, request)
     assert set(first_requests) == {"product", "engineering", "quality"}
     for request in adapter.invocations:
-        sources = _pinned_sources(request)
+        context = recorded_context(system, request)
+        sources = [part.source for part in context.parts]
         assert sources.index("current_work") < sources.index("project") < sources.index("department_rules")
         content = request.input_items[0]["content"]
         assert content.index("[current_work]") < content.index(f"[project]\n{text}") < content.index("[department_rules]")
         assert content.startswith(f"[intend]\n{run.task}\n\n[current_work]\n")
-        project_part = next(part for part in request.context.parts if part.source == "project")
+        project_part = next(part for part in context.parts if part.source == "project")
         assert project_part.version == run.project_context_ref["content_hash"].split(":", 1)[1][:12]
-        injected = [item.source for item in request.context.manifest.injected]
+        injected = [item.source for item in context.manifest.injected]
         assert injected.index("current_work") < injected.index("project") < injected.index("department_rules")
     # 部门工作消息不重复项目材料（它属于钉住材料）。
     department_inputs = [event for event in system.store.list_events(run_id) if event.type == EventType.DEPARTMENT_INPUT]
@@ -374,7 +376,7 @@ def test_project_context_guidance_stays_before_department_rules(data_dir):
     _work_item_id, run_id = system.projects.start_work_item(project_id, "带指导的事项")
     system.add_guidance(run_id, "product", "先给出验收标准。")
     system.activate_once(run_id)
-    sources = _pinned_sources(adapter.invocations[0])
+    sources = _pinned_sources(system, adapter.invocations[0])
     assert sources[:5] == ["intend", "current_work", "project", "department_guidance", "department_rules"]
 
 
@@ -392,7 +394,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
             identity = f"read-{request.activation_id}-{request.step_id}"
             return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
                                           "name": "read_file", "arguments": json_dumps({"path": "large.txt"})}])
-        return product_spec() if request.request_id is None else response_turn("answered", "Still applicable.")(request)
+        return product_spec() if pending_request_id(request) is None else response_turn("answered", "Still applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(data_dir, adapter, step_limits=StepLimits(max_model_steps=32))
@@ -409,7 +411,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
     for request in compactions:
         pinned = request.input_items[1]["content"]
         assert pinned.index("[current_work]") < pinned.index(f"[project]\n{project_text}") < pinned.index("[department_rules]")
-        pinned_work = next(part for part in request.context.parts if part.source == "pinned_work")
+        pinned_work = next(part for part in recorded_context(system, request).parts if part.source == "pinned_work")
         assert f"[project]\n{project_text}" in pinned_work.text
     audit = _model_input_audit(system.store, system.artifacts, run_id)
     assert audit["status"] == "verified", audit["notes"]

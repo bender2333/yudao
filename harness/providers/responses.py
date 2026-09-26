@@ -8,7 +8,6 @@ import re
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from threading import Event, Lock
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
@@ -23,17 +22,12 @@ from openai import (
 )
 
 from .errors import CancelledError, ProviderError
-from .invoke import InvokeResult, Observer, ProviderInput
+from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
 
 
 _STREAM_DRAIN_TIMEOUT_SEC = 0.1
-
-
-class _ObservationCaptureError(Exception):
-    # 观察接收方失败不可吞入流排空
-    pass
 
 
 @dataclass(frozen=True)
@@ -53,8 +47,7 @@ class _InvokeRequest:
     provider_input: ProviderInput
     session_id: str
     attempt_id: str
-    abort_event: Event
-    observer: Observer
+    emit: Emit
     config: ResponsesConfig
 
 
@@ -106,30 +99,19 @@ class _CompletionDeadline:
             self._timeout.reschedule(None)
 
 
-class ResponsesExecutionScope:
-    # 拥有一次同步运行的事件循环与可复用连接，认证句柄只在内存中隔离
+class ProviderConnections:
+    # 同一个事件循环内按端点与认证句柄复用 Responses 客户端，认证句柄只在内存中隔离；
+    # 只能在创建客户端的事件循环中使用，用完调用 aclose。Chat Completions 与 Messages 每次调用新建客户端
     def __init__(self) -> None:
-        self._runner = asyncio.Runner()
         self._clients: dict[tuple[Any, ...], AsyncOpenAI] = {}
         self._request_context: ContextVar[_RequestContext | None] = ContextVar(
             "yudao_providers_responses_request_context", default=None,
         )
         self._closed = False
 
-    def __enter__(self) -> ResponsesExecutionScope:
-        return self
-
-    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
-        self.close()
-
-    def run(self, awaitable: Any) -> Any:
-        if self._closed:
-            raise RuntimeError("Responses execution scope is closed")
-        return self._runner.run(awaitable)
-
     async def client_for(self, config: ResponsesConfig) -> AsyncOpenAI:
         if self._closed:
-            raise RuntimeError("Responses execution scope is closed")
+            raise RuntimeError("Provider connections are closed")
         # The credential is an in-memory connection identity only; it is never logged or persisted.
         identity = tuple(sorted(dict(config.identity_headers).items()))
         key = (config.provider, config.base_url, float(config.timeout_sec), config.api_key, identity)
@@ -161,46 +143,45 @@ class ResponsesExecutionScope:
         if context is None:
             raise ProviderError("Provider request context is unavailable", reason="provider_protocol")
         http_request.extensions["trace"] = context.trace
-        try:
-            body = _request_body(http_request)
-            context.invocation.observer.on_event({
-                "kind": "request",
-                "id": _request_observation_id(context.invocation),
-                "session_id": context.invocation.session_id,
-                "attempt_id": context.invocation.attempt_id,
-                "provider": context.invocation.config.provider,
-                "model": context.invocation.config.model,
-                "payload": body,
-            })
-        except BaseException as exc:
-            context.observation_errors.append(exc)
-            raise
+        await _emit_request(context.invocation, http_request, context.observation_errors)
 
-    async def _close_clients(self) -> None:
+    async def aclose(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         clients = tuple(self._clients.values())
         self._clients.clear()
         if clients:
             await asyncio.gather(*(client.close() for client in clients), return_exceptions=False)
 
-    def close(self) -> None:
-        if self._closed:
-            return
-        try:
-            self._runner.run(self._close_clients())
-        finally:
-            self._closed = True
-            self._runner.close()
+
+async def _emit_request(invocation: _InvokeRequest, http_request: httpx.Request,
+                        observation_errors: list[BaseException]) -> None:
+    # 请求在发送之前交给调用方记录；请求体无法解析时保留原始错误，不让 SDK 改写成连接错误
+    try:
+        body = _request_body(http_request)
+    except BaseException as exc:
+        observation_errors.append(exc)
+        raise
+    await invocation.emit({
+        "kind": "request",
+        "id": _request_observation_id(invocation),
+        "session_id": invocation.session_id,
+        "attempt_id": invocation.attempt_id,
+        "provider": invocation.config.provider,
+        "model": invocation.config.model,
+        "payload": body,
+    })
 
 
-def invoke_responses(
+async def invoke_responses(
     frozen_target: FrozenTarget,
     provider_input: ProviderInput,
     session_id: str,
     attempt_id: str,
-    abort_event: Event,
-    observer: Observer,
+    emit: Emit,
     *,
-    execution_scope: ResponsesExecutionScope | None = None,
+    connections: ProviderConnections | None = None,
 ) -> InvokeResult:
     # 单次 Responses 调用，SDK 内部重试关闭
     config = ResponsesConfig(
@@ -213,19 +194,13 @@ def invoke_responses(
     )
     invocation = _InvokeRequest(
         frozen_target=frozen_target, provider_input=provider_input,
-        session_id=session_id, attempt_id=attempt_id,
-        abort_event=abort_event, observer=observer, config=config,
+        session_id=session_id, attempt_id=attempt_id, emit=emit, config=config,
     )
     availability = check_availability(config)
     if not availability["available"]:
         raise ProviderError(availability["message"], reason=availability["reason"])
-    if abort_event.is_set():
-        raise CancelledError()
-    invoker = _ResponsesInvoker(execution_scope=execution_scope)
     try:
-        if execution_scope is None:
-            return asyncio.run(invoker.complete(invocation))
-        return execution_scope.run(invoker.complete(invocation))
+        return await _ResponsesInvoker(connections=connections).complete(invocation)
     except ProviderError:
         raise
     except (TimeoutError, APITimeoutError) as exc:
@@ -287,34 +262,17 @@ def check_availability(config: ResponsesConfig) -> dict[str, Any]:
 
 
 class _ResponsesInvoker:
-    def __init__(self, *, execution_scope: ResponsesExecutionScope | None = None) -> None:
-        self.execution_scope = execution_scope
-        self._lock = Lock()
-        self._active: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Task]] = {}
-
-    def abort(self, attempt_id: str) -> None:
-        # 取消只作用于本次调用尝试
-        with self._lock:
-            entry = self._active.get(str(attempt_id))
-            if entry is not None:
-                _, task = entry
-                loop, _ = entry
-                loop.call_soon_threadsafe(task.cancel)
+    def __init__(self, *, connections: ProviderConnections | None = None) -> None:
+        self.connections = connections
 
     async def complete(self, invocation: _InvokeRequest) -> InvokeResult:
-        loop = asyncio.get_running_loop()
+        # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
         trace = _TransportTrace()
         deadline = _CompletionDeadline()
-        with self._lock:
-            if invocation.attempt_id in self._active:
-                raise ProviderError("Responses invocation already active for this attempt")
-            task = asyncio.create_task(self._stream_once(invocation, trace, deadline))
-            self._active[invocation.attempt_id] = (loop, task)
-        watcher = asyncio.create_task(self._watch_abort(invocation, task))
         try:
             async with asyncio.timeout(invocation.config.timeout_sec) as timeout:
                 deadline.bind(timeout)
-                return await task
+                return await self._stream_once(invocation, trace, deadline)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
         except TimeoutError as exc:
@@ -323,19 +281,6 @@ class _ResponsesInvoker:
         except Exception as exc:
             _attach_transport_trace(exc, trace.snapshot())
             raise
-        finally:
-            with self._lock:
-                self._active.pop(invocation.attempt_id, None)
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
-
-    @staticmethod
-    async def _watch_abort(invocation: _InvokeRequest, task: asyncio.Task) -> None:
-        while not task.done():
-            if invocation.abort_event.is_set():
-                task.cancel()
-                return
-            await asyncio.sleep(0.02)
 
     async def _stream_once(
         self,
@@ -345,35 +290,20 @@ class _ResponsesInvoker:
     ) -> InvokeResult:
         started = time.monotonic()
         observation_errors: list[BaseException] = []
-        # 只有本协议的执行作用域才用于连接复用，其他协议的 scope 不适用
-        scope = self.execution_scope if isinstance(self.execution_scope, ResponsesExecutionScope) else None
-        if scope is not None:
+        if self.connections is not None:
             context = _RequestContext(invocation, trace, observation_errors)
-            token = scope.bind(context)
+            token = self.connections.bind(context)
             try:
-                client = await scope.client_for(invocation.config)
+                client = await self.connections.client_for(invocation.config)
                 return await self._stream_with_client(
                     invocation, trace, observation_errors, client, started, deadline,
                 )
             finally:
-                scope.reset(token)
+                self.connections.reset(token)
 
         async def observe_request(http_request: httpx.Request) -> None:
             http_request.extensions["trace"] = trace
-            try:
-                body = _request_body(http_request)
-                invocation.observer.on_event({
-                    "kind": "request",
-                    "id": _request_observation_id(invocation),
-                    "session_id": invocation.session_id,
-                    "attempt_id": invocation.attempt_id,
-                    "provider": invocation.config.provider,
-                    "model": invocation.config.model,
-                    "payload": body,
-                })
-            except BaseException as exc:
-                observation_errors.append(exc)
-                raise
+            await _emit_request(invocation, http_request, observation_errors)
 
         http_client = DefaultAsyncHttpxClient(
             timeout=invocation.config.timeout_sec,
@@ -395,20 +325,17 @@ class _ResponsesInvoker:
         event_index = 0
         async for event in event_source:
             event_payload = _sdk_json(event, secrets=(invocation.config.api_key,))
-            try:
-                invocation.observer.on_event({
-                    "kind": "stream_event",
-                    "id": f"{_request_observation_id(invocation)}:stream-{event_index}",
-                    "session_id": invocation.session_id,
-                    "attempt_id": invocation.attempt_id,
-                    "provider": invocation.config.provider,
-                    "model": _actual_model(event_payload) or _actual_model(event_payload.get("response")),
-                    "source": "sdk_decoded_stream",
-                    "sequence": event_index,
-                    "payload": event_payload,
-                })
-            except BaseException as exc:
-                raise _ObservationCaptureError from exc
+            await invocation.emit({
+                "kind": "stream_event",
+                "id": f"{_request_observation_id(invocation)}:stream-{event_index}",
+                "session_id": invocation.session_id,
+                "attempt_id": invocation.attempt_id,
+                "provider": invocation.config.provider,
+                "model": _actual_model(event_payload) or _actual_model(event_payload.get("response")),
+                "source": "sdk_decoded_stream",
+                "sequence": event_index,
+                "payload": event_payload,
+            })
             event_index += 1
             yield event
 
@@ -447,10 +374,8 @@ class _ResponsesInvoker:
         async with stream:
             event_source = self._observed_events(invocation, _provider_events(stream, trace))
             async for event in event_source:
-                if invocation.abort_event.is_set():
-                    raise CancelledError()
                 if event.type == "response.output_item.done":
-                    self._observe_item(
+                    await self._observe_item(
                         invocation,
                         event.item.model_dump(mode="json", exclude_unset=True),
                         seen_items,
@@ -459,7 +384,7 @@ class _ResponsesInvoker:
                     response = event.response
                     actual_model = _actual_model(response)
                     raw_response = _sdk_json(response, secrets=(invocation.config.api_key,))
-                    invocation.observer.on_event({
+                    await invocation.emit({
                         "kind": "response",
                         "id": str(raw_response.get("id") or _request_observation_id(invocation)),
                         "session_id": invocation.session_id,
@@ -477,7 +402,7 @@ class _ResponsesInvoker:
                         for item in (response.output or [])
                     ]
                     for item in output:
-                        self._observe_item(invocation, item, seen_items, actual_model=actual_model)
+                        await self._observe_item(invocation, item, seen_items, actual_model=actual_model)
                     raw_usage = (
                         _redact_sdk_json(
                             response.usage.model_dump(mode="json", exclude_unset=True),
@@ -486,7 +411,7 @@ class _ResponsesInvoker:
                         if response.usage else None
                     )
                     usage = _usage(raw_usage, started)
-                    invocation.observer.on_event({
+                    await invocation.emit({
                         "kind": "usage",
                         "id": response.id,
                         "session_id": invocation.session_id,
@@ -540,7 +465,7 @@ class _ResponsesInvoker:
                         diagnostics=_diagnostic_code(event.code, "stream_error"),
                     )
             if completed_response is not None:
-                await _drain_completed_stream(event_source, invocation)
+                await _drain_completed_stream(event_source)
                 return completed_response
         raise ProviderError(
             "Model response stream ended before a terminal response",
@@ -548,7 +473,7 @@ class _ResponsesInvoker:
             diagnostics=_transport_diagnostics("stream_incomplete", None, trace),
         )
 
-    def _observe_item(
+    async def _observe_item(
         self,
         invocation: _InvokeRequest,
         item: dict[str, Any],
@@ -567,7 +492,7 @@ class _ResponsesInvoker:
             part.get("text", "") for part in (item.get("content") or [])
             if isinstance(part, dict) and part.get("type") == "output_text"
         )
-        invocation.observer.on_event({
+        await invocation.emit({
             "kind": "message",
             "id": item_id,
             "session_id": invocation.session_id,
@@ -874,25 +799,16 @@ async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
         yield event
 
 
-async def _drain_completed_stream(event_source: Any, invocation: _InvokeRequest) -> None:
-    # 完成后给 SDK 流一次短暂排空机会以复用连接
+async def _drain_completed_stream(event_source: Any) -> None:
+    # 完成后给 SDK 流一次短暂排空机会以复用连接；排空中的读取错误不改变已完成的结果，取消照常传出
     try:
         async with asyncio.timeout(_STREAM_DRAIN_TIMEOUT_SEC):
             async for _event in event_source:
                 pass
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
-        if isinstance(exc, _ObservationCaptureError):
-            cause = exc.__cause__
-            if cause is not None:
-                raise cause
-            raise
-        if invocation.abort_event.is_set():
-            raise CancelledError()
+    except Exception:
         return
-    if invocation.abort_event.is_set():
-        raise CancelledError()
 
 
 def _retry_after(headers: Any) -> float | None:

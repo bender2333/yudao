@@ -235,11 +235,12 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
     errors = []
 
     class LateResponseAdapter(FakeAdapter):
-        def complete(self, request):
-            response = super().complete(request)
+        async def stream(self, call):
+            items = [item async for item in super().stream(call)]
             entered.set()
             assert released.wait(10)
-            return response
+            for item in items:
+                yield item
 
     system = LoopSystem.for_testing(tmp_path, LateResponseAdapter([product_spec()]))
     run_id = system.create_run("original")
@@ -274,22 +275,22 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
             else:
                 patch.setattr(system.store, "_insert", fail_event)
             if failure == "adapter_abort":
-                abort = system.test_adapter.abort
+                cancel = system.test_adapter.cancel
                 attempts = []
 
-                def abort_after_transient_error(session_id):
-                    attempts.append(session_id)
+                def cancel_after_transient_error(attempt_id):
+                    attempts.append(attempt_id)
                     if len(attempts) == 1:
-                        raise RuntimeError("injected transient abort notification failure")
-                    abort(session_id)
+                        raise RuntimeError("injected transient cancel notification failure")
+                    cancel(attempt_id)
 
-                patch.setattr(system.test_adapter, "abort", abort_after_transient_error)
+                patch.setattr(system.test_adapter, "cancel", cancel_after_transient_error)
             with pytest.raises(CancelledInputSaveError) as caught:
                 system.add_input(run_id, command)
         assert caught.value.cancelled and caught.value.run_id == run_id
         assert caught.value.cancellation_recorded == (failure != "cancellation_event")
         assert system.orchestrator._abort[run_id].is_set()
-        assert system.test_adapter._aborted == {before.sessions["product"].session_id}
+        assert system.test_adapter.cancelled == {system.test_adapter.invocations[0].attempt_id}
         current = system.project(run_id)
         assert current.git_version == before.git_version and current.input_version == before.input_version
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]
@@ -320,11 +321,12 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
     activation_errors, cancel_results = [], []
 
     class LateResponseAdapter(FakeAdapter):
-        def complete(self, request):
-            response = super().complete(request)
+        async def stream(self, call):
+            items = [item async for item in super().stream(call)]
             model_entered.set()
             assert model_release.wait(10)
-            return response
+            for item in items:
+                yield item
 
     system = LoopSystem.for_testing(tmp_path, LateResponseAdapter([product_spec()]))
     run_id = system.create_run("original")
@@ -358,8 +360,8 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
         cancelling.start()
         assert git_entered.wait(10)
         request = system.test_adapter.invocations[0]
-        assert request.abort_flag.is_set()
-        assert request.session_id in system.test_adapter._aborted
+        assert system.orchestrator._abort[run_id].is_set()
+        assert request.attempt_id in system.test_adapter.cancelled
         assert cancelling.is_alive()
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]
         model_release.set()

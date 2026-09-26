@@ -1,10 +1,7 @@
-"""Single-call model adapters."""
-
-from .base import ModelResponse, Availability, ModelAdapter, ModelRequest, ModelObservation, ProviderError
+from .base import Availability, ModelAdapter, ModelObservation, ModelRequest, ProviderError
 from .fake import FakeAdapter, FakeTurn
 
 __all__ = [
-    "ModelResponse",
     "Availability",
     "ModelAdapter",
     "FakeAdapter",

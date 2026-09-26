@@ -12,7 +12,7 @@ from harness.proposals import product_spec, delivery, review, collaboration_requ
 from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence, _git_evidence
-from harness.tests.helpers import run_scripted
+from harness.tests.helpers import recorded_context, run_scripted
 
 
 def test_smoke_requires_current_input_audit_and_host_receipts():
@@ -189,8 +189,10 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_ru
     assert summary["model_input_audit"]["status"] == "verified", summary["model_input_audit"]
     assert summary["check_receipts_verified"] is True
     assert summary["delivery_archive"]["status"] == "verified"
-    assert {request.input_version for request in system.test_adapter.invocations} == {1, 2}
-    assert {request.prompt_version for request in system.test_adapter.invocations if request.department == "product"} == {1, 2}
+    manifests = [(request.department, recorded_context(system, request).manifest)
+                 for request in system.test_adapter.invocations]
+    assert {manifest.input_version for _department, manifest in manifests} == {1, 2}
+    assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {1, 2}
 
 
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
@@ -218,8 +220,8 @@ def test_model_input_audit_rejects_changed_received_original(collaboration_run, 
 
 
 def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
-    from harness.adapters.base import ModelResponse
     from harness.adapters.fake import FakeAdapter
+    from harness.providers.call import ModelResponse
     from harness.runtime import LoopSystem
 
     def update(request):
@@ -234,8 +236,9 @@ def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
     for _ in range(3):
         system.activate_once(run_id)
     first, second, third = system.test_adapter.invocations[1:]
-    assert first.activation_id == second.activation_id and first.prompt_version == second.prompt_version == 1
-    assert third.activation_id != first.activation_id and third.prompt_version == 2
+    versions = [recorded_context(system, request).manifest.prompt_version for request in (first, second, third)]
+    assert first.activation_id == second.activation_id and versions[:2] == [1, 1]
+    assert third.activation_id != first.activation_id and versions[2] == 2
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit
 

@@ -1,31 +1,32 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
 import tempfile
 import threading
 import time
+from collections.abc import AsyncIterator
+from contextlib import aclosing
 from pathlib import Path
-from threading import Event
 from typing import Any, Mapping, Sequence
 
-from .chat import ChatExecutionScope
+from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
 from .invoke import (
     CancelRegistry,
     InvokeResult,
-    Observer,
     ProviderInput,
-    invoke_once as _invoke_once,
+    provider_input_for,
+    stream_invocation,
     to_provider_input,
 )
 from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
-from .messages import MessagesExecutionScope
 from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
-from .responses import ResponsesExecutionScope, check_availability
+from .responses import ProviderConnections, check_availability
 from .store import ProviderStore
 
 
@@ -39,7 +40,6 @@ class ProviderFacade:
         self,
         store: ProviderStore | None = None,
         credentials: CredentialChain | Mapping[str, Any] | None = None,
-        execution_scope: ResponsesExecutionScope | None = None,
     ) -> None:
         self._store = store if store is not None else ProviderStore.empty()
         if isinstance(credentials, CredentialChain):
@@ -50,7 +50,6 @@ class ProviderFacade:
             self._credentials = CredentialChain()
         else:
             self._credentials = CredentialChain()
-        self._scope = execution_scope
         self._cancels = CancelRegistry()
         # 部门绑定：department -> {"provider_id": ..., "model_id": ...}，与目录一起发布
         self._bindings: dict[str, dict[str, str]] = {}
@@ -477,31 +476,20 @@ class ProviderFacade:
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
                          model: Any) -> InvokeResult:
-        # 诊断调用走与正式调用相同的协议与身份路径，使用独立会话与尝试身份；
-        # 执行作用域按协议选择，不能把 Responses 作用域交给 Chat 或 Messages
+        # 诊断调用由接口层同步发起，在自己的事件循环中走与正式调用相同的协议与身份路径，
+        # 使用独立会话与尝试身份，每次新建客户端
         session_id = f"diagnostic:{target.provider_id}:{model.id}"
         attempt_id = f"diagnostic:{model.id}:1"
-        if target.protocol == "fake":
-            return _invoke_once(target, provider_input, session_id, attempt_id)
-        scope = self._scope_for_protocol(target.protocol)
-        try:
-            return _invoke_once(target, provider_input, session_id, attempt_id,
-                                execution_scope=scope)
-        finally:
-            if scope is not None and scope is not self._scope:
-                scope.close()
 
-    def _scope_for_protocol(self, protocol: str) -> Any | None:
-        expected = {
-            "responses": ResponsesExecutionScope,
-            "chat_completions": ChatExecutionScope,
-            "messages": MessagesExecutionScope,
-        }.get(str(protocol))
-        if expected is None:
-            return None
-        if isinstance(self._scope, expected):
-            return self._scope
-        return expected()
+        async def run() -> InvokeResult:
+            async with aclosing(stream_invocation(target, provider_input, session_id, attempt_id,
+                                                  self._cancels)) as items:
+                async for item in items:
+                    if isinstance(item, InvokeResult):
+                        return item
+            raise ProviderError("Model invocation ended without a result", reason="provider_protocol")
+
+        return asyncio.run(run())
 
     def describe_readiness(
         self,
@@ -588,35 +576,28 @@ class ProviderFacade:
                 "bindings": {key: dict(value) for key, value in self._bindings.items()},
             }
 
-    def invoke_once(
+    async def stream(
         self,
         frozen_target: FrozenTarget,
-        provider_input: ProviderInput | Mapping[str, Any],
-        session_id: str,
-        attempt_id: str,
-        abort_event: Event | None = None,
-        observer: Observer | None = None,
+        call: ModelCall,
         *,
-        execution_scope: ResponsesExecutionScope | None = None,
-    ) -> InvokeResult:
-        # 单次调用，取消按 attempt_id 隔离；调用方可传入本次运行的连接作用域
-        normalized = provider_input if isinstance(provider_input, ProviderInput) else _coerce_input(provider_input)
-        event = abort_event if abort_event is not None else Event()
-        scope = execution_scope if execution_scope is not None else self._scope
-        if self._cancels.contains(attempt_id):
-            # 同一次调用尝试不允许并发执行，避免两个请求共享取消身份
-            raise ProviderError("Model invocation already has an active attempt", reason="provider_error")
-        self._cancels.register(attempt_id, event)
-        try:
-            return _invoke_once(
-                frozen_target, normalized, session_id, attempt_id,
-                event, observer, execution_scope=scope,
-            )
-        finally:
-            self._cancels.discard(attempt_id)
+        connections: ProviderConnections | None = None,
+    ) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
+        # 一次模型调用尝试：逐条交回流式输出，最后交回结果；取消按 call.attempt_id 生效。
+        # connections 由调用方在自己的事件循环中持有，用于复用连接；不给时本次调用新建客户端
+        items = stream_invocation(frozen_target, provider_input_for(call), call.session_id, call.attempt_id,
+                                  self._cancels, connections=connections)
+        async with aclosing(items):
+            async for item in items:
+                if isinstance(item, InvokeResult):
+                    yield _model_response(item)
+                    return
+                event = _stream_event(item)
+                if event is not None:
+                    yield event
 
     def cancel(self, attempt_id: str) -> bool:
-        # 只作用于本次调用尝试
+        # 只作用于本次调用尝试；调用尚未开始时记下，开始时立即取消
         return self._cancels.cancel(attempt_id)
 
     def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
@@ -808,10 +789,66 @@ class ProviderFacade:
         self._disk_dotenv_seen = True
 
 
-def _coerce_input(raw: Mapping[str, Any]) -> ProviderInput:
-    return to_provider_input(
-        raw.get("messages", []), raw.get("tools", ()),
-        raw.get("tool_results", ()), raw.get("max_output_tokens"),
+def _stream_event(event: Mapping[str, Any]) -> ModelStreamEvent | None:
+    # 协议实现交出的观察换成合同中的流式输出；未知种类不交回
+    kind = event.get("kind")
+    payload = event.get("payload")
+    payload = dict(payload) if isinstance(payload, Mapping) else {}
+    provider = event.get("provider")
+    model = event.get("model")
+    identity = {
+        "id": str(event.get("id")) if event.get("id") is not None else "",
+        "payload": payload,
+        "provider": str(provider) if provider is not None else None,
+        "model": str(model) if model is not None else None,
+    }
+    if kind == "request":
+        return ModelStreamEvent(kind="request", **identity)
+    if kind == "stream_event":
+        return ModelStreamEvent(kind="stream_event", source="sdk_decoded_stream",
+                                sequence=event.get("sequence"), **identity)
+    if kind == "response":
+        return ModelStreamEvent(kind="response", source="sdk_response", **identity)
+    if kind == "usage":
+        # 优先使用协议实现已经归一化的用量（缓存字段不重复计入输入），payload.usage 只是原始证据
+        mapped = event.get("usage")
+        raw = mapped if isinstance(mapped, Mapping) else payload.get("usage")
+        return ModelStreamEvent(kind="usage", usage=_call_usage(raw), **identity)
+    if kind == "message":
+        text = event.get("text")
+        return ModelStreamEvent(kind="message", text=str(text) if text is not None else "", **identity)
+    return None
+
+
+def _model_response(result: InvokeResult) -> ModelResponse:
+    # 只记录服务实际返回的模型，未返回保持未知，不拿请求模型冒充
+    return ModelResponse(
+        output=result.output,
+        usage=_call_usage(result.usage),
+        provider=result.provider,
+        model=result.actual_model or "",
+        response_id=result.response_id,
+        sdk_response=dict(result.wire_evidence),
+    )
+
+
+def _call_usage(raw: Any) -> CallUsage:
+    # 用量只做只读记录，未上报保持未知，不估算
+    if not isinstance(raw, Mapping):
+        return CallUsage(reported=False)
+
+    def count(key: str) -> int:
+        value = raw.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+    return CallUsage(
+        input_tokens=count("input_tokens"),
+        output_tokens=count("output_tokens"),
+        total_tokens=count("total_tokens"),
+        latency_ms=count("latency_ms"),
+        cache_read_tokens=count("cache_read_tokens"),
+        cache_write_tokens=count("cache_write_tokens"),
+        reported=bool(raw.get("reported", False)),
     )
 
 

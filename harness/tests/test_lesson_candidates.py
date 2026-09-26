@@ -8,7 +8,7 @@ from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import DEPARTMENTS, EventType, json_dumps
 from harness.projection import project_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
-from harness.tests.helpers import happy_script, run_scripted
+from harness.tests.helpers import happy_script, recorded_context, run_scripted
 from harness.tests.test_web import get_json, request, running_server
 
 
@@ -92,9 +92,10 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
         without_candidate = assembler.assemble(replace(result, lesson_candidates=[]), **args)
         assert with_candidate == without_candidate
     for invocation in system.test_adapter.invocations:
-        assert candidate.id not in invocation.context.prompt_text
-        assert candidate.suggestion not in invocation.context.prompt_text
-        assert all("lesson" not in item.source for item in invocation.context.manifest.injected)
+        assert candidate.id not in json_dumps(invocation.input_items)
+        assert candidate.suggestion not in json_dumps(invocation.input_items)
+        injected = recorded_context(system, invocation).manifest.injected
+        assert all("lesson" not in item.source for item in injected)
     assert DEFAULT_PROMPTS == rules
     assert (system.test_adapter.name, system.test_adapter.model) == ("fake", "fake-script")
 
