@@ -9,7 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission
@@ -44,6 +44,11 @@ class ModelCallLoop:
             self._runner.run(self.connections.aclose())
         finally:
             self._runner.close()
+
+
+class SafeNode(Protocol):
+    # 流程编排提供的安全节点接口：部门循环在每个安全节点调用它，流程编排在这里分派新输入，回答继续还是停止
+    def proceed(self) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -88,14 +93,14 @@ def run_department(
     record_attempt_failed: Callable[[ModelRequest, ProviderError, bool], None],
     record_retry_scheduled: Callable[[ModelRequest, ProviderError, float, int], bool],
     require_tool_call: Callable[[ModelRequest, dict[str, Any], int], None],
-    stopped: Callable[[], bool],
+    nodes: SafeNode,
 ) -> DepartmentSubmission | None:
     attempt = 1
     root_step_id = 1
     retry_of_step_id = None
     replies_without_tool_call = 0
     for step_id in range(1, limits.max_model_steps + 1):
-        if stopped():
+        if not nodes.proceed():
             return None
         request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
         if request is None or not begin_request(request):
@@ -132,9 +137,9 @@ def run_department(
                 and attempt < limits.max_provider_attempts
                 and step_id < limits.max_model_steps
             )
-            will_retry = can_retry and not stopped()
+            will_retry = can_retry and nodes.proceed()
             record_attempt_failed(request, retry_error, will_retry)
-            if stopped():
+            if not nodes.proceed():
                 return None
             if not will_retry:
                 if retry_error.retryable and step_id >= limits.max_model_steps:
@@ -147,7 +152,7 @@ def run_department(
                 raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
             if not record_retry_scheduled(request, retry_error, delay, step_id + 1):
                 return None
-            if not _wait_for_retry(delay, stopped):
+            if not _wait_for_retry(delay, nodes):
                 return None
             attempt += 1
             retry_of_step_id = step_id
@@ -169,7 +174,7 @@ def run_department(
         attempt = 1
         root_step_id = step_id + 1
         retry_of_step_id = None
-        if stopped():
+        if not nodes.proceed():
             _skip_calls(response.output, step_id, record_skipped_tool,
                         "Not executed because this activation ended or its input changed during the model request.")
             return None
@@ -194,7 +199,7 @@ def run_department(
         for index, item in enumerate(response.output):
             if item.get("type") != "function_call":
                 continue
-            if stopped():
+            if not nodes.proceed():
                 _skip_calls(response.output[index:], step_id, record_skipped_tool,
                             "Not executed because this activation ended or its input changed before these tools started.")
                 return None
@@ -221,7 +226,7 @@ def run_department(
             call = {"id": identity, "name": name, "args": args, "ok": result.ok,
                     "output": result.output, "error": result.error, "step_id": step_id, "input_item": input_item}
             record_tool(call)
-            if stopped():
+            if not nodes.proceed():
                 _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,
                             "Not executed because this activation ended or its input changed after the current tool.")
                 return None
@@ -355,10 +360,10 @@ def _undeclared_tool_calls(request: ModelRequest, response: ModelResponse) -> li
     return [str(item.get("name")) for item in response.output if item.get("type") == "function_call"]
 
 
-def _wait_for_retry(delay: float, stopped: Callable[[], bool]) -> bool:
+def _wait_for_retry(delay: float, nodes: SafeNode) -> bool:
     deadline = time.monotonic() + delay
     while True:
-        if stopped():
+        if not nodes.proceed():
             return False
         remaining = deadline - time.monotonic()
         if remaining <= 0:

@@ -87,6 +87,16 @@ class _Activation:
                          self.effective_contract_hash, self.engineering_plan_hash, self.input_version)
 
 
+class _SafeNode:
+    # 流程编排为一次激活实现的安全节点接口（接口由部门循环定义）
+    def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
+        self._orchestrator = orchestrator
+        self._activation = activation
+
+    def proceed(self) -> bool:
+        return self._orchestrator._at_safe_node(self._activation)
+
+
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
 SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref"})
 
@@ -404,17 +414,24 @@ class Orchestrator:
         ))
         return self.project(run_id)
 
-    def _activation_stopped(self, activation: _Activation) -> bool:
+    def _at_safe_node(self, activation: _Activation) -> bool:
+        # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续
         with self.writes.lock:
-            if activation.abort_flag.is_set():
-                return True
-            elapsed = time.monotonic() - self._run_start_times.get(activation.run_id, time.monotonic())
-            if elapsed >= self.project(activation.run_id).run_time_limit_sec:
-                return True
-            current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
-            return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
-                    or current.input_version != activation.input_version
-                    or guidance_version(current, activation.department) > activation.guidance_version)
+            projection = self.project(activation.run_id)
+            if not (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)):
+                projection = self._assign_new_inputs(activation.run_id, projection)
+            return not self._stop_requested(activation, projection)
+
+    def _stop_requested(self, activation: _Activation, projection: RunProjection) -> bool:
+        # 停止判断：中止、运行时间用完、终态、输入版本改变或有新的指导；只读取，不写入
+        return (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)
+                or projection.phase in TERMINAL_PHASES
+                or projection.input_version != activation.input_version
+                or guidance_version(projection, activation.department) > activation.guidance_version)
+
+    def _time_used_up(self, run_id: str, projection: RunProjection) -> bool:
+        elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
+        return elapsed >= projection.run_time_limit_sec
 
     def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
@@ -732,7 +749,7 @@ class Orchestrator:
                 require_tool_call=lambda request, item, count: activation.recorder.tool_call_required(
                     request, item, count, TOOL_CALL_REQUIRED_LIMIT,
                 ),
-                stopped=lambda: self._activation_stopped(activation),
+                nodes=_SafeNode(self, activation),
             )
         except ProviderError as exc:
             if exc.reason in PAUSED_REASONS:
