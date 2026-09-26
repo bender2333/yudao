@@ -156,3 +156,5 @@ claude-opus-5-5 / 2026-09-26 20:55 / docs/architecture-issues.md 为 2.7 核对�
 claude-opus-5-5 / 2026-09-26 21:40 / 新增 docs/research/fermat-formalization-prove2me.md，docs/research/README.md 登记新资料 / 用户要求在 research 下补充 Anthropic 费马大定理形式化博客与 Prove2Me 项目的一手来源调研及与 Yudao 的对照
 
 claude-opus-5-5 / 2026-09-26 23:53 / docs/architecture-issues.md 登记裁决规则（U）直接读取工作区（路径解析与树摘要）与「控制核心不直接读写工作区文件」的冲突 / #43 第 4、5 个提交把工具许可与提案的提交判断搬入 U 时发现，需要架构师在动作合同之前决定这些依据的来源
+
+claude-opus-5-5 / 2026-09-27 01:09 / docs/design/architecture/overall-architecture.md 第 6.3 节新增「工作区的事实」：U 需要的工作区事实由执行环境的只读查询提供，作为输入交给 U，依据的摘要写进承载判断结果的事件；第 6.1 节 P 与 U 的代码位置改为 assembly.py 与 adjudication.py；docs/architecture-issues.md 追加处理结论 / #43 第二段登记裁决规则直接读取工作区的问题
