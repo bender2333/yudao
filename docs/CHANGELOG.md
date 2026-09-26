@@ -162,3 +162,5 @@ claude-opus-5-5 / 2026-09-27 01:09 / docs/design/architecture/overall-architectu
 claude-opus-5-5 / 2026-09-27 01:15 / docs/architecture-issues.md 登记 Messages 协议流式回复中途断开时的错误分类与另外两种协议不一致 / #43 第 3 个提交的审查修正中增加真实 Provider 的事件序列场景时发现
 
 claude-opus-5-5 / 2026-09-27 01:24 / docs/architecture-issues.md 为 Messages 流中途断开的分类问题追加处理结论（#108） / #43 审查修正中发现的原有缺陷
+
+claude-opus-5-5 / 2026-09-27 02:59 / docs/architecture-issues.md 登记两条：步骤驱动取消时工具进程的停止放在第 14 个提交；安全节点接口的两类时点（proceed 与 settle） / #43 第 10 至 13 个提交执行中发现
