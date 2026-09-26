@@ -16,7 +16,7 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import after_event, department_history, recorded_context
+from harness.tests.helpers import after_event, department_history, recorded_context, start_waiting_for_writes
 from harness.tools import ToolRuntime
 
 
@@ -53,6 +53,37 @@ def _parts(system, request):
 
 def _manifest(system, request):
     return recorded_context(system, request).manifest
+
+
+@pytest.mark.parametrize("operation", ["input", "stop", "guidance", "prompt"])
+def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_path, monkeypatch, operation):
+    # 请求装配完成但超过窗口：请求的记录与运行的结束在同一次持锁中完成，其间在写入锁上等待的操作得到 RunTerminalError
+    adapter = FakeAdapter([product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
+    operations = {
+        "input": lambda: system.add_input(run_id, "late input"),
+        "stop": lambda: system.add_input(run_id, "/stop"),
+        "guidance": lambda: system.add_guidance(run_id, "product", "late guidance"),
+        "prompt": lambda: system.update_prompt(run_id, "product", "late prompt"),
+    }
+    waiting = []
+
+    def arrive(event):
+        if not event.payload["admitted"]:
+            waiting.append(start_waiting_for_writes(operations[operation]))
+
+    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, arrive)
+    result = system.activate_once(run_id)
+    [late] = waiting
+    late.join()
+    assert result.phase == "FAILED" and result.stop_reason == "context_overflow"
+    assert len(late.errors) == 1 and isinstance(late.errors[0], RunTerminalError)
+    assert not adapter.invocations
+    kinds = {event.type for event in system.store.list_events(run_id)}
+    assert not kinds & {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+                        EventType.DEPARTMENT_PROMPT_UPDATED}
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_path):

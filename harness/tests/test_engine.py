@@ -10,7 +10,7 @@ from harness.models import EventType, RunProjection, canonical_hash, estimate_to
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, after_event, recorded_context
+from harness.tests.helpers import FAST_RETRIES, after_event, recorded_context, start_waiting_for_writes
 from harness.tests.protocol_helpers import complete, model_call
 from harness.tools import ToolRuntime
 
@@ -107,16 +107,22 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
 
 
 def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monkeypatch):
+    # 请求装配完成以后，另一个线程取消运行：取消在开始请求之前取得写入锁，这一步不开始模型调用
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     cancelled = []
-    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED,
-                lambda _event: cancelled.append(system.cancel(run_id).stop_reason))
+    waiting = []
+    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, lambda _event: waiting.append(
+        start_waiting_for_writes(lambda: cancelled.append(system.cancel(run_id).stop_reason))))
 
     result = system.activate_once(run_id)
 
+    [canceller] = waiting
+    canceller.join()
+    assert not canceller.errors
     assert cancelled == ["cancelled"]
+    assert result.stop_reason == "cancelled"
     assert not adapter.invocations
     assert result.token_used == 0
     assert result.manifests[0].admitted

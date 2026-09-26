@@ -271,6 +271,15 @@ def context_overflow(data_dir):
     return system, run_id, {}
 
 
+def request_not_admitted(data_dir):
+    # 固定材料放得下；激活第一步的部门工作消息再次带上整段原始意图，请求超过窗口，摘要请求也放不下
+    adapter = FakeAdapter([product_spec()])
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
+    system.run_until_stop(run_id)
+    return system, run_id, {}
+
+
 def text_only_reply(data_dir):
     system, _, run_id = _system(data_dir, [FakeTurn(transcript="我先整理一下需求，稍后提交。"), product_spec()])
     system.activate_once(run_id)
@@ -582,6 +591,10 @@ SCENARIOS: dict[str, Scenario] = {
     "context_overflow": Scenario(
         "固定材料超过上下文窗口（1500）：请求在发送之前判定超限，没有模型调用，运行以 context_overflow 失败。",
         context_overflow),
+    "request_not_admitted": Scenario(
+        "请求装配完成但超过上下文窗口（10000）：记录请求（context_assembled 的 admitted 为 false）以后在同一次持锁中"
+        "以 context_overflow 结束运行，没有模型调用。",
+        request_not_admitted),
     "text_only_reply": Scenario(
         "模型只回复文字（#47）：回复记入历史，主机追加一条要求调用工具的 user 消息（tool_call_required），下一步提交成功。",
         text_only_reply),

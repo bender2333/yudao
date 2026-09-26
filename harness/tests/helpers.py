@@ -1,7 +1,10 @@
 import json
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from harness.adapters.fake import FakeAdapter
 from harness.assembly import ContextAssembly
@@ -68,8 +71,10 @@ def department_history(system: LoopSystem, run_id: str, department: str) -> list
 
 
 def after_event(monkeypatch, system: LoopSystem, event_type: str, action: Callable[[Event], None]) -> None:
-    # 某种事件写入以后，在写入它的线程中执行 action：在步骤驱动的这个时点插入用户操作（新输入、取消），
-    # 或者通知测试线程。action 执行时写入锁仍由写入方持有，测试线程里等待写入锁的操作不能在 action 中等待
+    # 某种事件写入以后，在写入它的线程中执行 action：在这个时点插入用户操作（新输入、取消），或者通知测试线程。
+    # action 在写入方的线程中执行，此时写入锁仍由写入方持有：同一临界区中这条事件之后的写入都在 action 之后发生，
+    # 所以 action 只能挂在所在临界区最后一次写入的事件上；需要等待写入锁的操作不能在 action 中等待它完成，
+    # 要表示「来自其他线程、在这个临界区结束时到达」的操作，用 start_waiting_for_writes
     writes = system.orchestrator.writes
     append = writes.append
 
@@ -81,3 +86,34 @@ def after_event(monkeypatch, system: LoopSystem, event_type: str, action: Callab
         return written
 
     monkeypatch.setattr(writes, "append", append_then_act)
+
+
+class WaitingOperation:
+    # 另一个线程中的一个操作（取消、新输入、指导等），在写入锁上等待；join 以后 errors 是它抛出的异常
+    def __init__(self, operation: Callable[[], Any]) -> None:
+        self.errors: list[Exception] = []
+        started = threading.Event()
+
+        def run() -> None:
+            started.set()
+            try:
+                operation()
+            except Exception as exc:
+                self.errors.append(exc)
+
+        self.thread = threading.Thread(target=run)
+        self.thread.start()
+        assert started.wait(5)
+
+    def join(self) -> None:
+        self.thread.join(10)
+        assert not self.thread.is_alive()
+
+
+def start_waiting_for_writes(operation: Callable[[], Any]) -> WaitingOperation:
+    # 在 after_event 的 action 中调用（写入锁由写入方持有）：操作在另一个线程开始并在写入锁上等待，
+    # 写入方的临界区结束时写入锁交给它，先于写入方之后再次取得写入锁的操作。
+    # 依赖 CPython 3.13 起的锁：等待超过 1 毫秒的线程在锁释放时直接得到锁
+    waiting = WaitingOperation(operation)
+    time.sleep(0.1)
+    return waiting

@@ -87,6 +87,32 @@ def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_pa
     assert len(adapter.invocations) == 1
 
 
+class _CancelFailsAdapter(FakeAdapter):
+    # 取消调用尝试时出错的模型接入
+    def cancel(self, attempt_id):
+        raise RuntimeError("the model adapter could not cancel the attempt")
+
+
+def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(tmp_path, monkeypatch):
+    # 取消时模型接入取消调用尝试出错：错误交给取消的调用方，重试等待仍然立即醒来，不再重试
+    scheduled = Event()
+    adapter = _CancelFailsAdapter([ProviderError("temporary", retryable=True), product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+    run_id = system.create_run("original task")
+    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(system.activate_once, run_id)
+        assert scheduled.wait(5)
+        started = time.monotonic()
+        with pytest.raises(RuntimeError, match="could not cancel"):
+            system.cancel(run_id)
+        future.result(timeout=10)
+
+    assert time.monotonic() - started < 5
+    assert len(adapter.invocations) == 1
+
+
 def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
     # 运行时间在重试等待期间用完：等待到运行时间用完就结束，运行以 time_limit 停止
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])

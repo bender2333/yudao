@@ -52,6 +52,10 @@ class SafeNode(Protocol):
         # 在安全节点等待至多 seconds 秒，其间有新输入、指导或取消时提前回答；回答是否继续
         ...
 
+    def end(self, reason: str, message: str) -> None:
+        # 以停止原因结束运行；调用方持有写入锁，运行的结束与调用方刚写下的记录在同一次持锁中完成
+        ...
+
 
 @dataclass(frozen=True)
 class StepLimits:
@@ -346,7 +350,9 @@ class StepDriver:
             self._request = request
             self._recorder.request_assembled(projection.phase, request, step, snapshot_hash)
             if not step.admitted:
-                raise ProviderError("model request exceeds context_window", reason="context_overflow")
+                # 请求没有获准：在写下请求记录的同一次持锁中结束运行
+                self._nodes.end("context_overflow", "model request exceeds context_window")
+                return None
             return request
 
     def _start_request(self, request: ModelRequest) -> bool:

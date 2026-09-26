@@ -86,6 +86,9 @@ class _SafeNode:
     async def wait(self, seconds: float) -> bool:
         return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
 
+    def end(self, reason: str, message: str) -> None:
+        self._orchestrator._end_run(self._activation.run_id, reason, message)
+
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
 SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref"})
@@ -515,10 +518,12 @@ class Orchestrator:
         return self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
-        # 取消步骤驱动（正在进行的调用尝试按身份取消），在安全节点等待重试的激活立即醒来
-        if activation.driver is not None:
-            activation.driver.cancel()
-        self._wake(activation.run_id)
+        # 取消步骤驱动（正在进行的调用尝试按身份取消），在安全节点等待重试的激活立即醒来；取消调用尝试出错时同样唤醒
+        try:
+            if activation.driver is not None:
+                activation.driver.cancel()
+        finally:
+            self._wake(activation.run_id)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
         # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用
@@ -765,10 +770,7 @@ class Orchestrator:
             self._fail(run_id, projection, "provider_error", f"{type(exc).__name__}: {exc}")
             return
         if isinstance(result, Stopped) and result.reason is not None:
-            if result.reason in PAUSED_REASONS:
-                self._pause(run_id, projection, result.reason)
-            else:
-                self._fail(run_id, projection, result.reason, result.message)
+            self._end_run(run_id, result.reason, result.message)
             return
 
         current = self.project(run_id)
@@ -978,6 +980,13 @@ class Orchestrator:
                 "checks": checks, "evidence_refs": refs,
             },
         ))
+
+    def _end_run(self, run_id: str, reason: str, message: str) -> None:
+        # 按停止原因暂停或结束运行
+        if reason in PAUSED_REASONS:
+            self._pause(run_id, self.project(run_id), reason)
+        else:
+            self._fail(run_id, self.project(run_id), reason, message)
 
     def _pause(self, run_id: str, projection: RunProjection, reason: str) -> None:
         with self.writes.lock:
