@@ -18,6 +18,10 @@
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
   - 状态：Stage 2.7 已实现。「冻结目标」「协议归于模型访问定义」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效。
   - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0004。
+- [应用层与接口层](app-and-interface.md)
+  - 内容：应用层（合同、注册表、命令处理、查询处理、读取模型、事件流订阅、输出片段转发）与接口层（FastAPI 路由、OpenAPI、认证）；命令合同（身份、基准版本、结果）与命令清单；查询与读取模型；事件流（范围筛选、按位置补齐、缺口检测与重新同步、模型输出片段）；能力清单；本机与远程两种访问方式；与现有 Web 的对照与迁移。
+  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；未实施。工单：父工单 #70（子工单 #72 至 #78），桌面客户端 #71（子工单 #79 至 #82）。
+  - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0013](../adr/0013-event-log-and-single-write-path.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。
   - 状态：2026-09-06 设计；指导接口已在 `harness/web/server.py` 实现。
