@@ -146,3 +146,5 @@ claude-opus-5-5 / 2026-09-26 17:50 / docs/architecture-issues.md 登记 #103 的
 claude-opus-5-5 / 2026-09-26 18:22 / docs/architecture-issues.md 为 #103 登记的问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节加入 #106 / #103 发现请求中另有两处文字没有区分动作回执与检查回执，统一说法并排在 #43 之前
 
 claude-opus-5-5 / 2026-09-26 20:02 / docs/current-baseline.md、docs/stage-3-plan.md、docs/program-roadmap.md 与 docs/design/architecture/overall-architecture.md 第 10 节把 3.2A 改为已验收（#12 至 #15 关闭，真实模型全链路 run_5f1aff849e244a37），删除基线中 #15 受凭据阻塞的开放项 / #15 真实验收完成并关闭
+
+claude-opus-5-5 / 2026-09-26 15:10 / docs/architecture-issues.md 登记 #4、#5 验收标准与 ADR-0003、ADR-0004 现行内容的冲突及未拆工单的 D24 改动 / Stage 2.7 工单核对中发现的规范矛盾
