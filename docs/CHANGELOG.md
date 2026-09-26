@@ -132,3 +132,5 @@ claude-opus-5-5 / 2026-09-26 15:40 / docs/design/model-management.md 第 4.3 节
 claude-opus-5-5 / 2026-09-26 15:49 / docs/architecture-issues.md 为 #47 登记的架构问题追加处理结论；CONTEXT.md 新增「主机提示」；docs/design/semantic-system.md 第 10.1 节历史栏目加入主机提示，第 10.6 节写明主机提示与通知的区别与 no_tool_call；GitHub 新建 #101（修正两项在本机失败的测试，#43 依赖它）与 #102（最后一次主机提示要求调用工具，依赖 #43），#47 经核对关闭 / 处理 #47 执行中登记的架构问题
 
 claude-opus-5-5 / 2026-09-26 16:10 / docs/architecture-issues.md 登记 #101 的架构问题：工作区出现链接后运行在下一次取快照时失败，停止原因记为 context_overflow、provider_error 或 host_commit_error，与实际原因不符；登记命令可以在工作区留下链接；拒绝原因带有主机绝对路径 / #101 从运行系统整体验证链接拒绝时发现设计没有覆盖的边界，交给架构师处理
+
+claude-opus-5-5 / 2026-09-26 16:25 / docs/architecture-issues.md 登记 #101 的第二条架构问题：Responses 请求时限包含 openai SDK 的一次性初始化与主机落盘 / 修正流式超时测试时查明第一次请求在发出之前就会超时，交给架构师决定请求时限的计算范围

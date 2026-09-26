@@ -2,14 +2,13 @@
 
 import json
 from dataclasses import replace
-from threading import Event
 
 import harness.engine as engine
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
-from harness.tests.test_responses import CALL, RAW_USAGE, REASONING, TEXT, _send, _server, _stream
+from harness.tests.test_responses import CALL, RAW_USAGE, REASONING, TEXT, _request, _send, _server, _stream
 
 
 SUBMIT = {"id": "fc-submit", "type": "function_call", "name": "submit_product_spec", "call_id": "call-submit",
@@ -112,41 +111,43 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
 def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_messages(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
     monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-    release = Event()
 
-    def silence(handler, _body):
+    def partial_then_hold(handler, _body):
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream")
         handler.end_headers()
         handler.wfile.write(_stream([TEXT], terminal=False))
         handler.wfile.flush()
-        release.wait(5)
+        # 部分消息送出后不再发送任何字节，连接保持到客户端按请求时限自行关闭
+        handler.rfile.read(1)
 
-    try:
-        with _server([_stream([CALL]), silence, silence, silence]) as (config, captures, *_):
-            system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(replace(config, timeout_sec=0.8)))
-            try:
-                run_id = system.create_run("later timeout")
-                system.workspace(run_id).write_file("proof.txt", "survives-timeout")
-                result = system.activate_once(run_id)
-                assert result.phase == "FAILED" and result.stop_reason == "provider_timeout"
-                assert "timed out" in result.error
-                assert result.token_used >= 130
-                events = system.store.list_events(run_id)
-                reports = [event.payload for event in events if event.payload.get("name") == "provider_usage"]
-                assert reports[0]["total_tokens"] == RAW_USAGE["total_tokens"]
-                assert len([event for event in events if event.type == EventType.MODEL_MESSAGE]) == 4
-                assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 3
-                assert len(captures) == 4
-                assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
-                tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
-                assert _artifact(system, tool.payload["output_ref"]) == "survives-timeout"
-                _assert_request_audit(system, run_id, captures)
-                assert result.canonical_state() == system.replay(run_id).canonical_state()
-            finally:
-                system.store.close()
-    finally:
-        release.set()
+    # 进程内第一次请求要完成 openai SDK 的延迟导入与响应模型构建，负载高时超过 5 秒且计入请求时限；
+    # 先用一次时限宽裕的完整请求做完，被测运行的成功请求只剩每次请求的主机开销
+    with _server([_stream([CALL])]) as (warm_config, *_):
+        ResponsesAdapter(replace(warm_config, timeout_sec=120)).complete(_request())
+    # 请求时限沿用捕获服务的 5 秒；成功回复立即发送，三次部分流都由服务端保持到客户端超时
+    with _server([_stream([CALL]), partial_then_hold, partial_then_hold, partial_then_hold]) as (config, captures, *_):
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
+        try:
+            run_id = system.create_run("later timeout")
+            system.workspace(run_id).write_file("proof.txt", "survives-timeout")
+            result = system.activate_once(run_id)
+            assert result.phase == "FAILED" and result.stop_reason == "provider_timeout"
+            assert "timed out" in result.error
+            assert result.token_used >= 130
+            events = system.store.list_events(run_id)
+            reports = [event.payload for event in events if event.payload.get("name") == "provider_usage"]
+            assert reports[0]["total_tokens"] == RAW_USAGE["total_tokens"]
+            assert len([event for event in events if event.type == EventType.MODEL_MESSAGE]) == 4
+            assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 3
+            assert len(captures) == 4
+            assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
+            tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
+            assert _artifact(system, tool.payload["output_ref"]) == "survives-timeout"
+            _assert_request_audit(system, run_id, captures)
+            assert result.canonical_state() == system.replay(run_id).canonical_state()
+        finally:
+            system.store.close()
 
 
 def test_failed_first_model_request_still_has_durable_exact_input(tmp_path, monkeypatch):
