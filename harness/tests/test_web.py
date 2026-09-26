@@ -17,7 +17,7 @@ from harness.providers import ResponsesConfig
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
-from harness.runtime import LoopSystem
+from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
 from harness.web.server import serve
 from harness.views import retry_view
@@ -438,20 +438,20 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
         try:
             assert entered.wait(5)
             before = system.project(run_id)
-            insert = system.store._insert
+            append_batch = system.store.append_batch
 
             def fail_git(*args, **kwargs):
                 raise GitVersionError("injected Git save failure")
 
-            def fail_cancellation(event):
-                if event.type == "run_failed":
+            def fail_cancellation(run, entries):
+                if any(entry.type == "run_failed" for entry in entries):
                     raise OSError("injected cancellation event save failure")
-                return insert(event)
+                return append_batch(run, entries)
 
             with monkeypatch.context() as patch:
                 patch.setattr(system.git_versions, "prepare", fail_git)
                 if not record_cancellation:
-                    patch.setattr(system.store, "_insert", fail_cancellation)
+                    patch.setattr(system.store, "append_batch", fail_cancellation)
                 status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", {"text": text})
             result = json.loads(body)
             assert status == 503, result
@@ -459,7 +459,9 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
             assert result["cancelled"] is True and result["run_id"] == run_id
             assert result["cancellation_recorded"] is record_cancellation
             assert "执行已取消" in result["error"] and "未形成正式 Git 版本" in result["error"]
-            assert system.orchestrator._abort[run_id].is_set()
+            # 取消已经生效：运行不再接受任何修改
+            with pytest.raises(RunTerminalError):
+                system.update_prompt(run_id, "product", "The run is already cancelled")
             assert adapter.cancelled == {adapter.invocations[0].attempt_id}
             current = system.project(run_id)
             assert current.input_version == before.input_version and current.git_version == before.git_version

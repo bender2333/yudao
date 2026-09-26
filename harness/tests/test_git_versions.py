@@ -40,7 +40,25 @@ def _prepare(store, files=None, parent=None, code=None, message="accepted"):
 
 
 def _git(store, *arguments):
-    return store._git(store.root / (RUN + ".git"), *arguments)
+    # 用 Git 命令行直接查看版本库；去掉环境中的 GIT_ 变量，与版本库自己的调用一样不受外部配置影响
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    return subprocess.run(["git", "--no-pager", "--git-dir=" + str(store.root / (RUN + ".git")), *arguments],
+                          capture_output=True, check=True, env=environment).stdout
+
+
+def _failing_git(monkeypatch, fails):
+    # Git 命令在 fails(命令) 为真时失败（与 Git 返回非零退出码相同），其余命令照常执行；返回执行过的命令
+    run = subprocess.run
+    commands = []
+
+    def git(command, **kwargs):
+        commands.append(command)
+        if fails(command):
+            raise subprocess.CalledProcessError(1, command, stderr=b"injected failure")
+        return run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", git)
+    return commands
 
 
 def test_round_trip_preserves_raw_bytes_and_unicode_paths_and_survives_reopen(store):
@@ -166,26 +184,18 @@ def test_recompressed_object_under_original_oid_is_rejected(store, kind):
 
 
 def test_failed_git_write_does_not_return_a_reference(store, monkeypatch):
-    actual = store._git
-
-    def fail(repo, *args, **kwargs):
-        if args[0] == "update-ref":
-            raise GitVersionError("simulated write failure")
-        return actual(repo, *args, **kwargs)
-
-    monkeypatch.setattr(store, "_git", fail)
-    with pytest.raises(GitVersionError, match="simulated write failure"):
+    _failing_git(monkeypatch, lambda command: "update-ref" in command)
+    with pytest.raises(GitVersionError):
         _prepare(store, {"a": b"a"})
-    assert actual(store.root / (RUN + ".git"), "for-each-ref") == b""
+    assert _git(store, "for-each-ref") == b""
 
 
 def test_failed_readback_does_not_return_a_reference(store, monkeypatch):
-    def fail(*args):
-        raise GitVersionError("simulated read failure")
-
-    monkeypatch.setattr(store, "_load", fail)
-    with pytest.raises(GitVersionError, match="simulated read failure"):
+    # 写入引用以后的回读（ls-tree）失败：不交回版本
+    commands = _failing_git(monkeypatch, lambda command: "ls-tree" in command)
+    with pytest.raises(GitVersionError):
         _prepare(store)
+    assert any("update-ref" in command for command in commands)
 
 
 def test_git_ignores_global_environment_filters_textconv_hooks_and_autocrlf(store, tmp_path, monkeypatch):
@@ -278,43 +288,40 @@ def test_gitignore_and_gitattributes_do_not_change_complete_code_capture(store):
 
 @pytest.mark.parametrize("broken", [b"", b"missing\n", b"bad blob 3\nabc\n", b"0" * 40 + b" blob 3\nab\n"])
 def test_malformed_or_truncated_git_batch_output_is_rejected(store, monkeypatch, broken):
-    monkeypatch.setattr(store, "_git", lambda *args, **kwargs: broken)
+    version = _prepare(store, {"a": b"a"})
+    run = subprocess.run
+
+    def broken_batch(command, **kwargs):
+        # Git 批量读取对象的输出残缺或格式不对
+        if "cat-file" in command and "--batch" in command:
+            return subprocess.CompletedProcess(command, 0, stdout=broken, stderr=b"")
+        return run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", broken_batch)
     with pytest.raises(GitVersionError):
-        store._objects(store.root / (RUN + ".git"), {"0" * 40: "blob"})
+        store.read_files(RUN, version)
 
 
 def test_material_updates_reuse_validated_code_objects_and_batch_the_reads(store, monkeypatch):
     first = _prepare(store, {"intend.md": b"first"}, code=_tree({f"file-{index}.txt": str(index).encode() for index in range(20)}))
-    calls = []
-    original = store._git
-
-    def record(repo, *arguments, **kwargs):
-        calls.append(arguments)
-        return original(repo, *arguments, **kwargs)
-
-    monkeypatch.setattr(store, "_git", record)
+    commands = _failing_git(monkeypatch, lambda command: False)
     second = _prepare(store, {"intend.md": b"second"}, first["commit"])
-    assert len([args for args in calls if args[0] == "hash-object"]) == 1
-    assert len([args for args in calls if args[0] == "cat-file"]) == 4
-    assert all(args[1] == "--batch" for args in calls if args[0] == "cat-file")
+    assert len([command for command in commands if "hash-object" in command]) == 1
+    reads = [command for command in commands if "cat-file" in command]
+    assert len(reads) == 4
+    assert all(command[command.index("cat-file") + 1] == "--batch" for command in reads)
     assert _git(store, "rev-parse", first["commit"] + ":code") == _git(store, "rev-parse", second["commit"] + ":code")
 
 
 def test_readback_failure_followed_by_identical_retry_accepts_existing_snapshot(store, monkeypatch, frozen_git_time):
-    original = store._load
-    recorded = []
-
-    def fail(repo, run_id, revision):
-        recorded.append(revision)
-        raise GitVersionError("simulated readback failure")
-
-    monkeypatch.setattr(store, "_load", fail)
-    with pytest.raises(GitVersionError):
-        _prepare(store, {"a": b"same"})
-    monkeypatch.setattr(store, "_load", original)
+    with monkeypatch.context() as failure:
+        _failing_git(failure, lambda command: "ls-tree" in command)
+        with pytest.raises(GitVersionError):
+            _prepare(store, {"a": b"same"})
+    [written] = [line.split()[0].decode("ascii") for line in _git(store, "for-each-ref", "--format=%(objectname) %(refname)").splitlines()]
     actual = _prepare(store, {"a": b"same"})
-    assert actual == recorded[0]
-    assert store.read_files(RUN, recorded[0]) == store.read_files(RUN, actual)
+    assert actual["commit"] == written
+    assert store.read_files(RUN, actual) == {"a": b"same"}
 
 
 def test_existing_snapshot_ref_pointing_to_another_commit_is_rejected(store, frozen_git_time):

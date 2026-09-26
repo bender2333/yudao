@@ -1,8 +1,10 @@
 import json
 import threading
+from pathlib import Path
 
 import pytest
 
+import harness.interactions as interactions
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import NewEvent
 from harness.git_versions import GitVersionError
@@ -118,31 +120,38 @@ def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, 
         assert (material / "intend.md").read_bytes() == b"original"
 
 
+def _failing_append(store, event_type):
+    # 存储写入含有这种事件的一批事件时失败，整批都不写入
+    append_batch = store.append_batch
+
+    def append(run_id, entries):
+        if any(entry.type == event_type for entry in entries):
+            raise OSError(f"injected {event_type} persistence failure")
+        return append_batch(run_id, entries)
+
+    return append
+
+
 def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_accepted(tmp_path, monkeypatch):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
     before = system.project(run_id)
     candidates = []
-    prepare, insert = system.git_versions.prepare, system.store._insert
+    prepare = system.git_versions.prepare
 
     def prepare_candidate(*args, **kwargs):
         revision = prepare(*args, **kwargs)
         candidates.append(revision)
         return revision
 
-    def fail_input(event):
-        if event.type == EventType.USER_INPUT_RECEIVED:
-            raise OSError("injected event persistence failure")
-        return insert(event)
-
     monkeypatch.setattr(system.git_versions, "prepare", prepare_candidate)
-    monkeypatch.setattr(system.store, "_insert", fail_input)
-    with pytest.raises(OSError):
-        system.add_input(run_id, "rejected")
+    with monkeypatch.context() as failure:
+        failure.setattr(system.store, "append_batch", _failing_append(system.store, EventType.USER_INPUT_RECEIVED))
+        with pytest.raises(OSError):
+            system.add_input(run_id, "rejected")
     assert system.project(run_id).canonical_state() == before.canonical_state()
     assert (tmp_path / "materials" / run_id / "intend.md").read_bytes() == b"original"
     assert system.git_versions.read_file(run_id, candidates[-1], "intend.md") == b"originalrejected"
-    monkeypatch.setattr(system.store, "_insert", insert)
     accepted = system.add_input(run_id, "accepted")
     assert accepted.git_version["parent_commit"] == before.git_version["commit"]
     assert candidates[0]["commit"] not in {item["commit"] for item in accepted.git_versions}
@@ -152,31 +161,30 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
-    system.add_input(run_id, "Print uppercase")
-    system.orchestrator._assign_new_inputs(run_id, system.project(run_id))
+    received = system.add_input(run_id, "Print uppercase")
+    # 新输入交给产品工作（与激活开始时流程编排写入的事件相同），产品规格的修订才能接纳
+    system.orchestrator.writes.append(run_id, NewEvent(
+        EventType.PRODUCT_INPUT_ASSIGNED, role="product", state_before=received.phase, state_after="PRODUCT_SPEC",
+        payload={"through_version": received.input_version}))
     before = system.project(run_id)
+    assert before.product_work_input_version == before.input_version == 2
     original_prd = (tmp_path / "materials" / run_id / "PRD.md").read_bytes()
     candidates = []
-    prepare, insert = system.git_versions.prepare, system.store._insert
+    prepare = system.git_versions.prepare
 
     def prepare_candidate(*args, **kwargs):
         revision = prepare(*args, **kwargs)
         candidates.append(revision)
         return revision
 
-    def fail_contract(event):
-        if event.type == EventType.CONTRACT_ACCEPTED:
-            raise OSError("injected contract persistence failure")
-        return insert(event)
-
     monkeypatch.setattr(system.git_versions, "prepare", prepare_candidate)
-    monkeypatch.setattr(system.store, "_insert", fail_contract)
-    with pytest.raises(OSError):
-        _commit_spec(system, run_id, _revision())
+    with monkeypatch.context() as failure:
+        failure.setattr(system.store, "append_batch", _failing_append(system.store, EventType.CONTRACT_ACCEPTED))
+        with pytest.raises(OSError):
+            _commit_spec(system, run_id, _revision())
     assert system.project(run_id).canonical_state() == before.canonical_state()
     assert (tmp_path / "materials" / run_id / "PRD.md").read_bytes() == original_prd
     assert b'"revision": 2' in system.git_versions.read_file(run_id, candidates[0], "specs/product.json")
-    monkeypatch.setattr(system.store, "_insert", insert)
     accepted = _commit_spec(system, run_id, _revision())
     current = system.project(run_id)
     assert accepted.payload["git_version"]["parent_commit"] == before.git_version["commit"]
@@ -258,24 +266,31 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
     worker.start()
     try:
         assert entered.wait(10)
-        insert = system.store._insert
+        append_batch = system.store.append_batch
+        replace = interactions.os.replace
 
         def fail(*args, **kwargs):
             raise GitVersionError("injected input version storage failure")
 
-        def fail_event(event):
-            if event.type == EventType.USER_INPUT_RECEIVED or (
-                    failure == "cancellation_event" and event.type == EventType.RUN_FAILED):
+        def fail_publication(source, destination):
+            # 发布新的原始意图失败，其余文件照常替换
+            if Path(destination).name == "intend.md":
+                raise OSError("injected material publication failure")
+            return replace(source, destination)
+
+        def fail_event(run, entries):
+            if any(entry.type == EventType.USER_INPUT_RECEIVED or (
+                    failure == "cancellation_event" and entry.type == EventType.RUN_FAILED) for entry in entries):
                 raise OSError("injected event storage failure")
-            return insert(event)
+            return append_batch(run, entries)
 
         with monkeypatch.context() as patch:
             if failure in {"git", "adapter_abort"}:
                 patch.setattr(system.git_versions, "prepare", fail)
             elif failure == "material":
-                patch.setattr(system.orchestrator.interactions, "_publish", fail)
+                patch.setattr(interactions.os, "replace", fail_publication)
             else:
-                patch.setattr(system.store, "_insert", fail_event)
+                patch.setattr(system.store, "append_batch", fail_event)
             if failure == "adapter_abort":
                 cancel = system.test_adapter.cancel
                 attempts = []
@@ -291,7 +306,9 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
                 system.add_input(run_id, command)
         assert caught.value.cancelled and caught.value.run_id == run_id
         assert caught.value.cancellation_recorded == (failure != "cancellation_event")
-        assert system.orchestrator._abort[run_id].is_set()
+        # 取消已经生效：运行不再接受任何修改
+        with pytest.raises(RunTerminalError):
+            system.update_prompt(run_id, "product", "The run is already cancelled")
         assert system.test_adapter.cancelled == {system.test_adapter.invocations[0].attempt_id}
         current = system.project(run_id)
         assert current.git_version == before.git_version and current.input_version == before.input_version
@@ -361,8 +378,8 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
         monkeypatch.setattr(system.git_versions, "prepare", blocked_git)
         cancelling.start()
         assert git_entered.wait(10)
+        # 保存命令版本的 Git 操作还在等待时，进行中的调用尝试已经收到取消
         request = system.test_adapter.invocations[0]
-        assert system.orchestrator._abort[run_id].is_set()
         assert request.attempt_id in system.test_adapter.cancelled
         assert cancelling.is_alive()
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]

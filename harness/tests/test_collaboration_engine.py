@@ -331,10 +331,11 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
                                      "retired": ["Original casing"], "rationale": "The current product goal changed",
                                  }))
     assert decision.accepted
-    system.orchestrator._commit_accepted(
-        run_id, department="product", projection=external, snapshot=snapshot, artifact=decision.artifact,
-        transitions=[], parent_event_id=before.last_event_id, session_id=before.sessions["product"].session_id,
-        provider="fake", model="fake-script",
+    # 运行之外接纳新的产品规格（经提交的写入函数），协作请求的依据随之改变
+    system.orchestrator.submissions.commit(
+        projection=external, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
+        artifact=decision.artifact, department="product", parent_event_id=before.last_event_id,
+        session_id=before.sessions["product"].session_id, provider="fake", model="fake-script",
     )
     current = system.activate_once(run_id)
     assert current.phase == "ENGINEERING" and current.pending_request is None

@@ -1,7 +1,4 @@
 import time
-from unittest.mock import patch
-
-import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import StepLimits
@@ -11,14 +8,21 @@ from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, list_files_turn, run_scripted
 
 
+def _slow(turn):
+    # 模型调用持续超过 1 秒的运行时间限制
+    def respond(_call):
+        time.sleep(1.2)
+        return turn
+
+    return respond
+
+
 def test_time_limit_stops_run_with_failed_state(data_dir):
-    # 运行时间限制为 1 秒，适配器包含足够多的回合以超过限制
-    script = [product_spec(), plan_turn(), delivery_turn(),
+    # 运行时间限制为 1 秒，第一次模型调用期间运行时间用完
+    script = [_slow(product_spec()), plan_turn(), delivery_turn(),
               *[FakeTurn(proposal=None, transcript="working") for _ in range(100)]]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
-    # 让时间流逝
-    system.orchestrator._run_start_times[run_id] = time.monotonic() - 2
     result = system.activate_once(run_id)
     assert result.phase == "FAILED"
     assert result.stop_reason == "time_limit"
@@ -31,14 +35,14 @@ def test_time_limit_checked_between_activations(data_dir):
               review_turn("release", "ok")]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1)
-    # 第一次激活正常完成
+    # 第一次激活正常完成；运行时间从第一次激活开始计算
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
-    # 模拟时间超过限制
-    system.orchestrator._run_start_times[run_id] = time.monotonic() - 2
+    time.sleep(1.1)
     result = system.activate_once(run_id)
     assert result.phase == "FAILED"
     assert result.stop_reason == "time_limit"
+    assert len(system.test_adapter.invocations) == 1
 
 
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
@@ -127,11 +131,10 @@ def test_convergence_with_long_script_reaches_terminal(data_dir):
 
 
 def test_time_limit_event_recorded(data_dir):
-    script = [product_spec(), plan_turn(), delivery_turn(),
+    script = [_slow(product_spec()), plan_turn(), delivery_turn(),
               *[FakeTurn(proposal=None, transcript="working") for _ in range(50)]]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
-    system.orchestrator._run_start_times[run_id] = time.monotonic() - 2
     system.activate_once(run_id)
     events = system.store.list_events(run_id)
     failed_events = [e for e in events if e.type == EventType.RUN_FAILED]

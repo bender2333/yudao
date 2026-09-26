@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.artifacts import ArtifactStore
@@ -6,9 +7,12 @@ from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
 from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
+from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.helpers import developer_text, happy_script, recorded_context, run_scripted
+from harness.tests.protocol_helpers import serve
+from harness.tests.test_event_sequence import HTTP_REPLIES, HTTP_SCRIPT
 from harness.tools import TOOL_DEFS
 
 
@@ -457,22 +461,32 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     assert manifest.input_token_estimate + manifest.output_reserve_tokens <= manifest.budget == 8000
 
 
-def _bound_system(tmp_path, monkeypatch, script, *, context_window, max_output_tokens):
-    """A run frozen to a fake-protocol model with the given limits, answered by one scripted adapter."""
-    from harness.adapters.facade_adapter import FacadeAdapter
-    from harness.providers import ProviderFacade
+@contextmanager
+def _bound_system(tmp_path, replies, *, context_window, max_output_tokens):
+    # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
+    # 服务按请求顺序回放脚本中的工具调用，记录收到的请求
+    queue = iter(enumerate(replies, start=1))
 
-    adapter = FakeAdapter(script)
-    monkeypatch.setattr(FacadeAdapter, "stream", lambda self, call: adapter.stream(call))
-    facade = ProviderFacade()
-    facade.store_document({
-        "providers": [{"id": "fake", "name": "Fake"}],
-        "models": [{"id": "model", "provider_id": "fake", "model": "model", "protocol": "fake",
-                    "context_window": context_window, "max_output_tokens": max_output_tokens}],
-        "bindings": {department: {"provider_id": "fake", "model_id": "model"}
-                     for department in ("product", "engineering", "quality")},
-    })
-    return LoopSystem(tmp_path, facade=facade), adapter
+    def responder(_body):
+        index, calls = next(queue)
+        return 200, "text/event-stream", [HTTP_REPLIES["responses"](index, calls)]
+
+    server, capture, base = serve(responder)
+    try:
+        facade = ProviderFacade(credentials=CredentialChain(overrides={"CONTEXT_KEY": "context-secret"}, use_env=False))
+        facade.store_document({
+            "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
+                           "credential_ref": "CONTEXT_KEY", "timeout_sec": 30}],
+            "models": [{"id": "model", "provider_id": "local", "model": "model", "protocol": "responses",
+                        "context_window": context_window, "max_output_tokens": max_output_tokens}],
+            "bindings": {department: {"provider_id": "local", "model_id": "model"}
+                         for department in ("product", "engineering", "quality")},
+        })
+        facade.record_admission("local", "model", admitted_model="model")
+        yield LoopSystem(tmp_path, facade=facade), capture
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def _work_assemblies(system, run_id):
@@ -480,10 +494,10 @@ def _work_assemblies(system, run_id):
             if event.type == EventType.CONTEXT_ASSEMBLED and event.payload["purpose"] == "work"]
 
 
-def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_path, monkeypatch):
-    system, adapter = _bound_system(tmp_path, monkeypatch, [product_spec()], context_window=8000, max_output_tokens=4096)
-    run_id = system.create_run("build echo")
-    result = system.activate_once(run_id)
+def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_path):
+    with _bound_system(tmp_path, HTTP_SCRIPT[:1], context_window=8000, max_output_tokens=4096) as (system, capture):
+        run_id = system.create_run("build echo")
+        result = system.activate_once(run_id)
 
     assert result.phase == "ENGINEERING", result.error
     [payload] = _work_assemblies(system, run_id)
@@ -494,18 +508,19 @@ def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_p
     assert payload["max_output_tokens"] == min(4096, 8000 - payload["input_token_estimate"]) >= 4000
     assert payload["output_reserve_tokens"] == payload["max_output_tokens"]
     assert payload["admitted"] is True
-    assert adapter.invocations[0].max_output_tokens == payload["max_output_tokens"]
+    assert capture.requests[0]["max_output_tokens"] == payload["max_output_tokens"]
     assert summarize_run(system, run_id, scenario="narrow")["model_input_audit"]["status"] == "verified"
 
 
-def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path, monkeypatch):
-    system, adapter = _bound_system(tmp_path, monkeypatch, happy_script(), context_window=32000, max_output_tokens=4096)
-    run_id = system.create_run("build echo")
-    result = system.run_until_stop(run_id)
+def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path):
+    with _bound_system(tmp_path, HTTP_SCRIPT, context_window=32000, max_output_tokens=4096) as (system, capture):
+        run_id = system.create_run("build echo")
+        result = system.run_until_stop(run_id)
 
     assert result.phase == "DONE", result.error
     payloads = _work_assemblies(system, run_id)
-    assert len(payloads) == len(adapter.invocations) == 4
+    assert len(payloads) == len(capture.requests) == 4
+    assert [request["max_output_tokens"] for request in capture.requests] == [4096] * 4
     # Baseline before the narrow-window reserve: every 32000/4096 work request asked for 4096 tokens.
     assert all(item["max_output_tokens"] == item["output_reserve_tokens"] == 4096 for item in payloads)
     assert all(item["admitted"] is True and item["effective_context_window"] == 32000 for item in payloads)

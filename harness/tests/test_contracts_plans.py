@@ -27,9 +27,10 @@ def _accept_new_spec(system, run_id):
                                      "retired": ["Preserve the original case"], "rationale": "The product now requires uppercase output",
                                  }))
     assert decision.accepted
-    system.orchestrator._commit_accepted(
-        run_id, department="product", projection=projection, snapshot=system.workspace(run_id).snapshot(), artifact=decision.artifact,
-        transitions=[], parent_event_id=projection.last_event_id,
+    # 运行之外接纳新的产品规格（经提交的写入函数），有效合同随之改变
+    system.orchestrator.submissions.commit(
+        projection=projection, snapshot=system.workspace(run_id).snapshot(), workspace_root=system.workspace(run_id).root,
+        artifact=decision.artifact, department="product", parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake-script",
     )
 

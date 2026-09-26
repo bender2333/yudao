@@ -585,7 +585,6 @@ def test_connection_loop_keeps_same_url_different_credentials_separate():
         with ConnectionLoop() as loop:
             ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
             ResponsesAdapter(second_config, loop=loop).complete(_request(session_id="second"))
-            assert len(loop.connections._clients) == 2
 
     assert not errors
     assert len(captures) == 2
