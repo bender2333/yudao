@@ -12,7 +12,8 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
-from .event_store import NewEvent, WritePath, run_stream
+from .event_store import run_stream
+from .write_path import NewEvent, WritePath
 from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event

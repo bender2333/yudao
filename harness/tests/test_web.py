@@ -463,20 +463,20 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
         try:
             assert entered.wait(5)
             before = system.project(run_id)
-            append_batch = system.store.append_batch
+            commit = system.store.commit
 
             def fail_git(*args, **kwargs):
                 raise GitVersionError("injected Git save failure")
 
-            def fail_cancellation(run, entries):
-                if any(entry.type == "run_failed" for entry in entries):
+            def fail_cancellation(stream, expected_version, events, *args, **kwargs):
+                if any(event.type == "run_failed" for event in events):
                     raise OSError("injected cancellation event save failure")
-                return append_batch(run, entries)
+                return commit(stream, expected_version, events, *args, **kwargs)
 
             with monkeypatch.context() as patch:
                 patch.setattr(system.git_versions, "prepare", fail_git)
                 if not record_cancellation:
-                    patch.setattr(system.store, "append_batch", fail_cancellation)
+                    patch.setattr(system.store, "commit", fail_cancellation)
                 status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", {"text": text})
             result = json.loads(body)
             assert status == 503, result

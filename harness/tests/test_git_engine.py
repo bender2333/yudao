@@ -6,7 +6,7 @@ import pytest
 
 import harness.interactions as interactions
 from harness.adapters.fake import FakeAdapter
-from harness.event_store import NewEvent
+from harness.write_path import NewEvent
 from harness.git_versions import GitVersionError
 from harness.models import EventType, GIT_VERSION_EVENTS
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
@@ -121,15 +121,15 @@ def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, 
 
 
 def _failing_append(store, event_type):
-    # 存储写入含有这种事件的一批事件时失败，整批都不写入
-    append_batch = store.append_batch
+    # 存储提交含有这种事件的一批事件时失败，整批都不写入
+    commit = store.commit
 
-    def append(run_id, entries):
-        if any(entry.type == event_type for entry in entries):
+    def failing_commit(stream, expected_version, events, *args, **kwargs):
+        if any(event.type == event_type for event in events):
             raise OSError(f"injected {event_type} persistence failure")
-        return append_batch(run_id, entries)
+        return commit(stream, expected_version, events, *args, **kwargs)
 
-    return append
+    return failing_commit
 
 
 def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_accepted(tmp_path, monkeypatch):
@@ -146,7 +146,7 @@ def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_acc
 
     monkeypatch.setattr(system.git_versions, "prepare", prepare_candidate)
     with monkeypatch.context() as failure:
-        failure.setattr(system.store, "append_batch", _failing_append(system.store, EventType.USER_INPUT_RECEIVED))
+        failure.setattr(system.store, "commit", _failing_append(system.store, EventType.USER_INPUT_RECEIVED))
         with pytest.raises(OSError):
             system.add_input(run_id, "rejected")
     assert system.project(run_id).canonical_state() == before.canonical_state()
@@ -179,7 +179,7 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
 
     monkeypatch.setattr(system.git_versions, "prepare", prepare_candidate)
     with monkeypatch.context() as failure:
-        failure.setattr(system.store, "append_batch", _failing_append(system.store, EventType.CONTRACT_ACCEPTED))
+        failure.setattr(system.store, "commit", _failing_append(system.store, EventType.CONTRACT_ACCEPTED))
         with pytest.raises(OSError):
             _commit_spec(system, run_id, _revision())
     assert system.project(run_id).canonical_state() == before.canonical_state()
@@ -266,7 +266,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
     worker.start()
     try:
         assert entered.wait(10)
-        append_batch = system.store.append_batch
+        commit = system.store.commit
         replace = interactions.os.replace
 
         def fail(*args, **kwargs):
@@ -278,11 +278,11 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
                 raise OSError("injected material publication failure")
             return replace(source, destination)
 
-        def fail_event(run, entries):
-            if any(entry.type == EventType.USER_INPUT_RECEIVED or (
-                    failure == "cancellation_event" and entry.type == EventType.RUN_FAILED) for entry in entries):
+        def fail_event(stream, expected_version, events, *args, **kwargs):
+            if any(event.type == EventType.USER_INPUT_RECEIVED or (
+                    failure == "cancellation_event" and event.type == EventType.RUN_FAILED) for event in events):
                 raise OSError("injected event storage failure")
-            return append_batch(run, entries)
+            return commit(stream, expected_version, events, *args, **kwargs)
 
         with monkeypatch.context() as patch:
             if failure in {"git", "adapter_abort"}:
@@ -290,7 +290,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
             elif failure == "material":
                 patch.setattr(interactions.os, "replace", fail_publication)
             else:
-                patch.setattr(system.store, "append_batch", fail_event)
+                patch.setattr(system.store, "commit", fail_event)
             if failure == "adapter_abort":
                 cancel = system.test_adapter.cancel
                 attempts = []

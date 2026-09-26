@@ -2,13 +2,13 @@
 
 只通过 `Orchestrator.create_run(...)` 与运行内核交互，且只在事项创建时；
 只读 run 投影（`project_run`）与 run 工件，不生成运行事实、不改 run 流、不调用模型。
+项目事件经过写入口追加到项目流。
 """
 
 from __future__ import annotations
 
-import json
 import threading
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from typing import Any
 
 from .artifacts import ArtifactStore
@@ -16,20 +16,27 @@ from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
 from .event_store import EventStore
 from .materials import save_text_material
 from .models import (
+    Adoption,
     ArtifactRef,
     DEFAULT_MAX_CYCLES,
     DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
     Event,
     EventType,
+    HeldCandidate,
     ProjectEvent,
+    ProjectEventType,
+    ProjectProjection,
+    PromptConfig,
+    RegisteredCommand,
     RunProjection,
     TERMINAL_PHASES,
+    WorkItem,
     department_for_phase,
-    json_dumps,
     new_id,
 )
-from .projection import RunNotFoundError, project_run
+from .projection import RunNotFoundError, project_run, saved_project
+from .write_path import WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
 from .tree_archive import load_tree
@@ -38,21 +45,6 @@ TITLE_LIMIT = 40
 RECENT_LIMIT = 20
 RECENT_RUN_EVENTS = frozenset({EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED})
 REWORK_VERDICTS = frozenset({"rework_product", "rework_engineering"})
-
-
-class ProjectEventType:
-    PROJECT_REGISTERED = "project_registered"
-    PROJECT_RENAMED = "project_renamed"
-    PROJECT_PINNED = "project_pinned"
-    PROJECT_ARCHIVED = "project_archived"
-    PROJECT_RESTORED = "project_restored"
-    WORK_ITEM_CREATED = "work_item_created"
-    WORK_ITEM_START_FAILED = "work_item_start_failed"
-    DELIVERABLE_ADOPTED = "deliverable_adopted"
-    ADOPTION_HELD = "adoption_held"
-    DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
-    COMMAND_CONFIGURED = "command_configured"
-    MATERIAL_RECORDED = "material_recorded"
 
 
 class ProjectNotFoundError(KeyError):
@@ -81,185 +73,11 @@ class CommandConfigConflict(Exception):
         self.current = current
 
 
-# ---------------------------------------------------------------------------
-# 读模型
-
-
-@dataclass
-class Adoption:
-    adoption_id: str
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    qa_event_id: str
-    tree_ref: dict[str, Any]
-    code_tree_digest: str
-    summary: str
-    files: list[str]
-    check_names: list[str]
-    known_risks: list[str]
-    previous_adoption_id: str | None
-    adopted_at: str
-    stream_version: int
-    event_id: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class HeldCandidate:
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    code_tree_digest: str
-    reason: str
-    expected_adoption_id: str | None
-    current_adoption_id: str | None
-    held_at: str
-    stream_version: int
-    event_id: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class PromptConfig:
-    department: str
-    version: int
-    text: str
-    source: str
-    prompt_ref: dict[str, Any] | None = None
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class Material:
-    material_id: str
-    text: str
-    material_ref: dict[str, Any]
-    department: str | None
-    recorded_at: str
-    stream_version: int
-    event_id: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class RegisteredCommand:
-    name: str
-    version: int
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-    def frozen(self) -> dict[str, Any]:
-        # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
-        return {"argv": list(self.argv), "args": list(self.args),
-                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit}
-
-
-@dataclass
-class WorkItem:
-    work_item_id: str
-    title: str
-    text: str
-    run_id: str
-    baseline: dict[str, Any] | None
-    project_context_ref: dict[str, Any]
-    prompt_config_versions: dict[str, int]
-    max_cycles: int
-    run_time_limit_sec: int
-    context_window: int
-    created_at: str
-    stream_version: int
-    event_id: str
-    snapshot: dict[str, Any] | None = None
-    start_error: str | None = None
-    command_versions: dict[str, int] = field(default_factory=dict)
-    # 以下字段由所属 run 的投影派生，不存事件。
-    status: str = "not_started"
-    department: str | None = None
-    phase: str | None = None
-    stop_reason: str | None = None
-    human_action: str | None = None
-    cycle_count: int = 0
-    last_handoff: dict[str, Any] | None = None
-    rework: list[dict[str, Any]] = field(default_factory=list)
-    pending_question: str | None = None
-    adoption_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class ProjectProjection:
-    project_id: str = ""
-    name: str = ""
-    goal: str = ""
-    goal_ref: dict[str, Any] | None = None
-    source: str = "idea"
-    created_at: str = ""
-    pinned: bool = False
-    archived: bool = False
-    work_items: list[WorkItem] = field(default_factory=list)
-    current_adoption: Adoption | None = None
-    adoptions: list[Adoption] = field(default_factory=list)
-    held: list[HeldCandidate] = field(default_factory=list)
-    prompt_configs: dict[str, PromptConfig] = field(default_factory=dict)
-    prompt_config_history: list[PromptConfig] = field(default_factory=list)
-    commands: dict[str, RegisteredCommand] = field(default_factory=dict)
-    command_history: list[RegisteredCommand] = field(default_factory=list)
-    materials: list[Material] = field(default_factory=list)
-    active_work_item_id: str | None = None
-    updated_at: str = ""
-    # 投影所反映的项目流版本
-    stream_version: int = 0
-    last_event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-    def canonical_state(self) -> dict[str, Any]:
-        data = self.to_dict()
-        data.pop("last_event_id", None)
-        return data
-
-    def work_item(self, work_item_id: str) -> WorkItem | None:
-        return next((item for item in self.work_items if item.work_item_id == work_item_id), None)
-
-    def work_item_for_run(self, run_id: str) -> WorkItem | None:
-        return next((item for item in self.work_items if item.run_id == run_id), None)
-
-
-def _plain(value: Any) -> Any:
-    return json.loads(json_dumps(value))
-
-
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str) -> ProjectProjection:
-    """仅由 `project_events` 与所属 run 的 `project_run` 重建，不读任何派生缓存。"""
-    events = store.list_project_events(project_id)
-    if not events:
+    # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态
+    state = saved_project(store, project_id)
+    if state is None:
         raise ProjectNotFoundError(project_id)
-    state = ProjectProjection()
-    for event in events:
-        apply_project_event(state, event)
     for department in DEPARTMENTS:
         state.prompt_configs.setdefault(department, PromptConfig(
             department=department, version=0, text=DEFAULT_PROMPTS[department], source="default",
@@ -270,97 +88,6 @@ def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: 
         _derive_work_item(store, item, adopted, held, project_id)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
-
-
-def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
-    payload = event.payload
-    etype = event.type
-    state.last_event_id = event.event_id
-    state.stream_version = event.stream_version
-    state.updated_at = event.created_at
-    if etype == ProjectEventType.PROJECT_REGISTERED:
-        state.project_id = event.project_id
-        state.name = payload["name"]
-        state.goal = payload["goal"]
-        state.goal_ref = payload["goal_ref"]
-        state.source = payload["source"]
-        state.created_at = event.created_at
-        return
-    if etype == ProjectEventType.PROJECT_RENAMED:
-        state.name = payload["name"]
-        return
-    if etype == ProjectEventType.PROJECT_PINNED:
-        state.pinned = bool(payload["pinned"])
-        return
-    if etype == ProjectEventType.PROJECT_ARCHIVED:
-        state.archived = True
-        return
-    if etype == ProjectEventType.PROJECT_RESTORED:
-        state.archived = False
-        return
-    if etype == ProjectEventType.WORK_ITEM_CREATED:
-        state.work_items.append(WorkItem(
-            work_item_id=payload["work_item_id"], title=payload["title"], text=payload["text"], run_id=payload["run_id"],
-            baseline=payload["baseline"], project_context_ref=payload["project_context_ref"],
-            prompt_config_versions=dict(payload["prompt_config_versions"]),
-            command_versions=dict(payload.get("command_versions") or {}),
-            max_cycles=int(payload["max_cycles"]),
-            run_time_limit_sec=int(payload.get("run_time_limit_sec", 7200)),
-            context_window=int(payload["context_window"]), created_at=event.created_at, stream_version=event.stream_version,
-            event_id=event.event_id, snapshot=payload.get("snapshot"),
-        ))
-        return
-    if etype == ProjectEventType.WORK_ITEM_START_FAILED:
-        item = state.work_item(payload["work_item_id"])
-        if item is not None:
-            item.start_error = payload["error"]
-        return
-    if etype == ProjectEventType.DELIVERABLE_ADOPTED:
-        adoption = Adoption(
-            adoption_id=payload["adoption_id"], work_item_id=payload["work_item_id"], run_id=payload["run_id"],
-            delivery_event_id=payload["delivery_event_id"], qa_event_id=payload["qa_event_id"],
-            tree_ref=payload["tree_ref"], code_tree_digest=payload["code_tree_digest"], summary=payload["summary"],
-            files=list(payload["files"]), check_names=list(payload["check_names"]),
-            known_risks=list(payload["known_risks"]), previous_adoption_id=payload["previous_adoption_id"],
-            adopted_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
-        )
-        state.adoptions.append(adoption)
-        state.current_adoption = adoption
-        return
-    if etype == ProjectEventType.ADOPTION_HELD:
-        state.held.append(HeldCandidate(
-            work_item_id=payload["work_item_id"], run_id=payload["run_id"],
-            delivery_event_id=payload["delivery_event_id"], code_tree_digest=payload["code_tree_digest"],
-            reason=payload["reason"], expected_adoption_id=payload["expected_adoption_id"],
-            current_adoption_id=payload["current_adoption_id"], held_at=event.created_at, stream_version=event.stream_version,
-            event_id=event.event_id,
-        ))
-        return
-    if etype == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED:
-        config = PromptConfig(
-            department=payload["department"], version=int(payload["version"]), text=payload["text"],
-            source="configured", prompt_ref=payload["prompt_ref"], base_version=payload["base_version"],
-            updated_at=event.created_at, event_id=event.event_id,
-        )
-        state.prompt_configs[config.department] = config
-        state.prompt_config_history.append(config)
-        return
-    if etype == ProjectEventType.COMMAND_CONFIGURED:
-        command = RegisteredCommand(
-            name=payload["name"], version=int(payload["version"]), argv=list(payload["argv"]),
-            args=list(payload["args"]), timeout_sec=int(payload["timeout_sec"]),
-            output_limit=int(payload["output_limit"]), base_version=payload["base_version"],
-            updated_at=event.created_at, event_id=event.event_id,
-        )
-        state.commands[command.name] = command
-        state.command_history.append(command)
-        return
-    if etype == ProjectEventType.MATERIAL_RECORDED:
-        state.materials.append(Material(
-            material_id=payload["material_id"], text=payload["text"], material_ref=payload["material_ref"],
-            department=payload["department"], recorded_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
-        ))
-        return
 
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
@@ -546,8 +273,9 @@ def work_item_title(text: str) -> str:
 
 
 class ProjectService:
-    def __init__(self, store: EventStore, artifacts: ArtifactStore, orchestrator: Any) -> None:
+    def __init__(self, store: EventStore, writes: WritePath, artifacts: ArtifactStore, orchestrator: Any) -> None:
         self.store = store
+        self.writes = writes
         self.artifacts = artifacts
         self.orchestrator = orchestrator
         self._lock = threading.RLock()
@@ -588,7 +316,7 @@ class ProjectService:
         project_id = new_id("proj")
         goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
         with self._lock:
-            self.store.append_project(project_id, ProjectEventType.PROJECT_REGISTERED, {
+            self.writes.append_project(project_id, ProjectEventType.PROJECT_REGISTERED, {
                 "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
             })
         return project_id
@@ -597,14 +325,14 @@ class ProjectService:
         _require_text("name", name)
         with self._lock:
             self._writable(project_id)
-            self.store.append_project(project_id, ProjectEventType.PROJECT_RENAMED, {"name": name})
+            self.writes.append_project(project_id, ProjectEventType.PROJECT_RENAMED, {"name": name})
 
     def pin(self, project_id: str, pinned: bool) -> None:
         if not isinstance(pinned, bool):
             raise ValueError("pinned must be a boolean")
         with self._lock:
             self._writable(project_id)
-            self.store.append_project(project_id, ProjectEventType.PROJECT_PINNED, {"pinned": pinned})
+            self.writes.append_project(project_id, ProjectEventType.PROJECT_PINNED, {"pinned": pinned})
 
     def archive(self, project_id: str) -> None:
         with self._lock:
@@ -612,12 +340,12 @@ class ProjectService:
             if project.archived:
                 return
             _reject_in_progress(project)
-            self.store.append_project(project_id, ProjectEventType.PROJECT_ARCHIVED, {})
+            self.writes.append_project(project_id, ProjectEventType.PROJECT_ARCHIVED, {})
 
     def restore(self, project_id: str) -> None:
         with self._lock:
             if self.projection(project_id).archived:
-                self.store.append_project(project_id, ProjectEventType.PROJECT_RESTORED, {})
+                self.writes.append_project(project_id, ProjectEventType.PROJECT_RESTORED, {})
 
     # 事项
 
@@ -689,7 +417,7 @@ class ProjectService:
         work_item_id, run_id = work_item_id or new_id("wi"), run_id or new_id("run")
         # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
         context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
-        self.store.append_project(project.project_id, ProjectEventType.WORK_ITEM_CREATED, {
+        self.writes.append_project(project.project_id, ProjectEventType.WORK_ITEM_CREATED, {
             "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
@@ -707,7 +435,7 @@ class ProjectService:
                 registered_commands=frozen_commands, command_versions=command_versions,
             )
         except Exception as exc:
-            self.store.append_project(project.project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
+            self.writes.append_project(project.project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
                 "work_item_id": work_item_id, "run_id": run_id, "error": str(exc) or type(exc).__name__,
             })
             raise
@@ -757,12 +485,12 @@ class ProjectService:
         expected = None if item.baseline is None else item.baseline["adoption_id"]
         current = None if project.current_adoption is None else project.current_adoption.adoption_id
         if expected != current:
-            return self.store.append_project(project.project_id, ProjectEventType.ADOPTION_HELD, {
+            return self.writes.append_project(project.project_id, ProjectEventType.ADOPTION_HELD, {
                 "work_item_id": item.work_item_id, "run_id": run.run_id,
                 "delivery_event_id": delivery.created_event_id, "code_tree_digest": delivery.code_tree_digest,
                 "reason": "baseline_changed", "expected_adoption_id": expected, "current_adoption_id": current,
             })
-        return self.store.append_project(project.project_id, ProjectEventType.DELIVERABLE_ADOPTED, {
+        return self.writes.append_project(project.project_id, ProjectEventType.DELIVERABLE_ADOPTED, {
             "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
             "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
             "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
@@ -787,7 +515,7 @@ class ProjectService:
             if text == current.text:
                 return {**_prompt_view(current), "unchanged": True}
             ref = save_department_prompt(self.artifacts, project_id, department, text)
-            self.store.append_project(project_id, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
+            self.writes.append_project(project_id, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
                 "department": department, "version": current.version + 1, "text": text,
                 "prompt_ref": asdict(ref), "base_version": base_version,
             })
@@ -813,7 +541,7 @@ class ProjectService:
             })
             if current is not None and current.frozen() == normalized:
                 return {**_command_view(current), "unchanged": True}
-            self.store.append_project(project_id, ProjectEventType.COMMAND_CONFIGURED, {
+            self.writes.append_project(project_id, ProjectEventType.COMMAND_CONFIGURED, {
                 "name": name, "version": current_version + 1, **normalized, "base_version": base_version,
             })
             return {**self.read_command(project_id, name), "unchanged": False}
@@ -829,7 +557,7 @@ class ProjectService:
             _reject_in_progress(project)
             ref = save_text_material(self.artifacts, project_id, "project_material", text)
             material_id = new_id("material")
-            self.store.append_project(project_id, ProjectEventType.MATERIAL_RECORDED, {
+            self.writes.append_project(project_id, ProjectEventType.MATERIAL_RECORDED, {
                 "material_id": material_id, "text": text, "material_ref": asdict(ref), "department": department,
             })
             return material_id

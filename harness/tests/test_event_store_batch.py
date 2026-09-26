@@ -2,42 +2,57 @@ import sqlite3
 
 import pytest
 
-from harness.event_store import EventStore, NewEvent
+from harness.event_store import EventStore, StreamVersionConflict, run_stream
+from harness.write_path import NewEvent, WritePath
 
 
-def test_event_batch_commits_in_order_and_uses_one_contiguous_stream_version_range(tmp_path):
+def _note(name, **fields):
+    return NewEvent(name, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC", **fields)
+
+
+def test_event_batch_commits_in_order_with_contiguous_versions_and_positions(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    [first] = store.append_batch("run", [NewEvent("before", state_before="CREATED", state_after="PRODUCT_SPEC")])
-    batch = store.append_batch("run", [
-        NewEvent("spec_accepted", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC", payload={"value": "spec"}),
-        NewEvent("contract_accepted", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
-                 payload={"value": "contract"}),
-    ])
+    writes = WritePath(store)
+    [first] = writes.append("run", _note("before"))
+    batch = writes.append("run", _note("first", payload={"value": 1}), _note("second", payload={"value": 2}))
     assert [event.stream_version for event in batch] == [first.stream_version + 1, first.stream_version + 2]
     assert [event.position for event in batch] == [first.position + 1, first.position + 2]
     assert store.list_events("run") == [first, *batch]
     assert len({event.event_id for event in batch}) == 2
+    saved = store.projection(run_stream("run"))
+    assert (saved.version, saved.position) == (3, batch[-1].position)
 
 
-def test_failed_later_insert_rolls_back_the_whole_batch_without_consuming_versions_or_positions(tmp_path):
+def test_failed_later_insert_rolls_back_the_whole_batch_and_its_projection(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    [first] = store.append_batch("run", [NewEvent("before", state_before="CREATED", state_after="PRODUCT_SPEC")])
+    writes = WritePath(store)
+    [first] = writes.append("run", _note("before"))
+    saved = store.projection(run_stream("run"))
     with pytest.raises(TypeError):
-        store.append_batch("run", [
-            NewEvent("spec_accepted", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC"),
-            NewEvent("contract_accepted", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
-                     payload={"invalid": object()}),
-        ])
+        writes.append("run", _note("first"), _note("second", payload={"invalid": object()}))
     assert store.list_events("run") == [first]
-    [after] = store.append_batch("run", [NewEvent("after", state_before="PRODUCT_SPEC", state_after="ENGINEERING")])
+    assert store.projection(run_stream("run")) == saved
+    [after] = writes.append("run", _note("after"))
     assert (after.stream_version, after.position) == (first.stream_version + 1, first.position + 1)
 
 
 def test_invalid_batch_entry_cannot_begin_a_partial_commit(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
+    writes = WritePath(store)
     with pytest.raises(sqlite3.IntegrityError):
-        store.append_batch("run", [
-            NewEvent("valid", state_before="CREATED", state_after="PRODUCT_SPEC"),
-            NewEvent("invalid", state_before="PRODUCT_SPEC", state_after=None),
-        ])
+        writes.append("run", _note("valid"), NewEvent("invalid", state_before="PRODUCT_SPEC", state_after=None))
     assert store.list_events("run") == []
+    assert store.projection(run_stream("run")) is None
+
+
+def test_commit_with_a_stale_expected_version_is_rejected_without_writing(tmp_path):
+    store = EventStore(tmp_path / "events.sqlite")
+    writes = WritePath(store)
+    [first] = writes.append("run", _note("before"))
+    saved = store.projection(run_stream("run"))
+    with pytest.raises(StreamVersionConflict) as rejected:
+        store.commit(run_stream("run"), 0, [], saved.state)
+    assert (rejected.value.expected, rejected.value.actual) == (0, 1)
+    assert "stale" in str(rejected.value)
+    assert store.list_events("run") == [first]
+    assert store.projection(run_stream("run")) == saved

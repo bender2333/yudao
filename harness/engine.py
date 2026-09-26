@@ -24,7 +24,8 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
 from .environment import LocalEnvironment
-from .event_store import EventStore, WritePath
+from .event_store import EventStore
+from .write_path import WritePath
 from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
 from .projection import project_run
 from .providers.call import ModelResponse

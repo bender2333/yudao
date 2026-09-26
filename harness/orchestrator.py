@@ -20,7 +20,8 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .environment import LocalEnvironment
-from .event_store import EventStore, NewEvent, WritePath
+from .event_store import EventStore
+from .write_path import NewEvent, WritePath
 from .engine import StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
@@ -181,6 +182,7 @@ class Orchestrator:
     def __init__(
         self,
         store: EventStore,
+        writes: WritePath,
         artifacts: ArtifactStore,
         workspace_root: str | Path,
         *,
@@ -192,7 +194,7 @@ class Orchestrator:
         step_limits: StepLimits = StepLimits(),
     ) -> None:
         self.store = store
-        self.writes = WritePath(store)
+        self.writes = writes
         self.step_limits = step_limits
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)

@@ -8,8 +8,7 @@ from pathlib import Path
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
-from harness.projects import ProjectEventType
+from harness.models import ArtifactRef, EventType, ProjectEventType, canonical_hash, json_dumps
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
 from harness.snapshot import ingest_snapshot, restore_snapshot

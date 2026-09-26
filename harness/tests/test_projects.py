@@ -10,10 +10,9 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.engine import StepLimits
-from harness.models import ArtifactRef, EventType, json_dumps
+from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
 from harness.projects import (
     ProjectArchivedError,
-    ProjectEventType,
     ProjectNotFoundError,
     PromptConfigConflict,
     WorkItemInProgressError,
@@ -65,22 +64,24 @@ def _project_events(system, project_id, event_type):
 
 def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
     system = _system(data_dir, happy_script())
-    first = system.store.append_project("proj_a", "project_registered", {"name": "A"})
-    second = system.store.append_project("proj_a", "project_renamed", {"name": "A2"})
-    other = system.store.append_project("proj_b", "project_registered", {"name": "B"})
+    project_a = system.projects.register("A", GOAL)
+    system.projects.rename(project_a, "A2")
+    project_b = system.projects.register("B", GOAL)
+    first, second = system.store.list_project_events(project_a)
+    [other] = system.store.list_project_events(project_b)
     # 流内版本按项目各自递增，全局位置跨项目递增
     assert (first.stream_version, second.stream_version, other.stream_version) == (1, 2, 1)
     assert first.position < second.position < other.position
-    assert (first.stream, other.stream) == ("project:proj_a", "project:proj_b")
-    assert [event.type for event in system.store.list_project_events("proj_a")] == ["project_registered", "project_renamed"]
-    assert [event.stream_version for event in system.store.list_project_events("proj_a", after_version=1)] == [2]
+    assert (first.stream, other.stream) == (f"project:{project_a}", f"project:{project_b}")
+    assert [first.type, second.type] == ["project_registered", "project_renamed"]
+    assert [event.stream_version for event in system.store.list_project_events(project_a, after_version=1)] == [2]
     assert system.store.get_project_event(second.event_id).payload == {"name": "A2"}
     assert system.store.get_project_event("missing") is None
     assert system.store.get_event(second.event_id) is None
-    assert system.store.list_project_ids() == ["proj_b", "proj_a"]
+    assert system.store.list_project_ids() == [project_b, project_a]
     # 项目事件不进入 run 流。
     assert system.store.list_run_ids() == []
-    assert system.store.list_events("proj_a") == []
+    assert system.store.list_events(project_a) == []
 
 
 # ---------------------------------------------------------------------------
@@ -728,7 +729,7 @@ def test_source_run_from_another_project_cannot_be_baseline(data_dir):
     system.projects.settle(run_a)
     adoption = system.projects.projection(project_a).current_adoption
     project_b = system.projects.register("B", GOAL)
-    system.store.append_project(project_b, ProjectEventType.DELIVERABLE_ADOPTED, {
+    system.writes.append_project(project_b, ProjectEventType.DELIVERABLE_ADOPTED, {
         "adoption_id": adoption.adoption_id, "work_item_id": adoption.work_item_id,
         "run_id": adoption.run_id, "delivery_event_id": adoption.delivery_event_id,
         "qa_event_id": adoption.qa_event_id, "tree_ref": adoption.tree_ref,
@@ -748,7 +749,7 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     work_a, run_a = system.projects.start_work_item(project_a, "A的事项")
     assert system.projects.projection(project_a).work_item(work_a).status == "in_progress"
     project_b = system.projects.register("B", GOAL)
-    system.store.append_project(project_b, ProjectEventType.WORK_ITEM_CREATED, {
+    system.writes.append_project(project_b, ProjectEventType.WORK_ITEM_CREATED, {
         "work_item_id": "wi_forged", "title": "伪造", "text": "伪造", "run_id": run_a, "baseline": None,
         "project_context_ref": {"kind": "project_context"},
         "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0},

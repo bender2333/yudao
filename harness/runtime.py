@@ -10,6 +10,7 @@ from .artifacts import ArtifactStore
 from .engine import StepLimits
 from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
+from .write_path import WritePath
 from .projection import RunProjection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
@@ -38,6 +39,9 @@ class LoopSystem:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
+        # 唯一的写入口；保存的投影缺失的流（例如投影被删除）在启动时由重放补建
+        self.writes = WritePath(self.store)
+        self.writes.rebuild_missing()
         self.artifacts = ArtifactStore(self.data_dir / "artifacts")
         if test_adapter_factory is not None and facade is not None:
             raise ValueError("facade and test_adapter_factory are mutually exclusive")
@@ -55,6 +59,7 @@ class LoopSystem:
             self.facade.reload()
         self.orchestrator = Orchestrator(
             self.store,
+            self.writes,
             self.artifacts,
             self.data_dir / "workspaces",
             facade=self.facade,
@@ -64,7 +69,7 @@ class LoopSystem:
             step_limits=step_limits,
         )
         self.git_versions = self.orchestrator.git_versions
-        self.projects = ProjectService(self.store, self.artifacts, self.orchestrator)
+        self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
 
     @property
     def provider_config_path(self) -> Path | None:

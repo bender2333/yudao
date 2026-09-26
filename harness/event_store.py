@@ -1,6 +1,8 @@
 # 事件日志：系统唯一的事实来源。run 事件与项目事件在同一份日志中：每条事件有全局位置（跨项目递增）、
 # 所属的流（run:<run_id>、project:<project_id>）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
 # 建立索引供范围读取。日志只追加。
+# 每个流保存一份投影（投影的内容由写入口计算，这里按 JSON 文本存放），与这个流的事件在同一个事务中写入；
+# 提交时核对流版本，与调用方读取时的版本不同就拒绝。
 
 from __future__ import annotations
 
@@ -8,11 +10,11 @@ import json
 import sqlite3
 import threading
 from collections.abc import Sequence
-from dataclasses import KW_ONLY, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .models import DEPARTMENTS, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now
+from .models import Event, ProjectEvent, json_dumps
 
 
 SCHEMA = """
@@ -47,6 +49,12 @@ CREATE INDEX IF NOT EXISTS idx_events_work_item ON events(work_item_id, position
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, position);
 CREATE INDEX IF NOT EXISTS idx_events_department ON events(department, position);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, position);
+CREATE TABLE IF NOT EXISTS projections (
+    stream TEXT PRIMARY KEY,
+    version INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    state TEXT NOT NULL
+);
 """
 
 _RUN = "run:"
@@ -61,36 +69,26 @@ def project_stream(project_id: str) -> str:
     return _PROJECT + project_id
 
 
+def is_run_stream(stream: str) -> bool:
+    return stream.startswith(_RUN)
+
+
+class StreamVersionConflict(Exception):
+    # 追加时给出的期望版本与流的当前版本不同：判断所依据的状态已经过期，写入被拒绝
+    def __init__(self, stream: str, expected: int, actual: int) -> None:
+        super().__init__(f"stream {stream} is at version {actual}, not the expected version {expected}; "
+                         "the judgment was made on a stale state")
+        self.stream = stream
+        self.expected = expected
+        self.actual = actual
+
+
 @dataclass(frozen=True)
-class NewEvent:
-    # 一条要追加的 run 事件；事件编号、日志位置、流内版本与创建时间在追加时确定
-    type: str
-    _: KW_ONLY
-    state_before: str
-    state_after: str
-    role: str | None = None
-    parent_event_id: str | None = None
-    payload: dict[str, Any] = field(default_factory=dict)
-    artifact_hashes: list[str] = field(default_factory=list)
-    session_id: str | None = None
-    provider: str | None = None
-    model: str | None = None
-    context_digest: str | None = None
-    stop_reason: str | None = None
-    error: str | None = None
-
-
-class WritePath:
-    # 领域写入唯一的写入函数：流程编排、记录接口、提交与交互写入 run 的事件都经过 append，
-    # 一次调用的事件在同一个事务中追加。lock 是「读取运行状态、判断、追加」期间持有的锁，append 也在它之下进行。
-    # #44 在 append 上加入流版本与执行权的事务核对，并以同一事务中的读取与判断代替这把锁
-    def __init__(self, store: EventStore) -> None:
-        self._store = store
-        self.lock = threading.RLock()
-
-    def append(self, run_id: str, *events: NewEvent) -> list[Event]:
-        with self.lock:
-            return self._store.append_batch(run_id, events)
+class SavedProjection:
+    # 一个流保存的投影：投影所反映的流版本、最后一条事件的全局位置与投影的 JSON 文本
+    version: int
+    position: int
+    state: str
 
 
 class EventStore:
@@ -105,45 +103,68 @@ class EventStore:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.commit()
 
-    def append_batch(self, run_id: str, entries: Sequence[NewEvent]) -> list[Event]:
-        stream = run_stream(run_id)
-        events = [
-            Event(event_id=new_id("evt"), run_id=run_id, type=entry.type, role=entry.role,
-                  parent_event_id=entry.parent_event_id, state_before=entry.state_before,
-                  state_after=entry.state_after, payload=entry.payload, artifact_hashes=list(entry.artifact_hashes),
-                  session_id=entry.session_id, provider=entry.provider, model=entry.model,
-                  context_digest=entry.context_digest, stop_reason=entry.stop_reason, error=entry.error,
-                  created_at=utc_now(), position=0, stream=stream, stream_version=0, project_id=None,
-                  work_item_id=None, department=entry.role if entry.role in DEPARTMENTS else None)
-            for entry in entries
-        ]
+    def commit(self, stream: str, expected_version: int, events: Sequence[Event | ProjectEvent], state: str) -> None:
+        # 在一个事务中：核对流的当前版本等于 expected_version，按顺序追加事件（全局位置在这里确定，写回事件），
+        # 保存这个流的投影。版本不符时拒绝，什么也不写
         with self._lock, self._conn:
-            version = self._stream_version(stream)
-            project_id, work_item_id = self._run_owner(stream, events)
-            for offset, event in enumerate(events, start=1):
-                event.stream_version = version + offset
-                event.project_id, event.work_item_id = project_id, work_item_id
+            current = self._version(stream)
+            if current != expected_version:
+                raise StreamVersionConflict(stream, expected_version, current)
+            for event in events:
                 event.position = self._insert(event)
-        return events
+            position = events[-1].position if events else self._saved_position(stream)
+            self._conn.execute(
+                "INSERT INTO projections (stream, version, position, state) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
+                "state = excluded.state",
+                (stream, expected_version + len(events), position, state),
+            )
 
-    def append_project(self, project_id: str, type: str, payload: dict[str, Any] | None = None) -> ProjectEvent:
-        payload = dict(payload or {})
-        stream = project_stream(project_id)
-        event = ProjectEvent(event_id=new_id("pevt"), project_id=project_id, type=type, payload=payload,
-                             created_at=utc_now(), position=0, stream=stream, stream_version=0,
-                             work_item_id=payload.get("work_item_id"), run_id=payload.get("run_id"),
-                             department=payload.get("department"))
+    def replace_projection(self, stream: str, version: int, state: str) -> None:
+        # 用重放得到的投影替换这个流保存的投影；version 是重放到的流版本，流在重放以后又有写入时拒绝
         with self._lock, self._conn:
-            event.stream_version = self._stream_version(stream) + 1
-            event.position = self._insert(event)
-        return event
+            row = self._conn.execute(
+                "SELECT COALESCE(MAX(stream_version), 0) AS version, COALESCE(MAX(position), 0) AS position "
+                "FROM events WHERE stream = ?", (stream,),
+            ).fetchone()
+            if row["version"] != version:
+                raise StreamVersionConflict(stream, version, row["version"])
+            self._conn.execute(
+                "INSERT INTO projections (stream, version, position, state) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
+                "state = excluded.state",
+                (stream, version, row["position"], state),
+            )
+
+    def projection(self, stream: str) -> SavedProjection | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT version, position, state FROM projections WHERE stream = ?", (stream,)
+            ).fetchone()
+        return None if row is None else SavedProjection(row["version"], row["position"], row["state"])
+
+    def streams_without_projection(self) -> list[str]:
+        # 有事件但没有保存投影的流
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT DISTINCT stream FROM events WHERE stream NOT IN (SELECT stream FROM projections)"
+            ).fetchall()
+        return [row["stream"] for row in rows]
+
+    def stream_events(self, stream: str, *, after_version: int = 0) -> list[Event] | list[ProjectEvent]:
+        # 一个流中流内版本大于 after_version 的事件，按版本排列
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM events WHERE stream = ? AND stream_version > ? ORDER BY stream_version ASC",
+                (stream, after_version),
+            ).fetchall()
+        return [_from_row(row) for row in rows]
 
     def list_events(self, run_id: str, *, after_version: int = 0) -> list[Event]:
-        # run 流中流内版本大于 after_version 的事件，按版本排列
-        return self._stream_events(run_stream(run_id), after_version)
+        return self.stream_events(run_stream(run_id), after_version=after_version)
 
     def list_project_events(self, project_id: str, *, after_version: int = 0) -> list[ProjectEvent]:
-        return self._stream_events(project_stream(project_id), after_version)
+        return self.stream_events(project_stream(project_id), after_version=after_version)
 
     def read(self, after: int = 0, *, limit: int = 1000, projects: Sequence[str] = (),
              work_items: Sequence[str] = (), runs: Sequence[str] = (), departments: Sequence[str] = (),
@@ -200,33 +221,18 @@ class EventStore:
         with self._lock:
             self._conn.close()
 
-    def _stream_events(self, stream: str, after_version: int) -> list[Any]:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM events WHERE stream = ? AND stream_version > ? ORDER BY stream_version ASC",
-                (stream, after_version),
-            ).fetchall()
-        return [_from_row(row) for row in rows]
-
     def _get(self, event_id: str) -> Event | ProjectEvent | None:
         with self._lock:
             row = self._conn.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
         return None if row is None else _from_row(row)
 
-    def _stream_version(self, stream: str) -> int:
-        row = self._conn.execute(
-            "SELECT COALESCE(MAX(stream_version), 0) AS version FROM events WHERE stream = ?", (stream,)
-        ).fetchone()
-        return int(row["version"])
+    def _version(self, stream: str) -> int:
+        row = self._conn.execute("SELECT version FROM projections WHERE stream = ?", (stream,)).fetchone()
+        return 0 if row is None else int(row["version"])
 
-    def _run_owner(self, stream: str, events: list[Event]) -> tuple[str | None, str | None]:
-        # run 所属的项目与事项取自它的 run_created 事件
-        if events and events[0].type == EventType.RUN_CREATED:
-            return events[0].payload.get("project_id"), events[0].payload.get("work_item_id")
-        row = self._conn.execute(
-            "SELECT project_id, work_item_id FROM events WHERE stream = ? AND stream_version = 1", (stream,)
-        ).fetchone()
-        return (None, None) if row is None else (row["project_id"], row["work_item_id"])
+    def _saved_position(self, stream: str) -> int:
+        row = self._conn.execute("SELECT position FROM projections WHERE stream = ?", (stream,)).fetchone()
+        return 0 if row is None else int(row["position"])
 
     def _insert(self, event: Event | ProjectEvent) -> int:
         if isinstance(event, Event):

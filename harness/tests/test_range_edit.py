@@ -5,9 +5,8 @@ import pytest
 
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.models import ArtifactRef, EventType, json_dumps
+from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
 from harness.proposals import delivery, delivery_turn, plan_turn, product_spec, review, review_turn
-from harness.projects import ProjectEventType
 from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem

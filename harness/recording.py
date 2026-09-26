@@ -15,7 +15,8 @@ from .adapters.base import ModelRequest, ProviderError
 from .adjudication import WorkBasis
 from .artifacts import ArtifactStore
 from .assembly import CompactionResult, StepRequest
-from .event_store import EventStore, NewEvent, WritePath
+from .event_store import EventStore
+from .write_path import NewEvent, WritePath
 from .models import EventType, Usage, canonical_hash, json_dumps, utc_now
 from .projection import project_run
 from .providers.call import ModelResponse, ModelStreamEvent

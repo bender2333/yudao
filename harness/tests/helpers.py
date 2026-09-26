@@ -15,7 +15,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.assembly import ContextAssembly
 from harness.context import ContextPart
 from harness.engine import StepLimits
-from harness.event_store import NewEvent
+from harness.write_path import NewEvent
 from harness.models import ArtifactRef, ContextManifest, Event, json_dumps
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.environment import LocalEnvironment

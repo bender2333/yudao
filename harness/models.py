@@ -111,6 +111,21 @@ class EventType:
     RUN_FAILED = "run_failed"
 
 
+class ProjectEventType:
+    PROJECT_REGISTERED = "project_registered"
+    PROJECT_RENAMED = "project_renamed"
+    PROJECT_PINNED = "project_pinned"
+    PROJECT_ARCHIVED = "project_archived"
+    PROJECT_RESTORED = "project_restored"
+    WORK_ITEM_CREATED = "work_item_created"
+    WORK_ITEM_START_FAILED = "work_item_start_failed"
+    DELIVERABLE_ADOPTED = "deliverable_adopted"
+    ADOPTION_HELD = "adoption_held"
+    DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
+    COMMAND_CONFIGURED = "command_configured"
+    MATERIAL_RECORDED = "material_recorded"
+
+
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
     EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
@@ -617,6 +632,177 @@ class RunProjection:
         if not isinstance(departments, dict):
             return {}
         return departments
+
+
+# ---------------------------------------------------------------------------
+# 项目投影：由项目流的事件折叠而成；事项的状态等字段在读取时由所属 run 的投影派生，不保存
+
+
+@dataclass
+class Adoption:
+    adoption_id: str
+    work_item_id: str
+    run_id: str
+    delivery_event_id: str
+    qa_event_id: str
+    tree_ref: dict[str, Any]
+    code_tree_digest: str
+    summary: str
+    files: list[str]
+    check_names: list[str]
+    known_risks: list[str]
+    previous_adoption_id: str | None
+    adopted_at: str
+    stream_version: int
+    event_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class HeldCandidate:
+    work_item_id: str
+    run_id: str
+    delivery_event_id: str
+    code_tree_digest: str
+    reason: str
+    expected_adoption_id: str | None
+    current_adoption_id: str | None
+    held_at: str
+    stream_version: int
+    event_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class PromptConfig:
+    department: str
+    version: int
+    text: str
+    source: str
+    prompt_ref: dict[str, Any] | None = None
+    base_version: int | None = None
+    updated_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class Material:
+    material_id: str
+    text: str
+    material_ref: dict[str, Any]
+    department: str | None
+    recorded_at: str
+    stream_version: int
+    event_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class RegisteredCommand:
+    name: str
+    version: int
+    argv: list[str]
+    args: list[str]
+    timeout_sec: int
+    output_limit: int
+    base_version: int | None = None
+    updated_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+    def frozen(self) -> dict[str, Any]:
+        # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
+        return {"argv": list(self.argv), "args": list(self.args),
+                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit}
+
+
+@dataclass
+class WorkItem:
+    work_item_id: str
+    title: str
+    text: str
+    run_id: str
+    baseline: dict[str, Any] | None
+    project_context_ref: dict[str, Any]
+    prompt_config_versions: dict[str, int]
+    max_cycles: int
+    run_time_limit_sec: int
+    context_window: int
+    created_at: str
+    stream_version: int
+    event_id: str
+    snapshot: dict[str, Any] | None = None
+    start_error: str | None = None
+    command_versions: dict[str, int] = field(default_factory=dict)
+    # 以下字段由所属 run 的投影派生，不存事件。
+    status: str = "not_started"
+    department: str | None = None
+    phase: str | None = None
+    stop_reason: str | None = None
+    human_action: str | None = None
+    cycle_count: int = 0
+    last_handoff: dict[str, Any] | None = None
+    rework: list[dict[str, Any]] = field(default_factory=list)
+    pending_question: str | None = None
+    adoption_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class ProjectProjection:
+    project_id: str = ""
+    name: str = ""
+    goal: str = ""
+    goal_ref: dict[str, Any] | None = None
+    source: str = "idea"
+    created_at: str = ""
+    pinned: bool = False
+    archived: bool = False
+    work_items: list[WorkItem] = field(default_factory=list)
+    current_adoption: Adoption | None = None
+    adoptions: list[Adoption] = field(default_factory=list)
+    held: list[HeldCandidate] = field(default_factory=list)
+    prompt_configs: dict[str, PromptConfig] = field(default_factory=dict)
+    prompt_config_history: list[PromptConfig] = field(default_factory=list)
+    commands: dict[str, RegisteredCommand] = field(default_factory=dict)
+    command_history: list[RegisteredCommand] = field(default_factory=list)
+    materials: list[Material] = field(default_factory=list)
+    active_work_item_id: str | None = None
+    updated_at: str = ""
+    # 投影所反映的项目流版本
+    stream_version: int = 0
+    last_event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+    def canonical_state(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("last_event_id", None)
+        return data
+
+    def work_item(self, work_item_id: str) -> WorkItem | None:
+        return next((item for item in self.work_items if item.work_item_id == work_item_id), None)
+
+    def work_item_for_run(self, run_id: str) -> WorkItem | None:
+        return next((item for item in self.work_items if item.run_id == run_id), None)
+
+
+def _plain(value: Any) -> Any:
+    return json.loads(json_dumps(value))
 
 
 def department_for_phase(phase: str) -> str | None:

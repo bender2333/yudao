@@ -1,12 +1,17 @@
-"""从事件重放状态投影。Agent 不能写投影。"""
+# 状态投影：运行状态投影由 run 流的事件折叠而成，项目投影由项目流的事件折叠而成。Agent 不能写投影。
+# 投影随写入保存（写入口在追加事件的同一个事务中更新），读取时直接读取保存的投影；
+# 从头重放只用于重建保存的投影与核对它与重放结果一致。
 
 from __future__ import annotations
 
 from dataclasses import replace
 from typing import Any
 
-from .event_store import EventStore
+from pydantic import TypeAdapter
+
+from .event_store import EventStore, SavedProjection, is_run_stream, project_stream, run_stream
 from .models import (
+    Adoption,
     CollaborationRequest,
     CollaborationResponse,
     DepartmentGuidance,
@@ -22,17 +27,31 @@ from .models import (
     Event,
     EventType,
     GIT_VERSION_EVENTS,
+    HeldCandidate,
     LessonCandidate,
+    Material,
     ProductDecision,
     ProductSpec,
+    ProjectEvent,
+    ProjectEventType,
+    ProjectProjection,
+    PromptConfig,
     QAReview,
+    RegisteredCommand,
     RunProjection,
     SessionRecord,
     UserInput,
     TERMINAL_PHASES,
+    WorkItem,
     department_for_phase,
     waiting_reason_for,
 )
+
+Projection = RunProjection | ProjectProjection
+
+# 保存的投影以 JSON 存放，由 pydantic 按数据类的类型序列化与还原
+_RUN_STATE = TypeAdapter(RunProjection)
+_PROJECT_STATE = TypeAdapter(ProjectProjection)
 
 
 class RunNotFoundError(KeyError):
@@ -40,23 +59,79 @@ class RunNotFoundError(KeyError):
 
 
 def project_run(store: EventStore, run_id: str) -> RunProjection:
+    # 读取保存的运行状态投影
+    saved = store.projection(run_stream(run_id))
+    if saved is None:
+        raise RunNotFoundError(run_id)
+    return _RUN_STATE.validate_json(saved.state)
+
+
+def saved_project(store: EventStore, project_id: str) -> ProjectProjection | None:
+    # 读取保存的项目投影；项目不存在时为空
+    saved = store.projection(project_stream(project_id))
+    return None if saved is None else _PROJECT_STATE.validate_json(saved.state)
+
+
+def replay_run(store: EventStore, run_id: str) -> RunProjection:
+    # 从 run 流的第一条事件重放运行状态投影：只用于重建与核对
     events = store.list_events(run_id)
     if not events:
         raise RunNotFoundError(run_id)
     return project_events(events)
 
 
+def replay_project(store: EventStore, project_id: str) -> ProjectProjection | None:
+    # 从项目流的第一条事件重放项目投影：只用于重建与核对
+    events = store.list_project_events(project_id)
+    return replay(project_stream(project_id), events) if events else None
+
+
+def empty_projection(stream: str) -> Projection:
+    return RunProjection() if is_run_stream(stream) else ProjectProjection()
+
+
+def load_projection(saved: SavedProjection, stream: str) -> Projection:
+    adapter = _RUN_STATE if is_run_stream(stream) else _PROJECT_STATE
+    return adapter.validate_json(saved.state)
+
+
+def dump_projection(state: Projection) -> str:
+    adapter = _RUN_STATE if isinstance(state, RunProjection) else _PROJECT_STATE
+    return adapter.dump_json(state).decode("utf-8")
+
+
+def fold(state: Projection, event: Event | ProjectEvent) -> None:
+    # 把一条事件并入投影；并入以后的投影与从头重放到这条事件的结果相同
+    if isinstance(event, Event):
+        apply_event(state, event)
+        _settle_run_state(state)
+    else:
+        apply_project_event(state, event)
+
+
+def replay(stream: str, events: list[Event] | list[ProjectEvent]) -> Projection:
+    state = empty_projection(stream)
+    for event in events:
+        fold(state, event)
+    return state
+
+
 def project_events(events: list[Event]) -> RunProjection:
     state = RunProjection()
     for event in events:
         apply_event(state, event)
+    _settle_run_state(state)
+    return state
+
+
+def _settle_run_state(state: RunProjection) -> None:
+    # 由阶段、停止原因与待处理的协作请求得出的字段；可以重复计算，结果只取决于这些字段
     state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
     if state.pending_request is not None:
         state.waiting_reason = f"{state.pending_request.recipient} is handling a request from {state.pending_request.requester}"
     if state.phase in TERMINAL_PHASES:
         state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
         state.active_department = None
-    return state
 
 
 def apply_event(state: RunProjection, event: Event) -> None:
@@ -692,3 +767,95 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         defects=[Defect(**item) if not isinstance(item, Defect) else item for item in payload.get("defects", [])],
         evidence_refs=[ArtifactRef(**item) if not isinstance(item, ArtifactRef) else item for item in payload.get("evidence_refs", [])],
     )
+
+
+def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
+    payload = event.payload
+    etype = event.type
+    state.last_event_id = event.event_id
+    state.stream_version = event.stream_version
+    state.updated_at = event.created_at
+    if etype == ProjectEventType.PROJECT_REGISTERED:
+        state.project_id = event.project_id
+        state.name = payload["name"]
+        state.goal = payload["goal"]
+        state.goal_ref = payload["goal_ref"]
+        state.source = payload["source"]
+        state.created_at = event.created_at
+        return
+    if etype == ProjectEventType.PROJECT_RENAMED:
+        state.name = payload["name"]
+        return
+    if etype == ProjectEventType.PROJECT_PINNED:
+        state.pinned = bool(payload["pinned"])
+        return
+    if etype == ProjectEventType.PROJECT_ARCHIVED:
+        state.archived = True
+        return
+    if etype == ProjectEventType.PROJECT_RESTORED:
+        state.archived = False
+        return
+    if etype == ProjectEventType.WORK_ITEM_CREATED:
+        state.work_items.append(WorkItem(
+            work_item_id=payload["work_item_id"], title=payload["title"], text=payload["text"], run_id=payload["run_id"],
+            baseline=payload["baseline"], project_context_ref=payload["project_context_ref"],
+            prompt_config_versions=dict(payload["prompt_config_versions"]),
+            command_versions=dict(payload.get("command_versions") or {}),
+            max_cycles=int(payload["max_cycles"]),
+            run_time_limit_sec=int(payload.get("run_time_limit_sec", 7200)),
+            context_window=int(payload["context_window"]), created_at=event.created_at,
+            stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
+        ))
+        return
+    if etype == ProjectEventType.WORK_ITEM_START_FAILED:
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.start_error = payload["error"]
+        return
+    if etype == ProjectEventType.DELIVERABLE_ADOPTED:
+        adoption = Adoption(
+            adoption_id=payload["adoption_id"], work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            delivery_event_id=payload["delivery_event_id"], qa_event_id=payload["qa_event_id"],
+            tree_ref=payload["tree_ref"], code_tree_digest=payload["code_tree_digest"], summary=payload["summary"],
+            files=list(payload["files"]), check_names=list(payload["check_names"]),
+            known_risks=list(payload["known_risks"]), previous_adoption_id=payload["previous_adoption_id"],
+            adopted_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
+        )
+        state.adoptions.append(adoption)
+        state.current_adoption = adoption
+        return
+    if etype == ProjectEventType.ADOPTION_HELD:
+        state.held.append(HeldCandidate(
+            work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            delivery_event_id=payload["delivery_event_id"], code_tree_digest=payload["code_tree_digest"],
+            reason=payload["reason"], expected_adoption_id=payload["expected_adoption_id"],
+            current_adoption_id=payload["current_adoption_id"], held_at=event.created_at,
+            stream_version=event.stream_version, event_id=event.event_id,
+        ))
+        return
+    if etype == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED:
+        config = PromptConfig(
+            department=payload["department"], version=int(payload["version"]), text=payload["text"],
+            source="configured", prompt_ref=payload["prompt_ref"], base_version=payload["base_version"],
+            updated_at=event.created_at, event_id=event.event_id,
+        )
+        state.prompt_configs[config.department] = config
+        state.prompt_config_history.append(config)
+        return
+    if etype == ProjectEventType.COMMAND_CONFIGURED:
+        command = RegisteredCommand(
+            name=payload["name"], version=int(payload["version"]), argv=list(payload["argv"]),
+            args=list(payload["args"]), timeout_sec=int(payload["timeout_sec"]),
+            output_limit=int(payload["output_limit"]), base_version=payload["base_version"],
+            updated_at=event.created_at, event_id=event.event_id,
+        )
+        state.commands[command.name] = command
+        state.command_history.append(command)
+        return
+    if etype == ProjectEventType.MATERIAL_RECORDED:
+        state.materials.append(Material(
+            material_id=payload["material_id"], text=payload["text"], material_ref=payload["material_ref"],
+            department=payload["department"], recorded_at=event.created_at, stream_version=event.stream_version,
+            event_id=event.event_id,
+        ))
+        return

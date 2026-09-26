@@ -10,7 +10,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
-from .event_store import NewEvent, WritePath
+from .write_path import NewEvent, WritePath
 from .git_versions import GitVersionStore
 from .materials import append_intend
 from .models import ArtifactRef, DEPARTMENTS, Event, EventType, RunProjection, new_id

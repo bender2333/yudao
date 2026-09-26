@@ -1,13 +1,5 @@
-"""Replay integrity: projection determinism plus persisted delivery-tree and Git checks.
-
-A replay must fail closed. Rebuilding the same canonical state twice only proves
-the projection is deterministic; it says nothing about whether the persisted
-delivery blobs or the Git history survived. This module verifies every delivery
-archive referenced by the projection with ``load_tree`` and replays the accepted
-Git history with ``verify_git_history``. Any failure raises
-``ReplayIntegrityError`` with a ``reason`` that distinguishes tree damage from
-Git damage.
-"""
+# 重放核对：从头重放的运行状态投影必须与保存的投影相同，并核对保存的交付封存与 Git 历史。
+# 核对失败时抛出 ReplayIntegrityError，reason 区分投影、交付封存与 Git 历史。
 
 from __future__ import annotations
 
@@ -16,7 +8,7 @@ from .event_store import EventStore
 from .git_audit import verify_git_history
 from .git_versions import GitVersionStore
 from .models import GIT_VERSION_EVENTS, DeliverySpec, RunProjection
-from .projection import project_run
+from .projection import project_run, replay_run
 from .tree_archive import load_tree
 
 
@@ -39,11 +31,11 @@ def verify_replay(
     versions: GitVersionStore,
     run_id: str,
 ) -> RunProjection:
-    """Rebuild a run projection and verify its persisted delivery tree and Git history."""
-    first = project_run(store, run_id)
-    second = project_run(store, run_id)
-    if first.canonical_state() != second.canonical_state():
-        raise ReplayIntegrityError("replay projection is not deterministic", reason=PROJECTION_REASON)
+    # 重放 run 的全部事件，与保存的投影比较，再核对交付封存与 Git 历史；返回重放得到的投影
+    first = replay_run(store, run_id)
+    if first.to_dict() != project_run(store, run_id).to_dict():
+        raise ReplayIntegrityError("the saved projection differs from the replayed projection",
+                                   reason=PROJECTION_REASON)
     for delivery in first.delivery_specs:
         _verify_delivery_tree(artifacts, run_id, delivery)
     events = store.list_events(run_id)

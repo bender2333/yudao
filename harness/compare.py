@@ -12,8 +12,7 @@ from typing import Any
 
 from .adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from .department_prompts import DEFAULT_PROMPTS
-from .models import EventType
-from .projects import ProjectEventType
+from .models import EventType, ProjectEventType
 from .proposals import delivery_turn, engineering_plan, product_spec, review_turn
 from .public_tree import materialize_tree
 from .providers import ProviderFacade

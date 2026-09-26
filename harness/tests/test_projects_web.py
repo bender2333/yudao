@@ -9,8 +9,7 @@ import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.department_prompts import DEFAULT_PROMPTS
-from harness.models import EventType
-from harness.projects import ProjectEventType
+from harness.models import EventType, ProjectEventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
