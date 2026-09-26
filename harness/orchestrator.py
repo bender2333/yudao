@@ -45,7 +45,7 @@ from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
-from .tools import ToolRuntime, normalize_registered_commands
+from .tools import normalize_registered_commands
 from .workspace import Workspace, WorkspaceSnapshot
 
 
@@ -761,8 +761,7 @@ class Orchestrator:
             activation.driver = StepDriver.start(
                 scope, activation.prompt, store=self.store, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, target=activation.target,
-                environment=LocalEnvironment(workspace),
-                runtime=ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
+                environment=LocalEnvironment(workspace, registered_commands=dict(projection.registered_commands)),
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
             result = await activation.driver.result()

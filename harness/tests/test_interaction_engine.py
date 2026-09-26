@@ -1,5 +1,6 @@
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 
 import pytest
@@ -16,8 +17,8 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import after_event, department_history, recorded_context, start_waiting_for_writes
-from harness.tools import ToolRuntime
+from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history, recorded_context,
+                                   start_waiting_for_writes, wait_for_file)
 
 
 CHANGE_RECORD = {
@@ -253,23 +254,30 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
     assert system.activate_once(run_id).processed_input_version == 2
 
 
-def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_input(tmp_path, monkeypatch):
-    calls = [_call("first", "write_file", path="src/first.py", content="completed first tool"),
+def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_input(tmp_path):
+    # 登记命令运行中收到新输入：这个命令照常完成并记录，其余工具跳过
+    signals = tmp_path / "signals"
+    signals.mkdir()
+    code = ("import pathlib; pathlib.Path('src').mkdir(exist_ok=True); "
+            "pathlib.Path('src/first.py').write_text('completed first tool'); " + WAIT_FOR_RELEASE)
+    registry = {"first": {"argv": ["python", "-c", code, str(signals)], "args": [], "timeout_sec": 60,
+                          "output_limit": 4000}}
+    calls = [{"id": "first", "call_id": "first", "type": "function_call", "name": "run_command",
+              "arguments": json_dumps({"name": "first"})},
              _call("second", "write_file", path="src/second.py", content="must not start"),
              _call("submission", "submit_delivery", summary="old delivery", files=["src/first.py"], check_names=["smoke"])]
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls), _revision()]))
-    run_id = system.create_run("build echo")
+    run_id = system.create_run("build echo", registered_commands=registry, command_versions={"first": 1})
     _steps(system, run_id, 2)
-    execute = ToolRuntime.execute
-
-    def receive_during_tool(runtime, department, name, arguments):
-        if name == "write_file" and arguments["path"] == "src/first.py":
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(system.activate_once, run_id)
+        try:
+            wait_for_file(signals / "started")
             received = system.add_input(run_id, "Print uppercase instead")
             assert received.product_work_input_version == 1
-        return execute(runtime, department, name, arguments)
-
-    monkeypatch.setattr(ToolRuntime, "execute", receive_during_tool)
-    current = system.activate_once(run_id)
+        finally:
+            (signals / "release").write_text("go")
+        current = future.result(timeout=30)
     assert current.phase == "PRODUCT_SPEC" and current.processed_input_version == 1
     assert system.workspace(run_id).list_files() == ["src/first.py"]
     events = system.store.list_events(run_id)

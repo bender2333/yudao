@@ -1,14 +1,55 @@
-# 执行环境的合同：工作区事实的只读查询。裁决规则（U）需要的工作区事实（公开树的清单与摘要、路径在工作区中的
-# 规范形式与种类、检查回执）由执行环境查询：步骤驱动在工具许可之前取得，流程编排在提案判断之前取得，作为输入交给 U。
-# 全部是可以序列化的数据，不含进程内的对象。
+# 执行环境的合同：步骤驱动与执行环境之间的往来。
+# 动作：每次环境工具调用是一个动作（Action：身份、类别、工具与输入、前置条件），执行环境执行以后交回回执
+# （ActionReceipt）；取消按动作身份生效。
+# 工作区事实的只读查询：裁决规则（U）需要的工作区事实（公开树的清单与摘要、路径在工作区中的规范形式与种类、
+# 检查回执）由执行环境查询，步骤驱动在工具许可之前取得，流程编排在提案判断之前取得，作为输入交给 U。
+# 全部是可以序列化的数据，不含进程、线程标志或回调。
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .models import CheckReceipt
+
+ActionKind = Literal["read", "write", "check", "command"]
+
+
+class Preconditions(BaseModel):
+    # 动作的前置条件：tree_digest 是工具许可所依据的公开树摘要，执行之前核对仍然相同
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tree_digest: str | None = None
+
+
+class Action(BaseModel):
+    # 一次环境工具调用：动作身份、类别（读取、写入、检查、登记的本地命令）、工具与模型给出的输入、
+    # 调用的部门与前置条件
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    action_id: str
+    kind: ActionKind
+    tool: str
+    department: str
+    input: dict[str, Any]
+    preconditions: Preconditions = Field(default_factory=Preconditions)
+
+
+class ActionReceipt(BaseModel):
+    # 动作的回执。completed：动作完成，结果在 output；failed：动作没有完成，原因在 error；
+    # timeout、cancelled：进程类动作超时或被取消，进程树已经结束，output 带截至结束时的输出；
+    # 取消在动作开始之前到达时不执行，status 为 cancelled，只有 error
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    action_id: str
+    status: Literal["completed", "failed", "timeout", "cancelled"]
+    output: Any = None
+    error: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
 
 
 class FactsQuery(BaseModel):

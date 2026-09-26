@@ -1,6 +1,7 @@
 # 步骤驱动：一次激活内的步骤循环，以异步方式执行。每一步先在安全节点得到继续或停止，经上下文装配（P）取得请求，
 # 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
-# 以后执行；压缩请求的回答经 P 生成检查点；提交提案时结束。所有记录经过记录接口，
+# 以后执行：主机工具（提交）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
+# 提交提案时结束。所有记录经过记录接口，
 # 需要核对运行状态的记录在写入锁之内判断并写入。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：提交或停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
@@ -16,7 +17,7 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Any, Protocol
 
-from .actions import FactsQuery
+from .actions import Action, FactsQuery, Preconditions, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
@@ -29,7 +30,7 @@ from .projection import project_run
 from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget
 from .recording import ActivationScope, StepRecorder
-from .tools import SUBMIT_KINDS, TOOL_DEFS, ToolResult, ToolRuntime
+from .tools import SUBMIT_KINDS, TOOL_DEFS
 
 # 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
 TOOL_CALL_REQUIRED_LIMIT = 3
@@ -99,18 +100,18 @@ class StepDriver:
     @classmethod
     def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-              target: FrozenTarget | None, environment: LocalEnvironment, runtime: ToolRuntime, nodes: SafeNode,
+              target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
               cancelled: Event, limits: StepLimits) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(scope, prompt, store=store, writes=writes, artifacts=artifacts, assembly=assembly,
-                     adapter=adapter, target=target, environment=environment, runtime=runtime, nodes=nodes,
+                     adapter=adapter, target=target, environment=environment, nodes=nodes,
                      cancelled=cancelled, limits=limits)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-                 target: FrozenTarget | None, environment: LocalEnvironment, runtime: ToolRuntime, nodes: SafeNode,
+                 target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
                  cancelled: Event, limits: StepLimits) -> None:
         self._scope = scope
         basis = scope.basis
@@ -123,7 +124,6 @@ class StepDriver:
         self._adapter = adapter
         self._target = target
         self._environment = environment
-        self._runtime = runtime
         self._nodes = nodes
         self._cancelled = cancelled
         self._limits = limits
@@ -270,24 +270,30 @@ class StepDriver:
                         raise ValueError("tool arguments must be an object")
                 except (TypeError, ValueError) as exc:
                     args = {"invalid_arguments": raw_args}
-                    result = ToolResult(name, False, None, f"invalid tool arguments: {exc}")
+                    ok, output, error = False, None, f"invalid tool arguments: {exc}"
                 else:
-                    permission = self._begin_tool(request, {"id": identity, "name": name, "args": args,
-                                                            "step_id": step_id})
+                    permission, facts = self._begin_tool(request, {"id": identity, "name": name, "args": args,
+                                                                   "step_id": step_id})
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
                         return Stopped()
                     if not permission.allowed:
-                        result = ToolResult(name, False, None, permission.reason)
+                        ok, output, error = False, None, permission.reason
                     elif TOOL_DEFS[name]["kind"] == "host":
-                        result = ToolResult(name, True, _run_host_tool(name, args))
+                        ok, output, error = True, _run_host_tool(name, args), None
                     else:
-                        result = self._runtime.execute(request.department, name, args)
+                        # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要
+                        receipt = await self._environment.perform(Action(
+                            action_id=f"{request.activation_id}:{step_id}:{identity}", kind=TOOL_DEFS[name]["action"],
+                            tool=name, department=request.department, input=args,
+                            preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
+                        ))
+                        ok, output, error = receipt.ok, receipt.output, receipt.error
                 input_item = {"type": "function_call_output", "call_id": identity,
-                              "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
-                call = {"id": identity, "name": name, "args": args, "ok": result.ok,
-                        "output": result.output, "error": result.error, "step_id": step_id, "input_item": input_item}
+                              "output": json_dumps({"ok": ok, "output": output, "error": error})}
+                call = {"id": identity, "name": name, "args": args, "ok": ok,
+                        "output": output, "error": error, "step_id": step_id, "input_item": input_item}
                 self._recorder.tool_called(request, call)
                 if not self._nodes.proceed():
                     self._skip(request, response.output[index + 1:],
@@ -296,7 +302,7 @@ class StepDriver:
                 if name in SUBMIT_KINDS:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
-                    proposal = result.output if result.ok else {**args, "kind": SUBMIT_KINDS[name]}
+                    proposal = output if ok else {**args, "kind": SUBMIT_KINDS[name]}
                     return Submitted(proposal, response, self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
@@ -401,11 +407,11 @@ class StepDriver:
                 return
             self._recorder.compaction(projection.phase, request, result, response)
 
-    def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> ToolPermission:
+    def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> tuple[ToolPermission, WorkspaceFacts]:
+        # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U；同一份事实是动作的前置条件
         scope = self._scope
         with self._writes.lock:
             projection = self._nodes.settle()
-            # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
                 projection, call, department=scope.department, guidance_only=scope.guidance_only,
@@ -413,7 +419,7 @@ class StepDriver:
             )
             if permission.allowed:
                 self._recorder.tool_started(projection.phase, request, call, permission.command_basis)
-            return permission
+            return permission, facts
 
     def _skip(self, request: ModelRequest, output: list[dict[str, Any]], error: str) -> None:
         for item in output:

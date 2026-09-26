@@ -1,6 +1,5 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
 
 import pytest
 
@@ -10,9 +9,9 @@ from harness.models import EventType, RunProjection, canonical_hash, estimate_to
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, after_event, recorded_context, start_waiting_for_writes
+from harness.tests.helpers import (FAST_RETRIES, WAIT_FOR_RELEASE, after_event, recorded_context,
+                                   start_waiting_for_writes, wait_for_file)
 from harness.tests.protocol_helpers import complete, model_call
-from harness.tools import ToolRuntime
 
 
 def _call(identity, name, **args):
@@ -144,37 +143,32 @@ def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path):
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "write-1" for event in system.store.list_events(run_id))
 
 
-def test_cancel_records_inflight_tool_but_does_not_start_following_tool(tmp_path, monkeypatch):
-    entered, release = Event(), Event()
-    first = _call("write-1", "write_file", path="started.txt", content="started")
+def test_cancel_records_inflight_tool_but_does_not_start_following_tool(tmp_path):
+    # 登记命令运行中取消运行：这个命令的结果照常记录，之后的工具不开始
+    signals = tmp_path / "signals"
+    signals.mkdir()
+    registry = {"wait": {"argv": ["python", "-c", WAIT_FOR_RELEASE, str(signals)], "args": [],
+                         "timeout_sec": 60, "output_limit": 4000}}
+    first = {"id": "command-1", "call_id": "command-1", "type": "function_call", "name": "run_command",
+             "arguments": json_dumps({"name": "wait"})}
     second = _call("write-2", "write_file", path="later.txt", content="later")
-    adapter = FakeAdapter([product_spec(), plan_turn(scope=["started.txt", "later.txt"]), ModelResponse(output=[first, second])])
+    adapter = FakeAdapter([product_spec(), plan_turn(scope=["later.txt"]), ModelResponse(output=[first, second])])
     system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("echo")
+    run_id = system.create_run("echo", registered_commands=registry, command_versions={"wait": 1})
     system.activate_once(run_id)
     system.activate_once(run_id)
-    execute = ToolRuntime.execute
-
-    def delayed_execute(runtime, department, name, args=None):
-        if name == "write_file":
-            entered.set()
-            assert release.wait(5)
-        return execute(runtime, department, name, args)
-
-    monkeypatch.setattr(ToolRuntime, "execute", delayed_execute)
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         try:
-            assert entered.wait(5)
+            wait_for_file(signals / "started")
             assert system.cancel(run_id).stop_reason == "cancelled"
             assert not future.done()
         finally:
-            release.set()
-        result = future.result(timeout=5)
-    assert system.workspace(run_id).read_file("started.txt") == "started"
+            (signals / "release").write_text("go")
+        result = future.result(timeout=30)
     assert "later.txt" not in system.workspace(run_id).list_files()
     events = system.store.list_events(run_id)
-    assert any(event.type == EventType.TOOL_CALLED and event.payload.get("id") == "write-1" for event in events)
+    assert any(event.type == EventType.TOOL_CALLED and event.payload.get("id") == "command-1" for event in events)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "write-2" for event in events)
     assert result.stop_reason == "cancelled"
     assert result.canonical_state() == system.replay(run_id).canonical_state()

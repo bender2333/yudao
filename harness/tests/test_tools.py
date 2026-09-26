@@ -1,13 +1,27 @@
+import asyncio
 import json
 import os
+import re
 import sys
 import time
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from harness.tools import TOOL_SCHEMAS, TOOL_DEFS, ToolRuntime, tools_for
+from harness.adapters.fake import FakeAdapter
+from harness.environment import LocalEnvironment
+from harness.models import EventType, json_dumps
+from harness.proposals import delivery_turn, plan_turn, product_spec
+from harness.providers.call import ModelResponse
+from harness.runtime import LoopSystem
+from harness.tests.helpers import LONG_RUNNING_TREE, action, perform, wait_for_file, wait_until_stopped
+from harness.tools import TOOL_SCHEMAS, TOOL_DEFS, tools_for
 from harness.workspace import Workspace
+
+
+def _call(identity, name, **arguments):
+    return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
+            "arguments": json_dumps(arguments)}
 
 
 def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check(tmp_path):
@@ -15,10 +29,22 @@ def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check
     assert [name for name in tools_for("quality") if TOOL_DEFS[name].get("action") == "check"] == ["run_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
-    result = ToolRuntime(workspace).execute("quality", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "ok.py"]},
+                     department="quality")
     assert result.ok is True and result.output["executor"] == "host"
     assert workspace.snapshot().facts.latest_check("quality", "smoke").exit_code == 0
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
+
+
+def test_tools_are_host_tools_or_environment_actions():
+    # 主机工具只有提交类工具；其余工具是环境工具，各有动作类别
+    assert {name for name, spec in TOOL_DEFS.items() if spec["kind"] == "host"} == {
+        name for name in TOOL_DEFS if name.startswith("submit_")}
+    assert {name: spec["action"] for name, spec in TOOL_DEFS.items() if spec["kind"] == "environment"} == {
+        "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
+        "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
+        "run_check": "check", "run_command": "command",
+    }
 
 
 def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
@@ -57,9 +83,9 @@ def test_write_tool_descriptions_state_the_plan_requirement():
 
 def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
-    assert runtime.execute("engineering", "write_file", {"path": "src/deep/a.py", "content": "first\nsecond\n"}).ok
-    assert runtime.execute("engineering", "write_file", {"path": "src/deep/a.py", "content": "only\n"}).ok
+    environment = LocalEnvironment(workspace)
+    assert perform(environment, "write_file", {"path": "src/deep/a.py", "content": "first\nsecond\n"}).ok
+    assert perform(environment, "write_file", {"path": "src/deep/a.py", "content": "only\n"}).ok
     assert workspace.read_file("src/deep/a.py") == "only\n"
 
 
@@ -69,14 +95,15 @@ def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_u
     assert "Files that are not valid UTF-8 are rejected." in description
     assert "Use read_range for large files" in description and "content_hash" in description
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
+    environment = LocalEnvironment(workspace)
     # 超过 read_range 单页上限的文件由 read_file 完整返回
     text = "".join(f"line {index} " + "x" * 80 + "\n" for index in range(200))
     workspace.write_file("big.txt", text)
     assert len(text) > 4000
-    assert runtime.execute("quality", "read_file", {"path": "big.txt"}).output == text
+    assert perform(environment, "read_file", {"path": "big.txt"}, department="quality").output == text
     (tmp_path / "latin1.txt").write_bytes(b"caf\xe9\n")
-    assert runtime.execute("quality", "read_file", {"path": "latin1.txt"}).ok is False
+    unreadable = perform(environment, "read_file", {"path": "latin1.txt"}, department="quality")
+    assert unreadable.ok is False and unreadable.status == "failed"
 
 
 def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
@@ -85,26 +112,34 @@ def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
     assert "end it with / to limit the list to one directory" in (
         TOOL_SCHEMAS["list_files"]["parameters"]["properties"]["prefix"]["description"])
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
+    environment = LocalEnvironment(workspace)
     for path in ("src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"):
         workspace.write_file(path, "x\n")
-    assert sorted(runtime.execute("quality", "list_files", {}).output) == [
+    assert sorted(perform(environment, "list_files", {}).output) == [
         "src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"]
-    assert sorted(runtime.execute("quality", "list_files", {"prefix": "src/"}).output) == ["src/a.py", "src/deep/b.py"]
-    assert sorted(runtime.execute("quality", "list_files", {"prefix": "src"}).output) == [
+    assert sorted(perform(environment, "list_files", {"prefix": "src/"}).output) == ["src/a.py", "src/deep/b.py"]
+    assert sorted(perform(environment, "list_files", {"prefix": "src"}).output) == [
         "src/a.py", "src/deep/b.py", "src2/a.py"]
+
+
+def test_actions_and_receipts_are_serializable_contracts(tmp_path):
+    workspace = Workspace(tmp_path)
+    workspace.write_file("a.txt", "a\n")
+    request = action("read_file", {"path": "a.txt"}, department="quality")
+    assert type(request).model_validate_json(request.model_dump_json()) == request
+    assert request.kind == "read" and request.tool == "read_file"
+    receipt = asyncio.run(LocalEnvironment(workspace).perform(request))
+    assert receipt.action_id == request.action_id and receipt.status == "completed" and receipt.output == "a\n"
+    assert type(receipt).model_validate_json(receipt.model_dump_json()) == receipt
 
 
 def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
+    environment = LocalEnvironment(workspace)
     workspace.write_file("ok.py", "raise SystemExit(3)\n")
-    result = runtime.execute(
-        "engineering",
-        "run_check",
-        {"name": "smoke", "argv": ["python", "ok.py"], "exit_code": 0},
-    )
+    result = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "ok.py"], "exit_code": 0})
     assert result.ok is True
+    assert result.status == "completed"
     assert result.output["exit_code"] == 3
     assert result.output["executor"] == "host"
     receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
@@ -114,34 +149,27 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
 
 
 def test_run_check_requires_command(tmp_path):
-    runtime = ToolRuntime(Workspace(tmp_path))
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "exit_code": 0})
+    result = perform(LocalEnvironment(Workspace(tmp_path)), "run_check", {"name": "smoke", "exit_code": 0})
     assert result.ok is False
     assert "argv" in (result.error or "") or "command" in (result.error or "")
 
 
 def test_agent_cannot_read_or_write_checks(tmp_path):
-    workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
-    written = runtime.execute(
-        "engineering",
-        "write_file",
-        {"path": ".checks/receipts.jsonl", "content": "forged\n"},
-    )
+    environment = LocalEnvironment(Workspace(tmp_path))
+    written = perform(environment, "write_file", {"path": ".checks/receipts.jsonl", "content": "forged\n"})
     assert written.ok is False
-    read = runtime.execute("engineering", "read_file", {"path": ".checks/receipts.jsonl"})
+    read = perform(environment, "read_file", {"path": ".checks/receipts.jsonl"})
     assert read.ok is False
-    assert ".checks" not in runtime.execute("engineering", "list_files", {}).output
+    assert ".checks" not in perform(environment, "list_files", {}).output
 
 
 def test_check_cannot_persist_forged_receipt(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
     workspace.write_file(
         "forge.py",
         "from pathlib import Path\nPath('.checks/receipts.jsonl').write_text('forged\\n')\n",
     )
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "forge.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "forge.py"]})
     assert result.ok is True
     text = (tmp_path / ".checks" / "receipts.jsonl").read_text(encoding="utf-8")
     assert text.strip() != "forged"
@@ -153,10 +181,10 @@ def test_check_cannot_persist_forged_receipt(tmp_path):
 
 def test_check_does_not_keep_workspace_mutations(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
     workspace.write_file("src/echo.py", "print('ok')\n")
     workspace.write_file("mutate.py", "from pathlib import Path\nPath('hacked.txt').write_text('x')\n")
-    runtime.execute("quality", "run_check", {"name": "smoke", "argv": ["python", "mutate.py"]})
+    perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "mutate.py"]},
+            department="quality")
     assert "hacked.txt" not in workspace.list_files()
     assert workspace.read_file("src/echo.py") == "print('ok')\n"
 
@@ -164,14 +192,13 @@ def test_check_does_not_keep_workspace_mutations(tmp_path):
 def test_check_subprocess_does_not_inherit_provider_credentials(tmp_path, monkeypatch):
     monkeypatch.setenv("BLACKROUTER_API_KEY", "super-secret-value-123456")
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
     workspace.write_file(
         "env.py",
         "import os, sys\n"
         "print('has' if os.environ.get('BLACKROUTER_API_KEY') else 'missing')\n"
         "raise SystemExit(0)\n",
     )
-    result = runtime.execute("engineering", "run_check", {"name": "env", "argv": [sys.executable, "env.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "env", "argv": [sys.executable, "env.py"]})
     assert result.ok is True
     assert "missing" in result.output["summary"]
     assert "super-secret-value-123456" not in result.output["summary"]
@@ -179,7 +206,6 @@ def test_check_subprocess_does_not_inherit_provider_credentials(tmp_path, monkey
 
 def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
     workspace.write_file("app.py", "BROKEN = True\n")
     workspace.write_file(
         "fix.py",
@@ -189,7 +215,7 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
         "assert 'FIXED' in p.read_text()\n",
     )
     original = workspace.digest()
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "fix.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "fix.py"]})
     assert result.ok is True
     assert result.output["exit_code"] == 0
     assert workspace.read_file("app.py") == "BROKEN = True\n"
@@ -201,7 +227,6 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
 
 def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
     workspace = Workspace(tmp_path / "ws")
-    runtime = ToolRuntime(workspace)
     outside = tmp_path / "outside.txt"
     outside.write_text("EXTERNAL", encoding="utf-8")
     target = workspace.root / "target.txt"
@@ -210,7 +235,7 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
     except OSError:
         pytest.skip("hard links are not available")
     workspace.write_file("poke.py", "from pathlib import Path\nPath('target.txt').write_text('HACKED')\n")
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
     assert result.ok is False
     assert "hard-linked" in result.error.lower()
     assert workspace.receipts() == []
@@ -220,9 +245,8 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
 
 def test_failed_check_records_real_exit_code(tmp_path):
     workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
     workspace.write_file("fail.py", "raise SystemExit(7)\n")
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "fail.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "fail.py"]})
     assert result.ok is True
     assert result.output["exit_code"] == 7
     receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
@@ -231,20 +255,58 @@ def test_failed_check_records_real_exit_code(tmp_path):
     assert receipt.snapshot_hash == workspace.digest()
 
 
-def test_timed_out_check_records_timeout_exit_code(tmp_path, monkeypatch):
-    monkeypatch.setattr("harness.tools.CHECK_TIMEOUT_SEC", 1)
-    workspace = Workspace(tmp_path)
-    runtime = ToolRuntime(workspace)
-    workspace.write_file("hang.py", "import time\ntime.sleep(30)\n")
+def test_timed_out_check_records_timeout_exit_code_and_stops_the_process_tree(tmp_path):
+    workspace = Workspace(tmp_path / "ws")
+    environment = LocalEnvironment(workspace, check_timeout_sec=2)
+    marker = tmp_path / "started"
     started = time.monotonic()
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "hang.py"]})
-    assert time.monotonic() - started < 10
-    assert result.ok is True
+    result = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    assert time.monotonic() - started < 20
+    assert result.ok is True and result.status == "timeout"
     assert result.output["exit_code"] == 124
+    assert result.output["summary"].splitlines()[1] == "check timed out after 2s"
+    child = int(re.search(r"started child=(\d+)", result.output["summary"]).group(1))
+    assert wait_until_stopped(child)
     receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
     assert receipt is not None
     assert receipt.exit_code == 124
     assert "timed out" in receipt.summary
+
+
+def test_cancel_stops_a_running_check_and_its_receipt_is_cancelled(tmp_path):
+    # 检查运行中取消：结束整个进程树，回执记为已取消，带截至结束时的输出，检查回执的退出码是 130
+    workspace = Workspace(tmp_path / "ws")
+    environment = LocalEnvironment(workspace)
+    marker = tmp_path / "started"
+    request = action("run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(asyncio.run, environment.perform(request))
+        wait_for_file(marker)
+        started = time.monotonic()
+        environment.cancel(request.action_id)
+        result = future.result(timeout=20)
+    assert time.monotonic() - started < 10
+    assert result.ok is True and result.status == "cancelled"
+    assert result.output["exit_code"] == 130
+    lines = result.output["summary"].splitlines()
+    assert lines[1] == "check cancelled; the process tree was stopped"
+    child = int(re.search(r"started child=(\d+)", lines[2]).group(1))
+    assert wait_until_stopped(child)
+    [receipt] = workspace.receipts()
+    assert receipt.exit_code == 130 and receipt.summary == result.output["summary"]
+
+
+def test_cancel_before_the_action_starts_does_not_start_the_process(tmp_path):
+    workspace = Workspace(tmp_path / "ws")
+    environment = LocalEnvironment(workspace)
+    marker = tmp_path / "started"
+    request = action("run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    environment.cancel(request.action_id)
+    result = asyncio.run(environment.perform(request))
+    assert result.status == "cancelled" and result.ok is False and result.output is None
+    assert result.error == "The action was cancelled before it started."
+    assert not marker.exists()
+    assert workspace.receipts() == []
 
 
 @pytest.fixture
@@ -257,9 +319,8 @@ def check_copy_base(tmp_path, monkeypatch):
 
 def test_missing_check_command_does_not_leave_a_copy(tmp_path, check_copy_base):
     workspace = Workspace(tmp_path / "workspace")
-    runtime = ToolRuntime(workspace)
     workspace.write_file("ok.py", "print('ok')\n")
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["missing.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["missing.py"]})
     assert result.ok is False
     assert "missing.py" in (result.error or "")
     assert list(check_copy_base.iterdir()) == []
@@ -267,14 +328,13 @@ def test_missing_check_command_does_not_leave_a_copy(tmp_path, check_copy_base):
 
 def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_copy_base):
     workspace = Workspace(tmp_path / "workspace")
-    runtime = ToolRuntime(workspace)
     workspace.write_file("ok.py", "print('ok')\n")
     def fail_copy(tree, target):
         target.mkdir()
         raise OSError("copy failed")
 
     monkeypatch.setattr("harness.workspace.materialize_tree", fail_copy)
-    result = runtime.execute("engineering", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
     assert result.ok is False
     assert "copy failed" in (result.error or "")
     assert list(check_copy_base.iterdir()) == []
@@ -282,14 +342,14 @@ def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_co
 
 def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_base):
     workspace = Workspace(tmp_path / "workspace")
-    runtime = ToolRuntime(workspace)
+    environment = LocalEnvironment(workspace)
     workspace.write_file("ok.py", "print('ok')\n")
     workspace.write_file("fail.py", "raise SystemExit(7)\n")
     with workspace.check_copy(workspace.snapshot().tree) as copy_root:
         assert copy_root.parent.parent == check_copy_base
         assert not copy_root.is_relative_to(workspace.root)
-    ok = runtime.execute("engineering", "run_check", {"name": "ok", "argv": ["python", "ok.py"]})
-    failed = runtime.execute("engineering", "run_check", {"name": "fail", "argv": ["python", "fail.py"]})
+    ok = perform(environment, "run_check", {"name": "ok", "argv": ["python", "ok.py"]})
+    failed = perform(environment, "run_check", {"name": "fail", "argv": ["python", "fail.py"]})
     assert ok.ok is True
     assert ok.output["exit_code"] == 0
     assert failed.ok is True
@@ -298,19 +358,40 @@ def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_b
     assert list(check_copy_base.iterdir()) == []
 
 
-def test_product_cannot_write(tmp_path):
-    runtime = ToolRuntime(Workspace(tmp_path))
-    result = runtime.execute("product", "write_file", {"path": "src/echo.py", "content": "x"})
-    assert result.ok is False
+@pytest.mark.parametrize("department", ["product", "quality"])
+def test_departments_without_write_tools_cannot_change_files(tmp_path, department):
+    # 部门的工具范围由工具许可核对：没有写入工具的部门调用写入、编辑、删除、移动都被拒绝，文件不变
+    calls = ModelResponse(output=[
+        _call("write", "write_file", path="src/echo.py", content="x"),
+        _call("edit", "edit_range", path="src/echo.py", start_line=1, end_line=1,
+              expected_text="import sys", new_text="x"),
+        _call("delete", "delete_file", path="src/echo.py", reason="remove replaced implementation"),
+        _call("move", "move_file", source="src/echo.py", destination="src/moved.py", reason="organize module"),
+    ])
+    script = [calls] if department == "product" else [product_spec(), plan_turn(), delivery_turn(), calls]
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
+    run_id = system.create_run("echo")
+    workspace = system.workspace(run_id)
+    if department == "product":
+        workspace.write_file("src/echo.py", "original\n")
+    system.run_until_stop(run_id)
+    before = workspace.read_file("src/echo.py")
+    events = system.store.list_events(run_id)
+    for identity, tool in (("write", "write_file"), ("edit", "edit_range"), ("delete", "delete_file"),
+                           ("move", "move_file")):
+        called = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == identity)
+        assert called.role == department
+        assert not called.payload["ok"] and called.payload["error"] == f"{department} cannot use {tool}"
+        assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == identity for event in events)
+    assert workspace.read_file("src/echo.py") == before != "x"
+    assert not (workspace.root / "src" / "moved.py").exists()
 
 
 def test_module_import_check_preserves_complete_tree(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("helper.py", "VALUE = 42\n")
     workspace.write_file("main.py", "from helper import VALUE\nprint(VALUE)\nassert VALUE == 42\n")
-    result = ToolRuntime(workspace).execute("engineering", "run_check", {
-        "name": "imports", "argv": ["python", "main.py"],
-    })
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "imports", "argv": ["python", "main.py"]})
     assert result.ok and result.output["exit_code"] == 0
     assert result.output["tree_changed"] is False
     assert "42" in result.output["summary"]
@@ -329,21 +410,16 @@ def test_check_copy_uses_previously_captured_bytes(tmp_path):
         assert not (copy_root / "extra.py").exists()
 
 
-def test_check_records_source_workspace_change(tmp_path, monkeypatch):
-    import harness.tools as tools
-
-    workspace = Workspace(tmp_path)
-    workspace.write_file("app.py", "print('checked original')\nraise SystemExit(7)\n")
-    run = tools.subprocess.run
-
-    def execute(*args, **kwargs):
-        result = run(*args, **kwargs)
-        workspace.write_file("app.py", "changed after the check\n")
-        return result
-
-    monkeypatch.setattr(tools.subprocess, "run", execute)
-    result = ToolRuntime(workspace).execute("engineering", "run_check", {
-        "name": "source", "argv": ["python", "app.py"],
+def test_check_records_source_workspace_change(tmp_path):
+    # 检查进程在运行中改写了源工作区（路径由参数给出）：回执记为树已改变，不绑定到原来的快照
+    workspace = Workspace(tmp_path / "ws")
+    workspace.write_file(
+        "app.py",
+        "import sys\nfrom pathlib import Path\nprint('checked original')\n"
+        "Path(sys.argv[1]).write_text('changed after the check\\n')\nraise SystemExit(7)\n",
+    )
+    result = perform(LocalEnvironment(workspace), "run_check", {
+        "name": "source", "argv": ["python", "app.py", str(workspace.root / "app.py")],
     })
     assert result.ok and result.output["exit_code"] == 7
     assert result.output["tree_changed"] is True
@@ -354,52 +430,34 @@ def test_check_records_source_workspace_change(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("failed_root", ["copy", "source"])
-def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, monkeypatch, failed_root):
-    import harness.tools as tools
-
-    workspace = Workspace(tmp_path)
-    workspace.write_file("app.py", "print('observed output')\nraise SystemExit(9)\n")
-    capture = tools.capture_public_tree
-
-    def verify(root):
-        if (root == workspace.root) == (failed_root == "source"):
-            raise OSError("tree read failed")
-        return capture(root)
-
-    monkeypatch.setattr(tools, "capture_public_tree", verify)
-    result = ToolRuntime(workspace).execute("engineering", "run_check", {
-        "name": "unverified", "argv": ["python", "app.py"],
-    })
+def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, failed_root):
+    # 检查进程在被检查的副本或源工作区中留下硬链接，检查以后读取公开树失败：进程的结果仍然记为证据
+    workspace = Workspace(tmp_path / "ws")
+    workspace.write_file(
+        "app.py",
+        "import os, sys\nroot = sys.argv[1] if len(sys.argv) > 1 else '.'\n"
+        "os.link(os.path.join(root, 'app.py'), os.path.join(root, 'linked.py'))\n"
+        "print('observed output')\nraise SystemExit(9)\n",
+    )
+    argv = ["python", "app.py"] + ([str(workspace.root)] if failed_root == "source" else [])
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "unverified", "argv": argv})
     assert result.ok and result.output["exit_code"] == 9
     assert result.output["tree_changed"] is True
     assert "observed output" in result.output["summary"]
-    assert "could not be verified: tree read failed" in result.output["summary"]
-    assert len(workspace.receipts()) == 1
-    assert workspace.snapshot().facts.latest_check("engineering", "unverified") is None
-
-
-@pytest.mark.parametrize("department", ["product", "quality"])
-@pytest.mark.parametrize("tool,args", [
-    ("delete_file", {"path": "old.py", "reason": "remove replaced implementation"}),
-    ("move_file", {"source": "old.py", "destination": "new.py", "reason": "organize module"}),
-])
-def test_refactoring_tools_require_engineering(tmp_path, department, tool, args):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("old.py", "original\n")
-    result = ToolRuntime(workspace).execute(department, tool, args)
-    assert result.ok is False
-    assert workspace.read_file("old.py") == "original\n"
-    assert not (workspace.root / "new.py").exists()
+    label = "source workspace" if failed_root == "source" else "tested tree"
+    assert f"{label} could not be verified" in result.output["summary"]
+    [receipt] = workspace.receipts()
+    assert receipt.tree_changed is True
 
 
 @pytest.mark.parametrize("reason", [None, "", " ", 2])
 def test_refactoring_tools_require_explained_reason(tmp_path, reason):
     workspace = Workspace(tmp_path)
     workspace.write_file("old.py", "original\n")
-    runtime = ToolRuntime(workspace)
+    environment = LocalEnvironment(workspace)
     for tool, args in (("delete_file", {"path": "old.py"}),
                        ("move_file", {"source": "old.py", "destination": "new.py"})):
-        result = runtime.execute("engineering", tool, {**args, "reason": reason})
+        result = perform(environment, tool, {**args, "reason": reason})
         assert result.ok is False
         assert "reason" in result.error
         assert workspace.read_file("old.py") == "original\n"
@@ -408,14 +466,14 @@ def test_refactoring_tools_require_explained_reason(tmp_path, reason):
 def test_refactoring_tools_move_and_delete_regular_files(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("old.py", "original\n")
-    runtime = ToolRuntime(workspace)
-    moved = runtime.execute("engineering", "move_file", {
+    environment = LocalEnvironment(workspace)
+    moved = perform(environment, "move_file", {
         "source": "old.py", "destination": "src/new.py", "reason": "organize module",
     })
     assert moved.ok and moved.output == {"source": "old.py", "destination": "src/new.py"}
     assert not (workspace.root / "old.py").exists()
     assert workspace.read_file("src/new.py") == "original\n"
-    deleted = runtime.execute("engineering", "delete_file", {
+    deleted = perform(environment, "delete_file", {
         "path": "src/new.py", "reason": "remove replaced module",
     })
     assert deleted.ok and deleted.output == "src/new.py"

@@ -1,8 +1,9 @@
+import asyncio
 import json
-import os
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -12,9 +13,12 @@ from harness.projects import CommandConfigConflict
 from harness.proposals import delivery_turn, engineering_plan, plan_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, recorded_context
+from harness.actions import Preconditions
+from harness.environment import LocalEnvironment
+from harness.tests.helpers import (LONG_RUNNING_TREE, action, happy_script, perform, recorded_context,
+                                   wait_for_file, wait_until_stopped)
 from harness.tests.test_web import get_json, request, running_server
-from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, TOOL_SCHEMAS, ToolRuntime
+from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, TOOL_SCHEMAS
 from harness.workspace import Workspace
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -22,55 +26,47 @@ SECRET_NAME = "YUDAO_TEST_API_KEY"
 SECRET_VALUE = "credential-value-12345678"
 
 
-def _runtime(root, registry):
-    return ToolRuntime(Workspace(root), registry)
-
-
-def _pid_alive(pid):
-    # 跨平台存活检查：只读探测，不改进程状态
-    if os.name == "nt":
-        import ctypes
-
-        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
-        if not handle:
-            return False
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return True
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
 def test_unregistered_name_and_out_of_allowlist_args_rejected_before_execution(tmp_path):
     workspace = Workspace(tmp_path / "ws")
     workspace.write_file("marker.py", "from pathlib import Path\nPath('ran.txt').write_text('ran')\n")
-    runtime = ToolRuntime(workspace, {
+    environment = LocalEnvironment(workspace, registered_commands={
         "mark": {"argv": ["python", "marker.py"], "args": ["--fast"], "timeout_sec": 30, "output_limit": 4000},
     })
-    unknown = runtime.execute("engineering", "run_command", {"name": "missing"})
+    unknown = perform(environment, "run_command", {"name": "missing"})
     assert unknown.ok is False
     assert "unknown registered command" in (unknown.error or "")
-    smuggled = runtime.execute("engineering", "run_command", {"name": "mark", "args": ["--evil"]})
+    smuggled = perform(environment, "run_command", {"name": "mark", "args": ["--evil"]})
     assert smuggled.ok is False
     assert "allowlist" in (smuggled.error or "")
-    for department in ("product", "quality"):
-        denied = runtime.execute(department, "run_command", {"name": "mark", "args": ["--fast"]})
-        assert denied.ok is False
-        assert "cannot use run_command" in (denied.error or "")
     # 任一拒绝都没有执行：标记文件不存在
     assert not (workspace.root / "ran.txt").exists()
     assert workspace.receipts() == []
-    allowed = runtime.execute("engineering", "run_command", {"name": "mark", "args": ["--fast"]})
+    allowed = perform(environment, "run_command", {"name": "mark", "args": ["--fast"]})
     assert allowed.ok is True
     assert allowed.output["attempt"] == 1
     assert (workspace.root / "ran.txt").read_text() == "ran"
-    again = runtime.execute("engineering", "run_command", {"name": "mark", "args": ["--fast"]})
+    again = perform(environment, "run_command", {"name": "mark", "args": ["--fast"]})
     assert again.ok is True
     assert again.output["attempt"] == 2
+
+
+def test_command_does_not_run_when_the_tree_changed_after_the_permission(tmp_path):
+    # 前置条件：工具许可所依据的公开树摘要与执行之前的摘要不同时不执行
+    workspace = Workspace(tmp_path / "ws")
+    workspace.write_file("marker.py", "from pathlib import Path\nPath('ran.txt').write_text('ran')\n")
+    environment = LocalEnvironment(workspace, registered_commands={
+        "mark": {"argv": ["python", "marker.py"], "args": [], "timeout_sec": 30, "output_limit": 4000},
+    })
+    permitted = workspace.digest()
+    workspace.write_file("later.py", "changed after the permission\n")
+    stale = action("run_command", {"name": "mark"}, preconditions=Preconditions(tree_digest=permitted))
+    result = asyncio.run(environment.perform(stale))
+    assert result.status == "failed" and result.ok is False
+    assert result.error == "the workspace changed after the tool permission; call run_command again"
+    assert not (workspace.root / "ran.txt").exists()
+    current = action("run_command", {"name": "mark"}, preconditions=Preconditions(tree_digest=workspace.digest()))
+    finished = asyncio.run(environment.perform(current))
+    assert finished.status == "completed" and finished.output["status"] == "ok" and finished.output["attempt"] == 1
 
 
 def test_fixed_cwd_and_sanitized_env(tmp_path, monkeypatch):
@@ -83,10 +79,10 @@ def test_fixed_cwd_and_sanitized_env(tmp_path, monkeypatch):
         "print('CRED=' + ('has' if os.environ.get('YUDAO_TEST_API_KEY') else 'missing'))\n"
         "print('PWB=' + os.environ.get('PYTHONDONTWRITEBYTECODE', 'unset'))\n",
     )
-    runtime = ToolRuntime(workspace, {
+    environment = LocalEnvironment(workspace, registered_commands={
         "env": {"argv": ["python", "env.py"], "args": [], "timeout_sec": 30, "output_limit": 4000},
     })
-    result = runtime.execute("engineering", "run_command", {"name": "env"})
+    result = perform(environment, "run_command", {"name": "env"})
     assert result.ok is True
     assert result.output["status"] == "ok"
     assert f"CWD={workspace.root}" in result.output["output"]
@@ -99,17 +95,17 @@ def test_exit_failure_and_output_overflow_have_real_states(tmp_path):
     workspace = Workspace(tmp_path / "ws")
     workspace.write_file("fail.py", "raise SystemExit(7)\n")
     workspace.write_file("noisy.py", "print('y' * 20000)\n")
-    runtime = ToolRuntime(workspace, {
+    environment = LocalEnvironment(workspace, registered_commands={
         "fail": {"argv": ["python", "fail.py"], "args": [], "timeout_sec": 30, "output_limit": 4000},
         "noisy": {"argv": ["python", "noisy.py"], "args": [], "timeout_sec": 30, "output_limit": 500},
     })
-    failed = runtime.execute("engineering", "run_command", {"name": "fail"})
+    failed = perform(environment, "run_command", {"name": "fail"})
     assert failed.ok is True
     assert failed.output["exit_code"] == 7
     assert failed.output["status"] == "failed"
     assert failed.output["truncated"] is False
     assert failed.output["executor"] == "host"
-    overflow = runtime.execute("engineering", "run_command", {"name": "noisy"})
+    overflow = perform(environment, "run_command", {"name": "noisy"})
     assert overflow.ok is True
     assert overflow.output["exit_code"] == 0
     assert overflow.output["status"] == "ok"
@@ -126,34 +122,53 @@ def test_timeout_kills_the_whole_process_tree(tmp_path):
         "print(f'child={child.pid}', flush=True)\n"
         "time.sleep(30)\n",
     )
-    runtime = ToolRuntime(workspace, {
+    environment = LocalEnvironment(workspace, registered_commands={
         "hang": {"argv": ["python", "spawn.py"], "args": [], "timeout_sec": 3, "output_limit": 4000},
     })
     started = time.monotonic()
-    result = runtime.execute("engineering", "run_command", {"name": "hang"})
+    result = perform(environment, "run_command", {"name": "hang"})
     assert time.monotonic() - started < 20
-    assert result.ok is True
+    assert result.ok is True and result.status == "timeout"
     assert result.output["status"] == "timeout"
     assert result.output["exit_code"] == 124
-    assert "process tree was stopped" in result.output["output"]
+    assert result.output["output"].endswith("command timed out after 3s; the process tree was stopped")
     match = re.search(r"child=(\d+)", result.output["output"])
     assert match is not None
-    child_pid = int(match.group(1))
     # 子进程必须确实停止，不残留
-    for _ in range(100):
-        if not _pid_alive(child_pid):
-            break
-        time.sleep(0.1)
-    assert not _pid_alive(child_pid)
+    assert wait_until_stopped(int(match.group(1)))
+
+
+def test_cancel_stops_a_running_command_and_its_receipt_is_cancelled(tmp_path):
+    # 登记命令运行中取消：结束整个进程树，回执记为已取消，带截至结束时的输出
+    workspace = Workspace(tmp_path / "ws")
+    marker = tmp_path / "started"
+    environment = LocalEnvironment(workspace, registered_commands={
+        "serve": {"argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)], "args": [], "timeout_sec": 60,
+                  "output_limit": 4000},
+    })
+    request = action("run_command", {"name": "serve"})
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(asyncio.run, environment.perform(request))
+        wait_for_file(marker)
+        started = time.monotonic()
+        environment.cancel(request.action_id)
+        result = future.result(timeout=20)
+    assert time.monotonic() - started < 10
+    assert result.ok is True and result.status == "cancelled"
+    assert result.output["status"] == "cancelled" and result.output["exit_code"] == 130
+    lines = result.output["output"].splitlines()
+    assert lines[-1] == "command cancelled; the process tree was stopped"
+    child = int(re.search(r"started child=(\d+)", lines[0]).group(1))
+    assert wait_until_stopped(child)
 
 
 def test_model_reported_exit_code_is_not_evidence(tmp_path):
     workspace = Workspace(tmp_path / "ws")
     workspace.write_file("exiter.py", "raise SystemExit(3)\n")
-    runtime = ToolRuntime(workspace, {
+    environment = LocalEnvironment(workspace, registered_commands={
         "exiter": {"argv": ["python", "exiter.py"], "args": [], "timeout_sec": 30, "output_limit": 4000},
     })
-    result = runtime.execute("engineering", "run_command", {"name": "exiter", "exit_code": 0})
+    result = perform(environment, "run_command", {"name": "exiter", "exit_code": 0})
     assert result.ok is True
     assert result.output["exit_code"] == 3
     assert result.output["status"] == "failed"

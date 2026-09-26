@@ -1,11 +1,16 @@
+import asyncio
 import json
+import os
 import threading
 import time
+import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from harness.actions import Action, ActionReceipt, Preconditions
 from harness.adapters.fake import FakeAdapter
 from harness.assembly import ContextAssembly
 from harness.context import ContextPart
@@ -13,11 +18,81 @@ from harness.engine import StepLimits
 from harness.event_store import NewEvent
 from harness.models import ArtifactRef, ContextManifest, Event, json_dumps
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
+from harness.tools import TOOL_DEFS
 
 # 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
 FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
+
+
+def action(name: str, args: dict[str, Any], *, department: str = "engineering",
+           preconditions: Preconditions = Preconditions()) -> Action:
+    # 一个环境工具调用的动作合同，动作身份每次不同
+    return Action(action_id=f"test:{uuid.uuid4().hex}", kind=TOOL_DEFS[name]["action"], tool=name,
+                  department=department, input=args, preconditions=preconditions)
+
+
+def perform(environment: LocalEnvironment, name: str, args: dict[str, Any], *,
+            department: str = "engineering") -> ActionReceipt:
+    # 直接调用执行环境的公开接口执行一个动作。在另一个线程的事件循环中执行，假模型的脚本（已在事件循环中）也能调用
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, environment.perform(action(name, args, department=department))).result()
+
+
+# 长时间运行的进程（argv 的一项）：启动一个同样长时间运行的子进程并输出它的进程号，在第一个参数给出的位置写下
+# 标记文件以后等待；用来检查运行中的超时与取消是否结束整个进程树
+LONG_RUNNING_TREE = (
+    "import pathlib, subprocess, sys, time; "
+    "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+    "print(f'started child={child.pid}', flush=True); "
+    "pathlib.Path(sys.argv[1]).write_text('running'); "
+    "time.sleep(60)"
+)
+
+
+# 等待放行的进程（argv 的一项）：在第一个参数给出的目录中写下 started，然后等待同一目录中出现 release（至多 30 秒）
+WAIT_FOR_RELEASE = (
+    "import pathlib, sys, time; signals = pathlib.Path(sys.argv[1]); "
+    "(signals / 'started').write_text('running'); "
+    "[time.sleep(0.05) for _ in range(600) if not (signals / 'release').exists()]"
+)
+
+
+def wait_for_file(path: Path) -> None:
+    for _ in range(300):
+        if path.exists():
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"{path} was not created")
+
+
+def pid_alive(pid: int) -> bool:
+    # 跨平台的进程存活检查：只读探测，不改变进程状态
+    if os.name == "nt":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def wait_until_stopped(pid: int) -> bool:
+    for _ in range(100):
+        if not pid_alive(pid):
+            return True
+        time.sleep(0.1)
+    return False
 
 
 def system_with(data_dir: Path, script) -> LoopSystem:
