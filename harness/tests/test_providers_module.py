@@ -155,18 +155,39 @@ def test_missing_credentials_reported_per_item():
     assert any("second" in location for location in locations)
 
 
-def test_cancel_only_affects_current_attempt():
+def test_cancel_of_an_attempt_not_in_progress_leaves_nothing_in_the_facade():
     facade = ProviderFacade()
     facade.store(_fake_catalog())
     snapshot = facade.resolve_snapshot([{"key": "k", "provider_id": "pf", "model_id": "mf"}])
     frozen = snapshot.target("k")
-    # 调用开始之前收到的取消先记下，这次尝试开始时立即取消；其他尝试不受影响
+    # Provider 只登记正在进行的尝试：取消一次不在进行的尝试不留下记录，之后以同一身份开始的调用照常完成
     assert facade.cancel("attempt-a") is False
-    with pytest.raises(ProviderError) as exc_info:
-        _invoke(facade, frozen, _call("hi", "attempt-a"))
-    assert exc_info.value.reason == "cancelled"
-    result = _invoke(facade, frozen, _call("hi", "attempt-b"))
+    result = _invoke(facade, frozen, _call("hi", "attempt-a"))
     assert result.finish_reason == "completed"
+    assert _text(result) == "hi"
+
+
+def test_cancel_received_before_the_attempt_starts_cancels_it_when_it_starts():
+    facade = ProviderFacade()
+    facade.store(_fake_catalog())
+    snapshot = facade.resolve_snapshot([{"key": "k", "provider_id": "pf", "model_id": "mf"}])
+    frozen = snapshot.target("k")
+    # 调用方记下开始之前收到的取消并随调用交给 Provider：这次尝试一开始就被取消，其他尝试不受影响
+    events: list = []
+
+    async def run(call: ModelCall, cancelled: set[str]) -> ModelResponse:
+        async with aclosing(facade.stream(frozen, call, cancelled=cancelled)) as items:
+            async for item in items:
+                if isinstance(item, ModelResponse):
+                    return item
+                events.append(item)
+        raise AssertionError("model call ended without a response")
+
+    with pytest.raises(ProviderError) as exc_info:
+        asyncio.run(run(_call("hi", "attempt-a"), {"attempt-a"}))
+    assert exc_info.value.reason == "cancelled"
+    assert events == []
+    result = asyncio.run(run(_call("hi", "attempt-b"), {"attempt-a"}))
     assert _text(result) == "hi"
 
 

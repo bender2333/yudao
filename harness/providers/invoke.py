@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Container
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Mapping, Sequence
@@ -74,11 +74,10 @@ class InvokeResult:
 
 
 class CancelRegistry:
-    # 调用尝试级取消：按 attempt_id 找到正在执行的调用，可以从任何线程取消；
-    # 调用开始之前收到的取消先记下，这次尝试开始时立即取消
+    # 正在进行的调用尝试：按 attempt_id 找到这次调用的任务，可以从任何线程取消。
+    # 只登记正在进行的尝试；调用开始之前收到的取消由调用方记下，随调用交给 stream_invocation
     def __init__(self) -> None:
         self._active: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Task]] = {}
-        self._pending: set[str] = set()
         self._lock = Lock()
 
     def register(self, attempt_id: str, loop: asyncio.AbstractEventLoop, task: asyncio.Task) -> None:
@@ -87,10 +86,6 @@ class CancelRegistry:
                 # 同一次调用尝试不允许并发执行，避免两个请求共享取消身份
                 raise ProviderError("Model invocation already has an active attempt", reason="provider_error")
             self._active[attempt_id] = (loop, task)
-            cancelled = attempt_id in self._pending
-            self._pending.discard(attempt_id)
-        if cancelled:
-            task.cancel()
 
     def discard(self, attempt_id: str, task: asyncio.Task) -> None:
         with self._lock:
@@ -98,11 +93,11 @@ class CancelRegistry:
                 del self._active[attempt_id]
 
     def cancel(self, attempt_id: str) -> bool:
+        # 返回是否找到正在进行的这次尝试；找不到时不留下记录。
         # 在锁内安排取消：登记在调用结束时于它的事件循环中移除，持有锁期间事件循环一定仍在运行
         with self._lock:
             entry = self._active.get(attempt_id)
             if entry is None:
-                self._pending.add(attempt_id)
                 return False
             loop, task = entry
             loop.call_soon_threadsafe(task.cancel)
@@ -178,9 +173,11 @@ async def stream_invocation(
     cancels: CancelRegistry,
     *,
     connections: Any | None = None,
+    cancelled: Container[str] = (),
 ) -> AsyncIterator[dict[str, Any] | InvokeResult]:
     # 单次调用的流式结果：协议实现交出的每条观察先交给调用方，调用方取下一条时调用才继续；最后交出调用结果。
-    # 调用在自己的任务中执行，按 attempt_id 登记，取消只作用于这次尝试
+    # 调用在自己的任务中执行，按 attempt_id 登记，取消只作用于这次尝试。
+    # cancelled 是调用方在尝试开始之前收到取消的尝试身份，这次尝试在其中时一开始就取消
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[tuple[dict[str, Any], asyncio.Future] | None] = asyncio.Queue()
 
@@ -197,6 +194,9 @@ async def stream_invocation(
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
         raise
+    # 登记之后再看调用方记下的取消：调用方先记下再通知登记表，取消落在登记之前或之后都不会漏掉
+    if attempt_id in cancelled:
+        task.cancel()
     task.add_done_callback(lambda _task: queue.put_nowait(None))
     try:
         while (item := await queue.get()) is not None:

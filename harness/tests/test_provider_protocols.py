@@ -17,6 +17,7 @@ from harness.providers.errors import ProviderError
 from harness.tests.protocol_helpers import (
     bound_target,
     chat_responder,
+    complete,
     facade_with,
     invoke,
     messages_responder,
@@ -331,6 +332,34 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
         server.server_close()
     assert outcome == {"reason": "cancelled"}
     assert any(item["type"] == "function_call" for item in result.output)
+
+
+def test_cancel_before_start_holds_only_within_the_activation():
+    # 取消到达时尝试还没有开始：同一次激活（同一个适配器）内这次尝试一开始就被取消，请求不发出，其他尝试照常；
+    # 取消记在随激活创建的适配器上，激活结束时没有开始的尝试不影响之后以同一身份开始的尝试
+    from harness.adapters.base import ProviderError as KernelProviderError
+    from harness.adapters.facade_adapter import FacadeAdapter
+
+    server, capture, base = serve(responses_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="responses")
+        target = bound_target(facade)
+        cancelled = model_call(HI, session_id="s", attempt_id="activation:root-1:work:attempt-1")
+        never_started = model_call(HI, session_id="s", attempt_id="activation:root-2:work:attempt-1")
+        other = model_call(HI, session_id="s", attempt_id="activation:root-3:work:attempt-1")
+        activation = FacadeAdapter(facade, target)
+        activation.cancel(cancelled.attempt_id)
+        with pytest.raises(KernelProviderError) as caught:
+            complete(activation, cancelled)
+        assert caught.value.reason == "cancelled"
+        assert capture.requests == []
+        activation.cancel(never_started.attempt_id)
+        assert complete(activation, other).output
+        assert complete(FacadeAdapter(facade, target), never_started).output
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert len(capture.requests) == 2
 
 
 @pytest.mark.parametrize(("protocol", "first_event"), [

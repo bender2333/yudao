@@ -7,7 +7,7 @@ import os
 import tempfile
 import threading
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Container
 from contextlib import aclosing
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -583,11 +583,14 @@ class ProviderFacade:
         call: ModelCall,
         *,
         connections: ProviderConnections | None = None,
+        cancelled: Container[str] = (),
     ) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
         # 一次模型调用尝试：逐条交回流式输出，最后交回结果；取消按 call.attempt_id 生效。
-        # connections 由调用方在自己的事件循环中持有，用于复用连接；不给时本次调用新建客户端
+        # connections 由调用方在自己的事件循环中持有，用于复用连接；不给时本次调用新建客户端。
+        # cancelled 是调用方记下的、在尝试开始之前收到取消的尝试身份，由调用方持有与释放；
+        # 调用方取消时先记入 cancelled 再调用 cancel
         items = stream_invocation(frozen_target, provider_input_for(call), call.session_id, call.attempt_id,
-                                  self._cancels, connections=connections)
+                                  self._cancels, connections=connections, cancelled=cancelled)
         async with aclosing(items):
             async for item in items:
                 if isinstance(item, InvokeResult):
@@ -598,7 +601,7 @@ class ProviderFacade:
                     yield event
 
     def cancel(self, attempt_id: str) -> bool:
-        # 只作用于本次调用尝试；调用尚未开始时记下，开始时立即取消
+        # 只作用于正在进行的这次调用尝试，返回是否找到；尝试不在进行时不留下记录
         return self._cancels.cancel(attempt_id)
 
     def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
