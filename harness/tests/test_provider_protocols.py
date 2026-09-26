@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import threading
 from threading import Event
 from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
 from harness.providers import (
+    CredentialChain,
+    ProviderFacade,
     ProviderInput,
     ProviderMessage,
     ToolSpec,
@@ -202,19 +205,19 @@ def test_model_test_uses_the_matching_execution_scope_for_chat():
 
 
 @pytest.mark.parametrize(("protocol", "responder", "official"), [
-    ("responses", _responses_responder, "https://opencode.ai/zen/go/v1/responses"),
-    ("chat_completions", _chat_responder, "https://opencode.ai/zen/go/v1/chat/completions"),
-    ("messages", _messages_responder, "https://opencode.ai/zen/go/v1/messages"),
+    ("responses", responses_responder, "https://opencode.ai/zen/go/v1/responses"),
+    ("chat_completions", chat_responder, "https://opencode.ai/zen/go/v1/chat/completions"),
+    ("messages", messages_responder, "https://opencode.ai/zen/go/v1/messages"),
 ])
 def test_go_preset_base_url_reaches_the_official_protocol_path(protocol, responder, official):
     # 预置表按协议给出请求基址，适配器拼接协议路径后与官方端点一致
     base = get_preset("opencode-go")["base_urls"][protocol]
-    server, capture, local = _serve(responder)
+    server, capture, local = serve(responder)
     try:
         local_base = urlunsplit(urlsplit(base)._replace(scheme="http", netloc=urlsplit(local).netloc))
-        facade = _facade_with(local_base, protocol=protocol)
+        facade = facade_with(local_base, protocol=protocol)
         facade.invoke_once(
-            _target(facade),
+            bound_target(facade),
             ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
             session_id="s", attempt_id="a", abort_event=Event(),
         )
@@ -228,8 +231,8 @@ def test_go_preset_base_url_reaches_the_official_protocol_path(protocol, respond
 
 def test_one_preset_supports_independent_connections_with_own_address_and_key():
     # 同一服务方案下两份连接：地址与凭据各自独立，都带该方案要求的身份头
-    server_a, capture_a, base_a = _serve(_responses_responder)
-    server_b, capture_b, base_b = _serve(_responses_responder)
+    server_a, capture_a, base_a = serve(responses_responder)
+    server_b, capture_b, base_b = serve(responses_responder)
     try:
         facade = ProviderFacade(credentials=CredentialChain(
             overrides={"GO_KEY_A": "key-a", "GO_KEY_B": "key-b"}, use_env=False))
@@ -269,9 +272,9 @@ def test_one_preset_supports_independent_connections_with_own_address_and_key():
 
 def test_model_test_uses_its_own_diagnostic_session():
     # 模型测试使用独立诊断会话，不借用任何任务部门的会话身份
-    server, capture, base = _serve(_messages_responder)
+    server, capture, base = serve(messages_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="messages")
+        facade = facade_with(base + "/v1", protocol="messages")
         result = facade.model_test("go", "m-go")
     finally:
         server.shutdown()
@@ -287,8 +290,8 @@ def test_anthropic_base_url_does_not_duplicate_v1():
 
 
 @pytest.mark.parametrize(("protocol", "responder"), [
-    ("chat_completions", _chat_responder),
-    ("messages", _messages_responder),
+    ("chat_completions", chat_responder),
+    ("messages", messages_responder),
 ])
 def test_cancel_stops_only_the_active_attempt(protocol, responder):
     # 取消作用于进行中的这一次调用尝试；随后同一目标的新尝试照常完成
@@ -301,11 +304,11 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
             release.wait(10)
         return responder(body)
 
-    server, capture, base = _serve(gated)
+    server, capture, base = serve(gated)
     outcome: dict[str, str] = {}
     try:
-        facade = _facade_with(base + "/v1", protocol=protocol)
-        target = _target(facade)
+        facade = facade_with(base + "/v1", protocol=protocol)
+        target = bound_target(facade)
 
         def held_call() -> None:
             try:
@@ -340,12 +343,12 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
 ])
 def test_stream_without_terminal_event_is_a_retryable_failure(protocol, first_event):
     # 流在结束事件前断开：报可重试失败，不把部分输出当作完成
-    server, _capture, base = _serve(lambda body: (200, "text/event-stream", [_sse(first_event)]))
+    server, _capture, base = serve(lambda body: (200, "text/event-stream", [sse(first_event)]))
     try:
-        facade = _facade_with(base + "/v1", protocol=protocol)
+        facade = facade_with(base + "/v1", protocol=protocol)
         with pytest.raises(ProviderError) as exc_info:
             facade.invoke_once(
-                _target(facade),
+                bound_target(facade),
                 ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
                 session_id="s", attempt_id="a", abort_event=Event(),
             )
