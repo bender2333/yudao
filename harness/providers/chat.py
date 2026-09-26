@@ -6,12 +6,15 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+# openai 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
+import openai.resources.chat
 from openai import (
     APIConnectionError,
     APIError,
     APIStatusError,
     APITimeoutError,
     AsyncOpenAI,
+    DefaultAsyncHttpxClient,
 )
 
 from .errors import CancelledError, ProviderError
@@ -19,10 +22,9 @@ from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
 from .responses import (
-    _CompletionDeadline,
+    _ProviderClock,
     _RETRYABLE_HTTP_ERRORS,
     _TransportTrace,
-    _attach_transport_trace,
     _diagnostic_code,
     _error_code,
     _has_nonretryable_connection_cause,
@@ -115,16 +117,15 @@ class _ChatInvoker:
     async def complete(self, invocation: _ChatInvocation) -> InvokeResult:
         # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
         trace = _TransportTrace()
-        deadline = _CompletionDeadline()
         try:
-            async with asyncio.timeout(invocation.frozen_target.timeout_sec) as timeout:
-                deadline.bind(timeout)
-                return await self._stream_once(invocation, trace, deadline)
+            async with asyncio.timeout(None) as timeout:
+                clock = _ProviderClock(timeout, invocation.frozen_target.timeout_sec)
+                return await self._stream_once(invocation, trace, clock)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
 
     async def _stream_once(self, invocation: _ChatInvocation, trace: _TransportTrace,
-                           deadline: _CompletionDeadline) -> InvokeResult:
+                           clock: _ProviderClock) -> InvokeResult:
         started = time.monotonic()
         target = invocation.frozen_target
         params = _chat_request_params(invocation, target)
@@ -144,12 +145,13 @@ class _ChatInvoker:
             api_key=target.api_key, base_url=target.base_url,
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
+            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, event_hooks={
+                "request": [clock.request_sent], "response": [clock.response_started]}),
         ) as client:
-            return await self._stream_with_client(invocation, trace, client, params, started, deadline)
+            return await self._stream_with_client(invocation, trace, client, params, started)
 
     async def _stream_with_client(self, invocation: _ChatInvocation, trace: _TransportTrace,
-                                  client: AsyncOpenAI, params: dict[str, Any], started: float,
-                                  deadline: _CompletionDeadline) -> InvokeResult:
+                                  client: AsyncOpenAI, params: dict[str, Any], started: float) -> InvokeResult:
         call_params = dict(params)
         headers = call_params.pop("_request_headers", {})
         text_parts: list[str] = []
@@ -222,7 +224,6 @@ class _ChatInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
-        deadline.stop()
         return InvokeResult(
             output=output, text=text, usage=usage, finish_reason="completed",
             provider=invocation.frozen_target.provider_id, model=actual_model or invocation.frozen_target.model,

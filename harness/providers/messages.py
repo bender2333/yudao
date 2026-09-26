@@ -7,12 +7,15 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+# anthropic 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
+import anthropic.resources.messages
 from anthropic import (
     APIConnectionError,
     APIError,
     APIStatusError,
     APITimeoutError,
     AsyncAnthropic,
+    DefaultAsyncHttpxClient,
 )
 
 from .errors import CancelledError, ProviderError
@@ -20,7 +23,7 @@ from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
 from .responses import (
-    _CompletionDeadline,
+    _ProviderClock,
     _TransportTrace,
     _diagnostic_code,
     _error_code,
@@ -125,16 +128,15 @@ class _MessagesInvoker:
     async def complete(self, invocation: _MessagesInvocation) -> InvokeResult:
         # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
         trace = _TransportTrace()
-        deadline = _CompletionDeadline()
         try:
-            async with asyncio.timeout(invocation.frozen_target.timeout_sec) as timeout:
-                deadline.bind(timeout)
-                return await self._stream_once(invocation, trace, deadline)
+            async with asyncio.timeout(None) as timeout:
+                clock = _ProviderClock(timeout, invocation.frozen_target.timeout_sec)
+                return await self._stream_once(invocation, trace, clock)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
 
     async def _stream_once(self, invocation: _MessagesInvocation, trace: _TransportTrace,
-                           deadline: _CompletionDeadline) -> InvokeResult:
+                           clock: _ProviderClock) -> InvokeResult:
         started = time.monotonic()
         target = invocation.frozen_target
         params = _messages_request_params(invocation, target)
@@ -153,13 +155,14 @@ class _MessagesInvoker:
             api_key=target.api_key, base_url=anthropic_base_url(target.base_url),
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
+            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, event_hooks={
+                "request": [clock.request_sent], "response": [clock.response_started]}),
         ) as client:
-            return await self._stream_with_client(invocation, trace, client, params, headers, started, deadline)
+            return await self._stream_with_client(invocation, trace, client, params, headers, started)
 
     async def _stream_with_client(self, invocation: _MessagesInvocation, trace: _TransportTrace,
                                   client: AsyncAnthropic, params: dict[str, Any],
-                                  headers: dict[str, str], started: float,
-                                  deadline: _CompletionDeadline) -> InvokeResult:
+                                  headers: dict[str, str], started: float) -> InvokeResult:
         stream = await client.messages.create(
             **(params | ({"extra_headers": headers} if headers else {})),
         )
@@ -237,7 +240,6 @@ class _MessagesInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
-        deadline.stop()
         return InvokeResult(
             output=output, text=text, usage=usage,
             finish_reason=("tool_use" if tool_blocks else (stop_reason or "completed")),

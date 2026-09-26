@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # 全部是可以序列化的数据，不含线程标志、回调或适配器实例。
 # Provider 以异步迭代逐条交回流式输出，最后一条是 ModelResponse；调用方处理完一条（例如写成事件）
 # 再取下一条，Provider 才继续。请求发出前的记录与输出片段的记录因此都在调用方一侧完成，
-# Provider 可以把等待提供方的时间与调用方处理的时间分开计算（#105）。
+# 不计入单次请求的时限：时限只计算等待提供方的时间（D09）。
 # 取消按 attempt_id 生效。
 
 

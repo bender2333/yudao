@@ -12,6 +12,8 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import httpx
+# openai 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
+import openai.resources.responses
 from openai import (
     APIConnectionError,
     APIError,
@@ -25,9 +27,6 @@ from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
-
-
-_STREAM_DRAIN_TIMEOUT_SEC = 0.1
 
 
 @dataclass(frozen=True)
@@ -80,29 +79,77 @@ class _TransportTrace:
         }
 
 
+class _ProviderClock:
+    # 单次请求的时限只计算等待模型提供方的时间（D09）：请求发出时开始走时，收到回复头时暂停，之后只在读取回复体的
+    # 每一段时走时；SDK 解析流事件、主机处理与交回观察（调用方记录）都不计入。收到终态以后停止；
+    # 各段等待累计到时限时请求超时。两个方法作为 httpx 的请求钩子与回复钩子挂在调用使用的客户端上
+    def __init__(self, timeout: asyncio.Timeout, limit_sec: float) -> None:
+        self._timeout = timeout
+        self._remaining = float(limit_sec)
+        self._stopped = False
+
+    def resume(self) -> None:
+        timeout = self._timeout
+        if self._stopped or timeout.expired() or timeout.when() is not None:
+            return
+        timeout.reschedule(asyncio.get_running_loop().time() + self._remaining)
+
+    def pause(self) -> None:
+        timeout = self._timeout
+        when = timeout.when()
+        if timeout.expired() or when is None:
+            return
+        self._remaining = max(0.0, when - asyncio.get_running_loop().time())
+        timeout.reschedule(None)
+
+    def stop(self) -> None:
+        self.pause()
+        self._stopped = True
+
+    async def request_sent(self, _request: httpx.Request) -> None:
+        self.resume()
+
+    async def response_started(self, response: httpx.Response) -> None:
+        self.pause()
+        response.stream = _ClockedBody(response.stream, self)
+
+
+class _ClockedBody(httpx.AsyncByteStream):
+    # 回复体：读取每一段期间计时
+    def __init__(self, stream: httpx.AsyncByteStream, clock: _ProviderClock) -> None:
+        self._stream = stream
+        self._clock = clock
+
+    async def __aiter__(self):
+        chunks = self._stream.__aiter__()
+        while True:
+            self._clock.resume()
+            try:
+                chunk = await chunks.__anext__()
+            except StopAsyncIteration:
+                return
+            finally:
+                self._clock.pause()
+            yield chunk
+
+    async def aclose(self) -> None:
+        await self._stream.aclose()
+
+
 @dataclass
 class _RequestContext:
     invocation: _InvokeRequest
     trace: _TransportTrace
     observation_errors: list[BaseException]
-
-
-class _CompletionDeadline:
-    def __init__(self) -> None:
-        self._timeout: Any | None = None
-
-    def bind(self, timeout: Any) -> None:
-        self._timeout = timeout
-
-    def stop(self) -> None:
-        if self._timeout is not None:
-            self._timeout.reschedule(None)
+    clock: _ProviderClock
 
 
 class ProviderConnections:
     # 同一个事件循环内按端点与认证句柄复用 Responses 客户端，认证句柄只在内存中隔离；
-    # 只能在创建客户端的事件循环中使用，用完调用 aclose。Chat Completions 与 Messages 每次调用新建客户端
-    def __init__(self) -> None:
+    # 只能在创建客户端的事件循环中使用，用完调用 aclose。Chat Completions 与 Messages 每次调用新建客户端。
+    # drain_timeout_sec：收到终态以后读完回复剩余部分的时限，读完的连接才能复用；不计入请求时限
+    def __init__(self, *, drain_timeout_sec: float = 0.1) -> None:
+        self.drain_timeout_sec = drain_timeout_sec
         self._clients: dict[tuple[Any, ...], AsyncOpenAI] = {}
         self._request_context: ContextVar[_RequestContext | None] = ContextVar(
             "yudao_providers_responses_request_context", default=None,
@@ -119,7 +166,7 @@ class ProviderConnections:
         if client is None:
             http_client = DefaultAsyncHttpxClient(
                 timeout=config.timeout_sec,
-                event_hooks={"request": [self._observe_request]},
+                event_hooks={"request": [self._observe_request], "response": [self._observe_response]},
             )
             client = AsyncOpenAI(
                 api_key=config.api_key,
@@ -139,11 +186,18 @@ class ProviderConnections:
         self._request_context.reset(token)
 
     async def _observe_request(self, http_request: httpx.Request) -> None:
+        context = self._context()
+        http_request.extensions["trace"] = context.trace
+        await _emit_request(context.invocation, http_request, context.observation_errors, context.clock)
+
+    async def _observe_response(self, response: httpx.Response) -> None:
+        await self._context().clock.response_started(response)
+
+    def _context(self) -> _RequestContext:
         context = self._request_context.get()
         if context is None:
             raise ProviderError("Provider request context is unavailable", reason="provider_protocol")
-        http_request.extensions["trace"] = context.trace
-        await _emit_request(context.invocation, http_request, context.observation_errors)
+        return context
 
     async def aclose(self) -> None:
         if self._closed:
@@ -156,8 +210,8 @@ class ProviderConnections:
 
 
 async def _emit_request(invocation: _InvokeRequest, http_request: httpx.Request,
-                        observation_errors: list[BaseException]) -> None:
-    # 请求在发送之前交给调用方记录；请求体无法解析时保留原始错误，不让 SDK 改写成连接错误
+                        observation_errors: list[BaseException], clock: _ProviderClock) -> None:
+    # 请求在发送之前交给调用方记录，记录完成以后发出并开始计时；请求体无法解析时保留原始错误，不让 SDK 改写成连接错误
     try:
         body = _request_body(http_request)
     except BaseException as exc:
@@ -172,6 +226,7 @@ async def _emit_request(invocation: _InvokeRequest, http_request: httpx.Request,
         "model": invocation.config.model,
         "payload": body,
     })
+    await clock.request_sent(http_request)
 
 
 async def invoke_responses(
@@ -268,11 +323,10 @@ class _ResponsesInvoker:
     async def complete(self, invocation: _InvokeRequest) -> InvokeResult:
         # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
         trace = _TransportTrace()
-        deadline = _CompletionDeadline()
         try:
-            async with asyncio.timeout(invocation.config.timeout_sec) as timeout:
-                deadline.bind(timeout)
-                return await self._stream_once(invocation, trace, deadline)
+            async with asyncio.timeout(None) as timeout:
+                clock = _ProviderClock(timeout, invocation.config.timeout_sec)
+                return await self._stream_once(invocation, trace, clock)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
         except TimeoutError as exc:
@@ -286,28 +340,28 @@ class _ResponsesInvoker:
         self,
         invocation: _InvokeRequest,
         trace: _TransportTrace,
-        deadline: _CompletionDeadline,
+        clock: _ProviderClock,
     ) -> InvokeResult:
         started = time.monotonic()
         observation_errors: list[BaseException] = []
         if self.connections is not None:
-            context = _RequestContext(invocation, trace, observation_errors)
+            context = _RequestContext(invocation, trace, observation_errors, clock)
             token = self.connections.bind(context)
             try:
                 client = await self.connections.client_for(invocation.config)
                 return await self._stream_with_client(
-                    invocation, trace, observation_errors, client, started, deadline,
+                    invocation, trace, observation_errors, client, started, clock,
                 )
             finally:
                 self.connections.reset(token)
 
         async def observe_request(http_request: httpx.Request) -> None:
             http_request.extensions["trace"] = trace
-            await _emit_request(invocation, http_request, observation_errors)
+            await _emit_request(invocation, http_request, observation_errors, clock)
 
         http_client = DefaultAsyncHttpxClient(
             timeout=invocation.config.timeout_sec,
-            event_hooks={"request": [observe_request]},
+            event_hooks={"request": [observe_request], "response": [clock.response_started]},
         )
         async with AsyncOpenAI(
             api_key=invocation.config.api_key,
@@ -318,7 +372,7 @@ class _ResponsesInvoker:
             default_headers=dict(invocation.config.identity_headers) or None,
         ) as client:
             return await self._stream_with_client(
-                invocation, trace, observation_errors, client, started, deadline,
+                invocation, trace, observation_errors, client, started, clock,
             )
 
     async def _observed_events(self, invocation: _InvokeRequest, event_source: Any):
@@ -346,7 +400,7 @@ class _ResponsesInvoker:
         observation_errors: list[BaseException],
         client: AsyncOpenAI,
         started: float,
-        deadline: _CompletionDeadline,
+        clock: _ProviderClock,
     ) -> InvokeResult:
         provider_input = invocation.provider_input
         output_limit = {} if provider_input.max_output_tokens is None else {"max_output_tokens": provider_input.max_output_tokens}
@@ -455,7 +509,7 @@ class _ResponsesInvoker:
                         actual_model=actual_model or "",
                         wire_evidence={"response_id": response.id, "attempt_id": invocation.attempt_id},
                     )
-                    deadline.stop()
+                    clock.stop()
                     break
                 elif event.type == "error":
                     reason = "context_overflow" if _is_context_overflow(event.code) else "provider_error"
@@ -465,7 +519,8 @@ class _ResponsesInvoker:
                         diagnostics=_diagnostic_code(event.code, "stream_error"),
                     )
             if completed_response is not None:
-                await _drain_completed_stream(event_source)
+                if self.connections is not None:
+                    await _drain_completed_stream(event_source, self.connections.drain_timeout_sec)
                 return completed_response
         raise ProviderError(
             "Model response stream ended before a terminal response",
@@ -799,10 +854,10 @@ async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
         yield event
 
 
-async def _drain_completed_stream(event_source: Any) -> None:
+async def _drain_completed_stream(event_source: Any, timeout_sec: float) -> None:
     # 完成后给 SDK 流一次短暂排空机会以复用连接；排空中的读取错误不改变已完成的结果，取消照常传出
     try:
-        async with asyncio.timeout(_STREAM_DRAIN_TIMEOUT_SEC):
+        async with asyncio.timeout(timeout_sec):
             async for _event in event_source:
                 pass
     except asyncio.CancelledError:

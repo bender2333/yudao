@@ -11,16 +11,15 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.engine import StepLimits
 from harness.providers.call import ModelResponse
-from harness.models import DEPARTMENTS, json_dumps
+from harness.models import json_dumps
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, engineering_plan, guidance_response, plan_turn,
     product_spec, response_turn, review, review_turn,
 )
-from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.event_sequence import compare_with_baseline, normalized_run
 from harness.tests.helpers import FAST_RETRIES
-from harness.tests.protocol_helpers import serve, sse
+from harness.tests.protocol_helpers import provider_system, serve, sse
 
 # 每个场景用 FakeAdapter 脚本（或测试内启动的真实 HTTP 服务）驱动 LoopSystem，把规整后的事件序列与
 # harness/tests/event_sequences/<场景名>.json 比较；规整规则与基准文件的结构见 event_sequence.py。
@@ -442,22 +441,6 @@ def _messages_reply(index: int, calls: list[tuple[str, dict[str, Any]]]) -> byte
 HTTP_REPLIES = {"responses": _responses_reply, "chat_completions": _chat_reply, "messages": _messages_reply}
 
 
-def _provider_system(data_dir, base: str, protocol: str, *, timeout_sec: float = 20.0,
-                     step_limits: StepLimits = StepLimits()) -> tuple[LoopSystem, str]:
-    # 三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
-    facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
-    facade.store_document({
-        "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
-                       "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
-        "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model", "protocol": protocol,
-                    "context_window": 32000, "max_output_tokens": 2048}],
-        "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
-    })
-    facade.record_admission("local", "m-local", admitted_model="scenario-model")
-    system = LoopSystem(data_dir, facade=facade, step_limits=step_limits)
-    return system, system.create_run("build an echo CLI")
-
-
 def _http_scenario(protocol: str):
     def run(data_dir):
         replies = iter(enumerate(HTTP_SCRIPT, start=1))
@@ -468,7 +451,7 @@ def _http_scenario(protocol: str):
 
         server, _capture, base = serve(responder)
         try:
-            system, run_id = _provider_system(data_dir, base, protocol)
+            system, run_id = provider_system(data_dir, base, protocol)
             system.run_until_stop(run_id)
         finally:
             server.shutdown()
@@ -556,7 +539,7 @@ def _cancel_while_provider_holds(protocol: str):
     def run(data_dir):
         provider = _ScriptedProvider([_held])
         try:
-            system, run_id = _provider_system(data_dir, provider.base, protocol)
+            system, run_id = provider_system(data_dir, provider.base, protocol)
 
             def cancel_when_held() -> None:
                 provider.held.wait(60)
@@ -577,8 +560,8 @@ def _responses_failure_then_success(first, *, timeout_sec: float = 20.0, step_li
     def run(data_dir):
         provider = _ScriptedProvider([first, _product_spec_stream])
         try:
-            system, run_id = _provider_system(data_dir, provider.base, "responses", timeout_sec=timeout_sec,
-                                              step_limits=step_limits)
+            system, run_id = provider_system(data_dir, provider.base, "responses", timeout_sec=timeout_sec,
+                                             step_limits=step_limits)
             system.activate_once(run_id)
         finally:
             provider.close()

@@ -13,10 +13,10 @@ from threading import Event, Thread
 
 import pytest
 import httpx
-from openai import APIConnectionError, AsyncOpenAI, DefaultAsyncHttpxClient
+from openai import APIConnectionError, AsyncOpenAI
 
 from harness.adapters.base import ProviderError
-from harness.providers import ResponsesConfig
+from harness.providers import ProviderConnections, ResponsesConfig
 from harness.tests.protocol_helpers import ConnectionLoop, ResponsesAdapter, model_call
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
@@ -328,7 +328,7 @@ def test_sdk_sends_exact_host_context_and_preserves_stateless_tool_protocol(tmp_
 
 
 @pytest.mark.parametrize("failure_kind", ["connection", "timeout", "429", "500", "partial_stream"])
-def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path, monkeypatch, failure_kind):
+def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path, failure_kind):
     adapters = []
 
     def failure(handler, _body):
@@ -353,10 +353,7 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
 
     with _server([failure, success]) as (config, captures, *_):
         if failure_kind == "timeout":
-            # Local plaintext HTTP does not need certifi. Skip it so CONNECT fits
-            # in a 1s budget on Windows, then let the server outlast that deadline.
-            monkeypatch.setattr("harness.providers.responses.DefaultAsyncHttpxClient",
-                                lambda **kwargs: DefaultAsyncHttpxClient(verify=False, **kwargs))
+            # 请求时限 1 秒，服务端保持 2 秒不回复
             config = replace(config, timeout_sec=1)
         adapters.append(ResponsesAdapter(config))
         system = LoopSystem.for_testing(tmp_path, adapters[0], step_limits=FAST_RETRIES)
@@ -665,8 +662,7 @@ def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_
 
 
 def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeypatch):
-    monkeypatch.setattr("openai._base_client.get_platform", lambda: "test")
-    monkeypatch.setattr("harness.providers.responses._STREAM_DRAIN_TIMEOUT_SEC", 0.5)
+    # 排空时限（0.5 秒）长于请求时限（0.3 秒）：收到终态以后请求时限停止，排空期间不会记为超时
     body = _stream([TEXT])
     closed = Event()
 
@@ -690,7 +686,7 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
     config = ResponsesConfig(model="local-model", api_key=KEY,
                              base_url="http://mock.test/v1", timeout_sec=0.3)
     started = time.monotonic()
-    with ConnectionLoop() as loop:
+    with ConnectionLoop(ProviderConnections(drain_timeout_sec=0.5)) as loop:
         result = ResponsesAdapter(config, loop=loop).complete(_request())
 
     assert result.output == [TEXT]

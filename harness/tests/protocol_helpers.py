@@ -7,10 +7,14 @@ import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import aclosing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from harness.adapters.base import Availability, ModelAdapter, ProviderError
 from harness.adapters.facade_adapter import FacadeAdapter
+from harness.engine import StepLimits
+from harness.models import DEPARTMENTS
+from harness.runtime import LoopSystem
 from harness.providers import (
     CredentialChain,
     FrozenTarget,
@@ -26,9 +30,9 @@ from harness.providers import (
 
 class ConnectionLoop:
     # 测试直接完成多次调用时使用的事件循环：同一个事件循环中的调用复用 Provider 的连接，关闭时释放连接
-    def __init__(self) -> None:
+    def __init__(self, connections: ProviderConnections | None = None) -> None:
         self._runner = asyncio.Runner()
-        self.connections = ProviderConnections()
+        self.connections = ProviderConnections() if connections is None else connections
 
     def __enter__(self) -> ConnectionLoop:
         return self
@@ -208,6 +212,22 @@ def bound_target(facade: ProviderFacade) -> FrozenTarget:
     return facade.resolve_snapshot([{"key": "k", "provider_id": "go", "model_id": "m-go"}]).target("k")
 
 
+def provider_system(data_dir: Path, base: str, protocol: str, *, timeout_sec: float = 20.0,
+                    step_limits: StepLimits = StepLimits()) -> tuple[LoopSystem, str]:
+    # 经真实 Provider 模块的系统：三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
+    facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
+    facade.store_document({
+        "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
+                       "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
+        "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model", "protocol": protocol,
+                    "context_window": 32000, "max_output_tokens": 2048}],
+        "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
+    })
+    facade.record_admission("local", "m-local", admitted_model="scenario-model")
+    system = LoopSystem(data_dir, facade=facade, step_limits=step_limits)
+    return system, system.create_run("build an echo CLI")
+
+
 # 测试装配：协议实现只有 harness/providers/responses.py 一份，这里只把测试需要的
 # 适配器调用形状接到独立 Provider 模块，不复制任何请求或错误分类逻辑。
 class ResponsesAdapter:
@@ -287,6 +307,7 @@ __all__ = [
     "invoke",
     "messages_responder",
     "model_call",
+    "provider_system",
     "responses_responder",
     "serve",
     "sse",

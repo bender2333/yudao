@@ -1,7 +1,6 @@
 """The native loop owns each request, tool execution and durable model evidence."""
 
 import json
-from dataclasses import replace
 
 from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import ResponsesAdapter
@@ -9,7 +8,7 @@ from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.test_responses import (
-    CALL, RAW_USAGE, REASONING, TEXT, _event, _request, _response, _send, _server, _stream,
+    CALL, RAW_USAGE, REASONING, TEXT, _event, _response, _send, _server, _stream,
 )
 
 
@@ -120,10 +119,6 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_message
         # 部分消息送出后不再发送任何字节，连接保持到客户端按请求时限自行关闭
         handler.rfile.read(1)
 
-    # 进程内第一次请求要完成 openai SDK 的延迟导入与响应模型构建，负载高时超过 5 秒且计入请求时限；
-    # 先用一次时限宽裕的完整请求做完，被测运行的成功请求只剩每次请求的主机开销
-    with _server([_stream([CALL])]) as (warm_config, *_):
-        ResponsesAdapter(replace(warm_config, timeout_sec=120)).complete(_request())
     # 请求时限沿用捕获服务的 5 秒；成功回复立即发送，三次部分流都由服务端保持到客户端超时
     with _server([_stream([CALL]), partial_then_hold, partial_then_hold, partial_then_hold]) as (config, captures, *_):
         system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
@@ -236,8 +231,7 @@ def test_host_failure_to_record_a_stream_event_names_the_actual_error_type(tmp_p
             + large_delta
             + _event("response.completed", response=created, sequence_number=2))
     with _server([body]) as (config, captures, *_):
-        # 这里不核对请求时限：放宽时限，负载高时进程内第一次请求的 SDK 延迟导入也不会使请求超时
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(replace(config, timeout_sec=120)))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("stream capture failure")
             monkeypatch.setattr("tempfile.tempdir", str(tmp_path / "missing-temp"))

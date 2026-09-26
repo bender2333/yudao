@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# 三种协议的实现随 Provider 模块一起导入，各自的 SDK 一次性初始化在服务启动时完成（D09）
+from . import chat, messages, responses
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial, load_dotenv_dict, parse_dotenv_text
 from .discovery import refresh_candidates
