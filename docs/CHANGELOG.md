@@ -108,3 +108,5 @@ claude-opus-5-5 / 2026-09-26 02:43 / 新增 docs/adr/0010-control-core-drives-ro
 claude-opus-5-5 / 2026-09-26 02:52 / docs/design/semantic-system.md 开头状态、第 4、5.1、8、15 节写明洞见由教训发现模块找出、只能查询取得，复盘写出或更新画像；docs/requirements/semantic-system.md（D25）写入用户原话，已确认第 15 条与 TODO 同步，新增第 28 条，专题第 5 条同步；docs/requirements/department-roles.md（D26）「教训与洞见的来源」、docs/design/department-roles.md 第 5、6.2 节、docs/design/architecture/overall-architecture.md 第 2、3、6 节、docs/requirements/stage-requirements-overview.md 第 3.2 节、docs/requirements/meta-observer.md（D28）、CONTEXT.md（教训发现模块、洞见、复盘）同步；docs/program-roadmap.md 开头与第 2 节在 3.2A 与 3.1 之间加入控制核心重构（ADR-0010），后续条目顺延；docs/decision.md 同步；GitHub #34 改为「画像与复盘」，#22 的子工单清单评论同步 / 用户采纳建议：洞见也交给教训发现模块，控制核心重构单独立工单并排在 3.1 之前
 
 claude-opus-5-5 / 2026-09-26 09:30 / docs/program-roadmap.md 第 2 节控制核心重构一条链接工单 #43；docs/decision.md 写入 #43 的工单号与重构计划的四项决定（事件序列对照、并发不在范围内、测试只经公开接口、smoke 审计改用 P）/ 用户采纳重构计划的推荐，按 /request-refactor-plan 发布 #43
+
+claude-opus-5-5 / 2026-09-26 09:58 / 新增 docs/research/prompt-audit-2026-09-26.md（提示词审计：范围与目标模型、提示词清单、21 项结果与 5 项只登记的条目、逐段补丁、验证方法），docs/research/README.md 登记 / 用户运行 /claude-api prompt-audit

@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-26 新资料：[提示词审计（2026-09-26）](prompt-audit-2026-09-26.md)。按 `/claude-api prompt-audit` 检查规则文件、部门指令、上下文固定规则、压缩提示词与工具描述，列出 21 项结果与 5 项只登记的条目，附可以逐段采用的补丁；规则文件的补丁需要用户确认，`harness/` 的补丁与工具合并需要按工单实施。
+
 > 2026-09-25 新资料：[Loop engineering 调研](loop-engineering-2026.md)、[Graph engineering 与 2026 年基于图的 agent 编排](graph-engineering-2026.md)、[Anthropic 2026 年发布的 AI-native SDLC：一手来源调研](anthropic-ai-native-sdlc-sources.md)。三份资料核对 2026 年确定性流程工程化的三条动向，重点记录每种做法中下一步、完成与事实接纳、每次调用的上下文、持久性分别由代码还是 LLM 决定；AI-native SDLC 的架构比较见 [AI 原生 SDLC 对 Yudao 的启示](ai-native-sdlc-insights.md)。
 
 > 2026-09-25 新资料：[上下文组装：参照调研](context-assembly-reference.md)。支持 [D25 语义系统](../requirements/semantic-system.md)「重点 TODO：上下文组装」专题，含 Yudao 现行上下文装配、清单、压缩与提示缓存的事实，OMP 与 opencode 的系统提示构造、规则的放入与按路径附加、按需取得、旧工具结果裁剪、提示缓存与子 Agent 上下文，以及 Anthropic、Manus、Letta、Zep、Cognition、ExpeL、ACE 的做法与上下文长度研究。
