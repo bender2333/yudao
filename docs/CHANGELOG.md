@@ -160,3 +160,5 @@ claude-opus-5-5 / 2026-09-26 23:53 / docs/architecture-issues.md 登记裁决规
 claude-opus-5-5 / 2026-09-27 01:09 / docs/design/architecture/overall-architecture.md 第 6.3 节新增「工作区的事实」：U 需要的工作区事实由执行环境的只读查询提供，作为输入交给 U，依据的摘要写进承载判断结果的事件；第 6.1 节 P 与 U 的代码位置改为 assembly.py 与 adjudication.py；docs/architecture-issues.md 追加处理结论 / #43 第二段登记裁决规则直接读取工作区的问题
 
 claude-opus-5-5 / 2026-09-27 01:15 / docs/architecture-issues.md 登记 Messages 协议流式回复中途断开时的错误分类与另外两种协议不一致 / #43 第 3 个提交的审查修正中增加真实 Provider 的事件序列场景时发现
+
+claude-opus-5-5 / 2026-09-27 01:24 / docs/architecture-issues.md 为 Messages 流中途断开的分类问题追加处理结论（#108） / #43 审查修正中发现的原有缺陷
