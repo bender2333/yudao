@@ -140,3 +140,5 @@ claude-opus-5-5 / 2026-09-26 16:25 / docs/architecture-issues.md 登记 #101 的
 claude-opus-5-5 / 2026-09-26 17:10 / docs/requirements/execution-limits.md（D09）停止原因清单加入 `no_tool_call` 与 `workspace_unrepresentable`，并写明单次请求的时限只计算等待模型提供方的时间；docs/stage-3-plan.md 第 4.2 节新增「公开树」一行（按项目的忽略规则取得，参照 OpenCode 快照）与路径一律相对的规则；docs/architecture-issues.md 为 #101 的两条问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节写入 #101、#103 在 #43 之前，#102、#104、#105 在 #43 之后 / 处理 #101 登记的架构问题与 #15 真实验收发现的交付说明缺漏，安排新工单的顺序
 
 claude-opus-5-5 / 2026-09-26 17:50 / docs/architecture-issues.md 登记 #103 的架构问题：`run_command` 的描述与工程部门提案合同中的「主机回执」没有区分动作回执与交付的检查回执 / 实施 #103 时发现请求中另有两处相关文字不在工单范围内，交给架构师决定是否修改
+
+claude-opus-5-5 / 2026-09-26 18:22 / docs/architecture-issues.md 为 #103 登记的问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节加入 #106 / #103 发现请求中另有两处文字没有区分动作回执与检查回执，统一说法并排在 #43 之前
