@@ -10,7 +10,7 @@ from .base import Availability, ProviderError
 
 
 class FacadeAdapter:
-    # 内核侧薄桥接：把部门循环的模型调用交给独立 Provider 模块，Provider 的错误换成内核的 ProviderError。
+    # 内核侧薄桥接：把步骤驱动的模型调用交给独立 Provider 模块，Provider 的错误换成内核的 ProviderError。
     # 编排器每次激活创建一个，随激活结束释放
     name = "facade"
 

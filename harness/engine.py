@@ -2,9 +2,12 @@
 # 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
 # 以后执行；压缩请求的回答经 P 生成检查点；提交提案时结束。所有记录经过记录接口，
 # 需要核对运行状态的记录在写入锁之内判断并写入。
+# 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：提交或停止原因）；
+# 步骤驱动向上只经过安全节点接口（SafeNode）。
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import time
@@ -31,8 +34,9 @@ TOOL_CALL_REQUIRED_LIMIT = 3
 
 
 class SafeNode(Protocol):
-    # 流程编排提供的安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，
-    # 回答继续还是停止
+    # 安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，回答继续还是停止。
+    # 这是唯一一处由下层调用上层的接口，按依赖倒置处理：接口在步骤驱动一侧定义，流程编排实现并在开始时交给步骤驱动，
+    # 步骤驱动不引用流程编排
 
     def proceed(self) -> bool:
         # 分派新输入，回答是否继续
@@ -66,13 +70,38 @@ def tool_call_required_text(count: int) -> str:
 
 
 @dataclass(frozen=True)
-class DepartmentSubmission:
+class Submitted:
+    # 部门提交了提案：提案、带来提案的这次回答，以及本次激活成功步骤中模型的发言
     proposal: dict[str, Any]
     response: ModelResponse
+    transcript: str
+
+
+@dataclass(frozen=True)
+class Stopped:
+    # 步骤驱动停止。reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由流程编排按当时的
+    # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行
+    reason: str | None = None
+    message: str = ""
+
+
+StepResult = Submitted | Stopped
 
 
 class StepDriver:
     # 一次激活的步骤驱动。cancelled 是这次激活的取消信号，由流程编排持有；cancel() 可以从任何线程调用
+    @classmethod
+    def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
+              artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
+              target: FrozenTarget | None, runtime: ToolRuntime, nodes: SafeNode, cancelled: Event,
+              limits: StepLimits) -> StepDriver:
+        # 在当前事件循环中开始这次激活的步骤循环
+        driver = cls(scope, prompt, store=store, writes=writes, artifacts=artifacts, assembly=assembly,
+                     adapter=adapter, target=target, runtime=runtime, nodes=nodes, cancelled=cancelled,
+                     limits=limits)
+        driver._task = asyncio.get_running_loop().create_task(driver._run())
+        return driver
+
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  target: FrozenTarget | None, runtime: ToolRuntime, nodes: SafeNode, cancelled: Event,
@@ -93,26 +122,28 @@ class StepDriver:
         self._limits = limits
         self._request: ModelRequest | None = None
         self._step: StepRequest | None = None
-
-    @property
-    def transcript(self) -> str:
-        return self._recorder.transcript
+        self._task: asyncio.Task[StepResult] | None = None
 
     def cancel(self) -> None:
-        # 之后的核对都得到停止；这一步已经准备了请求时按尝试身份取消这次调用尝试，尝试还没有开始时开始即取消
+        # 之后的核对都得到停止；这一步已经准备了请求时按尝试身份取消这次调用尝试，尝试还没有开始时开始即取消。
+        # 取消落在正在进行的这一项上，步骤循环在下一个安全节点停止，记录与没有取消时走同一条路径
         self._cancelled.set()
         request = self._request
         if request is not None and request.attempt_id:
             self._adapter.cancel(request.attempt_id)
 
-    async def run(self) -> DepartmentSubmission | None:
-        # 提交提案时交回提案；在安全节点停止时交回 None；停止原因以 ProviderError 抛出
+    async def result(self) -> StepResult:
+        return await self._task
+
+    async def _run(self) -> StepResult:
         try:
             return await self._steps()
+        except ProviderError as exc:
+            return Stopped(exc.reason, str(exc))
         finally:
             self._recorder.close()
 
-    async def _steps(self) -> DepartmentSubmission | None:
+    async def _steps(self) -> StepResult:
         limits = self._limits
         attempt = 1
         root_step_id = 1
@@ -120,10 +151,10 @@ class StepDriver:
         replies_without_tool_call = 0
         for step_id in range(1, limits.max_model_steps + 1):
             if not self._nodes.proceed():
-                return None
+                return Stopped()
             request = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
             if request is None or not self._start_request(request):
-                return None
+                return Stopped()
             request.attempt_started_monotonic = time.monotonic()
             try:
                 response = await self._call_model(request)
@@ -159,7 +190,7 @@ class StepDriver:
                 will_retry = can_retry and self._nodes.proceed()
                 self._recorder.attempt_failed(request, retry_error, will_retry)
                 if not self._nodes.proceed():
-                    return None
+                    return Stopped()
                 if not will_retry:
                     if retry_error.retryable and step_id >= limits.max_model_steps:
                         raise ProviderError(
@@ -170,9 +201,9 @@ class StepDriver:
                     diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
                     raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
                 if not self._schedule_retry(request, retry_error, delay, step_id + 1):
-                    return None
+                    return Stopped()
                 if not await self._nodes.wait(delay):
-                    return None
+                    return Stopped()
                 attempt += 1
                 retry_of_step_id = step_id
                 continue
@@ -196,7 +227,7 @@ class StepDriver:
             if not self._nodes.proceed():
                 self._skip(request, response.output,
                            "Not executed because this activation ended or its input changed during the model request.")
-                return None
+                return Stopped()
             if request.purpose == "compaction":
                 self._finish_compaction(request, response)
                 continue
@@ -222,7 +253,7 @@ class StepDriver:
                 if not self._nodes.proceed():
                     self._skip(request, response.output[index:],
                                "Not executed because this activation ended or its input changed before these tools started.")
-                    return None
+                    return Stopped()
                 identity = str(item.get("call_id") or "")
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
@@ -239,7 +270,7 @@ class StepDriver:
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
-                        return None
+                        return Stopped()
                     result = (self._runtime.execute(request.department, name, args) if permission.allowed
                               else ToolResult(name, False, None, permission.reason))
                 input_item = {"type": "function_call_output", "call_id": identity,
@@ -250,12 +281,12 @@ class StepDriver:
                 if not self._nodes.proceed():
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
-                    return None
+                    return Stopped()
                 if name in SUBMIT_KINDS:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
                     proposal = result.output if result.ok else {**args, "kind": SUBMIT_KINDS[name]}
-                    return DepartmentSubmission(proposal, response)
+                    return Submitted(proposal, response, self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 

@@ -1,4 +1,6 @@
-"""Orchestrator：状态机、停止判定、权限与预算。状态迁移函数内不调用 LLM。"""
+# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止）、激活的准备与收尾、新输入的分派、
+# 提案接纳以后的流转、暂停与失败。一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；
+# 同时为步骤驱动实现安全节点接口。流程编排不调用模型。
 
 from __future__ import annotations
 
@@ -9,7 +11,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any
 
-from .adapters.base import ModelAdapter, ProviderError
+from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
@@ -17,7 +19,7 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .event_store import EventStore, NewEvent, WritePath
-from .engine import StepDriver, StepLimits
+from .engine import StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -68,7 +70,7 @@ class _Activation:
 
 
 class _SafeNode:
-    # 流程编排为一次激活实现的安全节点接口（接口由步骤驱动定义）
+    # 流程编排为一次激活实现的安全节点接口 engine.SafeNode。接口由下层的步骤驱动定义，这里实现并在开始时交给它（依赖倒置）
     def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
         self._orchestrator = orchestrator
         self._activation = activation
@@ -745,39 +747,38 @@ class Orchestrator:
                 effective_contract_hash=scope.basis.effective_contract_hash,
                 engineering_plan_hash=scope.basis.engineering_plan_hash,
             )
-            driver = StepDriver(
+            activation.driver = StepDriver.start(
                 scope, activation.prompt, store=self.store, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, target=activation.target,
                 runtime=ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
-            activation.driver = driver
-            submission = await driver.run()
-        except ProviderError as exc:
-            if exc.reason in PAUSED_REASONS:
-                self._pause(run_id, projection, exc.reason)
-            else:
-                self._fail(run_id, projection, exc.reason, str(exc))
-            return
+            result = await activation.driver.result()
         except Exception as exc:
             self._fail(run_id, projection, "provider_error", f"{type(exc).__name__}: {exc}")
+            return
+        if isinstance(result, Stopped) and result.reason is not None:
+            if result.reason in PAUSED_REASONS:
+                self._pause(run_id, projection, result.reason)
+            else:
+                self._fail(run_id, projection, result.reason, result.message)
             return
 
         current = self.project(run_id)
         if current.phase in TERMINAL_PHASES:
             return
-        if submission is None:
+        if isinstance(result, Stopped):
             elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
             if elapsed >= current.run_time_limit_sec:
                 self._fail(run_id, current, "time_limit",
                            f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s")
             return
+        submission = result
 
         try:
             transcript_ref = None
-            transcript = driver.transcript
-            if transcript:
-                ref = self.artifacts.put(run_id, "transcript", transcript, media_type="text/plain")
+            if submission.transcript:
+                ref = self.artifacts.put(run_id, "transcript", submission.transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
             self._apply_proposal(
                 run_id, department=department, projection=projection, proposal=submission.proposal,

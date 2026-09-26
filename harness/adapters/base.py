@@ -32,7 +32,7 @@ class Availability:
 
 @dataclass
 class ModelRequest:
-    # 编排器为一步准备的请求：装配结果与身份；交给模型接入的只是由它生成的模型调用合同
+    # 步骤驱动为一步准备的请求：装配结果与身份；交给模型接入的只是由它生成的模型调用合同
     run_id: str
     department: str
     session_id: str
@@ -76,7 +76,7 @@ class ModelRequest:
 
 
 class ModelAdapter(Protocol):
-    # 部门循环看到的模型接入：一次调用尝试逐条交回流式输出，最后交回 ModelResponse；取消按调用尝试的身份生效
+    # 步骤驱动看到的模型接入：一次调用尝试逐条交回流式输出，最后交回 ModelResponse；取消按调用尝试的身份生效
     name: str
     model: str
 
