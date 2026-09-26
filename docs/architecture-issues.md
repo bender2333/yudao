@@ -11,3 +11,5 @@
 `模型 ID / 时间（到分钟） / 工单编号或任务 / 遇到的架构问题与冲突 / 影响与建议处置方案`
 
 ---
+
+claude-opus-5-5 / 2026-09-26 15:05 / #47 模型只回复文字时下一次请求以助手消息结尾 / （1）修复后主机在工作步骤的回复没有工具调用时向部门历史追加一条 user 消息（事件 `tool_call_required`），连续第 4 次仍没有工具调用时运行暂停，新增停止原因 `no_tool_call`。CONTEXT.md 的「通知」与 docs/design/semantic-system.md 第 10.6 节只列出变更与新到达的输入，没有覆盖这类由模型回复引起的主机消息；docs/requirements/execution-limits.md（D09）规定停止原因只有一份封闭的清单、属于带版本的定义（ADR-0014），清单中只有 `time_limit`、`max_cycles`、`model_steps_exhausted`，执行者没有改动这份需求文档。（2）OMP 在最后一次说明时用指定工具的 tool_choice 要求模型调用 yield；Yudao 的请求合同（`{"input", "tools", "max_output_tokens"}`）没有 tool_choice 字段，本工单没有加入。 / 建议架构师决定：这条主机消息是否归入「通知」并在 #43 重写请求装配时统一事件名称；是否把 `no_tool_call` 加入 D09 的停止原因清单（代码已使用它暂停运行）；是否需要在请求合同中加入 tool_choice，以及不支持指定工具的模型如何处理
