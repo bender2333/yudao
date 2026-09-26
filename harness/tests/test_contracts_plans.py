@@ -66,8 +66,8 @@ def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
     assert result.delivery_spec.effective_contract_hash == result.last_review.effective_contract_hash == contract.content_hash
     assert result.delivery_spec.engineering_plan_hash == result.last_review.engineering_plan_hash == plan.content_hash
     events = system.store.list_events(run_id)
-    accepted = next(event.seq for event in events if event.type == EventType.PLAN_ACCEPTED)
-    assert all(event.seq > accepted for event in events if event.type == EventType.TOOL_STARTED and event.payload["name"] == "write_file")
+    accepted = next(event.stream_version for event in events if event.type == EventType.PLAN_ACCEPTED)
+    assert all(event.stream_version > accepted for event in events if event.type == EventType.TOOL_STARTED and event.payload["name"] == "write_file")
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 

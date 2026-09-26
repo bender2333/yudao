@@ -282,7 +282,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     started = next(event for event in events if event.type == EventType.TOOL_STARTED and event.payload["id"] == "first")
     received = _events(system, run_id, EventType.USER_INPUT_RECEIVED)[0]
     finished = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "first")
-    assert started.seq < received.seq < finished.seq
+    assert started.stream_version < received.stream_version < finished.stream_version
     assert finished.payload["ok"] and finished.payload["input_version"] == 1
     skipped = _events(system, run_id, EventType.TOOL_SKIPPED)
     assert [event.payload["id"] for event in skipped] == ["second", "submission"]
@@ -349,7 +349,8 @@ def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_
     assert current.inputs[-1].text == command and current.inputs[-1].kind == "command"
     assert current.processed_input_version == 0
     assert (tmp_path / "materials" / run_id / "intend.md").read_bytes() == ("original" + command).encode("utf-8")
-    assert _events(system, run_id, EventType.USER_INPUT_RECEIVED)[0].seq < _events(system, run_id, EventType.RUN_FAILED)[0].seq
+    assert (_events(system, run_id, EventType.USER_INPUT_RECEIVED)[0].stream_version
+            < _events(system, run_id, EventType.RUN_FAILED)[0].stream_version)
 
 
 def test_cancel_button_does_not_fabricate_text_and_terminal_work_never_resumes(tmp_path):

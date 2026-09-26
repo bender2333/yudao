@@ -20,8 +20,10 @@ from harness.models import ArtifactRef, EventType
 #
 # 规整规则（只去掉随运行变化的部分，其余字段原样保留）：
 # 1. 每条事件保留种类、部门（role）、状态迁移（state_before/state_after）、停止原因、错误与载荷中的全部字段；
-#    去掉事件编号（event_id、seq）、run_id 与创建时间。引用其他事件的字段（parent_event_id、载荷与工件中的事件编号）
-#    换成被引用事件的位置 <evt#N>。
+#    去掉事件编号（event_id）、事件在日志中的全局位置、所属的流与流内版本（position、stream、stream_version）、
+#    日志为范围读取保存的列（project_id、work_item_id、department）、run_id 与创建时间。
+#    引用其他事件的字段（parent_event_id、载荷与工件中的事件编号）换成被引用事件的位置 <evt#N>。
+#    投影的 stream_version 是 run 流的事件数，与运行时刻无关，原样保留。
 # 2. 其他随机生成的编号（act_、request_、spec_、ses_pro_ 等前缀加 16 位十六进制）按首次出现的顺序编为 <前缀#N>；
 #    sha256 摘要编为 <sha256#N>（「sha256:」开头、工件路径中的摘要与单独出现的摘要都按摘要本身编号），
 #    Git 提交号编为 <git#N>。同一个值在各处得到同一个编号，保留相等关系。

@@ -290,7 +290,7 @@ def test_pending_request_is_closed_before_provider_or_loop_stop(tmp_path, reason
     assert current.pending_request is None and current.requests[-1].status == status
     closure = _events(system, run_id, EventType.COLLABORATION_CLOSED)[0]
     terminal = _events(system, run_id, EventType.RUN_FAILED if phase == "FAILED" else EventType.RUN_PAUSED)[0]
-    assert closure.seq < terminal.seq and terminal.role == "quality"
+    assert closure.stream_version < terminal.stream_version and terminal.role == "quality"
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
 

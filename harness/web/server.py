@@ -396,7 +396,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             {
                 "ok": True,
                 "mutated": False,
-                "event_count": first.last_seq,
+                "event_count": first.stream_version,
                 "phase": first.phase,
             }
         )
@@ -1003,15 +1003,15 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         try:
             while True:
                 wrote = False
-                for event in store.list_project_events(project.project_id, after_seq=cursor["p"]):
-                    cursor["p"] = event.seq
+                for event in store.list_project_events(project.project_id, after_version=cursor["p"]):
+                    cursor["p"] = event.stream_version
                     if event.type == ProjectEventType.WORK_ITEM_CREATED:
                         runs[event.payload["run_id"]] = event.payload["work_item_id"]
                     self._write_sse(_encode_cursor(cursor), "project", project_event_card(event))
                     wrote = True
                 for run_id, work_item_id in list(runs.items()):
-                    for event in store.list_events(run_id, after_seq=cursor["r"].get(run_id, 0)):
-                        cursor["r"][run_id] = event.seq
+                    for event in store.list_events(run_id, after_version=cursor["r"].get(run_id, 0)):
+                        cursor["r"][run_id] = event.stream_version
                         self._write_sse(_encode_cursor(cursor), "loop",
                                         {**event_card(event), "run_id": run_id, "work_item_id": work_item_id})
                         wrote = True
@@ -1083,7 +1083,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if rest == ["events"]:
             project_run(store, run_id)
             after = self._resume_seq(query, default=0)
-            events = store.list_events(run_id, after_seq=after)
+            events = store.list_events(run_id, after_version=after)
             return self._send_json({"events": [event_card(event) for event in events]})
         if rest[:1] == ["events"] and len(rest) == 3 and rest[2] == "files":
             event = store.get_event(rest[1])
@@ -1151,7 +1151,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 for ref in event.payload["source_refs"]:
                     source = store.get_event(ref["event_id"])
                     if (source is None or source.run_id != run_id or source.role != event.role
-                            or source.seq != ref["seq"] or source.payload.get("activation_id") != ref["activation_id"]
+                            or source.stream_version != ref["seq"]
+                            or source.payload.get("activation_id") != ref["activation_id"]
                             or source.payload.get("step_id") != ref["step_id"]):
                         raise ValueError("compaction source does not match its department history")
                     if source.event_id not in seen:
@@ -1230,13 +1231,13 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         idle = 0
         try:
             while True:
-                events = store.list_events(run_id, after_seq=last)
+                events = store.list_events(run_id, after_version=last)
                 if events:
                     for event in events:
                         payload = json_dumps(event_card(event))
-                        chunk = f"id: {event.seq}\nevent: loop\ndata: {payload}\n\n"
+                        chunk = f"id: {event.stream_version}\nevent: loop\ndata: {payload}\n\n"
                         self.wfile.write(chunk.encode("utf-8"))
-                        last = event.seq
+                        last = event.stream_version
                     idle = 0
                 else:
                     self.wfile.write(b": keepalive\n\n")
@@ -1263,7 +1264,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                     "requested_model": projection.requested_model,
                     "actual_model": projection.actual_model,
                     "cycle_count": projection.cycle_count,
-                    "last_seq": projection.last_seq,
+                    "stream_version": projection.stream_version,
                 }
             )
         return rows

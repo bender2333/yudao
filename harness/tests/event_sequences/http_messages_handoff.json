@@ -4222,7 +4222,6 @@
    "status": "active",
    "verdict": "release"
   },
-  "last_seq": 73,
   "latency_ms": "<duration>",
   "lesson_candidates": [],
   "manifests": [
@@ -5180,6 +5179,7 @@
   },
   "snapshot": null,
   "stop_reason": "released",
+  "stream_version": 73,
   "task": "build an echo CLI",
   "token_used": 450,
   "tool_count": 7,

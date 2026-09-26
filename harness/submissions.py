@@ -12,7 +12,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
-from .event_store import NewEvent, WritePath
+from .event_store import NewEvent, WritePath, run_stream
 from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
@@ -48,9 +48,12 @@ class SubmissionWriter:
             }:
                 payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
-            event = Event(event_id="uncommitted", run_id=run_id, seq=projection.last_seq + len(prepared),
-                          type=event_type, **metadata, payload=payload, artifact_hashes=hashes or [],
-                          context_digest=None, stop_reason=None, error=None, created_at=utc_now())
+            event = Event(event_id="uncommitted", run_id=run_id, type=event_type, **metadata, payload=payload,
+                          artifact_hashes=hashes or [], context_digest=None, stop_reason=None, error=None,
+                          created_at=utc_now(), position=0, stream=run_stream(run_id),
+                          stream_version=projection.stream_version + len(prepared),
+                          project_id=projection.project_id, work_item_id=projection.work_item_id,
+                          department=department)
             apply_event(current, event)
             return len(prepared) - 1
 

@@ -634,7 +634,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 10,
   "latency_ms": "<duration>",
   "lesson_candidates": [
    {
@@ -913,6 +912,7 @@
   },
   "snapshot": null,
   "stop_reason": "retry_after_too_long",
+  "stream_version": 10,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 0,

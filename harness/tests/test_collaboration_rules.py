@@ -12,9 +12,11 @@ from harness.models import (
 )
 
 
-def event(seq, kind, payload, *, role="engineering", run_id="run"):
-    return Event(f"event-{seq}", run_id, seq, kind, role, None, "QUALITY", "QUALITY",
-                 payload, [], None, None, None, None, None, None, "2026-09-06")
+def event(version, kind, payload, *, role="engineering", run_id="run"):
+    return Event(f"event-{version}", run_id, kind, role, None, "QUALITY", "QUALITY",
+                 payload, [], None, None, None, None, None, None, "2026-09-06",
+                 position=version, stream=f"run:{run_id}", stream_version=version, project_id=None,
+                 work_item_id=None, department=role)
 
 
 def work(phase="QUALITY"):
@@ -53,16 +55,16 @@ def pending(projection, recipient="engineering", request_type="action", action="
 
 
 def tool_events(events, name="write_file", *, output="written", ok=True, recipient="engineering"):
-    seq = max(item.seq for item in events) + 1
-    identity = {"id": f"call-{seq}", "name": name, "activation_id": "activation", "step_id": 1,
+    version = max(item.stream_version for item in events) + 1
+    identity = {"id": f"call-{version}", "name": name, "activation_id": "activation", "step_id": 1,
                 "request_id": "request"}
-    events.append(event(seq, EventType.TOOL_STARTED, identity, role=recipient))
+    events.append(event(version, EventType.TOOL_STARTED, identity, role=recipient))
     result = {"ok": ok, "output": output, "error": None if ok else "failed"}
     payload = {**identity, "ok": ok,
                "input_item": {"type": "function_call_output", "call_id": identity["id"], "output": json_dumps(result)}}
     if output is not None:
         payload["output_ref"] = {"content_hash": hash_bytes(json_dumps(output).encode("utf-8"))}
-    called = event(seq + 1, EventType.TOOL_CALLED, payload, role=recipient)
+    called = event(version + 1, EventType.TOOL_CALLED, payload, role=recipient)
     events.append(called)
     return called
 
@@ -163,13 +165,13 @@ def test_inspection_requires_real_event_id_and_matched_tool_pair():
 @pytest.mark.parametrize("field,value", [
     ("run_id", "another-run"), ("role", "product"), ("request_id", "another-request"),
     ("activation_id", "another-activation"), ("step_id", 2), ("id", "another-call"),
-    ("name", "list_files"), ("seq", 0),
+    ("name", "list_files"), ("stream_version", 0),
 ])
 def test_results_cannot_be_borrowed_or_mismatched(field, value):
     projection = work()
     _, events = pending(projection, action="inspect")
     called = tool_events(events, "read_file", output="source")
-    if field in {"run_id", "role", "seq"}:
+    if field in {"run_id", "role", "stream_version"}:
         setattr(called, field, value)
     else:
         called.payload[field] = value

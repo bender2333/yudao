@@ -138,7 +138,7 @@ class ContextAssembly:
                 item = event.payload["input_item"]
             else:
                 continue
-            records.append({"event_id": event.event_id, "seq": event.seq,
+            records.append({"event_id": event.event_id, "seq": event.stream_version,
                             "activation_id": event.payload["activation_id"], "step_id": event.payload["step_id"],
                             "type": event.type, "item": item, "item_digest": canonical_hash(item)})
         return records

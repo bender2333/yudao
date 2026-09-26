@@ -244,20 +244,23 @@ def _collaboration_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
         if (source is None or source.type != EventType.COLLABORATION_REQUESTED
                 or source.role != request.requester or source.run_id != run_id
                 or response is None or result is None or result.type != EventType.COLLABORATION_RESPONDED
-                or result.role != request.recipient or result.run_id != run_id or result.seq <= source.seq
+                or result.role != request.recipient or result.run_id != run_id
+                or result.stream_version <= source.stream_version
                 or result.payload.get("request_id") != request.id):
             notes.append(f"request {request.id}: missing or unrelated recipient response")
             continue
         directions.append(f"{request.requester}->{request.recipient}")
         results = [events.get(event_id) for event_id in response.result_event_ids]
         if any(event is None or event.run_id != run_id or event.role != request.recipient
-               or event.payload.get("request_id") != request.id or not source.seq < event.seq < result.seq
+               or event.payload.get("request_id") != request.id
+               or not source.stream_version < event.stream_version < result.stream_version
                for event in results):
             notes.append(f"request {request.id}: result is not bound to its recipient work")
             continue
         if (request.requester == "product" and request.recipient == "engineering"
                 and request.request_type == "consultation" and response.status == "answered"
-                and not any(event.type == EventType.SPEC_ACCEPTED and event.seq < source.seq for event in events.values())):
+                and not any(event.type == EventType.SPEC_ACCEPTED and event.stream_version < source.stream_version
+                            for event in events.values())):
             pre_spec_consultation = True
         if (request.requester == "engineering" and request.recipient == "product"
                 and request.action == "revise_requirements" and response.status == "completed"
@@ -498,7 +501,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         try:
             apply_event(current_work, event)
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
-            notes.append(f"event {event.seq}: could not rebuild current work: {exc}")
+            notes.append(f"event {event.stream_version}: could not rebuild current work: {exc}")
             continue
         payload = event.payload or {}
         activation = payload.get("activation_id")
@@ -535,11 +538,11 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError("prompt differs from its recorded original")
                     prompt_versions[department] = item["version"]
             except (KeyError, TypeError, ValueError, OSError) as exc:
-                notes.append(f"event {event.seq}: {exc}")
+                notes.append(f"event {event.stream_version}: {exc}")
             continue
         if event.type == EventType.DEPARTMENT_ACTIVATED:
             if not activation or activation in activations:
-                notes.append(f"event {event.seq}: missing or duplicate department activation")
+                notes.append(f"event {event.stream_version}: missing or duplicate department activation")
             else:
                 activations[activation] = (event.role, event.session_id, event.event_id)
                 prompt = current_work.department_prompts[event.role]
@@ -554,7 +557,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                                      "guidance_only": guidance_only}
                 for field, value in {**basis, **expected_guidance}.items():
                     if field not in payload or payload[field] != value:
-                        notes.append(f"event {event.seq}: activation {field} does not match current work")
+                        notes.append(f"event {event.stream_version}: activation {field} does not match current work")
                 frozen_binding = current_work.provider_bindings.get(event.role or "")
                 if frozen_binding:
                     expected_binding = {
@@ -568,7 +571,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     }
                     for field, value in expected_binding.items():
                         if payload.get(field) != value:
-                            notes.append(f"event {event.seq}: provider binding {field} differs from the frozen task snapshot")
+                            notes.append(f"event {event.stream_version}: provider binding {field} differs from the frozen task snapshot")
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
@@ -854,7 +857,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if json.loads(item["output"]) != {"ok": payload.get("ok"), "output": output, "error": payload.get("error")}:
                         raise ValueError("tool input item does not match its recorded result")
         except (AttributeError, IndexError, KeyError, TypeError, ValueError, OSError) as exc:
-            notes.append(f"event {event.seq}: {exc}")
+            notes.append(f"event {event.stream_version}: {exc}")
     prepared_keys = set(step_meta)
     unrequested = prepared_keys - attempted
     orphaned = attempted - prepared_keys
@@ -924,11 +927,11 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
             output = _read_artifact(system.artifacts, run_id, payload["output_ref"])
             if isinstance(output, dict) and output.get("executor") == "host":
                 if not payload.get("activation_id") or output.get("activation_id") != payload.get("activation_id"):
-                    notes.append(f"check event {event.seq}: receipt activation does not match its execution")
+                    notes.append(f"check event {event.stream_version}: receipt activation does not match its execution")
                     continue
                 executions.append((event.role, output))
         except (KeyError, TypeError, ValueError, OSError) as exc:
-            notes.append(f"check event {event.seq}: {exc}")
+            notes.append(f"check event {event.stream_version}: {exc}")
     for receipt in receipts:
         match = next((index for index, (role, output) in enumerate(executions)
                       if role == receipt.get("department") and all(

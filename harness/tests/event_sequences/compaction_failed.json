@@ -1796,7 +1796,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 28,
   "latency_ms": "<duration>",
   "lesson_candidates": [
    {
@@ -2420,6 +2419,7 @@
   },
   "snapshot": null,
   "stop_reason": "compaction_failed",
+  "stream_version": 28,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 1,

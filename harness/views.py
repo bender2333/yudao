@@ -258,7 +258,8 @@ def event_card(event: Event) -> dict[str, Any]:
     payload = event.payload or {}
     return {
         "event_id": event.event_id,
-        "seq": event.seq,
+        "position": event.position,
+        "seq": event.stream_version,
         "type": event.type,
         "role": event.role,
         "state_before": event.state_before,

@@ -124,8 +124,8 @@ def request_still_applicable(request: CollaborationRequest, projection: RunProje
             or projection.pending_request.id != request.id):
         return False
     expected = dict(request.basis)
-    for event in sorted(events, key=lambda item: item.seq):
-        if event.run_id != request.run_id or event.seq <= creation.seq:
+    for event in sorted(events, key=lambda item: item.stream_version):
+        if event.run_id != request.run_id or event.stream_version <= creation.stream_version:
             continue
         payload = event.payload
         if (event.type in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}
@@ -261,8 +261,8 @@ def guidance_claimable_results(projection: RunProjection, department: str, event
     for item in items:
         if item is None:
             continue
-        after_seq = _event_seq(events, item.created_event_id)
-        if after_seq is None:
+        after_version = _event_version(events, item.created_event_id)
+        if after_version is None:
             continue
         activation_ids: set[str] = set()
         current = projection.last_activations.get(department)
@@ -273,7 +273,7 @@ def guidance_claimable_results(projection: RunProjection, department: str, event
         activation_ids.update(_applied_activation_ids(item.id, projection, events))
         for event in _claimable_results_for_activations(
                 projection, department, events, snapshot_hash, activation_ids):
-            if event.seq <= after_seq or event.event_id in consumed or event.event_id in seen:
+            if event.stream_version <= after_version or event.event_id in consumed or event.event_id in seen:
                 continue
             found.append(event)
             seen.add(event.event_id)
@@ -373,16 +373,16 @@ def _has_completed_action(request: CollaborationRequest, projection: RunProjecti
 def _tool_result(event: Event, request: CollaborationRequest, creation: Event,
                  events: list[Event]) -> dict[str, Any] | None:
     return _host_tool_result(
-        event, events, owned=lambda item: _owned(item, request, creation), after_seq=creation.seq)
+        event, events, owned=lambda item: _owned(item, request, creation), after_version=creation.stream_version)
 
 
 def _host_tool_result(event: Event, events: list[Event], *, owned: Callable[[Event], bool],
-                      after_seq: int) -> dict[str, Any] | None:
+                      after_version: int) -> dict[str, Any] | None:
     payload = event.payload
     if not owned(event) or not all(payload.get(key) is not None for key in ("id", "name", "step_id", "activation_id")):
         return None
     started = [item for item in events if item.type == EventType.TOOL_STARTED
-               and after_seq < item.seq < event.seq and owned(item)
+               and after_version < item.stream_version < event.stream_version and owned(item)
                and all(item.payload.get(key) == payload.get(key) for key in ("id", "name", "activation_id", "step_id"))]
     if len(started) != 1:
         return None
@@ -436,7 +436,7 @@ def _creation(request: CollaborationRequest, events: list[Event]) -> Event | Non
 
 
 def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool:
-    return (event.run_id == request.run_id and event.seq > creation.seq
+    return (event.run_id == request.run_id and event.stream_version > creation.stream_version
             and event.role == request.recipient and event.payload.get("request_id") == request.id)
 
 
@@ -444,11 +444,11 @@ def _guidance_owned(event: Event, projection: RunProjection, department: str) ->
     return event.run_id == projection.run_id and event.role == department
 
 
-def _event_seq(events: list[Event], event_id: str | None) -> int | None:
+def _event_version(events: list[Event], event_id: str | None) -> int | None:
     if not event_id:
         return None
     event = next((item for item in events if item.event_id == event_id), None)
-    return None if event is None else event.seq
+    return None if event is None else event.stream_version
 
 
 def _consumed_guidance_result_ids(events: list[Event], run_id: str) -> set[str]:
@@ -508,8 +508,8 @@ def _claimable_results_for_activations(projection: RunProjection, department: st
     for start in starts:
         nxt = next((event for event in events
                     if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
-                    and event.role == department and event.seq > start.seq), None)
-        windows.append((start, None if nxt is None else nxt.seq))
+                    and event.role == department and event.stream_version > start.stream_version), None)
+        windows.append((start, None if nxt is None else nxt.stream_version))
     owned = lambda item: _guidance_owned(item, projection, department)
     found: list[Event] = []
     seen: set[str] = set()
@@ -517,14 +517,15 @@ def _claimable_results_for_activations(projection: RunProjection, department: st
         if not owned(event) or event.event_id in seen:
             continue
         start = next((item for item, end in windows
-                      if item.seq < event.seq and (end is None or event.seq < end)), None)
+                      if item.stream_version < event.stream_version
+                      and (end is None or event.stream_version < end)), None)
         if start is None:
             continue
         if event.type == EventType.TOOL_CALLED:
             if (event.payload.get("activation_id") != start.payload.get("activation_id")
                     or event.payload.get("name") not in _CLAIMABLE_TOOLS):
                 continue
-            result = _host_tool_result(event, events, owned=owned, after_seq=start.seq)
+            result = _host_tool_result(event, events, owned=owned, after_version=start.stream_version)
             if result is None or not result["ok"]:
                 continue
             if event.payload.get("name") in _MUTATIONS and not _guidance_tool_current(event, projection):

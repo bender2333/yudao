@@ -63,20 +63,23 @@ def _project_events(system, project_id, event_type):
 # §3 项目流
 
 
-def test_project_events_table_is_separate_from_run_events(data_dir):
+def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
     system = _system(data_dir, happy_script())
     first = system.store.append_project("proj_a", "project_registered", {"name": "A"})
     second = system.store.append_project("proj_a", "project_renamed", {"name": "A2"})
     other = system.store.append_project("proj_b", "project_registered", {"name": "B"})
-    assert (first.seq, second.seq, other.seq) == (1, 2, 1)
+    # 流内版本按项目各自递增，全局位置跨项目递增
+    assert (first.stream_version, second.stream_version, other.stream_version) == (1, 2, 1)
+    assert first.position < second.position < other.position
+    assert (first.stream, other.stream) == ("project:proj_a", "project:proj_b")
     assert [event.type for event in system.store.list_project_events("proj_a")] == ["project_registered", "project_renamed"]
-    assert [event.seq for event in system.store.list_project_events("proj_a", after_seq=1)] == [2]
+    assert [event.stream_version for event in system.store.list_project_events("proj_a", after_version=1)] == [2]
     assert system.store.get_project_event(second.event_id).payload == {"name": "A2"}
     assert system.store.get_project_event("missing") is None
+    assert system.store.get_event(second.event_id) is None
     assert system.store.list_project_ids() == ["proj_b", "proj_a"]
     # 项目事件不进入 run 流。
     assert system.store.list_run_ids() == []
-    assert list(system.store.iter_all()) == []
     assert system.store.list_events("proj_a") == []
 
 
@@ -538,7 +541,7 @@ def test_material_recording_creates_no_run_events(data_dir):
     material = project.materials[0]
     assert material.text == "  用户口述的一段想法\r\n第二行  " and material.department == "product"
     assert system.artifacts.get_for_run(project_id, ArtifactRef(**material.material_ref)) == material.text.encode("utf-8")
-    assert system.store.list_run_ids() == [] and list(system.store.iter_all()) == []
+    assert system.store.list_run_ids() == []
     assert [event.type for event in system.store.list_project_events(project_id)] == [
         ProjectEventType.PROJECT_REGISTERED, ProjectEventType.MATERIAL_RECORDED,
     ]
@@ -652,7 +655,7 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
     recent = _overview(system, project_id)["recent"]
     assert recent[0]["kind"] == "project" and recent[0]["type"] == ProjectEventType.DELIVERABLE_ADOPTED
     assert any(entry["kind"] == "loop" and entry["type"] == EventType.RUN_DONE and entry["run_id"] == run_id for entry in recent)
-    assert all(entry["at"] >= later["at"] for entry, later in zip(recent, recent[1:]))
+    assert all(entry["position"] > later["position"] for entry, later in zip(recent, recent[1:]))
 
 
 def _overview(system, project_id):
@@ -771,7 +774,7 @@ def test_register_validates_and_stores_goal_artifact(data_dir):
     assert (project.name, project.goal, project.source) == ("名字", GOAL, "idea")
     assert project.goal_ref["media_type"] == "text/markdown"
     assert system.artifacts.get_for_run(project_id, ArtifactRef(**project.goal_ref)).decode("utf-8") == GOAL
-    assert project.created_at == project.updated_at and project.last_seq == 1
+    assert project.created_at == project.updated_at and project.stream_version == 1
     assert {department: config.version for department, config in project.prompt_configs.items()} == {
         "product": 0, "engineering": 0, "quality": 0,
     }

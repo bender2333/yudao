@@ -61,7 +61,7 @@ def project_events(events: list[Event]) -> RunProjection:
 
 def apply_event(state: RunProjection, event: Event) -> None:
     state.last_event_id = event.event_id
-    state.last_seq = event.seq
+    state.stream_version = event.stream_version
     payload = event.payload
     etype = event.type
     if etype in GIT_VERSION_EVENTS and payload.get("git_version") is not None:
@@ -233,7 +233,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.model = None
         state.model_requests.append({
             "event_id": event.event_id,
-            "seq": event.seq,
+            "seq": event.stream_version,
             "department": event.role,
             "activation_id": payload.get("activation_id"),
             "step_id": payload.get("step_id"),
@@ -582,7 +582,7 @@ def _bind_actual_model(state: RunProjection, event: Event) -> None:
     candidates = [
         item for item in state.model_requests
         if item.get("activation_id") == activation_id and item.get("step_id") == step_id
-        and item.get("seq", -1) < event.seq
+        and item.get("seq", -1) < event.stream_version
     ]
     if not candidates:
         return

@@ -327,7 +327,7 @@ def test_create_run_goes_through_engine_and_replays(data_dir):
         assert replay["ok"] is True
         assert replay["mutated"] is False
         after = system.project(run_id)
-        assert after.last_seq == before.last_seq
+        assert after.stream_version == before.stream_version
         assert after.canonical_state() == before.canonical_state()
         assert after.canonical_state() == system.replay(run_id).canonical_state()
 
@@ -421,7 +421,7 @@ def test_text_cancel_records_raw_command_before_immediate_cancellation(data_dir,
             events = system.store.list_events(run_id)
             received = next(event for event in events if event.type == "user_input_received")
             stopped = next(event for event in events if event.type == "run_failed")
-            assert received.seq < stopped.seq
+            assert received.stream_version < stopped.stream_version
         finally:
             release.set()
 
@@ -623,8 +623,8 @@ def test_unconfigured_test_provider_is_clear_error_and_does_not_create(data_dir)
 def test_sse_resumes_from_after_seq_and_last_event_id(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
     events = system.store.list_events(projection.run_id)
-    mid = events[len(events) // 2].seq
-    last = events[-1].seq
+    mid = events[len(events) // 2].stream_version
+    last = events[-1].stream_version
     with running_server(system) as (_server, host, port):
         after_block = first_loop_event(host, port, f"/api/runs/{projection.run_id}/stream?after_seq={mid}")
         assert sse_id(after_block) == mid + 1
@@ -667,7 +667,7 @@ def test_queries_do_not_mutate_existing_run(data_dir):
         assert replay["ok"] is True
         assert replay["mutated"] is False
         after = system.project(projection.run_id)
-        assert after.last_seq == projection.last_seq
+        assert after.stream_version == projection.stream_version
         assert after.canonical_state() == before
         assert request(host, port, "POST", f"/api/runs/{projection.run_id}")[0] == 404
 
@@ -689,7 +689,7 @@ def test_effective_prd_and_plan_are_visible_from_their_accepted_materials(data_d
             original = (system.artifacts.root / ref["path"]).read_bytes()
             material = data_dir / "materials" / projection.run_id / f"{kind.upper()}.md"
             assert detail[f"{kind}_markdown"].encode("utf-8") == original == material.read_bytes()
-        assert system.project(projection.run_id).last_seq == projection.last_seq
+        assert system.project(projection.run_id).stream_version == projection.stream_version
 
 
 @pytest.mark.parametrize("kind,event_type", [("prd", "contract_accepted"), ("plan", "plan_accepted")])
@@ -835,7 +835,7 @@ def test_worker_exception_is_visible_and_does_not_complete(data_dir):
         assert replay["ok"] is True
         assert replay["mutated"] is False
         after = system.project(run_id)
-        assert after.last_seq == before.last_seq
+        assert after.stream_version == before.stream_version
         assert after.canonical_state() == before.canonical_state()
 
 
@@ -874,13 +874,13 @@ def test_health_stays_busy_after_cancel_until_worker_exits_without_new_events(da
         assert status == 200, body
         after_cancel = system.project(run_id)
         assert after_cancel.phase == "FAILED"
-        last_seq = after_cancel.last_seq
+        version = after_cancel.stream_version
         time.sleep(0.25)
         assert server.busy() is True
         health = get_json(host, port, "/api/health")
         assert health["busy"] is True
         assert health["active_run_id"] == run_id
-        assert system.project(run_id).last_seq == last_seq
+        assert system.project(run_id).stream_version == version
         release.set()
         wait_until(lambda: not server.busy())
         idle = get_json(host, port, "/api/health")
@@ -909,7 +909,7 @@ def test_worker_error_after_last_event_is_on_that_run_only(data_dir):
         assert entered.wait(timeout=5)
         before = get_json(host, port, f"/api/runs/{run_id}")
         assert before["execution_error"] is None
-        seq = system.project(run_id).last_seq
+        version = system.project(run_id).stream_version
         assert get_json(host, port, "/api/health")["busy"] is True
         release.set()
         wait_until(lambda: not server.busy())
@@ -919,7 +919,7 @@ def test_worker_error_after_last_event_is_on_that_run_only(data_dir):
         assert "late-boom" in health["worker_error"]["message"]
         crashed = get_json(host, port, f"/api/runs/{run_id}")
         assert "late-boom" in (crashed["execution_error"] or "")
-        assert system.project(run_id).last_seq == seq
+        assert system.project(run_id).stream_version == version
         system.run_until_stop = original_run
         status, body, _ = start_work_item(host, port, project_id, "next")
         assert status == 201, body

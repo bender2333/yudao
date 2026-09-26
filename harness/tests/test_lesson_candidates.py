@@ -40,7 +40,7 @@ def assert_candidate_does_not_change_execution(system, projection):
         event for event in events if event.type != EventType.LESSON_CANDIDATE_RECORDED
     ]).to_dict()
     actual = projection.to_dict()
-    for field in ("lesson_candidates", "last_event_id", "last_seq"):
+    for field in ("lesson_candidates", "last_event_id", "stream_version"):
         actual.pop(field)
         without_candidates.pop(field)
     assert actual == without_candidates
@@ -57,7 +57,7 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
     recorded = system.store.get_event(candidate.created_event_id)
     assert source.type == candidate.source_type == EventType.QA_SUBMITTED
     assert source.run_id == candidate.run_id == result.run_id
-    assert source.seq < recorded.seq
+    assert source.stream_version < recorded.stream_version
     assert recorded.parent_event_id == source.event_id
     assert candidate.status == "unverified"
     assert candidate.observation == {key: source.payload[key] for key in ("verdict", "rationale", "defects")}
@@ -76,9 +76,9 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
     assert len(system.test_adapter.invocations) == len(script)
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
-    before = result.last_seq
-    assert system.run_until_stop(result.run_id).last_seq == before
-    assert system.activate_once(result.run_id).last_seq == before
+    before = result.stream_version
+    assert system.run_until_stop(result.run_id).stream_version == before
+    assert system.activate_once(result.run_id).stream_version == before
 
 
 def test_candidate_is_never_injected_into_department_context(tmp_path):
@@ -162,7 +162,7 @@ def test_web_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path)
     system, result = run_scripted(tmp_path, rework_script())
     candidate = result.lesson_candidates[0]
     path = f"/api/runs/{result.run_id}"
-    before = result.last_seq
+    before = result.stream_version
     with running_server(system) as (_server, host, port):
         payload = get_json(host, port, path)
         assert payload["evidence"]["lesson_candidates"] == result.to_dict()["lesson_candidates"]
@@ -179,4 +179,4 @@ def test_web_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path)
         assert detail in exported["events"] and source_event in exported["events"]
         assert json_dumps(exported["projection"]["lesson_candidates"]) == json_dumps(system.replay(result.run_id).lesson_candidates)
         assert request(host, port, "POST", f"{path}/replay")[0] == 200
-    assert system.project(result.run_id).last_seq == before
+    assert system.project(result.run_id).stream_version == before

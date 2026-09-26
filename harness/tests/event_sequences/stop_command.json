@@ -1045,7 +1045,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 18,
   "latency_ms": "<duration>",
   "lesson_candidates": [],
   "manifests": [
@@ -1370,6 +1369,7 @@
   },
   "snapshot": null,
   "stop_reason": "cancelled",
+  "stream_version": 18,
   "task": "build an echo CLI/stop",
   "token_used": 0,
   "tool_count": 1,

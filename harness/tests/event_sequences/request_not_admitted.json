@@ -502,7 +502,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 8,
   "latency_ms": "<duration>",
   "lesson_candidates": [
    {
@@ -730,6 +729,7 @@
   },
   "snapshot": null,
   "stop_reason": "context_overflow",
+  "stream_version": 8,
   "task": "<shared#2>",
   "token_used": 0,
   "tool_count": 0,

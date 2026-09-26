@@ -426,9 +426,10 @@ class ContextManifest:
 
 @dataclass
 class Event:
+    # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本；
+    # project_id、work_item_id、department 是日志为范围读取保存的列
     event_id: str
     run_id: str
-    seq: int
     type: str
     role: str | None
     parent_event_id: str | None
@@ -443,6 +444,12 @@ class Event:
     stop_reason: str | None
     error: str | None
     created_at: str
+    position: int
+    stream: str
+    stream_version: int
+    project_id: str | None
+    work_item_id: str | None
+    department: str | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -466,14 +473,18 @@ class Event:
 
 @dataclass
 class ProjectEvent:
-    """项目流事件：与 run 流分表，`seq` 按项目递增。"""
-
+    # 项目流中的一条事件，与 run 事件在同一份事件日志中；日志中的位置与范围列同 Event
     event_id: str
     project_id: str
-    seq: int
     type: str
     payload: dict[str, Any]
     created_at: str
+    position: int
+    stream: str
+    stream_version: int
+    work_item_id: str | None
+    run_id: str | None
+    department: str | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -589,7 +600,8 @@ class RunProjection:
     registered_commands: dict[str, Any] = field(default_factory=dict)
     command_versions: dict[str, int] = field(default_factory=dict)
     last_event_id: str | None = None
-    last_seq: int = 0
+    # 投影所反映的 run 流版本
+    stream_version: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))

@@ -244,7 +244,7 @@ def _plan_compliance(system: LoopSystem, run_id: str) -> dict[str, Any]:
         event for event in events
         if event.type == EventType.PROPOSAL_REJECTED and event.payload.get("kind") == "engineering_plan"
     ]
-    first_accepted = None if not accepted else accepted[0].seq
+    first_accepted = None if not accepted else accepted[0].stream_version
     before = []
     for event in events:
         if event.type not in {EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED}:
@@ -252,9 +252,9 @@ def _plan_compliance(system: LoopSystem, run_id: str) -> dict[str, Any]:
         name = (event.payload or {}).get("name")
         if name not in SIDE_EFFECT_TOOLS:
             continue
-        if first_accepted is None or event.seq < first_accepted:
+        if first_accepted is None or event.stream_version < first_accepted:
             before.append({
-                "seq": event.seq,
+                "seq": event.stream_version,
                 "type": event.type,
                 "name": name,
                 "ok": (event.payload or {}).get("ok"),

@@ -1829,7 +1829,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 26,
   "latency_ms": "<duration>",
   "lesson_candidates": [],
   "manifests": [
@@ -2633,6 +2632,7 @@
   },
   "snapshot": null,
   "stop_reason": "no_tool_call",
+  "stream_version": 26,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 0,

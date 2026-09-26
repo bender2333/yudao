@@ -295,7 +295,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     responded_event = next(event for event in system.store.list_events(run_id)
                            if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
     resume = next(event for event in system.store.list_events(run_id)
-                  if event.type == EventType.TRANSITION and event.seq > responded_event.seq)
+                  if event.type == EventType.TRANSITION and event.stream_version > responded_event.stream_version)
     assert resume.payload["from"] == "QUALITY"
     assert resume.payload["to"] == "ENGINEERING"
     assert resume.payload["yielded_work_resolved"] is True

@@ -100,7 +100,7 @@ class Adoption:
     known_risks: list[str]
     previous_adoption_id: str | None
     adopted_at: str
-    seq: int
+    stream_version: int
     event_id: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -117,7 +117,7 @@ class HeldCandidate:
     expected_adoption_id: str | None
     current_adoption_id: str | None
     held_at: str
-    seq: int
+    stream_version: int
     event_id: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -146,7 +146,7 @@ class Material:
     material_ref: dict[str, Any]
     department: str | None
     recorded_at: str
-    seq: int
+    stream_version: int
     event_id: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -187,7 +187,7 @@ class WorkItem:
     run_time_limit_sec: int
     context_window: int
     created_at: str
-    seq: int
+    stream_version: int
     event_id: str
     snapshot: dict[str, Any] | None = None
     start_error: str | None = None
@@ -229,7 +229,8 @@ class ProjectProjection:
     materials: list[Material] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
-    last_seq: int = 0
+    # 投影所反映的项目流版本
+    stream_version: int = 0
     last_event_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -275,7 +276,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     payload = event.payload
     etype = event.type
     state.last_event_id = event.event_id
-    state.last_seq = event.seq
+    state.stream_version = event.stream_version
     state.updated_at = event.created_at
     if etype == ProjectEventType.PROJECT_REGISTERED:
         state.project_id = event.project_id
@@ -305,7 +306,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             command_versions=dict(payload.get("command_versions") or {}),
             max_cycles=int(payload["max_cycles"]),
             run_time_limit_sec=int(payload.get("run_time_limit_sec", 7200)),
-            context_window=int(payload["context_window"]), created_at=event.created_at, seq=event.seq,
+            context_window=int(payload["context_window"]), created_at=event.created_at, stream_version=event.stream_version,
             event_id=event.event_id, snapshot=payload.get("snapshot"),
         ))
         return
@@ -321,7 +322,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             tree_ref=payload["tree_ref"], code_tree_digest=payload["code_tree_digest"], summary=payload["summary"],
             files=list(payload["files"]), check_names=list(payload["check_names"]),
             known_risks=list(payload["known_risks"]), previous_adoption_id=payload["previous_adoption_id"],
-            adopted_at=event.created_at, seq=event.seq, event_id=event.event_id,
+            adopted_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
         )
         state.adoptions.append(adoption)
         state.current_adoption = adoption
@@ -331,7 +332,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             work_item_id=payload["work_item_id"], run_id=payload["run_id"],
             delivery_event_id=payload["delivery_event_id"], code_tree_digest=payload["code_tree_digest"],
             reason=payload["reason"], expected_adoption_id=payload["expected_adoption_id"],
-            current_adoption_id=payload["current_adoption_id"], held_at=event.created_at, seq=event.seq,
+            current_adoption_id=payload["current_adoption_id"], held_at=event.created_at, stream_version=event.stream_version,
             event_id=event.event_id,
         ))
         return
@@ -357,7 +358,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     if etype == ProjectEventType.MATERIAL_RECORDED:
         state.materials.append(Material(
             material_id=payload["material_id"], text=payload["text"], material_ref=payload["material_ref"],
-            department=payload["department"], recorded_at=event.created_at, seq=event.seq, event_id=event.event_id,
+            department=payload["department"], recorded_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
         ))
         return
 
@@ -392,7 +393,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     handoffs = work_item_handoffs(events)
     item.last_handoff = handoffs[-1] if handoffs else None
     item.rework = [
-        {"verdict": event.payload["verdict"], "seq": event.seq, "at": event.created_at,
+        {"verdict": event.payload["verdict"], "seq": event.stream_version, "at": event.created_at,
          "summary": event.payload.get("rationale", "")}
         for event in events
         if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") in REWORK_VERDICTS
@@ -407,7 +408,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
 
 def work_item_handoffs(events: list[Event]) -> list[dict[str, Any]]:
     return [
-        {"from": event.state_before, "to": event.state_after, "seq": event.seq, "at": event.created_at}
+        {"from": event.state_before, "to": event.state_after, "seq": event.stream_version, "at": event.created_at}
         for event in events if event.type == EventType.TRANSITION
     ]
 
@@ -416,7 +417,8 @@ def project_event_card(event: ProjectEvent) -> dict[str, Any]:
     return {
         "event_id": event.event_id,
         "project_id": event.project_id,
-        "seq": event.seq,
+        "position": event.position,
+        "seq": event.stream_version,
         "type": event.type,
         "created_at": event.created_at,
         "work_item_id": event.payload.get("work_item_id"),
@@ -426,11 +428,11 @@ def project_event_card(event: ProjectEvent) -> dict[str, Any]:
 
 
 def project_overview(store: EventStore, project: ProjectProjection) -> dict[str, Any]:
-    """概览：目标、当前采用成果、待决、近期动态（项目事件与所属 run 的关键事件合并倒序）。"""
+    """概览：目标、当前采用成果、待决、近期动态（项目事件与所属 run 的关键事件按全局位置倒序）。"""
     recent = [
-        {"kind": "project", "type": event.type, "at": event.created_at, "seq": event.seq, "event_id": event.event_id,
-         "work_item_id": event.payload.get("work_item_id"), "run_id": event.payload.get("run_id"),
-         "summary": _project_event_summary(event)}
+        {"kind": "project", "type": event.type, "at": event.created_at, "position": event.position,
+         "event_id": event.event_id, "work_item_id": event.payload.get("work_item_id"),
+         "run_id": event.payload.get("run_id"), "summary": _project_event_summary(event)}
         for event in store.list_project_events(project.project_id)
     ]
     for item in project.work_items:
@@ -438,12 +440,12 @@ def project_overview(store: EventStore, project: ProjectProjection) -> dict[str,
             if event.type not in RECENT_RUN_EVENTS:
                 continue
             recent.append({
-                "kind": "loop", "type": event.type, "at": event.created_at, "seq": event.seq, "event_id": event.event_id,
-                "work_item_id": item.work_item_id, "run_id": item.run_id,
+                "kind": "loop", "type": event.type, "at": event.created_at, "position": event.position,
+                "event_id": event.event_id, "work_item_id": item.work_item_id, "run_id": item.run_id,
                 "summary": (f"{event.state_before}->{event.state_after}" if event.type == EventType.TRANSITION
                             else event.stop_reason or event.type),
             })
-    recent.sort(key=lambda entry: (entry["at"], entry["seq"]), reverse=True)
+    recent.sort(key=lambda entry: entry["position"], reverse=True)
     pending = [
         {"work_item_id": item.work_item_id, "title": item.title, "status": item.status,
          "question": item.pending_question, "human_action": item.human_action}

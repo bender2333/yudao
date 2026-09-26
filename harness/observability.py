@@ -356,7 +356,7 @@ class ObservabilityQuery:
                     continue
                 messages.append({
                     "event_id": event.event_id,
-                    "seq": event.seq,
+                    "seq": event.stream_version,
                     "type": event.type,
                     "source_type": source_type,
                     "source_role": source_role,
@@ -374,7 +374,7 @@ class ObservabilityQuery:
             if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED and payload.get("department") == department:
                 messages.append({
                     "event_id": event.event_id,
-                    "seq": event.seq,
+                    "seq": event.stream_version,
                     "type": event.type,
                     "source_type": "department",
                     "source_role": department,
@@ -410,7 +410,7 @@ class ObservabilityQuery:
                     text = payload.get("text") or payload.get("question") or payload.get("background") or ""
                     messages.append({
                         "event_id": event.event_id,
-                        "seq": event.seq,
+                        "seq": event.stream_version,
                         "type": event.type,
                         "source_type": "department" if is_self else "other_department",
                         "source_role": source_role,
@@ -424,7 +424,7 @@ class ObservabilityQuery:
             if event.type in DEPARTMENT_MATERIAL_EVENTS and role == department:
                 messages.append({
                     "event_id": event.event_id,
-                    "seq": event.seq,
+                    "seq": event.stream_version,
                     "type": event.type,
                     "source_type": "department",
                     "source_role": role,
@@ -445,7 +445,7 @@ class ObservabilityQuery:
                 if event.type == EventType.TRANSITION or department in {role, request_department, recipient}:
                     handovers.append({
                         "event_id": event.event_id,
-                        "seq": event.seq,
+                        "seq": event.stream_version,
                         "type": event.type,
                         "source_role": role,
                         "created_at": event.created_at,
@@ -749,7 +749,7 @@ class ObservabilityQuery:
         summaries = _summaries_from_parts(parts)
         return {
             "event_id": event.event_id,
-            "seq": event.seq,
+            "seq": event.stream_version,
             "manifest": payload,
             "request": request,
             "parts": parts,
@@ -931,7 +931,7 @@ def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict
         "started_at": None,
         "finished_at": None,
         "duration_ms": None,
-        "seq": event.seq,
+        "seq": event.stream_version,
         "sdk_request_ref": None,
         "response_ref": None,
         "stream_events_ref": None,
@@ -949,7 +949,7 @@ def _merge_context(record: dict[str, Any], event: Event, payload: dict[str, Any]
     record.update({
         "context_event_id": event.event_id,
         "prepared_at": event.created_at,
-        "seq": min(record.get("seq", event.seq), event.seq),
+        "seq": min(record.get("seq", event.stream_version), event.stream_version),
         "requested_provider": payload.get("requested_provider", record.get("requested_provider")),
         "requested_model": payload.get("requested_model", record.get("requested_model")),
         "prompt_version": payload.get("prompt_version", record.get("prompt_version")),
@@ -961,7 +961,7 @@ def _merge_started(record: dict[str, Any], event: Event, payload: dict[str, Any]
         "status": "requesting",
         "sent": True,
         "started_at": payload.get("started_at") or event.created_at,
-        "seq": min(record.get("seq", event.seq), event.seq),
+        "seq": min(record.get("seq", event.stream_version), event.stream_version),
         "requested_provider": payload.get("requested_provider", record.get("requested_provider")),
         "requested_model": payload.get("requested_model", record.get("requested_model")),
         "actual_provider": payload.get("actual_provider", record.get("actual_provider")),
@@ -1039,7 +1039,7 @@ def _event_by_id(events: Iterable[Event], event_id: Any) -> Event | None:
 def _event_detail(event: Event) -> dict[str, Any]:
     return {
         "event_id": event.event_id,
-        "seq": event.seq,
+        "seq": event.stream_version,
         "type": event.type,
         "role": event.role,
         "created_at": event.created_at,

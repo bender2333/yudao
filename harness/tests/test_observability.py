@@ -61,7 +61,7 @@ def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path
     run_id = system.create_run("observe attempts")
     system.run_until_stop(run_id)
     query = ObservabilityQuery(system.store, system.artifacts)
-    before = system.project(run_id).last_seq
+    before = system.project(run_id).stream_version
 
     listing = query.list_model_attempts(run_id, limit=1)
     assert {"run_id", "version", "items", "total", "next_cursor"} <= set(listing)
@@ -86,7 +86,7 @@ def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path
     assert usage["totals"]["cost"] is None
     assert usage["cost_status"] == "missing"
     assert usage["groups"]["departments"]
-    assert system.project(run_id).last_seq == before
+    assert system.project(run_id).stream_version == before
 
 
 def test_stream_artifact_cleanup_closes_temp_file_before_cleanup(tmp_path: Path):
@@ -384,7 +384,7 @@ def test_department_prompt_does_not_fallback_when_adopted_version_is_missing(tmp
     events = system.store.list_events(run_id)
     activation = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED)
     activation.payload["prompt_hash"] = "sha256:" + "0" * 64
-    monkeypatch.setattr(system.store, "list_events", lambda _run_id, after_seq=0: events if after_seq == 0 else [event for event in events if event.seq > after_seq])
+    monkeypatch.setattr(system.store, "list_events", lambda _run_id, after_version=0: events if after_version == 0 else [event for event in events if event.stream_version > after_version])
     department = ObservabilityQuery(system.store, system.artifacts).department(run_id, "product")
     assert department["prompt"]["status"] == "unknown"
     assert department["prompt"]["text"] is None
@@ -481,7 +481,7 @@ def test_observability_routes_are_run_scoped_and_query_only(tmp_path: Path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
     run_id = system.create_run("route checks")
     system.run_until_stop(run_id)
-    before = system.project(run_id).last_seq
+    before = system.project(run_id).stream_version
     server = serve(system, port=0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -508,14 +508,14 @@ def test_observability_routes_are_run_scoped_and_query_only(tmp_path: Path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
-    assert system.project(run_id).last_seq == before
+    assert system.project(run_id).stream_version == before
 
 
 def test_observability_export_contains_attempt_context_and_usage_without_mutating_run(tmp_path: Path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
     run_id = system.create_run("export observations")
     system.run_until_stop(run_id)
-    before = system.project(run_id).last_seq
+    before = system.project(run_id).stream_version
 
     exported = ObservabilityQuery(system.store, system.artifacts).export_run(run_id)
 
@@ -525,4 +525,4 @@ def test_observability_export_contains_attempt_context_and_usage_without_mutatin
     assert "request" in exported["attempts"][0]
     assert exported["usage"]["total_attempts"] == 4
     assert set(exported["departments"]) == {"product", "engineering", "quality"}
-    assert system.project(run_id).last_seq == before
+    assert system.project(run_id).stream_version == before

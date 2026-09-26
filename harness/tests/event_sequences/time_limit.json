@@ -780,7 +780,6 @@
    "product": "<act#1>"
   },
   "last_review": null,
-  "last_seq": 13,
   "latency_ms": "<duration>",
   "lesson_candidates": [
    {
@@ -1059,6 +1058,7 @@
   },
   "snapshot": null,
   "stop_reason": "time_limit",
+  "stream_version": 13,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 0,

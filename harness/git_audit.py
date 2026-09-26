@@ -61,7 +61,7 @@ def _expected_versions(artifacts: ArtifactStore, events: list[Event]) -> Iterato
     seen = set()
     try:
         for event in events:
-            if current.run_id and event.run_id != current.run_id or event.seq <= current.last_seq:
+            if current.run_id and event.run_id != current.run_id or event.stream_version <= current.stream_version:
                 raise GitBindingError("Git history must follow one run's event order")
             candidate = event.payload.get("git_version")
             if event.type in GIT_VERSION_EVENTS:
