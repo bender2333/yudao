@@ -9,8 +9,8 @@ from typing import Any
 
 from .adapters.base import ProviderError
 from .artifacts import ArtifactStore
-from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, plan_compaction, response_reserve,
-                         visible_history)
+from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, finish_compaction, plan_compaction,
+                         response_reserve, visible_history)
 from .context import AssembledContext, ContextAssembler, department_work_text
 from .models import (ArtifactRef, DepartmentGuidance, DepartmentPrompt, Event, EventType, RunProjection,
                      canonical_hash, estimate_tokens, json_dumps)
@@ -98,6 +98,14 @@ class StepRequest:
         return self.input_token_estimate + self.output_reserve_tokens <= self.limits.context_window
 
 
+@dataclass(frozen=True)
+class CompactionResult:
+    # 压缩请求的回答生成的检查点，连同它的压缩计划与它所接续的上一次压缩
+    checkpoint: CompactionCheckpoint
+    plan: CompactionPlan
+    previous_compaction_event_id: str | None
+
+
 class ContextAssembly:
     def __init__(self, artifacts: ArtifactStore) -> None:
         self.artifacts = artifacts
@@ -177,6 +185,14 @@ class ContextAssembly:
             input_token_estimate=estimate_tokens(json_dumps({"input": context.input_items, "tools": context.tools})),
             output_reserve_tokens=context.manifest.max_output_tokens or 0,
         )
+
+    def finish_compaction(self, step: StepRequest, output: list[dict[str, Any]]) -> CompactionResult | None:
+        # 压缩请求的回答只能是摘要文字（可以带推理），否则抛出 CompactionError；
+        # 摘要为空或超过上限时返回 None，不记录这次压缩，之后的激活重新压缩
+        checkpoint = finish_compaction(step.compaction_plan, output)
+        if checkpoint is None:
+            return None
+        return CompactionResult(checkpoint, step.compaction_plan, step.context.manifest.compaction_event_id)
 
     def _checkpoint(self, pinned: PinnedStep) -> tuple[CompactionCheckpoint | None, str | None]:
         # 摘要必须与它的原始工件一致

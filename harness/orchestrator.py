@@ -14,10 +14,10 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
                            tool_permission)
 from .artifacts import ArtifactStore
-from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
+from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, StepRequest, model_limits, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
-from .compaction import CompactionError, finish_compaction
+from .compaction import CompactionError
 from .event_store import EventStore
 from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, run_department
 from .git_versions import GitVersionStore
@@ -77,7 +77,7 @@ class _Activation:
     raw_usage_ref: dict[str, Any] | None = None
     provider: str | None = None
     model: str | None = None
-    compaction_plan: Any = None
+    step: StepRequest | None = None
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
@@ -931,7 +931,7 @@ class Orchestrator:
                 reason = "context_overflow" if pinned.fills_window else "compaction_failed"
                 raise ProviderError(str(exc), reason=reason) from exc
             assembled = step.context
-            activation.compaction_plan = step.compaction_plan
+            activation.step = step
             logical_call_id = self._logical_call_id(
                 identity.activation_id, root_step_id, assembled.manifest.purpose,
             )
@@ -1010,14 +1010,13 @@ class Orchestrator:
                 return
             if activation.basis.changed(current, activation.department):
                 return
-            plan = activation.compaction_plan
             try:
-                checkpoint = finish_compaction(plan, response.output)
+                result = self.assembly.finish_compaction(activation.step, response.output)
             except CompactionError as exc:
                 raise ProviderError(str(exc), reason="compaction_failed") from exc
-            if checkpoint is None:
-                # 摘要为空或超限：非致命，不记录压缩事件，后续激活重试压缩
+            if result is None:
                 return
+            checkpoint, plan = result.checkpoint, result.plan
             summary_ref = self.artifacts.put(activation.run_id, "department_summary", checkpoint.summary, media_type="text/plain")
             plan_ref = self.artifacts.put(activation.run_id, "compaction_plan", json_dumps(asdict(plan)), media_type="application/json")
             self.store.append(activation.run_id, EventType.COMPACTION_RECORDED, role=activation.department,
@@ -1038,7 +1037,7 @@ class Orchestrator:
                                        "engineering_plan_hash": activation.engineering_plan_hash,
                                        "request_id": activation.request_id,
                                        **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                                       "previous_compaction_event_id": request.context.manifest.compaction_event_id})
+                                       "previous_compaction_event_id": result.previous_compaction_event_id})
 
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
         with self._state_lock:
