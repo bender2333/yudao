@@ -1,6 +1,6 @@
 # 系统架构原理：控制核心与可替换的材料
 
-更新：2026-09-26。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节。
+更新：2026-09-26。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
 
 依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 分布式部署](../../requirements/distributed-deployment.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
@@ -97,7 +97,7 @@ Yudao 的循环有四层：角色任务内部的步骤循环（ReAct）、部门
 | 用测试、构建、类型检查拒收错误的生成 | 确定性工具 | 质检独立核验，确定性检查作为证据 |
 | 出错后往提示词里加一条提醒 | 人凭经验调整 | 教训：由教训发现模块单独审查事件与事实找出（待设计，[D25](../../requirements/semantic-system.md)），经 U 写入，由上下文装配器按规则放入 |
 | 跑偏时删掉任务清单或回退代码，重新生成计划 | 人凭感觉判断 | 返工回到需求或工程；部门连续 3 轮没有进展时重新规划，连续角色从新的历史开始；同一计划条目反复被审查退回时提醒用户（[D26](../../requirements/department-roles.md)） |
-| 没有构建与测试错误时打标签；任务清单做完；跑偏由人停下 | 一部分确定，一部分靠人 | 停止原因是封闭的枚举：done、max_reworks、stalled、no_change_stall、budget_exhausted 等 |
+| 没有构建与测试错误时打标签；任务清单做完；跑偏由人停下 | 一部分确定，一部分靠人 | 停止原因是定义中的一份封闭清单（[ADR-0014](../../adr/0014-versioned-definitions.md)） |
 
 Ralph 由操作者补上的那一半控制，Yudao 换成代码可以判定的规则，循环可以在没有操作者的情况下长时间运行，每一次停止都有明确的原因；同一计划条目反复被退回这类需要判断方向的情况，由规则识别出来以后提醒用户。
 
@@ -211,11 +211,13 @@ flowchart LR
   Tools --> Objects[("对象存储：工件与封存快照")]
 ```
 
-### 7.4 协议（架构师建议，待确认）
+### 7.4 协议
 
-- 桌面客户端与接口服务之间：HTTP、由 pydantic 模型经 FastAPI 生成的 OpenAPI、带序号的 SSE 事件流，断线按序号补齐。
-- 服务之间的请求与应答（控制核心调用 Provider 与执行环境，外包 agent 的适配程序与控制核心往来）：gRPC。取消与期限可以跨服务传递，模型输出与命令输出可以流式返回，protobuf 合同与语言无关（外包 agent 的适配程序可能使用 TypeScript）。connect-python 截至 2026-07-15 的 0.11.1 仍为 Beta，所以客户端一侧使用 OpenAPI。
-- 单机部署运行同一套服务，桌面客户端按地址连接本机或远端的部署。
+2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)）：
+
+- 桌面客户端与接口服务之间：HTTP、由 pydantic 类型经 FastAPI 生成的 OpenAPI、按全局位置推送的 SSE 事件流，断线按位置补齐。
+- 服务之间的请求与应答（控制核心调用 Provider 与执行环境，外包 agent 的适配程序与控制核心往来，观察者订阅与提案）：HTTP 加 JSON，流式结果使用 SSE 或分块传输；合同只有 pydantic 一种来源。
+- 单机部署运行同一套服务，桌面客户端按地址连接本机或远端的部署；从本机以外访问需要认证。
 
 ## 8. 外包角色
 
@@ -239,11 +241,11 @@ flowchart LR
 
 已确认的界面技术（2026-09-25）：React 19、TypeScript、Vite；画面渲染 PixiJS v8，画面对象命令式编写，React 只负责挂载与传入模型；角色行为 XState v5；补间动画 GSAP；中文像素字体 Fusion Pixel Font；网格寻路自己实现广度优先搜索。
 
-架构师建议（待确认）：
+2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)、[ADR-0011](../../adr/0011-async-control-core.md)）：
 
 - 桌面外壳使用 Electron：各平台同一个 Chromium 内核，PixiJS 的 WebGL 与 WebGPU 表现一致；外壳进程同样使用 TypeScript。桌面程序提供独立窗口（循环画面可以放在第二块屏幕）、托盘、窗口被遮挡时照常刷新、系统通知定位、窗口布局记忆，并能连接本机或远端的部署。
 - 后端不再提供界面文件。界面代码只通过一层很薄的外壳接口使用桌面功能，其余部分可以在普通测试环境中运行；端到端测试用 Playwright 启动 Electron 应用。
-- 后端继续使用 Python，按职责分层：接口层（FastAPI，路由、合同、事件流）、应用层（命令处理与查询处理，所有客户端唯一的入口）、控制核心（编排器、步骤驱动、上下文装配器、裁决规则、事件库）、知识层（语义系统的投影与查询）、基础设施（Provider、执行环境与工具、工件存储）。控制核心不直接读写文件与网络，给定事件序列即可验证状态与决定，是单元测试的主要对象；基础设施通过接口隔开，测试使用真实实现（例如临时目录中的 SQLite），不使用 mock。
+- 后端继续使用 Python 与 asyncio，按职责分层：接口层（FastAPI，路由、合同、事件流）、应用层（命令处理与查询处理，所有客户端唯一的入口）、控制核心（编排器、步骤驱动、上下文装配器、裁决规则、写入口、事件日志）、知识层（语义系统的投影与查询）、执行层（Provider、执行环境、外包 agent 的运行容器）与工件存储。分层与合同见[总体架构](overall-architecture.md)。控制核心不直接读写文件与网络，给定事件序列即可验证状态与决定，是单元测试的主要对象；基础设施通过接口隔开，测试使用真实实现（例如临时目录中的 SQLite），不使用 mock。
 
 ## 10. 项目的意义
 
@@ -253,11 +255,7 @@ Yudao 的意义是把关口从人的速度提到机器的速度，同时保持�
 
 ## 11. 待用户确认的事项
 
-1. D29 补充用户 2026-09-25 的原话：集群部署，部门与角色作为独立服务，成为云原生应用。
-2. 新写一份 ADR，取代 ADR-0007 的两条后果：「Stage 6 之前不引入消息队列、网络服务、新的数据库或容器编排」与「Stage 6 的运行方式在该阶段决定」。内容：控制核心保持一份，执行层（执行环境、Provider、外包 agent 的运行容器）做成服务池；不引入外部执行引擎，派发与执行权建立在事件库上。六条边界保留，作为服务之间的合同。
-3. 路线图 Stage 6 的内容随之修改。
-4. 界面改为桌面程序（Electron），以及第 7.4 节的协议，写入界面 ADR 与界面技术设计。
-5. D31 中待确认的规则：哪些角色允许外包（架构师建议按第 8 节的判据）、模型调用是否必须经过 Provider 的入口、文件与命令是否必须由工具执行服务完成、凭据与用量、路线位置。
+1. D31 中待确认的规则：哪些角色允许外包（架构师建议按第 8 节的判据）、凭据与用量（订阅账号或 API 密钥）、路线位置。外部 agent 的模型调用经过 Provider 的入口、文件与命令经过执行环境，已由[总体架构](overall-architecture.md)第 7 节的外包派发合同与动作合同确定。
 
 ## 12. 来源
 
