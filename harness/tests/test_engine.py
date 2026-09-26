@@ -133,28 +133,17 @@ def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monke
     assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))
 
 
-def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path, monkeypatch):
-    pending, release = Event(), Event()
-    adapter = FakeAdapter([product_spec(), ModelResponse(output=[_call("write-1", "write_file", path="new.txt", content="new")])])
+def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path):
+    def cancel_during_request(_call):
+        system.cancel(run_id)
+        return ModelResponse(output=[_call("write-1", "write_file", path="new.txt", content="new")])
+
+    adapter = FakeAdapter([product_spec(), cancel_during_request])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
-    begin = system.orchestrator._begin_tool
-
-    def delayed_begin(activation, call):
-        pending.set()
-        assert release.wait(5)
-        return begin(activation, call)
-
-    monkeypatch.setattr(system.orchestrator, "_begin_tool", delayed_begin)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(system.activate_once, run_id)
-        try:
-            assert pending.wait(5)
-            assert system.cancel(run_id).stop_reason == "cancelled"
-        finally:
-            release.set()
-        future.result(timeout=5)
+    result = system.activate_once(run_id)
+    assert result.stop_reason == "cancelled"
     assert "new.txt" not in system.workspace(run_id).list_files()
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "write-1" for event in system.store.list_events(run_id))
 

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
+from .adjudication import ToolPermission
 from .models import json_dumps
 from .providers import ProviderConnections
 from .providers.call import ModelCall, ModelResponse, ModelStreamEvent
@@ -69,12 +70,6 @@ class DepartmentSubmission:
     response: ModelResponse
 
 
-@dataclass(frozen=True)
-class ToolAdmission:
-    stopped: bool = False
-    error: str | None = None
-
-
 def run_department(
     adapter: ModelAdapter,
     runtime: ToolRuntime,
@@ -86,7 +81,7 @@ def run_department(
     record_response: Callable[[ModelResponse], None],
     record_tool: Callable[[dict[str, Any]], None],
     record_skipped_tool: Callable[[dict[str, Any]], None],
-    begin_tool: Callable[[dict[str, Any]], ToolAdmission],
+    begin_tool: Callable[[dict[str, Any]], ToolPermission],
     begin_request: Callable[[ModelRequest], bool],
     finish_compaction: Callable[[ModelResponse], None],
     record_attempt_finished: Callable[[ModelRequest, ModelResponse], None],
@@ -214,13 +209,13 @@ def run_department(
                 args = {"invalid_arguments": raw_args}
                 result = ToolResult(name, False, None, f"invalid tool arguments: {exc}")
             else:
-                admission = begin_tool({"id": identity, "name": name, "args": args, "step_id": step_id})
-                if admission.stopped:
+                permission = begin_tool({"id": identity, "name": name, "args": args, "step_id": step_id})
+                if permission.stopped:
                     _skip_calls(response.output[index:], step_id, record_skipped_tool,
                                 "Not executed because the current activation can no longer start tools.")
                     return None
-                result = (ToolResult(name, False, None, admission.error) if admission.error
-                          else runtime.execute(request.department, name, args))
+                result = (runtime.execute(request.department, name, args) if permission.allowed
+                          else ToolResult(name, False, None, permission.reason))
             input_item = {"type": "function_call_output", "call_id": identity,
                           "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
             call = {"id": identity, "name": name, "args": args, "ok": result.ok,

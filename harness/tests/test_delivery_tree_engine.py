@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 import pytest
 
-import harness.orchestrator as orchestration
+import harness.adjudication as adjudication
 import harness.submissions as submissions
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
@@ -67,7 +67,7 @@ def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, m
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
-    evaluate = orchestration.evaluate_proposal
+    evaluate = adjudication.evaluate_proposal
     store_tree = submissions.store_tree
     captured = []
     archived = []
@@ -85,7 +85,7 @@ def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, m
         archived.append(ref)
         return ref
 
-    monkeypatch.setattr(orchestration, "evaluate_proposal", mutate_after_validation)
+    monkeypatch.setattr(adjudication, "evaluate_proposal", mutate_after_validation)
     monkeypatch.setattr(submissions, "store_tree", archive_validated_tree)
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING", result.error
@@ -113,7 +113,7 @@ def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_pa
     for _ in range(3):
         current = system.activate_once(run_id)
     accepted_tree_digest = current.delivery_spec.code_tree_digest
-    evaluate = orchestration.evaluate_proposal
+    evaluate = adjudication.evaluate_proposal
 
     def mutate_after_quality_validation(**arguments):
         decision = evaluate(**arguments)
@@ -122,7 +122,7 @@ def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_pa
         system.workspace(run_id).write_file("src/unreviewed.py", "not part of the reviewed tree")
         return decision
 
-    monkeypatch.setattr(orchestration, "evaluate_proposal", mutate_after_quality_validation)
+    monkeypatch.setattr(adjudication, "evaluate_proposal", mutate_after_quality_validation)
     result = system.activate_once(run_id)
     assert result.phase == "QUALITY", result.error
     assert result.stop_reason is None

@@ -5,7 +5,7 @@ from dataclasses import asdict
 import pytest
 
 import harness.interactions as interactions
-import harness.orchestrator as orchestration
+import harness.adjudication as adjudication
 from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.compaction import visible_history
 from harness.engine import StepLimits
@@ -277,7 +277,7 @@ def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_pa
     ]))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 3)
-    evaluate = orchestration.evaluate_proposal
+    evaluate = adjudication.evaluate_proposal
 
     def receive_after_validation(**arguments):
         decision = evaluate(**arguments)
@@ -285,7 +285,7 @@ def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_pa
         system.add_input(run_id, "Print uppercase instead")
         return decision
 
-    monkeypatch.setattr(orchestration, "evaluate_proposal", receive_after_validation)
+    monkeypatch.setattr(adjudication, "evaluate_proposal", receive_after_validation)
     current = system.activate_once(run_id)
     assert current.phase == "PRODUCT_SPEC" and current.last_review is None
     assert current.rejections[-1]["errors"][0]["field"] == "execution_basis"
