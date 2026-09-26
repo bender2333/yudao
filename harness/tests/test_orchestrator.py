@@ -1,6 +1,6 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.engine import MAX_MODEL_STEPS, TOOL_CALL_REQUIRED_LIMIT
+from harness.engine import TOOL_CALL_REQUIRED_LIMIT
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted

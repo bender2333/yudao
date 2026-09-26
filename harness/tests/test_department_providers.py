@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterator
 
 import pytest
 
-import harness.engine as engine
+from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
 from harness.proposals import collaboration_request, collaboration_response, delivery, engineering_plan, product_spec, review
@@ -28,6 +28,7 @@ class _Reply:
 
 
 Responder = Callable[[dict[str, Any], int], _Reply]
+MILLISECOND_RETRIES = StepLimits(retry_initial_delay_sec=0.001, retry_max_delay_sec=0.001)
 
 
 def _event(kind: str, **payload: Any) -> bytes:
@@ -540,10 +541,7 @@ def test_restart_cannot_rebind_an_existing_run_to_new_credentials(tmp_path):
         assert "provider-b-new-key" not in public
 
 
-def test_retry_stays_on_the_bound_provider_and_model(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.001)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.001)
-
+def test_retry_stays_on_the_bound_provider_and_model(tmp_path):
     def retrying(body: dict[str, Any], count: int) -> _Reply:
         assert _department(body) == "product"
         if count == 1:
@@ -559,7 +557,7 @@ def test_retry_stays_on_the_bound_provider_and_model(tmp_path, monkeypatch):
             config_a.base_url, config_b.base_url, credentials={
                 "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
                 "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-            }))
+            }), step_limits=MILLISECOND_RETRIES)
         run_id = system.create_run("retry this task")
         result = system.activate_once(run_id)
 
@@ -651,10 +649,7 @@ def test_terminal_returned_models_are_recorded_for_unreported_multi_step_work(tm
         assert result.token_used == 0
 
 
-def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.001)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.001)
-
+def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_path):
     def always_fails(body: dict[str, Any], _count: int) -> _Reply:
         assert _department(body) == "product"
         return _error()
@@ -665,7 +660,7 @@ def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_p
             config_a.base_url, config_b.base_url, credentials={
                 "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
                 "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-            }))
+            }), step_limits=MILLISECOND_RETRIES)
         run_id = system.create_run("provider failure has no response model")
         result = system.activate_once(run_id)
 
@@ -823,9 +818,7 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
     return facade
 
 
-def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_department(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.001)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.001)
+def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_department(tmp_path):
     state = {"read": False}
 
     def product(body: dict[str, Any], count: int) -> _Reply:
@@ -876,7 +869,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
             _provider_server("provider-e", "unused", engineering) as (config_e, captures_e, errors_e), \
             _provider_server("provider-q", "unused", quality) as (config_q, captures_q, errors_q):
         system = LoopSystem(tmp_path, facade=_mixed_protocol_facade(
-            config_p.base_url, config_e.base_url, config_q.base_url))
+            config_p.base_url, config_e.base_url, config_q.base_url), step_limits=MILLISECOND_RETRIES)
         run_id = system.create_run("build an echo command")
         system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)
         result = system.run_until_stop(run_id)

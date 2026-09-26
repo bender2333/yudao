@@ -3,24 +3,18 @@ import json
 
 import pytest
 
-import harness.engine as engine
 from harness.adapters.base import ModelObservation, ModelResponse, ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
+from harness.tests.helpers import FAST_RETRIES
 
 
-def _fast_retries(monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-
-
-def _retry_run(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
+def _retry_run(tmp_path):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("retry audit")
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
@@ -34,7 +28,7 @@ def _mutated_events(system, run_id, monkeypatch):
 
 
 def test_native_retry_events_are_verified_by_model_input_audit(tmp_path, monkeypatch):
-    system, run_id = _retry_run(tmp_path, monkeypatch)
+    system, run_id = _retry_run(tmp_path)
 
     fields = isolation_fields(system.store, system.artifacts, run_id)
     audit = fields["model_input_audit"]
@@ -51,7 +45,7 @@ def test_native_retry_events_are_verified_by_model_input_audit(tmp_path, monkeyp
 
 
 def test_model_input_audit_rejects_retry_event_without_max_attempts(tmp_path, monkeypatch):
-    system, run_id = _retry_run(tmp_path, monkeypatch)
+    system, run_id = _retry_run(tmp_path)
     events = _mutated_events(system, run_id, monkeypatch)
     schedule = next(event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED)
     schedule.payload.pop("max_attempts")
@@ -63,7 +57,7 @@ def test_model_input_audit_rejects_retry_event_without_max_attempts(tmp_path, mo
 
 
 def test_model_input_audit_rejects_retry_event_with_wrong_next_attempt(tmp_path, monkeypatch):
-    system, run_id = _retry_run(tmp_path, monkeypatch)
+    system, run_id = _retry_run(tmp_path)
     events = _mutated_events(system, run_id, monkeypatch)
     schedule = next(event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED)
     schedule.payload["next_attempt"] = schedule.payload["attempt"] + 2
@@ -83,7 +77,7 @@ def test_model_input_audit_rejects_retry_event_with_wrong_next_attempt(tmp_path,
     (EventType.MODEL_REQUESTED, "retry_of_step_id"),
 ])
 def test_model_input_audit_rejects_missing_retry_metadata(tmp_path, monkeypatch, event_type, field):
-    system, run_id = _retry_run(tmp_path, monkeypatch)
+    system, run_id = _retry_run(tmp_path)
     events = _mutated_events(system, run_id, monkeypatch)
     event = next(item for item in events if item.type == event_type)
     event.payload.pop(field)
@@ -95,7 +89,6 @@ def test_model_input_audit_rejects_missing_retry_metadata(tmp_path, monkeypatch,
 
 
 def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fails_audit(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
     partial = {
         "id": "failed-partial",
         "type": "message",
@@ -108,7 +101,7 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
         raise ProviderError("stream disconnected", retryable=True)
 
     adapter = FakeAdapter([fail_after_partial, product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("partial retry audit")
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
@@ -131,9 +124,8 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
 
 
 def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
     adapter = FakeAdapter([ModelResponse(), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("prepared but not sent")
     original = system.orchestrator._begin_request
 

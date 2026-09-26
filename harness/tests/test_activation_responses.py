@@ -3,7 +3,7 @@
 import json
 from dataclasses import replace
 
-import harness.engine as engine
+from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
@@ -108,10 +108,7 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
             system.store.close()
 
 
-def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_messages(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-
+def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_messages(tmp_path):
     def partial_then_hold(handler, _body):
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream")
@@ -127,7 +124,7 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_message
         ResponsesAdapter(replace(warm_config, timeout_sec=120)).complete(_request())
     # 请求时限沿用捕获服务的 5 秒；成功回复立即发送，三次部分流都由服务端保持到客户端超时
     with _server([_stream([CALL]), partial_then_hold, partial_then_hold, partial_then_hold]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
         try:
             run_id = system.create_run("later timeout")
             system.workspace(run_id).write_file("proof.txt", "survives-timeout")
@@ -150,15 +147,13 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_message
             system.store.close()
 
 
-def test_failed_first_model_request_still_has_durable_exact_input(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+def test_failed_first_model_request_still_has_durable_exact_input(tmp_path):
     def fail(handler, _body):
         _send(handler, b'{"error":{"code":"server_error","message":"local failure"}}',
               status=500, content_type="application/json")
 
     with _server([fail, fail, fail]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
         try:
             run_id = system.create_run("failed provider request")
             result = system.activate_once(run_id)
@@ -172,16 +167,13 @@ def test_failed_first_model_request_still_has_durable_exact_input(tmp_path, monk
             system.store.close()
 
 
-def test_http_500_retry_then_success_reaches_native_loop(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-
+def test_http_500_retry_then_success_reaches_native_loop(tmp_path):
     def fail(handler, _body):
         _send(handler, b'{"error":{"code":"server_error","message":"transient"}}',
               status=500, content_type="application/json")
 
     with _server([fail, _stream([SUBMIT], response_id="retry-success")]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
         try:
             run_id = system.create_run("HTTP retry to success")
             result = system.activate_once(run_id)
@@ -195,13 +187,11 @@ def test_http_500_retry_then_success_reaches_native_loop(tmp_path, monkeypatch):
             system.store.close()
 
 
-def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path):
     partial = {**CALL, "id": "partial-call", "call_id": "partial-call"}
 
     with _server([_stream([partial], terminal=False), _stream([SUBMIT], response_id="partial-success")]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
         try:
             run_id = system.create_run("partial stream retry")
             result = system.activate_once(run_id)

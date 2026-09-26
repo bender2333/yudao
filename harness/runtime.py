@@ -7,6 +7,7 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
+from .engine import StepLimits
 from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .projection import RunProjection, project_run
@@ -32,6 +33,7 @@ class LoopSystem:
         test_adapter: ModelAdapter | None = None,
         provider_config_path: str | Path | None = None,
         dotenv_path: str | Path | None = None,
+        step_limits: StepLimits = StepLimits(),
     ) -> None:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -59,6 +61,7 @@ class LoopSystem:
             test_adapter_factory=test_adapter_factory,
             test_provider=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
+            step_limits=step_limits,
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.artifacts, self.orchestrator)
@@ -72,9 +75,10 @@ class LoopSystem:
         return self.facade.dotenv_path
 
     @classmethod
-    def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter) -> "LoopSystem":
+    def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter, *,
+                    step_limits: StepLimits = StepLimits()) -> "LoopSystem":
         # 显式提供的确定性适配器只用于确定性测试
-        return cls(data_dir, test_adapter=adapter)
+        return cls(data_dir, test_adapter=adapter, step_limits=step_limits)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态

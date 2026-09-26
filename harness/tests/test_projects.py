@@ -9,6 +9,7 @@ from harness.adapters.base import ModelResponse, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
+from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projects import (
     ProjectArchivedError,
@@ -377,12 +378,8 @@ def test_project_context_guidance_stays_before_department_rules(data_dir):
     assert sources[:5] == ["intend", "current_work", "project", "department_guidance", "department_rules"]
 
 
-def test_compaction_pinned_input_contains_project_part(data_dir, monkeypatch):
+def test_compaction_pinned_input_contains_project_part(data_dir):
     # 步数上限已放开为时间边界，本用例按旧步数上限验证单次激活内的压缩行为
-    from harness import engine
-
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
-
     def respond(request):
         if request.purpose == "compaction":
             return ModelResponse(output=[{
@@ -398,7 +395,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir, monkeypatch):
         return product_spec() if request.request_id is None else response_turn("answered", "Still applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter, step_limits=StepLimits(max_model_steps=32))
     project_id = system.projects.register("Compact", GOAL)
     _work_item_id, run_id = system.projects.start_work_item(project_id, "小窗口事项", context_window=6000)
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)

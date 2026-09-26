@@ -5,9 +5,9 @@ from typing import Any, Callable
 
 import pytest
 
-import harness.engine as engine
 from harness.adapters.base import ModelResponse, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.engine import StepLimits
 from harness.models import DEPARTMENTS, json_dumps
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, engineering_plan, guidance_response, plan_turn,
@@ -16,6 +16,7 @@ from harness.proposals import (
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.event_sequence import compare_with_baseline, normalized_run
+from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import serve, sse
 
 # 每个场景用 FakeAdapter 脚本（或测试内启动的真实 HTTP 服务）驱动 LoopSystem，把规整后的事件序列与
@@ -32,12 +33,7 @@ ECHO = "import sys\nprint(sys.argv[1])\n"
 @dataclass(frozen=True)
 class Scenario:
     covers: str
-    run: Callable[..., tuple[LoopSystem, str, dict[str, str]]]
-
-
-def _fast_retries(monkeypatch) -> None:
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+    run: Callable[[Any], tuple[LoopSystem, str, dict[str, str]]]
 
 
 def _call(identity: str, name: str, arguments: Any) -> dict[str, Any]:
@@ -57,36 +53,36 @@ def _handoff_script() -> list[Any]:
     return [product_spec(), plan_turn(), _deliver(), _release()]
 
 
-def _system(data_dir, script: list[Any], **run_options: Any) -> tuple[LoopSystem, FakeAdapter, str]:
+def _system(data_dir, script: list[Any], *, step_limits: StepLimits = StepLimits(),
+            **run_options: Any) -> tuple[LoopSystem, FakeAdapter, str]:
     adapter = FakeAdapter(script)
-    system = LoopSystem.for_testing(data_dir, adapter)
+    system = LoopSystem.for_testing(data_dir, adapter, step_limits=step_limits)
     return system, adapter, system.create_run("build an echo CLI", **run_options)
 
 
-def handoff_release(data_dir, monkeypatch):
+def handoff_release(data_dir):
     system, _, run_id = _system(data_dir, _handoff_script())
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def retry_then_success(data_dir, monkeypatch):
-    _fast_retries(monkeypatch)
+def retry_then_success(data_dir):
     system, _, run_id = _system(data_dir, [
         ProviderError("temporary connection failure", retryable=True, diagnostics={"error_type": "connection"}),
         product_spec(),
-    ])
+    ], step_limits=FAST_RETRIES)
     system.activate_once(run_id)
     return system, run_id, {}
 
 
-def retry_exhausted(data_dir, monkeypatch):
-    _fast_retries(monkeypatch)
-    system, _, run_id = _system(data_dir, [ProviderError("temporary", retryable=True) for _ in range(3)])
+def retry_exhausted(data_dir):
+    system, _, run_id = _system(data_dir, [ProviderError("temporary", retryable=True) for _ in range(3)],
+                                step_limits=FAST_RETRIES)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def retry_after_too_long(data_dir, monkeypatch):
+def retry_after_too_long(data_dir):
     system, _, run_id = _system(data_dir, [
         ProviderError("rate limited", retryable=True, diagnostics={"retry_after_sec": 60.1}),
         product_spec(),
@@ -100,7 +96,7 @@ def _summary(request, text="Product memory: the large file was read; keep the or
             "content": [{"type": "output_text", "text": text}]}
 
 
-def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse]):
+def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse], *, step_limits: StepLimits = StepLimits()):
     reads: set[str] = set()
 
     def respond(request):
@@ -112,30 +108,28 @@ def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse]):
             return ModelResponse(output=[_call(identity, "read_file", {"path": "large.txt"})])
         return product_spec()
 
-    system, _, run_id = _system(data_dir, [respond] * 20, context_window=6000)
+    system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits, context_window=6000)
     system.workspace(run_id).write_file("large.txt", "LARGE_TOOL_OUTPUT " * 2200)
     return system, run_id
 
 
-def compaction_success(data_dir, monkeypatch):
+def compaction_success(data_dir):
     system, run_id = _compaction_system(data_dir, lambda request: ModelResponse(output=[_summary(request)]))
     system.activate_once(run_id)
     return system, run_id, {}
 
 
-def compaction_failed(data_dir, monkeypatch):
-    _fast_retries(monkeypatch)
-
+def compaction_failed(data_dir):
     def undeclared(request):
         identity = f"corrupt-{request.activation_id}-{request.step_id}"
         return ModelResponse(output=[_call(identity, "list_files", {})])
 
-    system, run_id = _compaction_system(data_dir, undeclared)
+    system, run_id = _compaction_system(data_dir, undeclared, step_limits=FAST_RETRIES)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def invalid_tool_arguments(data_dir, monkeypatch):
+def invalid_tool_arguments(data_dir):
     system, _, run_id = _system(data_dir, [
         ModelResponse(output=[_call("call-truncated", "search", '{"pattern": "def add", "path": ')]),
         product_spec(),
@@ -144,14 +138,14 @@ def invalid_tool_arguments(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def tool_denied_outside_plan(data_dir, monkeypatch):
+def tool_denied_outside_plan(data_dir):
     outside = ModelResponse(output=[_call("write-outside", "write_file", {"path": "docs/notes.md", "content": "notes\n"})])
     system, _, run_id = _system(data_dir, [product_spec(), plan_turn(), outside, _deliver(), _release()])
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def tool_denied_unregistered_command(data_dir, monkeypatch):
+def tool_denied_unregistered_command(data_dir):
     registry = {"unit": {"argv": ["python", "-c", "print('unit ok')"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
     unknown = ModelResponse(output=[_call("command-missing", "run_command", {"name": "missing"})])
     system, _, run_id = _system(data_dir, [product_spec(), plan_turn(), unknown, _deliver(), _release()],
@@ -165,7 +159,7 @@ def _guidance_id(request) -> str:
     return json.loads(part.text)[0]["id"]
 
 
-def tool_denied_guidance_only(data_dir, monkeypatch):
+def tool_denied_guidance_only(data_dir):
     system, adapter, run_id = _system(data_dir, [product_spec(), plan_turn(), _deliver()])
     for _ in range(3):
         system.activate_once(run_id)
@@ -182,7 +176,7 @@ def tool_denied_guidance_only(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def collaboration_request_answer(data_dir, monkeypatch):
+def collaboration_request_answer(data_dir):
     system, _, run_id = _system(data_dir, [
         product_spec(), collaboration_request(),
         response_turn("answered", "The existing contract covers unknown flags: print them as given."),
@@ -192,7 +186,7 @@ def collaboration_request_answer(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def guidance_response_explained(data_dir, monkeypatch):
+def guidance_response_explained(data_dir):
     system, adapter, run_id = _system(data_dir, [product_spec()])
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
@@ -205,7 +199,7 @@ def guidance_response_explained(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def proposal_rejected(data_dir, monkeypatch):
+def proposal_rejected(data_dir):
     system, _, run_id = _system(data_dir, [
         {"kind": "product_spec", "goal": "", "requirements": ["print the argument"], "acceptance_criteria": ["prints it"]},
         *_handoff_script(),
@@ -214,7 +208,7 @@ def proposal_rejected(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def quality_rework(data_dir, monkeypatch):
+def quality_rework(data_dir):
     system, _, run_id = _system(data_dir, [
         product_spec(), plan_turn(), _deliver(),
         review_turn("rework_engineering", "the output misses a trailing newline check", checks=CHECKS,
@@ -227,7 +221,7 @@ def quality_rework(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def stop_command(data_dir, monkeypatch):
+def stop_command(data_dir):
     system, _, run_id = _system(data_dir, _handoff_script())
     system.activate_once(run_id)
     system.add_input(run_id, "/stop")
@@ -235,7 +229,7 @@ def stop_command(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def cancel_during_model_call(data_dir, monkeypatch):
+def cancel_during_model_call(data_dir):
     holder: dict[str, Any] = {}
 
     def cancel_then_deliver(request):
@@ -248,7 +242,7 @@ def cancel_during_model_call(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def time_limit(data_dir, monkeypatch):
+def time_limit(data_dir):
     # 限制留出 3 秒，请求之前的装配在负载高时也不会用完它；模型调用本身等待到限制之后
     def slow_spec(request):
         time.sleep(3.2)
@@ -259,38 +253,36 @@ def time_limit(data_dir, monkeypatch):
     return system, run_id, {}
 
 
-def model_steps_exhausted(data_dir, monkeypatch):
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 3)
-
+def model_steps_exhausted(data_dir):
     def list_files(request):
         identity = f"list-{request.activation_id}-{request.step_id}"
         return ModelResponse(output=[_call(identity, "list_files", {})])
 
-    system, _, run_id = _system(data_dir, [list_files] * 3)
+    system, _, run_id = _system(data_dir, [list_files] * 3, step_limits=StepLimits(max_model_steps=3))
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def context_overflow(data_dir, monkeypatch):
+def context_overflow(data_dir):
     system, _, run_id = _system(data_dir, [product_spec()], context_window=1500)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def text_only_reply(data_dir, monkeypatch):
+def text_only_reply(data_dir):
     system, _, run_id = _system(data_dir, [FakeTurn(transcript="我先整理一下需求，稍后提交。"), product_spec()])
     system.activate_once(run_id)
     return system, run_id, {}
 
 
-def no_tool_call_pause(data_dir, monkeypatch):
+def no_tool_call_pause(data_dir):
     replies = [FakeTurn(transcript=f"第 {index} 次只回复文字") for index in range(1, 5)]
     system, _, run_id = _system(data_dir, replies)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def run_command_is_not_a_check_receipt(data_dir, monkeypatch):
+def run_command_is_not_a_check_receipt(data_dir):
     argv = ["python", "src/echo.py", "hello"]
     registry = {"unit-tests": {"argv": argv, "args": [], "timeout_sec": 30, "output_limit": 4000}}
 
@@ -389,7 +381,7 @@ HTTP_REPLIES = {"responses": _responses_reply, "chat_completions": _chat_reply, 
 
 
 def _http_scenario(protocol: str):
-    def run(data_dir, monkeypatch):
+    def run(data_dir):
         replies = iter(enumerate(HTTP_SCRIPT, start=1))
 
         def responder(_body):
@@ -499,9 +491,9 @@ SCENARIOS: dict[str, Scenario] = {
 
 
 @pytest.mark.parametrize("name", list(SCENARIOS))
-def test_event_sequence_matches_its_baseline(name, data_dir, monkeypatch, request):
+def test_event_sequence_matches_its_baseline(name, data_dir, request):
     scenario = SCENARIOS[name]
-    system, run_id, replacements = scenario.run(data_dir, monkeypatch)
+    system, run_id, replacements = scenario.run(data_dir)
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
     compare_with_baseline(name, scenario.covers, normalized_run(system, run_id, replacements),
                           write=request.config.getoption("--write-event-baselines"))

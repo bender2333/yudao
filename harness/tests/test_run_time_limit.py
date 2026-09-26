@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.engine import MAX_MODEL_STEPS
+from harness.engine import StepLimits
 from harness.models import DEFAULT_MAX_CYCLES, DEFAULT_RUN_TIME_LIMIT_SEC, EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
@@ -62,7 +62,7 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
 
 
 def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
-    # 旧限制 MAX_MODEL_STEPS=32，新限制 999999
+    # 最大模型步数的默认值是 999999（StepLimits），不再是 32
     # 用超过 32 个步骤后提交，验证不会暂停
     many_steps = [list_files_turn for _ in range(40)]
     script = [
@@ -86,16 +86,14 @@ def test_small_cycle_limit_still_pauses(data_dir):
     assert projection.stop_reason == "max_cycles"
 
 
-def test_small_step_limit_still_pauses(data_dir, monkeypatch):
-    import harness.engine as engine
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 3)
+def test_small_step_limit_still_pauses(data_dir):
     script = [
         FakeTurn(proposal=None, transcript="step1"),
         FakeTurn(proposal=None, transcript="step2"),
         FakeTurn(proposal=None, transcript="step3"),
         FakeTurn(proposal=None, transcript="step4"),
     ]
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script), step_limits=StepLimits(max_model_steps=3))
     run_id = system.create_run("echo", run_time_limit_sec=7200)
     result = system.activate_once(run_id)
     assert result.phase == "PAUSED"

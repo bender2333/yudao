@@ -13,6 +13,7 @@ import pytest
 from harness.artifacts import ArtifactStore
 from harness.adapters.base import Availability, ModelObservation, ModelResponse, ProviderError
 from harness.tests.protocol_helpers import ResponsesAdapter
+from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, Usage
 from harness.observability import ObservabilityQuery, _detail_events, _usage_totals
 from harness.runtime import LoopSystem
@@ -464,14 +465,10 @@ def test_compaction_coverage_exposes_seq_range_and_covered_through():
     assert coverage["source_seq_through"] == 12
 
 
-def test_partial_stream_failure_keeps_stream_artifact_and_actual_identity(tmp_path: Path, monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.01)
-
+def test_partial_stream_failure_keeps_stream_artifact_and_actual_identity(tmp_path: Path):
     with _server([_stream([], terminal=False), _submit_stream()]) as (config, *_):
-        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config),
+                                        step_limits=StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.01))
         run_id = system.create_run("partial stream")
         system.activate_once(run_id)
 

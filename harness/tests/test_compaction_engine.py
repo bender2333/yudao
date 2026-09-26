@@ -4,9 +4,11 @@ from threading import Event
 
 from harness.adapters.base import ModelObservation, ModelResponse
 from harness.adapters.fake import FakeAdapter
+from harness.engine import StepLimits
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.proposals import collaboration_request, product_spec, response_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import FAST_RETRIES
 
 
 def _message(request, text="Product memory: prior evidence was read; keep the original requirements."):
@@ -20,7 +22,7 @@ def _read(request, path):
                                   "arguments": json_dumps({"path": path})}])
 
 
-def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False):
+def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):
     work_counts = {}
     rejected_spec = False
 
@@ -42,7 +44,7 @@ def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False):
         return product_spec() if request.request_id is None else response_turn("answered", "The original requirements remain applicable.")(request)
 
     adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
     original = "  Original intent\r\nDo not rewrite this. \n"
     run_id = system.create_run(original, context_window=6000)
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
@@ -167,15 +169,7 @@ def _undeclared_tool_call(request):
                                   "name": CORRUPT_TOOL_NAME, "arguments": "{}"}])
 
 
-def _fast_retries(monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
-
-
-def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_executes(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
+def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_executes(tmp_path):
     compaction_count = 0
 
     def summary(request):
@@ -183,7 +177,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
         compaction_count += 1
         return _undeclared_tool_call(request) if compaction_count == 1 else ModelResponse(output=[_message(request)])
 
-    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=summary)
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=summary, step_limits=FAST_RETRIES)
     result = system.activate_once(run_id)
 
     assert result.phase == "ENGINEERING", result.error
@@ -217,9 +211,8 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_evidence(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
-    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=_undeclared_tool_call)
+def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_evidence(tmp_path):
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=_undeclared_tool_call, step_limits=FAST_RETRIES)
     result = system.activate_once(run_id)
 
     assert result.phase == "FAILED" and result.stop_reason == "compaction_failed"
@@ -246,16 +239,14 @@ def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_e
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path, monkeypatch):
+def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path):
     """A summary cut off by the output limit is a terminal provider response: never adopted, never retried."""
-    _fast_retries(monkeypatch)
-
     def truncated(request):
         item = _message(request, "Decisions: the first half of the memory and then")
         item["status"] = "incomplete"
         return ModelResponse(output=[item], finish_reason="incomplete", error="max_output_tokens")
 
-    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=truncated)
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=truncated, step_limits=FAST_RETRIES)
     result = system.activate_once(run_id)
 
     assert result.phase == "FAILED" and result.stop_reason == "provider_error"
@@ -272,11 +263,8 @@ def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path, mon
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_path, monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 2)
-    system, adapter, run_id, _ = _runner(tmp_path)
+def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_path):
+    system, adapter, run_id, _ = _runner(tmp_path, step_limits=StepLimits(max_model_steps=2))
     result = system.activate_once(run_id)
     assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"
     assert len(adapter.invocations) == 2
@@ -287,10 +275,8 @@ def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_pa
     assert result.product_spec is None
 
 
-def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path, monkeypatch):
+def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
     """空摘要不导致任务失败，部门继续工作，后续激活可重试压缩。"""
-    import harness.engine as engine
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
     invocation_count = 0
 
     def respond(request):
@@ -306,7 +292,7 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path, 
         return product_spec()
 
     adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
     original = "Original intent"
     run_id = system.create_run(original, context_window=4000)
     # 使用足够大的工具输出触发压缩
@@ -324,10 +310,8 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path, 
     assert len(compaction_invocations) >= 1
 
 
-def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path, monkeypatch):
+def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
     """空摘要后，下次激活可重新尝试压缩。"""
-    import harness.engine as engine
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
     current_activation = [0]
 
     def respond(request):
@@ -340,7 +324,7 @@ def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path, monk
         return _read(request, "large.txt") if current_activation[0] <= 1 else product_spec()
 
     adapter = FakeAdapter([respond] * 200)
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
     run_id = system.create_run("Original intent", context_window=5000)
     system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 8000)
 

@@ -10,6 +10,7 @@ from harness.context import ContextAssembler
 from harness.models import EventType, RunProjection, Usage, canonical_hash, estimate_tokens, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import FAST_RETRIES
 from harness.tools import ToolRuntime
 
 
@@ -77,16 +78,12 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path, monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
     # A tool call in a tool-less summary request is malformed provider output: it is retried
     # within the attempt limit and never executed, so three of them fail the compaction.
     adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
                                          usage=Usage(total_tokens=100)), product_spec(), product_spec(), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo", context_window=6000)
     system.workspace(run_id).write_file("proof.txt", "x" * 40000)
     result = system.activate_once(run_id)

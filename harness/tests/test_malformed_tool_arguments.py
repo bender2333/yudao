@@ -4,7 +4,6 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import harness.engine as engine
 from harness.adapters.base import ModelResponse
 from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter
@@ -12,15 +11,11 @@ from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
+from harness.tests.helpers import FAST_RETRIES
 
 
 # 故障现场截断参数原文：search 工具流式调用在 path 值之前中断
 TRUNCATED_SEARCH_ARGUMENTS = '{"pattern": "def add", "path": '
-
-
-def _fast_retries(monkeypatch) -> None:
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
 
 
 def _recorded_call_arguments(records: list[dict]) -> list:
@@ -30,14 +25,13 @@ def _recorded_call_arguments(records: list[dict]) -> list:
     ]
 
 
-def test_truncated_arguments_are_sanitized_before_history_replay(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
+def test_truncated_arguments_are_sanitized_before_history_replay(tmp_path):
     malformed = ModelResponse(output=[{
         "id": "call-truncated", "call_id": "call-truncated", "type": "function_call",
         "name": "search", "arguments": TRUNCATED_SEARCH_ARGUMENTS,
     }])
     adapter = FakeAdapter([malformed, product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
@@ -66,15 +60,14 @@ def test_truncated_arguments_are_sanitized_before_history_replay(tmp_path, monke
                and item.payload.get("ok") is False for item in events)
 
 
-def test_valid_tool_call_still_executes_with_original_arguments(tmp_path, monkeypatch):
-    _fast_retries(monkeypatch)
+def test_valid_tool_call_still_executes_with_original_arguments(tmp_path):
     arguments = json_dumps({"pattern": "def add"})
     valid = ModelResponse(output=[{
         "id": "call-search", "call_id": "call-search", "type": "function_call",
         "name": "search", "arguments": arguments,
     }])
     adapter = FakeAdapter([valid, product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)

@@ -5,11 +5,11 @@ from dataclasses import asdict
 import pytest
 
 import harness.interactions as interactions
-import harness.engine as engine
 import harness.orchestrator as orchestration
 from harness.adapters.base import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.compaction import visible_history
+from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn, plan_turn,
@@ -204,15 +204,15 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
     assert system.test_adapter.invocations[-1].input_version == 2
 
 
-def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path, monkeypatch):
+def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path):
     def final_old_response(request):
         system.add_input(run_id, "Confirm uppercase output")
         return ModelResponse(output=[{"type": "message", "id": "old-output", "role": "assistant",
                                       "content": [{"type": "output_text", "text": "A response to the original input."}]}])
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([final_old_response, product_spec()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([final_old_response, product_spec()]),
+                                    step_limits=StepLimits(max_model_steps=1))
     run_id = system.create_run("build echo")
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 1)
     current = system.activate_once(run_id)
     assert current.phase == "PRODUCT_SPEC" and current.stop_reason is None
     assert current.product_work_input_version == 2 and current.processed_input_version == 0

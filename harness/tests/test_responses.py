@@ -23,6 +23,7 @@ from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tests.helpers import FAST_RETRIES
 from harness.tools import host_tool_definitions, tools_for
 
 
@@ -324,10 +325,6 @@ def test_sdk_sends_exact_host_context_and_preserves_stateless_tool_protocol(tmp_
 
 @pytest.mark.parametrize("failure_kind", ["connection", "timeout", "429", "500", "partial_stream"])
 def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path, monkeypatch, failure_kind):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
     adapters = []
 
     def failure(handler, _body):
@@ -358,7 +355,7 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
                                 lambda **kwargs: DefaultAsyncHttpxClient(verify=False, **kwargs))
             config = replace(config, timeout_sec=1)
         adapters.append(ResponsesAdapter(config))
-        system = LoopSystem.for_testing(tmp_path, adapters[0])
+        system = LoopSystem.for_testing(tmp_path, adapters[0], step_limits=FAST_RETRIES)
         run_id = system.create_run("local retry")
         result = system.activate_once(run_id)
 
@@ -372,16 +369,12 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
         assert not any(item.type == "tool_started" and item.payload.get("id") == "call-one" for item in events)
 
 
-def test_server_overloaded_stream_error_retries_after_partial_output_without_running_tools(tmp_path, monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+def test_server_overloaded_stream_error_retries_after_partial_output_without_running_tools(tmp_path):
     partial = _stream([CALL], terminal=False) + _event(
         "error", code="server_is_overloaded", message=KEY,
     )
     with _server([partial, _submit_stream()]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config), step_limits=FAST_RETRIES)
         result = system.activate_once(system.create_run("retry provider overload"))
 
     assert result.phase == "ENGINEERING", result.error
@@ -395,14 +388,10 @@ def test_server_overloaded_stream_error_retries_after_partial_output_without_run
     assert not any(event.type == "tool_started" and event.payload.get("id") == "call-one" for event in events)
 
 
-def test_server_overloaded_stream_error_is_exhausted_at_three_attempts(tmp_path, monkeypatch):
-    import harness.engine as engine
-
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.01)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.02)
+def test_server_overloaded_stream_error_is_exhausted_at_three_attempts(tmp_path):
     overload = _event("error", code="server_is_overloaded", message="overloaded")
     with _server([overload, overload, overload]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config), step_limits=FAST_RETRIES)
         result = system.activate_once(system.create_run("provider overload exhaustion"))
 
     assert result.phase == "FAILED" and result.stop_reason == "provider_error"

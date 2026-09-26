@@ -19,7 +19,7 @@ from .collaboration import guidance_resume_phase, request_basis, request_still_a
 from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
                          visible_history)
 from .event_store import EventStore
-from .engine import MAX_PROVIDER_ATTEMPTS, TOOL_CALL_REQUIRED_LIMIT, ToolAdmission, run_department
+from .engine import TOOL_CALL_REQUIRED_LIMIT, StepLimits, ToolAdmission, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -312,8 +312,10 @@ class Orchestrator:
         test_adapter_name: str = "test",
         assembler: ContextAssembler | None = None,
         sessions: SessionFactory | None = None,
+        step_limits: StepLimits = StepLimits(),
     ) -> None:
         self.store = store
+        self.step_limits = step_limits
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
@@ -855,6 +857,7 @@ class Orchestrator:
             )
             submission = run_department(
                 activation.adapter, ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
+                limits=self.step_limits,
                 prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
                     activation, step, attempt, root, retry_of,
                 ),
@@ -1212,7 +1215,8 @@ class Orchestrator:
                               context_digest=request.context.manifest.digest,
                               payload={"activation_id": request.activation_id, "step_id": request.step_id,
                                        **activation.versions(),
-                                       "attempt": request.attempt, "max_attempts": MAX_PROVIDER_ATTEMPTS,
+                                       "attempt": request.attempt,
+                                       "max_attempts": self.step_limits.max_provider_attempts,
                                        "root_step_id": request.root_step_id,
                                        "retry_of_step_id": request.retry_of_step_id,
                                        "attempt_id": request.attempt_id,
@@ -1471,7 +1475,7 @@ class Orchestrator:
                     "step_id": request.step_id,
                     **activation.versions(),
                     "attempt": request.attempt,
-                    "max_attempts": MAX_PROVIDER_ATTEMPTS,
+                    "max_attempts": self.step_limits.max_provider_attempts,
                     "root_step_id": request.root_step_id,
                     "retry_of_step_id": request.retry_of_step_id,
                     "purpose": request.purpose,
@@ -1532,7 +1536,7 @@ class Orchestrator:
                     "step_id": request.step_id,
                     **activation.versions(),
                     "attempt": request.attempt,
-                    "max_attempts": MAX_PROVIDER_ATTEMPTS,
+                    "max_attempts": self.step_limits.max_provider_attempts,
                     "root_step_id": request.root_step_id,
                     "retry_of_step_id": request.retry_of_step_id,
                     "attempt_id": request.attempt_id,

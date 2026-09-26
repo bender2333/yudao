@@ -13,12 +13,17 @@ from .adapters.base import ModelAdapter, ModelRequest, ModelResponse, ProviderEr
 from .models import json_dumps
 from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
-MAX_MODEL_STEPS = 999_999
-MAX_PROVIDER_ATTEMPTS = 3
-RETRY_INITIAL_DELAY_SEC = 1.0
-RETRY_MAX_DELAY_SEC = 60.0
 # 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
 TOOL_CALL_REQUIRED_LIMIT = 3
+
+
+@dataclass(frozen=True)
+class StepLimits:
+    # 部门循环的重试与步数参数；默认值是正式运行使用的值
+    retry_initial_delay_sec: float = 1.0
+    retry_max_delay_sec: float = 60.0
+    max_provider_attempts: int = 3
+    max_model_steps: int = 999_999
 
 
 def tool_call_required_text(count: int) -> str:
@@ -46,6 +51,7 @@ def run_department(
     adapter: ModelAdapter,
     runtime: ToolRuntime,
     *,
+    limits: StepLimits,
     prepare_step: Callable[[int, int, int, int | None], ModelRequest | None],
     record_response: Callable[[ModelResponse], None],
     record_tool: Callable[[dict[str, Any]], None],
@@ -63,7 +69,7 @@ def run_department(
     root_step_id = 1
     retry_of_step_id = None
     replies_without_tool_call = 0
-    for step_id in range(1, MAX_MODEL_STEPS + 1):
+    for step_id in range(1, limits.max_model_steps + 1):
         if stopped():
             return None
         request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
@@ -94,25 +100,25 @@ def run_department(
                     retryable=False,
                     diagnostics={"error_type": "adapter_failure"},
                 )
-            retry_error = _retry_after_error(exc)
-            delay = _retry_delay(retry_error, attempt)
+            retry_error = _retry_after_error(exc, limits)
+            delay = _retry_delay(retry_error, attempt, limits)
             can_retry = (
                 retry_error.retryable
-                and attempt < MAX_PROVIDER_ATTEMPTS
-                and step_id < MAX_MODEL_STEPS
+                and attempt < limits.max_provider_attempts
+                and step_id < limits.max_model_steps
             )
             will_retry = can_retry and not stopped()
             record_attempt_failed(request, retry_error, will_retry)
             if stopped():
                 return None
             if not will_retry:
-                if retry_error.retryable and step_id >= MAX_MODEL_STEPS:
+                if retry_error.retryable and step_id >= limits.max_model_steps:
                     raise ProviderError(
                         "department reached the model step limit during provider retries",
                         reason="model_steps_exhausted",
                     ) from retry_error
                 diagnostics = dict(retry_error.diagnostics or {})
-                diagnostics.update(attempts=attempt, max_attempts=MAX_PROVIDER_ATTEMPTS)
+                diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
                 raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
             if not record_retry_scheduled(request, retry_error, delay, step_id + 1):
                 return None
@@ -202,11 +208,11 @@ def run_department(
     raise ProviderError("department reached the model step limit without submitting a proposal", reason="model_steps_exhausted")
 
 
-def _retry_delay(error: ProviderError, attempt: int) -> float:
+def _retry_delay(error: ProviderError, attempt: int, limits: StepLimits) -> float:
     retry_after = _retry_after_seconds(error)
     if retry_after is not None:
         return retry_after
-    return min(RETRY_INITIAL_DELAY_SEC * (2 ** (attempt - 1)), RETRY_MAX_DELAY_SEC)
+    return min(limits.retry_initial_delay_sec * (2 ** (attempt - 1)), limits.retry_max_delay_sec)
 
 
 def _retry_after_seconds(error: ProviderError) -> float | None:
@@ -217,16 +223,17 @@ def _retry_after_seconds(error: ProviderError) -> float | None:
     return value if value > 0 and math.isfinite(value) else None
 
 
-def _retry_after_error(error: ProviderError) -> ProviderError:
+def _retry_after_error(error: ProviderError, limits: StepLimits) -> ProviderError:
     retry_after = _retry_after_seconds(error)
-    if not error.retryable or retry_after is None or retry_after <= RETRY_MAX_DELAY_SEC:
+    limit = limits.retry_max_delay_sec
+    if not error.retryable or retry_after is None or retry_after <= limit:
         return error
     diagnostics = dict(error.diagnostics or {})
     diagnostics["retry_after_sec"] = retry_after
-    diagnostics["retry_after_limit_sec"] = RETRY_MAX_DELAY_SEC
+    diagnostics["retry_after_limit_sec"] = limit
     diagnostics["underlying_reason"] = error.reason
     return ProviderError(
-        f"Provider requested Retry-After of {retry_after:g} seconds, exceeding the {RETRY_MAX_DELAY_SEC:g}-second limit",
+        f"Provider requested Retry-After of {retry_after:g} seconds, exceeding the {limit:g}-second limit",
         reason="retry_after_too_long",
         diagnostics=diagnostics,
     )

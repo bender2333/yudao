@@ -3,9 +3,9 @@ from threading import Event
 
 import pytest
 
-import harness.engine as engine
 from harness.adapters.base import ModelResponse, ProviderError
 from harness.adapters.fake import FakeAdapter
+from harness.engine import StepLimits
 from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -38,10 +38,9 @@ def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_
 
 def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeypatch):
     scheduled = Event()
-    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.2)
-    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.2)
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=0.2, retry_max_delay_sec=0.2))
     run_id = system.create_run("original task")
     original = system.orchestrator._record_retry_scheduled
 
@@ -103,16 +102,14 @@ def test_retry_schedule_admission_rechecks_interleaved_input_or_cancel(tmp_path,
         assert result.phase == "FAILED" and result.stop_reason == "cancelled"
 
 
-def test_model_attempts_are_bounded_by_model_steps(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 5)
-
+def test_model_attempts_are_bounded_by_model_steps(tmp_path):
     def transient_until_step_limit(request):
         if request.step_id % 3 == 0:
             return ModelResponse()
         return ProviderError("temporary", retryable=True)
 
     adapter = FakeAdapter([transient_until_step_limit] * 10)
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=5))
     result = system.activate_once(system.create_run("original task"))
 
     assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"

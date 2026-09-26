@@ -2,9 +2,13 @@ from pathlib import Path
 
 from harness.adapters.base import ModelRequest, ModelResponse
 from harness.adapters.fake import FakeAdapter
+from harness.engine import StepLimits
 from harness.models import json_dumps
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+
+# 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
+FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
 
 
 def system_with(data_dir: Path, script) -> LoopSystem:
