@@ -1,3 +1,4 @@
+import json
 import os
 
 import pytest
@@ -195,24 +196,76 @@ def test_unsafe_paths_are_rejected_without_modification(tmp_path, rel):
 
 
 def test_symlink_is_rejected_without_modification(tmp_path):
-    workspace, runtime = _runtime(tmp_path)
+    workspace, runtime = _runtime(tmp_path / "workspace")
     workspace.write_file("real.txt", "VALUE = 1\n")
     outside = tmp_path / "outside.txt"
     outside.write_text("VALUE = 9\n", encoding="utf-8")
+    before_digest = workspace.digest()
+    link = workspace.root / "linked.txt"
     try:
-        os.symlink(outside, workspace.root / "linked.txt")
+        os.symlink(outside, link)
     except OSError:
         pytest.skip("symbolic links are unavailable")
-    before_digest = workspace.digest()
     result = runtime.execute("engineering", "edit_range", {
         "path": "linked.txt", "start_line": 1, "end_line": 1,
         "expected_text": "VALUE = 9", "new_text": "VALUE = 2",
     })
     assert result.ok is False
-    assert result.error
+    assert "Links and reparse points are not supported" in (result.error or "")
     assert outside.read_text(encoding="utf-8") == "VALUE = 9\n"
+    assert link.is_symlink() and link.resolve() == outside.resolve()
     assert workspace.read_file("real.txt") == "VALUE = 1\n"
+    # 公开树不表示链接，工作区含链接时没有摘要；移除链接后其余公开字节与编辑前一致
+    link.unlink()
     assert workspace.digest() == before_digest
+
+
+def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("VALUE = 9\n", encoding="utf-8")
+    try:
+        os.symlink(outside, tmp_path / "link-probe")
+    except OSError:
+        pytest.skip("symbolic links are unavailable")
+
+    def link_then_edit(request):
+        return ModelResponse(output=[
+            {"id": "cmd-link", "call_id": "cmd-link", "type": "function_call", "name": "run_command",
+             "arguments": json_dumps({"name": "make-link"})},
+            _edit_call("edit-link", "src/linked.txt", 1, 1, "VALUE = 9", "VALUE = 2", None),
+        ])
+
+    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(), plan_turn(), link_then_edit]))
+    registry = {"make-link": {"argv": ["python", "make_link.py"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
+    run_id = system.create_run("Edit a file that a command turned into a link",
+                               registered_commands=registry, command_versions={"make-link": 1})
+    workspace = system.workspace(run_id)
+    workspace.write_file("make_link.py", (
+        "import os\n"
+        "os.makedirs('src', exist_ok=True)\n"
+        f"os.symlink({str(outside)!r}, 'src/linked.txt')\n"
+    ))
+    for _ in range(3):
+        system.activate_once(run_id)
+    events = system.store.list_events(run_id)
+    command = next(event for event in events
+                   if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_command")
+    command_output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**command.payload["output_ref"])))
+    assert command.payload["ok"] is True and command_output["exit_code"] == 0, command_output
+    link = workspace.root / "src" / "linked.txt"
+    assert link.is_symlink() and link.resolve() == outside.resolve()
+    # 工具许可阶段拒绝：编辑没有开始执行，拒绝原因作为该调用的工具结果交回部门
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "edit_range"
+                   for event in events)
+    edit = next(event for event in events
+                if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "edit_range")
+    assert edit.payload["ok"] is False
+    assert "Links and reparse points are not supported" in edit.payload["error"]
+    assert edit.payload["input_item"]["call_id"] == "edit-link"
+    assert json.loads(edit.payload["input_item"]["output"]) == {
+        "ok": False, "output": None, "error": edit.payload["error"],
+    }
+    assert outside.read_text(encoding="utf-8") == "VALUE = 9\n"
 
 
 def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
