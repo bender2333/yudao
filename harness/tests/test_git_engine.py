@@ -4,6 +4,7 @@ import threading
 import pytest
 
 from harness.adapters.fake import FakeAdapter
+from harness.event_store import NewEvent
 from harness.git_versions import GitVersionError
 from harness.models import EventType, GIT_VERSION_EVENTS
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
@@ -222,8 +223,9 @@ def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("build echo")
     before = system.project(run_id)
-    system.store.append(run_id, EventType.MODEL_MESSAGE, role="product", state_before=before.phase,
-                        state_after=before.phase, payload={"git_version": {"commit": "unaccepted"}})
+    system.orchestrator.writes.append(run_id, NewEvent(
+        EventType.MODEL_MESSAGE, role="product", state_before=before.phase, state_after=before.phase,
+        payload={"git_version": {"commit": "unaccepted"}}))
     after = system.project(run_id)
     assert after.git_version == before.git_version and after.git_versions == before.git_versions
 

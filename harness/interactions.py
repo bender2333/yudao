@@ -10,7 +10,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
-from .event_store import EventStore
+from .event_store import NewEvent, WritePath
 from .git_versions import GitVersionStore
 from .materials import append_intend
 from .models import ArtifactRef, DEPARTMENTS, Event, EventType, RunProjection, new_id
@@ -29,9 +29,9 @@ class CancelledInputSaveError(RuntimeError):
 
 
 class InteractionWriter:
-    def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path,
+    def __init__(self, writes: WritePath, artifacts: ArtifactStore, materials_root: Path,
                  git_versions: GitVersionStore) -> None:
-        self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
+        self.writes, self.artifacts, self.materials_root = writes, artifacts, materials_root
         self.git_versions = git_versions
 
     def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
@@ -49,11 +49,11 @@ class InteractionWriter:
                               previous_ref=ArtifactRef(**projection.intend_ref),
                               parent_commit=projection.git_version["commit"])
         try:
-            return self.store.append(
-                projection.run_id, EventType.USER_INPUT_RECEIVED, role="user",
+            return self.writes.append(projection.run_id, NewEvent(
+                EventType.USER_INPUT_RECEIVED, role="user",
                 state_before=projection.phase, state_after=projection.phase, payload=payload,
                 artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
-            )
+            ))[0]
         except Exception:
             self._publish(projection.run_id, self.artifacts.get_for_run(
                 projection.run_id, ArtifactRef(**projection.intend_ref)))
@@ -62,11 +62,11 @@ class InteractionWriter:
     def update_prompt(self, projection: RunProjection, department: str, text: str) -> Event:
         payload = self._prompt(projection.run_id, department, text,
                                projection.department_prompts[department].version + 1)
-        return self.store.append(
-            projection.run_id, EventType.DEPARTMENT_PROMPT_UPDATED, role="user",
+        return self.writes.append(projection.run_id, NewEvent(
+            EventType.DEPARTMENT_PROMPT_UPDATED, role="user",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["prompt_ref"]["content_hash"]],
-        )
+        ))[0]
 
     def receive_guidance(self, projection: RunProjection, department: str, text: str) -> Event:
         if department not in DEPARTMENTS:
@@ -84,15 +84,14 @@ class InteractionWriter:
             "guidance_ref": asdict(ref),
             "status": "received",
         }
-        return self.store.append(
-            projection.run_id,
+        return self.writes.append(projection.run_id, NewEvent(
             EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             role="user",
             state_before=projection.phase,
             state_after=projection.phase,
             payload=payload,
             artifact_hashes=[ref.content_hash],
-        )
+        ))[0]
 
     def _input(self, run_id: str, text: str, *, version: int, kind: str,
                previous_ref: ArtifactRef | None, parent_commit: str | None) -> dict[str, Any]:

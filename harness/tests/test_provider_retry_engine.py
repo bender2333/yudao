@@ -248,19 +248,17 @@ def test_malformed_tool_arguments_are_returned_to_model_without_starting_tool(tm
         "arguments": "{}",
     }]),
 ])
-def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_path, monkeypatch, response):
+def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_path, response):
     adapter = FakeAdapter([response, product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
-    recorded = []
-    monkeypatch.setattr(system.orchestrator, "_reconcile_response", lambda *_args: recorded.append(True))
     run_id = system.create_run("echo")
 
     result = system.activate_once(run_id)
 
     assert result.phase == "FAILED" and result.stop_reason in {"provider_error", "cancelled"}
     assert len(adapter.invocations) == 1
-    assert recorded == []
     events = system.store.list_events(run_id)
+    assert not any(item.type == EventType.MODEL_MESSAGE for item in events)
     failure = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
     assert failure.payload["retryable"] is False and failure.payload["will_retry"] is False
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)

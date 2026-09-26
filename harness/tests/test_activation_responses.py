@@ -240,7 +240,7 @@ def test_host_failure_to_record_a_stream_event_names_the_actual_error_type(tmp_p
         system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(replace(config, timeout_sec=120)))
         try:
             run_id = system.create_run("stream capture failure")
-            monkeypatch.setattr("harness.orchestrator.tempfile.tempdir", str(tmp_path / "missing-temp"))
+            monkeypatch.setattr("tempfile.tempdir", str(tmp_path / "missing-temp"))
             result = system.activate_once(run_id)
             assert result.phase == "FAILED" and result.stop_reason == "provider_error"
             assert len(captures) == 1

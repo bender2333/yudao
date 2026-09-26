@@ -12,7 +12,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
-from .event_store import EventStore
+from .event_store import NewEvent, WritePath
 from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
@@ -22,9 +22,9 @@ from .workspace import WorkspaceSnapshot
 
 
 class SubmissionWriter:
-    def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path,
+    def __init__(self, writes: WritePath, artifacts: ArtifactStore, materials_root: Path,
                  git_versions: GitVersionStore) -> None:
-        self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
+        self.writes, self.artifacts, self.materials_root = writes, artifacts, materials_root
         self.git_versions = git_versions
 
     def commit(self, *, projection: RunProjection, snapshot: WorkspaceSnapshot, workspace_root: Path, artifact: dict[str, Any],
@@ -151,10 +151,10 @@ class SubmissionWriter:
                 previous_materials[name] = None if ref is None else self.artifacts.get_for_run(run_id, ref)
                 self._write_material(run_id, name, raw)
             # Git objects and materials are ready; the complete formal event set is accepted atomically.
-            committed = self.store.append_batch(run_id, [
-                {"type": event_type, **metadata, "payload": payload, "artifact_hashes": hashes}
+            committed = self.writes.append(run_id, *(
+                NewEvent(event_type, **metadata, payload=payload, artifact_hashes=hashes)
                 for event_type, payload, hashes in prepared
-            ])
+            ))
         except Exception:
             for name, raw in previous_materials.items():
                 if raw is None:

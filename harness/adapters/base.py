@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from ..context import AssembledContext
-from ..models import Usage
 from ..providers.call import ModelCall, ModelResponse, ModelStreamEvent
 
 
@@ -29,26 +28,6 @@ class Availability:
     available: bool
     reason: str = ""
     message: str = ""
-
-
-@dataclass
-class ModelObservation:
-    # 编排器记录的一条观察：模型调用交回的流式输出，或者工具执行与跳过的结果
-    id: str
-    kind: str
-    payload: dict[str, Any] = field(default_factory=dict)
-    text: str = ""
-    usage: Usage | None = None
-    provider: str | None = None
-    model: str | None = None
-    source: str = "provider_sdk"
-    sequence: int | None = None
-
-    @classmethod
-    def from_stream(cls, event: ModelStreamEvent) -> ModelObservation:
-        usage = None if event.usage is None else Usage(**event.usage.model_dump())
-        return cls(event.id, event.kind, dict(event.payload), event.text, usage, event.provider,
-                   event.model, event.source, event.sequence)
 
 
 @dataclass

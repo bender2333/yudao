@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import tempfile
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from threading import Event, RLock
+from threading import Event
 from typing import Any
 
-from .adapters.base import ModelObservation, ModelAdapter, ModelRequest, ProviderError
+from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
                            tool_permission)
@@ -18,7 +17,7 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, StepRequest,
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .compaction import CompactionError
-from .event_store import EventStore
+from .event_store import EventStore, NewEvent, WritePath
 from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
@@ -32,18 +31,16 @@ from .models import (
     HUMAN_ACTIONS,
     PAUSED_REASONS,
     TERMINAL_PHASES,
-    Usage,
     canonical_hash,
     department_for_phase,
-    json_dumps,
     new_id,
-    utc_now,
 )
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
+from .recording import ActivationScope, StepRecorder
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import ToolRuntime, normalize_registered_commands
@@ -63,20 +60,8 @@ class _Activation:
     snapshot_id: str | None
     input_version: int
     prompt: DepartmentPrompt
+    recorder: StepRecorder
     request: ModelRequest | None = None
-    tokens_charged: int = 0
-    usage: Usage = field(default_factory=lambda: Usage(reported=False))
-    has_usage: bool = False
-    cost_charged: float = 0.0
-    seen: set[tuple[str, str]] = field(default_factory=set)
-    tool_ids: set[str] = field(default_factory=set)
-    messages: list[str] = field(default_factory=list)
-    message_steps: list[tuple[str, int]] = field(default_factory=list)
-    step_usage: Usage | None = None
-    previous_usage: Usage = field(default_factory=lambda: Usage(reported=True, cost_reported=True))
-    raw_usage_ref: dict[str, Any] | None = None
-    provider: str | None = None
-    model: str | None = None
     step: StepRequest | None = None
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
@@ -84,9 +69,7 @@ class _Activation:
     guidance_version: int = 0
     guidance_ids: tuple[str, ...] = ()
     guidance_only: bool = False
-    guidance_applied: bool = False
     yielded_work: dict[str, Any] | None = None
-    attempt_captures: dict[str, "_AttemptCapture"] = field(default_factory=dict)
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.input_version, "prompt_version": self.prompt.version,
@@ -102,101 +85,6 @@ class _Activation:
     def frame(self) -> StepFrame:
         return StepFrame(self.department, self.session_id, self.activation_id, self.prompt, self.guidance_only,
                          self.effective_contract_hash, self.engineering_plan_hash, self.input_version)
-
-
-@dataclass
-class _AttemptCapture:
-    """Bounded-memory capture for one Provider SDK attempt."""
-
-    stream: Any | None = None
-    stream_event_count: int = 0
-    stream_bytes: int = 0
-    stream_ref: dict[str, Any] | None = None
-    response_ref: dict[str, Any] | None = None
-    provider_response_id: str | None = None
-    actual_provider: str | None = None
-    actual_model: str | None = None
-    usage: Usage | None = None
-    usage_ref: dict[str, Any] | None = None
-    started_at: str | None = None
-    progress_stage: str | None = None
-    progress_last_emitted_monotonic: float | None = None
-    first_observed_at: str | None = None
-    first_output_at: str | None = None
-
-    def add_stream_event(self, sequence: int | None, payload: dict[str, Any], observed_at: str) -> None:
-        if self.stream is None:
-            self.stream = tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
-        record = {"sequence": sequence if sequence is not None else self.stream_event_count,
-                  "observed_at": observed_at, "event": payload}
-        raw = (json_dumps(record) + "\n").encode("utf-8")
-        self.stream.write(raw)
-        self.stream_event_count += 1
-        self.stream_bytes += len(raw)
-
-    def stream_chunks(self, chunk_size: int = 64 * 1024):
-        if self.stream is None:
-            return
-        self.stream.seek(0)
-        while True:
-            chunk = self.stream.read(chunk_size)
-            if not chunk:
-                return
-            yield chunk
-
-    def close(self) -> None:
-        if self.stream is not None:
-            self.stream.close()
-
-
-_SENSITIVE_OBSERVATION_KEYS = frozenset({
-    "authorization", "api_key", "apikey", "access_token", "refresh_token",
-    "client_secret", "password", "cookie", "set_cookie", "credential",
-    "credentials", "headers", "proxy_authorization",
-})
-
-
-def _stream_progress_stage(payload: dict[str, Any]) -> str:
-    event_type = str(payload.get("type") or "")
-    if event_type == "response.created":
-        return "response_created"
-    if "output_text.delta" in event_type or "output_item.added" in event_type:
-        return "output"
-    if event_type == "response.output_item.done":
-        return "output_item_done"
-    if event_type == "response.completed":
-        return "completed"
-    if event_type in {"response.incomplete", "response.failed", "error"}:
-        return "error"
-    return "event"
-
-
-def _stream_progress_summary(payload: dict[str, Any]) -> str:
-    event_type = str(payload.get("type") or "provider_event")
-    if event_type == "response.output_item.done":
-        item = payload.get("item")
-        if isinstance(item, dict):
-            return f"{event_type}: {item.get('type') or 'output_item'}"
-    response = payload.get("response")
-    if isinstance(response, dict) and response.get("status"):
-        return f"{event_type}: {response['status']}"
-    return event_type
-
-
-def _redact_observation(value: Any, *, secret: str | None = None, key: str | None = None) -> Any:
-    normalized_key = key.casefold().replace("-", "_") if isinstance(key, str) else ""
-    if normalized_key in _SENSITIVE_OBSERVATION_KEYS or normalized_key.endswith("_api_key"):
-        return "[REDACTED]"
-    if isinstance(value, dict):
-        return {
-            str(child_key): _redact_observation(child_value, secret=secret, key=str(child_key))
-            for child_key, child_value in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_observation(item, secret=secret, key=key) for item in value]
-    if isinstance(value, str) and secret:
-        return value.replace(secret, "[REDACTED]")
-    return value
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
@@ -301,13 +189,14 @@ class Orchestrator:
         step_limits: StepLimits = StepLimits(),
     ) -> None:
         self.store = store
+        self.writes = WritePath(store)
         self.step_limits = step_limits
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
-        self.submissions = SubmissionWriter(store, artifacts, self.materials_root, self.git_versions)
-        self.interactions = InteractionWriter(store, artifacts, self.materials_root, self.git_versions)
+        self.submissions = SubmissionWriter(self.writes, artifacts, self.materials_root, self.git_versions)
+        self.interactions = InteractionWriter(self.writes, artifacts, self.materials_root, self.git_versions)
         self.facade = facade
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
@@ -315,7 +204,6 @@ class Orchestrator:
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
-        self._state_lock = RLock()
         self._active: dict[str, _Activation] = {}
         self._snapshots: dict[str, ResolveSnapshot] = {}
         self._run_start_times: dict[str, float] = {}
@@ -390,8 +278,7 @@ class Orchestrator:
             project_context_ref = asdict(self.artifacts.put(
                 run_id, "project_context", project_context, media_type="text/markdown",
             ))
-        self.store.append(
-            run_id,
+        self.writes.append(run_id, NewEvent(
             EventType.RUN_CREATED,
             role="product",
             state_before="CREATED",
@@ -417,15 +304,14 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
             },
-        )
-        self.store.append(
-            run_id,
+        ))
+        self.writes.append(run_id, NewEvent(
             EventType.TRANSITION,
             role="product",
             state_before="CREATED",
             state_after="PRODUCT_SPEC",
             payload={"from": "CREATED", "to": "PRODUCT_SPEC", "route": "CREATED->PRODUCT_SPEC"},
-        )
+        ))
         return run_id
 
     def project(self, run_id: str) -> RunProjection:
@@ -443,7 +329,7 @@ class Orchestrator:
         save_error = stop_error = None
         cancellation_recorded = False
         try:
-            with self._state_lock:
+            with self.writes.lock:
                 current = self.project(run_id)
                 if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                     raise RunTerminalError("This run has ended; create a new task for this input.")
@@ -488,7 +374,7 @@ class Orchestrator:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("prompt must be a non-empty string")
-        with self._state_lock:
+        with self.writes.lock:
             current = self.project(run_id)
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 raise RunTerminalError("This run has ended; prompts can be edited in a new task.")
@@ -498,7 +384,7 @@ class Orchestrator:
     def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        with self._state_lock:
+        with self.writes.lock:
             current = self.project(run_id)
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 raise RunTerminalError("This run has ended; guidance can be sent to a new task.")
@@ -511,15 +397,15 @@ class Orchestrator:
         projection = self._close_request(run_id, projection, status="superseded",
                                          reason="New user input requires updated product work.",
                                          return_phase="PRODUCT_SPEC", return_work_valid=False)
-        self.store.append(
-            run_id, EventType.PRODUCT_INPUT_ASSIGNED, role="product",
+        self.writes.append(run_id, NewEvent(
+            EventType.PRODUCT_INPUT_ASSIGNED, role="product",
             state_before=projection.phase, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
-        )
+        ))
         return self.project(run_id)
 
     def _activation_stopped(self, activation: _Activation) -> bool:
-        with self._state_lock:
+        with self.writes.lock:
             if activation.abort_flag.is_set():
                 return True
             elapsed = time.monotonic() - self._run_start_times.get(activation.run_id, time.monotonic())
@@ -535,13 +421,13 @@ class Orchestrator:
         request = projection.pending_request
         if request is None:
             return projection
-        self.store.append(
-            run_id, EventType.COLLABORATION_CLOSED, role=request.recipient,
+        self.writes.append(run_id, NewEvent(
+            EventType.COLLABORATION_CLOSED, role=request.recipient,
             parent_event_id=request.created_event_id, state_before=projection.phase, state_after=return_phase,
             session_id=projection.sessions[request.recipient].session_id,
             payload={"request_id": request.id, "status": status, "reason": reason,
                      "return_phase": return_phase, "return_work_valid": return_work_valid},
-        )
+        ))
         return self.project(run_id)
 
     def _close_obsolete_request(self, run_id: str, projection: RunProjection) -> RunProjection:
@@ -560,7 +446,7 @@ class Orchestrator:
         activation = None
         abort_notified = False
         try:
-            with self._state_lock:
+            with self.writes.lock:
                 projection = self.project(run_id)
                 if projection.phase in TERMINAL_PHASES:
                     return projection
@@ -596,7 +482,7 @@ class Orchestrator:
         return self._activate_once(run_id, model_loop)
 
     def _activate_once(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
-        with self._state_lock:
+        with self.writes.lock:
             if run_id in self._active:
                 raise RuntimeError("run already has an active department invocation")
             activation = self._prepare_activation(run_id, model_loop)
@@ -607,11 +493,10 @@ class Orchestrator:
         try:
             self._invoke_activation(activation, model_loop)
         finally:
-            with self._state_lock:
+            with self.writes.lock:
                 current = self.project(run_id)
                 request = activation
-                self.store.append(
-                    run_id,
+                self.writes.append(run_id, NewEvent(
                     EventType.ACTIVATION_FINISHED,
                     role=request.department,
                     parent_event_id=activation.parent_event_id,
@@ -624,10 +509,9 @@ class Orchestrator:
                         "latency_ms": int((time.monotonic() - started) * 1000),
                         "stop_reason": current.stop_reason,
                     },
-                )
+                ))
                 self.sessions.get(run_id, request.department).idle()
-                for capture in activation.attempt_captures.values():
-                    capture.close()
+                activation.recorder.close()
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
@@ -713,8 +597,9 @@ class Orchestrator:
         activation_id = session.activate()
         prompt = projection.department_prompts[department]
         basis = WorkBasis.current(projection, department)
-        parent = self.store.append(
-            run_id,
+        guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
+        target_metadata = self._target_metadata(target, adapter, snapshot_id)
+        parent = self.writes.append(run_id, NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
             role=department,
             state_before=projection.phase,
@@ -724,22 +609,28 @@ class Orchestrator:
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": basis.effective_contract_hash,
                      "engineering_plan_hash": basis.engineering_plan_hash, "request_id": basis.request_id,
-                     "guidance_ids": [item.id for item in pending_guidance(projection, department)],
+                     "guidance_ids": list(guidance_ids),
                      "guidance_only": guidance_only,
                      "yielded_work": yielded_work,
                      "guidance_version": basis.guidance_version,
                      "input_version": basis.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash,
-                     **self._target_metadata(target, adapter, snapshot_id)},
-        )
+                     **target_metadata},
+        ))[0]
+        recorder = StepRecorder(self.store, self.writes, self.artifacts, ActivationScope(
+            run_id, department, session.session_id, activation_id, parent.event_id,
+            prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
+            guidance_only=guidance_only, basis=basis, provider=self._configured_provider(target, adapter),
+            target=target_metadata, secret=getattr(target, "api_key", None),
+        ), max_attempts=self.step_limits.max_provider_attempts)
         abort_flag = self._abort.setdefault(run_id, Event())
         return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
                            adapter, target, snapshot_id,
-                           input_version=basis.input_version, prompt=prompt,
+                           input_version=basis.input_version, prompt=prompt, recorder=recorder,
                            effective_contract_hash=basis.effective_contract_hash,
                            engineering_plan_hash=basis.engineering_plan_hash, request_id=basis.request_id,
                            guidance_version=basis.guidance_version,
-                           guidance_ids=tuple(item.id for item in pending_guidance(projection, department)),
+                           guidance_ids=guidance_ids,
                            guidance_only=guidance_only, yielded_work=yielded_work)
 
     @staticmethod
@@ -826,24 +717,20 @@ class Orchestrator:
                 prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
                     activation, step, attempt, root, retry_of,
                 ),
-                record_stream=lambda event: self._record_observation(activation, ModelObservation.from_stream(event)),
-                record_response=lambda response: self._reconcile_response(activation, response),
-                record_tool=lambda call: self._record_observation(activation, ModelObservation(call["id"], "tool", call)),
-                record_skipped_tool=lambda call: self._record_observation(activation, ModelObservation(call["id"], "skipped_tool", call)),
+                record_stream=lambda event: activation.recorder.stream(activation.request, event),
+                record_response=lambda response: activation.recorder.response(activation.request, response),
+                record_tool=lambda call: activation.recorder.tool_called(activation.request, call),
+                record_skipped_tool=lambda call: activation.recorder.tool_skipped(activation.request, call),
                 begin_tool=lambda call: self._begin_tool(activation, call),
                 begin_request=lambda request: self._begin_request(activation, request),
                 finish_compaction=lambda response: self._finish_compaction(activation, response),
-                record_attempt_finished=lambda request, response: self._record_attempt_finished(
-                    activation, request, response,
-                ),
-                record_attempt_failed=lambda request, error, will_retry: self._record_attempt_failed(
-                    activation, request, error, will_retry,
-                ),
+                record_attempt_finished=activation.recorder.attempt_finished,
+                record_attempt_failed=activation.recorder.attempt_failed,
                 record_retry_scheduled=lambda request, error, delay, next_step: self._record_retry_scheduled(
                     activation, request, error, delay, next_step,
                 ),
-                require_tool_call=lambda request, item, count: self._record_tool_call_required(
-                    activation, request, item, count,
+                require_tool_call=lambda request, item, count: activation.recorder.tool_call_required(
+                    request, item, count, TOOL_CALL_REQUIRED_LIMIT,
                 ),
                 stopped=lambda: self._activation_stopped(activation),
             )
@@ -869,7 +756,7 @@ class Orchestrator:
 
         try:
             transcript_ref = None
-            transcript = "\n".join(activation.messages)
+            transcript = activation.recorder.transcript
             if transcript:
                 ref = self.artifacts.put(run_id, "transcript", transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
@@ -893,7 +780,7 @@ class Orchestrator:
         root_step_id: int,
         retry_of_step_id: int | None,
     ) -> ModelRequest | None:
-        with self._state_lock:
+        with self.writes.lock:
             identity = activation
             current = self.project(identity.run_id)
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
@@ -915,15 +802,7 @@ class Orchestrator:
                 raise ProviderError(str(exc), reason="context_overflow") from exc
             input_item = pinned.department_input
             if input_item is not None:
-                received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
-                self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
-                                  parent_event_id=activation.parent_event_id, state_before=current.phase,
-                                  state_after=current.phase, session_id=identity.session_id,
-                                  artifact_hashes=[received_ref.content_hash],
-                                  payload={"activation_id": identity.activation_id, "step_id": step_id, "input_ref": asdict(received_ref),
-                                           **activation.versions(),
-                                           "effective_contract_hash": activation.effective_contract_hash,
-                                           "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
+                activation.recorder.department_input(current.phase, step_id, input_item)
             history = self.assembly.department_history(self.store.list_events(identity.run_id), identity.department)
             try:
                 step = self.assembly.request(pinned, history)
@@ -946,64 +825,14 @@ class Orchestrator:
                                    logical_call_id=logical_call_id,
                                    guidance_version=activation.guidance_version, **activation.versions())
             activation.request = request
-            activation.provider = None
-            activation.model = None
-            activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
-            activation.step_usage = None
-            activation.raw_usage_ref = None
-            ref = self.artifacts.put(request.run_id, "model_request", json_dumps(step.payload), media_type="application/json")
-            parts_ref = self.artifacts.put(
-                request.run_id,
-                "context_parts",
-                json_dumps(step.parts),
-                media_type="application/json",
-            )
-            payload = asdict(assembled.manifest)
-            payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=step.admitted,
-                           tokens_charged=0, step_id=step_id, attempt=attempt, root_step_id=root_step_id,
-                           retry_of_step_id=retry_of_step_id,
-                           **self._target_metadata(identity.target, identity.adapter, identity.snapshot_id),
-                           effective_context_window=step.limits.context_window,
-                           input_token_estimate=step.input_token_estimate,
-                           output_reserve_tokens=step.output_reserve_tokens,
-                           parts_ref=asdict(parts_ref),
-                           snapshot_hash=snapshot_hash)
-            payload.update(attempt_id=attempt_id, logical_call_id=logical_call_id,
-                           collaboration_request_id=activation.request_id)
-            context_event = self.store.append(request.run_id, EventType.CONTEXT_ASSEMBLED, role=request.department,
-                                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                                              state_after=current.phase, session_id=request.session_id,
-                                              provider=self._configured_provider(identity.target, identity.adapter),
-                                              context_digest=assembled.manifest.digest,
-                                              artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload)
-            request.context_event_id = context_event.event_id
+            activation.recorder.request_assembled(current.phase, request, step, snapshot_hash)
             if not step.admitted:
                 self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
                 return None
             return request
 
-    def _record_tool_call_required(self, activation: _Activation, request: ModelRequest,
-                                   item: dict[str, Any], count: int) -> None:
-        # 模型回复没有调用工具：主机追加的 user 消息写成事件，进入部门历史
-        with self._state_lock:
-            current = self.project(activation.run_id)
-            ref = self.artifacts.put(activation.run_id, "tool_call_required", json_dumps(item),
-                                     media_type="application/json")
-            self.store.append(activation.run_id, EventType.TOOL_CALL_REQUIRED, role=activation.department,
-                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                              state_after=current.phase, session_id=activation.session_id,
-                              artifact_hashes=[ref.content_hash],
-                              payload={"activation_id": activation.activation_id, "step_id": request.step_id,
-                                       "attempt_id": request.attempt_id, "context_event_id": request.context_event_id,
-                                       "purpose": request.purpose, "count": count,
-                                       "limit": TOOL_CALL_REQUIRED_LIMIT, "input_ref": asdict(ref),
-                                       **activation.versions(),
-                                       "effective_contract_hash": activation.effective_contract_hash,
-                                       "engineering_plan_hash": activation.engineering_plan_hash,
-                                       "request_id": activation.request_id})
-
     def _finish_compaction(self, activation: _Activation, response: ModelResponse) -> None:
-        with self._state_lock:
+        with self.writes.lock:
             request = activation.request
             current = self.project(activation.run_id)
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
@@ -1016,353 +845,18 @@ class Orchestrator:
                 raise ProviderError(str(exc), reason="compaction_failed") from exc
             if result is None:
                 return
-            checkpoint, plan = result.checkpoint, result.plan
-            summary_ref = self.artifacts.put(activation.run_id, "department_summary", checkpoint.summary, media_type="text/plain")
-            plan_ref = self.artifacts.put(activation.run_id, "compaction_plan", json_dumps(asdict(plan)), media_type="application/json")
-            self.store.append(activation.run_id, EventType.COMPACTION_RECORDED, role=activation.department,
-                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                              state_after=current.phase, session_id=activation.session_id,
-                              provider=response.provider or self._configured_provider(activation.target, activation.adapter),
-                              model=response.model,
-                              context_digest=request.context.manifest.digest,
-                              artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
-                              payload={"run_id": activation.run_id, "department": activation.department,
-                                       **activation.versions(),
-                                       "activation_id": activation.activation_id, "step_id": request.step_id,
-                                       "purpose": "compaction", "checkpoint": asdict(checkpoint),
-                                       "source_refs": plan.source_refs, "summary_ref": asdict(summary_ref),
-                                       "plan_ref": asdict(plan_ref), "summary_token_limit": plan.summary_token_limit,
-                                       "max_output_tokens": plan.max_output_tokens,
-                                       "effective_contract_hash": activation.effective_contract_hash,
-                                       "engineering_plan_hash": activation.engineering_plan_hash,
-                                       "request_id": activation.request_id,
-                                       **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                                       "previous_compaction_event_id": result.previous_compaction_event_id})
+            activation.recorder.compaction(current.phase, request, result, response)
 
     def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
-        with self._state_lock:
+        with self.writes.lock:
             current = self.project(request.run_id)
             current = self._close_obsolete_request(request.run_id, current)
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return False
             if activation.basis.changed(current, activation.department):
                 return False
-            if request.context.manifest.guidance_ids and not activation.guidance_applied:
-                self.store.append(
-                    request.run_id,
-                    EventType.DEPARTMENT_GUIDANCE_APPLIED,
-                    role=request.department,
-                    parent_event_id=activation.parent_event_id,
-                    state_before=current.phase,
-                    state_after=current.phase,
-                    session_id=request.session_id,
-                    payload={
-                        "guidance_ids": list(request.context.manifest.guidance_ids),
-                        "activation_id": request.activation_id,
-                        "context_event_id": request.context_event_id,
-                        "input_version": request.input_version,
-                    },
-                )
-                activation.guidance_applied = True
-            request.attempt_started_at = request.attempt_started_at or utc_now()
-            self.store.append(request.run_id, EventType.MODEL_REQUESTED, role=request.department,
-                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                              state_after=current.phase, session_id=request.session_id,
-                              provider=self._configured_provider(activation.target, activation.adapter),
-                              context_digest=request.context.manifest.digest,
-                              payload={"activation_id": request.activation_id, "step_id": request.step_id,
-                                       **activation.versions(),
-                                       "attempt": request.attempt,
-                                       "max_attempts": self.step_limits.max_provider_attempts,
-                                       "root_step_id": request.root_step_id,
-                                       "retry_of_step_id": request.retry_of_step_id,
-                                       "attempt_id": request.attempt_id,
-                                       "logical_call_id": request.logical_call_id,
-                                       "context_event_id": request.context_event_id,
-                                       "collaboration_request_id": request.request_id,
-                                       "started_at": request.attempt_started_at,
-                                       "attempted": True, "purpose": request.purpose,
-                                       "effective_contract_hash": request.effective_contract_hash,
-                                       "engineering_plan_hash": request.engineering_plan_hash, "request_id": activation.request_id,
-                                       **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                                       "effective_context_window": request.context.manifest.budget,
-                                       "max_output_tokens": request.max_output_tokens})
+            activation.recorder.request_started(current.phase, request)
             return True
-
-    @staticmethod
-    def _attempt_collection_scope() -> dict[str, Any]:
-        return {
-            "request": "SDK request JSON object captured from the prepared HTTP request; authentication headers and raw HTTP bytes are excluded.",
-            "response": "Complete SDK response object exposed by the provider SDK when a terminal response was received, with credential and header fields redacted.",
-            "events": "SDK decoded stream event JSON objects captured as JSON Lines with credential and header fields redacted; raw HTTP/SSE bytes are not available.",
-            "credentials": "excluded",
-        }
-
-    def _capture_for(self, activation: _Activation, request: ModelRequest) -> _AttemptCapture:
-        attempt_id = request.attempt_id or self._attempt_id(
-            request.logical_call_id or self._logical_call_id(request.activation_id, request.root_step_id or request.step_id, request.purpose),
-            request.attempt,
-        )
-        request.attempt_id = attempt_id
-        request.logical_call_id = request.logical_call_id or attempt_id.rsplit(":attempt-", 1)[0]
-        capture = activation.attempt_captures.get(attempt_id)
-        if capture is None:
-            capture = _AttemptCapture()
-            activation.attempt_captures[attempt_id] = capture
-        return capture
-
-    def _record_stream_progress(
-        self,
-        activation: _Activation,
-        request: ModelRequest,
-        capture: _AttemptCapture,
-        observation: ModelObservation,
-        observed_at: str,
-    ) -> None:
-        payload = observation.payload
-        stage = _stream_progress_stage(payload)
-        if capture.first_observed_at is None:
-            capture.first_observed_at = observed_at
-        if stage in {"output", "output_item_done"} and capture.first_output_at is None:
-            capture.first_output_at = observed_at
-        now = time.monotonic()
-        changed = stage != capture.progress_stage
-        due = capture.progress_last_emitted_monotonic is None or now - capture.progress_last_emitted_monotonic >= 0.25
-        capture.progress_stage = stage
-        if not changed and not due:
-            return
-        capture.progress_last_emitted_monotonic = now
-        provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
-        current = self.project(request.run_id)
-        self.store.append(
-            request.run_id,
-            EventType.MODEL_STREAM_PROGRESS,
-            role=request.department,
-            parent_event_id=activation.parent_event_id,
-            state_before=current.phase,
-            state_after=current.phase,
-            session_id=request.session_id,
-            provider=provider,
-            model=observation.model or activation.model,
-            context_digest=request.context.manifest.digest,
-            payload={
-                "attempt_id": request.attempt_id,
-                "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
-                "context_event_id": request.context_event_id,
-                "activation_id": request.activation_id,
-                "step_id": request.step_id,
-                "attempt": request.attempt,
-                "root_step_id": request.root_step_id,
-                "purpose": request.purpose,
-                "source": "sdk_decoded_stream",
-                "stage": stage,
-                "event_type": payload.get("type"),
-                "sequence": observation.sequence,
-                "observed_at": observed_at,
-                "first_observed_at": capture.first_observed_at,
-                "first_output_at": capture.first_output_at,
-                "summary": _stream_progress_summary(payload),
-                **activation.versions(),
-            },
-        )
-
-    def _finalize_capture(self, activation: _Activation, request: ModelRequest) -> _AttemptCapture:
-        capture = activation.attempt_captures.pop(request.attempt_id or "", None)
-        if capture is None:
-            capture = _AttemptCapture()
-        try:
-            if capture.stream_event_count:
-                ref = self.artifacts.put_stream(
-                    request.run_id,
-                    "sdk_stream_events",
-                    capture.stream_chunks(),
-                    media_type="application/x-ndjson",
-                )
-                capture.stream_ref = asdict(ref)
-        finally:
-            capture.close()
-        return capture
-
-    @staticmethod
-    def _usage_summary(usage: Usage | None) -> dict[str, Any] | None:
-        if usage is None or not (usage.reported or usage.total_tokens or usage.input_tokens
-                                 or usage.output_tokens or usage.cache_read_tokens
-                                 or usage.cache_write_tokens or usage.cost):
-            return None
-        return {
-            "input_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
-            "output_tokens": usage.output_tokens,
-            "cache_read_tokens": usage.cache_read_tokens,
-            "cache_write_tokens": usage.cache_write_tokens,
-            "total_tokens": usage.total_tokens,
-            "cost": usage.cost if usage.cost_reported else None,
-            "currency": None,
-            "cost_source": None,
-            "latency_ms": usage.latency_ms if usage.latency_ms else None,
-            "reported": bool(usage.reported),
-        }
-
-    def _record_attempt_finished(
-        self,
-        activation: _Activation,
-        request: ModelRequest,
-        response: ModelResponse,
-    ) -> None:
-        with self._state_lock:
-            current = self.project(request.run_id)
-            finished_at = utc_now()
-            started_monotonic = request.attempt_started_monotonic
-            finished_monotonic = request.attempt_finished_monotonic or time.monotonic()
-            duration_ms = None if started_monotonic is None else max(
-                0, int((finished_monotonic - started_monotonic) * 1000)
-            )
-            capture = self._finalize_capture(activation, request)
-            if capture.response_ref is None and isinstance(response.sdk_response, dict):
-                safe_response = _redact_observation(
-                    response.sdk_response,
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                response_ref = self.artifacts.put(
-                    request.run_id,
-                    "sdk_response",
-                    json_dumps(safe_response),
-                    media_type="application/json",
-                )
-                capture.response_ref = asdict(response_ref)
-                capture.provider_response_id = safe_response.get("id") or response.response_id
-            provider = response.provider or self._configured_provider(activation.target, activation.adapter)
-            model = response.model or activation.model
-            payload = {
-                "attempt_id": request.attempt_id,
-                "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
-                "context_event_id": request.context_event_id,
-                "activation_id": request.activation_id,
-                "step_id": request.step_id,
-                "root_step_id": request.root_step_id,
-                "retry_of_step_id": request.retry_of_step_id,
-                "attempt": request.attempt,
-                "purpose": request.purpose,
-                "status": "completed",
-                "started_at": request.attempt_started_at,
-                "finished_at": finished_at,
-                "duration_ms": duration_ms,
-                "duration_source": "monotonic",
-                "provider_response_id": response.response_id or capture.provider_response_id,
-                "actual_provider": capture.actual_provider or (provider if response.response_id or response.model else None),
-                "actual_model": capture.actual_model or (response.model or None),
-                "response_ref": capture.response_ref,
-                "stream_events_ref": getattr(capture, "stream_ref", None),
-                "stream_event_count": capture.stream_event_count,
-                "stream_first_observed_at": capture.first_observed_at,
-                "stream_first_output_at": capture.first_output_at,
-                "stream_last_stage": capture.progress_stage,
-                "collection_scope": self._attempt_collection_scope(),
-                "usage": self._usage_summary(capture.usage or activation.step_usage),
-                "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
-                **activation.versions(),
-                **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-            }
-            self.store.append(
-                request.run_id,
-                EventType.MODEL_ATTEMPT_FINISHED,
-                role=request.department,
-                parent_event_id=activation.parent_event_id,
-                state_before=current.phase,
-                state_after=current.phase,
-                session_id=request.session_id,
-                provider=provider,
-                model=model or None,
-                context_digest=request.context.manifest.digest,
-                artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, getattr(capture, "stream_ref", None)) if ref],
-                payload=payload,
-            )
-
-    def _record_attempt_failed(
-        self,
-        activation: _Activation,
-        request: ModelRequest,
-        error: ProviderError,
-        will_retry: bool,
-    ) -> None:
-        with self._state_lock:
-            current = self.project(request.run_id)
-            failed_key = (request.activation_id, request.step_id)
-            kept = [
-                (text, key)
-                for text, key in zip(activation.messages, activation.message_steps)
-                if key != failed_key
-            ]
-            activation.messages = [text for text, _key in kept]
-            activation.message_steps = [key for _text, key in kept]
-            capture = self._finalize_capture(activation, request)
-            provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
-            model = activation.model
-            finished_at = utc_now()
-            started_monotonic = request.attempt_started_monotonic
-            finished_monotonic = request.attempt_finished_monotonic or time.monotonic()
-            duration_ms = None if started_monotonic is None else max(
-                0, int((finished_monotonic - started_monotonic) * 1000)
-            )
-            status = "cancelled" if error.reason == "cancelled" else "failed"
-            safe_error = _redact_observation(
-                str(error),
-                secret=getattr(activation.target, "api_key", None),
-            )
-            safe_diagnostics = _redact_observation(
-                dict(error.diagnostics or {}),
-                secret=getattr(activation.target, "api_key", None),
-            )
-            self.store.append(
-                request.run_id, EventType.MODEL_ATTEMPT_FAILED, role=request.department,
-                parent_event_id=activation.parent_event_id, state_before=current.phase,
-                state_after=current.phase, session_id=request.session_id,
-                provider=provider,
-                model=model,
-                context_digest=request.context.manifest.digest,
-                error=safe_error,
-                artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, capture.stream_ref) if ref],
-                payload={
-                    "attempt_id": request.attempt_id,
-                    "logical_call_id": request.logical_call_id,
-                    "collaboration_request_id": request.request_id,
-                    "context_event_id": request.context_event_id,
-                    "activation_id": request.activation_id,
-                    "step_id": request.step_id,
-                    **activation.versions(),
-                    "attempt": request.attempt,
-                    "max_attempts": self.step_limits.max_provider_attempts,
-                    "root_step_id": request.root_step_id,
-                    "retry_of_step_id": request.retry_of_step_id,
-                    "purpose": request.purpose,
-                    "status": status,
-                    "started_at": request.attempt_started_at,
-                    "finished_at": finished_at,
-                    "duration_ms": duration_ms,
-                    "duration_source": "monotonic",
-                    "actual_provider": capture.actual_provider,
-                    "actual_model": capture.actual_model,
-                    "provider_response_id": capture.provider_response_id,
-                    "response_ref": capture.response_ref,
-                    "stream_events_ref": capture.stream_ref,
-                    "stream_event_count": capture.stream_event_count,
-                    "stream_first_observed_at": capture.first_observed_at,
-                    "stream_first_output_at": capture.first_output_at,
-                    "stream_last_stage": capture.progress_stage,
-                    "collection_scope": self._attempt_collection_scope(),
-                    "usage": self._usage_summary(capture.usage or activation.step_usage),
-                    "raw_usage_ref": capture.usage_ref or activation.raw_usage_ref,
-                    "effective_contract_hash": request.effective_contract_hash,
-                    "engineering_plan_hash": request.engineering_plan_hash,
-                    "request_id": request.request_id,
-                    "reason": error.reason,
-                    "retryable": error.retryable,
-                    "will_retry": will_retry,
-                    "diagnostics": safe_diagnostics,
-                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                },
-            )
 
     def _record_retry_scheduled(
         self,
@@ -1372,46 +866,16 @@ class Orchestrator:
         delay: float,
         next_step_id: int,
     ) -> bool:
-        with self._state_lock:
+        with self.writes.lock:
             current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
             if (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
                     or activation.basis.changed(current, activation.department)):
                 return False
-            provider = self._configured_provider(activation.target, activation.adapter)
-            self.store.append(
-                request.run_id, EventType.MODEL_RETRY_SCHEDULED, role=request.department,
-                parent_event_id=activation.parent_event_id, state_before=current.phase,
-                state_after=current.phase, session_id=request.session_id,
-                provider=provider,
-                context_digest=request.context.manifest.digest,
-                payload={
-                    "activation_id": request.activation_id,
-                    "step_id": request.step_id,
-                    **activation.versions(),
-                    "attempt": request.attempt,
-                    "max_attempts": self.step_limits.max_provider_attempts,
-                    "root_step_id": request.root_step_id,
-                    "retry_of_step_id": request.retry_of_step_id,
-                    "attempt_id": request.attempt_id,
-                    "logical_call_id": request.logical_call_id,
-                    "context_event_id": request.context_event_id,
-                    "collaboration_request_id": request.request_id,
-                    "next_step_id": next_step_id,
-                    "next_attempt": request.attempt + 1,
-                    "purpose": request.purpose,
-                    "effective_contract_hash": request.effective_contract_hash,
-                    "engineering_plan_hash": request.engineering_plan_hash,
-                    "request_id": request.request_id,
-                    "reason": error.reason,
-                    "retryable": True,
-                    "delay_sec": delay,
-                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                },
-            )
+            activation.recorder.retry_scheduled(current.phase, request, error, delay, next_step_id)
             return True
 
     def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolPermission:
-        with self._state_lock:
+        with self.writes.lock:
             request = activation.request
             current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
             permission = tool_permission(
@@ -1421,283 +885,8 @@ class Orchestrator:
             )
             if not permission.allowed:
                 return permission
-            self.store.append(request.run_id, EventType.TOOL_STARTED, role=request.department,
-                              parent_event_id=activation.parent_event_id, state_before=current.phase,
-                              state_after=current.phase, session_id=request.session_id,
-                              payload={**call, "activation_id": request.activation_id,
-                                       "attempt_id": request.attempt_id,
-                                       "logical_call_id": request.logical_call_id,
-                                       "collaboration_request_id": request.request_id,
-                                       "context_event_id": request.context_event_id,
-                                       "attempt": request.attempt,
-                                       **activation.versions(),
-                                       "effective_contract_hash": activation.effective_contract_hash,
-                                       "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id,
-                                       **permission.command_basis})
+            activation.recorder.tool_started(current.phase, request, call, permission.command_basis)
             return permission
-
-    def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:
-        request = activation.request
-        with self._state_lock:
-            if observation.kind != "stream_event":
-                key = (f"{request.attempt_id or request.step_id}:{observation.kind}", observation.id)
-                if key in activation.seen:
-                    return
-                activation.seen.add(key)
-            if observation.kind == "request":
-                current = self.project(request.run_id)
-                if not isinstance(observation.payload, dict):
-                    raise ProviderError("Serialized provider request is not a JSON object", reason="provider_protocol")
-                ref = self.artifacts.put(
-                    request.run_id,
-                    "sdk_request",
-                    json_dumps(observation.payload),
-                    media_type="application/json",
-                )
-                payload = {
-                    "attempt_id": request.attempt_id,
-                    "logical_call_id": request.logical_call_id,
-                    "collaboration_request_id": request.request_id,
-                    "context_event_id": request.context_event_id,
-                    "activation_id": request.activation_id,
-                    "step_id": request.step_id,
-                    "attempt": request.attempt,
-                    "root_step_id": request.root_step_id,
-                    "retry_of_step_id": request.retry_of_step_id,
-                    "purpose": request.purpose,
-                    "request_ref": asdict(ref),
-                    "request_digest": canonical_hash(observation.payload),
-                    "serialization": "sdk_request_json_object",
-                    "effective_contract_hash": activation.effective_contract_hash,
-                    "engineering_plan_hash": activation.engineering_plan_hash,
-                    "request_id": activation.request_id,
-                    **activation.versions(),
-                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                }
-                self.store.append(
-                    request.run_id,
-                    EventType.MODEL_REQUEST_SERIALIZED,
-                    role=request.department,
-                    parent_event_id=activation.parent_event_id,
-                    state_before=current.phase,
-                    state_after=current.phase,
-                    session_id=request.session_id,
-                    provider=self._configured_provider(activation.target, activation.adapter),
-                    context_digest=request.context.manifest.digest,
-                    artifact_hashes=[ref.content_hash],
-                    payload=payload,
-                )
-                return
-            if observation.provider:
-                activation.provider = observation.provider
-            if observation.model:
-                activation.model = observation.model
-            provider = activation.provider or self._configured_provider(activation.target, activation.adapter)
-            model = activation.model
-            if observation.kind == "stream_event":
-                if not isinstance(observation.payload, dict):
-                    raise ProviderError("Decoded provider stream event is not a JSON object", reason="provider_protocol")
-                capture = self._capture_for(activation, request)
-                observation.payload = _redact_observation(
-                    observation.payload,
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                capture.actual_provider = observation.provider or capture.actual_provider
-                capture.actual_model = observation.model or capture.actual_model
-                nested_response = observation.payload.get("response")
-                if isinstance(nested_response, dict):
-                    response_id = nested_response.get("id")
-                    if isinstance(response_id, str) and response_id:
-                        capture.provider_response_id = response_id
-                    nested_model = nested_response.get("model")
-                    if isinstance(nested_model, str) and nested_model.strip():
-                        capture.actual_model = nested_model.strip()
-                observed_at = utc_now()
-                capture.add_stream_event(observation.sequence, observation.payload, observed_at)
-                self._record_stream_progress(activation, request, capture, observation, observed_at)
-                return
-            if observation.kind == "response":
-                if not isinstance(observation.payload, dict):
-                    raise ProviderError("Provider response is not a JSON object", reason="provider_protocol")
-                capture = self._capture_for(activation, request)
-                observation.payload = _redact_observation(
-                    observation.payload,
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                capture.actual_provider = observation.provider or capture.actual_provider
-                capture.actual_model = observation.model or capture.actual_model
-                ref = self.artifacts.put(
-                    request.run_id,
-                    "sdk_response",
-                    json_dumps(observation.payload),
-                    media_type="application/json",
-                )
-                capture.response_ref = asdict(ref)
-                capture.provider_response_id = (
-                    observation.payload.get("id") if isinstance(observation.payload.get("id"), str) else observation.id
-                )
-                return
-            if observation.kind == "usage":
-                if observation.usage is not None:
-                    capture = self._capture_for(activation, request)
-                    safe_usage = _redact_observation(
-                        observation.payload,
-                        secret=getattr(activation.target, "api_key", None),
-                    )
-                    ref = self.artifacts.put(request.run_id, "model_usage", json_dumps(safe_usage), media_type="application/json")
-                    activation.raw_usage_ref = asdict(ref)
-                    capture.usage = observation.usage
-                    capture.usage_ref = asdict(ref)
-                    has_usage = bool(
-                        observation.usage.reported
-                        or observation.usage.total_tokens
-                        or observation.usage.cost
-                    )
-                    if has_usage:
-                        activation.step_usage = observation.usage
-                        usage = activation.previous_usage.plus(observation.usage)
-                    else:
-                        usage = activation.usage if activation.has_usage else Usage(reported=False)
-                    self._record_usage(
-                        activation,
-                        usage,
-                        provider=provider,
-                        model=model,
-                        force=bool(observation.model),
-                        reported=(observation.usage.reported if has_usage else False),
-                    )
-                return
-            current = self.project(request.run_id)
-            if observation.kind in {"tool", "skipped_tool"}:
-                payload = _redact_observation(
-                    dict(observation.payload),
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                tool_id = f"{request.step_id}:{payload.get('id') or observation.id}"
-                if tool_id in activation.tool_ids:
-                    return
-                activation.tool_ids.add(tool_id)
-                output = payload.pop("output", None)
-                if output is not None:
-                    ref = self.artifacts.put(request.run_id, "tool_output", json_dumps(output), media_type="application/json")
-                    payload["output_ref"] = asdict(ref)
-                event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED
-            elif observation.kind == "message":
-                safe_text = _redact_observation(
-                    observation.text,
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                activation.messages.append(safe_text)
-                activation.message_steps.append((request.activation_id, request.step_id))
-                message = _redact_observation(
-                    observation.payload or {"role": "assistant", "content": safe_text},
-                    secret=getattr(activation.target, "api_key", None),
-                )
-                ref = self.artifacts.put(request.run_id, "model_message", json_dumps(message), media_type="application/json")
-                payload = {
-                    "message_ref": asdict(ref),
-                    "message_index": len(activation.messages),
-                    "response_id": message.get("id"),
-                    "stop_reason": message.get("status"),
-                    "summary": safe_text[:160],
-                }
-                event_type = EventType.MODEL_MESSAGE
-            else:
-                raise ValueError(f"unknown adapter observation: {observation.kind}")
-            payload["attempt_id"] = request.attempt_id
-            payload["logical_call_id"] = request.logical_call_id
-            payload["collaboration_request_id"] = request.request_id
-            payload["context_event_id"] = request.context_event_id
-            payload["activation_id"] = request.activation_id
-            payload["step_id"] = request.step_id
-            payload["purpose"] = request.purpose
-            payload["effective_contract_hash"] = activation.effective_contract_hash
-            payload["engineering_plan_hash"] = activation.engineering_plan_hash
-            payload["request_id"] = activation.request_id
-            payload.update(activation.versions())
-            payload.update(self._target_metadata(activation.target, activation.adapter, activation.snapshot_id))
-            self.store.append(
-                request.run_id, event_type, role=request.department,
-                parent_event_id=activation.parent_event_id,
-                state_before=current.phase, state_after=current.phase,
-                session_id=request.session_id, provider=provider, model=model, payload=payload,
-            )
-            if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens or observation.usage.cost):
-                activation.step_usage = observation.usage
-                usage = activation.previous_usage.plus(observation.usage)
-                self._record_usage(activation, usage, provider=provider, model=model)
-
-    def _record_usage(
-        self,
-        activation: _Activation,
-        usage: Usage,
-        *,
-        provider: str,
-        model: str | None,
-        force: bool = False,
-        reported: bool | None = None,
-    ) -> None:
-        request = activation.request
-        token_delta = usage.total_tokens - activation.tokens_charged
-        cost_delta = usage.cost - activation.cost_charged
-        first = not activation.has_usage
-        activation.has_usage = True
-        activation.usage = usage
-        activation.tokens_charged = usage.total_tokens
-        activation.cost_charged = usage.cost
-        current = self.project(request.run_id)
-        if first or token_delta or cost_delta or force:
-            self.store.append(
-                request.run_id, EventType.TOOL_CALLED, role=request.department,
-                parent_event_id=activation.parent_event_id,
-                state_before=current.phase, state_after=current.phase,
-                session_id=request.session_id, provider=provider, model=model,
-                payload={
-                    "name": "provider_usage", "ok": True,
-                    **activation.versions(),
-                    "activation_id": request.activation_id,
-                    "step_id": request.step_id,
-                    "purpose": request.purpose,
-                    "accounting": "activation_total_with_charge_delta",
-                    "scope": "observable_main_dialogue",
-                    "source": "reported" if (usage.reported if reported is None else reported) else "unreported",
-                    "cost_reported": usage.cost_reported,
-                    "raw_usage_ref": activation.raw_usage_ref,
-                    "tokens_charged": token_delta,
-                    "total_tokens": usage.total_tokens,
-                    "input_tokens": usage.input_tokens,
-                    "cache_read_tokens": usage.cache_read_tokens,
-                    "cache_write_tokens": usage.cache_write_tokens,
-                    "input_total_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
-                    "output_tokens": usage.output_tokens,
-                    "cost": cost_delta, "total_cost": usage.cost,
-                    **self._target_metadata(activation.target, activation.adapter, activation.snapshot_id),
-                },
-            )
-
-    def _reconcile_response(self, activation: _Activation, result: ModelResponse) -> None:
-        provider = result.provider or self._configured_provider(activation.target, activation.adapter)
-        model = result.model
-        for index, item in enumerate(result.output):
-            content = item.get("content") or []
-            text = "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict)) if isinstance(content, list) else str(content)
-            self._record_observation(activation, ModelObservation(
-                str(item.get("id") or f"output-{index}"), "message", item, text,
-                provider=provider, model=model,
-            ))
-        usage = Usage(**result.usage.model_dump())
-        if not (usage.reported or usage.total_tokens or usage.cost):
-            usage = activation.step_usage or Usage(reported=False)
-        activation.step_usage = usage
-        with self._state_lock:
-            self._record_usage(
-                activation,
-                activation.previous_usage.plus(usage),
-                provider=provider,
-                model=model,
-                force=bool(result.model) and activation.model != result.model,
-                reported=usage.reported,
-            )
 
     def _apply_proposal(
         self,
@@ -1719,7 +908,7 @@ class Orchestrator:
         snapshot = self.workspace(run_id).snapshot()
         decision = proposal_decision(evaluated, department=department, proposal=proposal, snapshot=snapshot,
                                      events=self.store.list_events(run_id))
-        with self._state_lock:
+        with self.writes.lock:
             current = self.project(run_id)
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 return
@@ -1732,17 +921,17 @@ class Orchestrator:
             )
             projection, snapshot = current, fresh_snapshot
             if proposal is not None:
-                self.store.append(
-                    run_id, EventType.PROPOSAL_SUBMITTED, role=department,
+                self.writes.append(run_id, NewEvent(
+                    EventType.PROPOSAL_SUBMITTED, role=department,
                     parent_event_id=parent_event_id,
                     state_before=projection.phase, state_after=projection.phase,
                     session_id=session_id, provider=provider, model=model,
                     payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
                              "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
-                )
+                ))
             if not decision.accepted:
-                self.store.append(
-                    run_id, EventType.PROPOSAL_REJECTED, role=department,
+                self.writes.append(run_id, NewEvent(
+                    EventType.PROPOSAL_REJECTED, role=department,
                     parent_event_id=parent_event_id,
                     state_before=projection.phase, state_after=projection.phase,
                     session_id=session_id, provider=provider, model=model,
@@ -1752,7 +941,7 @@ class Orchestrator:
                         "kind": None if proposal is None else proposal.get("kind"),
                         "input_version": basis.input_version,
                     },
-                )
+                ))
                 return
             self._commit_accepted(
                 run_id, department=department, projection=projection, snapshot=snapshot,
@@ -1787,8 +976,7 @@ class Orchestrator:
         if artifact["kind"] == "qa_review" and artifact["verdict"] in {"rework_product", "rework_engineering"}:
             self._record_lesson_candidate(source_event, projection)
         for source, target in transitions:
-            self.store.append(
-                run_id,
+            self.writes.append(run_id, NewEvent(
                 EventType.TRANSITION,
                 role=department_for_phase(target) or department,
                 parent_event_id=parent_event_id,
@@ -1796,10 +984,9 @@ class Orchestrator:
                 state_after=target,
                 session_id=session_id,
                 payload={"from": source, "to": target, "route": f"{source}->{target}"},
-            )
+            ))
             if target == "DONE":
-                self.store.append(
-                    run_id,
+                self.writes.append(run_id, NewEvent(
                     EventType.RUN_DONE,
                     role="quality",
                     parent_event_id=parent_event_id,
@@ -1808,7 +995,7 @@ class Orchestrator:
                     session_id=session_id,
                     stop_reason="released",
                     payload={"stop_reason": "released"},
-                )
+                ))
                 self.sessions.close_run(run_id)
         self._resume_yielded_work(
             run_id, artifact=artifact, yielded_work=yielded_work,
@@ -1834,8 +1021,7 @@ class Orchestrator:
         target = guidance_resume_phase(basis, current)
         if target == current.phase:
             return
-        self.store.append(
-            run_id,
+        self.writes.append(run_id, NewEvent(
             EventType.TRANSITION,
             role=department_for_phase(target) or department,
             parent_event_id=parent_event_id,
@@ -1844,7 +1030,7 @@ class Orchestrator:
             session_id=session_id,
             payload={"from": current.phase, "to": target, "route": f"{current.phase}->{target}",
                      "yielded_work_resolved": True, "yielded_work": dict(basis)},
-        )
+        ))
 
     def _record_lesson_candidate(self, source: RunEvent, projection: RunProjection) -> None:
         if source.type == EventType.QA_SUBMITTED:
@@ -1866,8 +1052,8 @@ class Orchestrator:
             delivery_hash = delivery.content_hash if delivery is not None else None
             checks = delivery.checks if delivery is not None else []
             refs = [asdict(delivery.tree_ref)] if delivery is not None else []
-        self.store.append(
-            source.run_id, EventType.LESSON_CANDIDATE_RECORDED,
+        self.writes.append(source.run_id, NewEvent(
+            EventType.LESSON_CANDIDATE_RECORDED,
             role=source.role, parent_event_id=source.event_id,
             state_before=source.state_after, state_after=source.state_after,
             session_id=source.session_id,
@@ -1878,18 +1064,18 @@ class Orchestrator:
                 "product_spec_hash": spec_hash, "delivery_spec_hash": delivery_hash,
                 "checks": checks, "evidence_refs": refs,
             },
-        )
+        ))
 
     def _pause(self, run_id: str, projection: RunProjection, reason: str) -> None:
-        with self._state_lock:
+        with self.writes.lock:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return
             department = projection.active_department
             projection = self._close_request(run_id, projection, status="stopped", reason=reason,
                                              return_phase=projection.phase, return_work_valid=False)
-            self.store.append(
-                run_id, EventType.RUN_PAUSED, role=department,
+            self.writes.append(run_id, NewEvent(
+                EventType.RUN_PAUSED, role=department,
                 state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
                 provider=projection.provider, model=projection.model,
                 payload={
@@ -1900,7 +1086,7 @@ class Orchestrator:
                     "max_cycles": projection.max_cycles,
                     "token_used": projection.token_used,
                 },
-            )
+            ))
             self.sessions.close_run(run_id)
 
     def _fail(self, run_id: str, projection: RunProjection, reason: str, message: str,
@@ -1916,7 +1102,7 @@ class Orchestrator:
             "host_commit_error": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。",
             "time_limit": HUMAN_ACTIONS["time_limit"],
         }.get(reason)
-        with self._state_lock:
+        with self.writes.lock:
             projection = self.project(run_id)
             if projection.phase in TERMINAL_PHASES:
                 return
@@ -1924,13 +1110,13 @@ class Orchestrator:
             status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
             projection = self._close_request(run_id, projection, status=status, reason=reason,
                                              return_phase=projection.phase, return_work_valid=False)
-            source_event = self.store.append(
-                run_id, EventType.RUN_FAILED, role=department,
+            source_event = self.writes.append(run_id, NewEvent(
+                EventType.RUN_FAILED, role=department,
                 state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
                 provider=projection.provider, model=projection.model,
                 payload={"stop_reason": reason, "human_action": human, "message": message,
                          **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
-            )
+            ))[0]
             self.sessions.close_run(run_id)
             if reason != "cancelled":
                 self._record_lesson_candidate(source_event, projection)

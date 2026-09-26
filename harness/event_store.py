@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from collections.abc import Sequence
+from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -46,6 +48,38 @@ CREATE INDEX IF NOT EXISTS idx_project_events_project_seq ON project_events(proj
 """
 
 
+@dataclass(frozen=True)
+class NewEvent:
+    # 一条要追加的 run 事件；事件编号、序号与创建时间在追加时确定
+    type: str
+    _: KW_ONLY
+    state_before: str
+    state_after: str
+    role: str | None = None
+    parent_event_id: str | None = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    artifact_hashes: list[str] = field(default_factory=list)
+    session_id: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    context_digest: str | None = None
+    stop_reason: str | None = None
+    error: str | None = None
+
+
+class WritePath:
+    # 领域写入唯一的写入函数：流程编排、记录接口、提交与交互写入 run 的事件都经过 append，
+    # 一次调用的事件在同一个事务中追加。lock 是「读取运行状态、判断、追加」期间持有的锁，append 也在它之下进行。
+    # #44 在 append 上加入流版本与执行权的事务核对，并以同一事务中的读取与判断代替这把锁
+    def __init__(self, store: EventStore) -> None:
+        self._store = store
+        self.lock = threading.RLock()
+
+    def append(self, run_id: str, *events: NewEvent) -> list[Event]:
+        with self.lock:
+            return self._store.append_batch(run_id, events)
+
+
 class EventStore:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -58,41 +92,16 @@ class EventStore:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.commit()
 
-    def append(
-        self,
-        run_id: str,
-        type: str,
-        *,
-        role: str | None = None,
-        parent_event_id: str | None = None,
-        state_before: str,
-        state_after: str,
-        payload: dict[str, Any] | None = None,
-        artifact_hashes: list[str] | None = None,
-        session_id: str | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        context_digest: str | None = None,
-        stop_reason: str | None = None,
-        error: str | None = None,
-    ) -> Event:
-        return self.append_batch(run_id, [{
-            "type": type, "role": role, "parent_event_id": parent_event_id,
-            "state_before": state_before, "state_after": state_after, "payload": payload,
-            "artifact_hashes": artifact_hashes, "session_id": session_id, "provider": provider,
-            "model": model, "context_digest": context_digest, "stop_reason": stop_reason, "error": error,
-        }])[0]
-
-    def append_batch(self, run_id: str, entries: list[dict[str, Any]]) -> list[Event]:
-        events = []
-        for entry in entries:
-            values = {
-                "role": None, "parent_event_id": None, "session_id": None,
-                "provider": None, "model": None, "context_digest": None, "stop_reason": None, "error": None,
-                **entry,
-                "payload": entry.get("payload") or {}, "artifact_hashes": list(entry.get("artifact_hashes") or []),
-            }
-            events.append(Event(event_id=new_id("evt"), run_id=run_id, seq=0, created_at=utc_now(), **values))
+    def append_batch(self, run_id: str, entries: Sequence[NewEvent]) -> list[Event]:
+        events = [
+            Event(event_id=new_id("evt"), run_id=run_id, seq=0, type=entry.type, role=entry.role,
+                  parent_event_id=entry.parent_event_id, state_before=entry.state_before,
+                  state_after=entry.state_after, payload=entry.payload, artifact_hashes=list(entry.artifact_hashes),
+                  session_id=entry.session_id, provider=entry.provider, model=entry.model,
+                  context_digest=entry.context_digest, stop_reason=entry.stop_reason, error=entry.error,
+                  created_at=utc_now())
+            for entry in entries
+        ]
         with self._lock, self._conn:
             seq = self._next_seq(run_id)
             for offset, event in enumerate(events):

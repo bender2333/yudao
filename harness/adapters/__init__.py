@@ -1,4 +1,4 @@
-from .base import Availability, ModelAdapter, ModelObservation, ModelRequest, ProviderError
+from .base import Availability, ModelAdapter, ModelRequest, ProviderError
 from .fake import FakeAdapter, FakeTurn
 
 __all__ = [
@@ -7,6 +7,5 @@ __all__ = [
     "FakeAdapter",
     "FakeTurn",
     "ModelRequest",
-    "ModelObservation",
     "ProviderError",
 ]
