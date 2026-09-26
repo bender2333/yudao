@@ -2,7 +2,7 @@ from dataclasses import asdict, replace
 
 import pytest
 
-import harness.orchestrator as orchestration
+import harness.adjudication as adjudication
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.contracts import contract_payload, normalize_scope, path_in_scope, render_plan, render_prd
@@ -169,7 +169,7 @@ def test_sent_plan_cannot_be_rebound_after_contract_changes(tmp_path, monkeypatc
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
-    evaluate = orchestration.evaluate_proposal
+    evaluate = adjudication.evaluate_proposal
 
     def change_after_evaluation(**arguments):
         decision = evaluate(**arguments)
@@ -177,7 +177,7 @@ def test_sent_plan_cannot_be_rebound_after_contract_changes(tmp_path, monkeypatc
         _accept_new_spec(system, run_id)
         return decision
 
-    monkeypatch.setattr(orchestration, "evaluate_proposal", change_after_evaluation)
+    monkeypatch.setattr(adjudication, "evaluate_proposal", change_after_evaluation)
     result = system.activate_once(run_id)
 
     assert result.engineering_plan is None
@@ -191,7 +191,7 @@ def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(t
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     original = system.activate_once(run_id)
-    evaluate = orchestration.evaluate_proposal
+    evaluate = adjudication.evaluate_proposal
 
     def change_after_evaluation(**arguments):
         decision = evaluate(**arguments)
@@ -199,7 +199,7 @@ def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(t
         _accept_new_spec(system, run_id)
         return decision
 
-    monkeypatch.setattr(orchestration, "evaluate_proposal", change_after_evaluation)
+    monkeypatch.setattr(adjudication, "evaluate_proposal", change_after_evaluation)
     current = system.activate_once(run_id)
     assert current.effective_contract.content_hash != original.effective_contract.content_hash
     assert current.delivery_spec is None

@@ -1,8 +1,8 @@
 from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter
-from harness.adjudication import WorkBasis, tool_permission
-from harness.proposals import plan_turn, product_spec
+from harness.adjudication import WorkBasis, commit_decision, proposal_decision, tool_permission
+from harness.proposals import engineering_plan, plan_turn, product_spec
 from harness.runtime import LoopSystem
 
 REGISTRY = {"unit": {"argv": ["python", "-c", "print('ok')"], "args": ["--fast"]}}
@@ -50,6 +50,28 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     assert unknown.reason == "unknown registered command: deploy; only project-registered commands may run"
     extra = _permission(system, projection, "run_command", {"name": "unit", "args": ["--slow"]})
     assert extra.reason == "argument not allowlisted for unit: --slow"
+
+
+def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_path):
+    system, projection = _engineering(tmp_path)
+    workspace = system.workspace(projection.run_id)
+    proposal = engineering_plan(scope=["src/", "tests/"], reason="Tests need their own directory")
+    snapshot = workspace.snapshot()
+    events = system.store.list_events(projection.run_id)
+    first = proposal_decision(projection, department="engineering", proposal=proposal, snapshot=snapshot,
+                              events=events)
+    assert first.accepted, first.error_dicts
+    arguments = dict(department="engineering", proposal=proposal,
+                     basis=WorkBasis.current(projection, "engineering"), started=projection,
+                     evaluated=projection, snapshot=snapshot, events=events)
+    assert commit_decision(first, current=projection, current_snapshot=snapshot, **arguments).accepted
+    newer_input = replace(projection, input_version=projection.input_version + 1)
+    stale = commit_decision(first, current=newer_input, current_snapshot=snapshot, **arguments)
+    assert [error.field for error in stale.errors] == ["execution_basis"]
+    workspace.write_file("src/echo.py", "print('changed after validation')\n")
+    changed = commit_decision(first, current=projection, current_snapshot=workspace.snapshot(), **arguments)
+    assert not changed.accepted
+    assert changed.errors[0].message.startswith("The workspace snapshot changed")
 
 
 def test_registered_command_permission_carries_its_execution_basis(tmp_path):

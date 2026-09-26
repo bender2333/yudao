@@ -21,7 +21,7 @@ def _message(identity, usage):
 
 
 def test_cancel_between_validation_and_commit_preserves_terminal_state(tmp_path, monkeypatch):
-    import harness.orchestrator as module
+    import harness.adjudication as module
 
     validated, release = Event(), Event()
     evaluate = module.evaluate_proposal

@@ -12,11 +12,12 @@ from typing import Any
 
 from .adapters.base import ModelObservation, ModelAdapter, ModelRequest, ProviderError
 from .adapters.facade_adapter import FacadeAdapter
-from .adjudication import ToolPermission, WorkBasis, guidance_version, tool_permission
+from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
+                           tool_permission)
 from .artifacts import ArtifactStore
 from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
-from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase
+from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
                          visible_history)
 from .event_store import EventStore
@@ -50,7 +51,6 @@ from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import ToolRuntime, normalize_registered_commands
-from .validation import FieldError, ProposalDecision, evaluate_proposal
 from .workspace import Workspace, WorkspaceSnapshot
 
 
@@ -535,10 +535,6 @@ class Orchestrator:
         return [item for item in projection.department_guidance
                 if item.department == department and item.status in {"received", "in_input"}]
 
-    @staticmethod
-    def _request_id(projection: RunProjection) -> str | None:
-        return None if projection.pending_request is None else projection.pending_request.id
-
     def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
         request = projection.pending_request
@@ -901,10 +897,9 @@ class Orchestrator:
                 transcript_ref = ref.__dict__
             self._apply_proposal(
                 run_id, department=department, projection=projection, proposal=submission.proposal,
-                input_version=activation.input_version,
+                basis=activation.basis,
                 transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
                 session_id=request.session_id,
-                guidance_version=activation.guidance_version,
                 yielded_work=activation.yielded_work,
                 provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
                 model=submission.response.model,
@@ -1826,69 +1821,32 @@ class Orchestrator:
         *,
         department: str,
         projection: RunProjection,
-        input_version: int,
+        basis: WorkBasis,
         proposal: dict[str, Any] | None,
         transcript_ref: dict[str, Any] | None,
         parent_event_id: str,
         session_id: str,
-        guidance_version: int,
         provider: str | None,
         model: str | None,
         yielded_work: dict[str, Any] | None = None,
     ) -> None:
+        # 提案先在锁外校验；锁内关闭过时的协作请求以后，由 U 按最新的投影与工作区快照作提交判断
         evaluated = self.project(run_id)
         snapshot = self.workspace(run_id).snapshot()
-        try:
-            decision = evaluate_proposal(
-                phase=evaluated.phase,
-                department=department,
-                proposal=proposal,
-                projection=evaluated,
-                snapshot=snapshot,
-                events=self.store.list_events(run_id),
-            )
-        except Exception as exc:
-            decision = ProposalDecision(
-                False,
-                [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
-            )
+        decision = proposal_decision(evaluated, department=department, proposal=proposal, snapshot=snapshot,
+                                     events=self.store.list_events(run_id))
         with self._state_lock:
             current = self.project(run_id)
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 return
             current = self._close_obsolete_request(run_id, current)
-            if (current.phase != projection.phase
-                    or current.input_version != input_version
-                    or WorkBasis.current(current, department).guidance_version != guidance_version
-                    or current_contract_hash(current) != current_contract_hash(projection)
-                    or current_plan_hash(current) != current_plan_hash(projection)
-                    or self._request_id(current) != self._request_id(projection)
-                    or request_basis(current) != request_basis(evaluated)):
-                decision = ProposalDecision(False, [FieldError("execution_basis", "The input, contract, plan, or current work changed after this activation began; stale results cannot be rebound.")])
-            projection = current
-            # 锁外获取的 snapshot 在进入本锁前可能已被并发写入改旧；若直接用
-            # 它提交，submissions.commit 的字节核对会以 host_commit_error/FAILED
-            # 脏收场。锁内重取快照并重算校验，陈旧则走 PROPOSAL_REJECTED 干净拒绝；
-            # 接受时提交的 snapshot 与锁内投影一致，QA release 不再绑定陈旧快照。
             fresh_snapshot = self.workspace(run_id).snapshot()
-            if fresh_snapshot != snapshot:
-                decision = ProposalDecision(False, [FieldError("execution_basis", "The workspace snapshot changed after this activation began; stale results cannot be rebound.")])
-            elif decision.accepted:
-                try:
-                    decision = evaluate_proposal(
-                        phase=current.phase,
-                        department=department,
-                        proposal=proposal,
-                        projection=current,
-                        snapshot=fresh_snapshot,
-                        events=self.store.list_events(run_id),
-                    )
-                except Exception as exc:
-                    decision = ProposalDecision(
-                        False,
-                        [FieldError("proposal", f"invalid proposal payload: {type(exc).__name__}: {exc}")],
-                    )
-            snapshot = fresh_snapshot
+            decision = commit_decision(
+                decision, department=department, proposal=proposal, basis=basis, started=projection,
+                evaluated=evaluated, snapshot=snapshot, current=current, current_snapshot=fresh_snapshot,
+                events=self.store.list_events(run_id),
+            )
+            projection, snapshot = current, fresh_snapshot
             if proposal is not None:
                 self.store.append(
                     run_id, EventType.PROPOSAL_SUBMITTED, role=department,
@@ -1896,7 +1854,7 @@ class Orchestrator:
                     state_before=projection.phase, state_after=projection.phase,
                     session_id=session_id, provider=provider, model=model,
                     payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
-                             "raw_keys": sorted(proposal.keys()), "input_version": input_version},
+                             "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
                 )
             if not decision.accepted:
                 self.store.append(
@@ -1908,7 +1866,7 @@ class Orchestrator:
                         "errors": decision.error_dicts,
                         "transcript_ref": transcript_ref,
                         "kind": None if proposal is None else proposal.get("kind"),
-                        "input_version": input_version,
+                        "input_version": basis.input_version,
                     },
                 )
                 return

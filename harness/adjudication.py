@@ -6,11 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .collaboration import tool_error
+from .collaboration import request_basis, tool_error
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
-from .models import TERMINAL_PHASES, RunProjection
+from .models import TERMINAL_PHASES, Event, RunProjection
 from .tools import has_tool, tools_for
-from .workspace import Workspace
+from .validation import FieldError, ProposalDecision, evaluate_proposal
+from .workspace import Workspace, WorkspaceSnapshot
 
 # 因待处理指导被提前安排、只能回应指导的激活可以使用的工具
 GUIDANCE_ONLY_TOOLS = frozenset({
@@ -18,6 +19,10 @@ GUIDANCE_ONLY_TOOLS = frozenset({
 })
 
 _WRITE_TOOLS = frozenset({"write_file", "edit_range", "delete_file", "move_file"})
+
+_STALE_BASIS = ("The input, contract, plan, or current work changed after this activation began; "
+                "stale results cannot be rebound.")
+_STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
 
 
 def guidance_version(projection: RunProjection, department: str) -> int:
@@ -104,6 +109,45 @@ def tool_permission(
         if reason:
             return ToolPermission(reason=reason)
     return ToolPermission(command_basis=command_basis)
+
+
+def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
+                      snapshot: WorkspaceSnapshot, events: list[Event]) -> ProposalDecision:
+    # 提案校验：按投影、工作区快照与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
+    return evaluate_proposal(phase=projection.phase, department=department, proposal=proposal,
+                             projection=projection, snapshot=snapshot, events=events)
+
+
+def commit_decision(
+    decision: ProposalDecision,
+    *,
+    department: str,
+    proposal: dict[str, Any] | None,
+    basis: WorkBasis,
+    started: RunProjection,
+    evaluated: RunProjection,
+    snapshot: WorkspaceSnapshot,
+    current: RunProjection,
+    current_snapshot: WorkspaceSnapshot,
+    events: list[Event],
+) -> ProposalDecision:
+    # 提交判断：提交之前按最新的投影与工作区快照复核校验结果。激活开始以后输入、指导、合同、计划、
+    # 协作请求或当前工作改变，或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
+    before, now = WorkBasis.current(started, department), WorkBasis.current(current, department)
+    if (current.phase != started.phase
+            or now.input_version != basis.input_version
+            or now.guidance_version != basis.guidance_version
+            or now.effective_contract_hash != before.effective_contract_hash
+            or now.engineering_plan_hash != before.engineering_plan_hash
+            or now.request_id != before.request_id
+            or request_basis(current) != request_basis(evaluated)):
+        decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
+    if current_snapshot != snapshot:
+        return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
+    if decision.accepted:
+        return proposal_decision(current, department=department, proposal=proposal,
+                                 snapshot=current_snapshot, events=events)
+    return decision
 
 
 def _run_command_basis(workspace: Workspace, projection: RunProjection,
