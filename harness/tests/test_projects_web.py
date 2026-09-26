@@ -464,30 +464,49 @@ def test_materials_are_recorded_without_run_events(data_dir):
 # SSE：项目事件与所属 run 事件
 
 
-def test_project_stream_emits_project_and_loop_events_with_opaque_cursor(data_dir):
+def test_project_stream_emits_project_and_loop_events_by_global_position(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     with running_server(system) as (_server, host, port):
         project_id = _register(host, port)
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "流式事项"}, 201)
         _wait_work_item(host, port, project_id, created["work_item_id"])
+        logged = system.store.read(projects=[project_id], limit=10_000)
         blocks = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream", 6)
+        # 按全局位置推送，SSE 的 id 就是位置
+        assert [int(block["id"]) for block in blocks] == [event.position for event in logged[:6]]
         assert blocks[0]["event"] == "project" and blocks[0]["data"]["type"] == ProjectEventType.PROJECT_REGISTERED
         assert blocks[1]["event"] == "project" and blocks[1]["data"]["type"] == ProjectEventType.WORK_ITEM_CREATED
         assert blocks[1]["data"]["run_id"] == created["run_id"] and blocks[1]["data"]["work_item_id"] == created["work_item_id"]
-        assert blocks[2]["event"] == "project" and blocks[2]["data"]["type"] == ProjectEventType.DELIVERABLE_ADOPTED
         loops = [block for block in blocks if block["event"] == "loop"]
         assert loops and loops[0]["data"]["type"] == EventType.RUN_CREATED and loops[0]["data"]["seq"] == 1
         assert all(block["data"]["run_id"] == created["run_id"] and block["data"]["work_item_id"] == created["work_item_id"]
                    for block in loops)
-        for block in blocks:
-            assert block["id"] and ":" not in block["id"] and not block["id"].isdigit()
         resumed = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream", 2, headers={"Last-Event-ID": blocks[3]["id"]})
-        first_ids = {block["data"]["event_id"] for block in blocks[:4]}
-        assert all(block["data"]["event_id"] not in first_ids for block in resumed)
-        assert resumed[0]["data"]["event_id"] == blocks[4]["data"]["event_id"]
+        assert [block["data"]["event_id"] for block in resumed] == [event.event_id for event in logged[4:6]]
         status, raw, _ = request(host, port, "GET", f"/api/projects/{project_id}/stream", headers={"Last-Event-ID": "garbage"})
         assert status == 400, raw
-        after = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream?after_seq=3", 1)
-        assert after[0]["event"] == "loop" and after[0]["data"]["seq"] == 1
+        after = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream?after={blocks[2]['id']}", 1)
+        assert after[0]["data"]["event_id"] == logged[3].event_id
         status, raw, _ = request(host, port, "GET", "/api/projects/proj_missing/stream")
         assert status == 404, raw
+
+
+def test_project_stream_resumed_across_new_events_has_no_gap_or_duplicate(data_dir):
+    # 第一次连接读到一半断开；之后项目写入新的事件；按最后收到的位置续传，两次收到的事件合起来正好是项目范围内的全部事件
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
+    with running_server(system) as (_server, host, port):
+        project_id = _register(host, port)
+        created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "流式事项"}, 201)
+        _wait_work_item(host, port, project_id, created["work_item_id"])
+        written = system.store.read(projects=[project_id], limit=10_000)
+        first = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream", len(written) // 2)
+        system.projects.rename(project_id, "改名以后")
+        system.projects.pin(project_id, True)
+        everything = system.store.read(projects=[project_id], limit=10_000)
+        rest = _read_sse_blocks(host, port, f"/api/projects/{project_id}/stream", len(everything) - len(first),
+                                headers={"Last-Event-ID": first[-1]["id"]})
+    received = first + rest
+    assert [block["data"]["event_id"] for block in received] == [event.event_id for event in everything]
+    assert [int(block["id"]) for block in received] == [event.position for event in everything]
+    assert [block["data"]["type"] for block in rest[-2:]] == [ProjectEventType.PROJECT_RENAMED,
+                                                              ProjectEventType.PROJECT_PINNED]

@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from ..git_audit import git_version_detail
-from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, json_dumps
+from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, ProjectEvent, json_dumps
 from ..observability import MAX_LIMIT, AttemptNotFoundError, ObservabilityQuery
 from ..providers.errors import CatalogValidationError
 from ..projection import RunNotFoundError, project_run
@@ -22,7 +22,6 @@ from ..replay_check import ReplayIntegrityError
 from ..projects import (
     CommandConfigConflict,
     ProjectArchivedError,
-    ProjectEventType,
     ProjectNotFoundError,
     PromptConfigConflict,
     WorkItemInProgressError,
@@ -929,7 +928,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._send_json(self._project_attempts(project, query, store))
             return self._send_json(self._project_usage(project, query, store))
         if rest == ["stream"]:
-            return self._project_stream(project, query, store)
+            # 项目事件与所属 run 的事件
+            return self._event_stream(self._resume_position(query), store, project_events=True,
+                                      projects=[project.project_id])
         self._send_json({"error": "not found"}, 404)
 
     def _project_records(self, project, query: dict[str, list[str]], store) -> tuple[list[tuple[Any, dict[str, Any]]], dict[str, Any]]:
@@ -991,31 +992,27 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             "by_work_item": by_work_item,
         }
 
-    def _project_stream(self, project, query: dict[str, list[str]], store) -> None:
-        cursor = self._project_cursor(query)
-        runs = {item.run_id: item.work_item_id for item in project.work_items}
+    def _event_stream(self, after: int, store, *, project_events: bool, **scope: list[str]) -> None:
+        # 旧控制台的事件流：按全局位置从事件日志读取范围内的事件并推送，SSE 的 id 是全局位置；
+        # 断线以后从 Last-Event-ID 或 after 参数给出的位置续传。定时查询日志，没有新事件时发送保活注释
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        idle = 0
+        last, idle = after, 0
         try:
             while True:
-                wrote = False
-                for event in store.list_project_events(project.project_id, after_version=cursor["p"]):
-                    cursor["p"] = event.stream_version
-                    if event.type == ProjectEventType.WORK_ITEM_CREATED:
-                        runs[event.payload["run_id"]] = event.payload["work_item_id"]
-                    self._write_sse(_encode_cursor(cursor), "project", project_event_card(event))
-                    wrote = True
-                for run_id, work_item_id in list(runs.items()):
-                    for event in store.list_events(run_id, after_version=cursor["r"].get(run_id, 0)):
-                        cursor["r"][run_id] = event.stream_version
-                        self._write_sse(_encode_cursor(cursor), "loop",
-                                        {**event_card(event), "run_id": run_id, "work_item_id": work_item_id})
-                        wrote = True
-                if wrote:
+                events = store.read(last, **scope)
+                for event in events:
+                    last = event.position
+                    if isinstance(event, ProjectEvent):
+                        if project_events:
+                            self._write_sse(event.position, "project", project_event_card(event))
+                        continue
+                    self._write_sse(event.position, "loop", {**event_card(event), "run_id": event.run_id,
+                                                              "work_item_id": event.work_item_id})
+                if events:
                     idle = 0
                 else:
                     self.wfile.write(b": keepalive\n\n")
@@ -1025,19 +1022,20 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         except Exception:
             return
 
-    def _project_cursor(self, query: dict[str, list[str]]) -> dict[str, Any]:
+    def _resume_position(self, query: dict[str, list[str]]) -> int:
+        # 续传的全局位置：Last-Event-ID 请求头优先，其次是 after 参数，都没有时从日志开头
         header = self.headers.get("Last-Event-ID")
-        if header not in (None, ""):
-            cursor = _decode_cursor(header)
-            if (not isinstance(cursor, dict) or set(cursor) != {"p", "r"} or type(cursor["p"]) is not int
-                    or not isinstance(cursor["r"], dict)
-                    or any(not isinstance(key, str) or type(value) is not int for key, value in cursor["r"].items())):
-                raise ValueError("Last-Event-ID is not a project stream cursor")
-            return cursor
-        return {"p": self._resume_seq(query, default=0), "r": {}}
+        raw = header if header not in (None, "") else (query.get("after") or ["0"])[0]
+        try:
+            position = int(raw)
+        except ValueError as exc:
+            raise ValueError("the resume position must be a non-negative integer") from exc
+        if position < 0:
+            raise ValueError("the resume position must be a non-negative integer")
+        return position
 
-    def _write_sse(self, identity: str, event_name: str, data: dict[str, Any]) -> None:
-        chunk = f"id: {identity}\nevent: {event_name}\ndata: {json_dumps(data)}\n\n"
+    def _write_sse(self, position: int, event_name: str, data: dict[str, Any]) -> None:
+        chunk = f"id: {position}\nevent: {event_name}\ndata: {json_dumps(data)}\n\n"
         self.wfile.write(chunk.encode("utf-8"))
 
     # ------------------------------------------------------------------ runs
@@ -1082,8 +1080,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._send_json(observability.department(run_id, unquote(rest[1])))
         if rest == ["events"]:
             project_run(store, run_id)
-            after = self._resume_seq(query, default=0)
-            events = store.list_events(run_id, after_version=after)
+            after = self._resume_position(query)
+            events = [event for event in store.list_events(run_id) if event.position > after]
             return self._send_json({"events": [event_card(event) for event in events]})
         if rest[:1] == ["events"] and len(rest) == 3 and rest[2] == "files":
             event = store.get_event(rest[1])
@@ -1167,9 +1165,9 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 detail["source_events"] = sources
             return self._send_json(detail)
         if rest == ["stream"]:
+            # 这个 run 的事件；与它有关的项目事件（事项新建、采纳等）属于项目事件流
             project_run(store, run_id)
-            after = self._resume_seq(query, default=0)
-            return self._stream(run_id, after, store)
+            return self._event_stream(self._resume_position(query), store, project_events=False, runs=[run_id])
         if rest == ["export"]:
             projection = project_run(store, run_id)
             observability = ObservabilityQuery(store, self.server.system.artifacts)
@@ -1207,45 +1205,6 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         if tree.digest != event.payload["code_tree_digest"]:
             raise ValueError("archived tree does not match its accepted delivery")
         return tree, json.loads(artifacts.get_for_run(event.run_id, ref))
-
-    def _resume_seq(self, query: dict[str, list[str]], default: int = 0) -> int:
-        header = self.headers.get("Last-Event-ID")
-        if header not in (None, ""):
-            try:
-                return int(header)
-            except ValueError:
-                pass
-        raw = (query.get("after_seq") or [str(default)])[0]
-        try:
-            return int(raw)
-        except ValueError as exc:
-            raise ValueError("after_seq must be an integer") from exc
-
-    def _stream(self, run_id: str, after_seq: int, store) -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.end_headers()
-        last = after_seq
-        idle = 0
-        try:
-            while True:
-                events = store.list_events(run_id, after_version=last)
-                if events:
-                    for event in events:
-                        payload = json_dumps(event_card(event))
-                        chunk = f"id: {event.stream_version}\nevent: loop\ndata: {payload}\n\n"
-                        self.wfile.write(chunk.encode("utf-8"))
-                        last = event.stream_version
-                    idle = 0
-                else:
-                    self.wfile.write(b": keepalive\n\n")
-                    idle += 1
-                self.wfile.flush()
-                time.sleep(0.2 if idle < 25 else 1.0)
-        except Exception:
-            return
 
     def _list_runs(self, store) -> list[dict[str, Any]]:
         rows = []

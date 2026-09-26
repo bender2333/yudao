@@ -145,6 +145,33 @@ class EventStore:
     def list_project_events(self, project_id: str, *, after_version: int = 0) -> list[ProjectEvent]:
         return self._stream_events(project_stream(project_id), after_version)
 
+    def read(self, after: int = 0, *, limit: int = 1000, projects: Sequence[str] = (),
+             work_items: Sequence[str] = (), runs: Sequence[str] = (), departments: Sequence[str] = (),
+             types: Sequence[str] = ()) -> list[Event | ProjectEvent]:
+        # 按全局位置分批读取：位置大于 after 的事件，按位置排列，至多 limit 条。
+        # 各个范围之间取交集，同一个范围的多个值取并集；省略的范围不限制
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        clauses: list[str] = ["position > ?"]
+        params: list[Any] = [after]
+        for column, values in (("project_id", projects), ("work_item_id", work_items), ("run_id", runs),
+                               ("department", departments), ("type", types)):
+            if values:
+                clauses.append(f"{column} IN ({', '.join('?' * len(values))})")
+                params.extend(values)
+        params.append(limit)
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM events WHERE {' AND '.join(clauses)} ORDER BY position ASC LIMIT ?", params,
+            ).fetchall()
+        return [_from_row(row) for row in rows]
+
+    def end_position(self) -> int:
+        # 日志末尾的全局位置；日志为空时是 0
+        with self._lock:
+            row = self._conn.execute("SELECT COALESCE(MAX(position), 0) AS position FROM events").fetchone()
+        return int(row["position"])
+
     def get_event(self, event_id: str) -> Event | None:
         event = self._get(event_id)
         return event if isinstance(event, Event) else None

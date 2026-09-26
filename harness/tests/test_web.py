@@ -134,6 +134,31 @@ def first_loop_event(host, port, path, headers=None, timeout=5):
         conn.close()
 
 
+def loop_blocks(host, port, path, count, headers=None, timeout=10):
+    # 从事件流读取 count 条 loop 事件以后断开
+    conn = HTTPConnection(host, port, timeout=timeout)
+    blocks = []
+    try:
+        conn.request("GET", path, headers=headers or {})
+        response = conn.getresponse()
+        assert response.status == 200, response.read().decode("utf-8", errors="ignore")
+        buf = ""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and len(blocks) < count:
+            chunk = response.read(64)
+            if not chunk:
+                break
+            buf += chunk.decode("utf-8", errors="ignore")
+            while "\n\n" in buf and len(blocks) < count:
+                block, buf = buf.split("\n\n", 1)
+                if "event: loop" in block:
+                    blocks.append(block)
+    finally:
+        conn.close()
+    assert len(blocks) == count, blocks
+    return blocks
+
+
 def sse_id(block: str) -> int:
     for line in block.splitlines():
         if line.startswith("id:"):
@@ -620,28 +645,48 @@ def test_unconfigured_test_provider_is_clear_error_and_does_not_create(data_dir)
         assert system.test_adapter.name == "responses"
 
 
-def test_sse_resumes_from_after_seq_and_last_event_id(data_dir):
+def test_sse_resumes_from_global_position_and_last_event_id(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
     events = system.store.list_events(projection.run_id)
-    mid = events[len(events) // 2].stream_version
-    last = events[-1].stream_version
+    middle = len(events) // 2
     with running_server(system) as (_server, host, port):
-        after_block = first_loop_event(host, port, f"/api/runs/{projection.run_id}/stream?after_seq={mid}")
-        assert sse_id(after_block) == mid + 1
+        after_block = first_loop_event(
+            host, port, f"/api/runs/{projection.run_id}/stream?after={events[middle].position}")
+        assert sse_id(after_block) == events[middle + 1].position
         header_block = first_loop_event(
             host,
             port,
-            f"/api/runs/{projection.run_id}/stream?after_seq=0",
-            headers={"Last-Event-ID": str(mid)},
+            f"/api/runs/{projection.run_id}/stream?after=0",
+            headers={"Last-Event-ID": str(events[middle].position)},
         )
-        assert sse_id(header_block) == mid + 1
+        assert sse_id(header_block) == events[middle + 1].position
         last_block = first_loop_event(
             host,
             port,
-            f"/api/runs/{projection.run_id}/stream?after_seq=0",
-            headers={"Last-Event-ID": str(last - 1)},
+            f"/api/runs/{projection.run_id}/stream",
+            headers={"Last-Event-ID": str(events[-2].position)},
         )
-        assert sse_id(last_block) == last
+        assert sse_id(last_block) == events[-1].position
+        status, raw, _ = request(host, port, "GET", f"/api/runs/{projection.run_id}/stream",
+                                 headers={"Last-Event-ID": "garbage"})
+        assert status == 400, raw
+
+
+def test_run_stream_resumed_across_new_events_has_no_gap_or_duplicate(data_dir):
+    # 第一次连接读到一半断开；之后 run 继续写入新的事件；按最后收到的位置续传，两次收到的事件合起来正好是这个 run 的全部事件
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)
+    with running_server(system) as (_server, host, port):
+        written = system.store.list_events(run_id)
+        first = loop_blocks(host, port, f"/api/runs/{run_id}/stream", len(written) // 2)
+        system.run_until_stop(run_id)
+        everything = system.store.list_events(run_id)
+        rest = loop_blocks(host, port, f"/api/runs/{run_id}/stream", len(everything) - len(first),
+                           headers={"Last-Event-ID": str(sse_id(first[-1]))})
+    received = [json.loads(block.split("data: ", 1)[1])["event_id"] for block in first + rest]
+    assert received == [event.event_id for event in everything]
+    assert [sse_id(block) for block in first + rest] == [event.position for event in everything]
 
 
 def test_queries_do_not_mutate_existing_run(data_dir):
