@@ -137,6 +137,8 @@ claude-opus-5-5 / 2026-09-26 16:10 / docs/architecture-issues.md 登记 #101 的
 
 claude-opus-5-5 / 2026-09-26 16:25 / docs/architecture-issues.md 登记 #101 的第二条架构问题：Responses 请求时限包含 openai SDK 的一次性初始化与主机落盘 / 修正流式超时测试时查明第一次请求在发出之前就会超时，交给架构师决定请求时限的计算范围
 
+claude-opus-5-5 / 2026-09-26 17:00 / 新增 docs/stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md，记录 #15 真实模型全链路验收的环境、两次运行（run_c4e724a13fb14af0 发现的适配器缺陷与 run_5f1aff849e244a37 的全链路结果）、登记命令动作回执与验收标准对照 / #15 要求按验收路径保留应用版本、运行身份、有序事件、检查回执、封存与采纳的证据
+
 claude-opus-5-5 / 2026-09-26 17:10 / docs/requirements/execution-limits.md（D09）停止原因清单加入 `no_tool_call` 与 `workspace_unrepresentable`，并写明单次请求的时限只计算等待模型提供方的时间；docs/stage-3-plan.md 第 4.2 节新增「公开树」一行（按项目的忽略规则取得，参照 OpenCode 快照）与路径一律相对的规则；docs/architecture-issues.md 为 #101 的两条问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节写入 #101、#103 在 #43 之前，#102、#104、#105 在 #43 之后 / 处理 #101 登记的架构问题与 #15 真实验收发现的交付说明缺漏，安排新工单的顺序
 
 claude-opus-5-5 / 2026-09-26 17:50 / docs/architecture-issues.md 登记 #103 的架构问题：`run_command` 的描述与工程部门提案合同中的「主机回执」没有区分动作回执与交付的检查回执 / 实施 #103 时发现请求中另有两处相关文字不在工单范围内，交给架构师决定是否修改
