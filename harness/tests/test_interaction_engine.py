@@ -16,7 +16,7 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import department_history, recorded_context
+from harness.tests.helpers import after_event, department_history, recorded_context
 from harness.tools import ToolRuntime
 
 
@@ -191,17 +191,15 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
 def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path, monkeypatch):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("build echo")
-    begin = system.orchestrator._begin_request
     received = False
 
-    def receive_before_start(activation, request):
+    def receive_before_start(_event):
         nonlocal received
         if not received:
             received = True
             system.add_input(run_id, "Confirm uppercase output")
-        return begin(activation, request)
 
-    monkeypatch.setattr(system.orchestrator, "_begin_request", receive_before_start)
+    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, receive_before_start)
     stopped = system.activate_once(run_id)
     assert stopped.phase == "PRODUCT_SPEC" and not system.test_adapter.invocations
     assert not _events(system, run_id, EventType.MODEL_REQUESTED)

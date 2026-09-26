@@ -10,7 +10,7 @@ from harness.models import EventType, RunProjection, canonical_hash, estimate_to
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, recorded_context
+from harness.tests.helpers import FAST_RETRIES, after_event, recorded_context
 from harness.tests.protocol_helpers import complete, model_call
 from harness.tools import ToolRuntime
 
@@ -107,26 +107,16 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
 
 
 def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monkeypatch):
-    prepared, release = Event(), Event()
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    begin = system.orchestrator._begin_request
+    cancelled = []
+    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED,
+                lambda _event: cancelled.append(system.cancel(run_id).stop_reason))
 
-    def delayed_begin(activation, request):
-        prepared.set()
-        assert release.wait(5)
-        return begin(activation, request)
+    result = system.activate_once(run_id)
 
-    monkeypatch.setattr(system.orchestrator, "_begin_request", delayed_begin)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(system.activate_once, run_id)
-        try:
-            assert prepared.wait(5)
-            assert system.cancel(run_id).stop_reason == "cancelled"
-        finally:
-            release.set()
-        result = future.result(timeout=5)
+    assert cancelled == ["cancelled"]
     assert not adapter.invocations
     assert result.token_used == 0
     assert result.manifests[0].admitted

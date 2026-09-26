@@ -10,7 +10,7 @@ from harness.proposals import product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, after_event
 
 
 def _retry_run(tmp_path):
@@ -128,12 +128,13 @@ def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_p
     adapter = FakeAdapter([ModelResponse(), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("prepared but not sent")
-    original = system.orchestrator._begin_request
 
-    def reject_second(activation, request):
-        return False if request.step_id == 2 else original(activation, request)
+    def input_after_second_preparation(event):
+        # 第二步装配好以后到达新输入，这一步的请求不再发出
+        if event.payload["step_id"] == 2:
+            system.add_input(run_id, "a new input before the second request")
 
-    monkeypatch.setattr(system.orchestrator, "_begin_request", reject_second)
+    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, input_after_second_preparation)
     result = system.activate_once(run_id)
     assert result.phase == "PRODUCT_SPEC"
 

@@ -16,9 +16,8 @@ import httpx
 from openai import APIConnectionError, AsyncOpenAI, DefaultAsyncHttpxClient
 
 from harness.adapters.base import ProviderError
-from harness.engine import ModelCallLoop
 from harness.providers import ResponsesConfig
-from harness.tests.protocol_helpers import ResponsesAdapter, model_call
+from harness.tests.protocol_helpers import ConnectionLoop, ResponsesAdapter, model_call
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
@@ -565,9 +564,9 @@ def test_transport_trace_state_is_isolated_between_adapter_calls(monkeypatch):
     assert result.output == [TEXT]
 
 
-def test_model_call_loop_reuses_http11_connection_across_adapters():
+def test_connection_loop_reuses_http11_connection_across_adapters():
     with _keepalive_server() as (config, captures, client_ports, authorizations, meta, errors):
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             first = ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
             second = ResponsesAdapter(config, loop=loop).complete(_request(session_id="second"))
 
@@ -578,12 +577,12 @@ def test_model_call_loop_reuses_http11_connection_across_adapters():
     assert authorizations == [f"Bearer {KEY}", f"Bearer {KEY}"]
 
 
-def test_model_call_loop_keeps_same_url_different_credentials_separate():
+def test_connection_loop_keeps_same_url_different_credentials_separate():
     first_key = "first-provider-credential"
     second_key = "second-provider-credential"
     with _keepalive_server(key=first_key) as (config, captures, client_ports, authorizations, _meta, errors):
         second_config = replace(config, api_key=second_key, model="second-model")
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
             ResponsesAdapter(second_config, loop=loop).complete(_request(session_id="second"))
             assert len(loop.connections._clients) == 2
@@ -594,7 +593,7 @@ def test_model_call_loop_keeps_same_url_different_credentials_separate():
     assert authorizations == [f"Bearer {first_key}", f"Bearer {second_key}"]
 
 
-def test_model_call_loop_drops_failed_keepalive_connection_before_next_request():
+def test_connection_loop_drops_failed_keepalive_connection_before_next_request():
     def close_connection(handler, _body):
         handler.close_connection = True
         handler.connection.shutdown(socket.SHUT_RDWR)
@@ -603,7 +602,7 @@ def test_model_call_loop_drops_failed_keepalive_connection_before_next_request()
     with _keepalive_server(replies=[close_connection, _stream([TEXT])]) as (
         config, captures, client_ports, _authorizations, _meta, errors,
     ):
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             with pytest.raises(ProviderError):
                 ResponsesAdapter(config, loop=loop).complete(_request(session_id="failed"))
             result = ResponsesAdapter(config, loop=loop).complete(_request(session_id="recovered"))
@@ -614,7 +613,7 @@ def test_model_call_loop_drops_failed_keepalive_connection_before_next_request()
     assert errors
 
 
-def test_model_call_loop_closes_clients_when_it_closes(monkeypatch):
+def test_connection_loop_closes_clients_when_it_closes(monkeypatch):
     closed = []
     original_close = AsyncOpenAI.close
 
@@ -624,7 +623,7 @@ def test_model_call_loop_closes_clients_when_it_closes(monkeypatch):
 
     monkeypatch.setattr(AsyncOpenAI, "close", close)
     with _keepalive_server() as (config, _captures, _client_ports, _authorizations, _meta, _errors):
-        loop = ModelCallLoop()
+        loop = ConnectionLoop()
         ResponsesAdapter(config, loop=loop).complete(_request())
         assert closed == []
         loop.close()
@@ -634,7 +633,7 @@ def test_model_call_loop_closes_clients_when_it_closes(monkeypatch):
 def test_completed_stream_with_segmented_eof_is_reused_and_does_not_observe_tail():
     first_observations, second_observations = [], []
     with _tail_server("delayed") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             first = ResponsesAdapter(config, loop=loop).complete(
                 _request(session_id="first"), first_observations.append,
             )
@@ -653,7 +652,7 @@ def test_completed_stream_with_segmented_eof_is_reused_and_does_not_observe_tail
 
 def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_connection():
     with _tail_server("done") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             started = time.monotonic()
             first = ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
             assert terminal_sent.is_set()
@@ -692,7 +691,7 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
     config = ResponsesConfig(model="local-model", api_key=KEY,
                              base_url="http://mock.test/v1", timeout_sec=0.3)
     started = time.monotonic()
-    with ModelCallLoop() as loop:
+    with ConnectionLoop() as loop:
         result = ResponsesAdapter(config, loop=loop).complete(_request())
 
     assert result.output == [TEXT]
@@ -703,7 +702,7 @@ def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeyp
 
 def test_completed_stream_tail_read_error_keeps_terminal_success_and_closes_connection():
     with _tail_server("truncated") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ModelCallLoop() as loop:
+        with ConnectionLoop() as loop:
             result = ResponsesAdapter(config, loop=loop).complete(_request())
 
     assert terminal_sent.is_set()
@@ -717,7 +716,7 @@ def test_cancel_during_completed_stream_drain_has_priority_and_closes_the_loop()
     request = _request(session_id="tail-cancel")
 
     with _tail_server("hold") as (config, captures, _ports, terminal_sent, release, errors):
-        loop = ModelCallLoop()
+        loop = ConnectionLoop()
         adapter = ResponsesAdapter(config, loop=loop)
 
         def invoke():

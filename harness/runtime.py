@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,7 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
-from .engine import ModelCallLoop, StepLimits
+from .engine import StepLimits
 from .event_store import EventStore
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .projection import RunProjection, project_run
@@ -111,13 +112,11 @@ class LoopSystem:
         return self.orchestrator.create_run(task, **kwargs)
 
     def run_until_stop(self, run_id: str) -> RunProjection:
-        # 一次同步运行的模型调用共用部门循环的事件循环，连接按端点与认证句柄复用隔离
-        with ModelCallLoop() as model_loop:
-            return self.orchestrator.run_until_stop(run_id, model_loop)
+        # 公开方法保持同步调用方式：在内部的事件循环中运行，一次运行期间的模型调用复用同一组连接
+        return asyncio.run(self.orchestrator.run_until_stop(run_id))
 
     def activate_once(self, run_id: str) -> RunProjection:
-        with ModelCallLoop() as model_loop:
-            return self.orchestrator.activate_once(run_id, model_loop)
+        return asyncio.run(self.orchestrator.activate_once(run_id))
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)

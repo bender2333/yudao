@@ -1,59 +1,55 @@
-"""Native model/tool loop for one department activation."""
+# 步骤驱动：一次激活内的步骤循环，以异步方式执行。每一步先在安全节点得到继续或停止，经上下文装配（P）取得请求，
+# 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
+# 以后执行；压缩请求的回答经 P 生成检查点；提交提案时结束。所有记录经过记录接口，
+# 需要核对运行状态的记录在写入锁之内判断并写入。
 
 from __future__ import annotations
 
-import asyncio
 import json
 import math
 import time
-from collections.abc import Awaitable, Callable
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import Any, Protocol, TypeVar
+from threading import Event
+from typing import Any, Protocol
 
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
-from .adjudication import ToolPermission
-from .models import json_dumps
-from .providers import ProviderConnections
-from .providers.call import ModelCall, ModelResponse, ModelStreamEvent
+from .adjudication import ToolPermission, tool_permission
+from .artifacts import ArtifactStore
+from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
+from .compaction import CompactionError
+from .event_store import EventStore, WritePath
+from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
+from .projection import project_run
+from .providers.call import ModelResponse
+from .providers.resolve import FrozenTarget
+from .recording import ActivationScope, StepRecorder
 from .tools import SUBMIT_KINDS, ToolResult, ToolRuntime
 
 # 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
 TOOL_CALL_REQUIRED_LIMIT = 3
 
-_Result = TypeVar("_Result")
-
-
-class ModelCallLoop:
-    # 部门循环自己的事件循环：一次运行期间的模型调用都在这里执行，同一个事件循环内复用提供方的连接
-    def __init__(self) -> None:
-        self._runner = asyncio.Runner()
-        self.connections = ProviderConnections()
-
-    def __enter__(self) -> ModelCallLoop:
-        return self
-
-    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
-        self.close()
-
-    def run(self, awaitable: Awaitable[_Result]) -> _Result:
-        return self._runner.run(awaitable)
-
-    def close(self) -> None:
-        try:
-            self._runner.run(self.connections.aclose())
-        finally:
-            self._runner.close()
-
 
 class SafeNode(Protocol):
-    # 流程编排提供的安全节点接口：部门循环在每个安全节点调用它，流程编排在这里分派新输入，回答继续还是停止
-    def proceed(self) -> bool: ...
+    # 流程编排提供的安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，
+    # 回答继续还是停止
+
+    def proceed(self) -> bool:
+        # 分派新输入，回答是否继续
+        ...
+
+    def settle(self) -> RunProjection:
+        # 分派新输入并关闭过时的协作请求，返回当前的运行状态；调用方持有写入锁，随后判断并写入
+        ...
+
+    async def wait(self, seconds: float) -> bool:
+        # 在安全节点等待至多 seconds 秒，其间有新输入、指导或取消时提前回答；回答是否继续
+        ...
 
 
 @dataclass(frozen=True)
 class StepLimits:
-    # 部门循环的重试与步数参数；默认值是正式运行使用的值
+    # 步骤驱动的重试与步数参数；默认值是正式运行使用的值
     retry_initial_delay_sec: float = 1.0
     retry_max_delay_sec: float = 60.0
     max_provider_attempts: int = 3
@@ -75,178 +71,316 @@ class DepartmentSubmission:
     response: ModelResponse
 
 
-def run_department(
-    adapter: ModelAdapter,
-    runtime: ToolRuntime,
-    *,
-    limits: StepLimits,
-    model_loop: ModelCallLoop,
-    prepare_step: Callable[[int, int, int, int | None], ModelRequest | None],
-    record_stream: Callable[[ModelStreamEvent], None],
-    record_response: Callable[[ModelResponse], None],
-    record_tool: Callable[[dict[str, Any]], None],
-    record_skipped_tool: Callable[[dict[str, Any]], None],
-    begin_tool: Callable[[dict[str, Any]], ToolPermission],
-    begin_request: Callable[[ModelRequest], bool],
-    finish_compaction: Callable[[ModelResponse], None],
-    record_attempt_finished: Callable[[ModelRequest, ModelResponse], None],
-    record_attempt_failed: Callable[[ModelRequest, ProviderError, bool], None],
-    record_retry_scheduled: Callable[[ModelRequest, ProviderError, float, int], bool],
-    require_tool_call: Callable[[ModelRequest, dict[str, Any], int], None],
-    nodes: SafeNode,
-) -> DepartmentSubmission | None:
-    attempt = 1
-    root_step_id = 1
-    retry_of_step_id = None
-    replies_without_tool_call = 0
-    for step_id in range(1, limits.max_model_steps + 1):
-        if not nodes.proceed():
-            return None
-        request = prepare_step(step_id, attempt, root_step_id, retry_of_step_id)
-        if request is None or not begin_request(request):
-            return None
-        request.attempt_started_monotonic = time.monotonic()
+class StepDriver:
+    # 一次激活的步骤驱动。cancelled 是这次激活的取消信号，由流程编排持有；cancel() 可以从任何线程调用
+    def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
+                 artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
+                 target: FrozenTarget | None, runtime: ToolRuntime, nodes: SafeNode, cancelled: Event,
+                 limits: StepLimits) -> None:
+        self._scope = scope
+        basis = scope.basis
+        self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
+                                basis.effective_contract_hash, basis.engineering_plan_hash, basis.input_version)
+        self._store = store
+        self._writes = writes
+        self._assembly = assembly
+        self._recorder = StepRecorder(store, writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
+        self._adapter = adapter
+        self._target = target
+        self._runtime = runtime
+        self._nodes = nodes
+        self._cancelled = cancelled
+        self._limits = limits
+        self._request: ModelRequest | None = None
+        self._step: StepRequest | None = None
+
+    @property
+    def transcript(self) -> str:
+        return self._recorder.transcript
+
+    def cancel(self) -> None:
+        # 之后的核对都得到停止；这一步已经准备了请求时按尝试身份取消这次调用尝试，尝试还没有开始时开始即取消
+        self._cancelled.set()
+        request = self._request
+        if request is not None and request.attempt_id:
+            self._adapter.cancel(request.attempt_id)
+
+    async def run(self) -> DepartmentSubmission | None:
+        # 提交提案时交回提案；在安全节点停止时交回 None；停止原因以 ProviderError 抛出
         try:
-            response = model_loop.run(_call_model(adapter, request.model_call(), record_stream))
-            _validate_response(response)
-            request.attempt_finished_monotonic = time.monotonic()
-            undeclared = _undeclared_tool_calls(request, response)
-            if undeclared:
-                # Provider-side corruption: tool calls arrived although the request declared no
-                # tools. Keep the output as audit evidence (failed steps never enter effective
-                # history) and treat the attempt as a retryable failure; nothing executes.
-                record_response(response)
-                raise ProviderError(
-                    "model returned tool calls although the request declared no tools",
-                    reason="compaction_failed" if request.purpose == "compaction" else "provider_error",
-                    retryable=True,
-                    diagnostics={"error_type": "undeclared_tool_call", "tool_names": undeclared},
+            return await self._steps()
+        finally:
+            self._recorder.close()
+
+    async def _steps(self) -> DepartmentSubmission | None:
+        limits = self._limits
+        attempt = 1
+        root_step_id = 1
+        retry_of_step_id = None
+        replies_without_tool_call = 0
+        for step_id in range(1, limits.max_model_steps + 1):
+            if not self._nodes.proceed():
+                return None
+            request = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
+            if request is None or not self._start_request(request):
+                return None
+            request.attempt_started_monotonic = time.monotonic()
+            try:
+                response = await self._call_model(request)
+                _validate_response(response)
+                request.attempt_finished_monotonic = time.monotonic()
+                undeclared = _undeclared_tool_calls(request, response)
+                if undeclared:
+                    # Provider-side corruption: tool calls arrived although the request declared no
+                    # tools. Keep the output as audit evidence (failed steps never enter effective
+                    # history) and treat the attempt as a retryable failure; nothing executes.
+                    self._recorder.response(request, response)
+                    raise ProviderError(
+                        "model returned tool calls although the request declared no tools",
+                        reason="compaction_failed" if request.purpose == "compaction" else "provider_error",
+                        retryable=True,
+                        diagnostics={"error_type": "undeclared_tool_call", "tool_names": undeclared},
+                    )
+            except Exception as exc:
+                if not isinstance(exc, ProviderError):
+                    exc = ProviderError(
+                        f"model adapter failed: {type(exc).__name__}",
+                        reason="provider_error",
+                        retryable=False,
+                        diagnostics={"error_type": "adapter_failure"},
+                    )
+                retry_error = _retry_after_error(exc, limits)
+                delay = _retry_delay(retry_error, attempt, limits)
+                can_retry = (
+                    retry_error.retryable
+                    and attempt < limits.max_provider_attempts
+                    and step_id < limits.max_model_steps
                 )
-        except Exception as exc:
-            if not isinstance(exc, ProviderError):
-                exc = ProviderError(
-                    f"model adapter failed: {type(exc).__name__}",
+                will_retry = can_retry and self._nodes.proceed()
+                self._recorder.attempt_failed(request, retry_error, will_retry)
+                if not self._nodes.proceed():
+                    return None
+                if not will_retry:
+                    if retry_error.retryable and step_id >= limits.max_model_steps:
+                        raise ProviderError(
+                            "department reached the model step limit during provider retries",
+                            reason="model_steps_exhausted",
+                        ) from retry_error
+                    diagnostics = dict(retry_error.diagnostics or {})
+                    diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
+                    raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
+                if not self._schedule_retry(request, retry_error, delay, step_id + 1):
+                    return None
+                if not await self._nodes.wait(delay):
+                    return None
+                attempt += 1
+                retry_of_step_id = step_id
+                continue
+            try:
+                # 截断流产生的无效参数不得进入有效历史，否则下次回放即被上游拒绝；
+                # 工具循环仍用原始输出，保证具体参数错误回传模型且不启动工具
+                self._recorder.response(request, _sanitized_response(response))
+            except Exception as exc:
+                host_error = ProviderError(
+                    f"model observation persistence failed: {type(exc).__name__}",
                     reason="provider_error",
                     retryable=False,
-                    diagnostics={"error_type": "adapter_failure"},
+                    diagnostics={"error_type": "observation_persistence"},
                 )
-            retry_error = _retry_after_error(exc, limits)
-            delay = _retry_delay(retry_error, attempt, limits)
-            can_retry = (
-                retry_error.retryable
-                and attempt < limits.max_provider_attempts
-                and step_id < limits.max_model_steps
-            )
-            will_retry = can_retry and nodes.proceed()
-            record_attempt_failed(request, retry_error, will_retry)
-            if not nodes.proceed():
+                self._recorder.attempt_failed(request, host_error, False)
+                raise host_error from exc
+            self._recorder.attempt_finished(request, response)
+            attempt = 1
+            root_step_id = step_id + 1
+            retry_of_step_id = None
+            if not self._nodes.proceed():
+                self._skip(request, response.output,
+                           "Not executed because this activation ended or its input changed during the model request.")
                 return None
-            if not will_retry:
-                if retry_error.retryable and step_id >= limits.max_model_steps:
+            if request.purpose == "compaction":
+                self._finish_compaction(request, response)
+                continue
+            if not any(item.get("type") == "function_call" for item in response.output):
+                # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
+                replies_without_tool_call += 1
+                if replies_without_tool_call > TOOL_CALL_REQUIRED_LIMIT:
                     raise ProviderError(
-                        "department reached the model step limit during provider retries",
-                        reason="model_steps_exhausted",
-                    ) from retry_error
-                diagnostics = dict(retry_error.diagnostics or {})
-                diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
-                raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
-            if not record_retry_scheduled(request, retry_error, delay, step_id + 1):
-                return None
-            if not _wait_for_retry(delay, nodes):
-                return None
-            attempt += 1
-            retry_of_step_id = step_id
-            continue
-        try:
-            # 截断流产生的无效参数不得进入有效历史，否则下次回放即被上游拒绝；
-            # 工具循环仍用原始输出，保证具体参数错误回传模型且不启动工具
-            record_response(_sanitized_response(response))
-        except Exception as exc:
-            host_error = ProviderError(
-                f"model observation persistence failed: {type(exc).__name__}",
-                reason="provider_error",
-                retryable=False,
-                diagnostics={"error_type": "observation_persistence"},
-            )
-            record_attempt_failed(request, host_error, False)
-            raise host_error from exc
-        record_attempt_finished(request, response)
-        attempt = 1
-        root_step_id = step_id + 1
-        retry_of_step_id = None
-        if not nodes.proceed():
-            _skip_calls(response.output, step_id, record_skipped_tool,
-                        "Not executed because this activation ended or its input changed during the model request.")
-            return None
-        if request.purpose == "compaction":
-            finish_compaction(response)
-            continue
-        if not any(item.get("type") == "function_call" for item in response.output):
-            # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
-            replies_without_tool_call += 1
-            if replies_without_tool_call > TOOL_CALL_REQUIRED_LIMIT:
-                raise ProviderError(
-                    f"department replied {replies_without_tool_call} times in a row without calling a tool",
-                    reason="no_tool_call",
+                        f"department replied {replies_without_tool_call} times in a row without calling a tool",
+                        reason="no_tool_call",
+                    )
+                self._recorder.tool_call_required(
+                    request,
+                    {"role": "user", "content": tool_call_required_text(replies_without_tool_call)},
+                    replies_without_tool_call,
+                    TOOL_CALL_REQUIRED_LIMIT,
                 )
-            require_tool_call(
-                request,
-                {"role": "user", "content": tool_call_required_text(replies_without_tool_call)},
-                replies_without_tool_call,
+                continue
+            replies_without_tool_call = 0
+            for index, item in enumerate(response.output):
+                if item.get("type") != "function_call":
+                    continue
+                if not self._nodes.proceed():
+                    self._skip(request, response.output[index:],
+                               "Not executed because this activation ended or its input changed before these tools started.")
+                    return None
+                identity = str(item.get("call_id") or "")
+                name = str(item.get("name") or "")
+                raw_args = item.get("arguments")
+                try:
+                    args = json.loads(raw_args)
+                    if not isinstance(args, dict):
+                        raise ValueError("tool arguments must be an object")
+                except (TypeError, ValueError) as exc:
+                    args = {"invalid_arguments": raw_args}
+                    result = ToolResult(name, False, None, f"invalid tool arguments: {exc}")
+                else:
+                    permission = self._begin_tool(request, {"id": identity, "name": name, "args": args,
+                                                            "step_id": step_id})
+                    if permission.stopped:
+                        self._skip(request, response.output[index:],
+                                   "Not executed because the current activation can no longer start tools.")
+                        return None
+                    result = (self._runtime.execute(request.department, name, args) if permission.allowed
+                              else ToolResult(name, False, None, permission.reason))
+                input_item = {"type": "function_call_output", "call_id": identity,
+                              "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
+                call = {"id": identity, "name": name, "args": args, "ok": result.ok,
+                        "output": result.output, "error": result.error, "step_id": step_id, "input_item": input_item}
+                self._recorder.tool_called(request, call)
+                if not self._nodes.proceed():
+                    self._skip(request, response.output[index + 1:],
+                               "Not executed because this activation ended or its input changed after the current tool.")
+                    return None
+                if name in SUBMIT_KINDS:
+                    self._skip(request, response.output[index + 1:],
+                               "Not executed because the department already submitted its proposal.")
+                    proposal = result.output if result.ok else {**args, "kind": SUBMIT_KINDS[name]}
+                    return DepartmentSubmission(proposal, response)
+        raise ProviderError("department reached the model step limit without submitting a proposal",
+                            reason="model_steps_exhausted")
+
+    def _prepare(self, step_id: int, attempt: int, root_step_id: int,
+                 retry_of_step_id: int | None) -> ModelRequest | None:
+        # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出
+        scope = self._scope
+        with self._writes.lock:
+            projection = self._project()
+            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+                return None
+            projection = self._nodes.settle()
+            if scope.basis.changed(projection, scope.department):
+                return None
+            target = self._target
+            try:
+                limits = model_limits(projection.context_window,
+                                      None if target is None else target.context_window,
+                                      None if target is None else target.max_output_tokens)
+                events = self._store.list_events(scope.run_id)
+                snapshot_hash = self._runtime.workspace.snapshot().digest
+                pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
+                                            events=events, snapshot_hash=snapshot_hash)
+            except ValueError as exc:
+                raise ProviderError(str(exc), reason="context_overflow") from exc
+            department_input = pinned.department_input
+            if department_input is not None:
+                self._recorder.department_input(projection.phase, step_id, department_input)
+            history = self._assembly.department_history(self._store.list_events(scope.run_id), scope.department)
+            try:
+                step = self._assembly.request(pinned, history)
+            except (CompactionError, ValueError, FileNotFoundError) as exc:
+                reason = "context_overflow" if pinned.fills_window else "compaction_failed"
+                raise ProviderError(str(exc), reason=reason) from exc
+            assembled = step.context
+            self._step = step
+            logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
+            request = ModelRequest(scope.run_id, scope.department, scope.session_id, scope.activation_id,
+                                   step_id, assembled, assembled.tools,
+                                   purpose=assembled.manifest.purpose,
+                                   max_output_tokens=assembled.manifest.max_output_tokens,
+                                   effective_contract_hash=scope.basis.effective_contract_hash,
+                                   engineering_plan_hash=scope.basis.engineering_plan_hash,
+                                   request_id=scope.basis.request_id,
+                                   attempt=attempt, root_step_id=root_step_id,
+                                   retry_of_step_id=retry_of_step_id,
+                                   attempt_id=f"{logical_call_id}:attempt-{attempt}",
+                                   logical_call_id=logical_call_id,
+                                   guidance_version=scope.basis.guidance_version, **scope.versions())
+            self._request = request
+            self._recorder.request_assembled(projection.phase, request, step, snapshot_hash)
+            if not step.admitted:
+                raise ProviderError("model request exceeds context_window", reason="context_overflow")
+            return request
+
+    def _start_request(self, request: ModelRequest) -> bool:
+        scope = self._scope
+        with self._writes.lock:
+            projection = self._nodes.settle()
+            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+                return False
+            if scope.basis.changed(projection, scope.department):
+                return False
+            self._recorder.request_started(projection.phase, request)
+            return True
+
+    async def _call_model(self, request: ModelRequest) -> ModelResponse:
+        # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果
+        async with aclosing(self._adapter.stream(request.model_call())) as items:
+            async for item in items:
+                if isinstance(item, ModelResponse):
+                    return item
+                self._recorder.stream(request, item)
+        raise ProviderError("model call ended without a response", diagnostics={"error_type": "protocol"})
+
+    def _schedule_retry(self, request: ModelRequest, error: ProviderError, delay: float, next_step_id: int) -> bool:
+        scope = self._scope
+        with self._writes.lock:
+            projection = self._nodes.settle()
+            if (projection.phase in TERMINAL_PHASES or self._cancelled.is_set()
+                    or scope.basis.changed(projection, scope.department)):
+                return False
+            self._recorder.retry_scheduled(projection.phase, request, error, delay, next_step_id)
+            return True
+
+    def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> None:
+        scope = self._scope
+        with self._writes.lock:
+            projection = self._project()
+            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+                return
+            if scope.basis.changed(projection, scope.department):
+                return
+            try:
+                result = self._assembly.finish_compaction(self._step, response.output)
+            except CompactionError as exc:
+                raise ProviderError(str(exc), reason="compaction_failed") from exc
+            if result is None:
+                return
+            self._recorder.compaction(projection.phase, request, result, response)
+
+    def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> ToolPermission:
+        scope = self._scope
+        with self._writes.lock:
+            projection = self._nodes.settle()
+            permission = tool_permission(
+                projection, call, department=scope.department, guidance_only=scope.guidance_only,
+                basis=scope.basis, aborted=self._cancelled.is_set(), workspace=self._runtime.workspace,
             )
-            continue
-        replies_without_tool_call = 0
-        for index, item in enumerate(response.output):
+            if permission.allowed:
+                self._recorder.tool_started(projection.phase, request, call, permission.command_basis)
+            return permission
+
+    def _skip(self, request: ModelRequest, output: list[dict[str, Any]], error: str) -> None:
+        for item in output:
             if item.get("type") != "function_call":
                 continue
-            if not nodes.proceed():
-                _skip_calls(response.output[index:], step_id, record_skipped_tool,
-                            "Not executed because this activation ended or its input changed before these tools started.")
-                return None
-            identity = str(item.get("call_id") or "")
-            name = str(item.get("name") or "")
-            raw_args = item.get("arguments")
-            try:
-                args = json.loads(raw_args)
-                if not isinstance(args, dict):
-                    raise ValueError("tool arguments must be an object")
-            except (TypeError, ValueError) as exc:
-                args = {"invalid_arguments": raw_args}
-                result = ToolResult(name, False, None, f"invalid tool arguments: {exc}")
-            else:
-                permission = begin_tool({"id": identity, "name": name, "args": args, "step_id": step_id})
-                if permission.stopped:
-                    _skip_calls(response.output[index:], step_id, record_skipped_tool,
-                                "Not executed because the current activation can no longer start tools.")
-                    return None
-                result = (runtime.execute(request.department, name, args) if permission.allowed
-                          else ToolResult(name, False, None, permission.reason))
-            input_item = {"type": "function_call_output", "call_id": identity,
-                          "output": json_dumps({"ok": result.ok, "output": result.output, "error": result.error})}
-            call = {"id": identity, "name": name, "args": args, "ok": result.ok,
-                    "output": result.output, "error": result.error, "step_id": step_id, "input_item": input_item}
-            record_tool(call)
-            if not nodes.proceed():
-                _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,
-                            "Not executed because this activation ended or its input changed after the current tool.")
-                return None
-            if name in SUBMIT_KINDS:
-                _skip_calls(response.output[index + 1:], step_id, record_skipped_tool,
-                            "Not executed because the department already submitted its proposal.")
-                proposal = result.output if result.ok else {**args, "kind": SUBMIT_KINDS[name]}
-                return DepartmentSubmission(proposal, response)
-    raise ProviderError("department reached the model step limit without submitting a proposal", reason="model_steps_exhausted")
+            self._recorder.tool_skipped(request, {
+                "id": item["call_id"], "name": item["name"], "ok": False, "output": None,
+                "error": error, "step_id": request.step_id,
+                "input_item": {"type": "function_call_output", "call_id": item["call_id"],
+                               "output": json_dumps({"ok": False, "output": None, "error": error})}})
 
-
-async def _call_model(adapter: ModelAdapter, call: ModelCall,
-                      record_stream: Callable[[ModelStreamEvent], None]) -> ModelResponse:
-    # 流式输出逐条记录以后再取下一条，最后一条是这次调用尝试的结果
-    async with aclosing(adapter.stream(call)) as items:
-        async for item in items:
-            if isinstance(item, ModelResponse):
-                return item
-            record_stream(item)
-    raise ProviderError("model call ended without a response", diagnostics={"error_type": "protocol"})
+    def _project(self) -> RunProjection:
+        return project_run(self._store, self._scope.run_id)
 
 
 def _retry_delay(error: ProviderError, attempt: int, limits: StepLimits) -> float:
@@ -281,7 +415,7 @@ def _retry_after_error(error: ProviderError, limits: StepLimits) -> ProviderErro
 
 
 def _validate_response(response: ModelResponse) -> None:
-    """Reject malformed provider responses before they can enter effective history."""
+    # 格式不对的回答在进入有效历史之前拒绝
     if not isinstance(response, ModelResponse):
         raise ProviderError("model adapter returned an invalid response", diagnostics={"error_type": "protocol"})
     if response.finish_reason != "completed":
@@ -354,28 +488,7 @@ def _sanitized_response(response: ModelResponse) -> ModelResponse:
 
 
 def _undeclared_tool_calls(request: ModelRequest, response: ModelResponse) -> list[str]:
-    """Tool call names in a response whose request offered no tools at all."""
+    # 请求没有提供任何工具时，回答中的工具调用名称
     if request.tools:
         return []
     return [str(item.get("name")) for item in response.output if item.get("type") == "function_call"]
-
-
-def _wait_for_retry(delay: float, nodes: SafeNode) -> bool:
-    deadline = time.monotonic() + delay
-    while True:
-        if not nodes.proceed():
-            return False
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return True
-        time.sleep(min(0.02, remaining))
-
-
-def _skip_calls(output: list[dict[str, Any]], step_id: int, record: Callable[[dict[str, Any]], None], error: str) -> None:
-    for item in output:
-        if item.get("type") != "function_call":
-            continue
-        record({"id": item["call_id"], "name": item["name"], "ok": False, "output": None,
-                "error": error, "step_id": step_id,
-                "input_item": {"type": "function_call_output", "call_id": item["call_id"],
-                               "output": json_dumps({"ok": False, "output": None, "error": error})}})

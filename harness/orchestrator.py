@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event
 from typing import Any
 
-from .adapters.base import ModelAdapter, ModelRequest, ProviderError
+from .adapters.base import ModelAdapter, ProviderError
 from .adapters.facade_adapter import FacadeAdapter
-from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
-                           tool_permission)
+from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
-from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, StepRequest, model_limits, pending_guidance
+from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
-from .compaction import CompactionError
 from .event_store import EventStore, NewEvent, WritePath
-from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, run_department
+from .engine import StepDriver, StepLimits
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -35,12 +34,11 @@ from .models import (
     department_for_phase,
     new_id,
 )
-from .providers import ProviderFacade
-from .providers.call import ModelResponse
+from .providers import ProviderConnections, ProviderFacade
 from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
-from .recording import ActivationScope, StepRecorder
+from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import ToolRuntime, normalize_registered_commands
@@ -49,52 +47,40 @@ from .workspace import Workspace, WorkspaceSnapshot
 
 @dataclass
 class _Activation:
-    run_id: str
-    department: str
-    session_id: str
-    activation_id: str
+    # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词、调用目标与适配器，
+    # 中止信号，步骤驱动，以及在安全节点等待重试时的唤醒
+    scope: ActivationScope
+    prompt: DepartmentPrompt
     abort_flag: Event
-    parent_event_id: str
     adapter: ModelAdapter
     target: FrozenTarget | None
-    snapshot_id: str | None
-    input_version: int
-    prompt: DepartmentPrompt
-    recorder: StepRecorder
-    request: ModelRequest | None = None
-    step: StepRequest | None = None
-    effective_contract_hash: str | None = None
-    engineering_plan_hash: str | None = None
-    request_id: str | None = None
-    guidance_version: int = 0
-    guidance_ids: tuple[str, ...] = ()
-    guidance_only: bool = False
-    yielded_work: dict[str, Any] | None = None
-
-    def versions(self) -> dict[str, Any]:
-        return {"input_version": self.input_version, "prompt_version": self.prompt.version,
-                "prompt_hash": self.prompt.prompt_ref.content_hash,
-                "guidance_ids": list(self.guidance_ids), "guidance_only": self.guidance_only}
+    yielded_work: dict[str, Any] | None
+    driver: StepDriver | None = None
+    wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
 
     @property
-    def basis(self) -> WorkBasis:
-        return WorkBasis(self.effective_contract_hash, self.engineering_plan_hash, self.request_id,
-                         self.input_version, self.guidance_version)
+    def run_id(self) -> str:
+        return self.scope.run_id
 
     @property
-    def frame(self) -> StepFrame:
-        return StepFrame(self.department, self.session_id, self.activation_id, self.prompt, self.guidance_only,
-                         self.effective_contract_hash, self.engineering_plan_hash, self.input_version)
+    def department(self) -> str:
+        return self.scope.department
 
 
 class _SafeNode:
-    # 流程编排为一次激活实现的安全节点接口（接口由部门循环定义）
+    # 流程编排为一次激活实现的安全节点接口（接口由步骤驱动定义）
     def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
         self._orchestrator = orchestrator
         self._activation = activation
 
     def proceed(self) -> bool:
         return self._orchestrator._at_safe_node(self._activation)
+
+    def settle(self) -> RunProjection:
+        return self._orchestrator._settle(self._activation)
+
+    async def wait(self, seconds: float) -> bool:
+        return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
@@ -345,12 +331,13 @@ class Orchestrator:
                     raise RunTerminalError("This run has ended; create a new task for this input.")
                 if not command:
                     self.interactions.receive(current, text, command=False)
+                    self._wake(run_id)
                 else:
                     activation = self._active.get(run_id)
                     self._abort.setdefault(run_id, Event()).set()
                     if activation is not None:
                         try:
-                            self._cancel_model_call(activation)
+                            self._cancel_driver(activation)
                             abort_notified = True
                         except Exception as exc:
                             stop_error = exc
@@ -370,7 +357,7 @@ class Orchestrator:
         finally:
             if command and activation is not None and not abort_notified:
                 try:
-                    self._cancel_model_call(activation)
+                    self._cancel_driver(activation)
                 except Exception as exc:
                     stop_error = stop_error or exc
         if save_error is not None:
@@ -399,6 +386,7 @@ class Orchestrator:
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 raise RunTerminalError("This run has ended; guidance can be sent to a new task.")
             self.interactions.receive_guidance(current, department, text)
+            self._wake(run_id)
             return self.project(run_id)
 
     def _assign_new_inputs(self, run_id: str, projection: RunProjection) -> RunProjection:
@@ -424,14 +412,54 @@ class Orchestrator:
 
     def _stop_requested(self, activation: _Activation, projection: RunProjection) -> bool:
         # 停止判断：中止、运行时间用完、终态、输入版本改变或有新的指导；只读取，不写入
+        basis = activation.scope.basis
         return (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)
                 or projection.phase in TERMINAL_PHASES
-                or projection.input_version != activation.input_version
-                or guidance_version(projection, activation.department) > activation.guidance_version)
+                or projection.input_version != basis.input_version
+                or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _time_used_up(self, run_id: str, projection: RunProjection) -> bool:
-        elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
-        return elapsed >= projection.run_time_limit_sec
+        return self._time_left(run_id, projection) <= 0
+
+    def _time_left(self, run_id: str, projection: RunProjection) -> float:
+        return projection.run_time_limit_sec - (time.monotonic() - self._run_start_times.get(run_id, time.monotonic()))
+
+    def _settle(self, activation: _Activation) -> RunProjection:
+        # 安全节点：分派新输入并关闭因此或因依据改变而过时的协作请求，交回当前的运行状态
+        with self.writes.lock:
+            return self._close_obsolete_request(activation.run_id, self.project(activation.run_id))
+
+    async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> bool:
+        # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
+        # 醒来以后回到安全节点判断。唤醒在判断之前登记，判断之后到达的改变不会漏掉
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + seconds
+        try:
+            while True:
+                changed = asyncio.Event()
+                with self.writes.lock:
+                    activation.wakeup = (loop, changed)
+                    if not self._at_safe_node(activation):
+                        return False
+                    time_left = self._time_left(activation.run_id, self.project(activation.run_id))
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    return True
+                try:
+                    await asyncio.wait_for(changed.wait(), max(0.0, min(remaining, time_left)))
+                except TimeoutError:
+                    pass
+        finally:
+            with self.writes.lock:
+                activation.wakeup = None
+
+    def _wake(self, run_id: str) -> None:
+        # 在安全节点等待重试的激活立即回到安全节点判断
+        with self.writes.lock:
+            activation = self._active.get(run_id)
+            if activation is not None and activation.wakeup is not None:
+                loop, changed = activation.wakeup
+                loop.call_soon_threadsafe(changed.set)
 
     def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
@@ -470,69 +498,75 @@ class Orchestrator:
                 self._abort.setdefault(run_id, Event()).set()
                 activation = self._active.get(run_id)
                 if activation is not None:
-                    self._cancel_model_call(activation)
+                    self._cancel_driver(activation)
                     abort_notified = True
                 self._fail(run_id, projection, "cancelled", "run cancelled")
         finally:
             if activation is not None and not abort_notified:
-                self._cancel_model_call(activation)
+                self._cancel_driver(activation)
         return self.project(run_id)
 
-    @staticmethod
-    def _cancel_model_call(activation: _Activation) -> None:
-        # 取消按调用尝试的身份生效：当前步骤已经准备了请求时，通知模型接入取消这次尝试；
-        # 请求还没有开始时，模型接入记下这次取消，开始时立即取消
-        request = activation.request
-        if request is not None and request.attempt_id:
-            activation.adapter.cancel(request.attempt_id)
+    def _cancel_driver(self, activation: _Activation) -> None:
+        # 取消步骤驱动（正在进行的调用尝试按身份取消），在安全节点等待重试的激活立即醒来
+        if activation.driver is not None:
+            activation.driver.cancel()
+        self._wake(activation.run_id)
 
-    def run_until_stop(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
-        while True:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
-                return projection
-            if self._abort.get(run_id) and self._abort[run_id].is_set():
-                return self.cancel(run_id)
-            self._activate_once(run_id, model_loop)
+    async def run_until_stop(self, run_id: str) -> RunProjection:
+        # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用
+        connections = ProviderConnections()
+        try:
+            while True:
+                projection = self.project(run_id)
+                if projection.phase in TERMINAL_PHASES:
+                    return projection
+                if self._abort.get(run_id) and self._abort[run_id].is_set():
+                    return self.cancel(run_id)
+                await self._activate_once(run_id, connections)
+        finally:
+            await connections.aclose()
 
-    def activate_once(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
-        return self._activate_once(run_id, model_loop)
+    async def activate_once(self, run_id: str) -> RunProjection:
+        connections = ProviderConnections()
+        try:
+            return await self._activate_once(run_id, connections)
+        finally:
+            await connections.aclose()
 
-    def _activate_once(self, run_id: str, model_loop: ModelCallLoop) -> RunProjection:
+    async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         with self.writes.lock:
             if run_id in self._active:
                 raise RuntimeError("run already has an active department invocation")
-            activation = self._prepare_activation(run_id, model_loop)
+            activation = self._prepare_activation(run_id, connections)
             if activation is None:
                 return self.project(run_id)
             self._active[run_id] = activation
         started = time.monotonic()
         try:
-            self._invoke_activation(activation, model_loop)
+            await self._invoke_activation(activation)
         finally:
             with self.writes.lock:
                 current = self.project(run_id)
-                request = activation
+                scope = activation.scope
                 self.writes.append(run_id, NewEvent(
                     EventType.ACTIVATION_FINISHED,
-                    role=request.department,
-                    parent_event_id=activation.parent_event_id,
+                    role=scope.department,
+                    parent_event_id=scope.parent_event_id,
                     state_before=current.phase,
                     state_after=current.phase,
-                    session_id=request.session_id,
+                    session_id=scope.session_id,
                     payload={
-                        "activation_id": request.activation_id,
-                        **activation.versions(),
+                        "activation_id": scope.activation_id,
+                        **scope.versions(),
                         "latency_ms": int((time.monotonic() - started) * 1000),
                         "stop_reason": current.stop_reason,
                     },
                 ))
-                self.sessions.get(run_id, request.department).idle()
-                activation.recorder.close()
+                self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)
         return self.project(run_id)
 
-    def _prepare_activation(self, run_id: str, model_loop: ModelCallLoop) -> _Activation | None:
+    def _prepare_activation(self, run_id: str, connections: ProviderConnections) -> _Activation | None:
         if run_id not in self._run_start_times:
             self._run_start_times[run_id] = time.monotonic()
         projection = self.project(run_id)
@@ -580,7 +614,7 @@ class Orchestrator:
                 target = snapshot.target(department)
                 snapshot_id = canonical_hash(_snapshot_event_dict(snapshot))
                 # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
-                adapter = FacadeAdapter(self.facade, target, connections=model_loop.connections)
+                adapter = FacadeAdapter(self.facade, target, connections=connections)
             except (KeyError, ValueError) as exc:
                 self._fail(run_id, projection, "provider_unavailable", str(exc))
                 return None
@@ -634,21 +668,13 @@ class Orchestrator:
                      "prompt_hash": prompt.prompt_ref.content_hash,
                      **target_metadata},
         ))[0]
-        recorder = StepRecorder(self.store, self.writes, self.artifacts, ActivationScope(
+        scope = ActivationScope(
             run_id, department, session.session_id, activation_id, parent.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
             guidance_only=guidance_only, basis=basis, provider=self._configured_provider(target, adapter),
             target=target_metadata, secret=getattr(target, "api_key", None),
-        ), max_attempts=self.step_limits.max_provider_attempts)
-        abort_flag = self._abort.setdefault(run_id, Event())
-        return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
-                           adapter, target, snapshot_id,
-                           input_version=basis.input_version, prompt=prompt, recorder=recorder,
-                           effective_contract_hash=basis.effective_contract_hash,
-                           engineering_plan_hash=basis.engineering_plan_hash, request_id=basis.request_id,
-                           guidance_version=basis.guidance_version,
-                           guidance_ids=guidance_ids,
-                           guidance_only=guidance_only, yielded_work=yielded_work)
+        )
+        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, target, yielded_work)
 
     @staticmethod
     def _work_basis(projection: RunProjection) -> dict[str, Any]:
@@ -662,14 +688,6 @@ class Orchestrator:
     @staticmethod
     def _configured_provider(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
         return target.provider_id if target is not None else getattr(adapter, "name", "test")
-
-    @staticmethod
-    def _logical_call_id(activation_id: str, root_step_id: int, purpose: str) -> str:
-        return f"{activation_id}:root-{root_step_id}:{purpose}"
-
-    @staticmethod
-    def _attempt_id(logical_call_id: str, attempt: int) -> str:
-        return f"{logical_call_id}:attempt-{attempt}"
 
     @staticmethod
     def _configured_model(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
@@ -714,43 +732,27 @@ class Orchestrator:
             "configured_max_output_tokens": target.max_output_tokens,
         }
 
-    def _invoke_activation(self, activation: _Activation, model_loop: ModelCallLoop) -> None:
-        request = activation
-        run_id, department = request.run_id, request.department
+    async def _invoke_activation(self, activation: _Activation) -> None:
+        scope = activation.scope
+        run_id, department = scope.run_id, scope.department
         projection = self.project(run_id)
         try:
             workspace = self.workspace(run_id)
             workspace.bind_check(
-                activation_id=request.activation_id,
+                activation_id=scope.activation_id,
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
                 delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-                effective_contract_hash=request.effective_contract_hash,
-                engineering_plan_hash=request.engineering_plan_hash,
+                effective_contract_hash=scope.basis.effective_contract_hash,
+                engineering_plan_hash=scope.basis.engineering_plan_hash,
             )
-            submission = run_department(
-                activation.adapter, ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
-                limits=self.step_limits,
-                model_loop=model_loop,
-                prepare_step=lambda step, attempt, root, retry_of: self._prepare_step(
-                    activation, step, attempt, root, retry_of,
-                ),
-                record_stream=lambda event: activation.recorder.stream(activation.request, event),
-                record_response=lambda response: activation.recorder.response(activation.request, response),
-                record_tool=lambda call: activation.recorder.tool_called(activation.request, call),
-                record_skipped_tool=lambda call: activation.recorder.tool_skipped(activation.request, call),
-                begin_tool=lambda call: self._begin_tool(activation, call),
-                begin_request=lambda request: self._begin_request(activation, request),
-                finish_compaction=lambda response: self._finish_compaction(activation, response),
-                record_attempt_finished=activation.recorder.attempt_finished,
-                record_attempt_failed=activation.recorder.attempt_failed,
-                record_retry_scheduled=lambda request, error, delay, next_step: self._record_retry_scheduled(
-                    activation, request, error, delay, next_step,
-                ),
-                require_tool_call=lambda request, item, count: activation.recorder.tool_call_required(
-                    request, item, count, TOOL_CALL_REQUIRED_LIMIT,
-                ),
-                nodes=_SafeNode(self, activation),
+            driver = StepDriver(
+                scope, activation.prompt, store=self.store, writes=self.writes, artifacts=self.artifacts,
+                assembly=self.assembly, adapter=activation.adapter, target=activation.target,
+                runtime=ToolRuntime(workspace, registered_commands=dict(projection.registered_commands)),
+                nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
+            activation.driver = driver
+            submission = await driver.run()
         except ProviderError as exc:
             if exc.reason in PAUSED_REASONS:
                 self._pause(run_id, projection, exc.reason)
@@ -773,137 +775,21 @@ class Orchestrator:
 
         try:
             transcript_ref = None
-            transcript = activation.recorder.transcript
+            transcript = driver.transcript
             if transcript:
                 ref = self.artifacts.put(run_id, "transcript", transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
             self._apply_proposal(
                 run_id, department=department, projection=projection, proposal=submission.proposal,
-                basis=activation.basis,
-                transcript_ref=transcript_ref, parent_event_id=activation.parent_event_id,
-                session_id=request.session_id,
+                basis=scope.basis,
+                transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
+                session_id=scope.session_id,
                 yielded_work=activation.yielded_work,
                 provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
                 model=submission.response.model,
             )
         except Exception as exc:
             self._fail(run_id, self.project(run_id), "host_commit_error", f"{type(exc).__name__}: {exc}")
-
-    def _prepare_step(
-        self,
-        activation: _Activation,
-        step_id: int,
-        attempt: int,
-        root_step_id: int,
-        retry_of_step_id: int | None,
-    ) -> ModelRequest | None:
-        with self.writes.lock:
-            identity = activation
-            current = self.project(identity.run_id)
-            if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
-                return None
-            current = self._close_obsolete_request(identity.run_id, current)
-            if activation.basis.changed(current, activation.department):
-                return None
-            # 由 P 装配这一步；装配失败的原因在这里换成停止原因，部门工作消息与请求记录由编排器写入
-            target = identity.target
-            try:
-                limits = model_limits(current.context_window,
-                                      None if target is None else target.context_window,
-                                      None if target is None else target.max_output_tokens)
-                events = self.store.list_events(identity.run_id)
-                snapshot_hash = self.workspace(identity.run_id).snapshot().digest
-                pinned = self.assembly.pin(current, activation.frame, limits, step_id=step_id,
-                                           events=events, snapshot_hash=snapshot_hash)
-            except ValueError as exc:
-                raise ProviderError(str(exc), reason="context_overflow") from exc
-            input_item = pinned.department_input
-            if input_item is not None:
-                activation.recorder.department_input(current.phase, step_id, input_item)
-            history = self.assembly.department_history(self.store.list_events(identity.run_id), identity.department)
-            try:
-                step = self.assembly.request(pinned, history)
-            except (CompactionError, ValueError, FileNotFoundError) as exc:
-                reason = "context_overflow" if pinned.fills_window else "compaction_failed"
-                raise ProviderError(str(exc), reason=reason) from exc
-            assembled = step.context
-            activation.step = step
-            logical_call_id = self._logical_call_id(
-                identity.activation_id, root_step_id, assembled.manifest.purpose,
-            )
-            attempt_id = self._attempt_id(logical_call_id, attempt)
-            request = ModelRequest(identity.run_id, identity.department, identity.session_id, identity.activation_id,
-                                   step_id, assembled, assembled.tools,
-                                   purpose=assembled.manifest.purpose, max_output_tokens=assembled.manifest.max_output_tokens,
-                                   effective_contract_hash=activation.effective_contract_hash,
-                                   engineering_plan_hash=activation.engineering_plan_hash, request_id=activation.request_id,
-                                   attempt=attempt, root_step_id=root_step_id,
-                                   retry_of_step_id=retry_of_step_id, attempt_id=attempt_id,
-                                   logical_call_id=logical_call_id,
-                                   guidance_version=activation.guidance_version, **activation.versions())
-            activation.request = request
-            activation.recorder.request_assembled(current.phase, request, step, snapshot_hash)
-            if not step.admitted:
-                self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
-                return None
-            return request
-
-    def _finish_compaction(self, activation: _Activation, response: ModelResponse) -> None:
-        with self.writes.lock:
-            request = activation.request
-            current = self.project(activation.run_id)
-            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
-                return
-            if activation.basis.changed(current, activation.department):
-                return
-            try:
-                result = self.assembly.finish_compaction(activation.step, response.output)
-            except CompactionError as exc:
-                raise ProviderError(str(exc), reason="compaction_failed") from exc
-            if result is None:
-                return
-            activation.recorder.compaction(current.phase, request, result, response)
-
-    def _begin_request(self, activation: _Activation, request: ModelRequest) -> bool:
-        with self.writes.lock:
-            current = self.project(request.run_id)
-            current = self._close_obsolete_request(request.run_id, current)
-            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
-                return False
-            if activation.basis.changed(current, activation.department):
-                return False
-            activation.recorder.request_started(current.phase, request)
-            return True
-
-    def _record_retry_scheduled(
-        self,
-        activation: _Activation,
-        request: ModelRequest,
-        error: ProviderError,
-        delay: float,
-        next_step_id: int,
-    ) -> bool:
-        with self.writes.lock:
-            current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
-            if (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
-                    or activation.basis.changed(current, activation.department)):
-                return False
-            activation.recorder.retry_scheduled(current.phase, request, error, delay, next_step_id)
-            return True
-
-    def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolPermission:
-        with self.writes.lock:
-            request = activation.request
-            current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
-            permission = tool_permission(
-                current, call, department=request.department, guidance_only=activation.guidance_only,
-                basis=activation.basis, aborted=activation.abort_flag.is_set(),
-                workspace=self.workspace(request.run_id),
-            )
-            if not permission.allowed:
-                return permission
-            activation.recorder.tool_started(current.phase, request, call, permission.command_basis)
-            return permission
 
     def _apply_proposal(
         self,

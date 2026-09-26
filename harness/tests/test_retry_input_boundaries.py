@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
@@ -10,6 +11,7 @@ from harness.engine import StepLimits
 from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tests.helpers import after_event
 
 
 def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_path):
@@ -43,14 +45,7 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeyp
     system = LoopSystem.for_testing(tmp_path, adapter,
                                     step_limits=StepLimits(retry_initial_delay_sec=0.2, retry_max_delay_sec=0.2))
     run_id = system.create_run("original task")
-    original = system.orchestrator._record_retry_scheduled
-
-    def record(*args):
-        result = original(*args)
-        scheduled.set()
-        return result
-
-    monkeypatch.setattr(system.orchestrator, "_record_retry_scheduled", record)
+    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(5)
@@ -68,30 +63,62 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeyp
     assert "NEW USER ORIGINAL\nwith exact spacing" in content
 
 
+@pytest.mark.parametrize("action", ["input", "guidance"])
+def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path, monkeypatch, action):
+    # 重试等待 30 秒；等待期间到达的新输入或指导使激活立即回到安全节点并停止，不等到间隔结束
+    scheduled = Event()
+    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+    run_id = system.create_run("original task")
+    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(system.activate_once, run_id)
+        assert scheduled.wait(5)
+        started = time.monotonic()
+        if action == "input":
+            system.add_input(run_id, "NEW USER ORIGINAL")
+        else:
+            system.add_guidance(run_id, "product", "Keep the output short")
+        result = future.result(timeout=10)
+
+    assert time.monotonic() - started < 5
+    assert result.phase == "PRODUCT_SPEC" and result.stop_reason is None
+    assert len(adapter.invocations) == 1
+
+
+def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
+    # 运行时间在重试等待期间用完：等待到运行时间用完就结束，运行以 time_limit 停止
+    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+    run_id = system.create_run("original task", run_time_limit_sec=1)
+
+    started = time.monotonic()
+    result = system.activate_once(run_id)
+
+    assert time.monotonic() - started < 10
+    assert result.phase == "FAILED" and result.stop_reason == "time_limit"
+    assert len(adapter.invocations) == 1
+    assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in system.store.list_events(run_id))
+
+
 @pytest.mark.parametrize("action", ["input", "cancel"])
-def test_retry_schedule_admission_rechecks_interleaved_input_or_cancel(tmp_path, monkeypatch, action):
-    entered = Event()
-    release = Event()
+def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, monkeypatch, action):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("original task")
-    original = system.orchestrator._record_retry_scheduled
 
-    def block_before_admission(*args):
-        entered.set()
-        assert release.wait(5)
-        return original(*args)
-
-    monkeypatch.setattr(system.orchestrator, "_record_retry_scheduled", block_before_admission)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(system.activate_once, run_id)
-        assert entered.wait(5)
+    def interleave(event):
+        # 这次尝试已经按将要重试记录，重试安排之前到达新输入或取消
+        assert event.payload["will_retry"] is True
         if action == "input":
             system.add_input(run_id, "NEW USER ORIGINAL")
         else:
             system.cancel(run_id)
-        release.set()
-        result = future.result(timeout=5)
+
+    after_event(monkeypatch, system, EventType.MODEL_ATTEMPT_FAILED, interleave)
+    result = system.activate_once(run_id)
 
     events = system.store.list_events(run_id)
     assert len(adapter.invocations) == 1

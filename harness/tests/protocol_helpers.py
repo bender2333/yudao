@@ -11,17 +11,39 @@ from typing import Any
 
 from harness.adapters.base import Availability, ModelAdapter, ProviderError
 from harness.adapters.facade_adapter import FacadeAdapter
-from harness.engine import ModelCallLoop
 from harness.providers import (
     CredentialChain,
     FrozenTarget,
     ModelCall,
     ModelResponse,
     ModelStreamEvent,
+    ProviderConnections,
     ProviderFacade,
     ResponsesConfig,
     check_availability,
 )
+
+
+class ConnectionLoop:
+    # 测试直接完成多次调用时使用的事件循环：同一个事件循环中的调用复用 Provider 的连接，关闭时释放连接
+    def __init__(self) -> None:
+        self._runner = asyncio.Runner()
+        self.connections = ProviderConnections()
+
+    def __enter__(self) -> ConnectionLoop:
+        return self
+
+    def __exit__(self, *_exc_info: Any) -> None:
+        self.close()
+
+    def run(self, awaitable: Any) -> Any:
+        return self._runner.run(awaitable)
+
+    def close(self) -> None:
+        try:
+            self._runner.run(self.connections.aclose())
+        finally:
+            self._runner.close()
 
 
 def model_call(input_items: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None, *,
@@ -47,7 +69,7 @@ async def _consume(items: AsyncIterator[ModelStreamEvent | ModelResponse],
 
 
 def complete(adapter: ModelAdapter, call: ModelCall, *, observe: Callable[[ModelStreamEvent], None] | None = None,
-             loop: ModelCallLoop | None = None) -> ModelResponse:
+             loop: ConnectionLoop | None = None) -> ModelResponse:
     # 测试直接完成一次调用：流式输出交给 observe；给出 loop 时在它的事件循环中执行（复用它的连接）
     if loop is not None:
         return loop.run(_consume(adapter.stream(call), observe))
@@ -191,7 +213,7 @@ def bound_target(facade: ProviderFacade) -> FrozenTarget:
 class ResponsesAdapter:
     name = "responses"
 
-    def __init__(self, config: ResponsesConfig, *, loop: ModelCallLoop | None = None) -> None:
+    def __init__(self, config: ResponsesConfig, *, loop: ConnectionLoop | None = None) -> None:
         self.config = config
         self.model = config.model or "unconfigured"
         self.loop = loop
@@ -221,7 +243,7 @@ class ResponsesAdapter:
         return complete(self, call, observe=observe, loop=self.loop)
 
 
-def _build_delegate(config: ResponsesConfig, loop: ModelCallLoop | None) -> ModelAdapter | None:
+def _build_delegate(config: ResponsesConfig, loop: ConnectionLoop | None) -> ModelAdapter | None:
     # 配置本身不可用时返回空实现，由 availability()/complete() 报同样的错误，
     # 与旧适配器“构造不校验、可用性检查才报错”的行为一致
     if not config.api_key or not config.model or not config.base_url:
@@ -256,6 +278,7 @@ def _build_delegate(config: ResponsesConfig, loop: ModelCallLoop | None) -> Mode
 
 __all__ = [
     "Capture",
+    "ConnectionLoop",
     "ResponsesAdapter",
     "bound_target",
     "chat_responder",

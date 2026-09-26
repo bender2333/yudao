@@ -5,7 +5,6 @@ from threading import Event
 
 import pytest
 
-import harness.engine as engine
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.engine import StepLimits
@@ -13,7 +12,7 @@ from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, department_history, list_files_turn, recorded_context
+from harness.tests.helpers import FAST_RETRIES, after_event, department_history, list_files_turn, recorded_context
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -76,9 +75,7 @@ def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path):
     assert failed[-1].payload["will_retry"] is False
 
 
-def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path, monkeypatch):
-    waited = []
-    monkeypatch.setattr(engine, "_wait_for_retry", lambda delay, _stopped: (waited.append(delay) or True))
+def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path):
     adapter = FakeAdapter([
         ProviderError("single request timed out", reason="provider_timeout", retryable=True),
         product_spec(),
@@ -89,16 +86,14 @@ def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path, monkey
 
     assert result.phase == "ENGINEERING"
     assert len(adapter.invocations) == 2
-    assert waited == [0.01]
-    failed = next(item for item in system.store.list_events(result.run_id)
-                  if item.type == EventType.MODEL_ATTEMPT_FAILED)
+    events = system.store.list_events(result.run_id)
+    assert [item.payload["delay_sec"] for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED] == [0.01]
+    failed = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
     assert failed.payload["reason"] == "provider_timeout"
     assert failed.payload["will_retry"] is True
 
 
-def test_retry_after_over_max_stops_without_waiting(tmp_path, monkeypatch):
-    waited = []
-    monkeypatch.setattr(engine, "_wait_for_retry", lambda delay, _stopped: (waited.append(delay) or True))
+def test_retry_after_over_max_stops_without_waiting(tmp_path):
     adapter = FakeAdapter([
         ProviderError("temporary", retryable=True, diagnostics={"retry_after_sec": 60.1}),
         product_spec(),
@@ -106,11 +101,12 @@ def test_retry_after_over_max_stops_without_waiting(tmp_path, monkeypatch):
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo")
 
+    started = time.monotonic()
     result = system.activate_once(run_id)
 
+    assert time.monotonic() - started < 30
     assert result.phase == "FAILED" and result.stop_reason == "retry_after_too_long"
     assert len(adapter.invocations) == 1
-    assert waited == []
     events = system.store.list_events(run_id)
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
     failed = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
@@ -156,14 +152,7 @@ def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path, monkeypa
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(retry_initial_delay_sec=5.0))
     run_id = system.create_run("echo")
-    original = system.orchestrator._record_retry_scheduled
-
-    def record(*args):
-        result = original(*args)
-        scheduled.set()
-        return result
-
-    monkeypatch.setattr(system.orchestrator, "_record_retry_scheduled", record)
+    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(3)
