@@ -1,0 +1,146 @@
+# 裁决规则（U）：工具许可，以及提案校验与提交的判断。只读取投影与工作区，不写入，不调用模型；
+# 许可规则可以增加，只能收紧。
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from .collaboration import tool_error
+from .contracts import current_contract_hash, current_plan_hash, path_in_scope
+from .models import TERMINAL_PHASES, RunProjection
+from .tools import has_tool, tools_for
+from .workspace import Workspace
+
+# 因待处理指导被提前安排、只能回应指导的激活可以使用的工具
+GUIDANCE_ONLY_TOOLS = frozenset({
+    "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
+})
+
+_WRITE_TOOLS = frozenset({"write_file", "edit_range", "delete_file", "move_file"})
+
+
+def guidance_version(projection: RunProjection, department: str) -> int:
+    return max((item.version for item in projection.department_guidance
+                if item.department == department), default=0)
+
+
+@dataclass(frozen=True)
+class WorkBasis:
+    # 激活开始时采用的工作依据；依据改变以后，这次激活不能再开始模型请求与工具
+    effective_contract_hash: str | None
+    engineering_plan_hash: str | None
+    request_id: str | None
+    input_version: int
+    guidance_version: int
+
+    @classmethod
+    def current(cls, projection: RunProjection, department: str) -> WorkBasis:
+        return cls(
+            effective_contract_hash=current_contract_hash(projection),
+            engineering_plan_hash=current_plan_hash(projection),
+            request_id=None if projection.pending_request is None else projection.pending_request.id,
+            input_version=projection.input_version,
+            guidance_version=guidance_version(projection, department),
+        )
+
+    def changed(self, projection: RunProjection, department: str) -> bool:
+        current = WorkBasis.current(projection, department)
+        return (current.effective_contract_hash != self.effective_contract_hash
+                or current.engineering_plan_hash != self.engineering_plan_hash
+                or current.request_id != self.request_id
+                or current.input_version != self.input_version
+                or current.guidance_version > self.guidance_version)
+
+
+@dataclass(frozen=True)
+class ToolPermission:
+    # 工具许可的三种结果：允许（登记命令附带执行依据）；拒绝并说明原因，原因作为工具结果交回模型；停止
+    stopped: bool = False
+    reason: str | None = None
+    command_basis: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def allowed(self) -> bool:
+        return not self.stopped and self.reason is None
+
+
+def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
+    # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交
+    available = tools_for(department)
+    if guidance_only:
+        available = [name for name in available if name in GUIDANCE_ONLY_TOOLS]
+    return [name for name in available if tool_error(projection, department, name, {}) is None]
+
+
+def tool_permission(
+    projection: RunProjection,
+    call: dict[str, Any],
+    *,
+    department: str,
+    guidance_only: bool,
+    basis: WorkBasis,
+    aborted: bool,
+    workspace: Workspace,
+) -> ToolPermission:
+    if projection.phase in TERMINAL_PHASES or aborted or basis.changed(projection, department):
+        return ToolPermission(stopped=True)
+    name, args = call["name"], call["args"]
+    if not has_tool(department, name):
+        return ToolPermission(reason=f"{department} cannot use {name}")
+    if guidance_only and name not in GUIDANCE_ONLY_TOOLS:
+        return ToolPermission(reason="This guidance activation cannot change files or submit normal department work.")
+    reason = tool_error(projection, department, name, args)
+    if reason:
+        return ToolPermission(reason=reason)
+    command_basis: dict[str, Any] = {}
+    if name == "run_command":
+        # 登记命令在执行前核对冻结的登记表：未登记的名称与越界参数在这里拒绝，不执行
+        reason, command_basis = _run_command_basis(workspace, projection, args)
+        if reason:
+            return ToolPermission(reason=reason)
+    if name in _WRITE_TOOLS:
+        reason = _plan_scope_error(workspace, projection, name, args)
+        if reason:
+            return ToolPermission(reason=reason)
+    return ToolPermission(command_basis=command_basis)
+
+
+def _run_command_basis(workspace: Workspace, projection: RunProjection,
+                       args: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    # 执行前依据：命令身份（登记名与完整参数）加当时工作区快照摘要；只读核对，不执行
+    name = args.get("name")
+    if not isinstance(name, str) or not name:
+        return "run_command requires a registered command name", {}
+    entry = projection.registered_commands.get(name)
+    if entry is None:
+        return f"unknown registered command: {name}; only project-registered commands may run", {}
+    extra = args.get("args", [])
+    if extra is None:
+        extra = []
+    if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
+        return f"run_command {name} args must be a list of strings", {}
+    for item in extra:
+        if item not in entry.get("args", []):
+            return f"argument not allowlisted for {name}: {item}", {}
+    return None, {"registered_name": name, "registered_argv": [*entry["argv"], *extra],
+                  "snapshot_hash": workspace.snapshot().digest}
+
+
+def _plan_scope_error(workspace: Workspace, projection: RunProjection, name: str,
+                      args: dict[str, Any]) -> str | None:
+    # 写入只能落在当前有效合同的工程计划范围之内，按工作区解析以后的实际路径再核对一次
+    plan = projection.engineering_plan
+    if plan is None or plan.effective_contract_hash != current_contract_hash(projection):
+        return "Submit an engineering plan for the current effective contract before writing files."
+    targets = [args.get("source"), args.get("destination")] if name == "move_file" else [args.get("path")]
+    for target in targets:
+        if not path_in_scope(target, plan.scope):
+            return "The file is outside the current engineering plan scope; submit an adjusted plan with a reason first."
+        try:
+            actual = workspace.resolve(target).relative_to(workspace.root.resolve()).as_posix()
+        except (OSError, ValueError) as exc:
+            return str(exc)
+        if not path_in_scope(actual, plan.scope):
+            return "The resolved file is outside the current engineering plan scope."
+    return None

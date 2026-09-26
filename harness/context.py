@@ -6,8 +6,9 @@ from dataclasses import asdict, dataclass
 from copy import deepcopy
 from typing import Any
 
+from .adjudication import offered_tools
 from .contracts import current_contract_hash, current_plan_hash
-from .collaboration import guidance_result_summaries, tool_error
+from .collaboration import guidance_result_summaries
 from .artifacts import ArtifactStore
 from .models import (
     ArtifactRef,
@@ -170,7 +171,7 @@ class ContextAssembler:
         guidance_items = list(guidance or [])
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
-        tool_names = _tools_for(projection, department, guidance_only=guidance_only)
+        tool_names = offered_tools(projection, department, guidance_only=guidance_only)
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
@@ -552,17 +553,3 @@ def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None
         if item.status != "active":
             return item
     return None
-
-
-GUIDANCE_ONLY_TOOLS = frozenset({
-    "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
-})
-
-
-def _tools_for(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
-    from .tools import tools_for
-
-    available = tools_for(department)
-    if guidance_only:
-        available = [name for name in available if name in GUIDANCE_ONLY_TOOLS]
-    return [name for name in available if tool_error(projection, department, name, {}) is None]

@@ -9,10 +9,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from .adjudication import offered_tools
 from .artifacts import ArtifactStore
-from .collaboration import tool_error
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES, CompactionCheckpoint, plan_compaction
-from .context import GUIDANCE_ONLY_TOOLS, ContextAssembler, department_work_text
+from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
 from .engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
 from .event_store import EventStore
@@ -509,8 +509,6 @@ def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
 
 
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
-    from .tools import tools_for
-
     notes: list[str] = []
     histories: dict[str, list[dict[str, Any]]] = {}
     activations: dict[str, tuple[str, str, str]] = {}
@@ -840,10 +838,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != visible:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    available = tools_for(event.role)
-                    if guidance_context["guidance_only"]:
-                        available = [name for name in available if name in GUIDANCE_ONLY_TOOLS]
-                    expected = {name for name in available if tool_error(current_work, event.role, name, {}) is None}
+                    expected = set(offered_tools(current_work, event.role,
+                                                 guidance_only=guidance_context["guidance_only"]))
                     if len(names) != len(set(names)) or set(names) != expected:
                         raise ValueError("actual tool schemas do not match the department's tools")
                     expected_context = assembler.assemble(

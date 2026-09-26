@@ -12,14 +12,15 @@ from typing import Any
 
 from .adapters.base import ModelObservation, ModelAdapter, ModelRequest, ProviderError
 from .adapters.facade_adapter import FacadeAdapter
+from .adjudication import ToolPermission, WorkBasis, guidance_version, tool_permission
 from .artifacts import ArtifactStore
-from .context import ContextAssembler, GUIDANCE_ONLY_TOOLS, department_work_text
-from .contracts import current_contract_hash, current_plan_hash, path_in_scope
-from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase, tool_error
+from .context import ContextAssembler, department_work_text
+from .contracts import current_contract_hash, current_plan_hash
+from .collaboration import guidance_resume_phase, request_basis, request_still_applicable, resume_phase
 from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
                          visible_history)
 from .event_store import EventStore
-from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, ToolAdmission, run_department
+from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -48,7 +49,7 @@ from .projection import RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
-from .tools import ToolRuntime, has_tool, normalize_registered_commands
+from .tools import ToolRuntime, normalize_registered_commands
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 from .workspace import Workspace, WorkspaceSnapshot
 
@@ -95,6 +96,11 @@ class _Activation:
         return {"input_version": self.input_version, "prompt_version": self.prompt.version,
                 "prompt_hash": self.prompt.prompt_ref.content_hash,
                 "guidance_ids": list(self.guidance_ids), "guidance_only": self.guidance_only}
+
+    @property
+    def basis(self) -> WorkBasis:
+        return WorkBasis(self.effective_contract_hash, self.engineering_plan_hash, self.request_id,
+                         self.input_version, self.guidance_version)
 
 
 @dataclass
@@ -277,27 +283,6 @@ def _validate_frozen_commands(registered_commands: dict[str, Any] | None,
     if set(normalized) != set(command_versions):
         raise ValueError("registered_commands and command_versions must cover the same commands")
     return normalized, dict(command_versions)
-
-
-def _run_command_basis(workspace: Workspace, projection: RunProjection,
-                       args: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
-    # 执行前依据：命令身份（登记名与完整参数）加当时工作区快照摘要；只读核对，不执行
-    name = args.get("name")
-    if not isinstance(name, str) or not name:
-        return "run_command requires a registered command name", {}
-    entry = projection.registered_commands.get(name)
-    if entry is None:
-        return f"unknown registered command: {name}; only project-registered commands may run", {}
-    extra = args.get("args", [])
-    if extra is None:
-        extra = []
-    if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
-        return f"run_command {name} args must be a list of strings", {}
-    for item in extra:
-        if item not in entry.get("args", []):
-            return f"argument not allowlisted for {name}: {item}", {}
-    return None, {"registered_name": name, "registered_argv": [*entry["argv"], *extra],
-                  "snapshot_hash": workspace.snapshot().digest}
 
 
 class Orchestrator:
@@ -543,12 +528,7 @@ class Orchestrator:
             current = self._assign_new_inputs(activation.run_id, self.project(activation.run_id))
             return (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
                     or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version)
-
-    @staticmethod
-    def _guidance_version(projection: RunProjection, department: str) -> int:
-        return max((item.version for item in projection.department_guidance
-                    if item.department == department), default=0)
+                    or guidance_version(current, activation.department) > activation.guidance_version)
 
     @staticmethod
     def _pending_guidance(projection: RunProjection, department: str) -> list[Any]:
@@ -742,6 +722,7 @@ class Orchestrator:
 
         activation_id = session.activate()
         prompt = projection.department_prompts[department]
+        basis = WorkBasis.current(projection, department)
         parent = self.store.append(
             run_id,
             EventType.DEPARTMENT_ACTIVATED,
@@ -751,23 +732,23 @@ class Orchestrator:
             session_id=session.session_id,
             provider=self._configured_provider(target, adapter),
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
-                     "effective_contract_hash": current_contract_hash(projection),
-                     "engineering_plan_hash": current_plan_hash(projection), "request_id": self._request_id(projection),
+                     "effective_contract_hash": basis.effective_contract_hash,
+                     "engineering_plan_hash": basis.engineering_plan_hash, "request_id": basis.request_id,
                      "guidance_ids": [item.id for item in self._pending_guidance(projection, department)],
                      "guidance_only": guidance_only,
                      "yielded_work": yielded_work,
-                     "guidance_version": self._guidance_version(projection, department),
-                     "input_version": projection.input_version, "prompt_version": prompt.version,
+                     "guidance_version": basis.guidance_version,
+                     "input_version": basis.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash,
                      **self._target_metadata(target, adapter, snapshot_id)},
         )
         abort_flag = self._abort.setdefault(run_id, Event())
         return _Activation(run_id, department, session.session_id, activation_id, abort_flag, parent.event_id,
                            adapter, target, snapshot_id,
-                           input_version=projection.input_version, prompt=prompt,
-                           effective_contract_hash=current_contract_hash(projection),
-                           engineering_plan_hash=current_plan_hash(projection), request_id=self._request_id(projection),
-                           guidance_version=self._guidance_version(projection, department),
+                           input_version=basis.input_version, prompt=prompt,
+                           effective_contract_hash=basis.effective_contract_hash,
+                           engineering_plan_hash=basis.engineering_plan_hash, request_id=basis.request_id,
+                           guidance_version=basis.guidance_version,
                            guidance_ids=tuple(item.id for item in self._pending_guidance(projection, department)),
                            guidance_only=guidance_only, yielded_work=yielded_work)
 
@@ -945,11 +926,7 @@ class Orchestrator:
             if current.phase in TERMINAL_PHASES or identity.abort_flag.is_set():
                 return None
             current = self._close_obsolete_request(identity.run_id, current)
-            if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version):
+            if activation.basis.changed(current, activation.department):
                 return None
             try:
                 effective_window, output_limit, output_reserve = self._effective_limits(current, identity.target)
@@ -1151,11 +1128,7 @@ class Orchestrator:
             current = self.project(activation.run_id)
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return
-            if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version):
+            if activation.basis.changed(current, activation.department):
                 return
             plan = activation.compaction_plan
             try:
@@ -1193,11 +1166,7 @@ class Orchestrator:
             current = self._close_obsolete_request(request.run_id, current)
             if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
                 return False
-            if (current_contract_hash(current) != request.effective_contract_hash
-                    or current_plan_hash(current) != request.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version):
+            if activation.basis.changed(current, activation.department):
                 return False
             if request.context.manifest.guidance_ids and not activation.guidance_applied:
                 self.store.append(
@@ -1527,11 +1496,7 @@ class Orchestrator:
         with self._state_lock:
             current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
             if (current.phase in TERMINAL_PHASES or activation.abort_flag.is_set()
-                    or current_contract_hash(current) != request.effective_contract_hash
-                    or current_plan_hash(current) != request.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version):
+                    or activation.basis.changed(current, activation.department)):
                 return False
             provider = self._configured_provider(activation.target, activation.adapter)
             self.store.append(
@@ -1566,49 +1531,17 @@ class Orchestrator:
             )
             return True
 
-    def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolAdmission:
+    def _begin_tool(self, activation: _Activation, call: dict[str, Any]) -> ToolPermission:
         with self._state_lock:
             request = activation.request
-            current = self.project(request.run_id)
-            current = self._close_obsolete_request(request.run_id, current)
-            if current.phase in TERMINAL_PHASES or activation.abort_flag.is_set():
-                return ToolAdmission(stopped=True)
-            if (current_contract_hash(current) != activation.effective_contract_hash
-                    or current_plan_hash(current) != activation.engineering_plan_hash
-                    or self._request_id(current) != activation.request_id
-                    or current.input_version != activation.input_version
-                    or self._guidance_version(current, activation.department) > activation.guidance_version):
-                return ToolAdmission(stopped=True)
-            if not has_tool(request.department, call["name"]):
-                return ToolAdmission(error=f"{request.department} cannot use {call['name']}")
-            if activation.guidance_only and call["name"] not in GUIDANCE_ONLY_TOOLS:
-                return ToolAdmission(error="This guidance activation cannot change files or submit normal department work.")
-            error = tool_error(current, request.department, call["name"], call["args"])
-            if error:
-                return ToolAdmission(error=error)
-            command_basis: dict[str, Any] = {}
-            if call["name"] == "run_command":
-                # 登记命令在执行前核对冻结注册表：未登记的名称与越界参数在这里拒绝，不执行
-                basis_error, command_basis = _run_command_basis(
-                    self.workspace(request.run_id), current, call["args"])
-                if basis_error:
-                    return ToolAdmission(error=basis_error)
-            if call["name"] in {"write_file", "edit_range", "delete_file", "move_file"}:
-                plan = current.engineering_plan
-                if plan is None or plan.effective_contract_hash != current_contract_hash(current):
-                    return ToolAdmission(error="Submit an engineering plan for the current effective contract before writing files.")
-                targets = ([call["args"].get("source"), call["args"].get("destination")]
-                           if call["name"] == "move_file" else [call["args"].get("path")])
-                workspace = self.workspace(request.run_id)
-                for target in targets:
-                    if not path_in_scope(target, plan.scope):
-                        return ToolAdmission(error="The file is outside the current engineering plan scope; submit an adjusted plan with a reason first.")
-                    try:
-                        actual = workspace.resolve(target).relative_to(workspace.root.resolve()).as_posix()
-                    except (OSError, ValueError) as exc:
-                        return ToolAdmission(error=str(exc))
-                    if not path_in_scope(actual, plan.scope):
-                        return ToolAdmission(error="The resolved file is outside the current engineering plan scope.")
+            current = self._close_obsolete_request(request.run_id, self.project(request.run_id))
+            permission = tool_permission(
+                current, call, department=request.department, guidance_only=activation.guidance_only,
+                basis=activation.basis, aborted=activation.abort_flag.is_set(),
+                workspace=self.workspace(request.run_id),
+            )
+            if not permission.allowed:
+                return permission
             self.store.append(request.run_id, EventType.TOOL_STARTED, role=request.department,
                               parent_event_id=activation.parent_event_id, state_before=current.phase,
                               state_after=current.phase, session_id=request.session_id,
@@ -1621,8 +1554,8 @@ class Orchestrator:
                                        **activation.versions(),
                                        "effective_contract_hash": activation.effective_contract_hash,
                                        "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id,
-                                       **command_basis})
-            return ToolAdmission()
+                                       **permission.command_basis})
+            return permission
 
     def _record_observation(self, activation: _Activation, observation: ModelObservation) -> None:
         request = activation.request
@@ -1926,7 +1859,7 @@ class Orchestrator:
             current = self._close_obsolete_request(run_id, current)
             if (current.phase != projection.phase
                     or current.input_version != input_version
-                    or self._guidance_version(current, department) != guidance_version
+                    or WorkBasis.current(current, department).guidance_version != guidance_version
                     or current_contract_hash(current) != current_contract_hash(projection)
                     or current_plan_hash(current) != current_plan_hash(projection)
                     or self._request_id(current) != self._request_id(projection)

@@ -7,7 +7,7 @@ from dataclasses import asdict
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.context import GUIDANCE_ONLY_TOOLS
+from harness.adjudication import GUIDANCE_ONLY_TOOLS
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
     collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec, response_turn, review_turn,
