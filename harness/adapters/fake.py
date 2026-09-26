@@ -78,9 +78,7 @@ class FakeAdapter:
         for path, content in item.writes.items():
             call("write_file", {"path": path, "content": content})
         for name, spec in item.checks.items():
-            payload = _fake_check_payload(name, spec)
-            tool_name = "collect_evidence" if request.department == "quality" else "run_check"
-            call(tool_name, payload)
+            call("run_check", _fake_check_payload(name, spec))
         proposal = None if item.proposal is None else dict(item.proposal)
         if proposal:
             proposal.pop("_writes", None)

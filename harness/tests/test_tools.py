@@ -6,8 +6,75 @@ from pathlib import Path
 
 import pytest
 
-from harness.tools import ToolRuntime
+from harness.tools import HOST_TOOL_SCHEMAS, TOOL_DEFS, ToolRuntime, tools_for
 from harness.workspace import Workspace
+
+
+def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check(tmp_path):
+    assert set(HOST_TOOL_SCHEMAS) == set(TOOL_DEFS)
+    assert [name for name in tools_for("quality") if TOOL_DEFS[name]["access"] == "check"] == ["run_check"]
+    workspace = Workspace(tmp_path)
+    workspace.write_file("ok.py", "raise SystemExit(0)\n")
+    result = ToolRuntime(workspace).execute("quality", "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
+    assert result.ok is True and result.output["executor"] == "host"
+    assert workspace.snapshot().latest_check("quality", "smoke").exit_code == 0
+    assert workspace.snapshot().latest_check("engineering", "smoke") is None
+
+
+def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
+    review = HOST_TOOL_SCHEMAS["submit_review"]
+    assert "Engineering receipts are not accepted as QA evidence." in review["description"]
+    assert review["parameters"]["properties"]["checks"]["description"] == "Quality check names run via run_check"
+
+
+def test_write_tool_descriptions_state_the_plan_requirement():
+    write = HOST_TOOL_SCHEMAS["write_file"]["description"]
+    assert "replace its entire content" in write and "missing parent directories are created" in write
+    assert "Use edit_range to change part of an existing file." in write
+    for name in ("write_file", "edit_range"):
+        text = HOST_TOOL_SCHEMAS[name]["description"]
+        assert "Requires an accepted engineering plan for the current effective contract" in text
+        assert "the path must be inside that plan's scope" in text
+
+
+def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
+    workspace = Workspace(tmp_path)
+    runtime = ToolRuntime(workspace)
+    assert runtime.execute("engineering", "write_file", {"path": "src/deep/a.py", "content": "first\nsecond\n"}).ok
+    assert runtime.execute("engineering", "write_file", {"path": "src/deep/a.py", "content": "only\n"}).ok
+    assert workspace.read_file("src/deep/a.py") == "only\n"
+
+
+def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_utf8(tmp_path):
+    description = HOST_TOOL_SCHEMAS["read_file"]["description"]
+    assert "entire content" in description and "without line numbers or truncation" in description
+    assert "Files that are not valid UTF-8 are rejected." in description
+    assert "Use read_range for large files" in description and "content_hash" in description
+    workspace = Workspace(tmp_path)
+    runtime = ToolRuntime(workspace)
+    # 超过 read_range 单页上限的文件由 read_file 完整返回
+    text = "".join(f"line {index} " + "x" * 80 + "\n" for index in range(200))
+    workspace.write_file("big.txt", text)
+    assert len(text) > 4000
+    assert runtime.execute("quality", "read_file", {"path": "big.txt"}).output == text
+    (tmp_path / "latin1.txt").write_bytes(b"caf\xe9\n")
+    assert runtime.execute("quality", "read_file", {"path": "latin1.txt"}).ok is False
+
+
+def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
+    description = HOST_TOOL_SCHEMAS["list_files"]["description"]
+    assert "recursively" in description and '"src2/a.py"' in description
+    assert "end it with / to limit the list to one directory" in (
+        HOST_TOOL_SCHEMAS["list_files"]["parameters"]["properties"]["prefix"]["description"])
+    workspace = Workspace(tmp_path)
+    runtime = ToolRuntime(workspace)
+    for path in ("src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"):
+        workspace.write_file(path, "x\n")
+    assert sorted(runtime.execute("quality", "list_files", {}).output) == [
+        "src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"]
+    assert sorted(runtime.execute("quality", "list_files", {"prefix": "src/"}).output) == ["src/a.py", "src/deep/b.py"]
+    assert sorted(runtime.execute("quality", "list_files", {"prefix": "src"}).output) == [
+        "src/a.py", "src/deep/b.py", "src2/a.py"]
 
 
 def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp_path):

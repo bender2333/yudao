@@ -263,7 +263,7 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     assert current.phase == "PRODUCT_SPEC" and current.last_review is None
     assert current.input_version == 2 and current.processed_input_version == 1
     assert not _events(system, run_id, EventType.RUN_DONE)
-    assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["collect_evidence", "submit_review"]
+    assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
 
 
 def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_path, monkeypatch):

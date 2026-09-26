@@ -1009,7 +1009,7 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
     executions: list[tuple[str, dict[str, Any]]] = []
     for event in system.store.list_events(run_id):
         payload = event.payload or {}
-        if event.type != EventType.TOOL_CALLED or payload.get("name") not in {"run_check", "collect_evidence"}:
+        if event.type != EventType.TOOL_CALLED or payload.get("name") != "run_check":
             continue
         if not payload.get("output_ref"):
             continue

@@ -15,7 +15,7 @@ from .tools import SUBMIT_KINDS, TOOL_DEFS
 
 _MUTATIONS = {"write_file", "edit_range", "delete_file", "move_file"}
 _READS = {"read_file", "list_files"}
-_CHECKS = {"run_check", "collect_evidence"}
+_CHECKS = {"run_check"}
 _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
 _ACCEPTED_RESULTS = {
     EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,

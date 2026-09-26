@@ -37,7 +37,6 @@ TOOL_DEFS = {
     "move_file": {"access": "write", "departments": ("engineering",)},
     "run_check": {"access": "check", "departments": ("product", "engineering", "quality")},
     "run_command": {"access": "check", "departments": ("engineering",)},
-    "collect_evidence": {"access": "check", "departments": ("quality",)},
     "submit_product_spec": {"access": "submit", "departments": ("product",)},
     "submit_product_decision": {"access": "submit", "departments": ("product",)},
     "submit_request": {"access": "submit", "departments": ("product", "engineering", "quality")},
@@ -134,7 +133,6 @@ class ToolRuntime:
             "move_file": self._move_file,
             "run_check": self._run_check,
             "run_command": self._run_command,
-            "collect_evidence": self._collect_evidence,
             "submit_product_spec": self._submit,
             "submit_product_decision": self._submit,
             "submit_request": self._submit,
@@ -402,9 +400,6 @@ class ToolRuntime:
             "attempt": attempt,
         }
 
-    def _collect_evidence(self, department: str, args: dict[str, Any]) -> dict[str, Any]:
-        return self._execute_check(department, args)
-
     def _submit(self, department: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
         payload = dict(args)
         payload["kind"] = SUBMIT_KINDS[name]
@@ -504,7 +499,7 @@ def _argv_from_args(args: dict[str, Any]) -> list[str]:
         if not parts:
             raise ValueError("command is empty")
         return parts
-    raise ValueError("run_check/collect_evidence require host-executed argv or command; exit_code is not evidence")
+    raise ValueError("run_check requires host-executed argv or command; exit_code is not evidence")
 
 
 def _resolve_argv(workspace: Workspace, argv: list[str], *, cwd: Path | None = None) -> list[str]:
@@ -680,15 +675,15 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "read_file": {
         "name": "read_file",
         "label": "read_file",
-        "description": "Read a workspace file. Paths under .checks are host-private.",
+        "description": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
         "parameters": _object_schema({"path": {"type": "string", "description": "Workspace-relative file path"}}, ["path"]),
         "loadMode": "essential",
     },
     "list_files": {
         "name": "list_files",
         "label": "list_files",
-        "description": "List workspace files. Does not include .checks.",
-        "parameters": _object_schema({"prefix": {"type": "string", "description": "Optional path prefix"}}),
+        "description": "List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \"src/\" keeps only the src directory, while \"src\" also keeps paths such as \"src2/a.py\". Paths under .checks are never listed.",
+        "parameters": _object_schema({"prefix": {"type": "string", "description": "Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory"}}),
         "loadMode": "essential",
     },
     "search": {
@@ -724,7 +719,7 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "write_file": {
         "name": "write_file",
         "label": "write_file",
-        "description": "Write a workspace file. Engineering only. Cannot write .checks.",
+        "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
         "parameters": _object_schema(
             {
                 "path": {"type": "string", "description": "Workspace-relative file path"},
@@ -737,7 +732,7 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "edit_range": {
         "name": "edit_range",
         "label": "edit_range",
-        "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
+        "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.",
         "parameters": _object_schema(
             {
                 "path": {"type": "string", "description": "Workspace-relative file path"},
@@ -802,23 +797,6 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
             },
             ["name"],
-        ),
-        "loadMode": "essential",
-    },
-    "collect_evidence": {
-        "name": "collect_evidence",
-        "label": "collect_evidence",
-        "description": "Quality-only host-executed check. Engineering receipts are not accepted as QA evidence.",
-        "parameters": _object_schema(
-            {
-                "name": {"type": "string", "description": "Check name, e.g. smoke"},
-                "argv": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Argument vector executed by the host, e.g. [\"python\", \"src/echo.py\", \"hello\"]",
-                },
-            },
-            ["name", "argv"],
         ),
         "loadMode": "essential",
     },
@@ -971,12 +949,12 @@ HOST_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "submit_review": {
         "name": "submit_review",
         "label": "submit_review",
-        "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. checks are check names.",
+        "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. Engineering receipts are not accepted as QA evidence. checks are check names.",
         "parameters": _object_schema(
             {
                 "verdict": {"type": "string", "enum": ["rework_product", "rework_engineering", "release"]},
                 "rationale": {"type": "string"},
-                "checks": {"type": "array", "items": {"type": "string"}, "description": "Quality check names run via collect_evidence or run_check"},
+                "checks": {"type": "array", "items": {"type": "string"}, "description": "Quality check names run via run_check"},
                 "defects": {
                     "type": "array",
                     "items": {

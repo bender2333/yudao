@@ -274,7 +274,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         calls = [
             _call(
                 f"quality-check-{counts[department]}",
-                "collect_evidence",
+                "run_check",
                 {"name": "smoke", "argv": [sys.executable, "-c", "print('quality')"]},
             ),
             _call(f"quality-review-{counts[department]}", "submit_review", payload),

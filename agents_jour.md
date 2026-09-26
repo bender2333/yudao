@@ -9,6 +9,8 @@
 
 claude-3-7-sonnet / 2026-09-24 14:26 / 初始化智能体执行日记，建立架构执行问题独立记录文件 docs/architecture-issues.md，更新 AGENTS.md 计划执行角色、GitHub Issues 提法、完成关闭闭环及问题追踪规则。
 
+claude-opus-5-5 / 2026-09-26 12:12 / 领取 #46（提示词审计 T1 至 T4、S1）。核对位置：tools.py 的 TOOL_DEFS、处理函数表、错误文字、四个工具描述与 submit_review；collaboration.py 的 _CHECKS；department_prompts.py 质检指令；fake.py 质检检查工具名；smoke.py 回执审计；context.py 的 loop_limits 两处；两个测试文件的旧工具名。计划：先写测试（质检只有 run_check、请求没有剩余循环次数、描述与实际行为一致），再改代码。
+
 claude-opus-5-5 / 2026-09-26 14:10 / 领取 #47（F2）。按 /diagnosing-bugs 建立反馈回路：LoopSystem 与 FakeAdapter 脚本（一次只含文字的回复，再提交 ProductSpec）产生的第二次请求，经 FacadeAdapter 按 Responses、Chat Completions、Messages 编码后发到本机捕获服务，三种协议的最后一条消息都是 assistant，测试失败，复现成立。
 
 claude-opus-5-5 / 2026-09-26 14:20 / 根因：engine.run_department 只遍历 function_call，没有工具调用时直接进入下一步，部门历史的最后一项是助手消息。参照 OMP fdfeef1f78（task/executor.ts:1942、2009-2038 的 yield 说明上限 3 次；session/turn-recovery.ts:74、800、812 的空回复连续计数上限 3 次）与 opencode 0027387（session/prompt.ts:1111-1129 没有工具调用即结束循环，1285 与 1311 要求结构化输出时没有调用工具记为错误）。Yudao 的部门没有用户接手，采用 OMP 的做法：追加 user 消息，写成 tool_call_required 事件进入部门历史，连续计数，第 4 次暂停，停止原因 no_tool_call。

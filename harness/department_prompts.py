@@ -29,7 +29,7 @@ DEFAULT_PROMPTS = {
         "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。"
         "当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。"
         "不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。"
-        "使用 collect_evidence 或 run_check 让主机执行检查，再 submit_review。"
+        "使用 run_check 让主机执行检查，再 submit_review。"
         "交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。"
         "只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。"
         "自然语言中的“完成”不会改变任务状态。"

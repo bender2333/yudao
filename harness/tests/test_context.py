@@ -9,6 +9,7 @@ from harness.proposals import collaboration_request, delivery_turn, plan_turn, p
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.helpers import happy_script, run_scripted
+from harness.tools import TOOL_DEFS
 
 
 def _part(request, source: str):
@@ -99,6 +100,31 @@ def test_product_and_quality_do_not_receive_write_tools(data_dir):
     assert "write_file" not in by_dept["product"]
     assert "write_file" in by_dept["engineering"]
     assert "write_file" not in by_dept["quality"]
+
+
+def test_quality_runs_its_checks_through_run_check(data_dir):
+    adapter = FakeAdapter(happy_script())
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build echo")
+    assert system.run_until_stop(run_id).phase == "DONE"
+    [quality] = [item for item in adapter.invocations if item.department == "quality"]
+    assert [tool["name"] for tool in quality.tools if TOOL_DEFS[tool["name"]]["access"] == "check"] == ["run_check"]
+    checks = [event.payload["name"] for event in system.store.list_events(run_id)
+              if event.type == EventType.TOOL_CALLED and event.role == "quality"
+              and TOOL_DEFS.get(event.payload["name"], {}).get("access") == "check"]
+    assert checks == ["run_check"]
+
+
+def test_requests_carry_no_remaining_cycles_while_the_host_enforces_the_limit(data_dir):
+    adapter = FakeAdapter([product_spec(), collaboration_request(), response_turn()])
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build echo", max_cycles=2)
+    projection = system.run_until_stop(run_id)
+    assert projection.phase == "PAUSED" and projection.stop_reason == "max_cycles"
+    assert adapter.invocations
+    for item in adapter.invocations:
+        assert "loop_limits" not in [part.source for part in item.context.parts]
+        assert "cycles_remaining" not in json.dumps(item.input_items, ensure_ascii=False)
 
 
 def test_proposal_contract_and_binding_refs_are_injected(data_dir):
@@ -462,7 +488,7 @@ def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_p
     assert result.phase == "ENGINEERING", result.error
     [payload] = _work_assemblies(system, run_id)
     assert payload["effective_context_window"] == 8000 and payload["configured_max_output_tokens"] == 4096
-    assert 2000 <= payload["input_token_estimate"] <= 3000  # pinned department material plus tool schemas
+    assert 2000 <= payload["input_token_estimate"] <= 3500  # pinned department material plus tool schemas
     # The request keeps whatever the window leaves after its input, up to the declared limit:
     # the old fixed 15% reserve would have allowed only 1200 tokens here.
     assert payload["max_output_tokens"] == min(4096, 8000 - payload["input_token_estimate"]) >= 4000

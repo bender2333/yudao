@@ -140,7 +140,7 @@ class AssembledContext:
 
 def department_work_text(pinned: AssembledContext) -> str:
     static = {"intend", "project", "department_rules", "professional_completion", "collaboration_rules", "input_handling",
-              "proposal_contract", "allowed_tools", "loop_limits", "department_history", "tool_schemas"}
+              "proposal_contract", "allowed_tools", "department_history", "tool_schemas"}
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
 
@@ -226,15 +226,6 @@ class ContextAssembler:
                         "每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。"),
             ContextPart("proposal_contract", department, json_dumps(PROPOSAL_CONTRACTS[department])),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
-            ContextPart(
-                "loop_limits",
-                None,
-                json_dumps(
-                    {
-                        "cycles_remaining": max(0, projection.max_cycles - projection.cycle_count),
-                    }
-                ),
-            ),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
         ])
         pending_inputs = [item for item in projection.inputs
