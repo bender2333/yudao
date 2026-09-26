@@ -12,7 +12,7 @@ from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import _model_input_audit
-from harness.tests.helpers import list_files_turn
+from harness.tests.helpers import department_history, list_files_turn
 from harness.tests.protocol_helpers import (
     bound_target,
     chat_responder,
@@ -61,7 +61,7 @@ def test_text_only_reply_appends_user_message_to_history_and_events(tmp_path):
     stored = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["input_ref"])))
     assert stored == appended
 
-    history = system.orchestrator._department_history_records(run_id, "product")
+    history = department_history(system, run_id, "product")
     position = next(index for index, record in enumerate(history) if record["event_id"] == event.event_id)
     assert history[position]["item"] == appended
     assert history[position - 1]["type"] == EventType.MODEL_MESSAGE and REPLY in json_dumps(history[position - 1]["item"])
@@ -96,7 +96,7 @@ def test_consecutive_text_only_replies_pause_the_run_and_keep_every_reply(tmp_pa
     # 每一次只含文字的回复都保留为事件，并留在部门历史中
     messages = [json_dumps(json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["message_ref"]))))
                 for event in _events(system, run_id, EventType.MODEL_MESSAGE)]
-    history = json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    history = json_dumps(department_history(system, run_id, "product"))
     for text in replies:
         assert any(text in message for message in messages)
         assert text in history

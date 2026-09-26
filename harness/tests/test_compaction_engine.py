@@ -8,7 +8,7 @@ from harness.models import EventType, canonical_hash, json_dumps
 from harness.proposals import collaboration_request, product_spec, response_turn
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, recorded_context
+from harness.tests.helpers import FAST_RETRIES, department_history, recorded_context
 
 
 def _message(request, text="Product memory: prior evidence was read; keep the original requirements."):
@@ -73,7 +73,7 @@ def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path)
         if request.purpose == "compaction":
             assert not request.tools
             assert saved["max_output_tokens"] == request.max_output_tokens > 0
-    source_ids = {record["event_id"] for record in system.orchestrator._department_history_records(run_id, "product")}
+    source_ids = {record["event_id"] for record in department_history(system, run_id, "product")}
     summary_ids = {event.event_id for event in events if event.type == EventType.MODEL_MESSAGE and event.payload.get("purpose") == "compaction"}
     assert summary_ids and source_ids.isdisjoint(summary_ids)
     for record in result.compactions:
@@ -157,7 +157,7 @@ def test_cancelled_compaction_keeps_observed_summary_without_adopting_it(tmp_pat
     assert len(adapter.invocations) == 2
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.MODEL_MESSAGE and event.payload.get("purpose") == "compaction" for event in events)
-    assert "LATE_SUMMARY_MUST_NOT_BE_ADOPTED" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert "LATE_SUMMARY_MUST_NOT_BE_ADOPTED" not in json_dumps(department_history(system, run_id, "product"))
 
 
 CORRUPT_TOOL_NAME = "thought\n<ctrl95><ctrl42>call:list_files"
@@ -209,7 +209,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert len(evidence) == 1
     saved = json.loads(system.artifacts.get_text(evidence[0].payload["message_ref"]["content_hash"]))
     assert saved["type"] == "function_call" and saved["name"] == CORRUPT_TOOL_NAME
-    assert "corrupt-" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert "corrupt-" not in json_dumps(department_history(system, run_id, "product"))
     assert "corrupt-" not in json_dumps([record["source_refs"] for record in result.compactions])
     assert "corrupt-" not in json_dumps(adapter.invocations[-1].input_items)
     assert result.canonical_state() == system.replay(run_id).canonical_state()
@@ -237,7 +237,7 @@ def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_e
                if event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and event.payload.get("purpose") == "compaction")
     raw_tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == 2200
-    history = system.orchestrator._department_history_records(run_id, "product")
+    history = department_history(system, run_id, "product")
     assert raw_tool.event_id in {record["event_id"] for record in history}
     assert "corrupt-" not in json_dumps(history)
     assert result.canonical_state() == system.replay(run_id).canonical_state()
@@ -263,7 +263,7 @@ def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path):
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     assert len(failed) == 1 and failed[0].payload["purpose"] == "compaction"
     assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
-    assert "the first half" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert "the first half" not in json_dumps(department_history(system, run_id, "product"))
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 

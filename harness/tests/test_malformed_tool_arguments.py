@@ -11,7 +11,7 @@ from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, department_history
 
 
 # 故障现场截断参数原文：search 工具流式调用在 path 值之前中断
@@ -40,7 +40,7 @@ def test_truncated_arguments_are_sanitized_before_history_replay(tmp_path):
     assert result.phase == "ENGINEERING"
     assert len(adapter.invocations) == 2
     # 记入历史与下次请求回放的参数恒为有效 JSON 对象
-    history = system.orchestrator._department_history_records(run_id, "product")
+    history = department_history(system, run_id, "product")
     assert history
     for raw in _recorded_call_arguments(history):
         assert isinstance(json.loads(raw), dict)

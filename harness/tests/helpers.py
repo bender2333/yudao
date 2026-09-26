@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter
+from harness.assembly import ContextAssembly
 from harness.context import ContextPart
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, json_dumps
@@ -57,3 +58,8 @@ def recorded_context(system: LoopSystem, call: ModelCall) -> RecordedContext:
 def developer_text(call: ModelCall) -> str:
     # 工作请求的第一条消息：本步装配的全部部门材料
     return call.input_items[0]["content"]
+
+
+def department_history(system: LoopSystem, run_id: str, department: str) -> list[dict]:
+    # 部门历史，按事件由上下文装配（P）重建
+    return ContextAssembly(system.artifacts).department_history(system.store.list_events(run_id), department)

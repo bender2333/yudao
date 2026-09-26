@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -15,6 +14,7 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
                            tool_permission)
 from .artifacts import ArtifactStore
+from .assembly import ContextAssembly
 from .context import ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
@@ -313,6 +313,7 @@ class Orchestrator:
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
         self.assembler = assembler or ContextAssembler(artifacts)
+        self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
         self._state_lock = RLock()
@@ -950,7 +951,7 @@ class Orchestrator:
                                            **activation.versions(),
                                            "effective_contract_hash": activation.effective_contract_hash,
                                            "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
-            records = self._department_history_records(identity.run_id, identity.department)
+            records = self.assembly.department_history(self.store.list_events(identity.run_id), identity.department)
             checkpoint_event = next((item for item in reversed(current.compactions)
                                      if item["department"] == identity.department
                                      and item["effective_contract_hash"] == activation.effective_contract_hash
@@ -1065,37 +1066,6 @@ class Orchestrator:
                 raise ProviderError("assembled context source digest is inconsistent", reason="provider_protocol")
             result.append({"source": part.source, "version": part.version, "text": part.text, "digest": digest})
         return result
-
-    def _department_history_records(self, run_id: str, department: str) -> list[dict[str, Any]]:
-        events = self.store.list_events(run_id)
-        failed_steps = {
-            (event.payload.get("activation_id"), event.payload.get("step_id"))
-            for event in events
-            if event.type == EventType.MODEL_ATTEMPT_FAILED and event.role == department
-        }
-        records: list[dict[str, Any]] = []
-        for event in events:
-            if event.role != department:
-                continue
-            if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED}:
-                if event.payload.get("purpose") == "compaction":
-                    continue
-                if event.type == EventType.MODEL_MESSAGE and (
-                    event.payload.get("activation_id"), event.payload.get("step_id")
-                ) in failed_steps:
-                    continue
-                ref = ArtifactRef(**event.payload["message_ref" if event.type == EventType.MODEL_MESSAGE else "input_ref"])
-                item = json.loads(self.artifacts.get_for_run(run_id, ref))
-            elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and "input_item" in event.payload:
-                if (event.payload.get("activation_id"), event.payload.get("step_id")) in failed_steps:
-                    continue
-                item = event.payload["input_item"]
-            else:
-                continue
-            records.append({"event_id": event.event_id, "seq": event.seq,
-                            "activation_id": event.payload["activation_id"], "step_id": event.payload["step_id"],
-                            "type": event.type, "item": item, "item_digest": canonical_hash(item)})
-        return records
 
     def _record_tool_call_required(self, activation: _Activation, request: ModelRequest,
                                    item: dict[str, Any], count: int) -> None:

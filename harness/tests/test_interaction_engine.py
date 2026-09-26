@@ -16,7 +16,7 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import recorded_context
+from harness.tests.helpers import department_history, recorded_context
 from harness.tools import ToolRuntime
 
 
@@ -252,7 +252,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     skipped = _events(system, run_id, EventType.TOOL_SKIPPED)
     assert [event.payload["id"] for event in skipped] == ["second", "submission"]
     assert all(event.payload["input_version"] == 1 for event in skipped)
-    visible_history(system.orchestrator._department_history_records(run_id, "engineering"))
+    visible_history(department_history(system, run_id, "engineering"))
     assert system.activate_once(run_id).processed_input_version == 2
 
 

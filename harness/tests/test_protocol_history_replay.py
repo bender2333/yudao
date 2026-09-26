@@ -9,6 +9,7 @@ from harness.models import json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
+from harness.tests.helpers import department_history
 
 
 # 本地回环服务按协议回放两轮流：第一轮文字加两个并行工具调用，第二轮提交产品要求；
@@ -119,7 +120,7 @@ def _run_product_activation(tmp_path, responder, protocol: str):
         system = LoopSystem(tmp_path, facade=facade)
         run_id = system.create_run("echo")
         result = system.activate_once(run_id)
-        history = system.orchestrator._department_history_records(run_id, "product")
+        history = department_history(system, run_id, "product")
     finally:
         server.shutdown()
         server.server_close()

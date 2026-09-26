@@ -3,7 +3,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import TOOL_CALL_REQUIRED_LIMIT
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, run_scripted
+from harness.tests.helpers import department_history, happy_script, run_scripted
 
 
 def test_happy_path_requires_quality_release(data_dir):
@@ -365,5 +365,5 @@ def test_truncated_work_response_is_terminal_without_retry(data_dir):
     assert len(failed) == 1 and failed[0].payload["purpose"] == "work"
     assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
     assert not any(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events)
-    assert "TRUNCATED_WORK" not in json_dumps(system.orchestrator._department_history_records(run_id, "product"))
+    assert "TRUNCATED_WORK" not in json_dumps(department_history(system, run_id, "product"))
     assert result.canonical_state() == system.replay(run_id).canonical_state()

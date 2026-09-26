@@ -13,7 +13,7 @@ from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, list_files_turn, recorded_context
+from harness.tests.helpers import FAST_RETRIES, department_history, list_files_turn, recorded_context
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -208,7 +208,7 @@ def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path):
 
     assert result.phase == "ENGINEERING"
     assert "must-not-exist.txt" not in system.workspace(run_id).list_files()
-    history = system.orchestrator._department_history_records(run_id, "product")
+    history = department_history(system, run_id, "product")
     assert "failed-call" not in json_dumps(history)
     events = system.store.list_events(run_id)
     assert any(item.type == EventType.MODEL_MESSAGE and item.payload.get("response_id") == "failed-call" for item in events)
