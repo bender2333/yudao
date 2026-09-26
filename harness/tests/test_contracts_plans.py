@@ -2,7 +2,6 @@ from dataclasses import asdict, replace
 
 import pytest
 
-import harness.adjudication as adjudication
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.contracts import contract_payload, normalize_scope, path_in_scope, render_plan, render_prd
@@ -164,50 +163,6 @@ def test_plan_without_model_hash_is_bound_to_current_contract_by_host(tmp_path):
     assert all("effective_contract_hash" not in event.payload.get("raw_keys", [])
                for event in system.store.list_events(run_id)
                if event.type == EventType.PROPOSAL_SUBMITTED)
-
-
-def test_sent_plan_cannot_be_rebound_after_contract_changes(tmp_path, monkeypatch):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn()]))
-    run_id = system.create_run("echo")
-    system.activate_once(run_id)
-    evaluate = adjudication.evaluate_proposal
-
-    def change_after_evaluation(**arguments):
-        decision = evaluate(**arguments)
-        assert decision.accepted
-        _accept_new_spec(system, run_id)
-        return decision
-
-    monkeypatch.setattr(adjudication, "evaluate_proposal", change_after_evaluation)
-    result = system.activate_once(run_id)
-
-    assert result.engineering_plan is None
-    rejection = result.rejections[-1]
-    assert rejection["errors"][0]["field"] == "execution_basis"
-    assert not any(event.type == EventType.PLAN_ACCEPTED for event in system.store.list_events(run_id))
-
-
-def test_contract_change_during_proposal_validation_never_rebinds_old_delivery(tmp_path, monkeypatch):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
-    run_id = system.create_run("echo")
-    system.activate_once(run_id)
-    original = system.activate_once(run_id)
-    evaluate = adjudication.evaluate_proposal
-
-    def change_after_evaluation(**arguments):
-        decision = evaluate(**arguments)
-        assert decision.accepted
-        _accept_new_spec(system, run_id)
-        return decision
-
-    monkeypatch.setattr(adjudication, "evaluate_proposal", change_after_evaluation)
-    current = system.activate_once(run_id)
-    assert current.effective_contract.content_hash != original.effective_contract.content_hash
-    assert current.delivery_spec is None
-    assert current.rejections[-1]["errors"][0]["field"] == "execution_basis"
-    receipt = system.workspace(run_id).snapshot().checks[-1]
-    assert receipt.effective_contract_hash == original.effective_contract.content_hash
-    assert not any(event.type == EventType.DELIVERY_ACCEPTED for event in system.store.list_events(run_id))
 
 
 def test_contract_change_before_tool_start_skips_unstarted_calls(tmp_path):

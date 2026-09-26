@@ -1,19 +1,17 @@
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict
 
 import pytest
 
 import harness.interactions as interactions
-import harness.adjudication as adjudication
 from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.compaction import visible_history
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn, plan_turn,
-    product_decision, product_spec, response_turn, review, review_turn,
+    product_decision, product_spec, response_turn, review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
@@ -306,27 +304,6 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     assert current.input_version == 2 and current.processed_input_version == 1
     assert not _events(system, run_id, EventType.RUN_DONE)
     assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
-
-
-def test_input_between_review_validation_and_commit_wins_over_old_release(tmp_path, monkeypatch):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Current check passed"),
-    ]))
-    run_id = system.create_run("build echo")
-    _steps(system, run_id, 3)
-    evaluate = adjudication.evaluate_proposal
-
-    def receive_after_validation(**arguments):
-        decision = evaluate(**arguments)
-        assert decision.accepted
-        system.add_input(run_id, "Print uppercase instead")
-        return decision
-
-    monkeypatch.setattr(adjudication, "evaluate_proposal", receive_after_validation)
-    current = system.activate_once(run_id)
-    assert current.phase == "PRODUCT_SPEC" and current.last_review is None
-    assert current.rejections[-1]["errors"][0]["field"] == "execution_basis"
-    assert not _events(system, run_id, EventType.RUN_DONE)
 
 
 def test_release_commit_and_later_input_share_one_control_order(tmp_path, monkeypatch):

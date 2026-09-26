@@ -2,12 +2,10 @@ from dataclasses import asdict
 
 import pytest
 
-import harness.adjudication as adjudication
-import harness.submissions as submissions
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec
 from harness.public_tree import capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
@@ -59,81 +57,6 @@ def test_accepted_delivery_restores_complete_tree_without_the_original_workspace
     assert (restored / "empty" / "nested").is_dir()
     assert not (restored / ".checks").exists()
     assert capture_public_tree(restored).digest == delivery.code_tree_digest
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
-
-
-def test_tree_changed_after_validation_cannot_be_accepted_or_rebound(tmp_path, monkeypatch):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
-    run_id = system.create_run("echo")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    evaluate = adjudication.evaluate_proposal
-    store_tree = submissions.store_tree
-    captured = []
-    archived = []
-
-    def mutate_after_validation(**arguments):
-        decision = evaluate(**arguments)
-        assert decision.accepted
-        captured.append(arguments["facts"])
-        system.workspace(run_id).write_file("src/echo.py", "changed after validation")
-        return decision
-
-    def archive_validated_tree(store, run, tree):
-        assert tree.digest == captured[0].digest
-        ref = store_tree(store, run, tree)
-        archived.append(ref)
-        return ref
-
-    monkeypatch.setattr(adjudication, "evaluate_proposal", mutate_after_validation)
-    monkeypatch.setattr(submissions, "store_tree", archive_validated_tree)
-    result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING", result.error
-    assert result.stop_reason is None
-    assert result.delivery_spec is None
-    assert len(captured) == 1
-    assert len(archived) == 0
-    events = system.store.list_events(run_id)
-    assert not any(event.type == EventType.DELIVERY_ACCEPTED for event in events)
-    assert not any(event.type == EventType.RUN_FAILED for event in events)
-    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
-    assert rejected
-    assert any(item.get("field") == "execution_basis" for item in rejected[-1].payload["errors"])
-    receipt = system.workspace(run_id).snapshot().checks[-1]
-    assert receipt.snapshot_hash == captured[0].digest
-    assert receipt.snapshot_hash != system.workspace(run_id).digest()
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
-
-
-def test_tree_changed_after_quality_validation_cannot_release_old_results(tmp_path, monkeypatch):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Verified the complete tree"),
-    ]))
-    run_id = system.create_run("echo")
-    for _ in range(3):
-        current = system.activate_once(run_id)
-    accepted_tree_digest = current.delivery_spec.code_tree_digest
-    evaluate = adjudication.evaluate_proposal
-
-    def mutate_after_quality_validation(**arguments):
-        decision = evaluate(**arguments)
-        assert arguments["department"] == "quality" and decision.accepted
-        assert arguments["facts"].digest == accepted_tree_digest
-        system.workspace(run_id).write_file("src/unreviewed.py", "not part of the reviewed tree")
-        return decision
-
-    monkeypatch.setattr(adjudication, "evaluate_proposal", mutate_after_quality_validation)
-    result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
-    assert result.stop_reason is None
-    assert result.last_review is None
-    assert result.delivery_spec.code_tree_digest == accepted_tree_digest
-    events = system.store.list_events(run_id)
-    assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in events)
-    assert not any(event.type == EventType.RUN_FAILED for event in events)
-    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
-    assert rejected
-    assert any(item.get("field") == "execution_basis" for item in rejected[-1].payload["errors"])
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 

@@ -2,11 +2,9 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
-from harness.models import ArtifactRef, EventType, RunProjection, canonical_hash, estimate_tokens, json_dumps
+from harness.models import ArtifactRef, EventType, canonical_hash, estimate_tokens, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem

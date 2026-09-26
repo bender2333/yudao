@@ -48,14 +48,6 @@ class SessionFactory:
             raise KeyError(run_id)
         return self._sessions[run_id][department]
 
-    def for_run(self, run_id: str) -> dict[str, DepartmentSession]:
-        return self._sessions[run_id]
-
-    def abort_run(self, run_id: str) -> None:
-        for session in self._sessions.get(run_id, {}).values():
-            if session.status == "active":
-                session.close("aborted")
-
     def close_run(self, run_id: str) -> None:
         for session in self._sessions.get(run_id, {}).values():
             session.close("closed")

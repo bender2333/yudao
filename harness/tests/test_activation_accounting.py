@@ -20,38 +20,6 @@ def _message(identity, usage):
     )
 
 
-def test_cancel_between_validation_and_commit_preserves_terminal_state(tmp_path, monkeypatch):
-    import harness.adjudication as module
-
-    validated, release = Event(), Event()
-    evaluate = module.evaluate_proposal
-
-    def blocked_validation(**kwargs):
-        decision = evaluate(**kwargs)
-        validated.set()
-        assert release.wait(5)
-        return decision
-
-    monkeypatch.setattr(module, "evaluate_proposal", blocked_validation)
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
-    run_id = system.create_run("echo")
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(system.activate_once, run_id)
-        try:
-            assert validated.wait(5)
-            cancelled = system.cancel(run_id)
-            assert cancelled.phase == "FAILED"
-            assert cancelled.stop_reason == "cancelled"
-        finally:
-            release.set()
-        result = future.result(timeout=5)
-    events = system.store.list_events(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
-    assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
-    assert sum(event.type == EventType.RUN_FAILED for event in events) == 1
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
-
-
 def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
     entered, release = Event(), Event()
 

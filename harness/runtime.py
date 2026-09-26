@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from .adapters.base import ModelAdapter
-from .adapters.fake import FakeAdapter
 from .artifacts import ArtifactStore
 from .engine import StepLimits
 from .event_store import EventStore

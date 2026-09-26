@@ -166,3 +166,5 @@ claude-opus-5-5 / 2026-09-27 01:24 / docs/architecture-issues.md 为 Messages �
 claude-opus-5-5 / 2026-09-27 02:59 / docs/architecture-issues.md 登记两条：步骤驱动取消时工具进程的停止放在第 14 个提交；安全节点接口的两类时点（proceed 与 settle） / #43 第 10 至 13 个提交执行中发现
 
 claude-opus-5-5 / 2026-09-27 03:03 / docs/design/architecture/overall-architecture.md 第 5 节写明安全节点接口的两个操作，第 7.3 节写明进程类动作的超时与取消结束整个进程树、回执记为超时或已取消；docs/architecture-issues.md 为 #43 第三段登记的两条问题追加处理结论 / #43 第 10 至 13 个提交登记的问题
+
+claude-opus-5-5 / 2026-09-27 05:04 / docs/architecture-issues.md 登记：提案校验之后、提交之前的变化没有公开的时点，替换 evaluate_proposal 的 6 项端到端测试已删除 / #43 第 15 个提交清理测试时发现

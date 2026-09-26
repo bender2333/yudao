@@ -1,7 +1,6 @@
 import asyncio
 import json
 import re
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 

@@ -76,6 +76,10 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
     newer_input = replace(projection, input_version=projection.input_version + 1)
     stale = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
     assert [error.field for error in stale.errors] == ["execution_basis"]
+    other_contract = replace(projection, effective_contract=replace(projection.effective_contract,
+                                                                     content_hash="sha256:other"))
+    rebound = commit_decision(first, current=other_contract, current_facts=facts, **arguments)
+    assert [error.field for error in rebound.errors] == ["execution_basis"]
     system.workspace(projection.run_id).write_file("src/echo.py", "print('changed after validation')\n")
     changed = commit_decision(first, current=projection, current_facts=environment.query(FactsQuery(tree=True)).tree,
                               **arguments)
