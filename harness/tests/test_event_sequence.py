@@ -1,6 +1,8 @@
 import json
+import threading
 import time
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
 import pytest
@@ -320,6 +322,10 @@ HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = [
 ]
 
 
+def _sse_event(kind: str, payload: dict[str, Any]) -> str:
+    return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload})}\n\n"
+
+
 def _responses_reply(index: int, calls: list[tuple[str, dict[str, Any]]]) -> bytes:
     output = [{"id": f"item-{index}-{number}", "type": "function_call", "status": "completed",
                "call_id": f"call-{index}-{number}", "name": name, "arguments": json_dumps(arguments)}
@@ -329,16 +335,12 @@ def _responses_reply(index: int, calls: list[tuple[str, dict[str, Any]]]) -> byt
                 "usage": {"input_tokens": 100 + index, "output_tokens": 10, "total_tokens": 110 + index,
                           "input_tokens_details": {"cached_tokens": 0},
                           "output_tokens_details": {"reasoning_tokens": 0}}}
-
-    def event(kind: str, payload: dict[str, Any]) -> str:
-        return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload})}\n\n"
-
-    frames = [event("response.created", {"response": {**response, "status": "in_progress", "output": [],
-                                                      "usage": None}, "sequence_number": 0})]
+    frames = [_sse_event("response.created", {"response": {**response, "status": "in_progress", "output": [],
+                                                           "usage": None}, "sequence_number": 0})]
     for number, item in enumerate(output, start=1):
-        frames.append(event("response.output_item.done",
-                            {"item": item, "output_index": number - 1, "sequence_number": number}))
-    frames.append(event("response.completed", {"response": response, "sequence_number": len(frames)}))
+        frames.append(_sse_event("response.output_item.done",
+                                 {"item": item, "output_index": number - 1, "sequence_number": number}))
+    frames.append(_sse_event("response.completed", {"response": response, "sequence_number": len(frames)}))
     return sse(*frames)
 
 
@@ -358,26 +360,39 @@ def _chat_reply(index: int, calls: list[tuple[str, dict[str, Any]]]) -> bytes:
 
 
 def _messages_reply(index: int, calls: list[tuple[str, dict[str, Any]]]) -> bytes:
-    def event(kind: str, payload: dict[str, Any]) -> str:
-        return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload})}\n\n"
-
-    frames = [event("message_start", {"message": {
+    frames = [_sse_event("message_start", {"message": {
         "id": f"msg-{index}", "type": "message", "role": "assistant", "model": "scenario-model-actual",
         "content": [], "usage": {"input_tokens": 100 + index, "output_tokens": 1}}})]
     for number, (name, arguments) in enumerate(calls):
         frames.extend([
-            event("content_block_start", {"index": number, "content_block": {
+            _sse_event("content_block_start", {"index": number, "content_block": {
                 "type": "tool_use", "id": f"toolu-{index}-{number}", "name": name, "input": {}}}),
-            event("content_block_delta", {"index": number, "delta": {
+            _sse_event("content_block_delta", {"index": number, "delta": {
                 "type": "input_json_delta", "partial_json": json_dumps(arguments)}}),
-            event("content_block_stop", {"index": number}),
+            _sse_event("content_block_stop", {"index": number}),
         ])
-    frames.append(event("message_delta", {"delta": {"stop_reason": "tool_use"}, "usage": {"output_tokens": 10}}))
-    frames.append(event("message_stop", {}))
+    frames.append(_sse_event("message_delta", {"delta": {"stop_reason": "tool_use"}, "usage": {"output_tokens": 10}}))
+    frames.append(_sse_event("message_stop", {}))
     return sse(*frames)
 
 
 HTTP_REPLIES = {"responses": _responses_reply, "chat_completions": _chat_reply, "messages": _messages_reply}
+
+
+def _provider_system(data_dir, base: str, protocol: str, *, timeout_sec: float = 20.0,
+                     step_limits: StepLimits = StepLimits()) -> tuple[LoopSystem, str]:
+    # 三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
+    facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
+    facade.store_document({
+        "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
+                       "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
+        "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model", "protocol": protocol,
+                    "context_window": 32000, "max_output_tokens": 2048}],
+        "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
+    })
+    facade.record_admission("local", "m-local", admitted_model="scenario-model")
+    system = LoopSystem(data_dir, facade=facade, step_limits=step_limits)
+    return system, system.create_run("build an echo CLI")
 
 
 def _http_scenario(protocol: str):
@@ -390,23 +405,121 @@ def _http_scenario(protocol: str):
 
         server, _capture, base = serve(responder)
         try:
-            facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"},
-                                                                use_env=False))
-            facade.store_document({
-                "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
-                               "credential_ref": "SCENARIO_KEY", "timeout_sec": 20.0}],
-                "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model", "protocol": protocol,
-                            "context_window": 32000, "max_output_tokens": 2048}],
-                "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
-            })
-            facade.record_admission("local", "m-local", admitted_model="scenario-model")
-            system = LoopSystem(data_dir, facade=facade)
-            run_id = system.create_run("build an echo CLI")
+            system, run_id = _provider_system(data_dir, base, protocol)
             system.run_until_stop(run_id)
         finally:
             server.shutdown()
             server.server_close()
         return system, run_id, {base: "<provider>"}
+
+    return run
+
+
+# 真实 Provider 模块的失败、重试与取消：测试内启动的 HTTP 服务按请求顺序执行回复脚本，每一项自己写出这次请求的回复
+class _ScriptedProvider:
+    def __init__(self, replies: list[Callable[["_ScriptedProvider", BaseHTTPRequestHandler], None]]) -> None:
+        self.replies = list(replies)
+        # held：服务端收到一个保持不回复的请求；release：场景结束，保持的请求不再等待
+        self.held = threading.Event()
+        self.release = threading.Event()
+        provider = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args: Any) -> None:
+                return
+
+            def do_POST(self) -> None:
+                self.rfile.read(int(self.headers["Content-Length"]))
+                reply = provider.replies.pop(0)
+                try:
+                    reply(provider, self)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    return
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.release.set()
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def _held(provider: _ScriptedProvider, _handler: BaseHTTPRequestHandler) -> None:
+    # 收到请求以后一直不回复，直到场景结束
+    provider.held.set()
+    provider.release.wait(60)
+
+
+def _send(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes, *,
+          headers: tuple[tuple[str, str], ...] = (), declared_length: int | None = None) -> None:
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(body) if declared_length is None else declared_length))
+    for name, value in headers:
+        handler.send_header(name, value)
+    handler.end_headers()
+    handler.wfile.write(body)
+    handler.wfile.flush()
+
+
+def _product_spec_stream(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    _send(handler, 200, "text/event-stream", _responses_reply(1, HTTP_SCRIPT[0]))
+
+
+def _http_error(status: int, code: str, *headers: tuple[str, str]):
+    def reply(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+        body = json.dumps({"error": {"code": code, "type": "server_error", "message": "scenario failure"}})
+        _send(handler, status, "application/json", body.encode("utf-8"), headers=headers)
+
+    return reply
+
+
+def _broken_stream(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    # 送出 response.created 与一条完整的输出之后连接关闭：声明的长度没有送完，回复在中途断开
+    created = {"id": "resp-broken", "object": "response", "created_at": 1, "status": "in_progress",
+               "model": "scenario-model-actual", "output": [], "usage": None, "error": None,
+               "incomplete_details": None}
+    item = {"id": "partial-message", "type": "message", "role": "assistant", "status": "completed",
+            "content": [{"type": "output_text", "text": "partial output before the connection broke",
+                         "annotations": []}]}
+    body = sse(_sse_event("response.created", {"response": created, "sequence_number": 0}),
+               _sse_event("response.output_item.done", {"item": item, "output_index": 0, "sequence_number": 1}))
+    _send(handler, 200, "text/event-stream", body, declared_length=len(body) + 4096)
+
+
+def _cancel_while_provider_holds(protocol: str):
+    def run(data_dir):
+        provider = _ScriptedProvider([_held])
+        try:
+            system, run_id = _provider_system(data_dir, provider.base, protocol)
+
+            def cancel_when_held() -> None:
+                provider.held.wait(60)
+                system.cancel(run_id)
+
+            canceller = threading.Thread(target=cancel_when_held)
+            canceller.start()
+            system.run_until_stop(run_id)
+            canceller.join(60)
+        finally:
+            provider.close()
+        return system, run_id, {provider.base: "<provider>"}
+
+    return run
+
+
+def _responses_failure_then_success(first, *, timeout_sec: float = 20.0, step_limits: StepLimits = FAST_RETRIES):
+    def run(data_dir):
+        provider = _ScriptedProvider([first, _product_spec_stream])
+        try:
+            system, run_id = _provider_system(data_dir, provider.base, "responses", timeout_sec=timeout_sec,
+                                              step_limits=step_limits)
+            system.activate_once(run_id)
+        finally:
+            provider.close()
+        return system, run_id, {provider.base: "<provider>"}
 
     return run
 
@@ -487,6 +600,35 @@ SCENARIOS: dict[str, Scenario] = {
     "http_messages_handoff": Scenario(
         "经真实 Provider 模块与测试内启动的 HTTP 服务（Messages 协议）走完交接与放行：记录序列化请求、流式进度与用量。",
         _http_scenario("messages")),
+    "http_responses_cancel_while_provider_holds": Scenario(
+        "经真实 Provider 模块（Responses 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
+        "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
+        _cancel_while_provider_holds("responses")),
+    "http_chat_cancel_while_provider_holds": Scenario(
+        "经真实 Provider 模块（Chat Completions 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
+        "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
+        _cancel_while_provider_holds("chat_completions")),
+    "http_messages_cancel_while_provider_holds": Scenario(
+        "经真实 Provider 模块（Messages 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
+        "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
+        _cancel_while_provider_holds("messages")),
+    "http_responses_retry_after_then_success": Scenario(
+        "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 429 并带 Retry-After: 1，记录失败的尝试与按 Retry-After "
+        "等待 1 秒的重试安排，同一个逻辑调用的第二次尝试成功，产品规格被接纳。",
+        _responses_failure_then_success(_http_error(429, "rate_limit_exceeded", ("Retry-After", "1")),
+                                        step_limits=StepLimits())),
+    "http_responses_server_error_then_success": Scenario(
+        "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 500（server_error），记录可重试的失败与重试安排，"
+        "第二次尝试成功，产品规格被接纳。",
+        _responses_failure_then_success(_http_error(500, "server_error"))),
+    "http_responses_stream_broken_then_success": Scenario(
+        "经真实 Provider 模块（Responses 协议）：流式回复送出 response.created 与一条输出之后连接中途断开："
+        "已收到的输出只作为审计记录，不进入重试请求，失败可重试，第二次尝试成功，产品规格被接纳。",
+        _responses_failure_then_success(_broken_stream)),
+    "http_responses_timeout_then_success": Scenario(
+        "经真实 Provider 模块（Responses 协议）：服务端收到请求后一直不回复，超过请求时限（10 秒）："
+        "尝试记为 provider_timeout 的可重试失败，第二次尝试成功，产品规格被接纳。",
+        _responses_failure_then_success(_held, timeout_sec=10.0)),
 }
 
 
