@@ -145,6 +145,67 @@ def test_cli_default_command(tmp_path, monkeypatch):
     assert cfg["reload_error"] is None
 
 
+_ABSENT_KEY = "YUDAO_STARTUP_ABSENT_KEY"
+
+
+def _startup_config(state: str):
+    if state == "missing":
+        return None
+    if state == "invalid_json":
+        return "{ not json"
+    if state == "empty_catalog":
+        return {"providers": [], "models": [], "bindings": {}}
+    if state == "unbound":
+        return _fake_catalog_only()
+    return {
+        "providers": [{"id": "p1", "name": "P1", "base_url": "https://example.com/v1",
+                       "credential_ref": _ABSENT_KEY, "timeout_sec": 60}],
+        "models": [{"id": "m1", "provider_id": "p1", "model": "m", "protocol": "responses",
+                    "context_window": 8000, "max_output_tokens": 512}],
+        "bindings": {department: {"provider_id": "p1", "model_id": "m1"}
+                     for department in ("product", "engineering", "quality")},
+    }
+
+
+@pytest.mark.parametrize("state", ["missing", "invalid_json", "empty_catalog", "unbound", "missing_key"])
+def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, monkeypatch, state):
+    """缺文件、坏 JSON、空目录、未绑定、缺 Key：CLI 装配与控制台照常启动，新建任务被拒绝。"""
+    import harness.__main__ as cli_mod
+    from harness.providers import CatalogValidationError
+    from harness.tests.test_provider_config_web import get_json, request, running_server
+
+    monkeypatch.delenv(_ABSENT_KEY, raising=False)
+    monkeypatch.setattr(cli_mod, "DEFAULT_DOTENV", tmp_path / ".env")
+    config_path = tmp_path / "providers.json"
+    content = _startup_config(state)
+    if isinstance(content, str):
+        _write_text(config_path, content)
+    elif content is not None:
+        _write_json(config_path, content)
+
+    system = cli_mod._production_system(tmp_path / "data", config_path)
+    with running_server(system) as (_server, host, port):
+        status, html = request(host, port, "GET", "/")
+        assert status == 200
+        assert "provider-config.js" in html
+        health = get_json(host, port, "/api/health")
+        listed = get_json(host, port, "/api/providers")
+    assert health["provider_available"] is False
+    assert isinstance(listed["providers"], list)
+    status_view = system.facade.config_status()
+    if state == "invalid_json":
+        assert status_view["reload_error"]
+        assert health["provider_reload_error"]
+    else:
+        assert status_view["reload_error"] is None
+    if state == "missing_key":
+        assert _ABSENT_KEY in status_view["message"]
+    with pytest.raises(CatalogValidationError):
+        system.create_run("must not start without a ready provider")
+    assert system.list_run_ids() == []
+    system.close()
+
+
 # ---------------------------------------------------------------------------
 # 3. 结构合法的部分保存
 # ---------------------------------------------------------------------------

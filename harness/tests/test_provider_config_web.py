@@ -258,6 +258,44 @@ def test_import_keeps_old_catalog_on_invalid_document(tmp_path):
         assert health["provider_available"] is False
 
 
+def test_moving_a_model_to_another_connection_keeps_one_owner_and_moves_bindings(tmp_path):
+    def provider(provider_id):
+        return {"id": provider_id, "name": provider_id, "base_url": "", "credential_ref": "", "timeout_sec": 600}
+
+    def bindings(provider_id):
+        return {department: {"provider_id": provider_id, "model_id": "model-a"} for department in DEPARTMENTS}
+
+    document = {
+        "providers": [provider("fake-a"), provider("fake-b")],
+        "models": [_model_document("model-a", "fake-a")],
+        "bindings": bindings("fake-a"),
+    }
+    system, config = catalog_system(tmp_path, document)
+    before = config.read_text(encoding="utf-8")
+    with running_server(system) as (_server, host, port):
+        # 只换归属而绑定仍指向旧归属：整份拒绝并指出绑定位置，原目录不变
+        status, body = request(host, port, "POST", "/api/providers", {
+            **document, "models": [_model_document("model-a", "fake-b")]})
+        assert status == 400, body
+        assert "bindings.product" in body
+        assert config.read_text(encoding="utf-8") == before
+        # 同名模型同时留在新旧两个归属：整份拒绝
+        status, body = request(host, port, "POST", "/api/providers", {
+            **document, "models": [_model_document("model-a", "fake-a"), _model_document("model-a", "fake-b")]})
+        assert status == 400, body
+        assert config.read_text(encoding="utf-8") == before
+        # 移动：模型换到新归属，部门绑定跟随
+        status, body = request(host, port, "POST", "/api/providers", {
+            **document, "models": [_model_document("model-a", "fake-b")], "bindings": bindings("fake-b")})
+        assert status == 200, body
+        listed = get_json(host, port, "/api/providers")
+    owners = {item["id"]: [model["id"] for model in item["models"]] for item in listed["providers"]}
+    assert owners == {"fake-a": [], "fake-b": ["model-a"]}
+    assert {binding["provider_id"] for binding in listed["bindings"].values()} == {"fake-b"}
+    saved = json.loads(config.read_text(encoding="utf-8"))
+    assert [(model["id"], model["provider_id"]) for model in saved["models"]] == [("model-a", "fake-b")]
+
+
 def test_fake_test_connection_skips_network(tmp_path):
     system, _config = catalog_system(tmp_path)
     with running_server(system) as (_server, host, port):
@@ -515,7 +553,11 @@ def test_provider_presets_endpoint_exposes_version_and_go_endpoints(tmp_path):
     assert payload["source"]
     preset = payload["presets"][0]
     assert preset["id"] == "opencode-go"
-    assert set(preset["endpoints"]) == {"responses", "chat_completions", "messages"}
+    assert preset["base_urls"] == {
+        "responses": "https://opencode.ai/zen/go/v1",
+        "chat_completions": "https://opencode.ai/zen/go/v1",
+        "messages": "https://opencode.ai/zen/go/v1",
+    }
     assert preset["models_url"].endswith("/zen/go/v1/models")
     assert preset["auth"] == "api_key"
     assert {hint["protocol"] for hint in preset["known_models"]} == {

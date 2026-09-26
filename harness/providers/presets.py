@@ -5,7 +5,7 @@ from typing import Any, Mapping
 
 
 # 预置表是模块内数据，带版本与来源，不做远端热更（ADR-0003）
-PRESET_TABLE_VERSION = "2026-09-19.1"
+PRESET_TABLE_VERSION = "2026-09-26.1"
 PRESET_TABLE_SOURCE = "https://opencode.ai/docs/go/ 与 https://opencode.ai/zen/go/v1/models（2026-09-19 采集）"
 
 
@@ -14,7 +14,7 @@ def _preset(
     name: str,
     *,
     auth: str,
-    endpoints: Mapping[str, str],
+    base_urls: Mapping[str, str],
     models_url: str,
     docs_url: str,
     header_profile: str = "",
@@ -26,7 +26,7 @@ def _preset(
         "id": preset_id,
         "name": name,
         "auth": auth,
-        "endpoints": dict(endpoints),
+        "base_urls": dict(base_urls),
         "models_url": models_url,
         "docs_url": docs_url,
         "header_profile": header_profile,
@@ -36,16 +36,17 @@ def _preset(
     }
 
 
-# 每个模型访问定义只声明一条协议，同一服务下的不同模型可以走不同协议
+# 每个模型访问定义只声明一条协议，同一服务下的不同模型可以走不同协议；
+# base_urls 是按协议的请求基址，请求路径由各协议适配器拼接
 _PRESETS: tuple[dict[str, Any], ...] = (
     _preset(
         "opencode-go",
         "OpenCode Go",
         auth="api_key",
-        endpoints={
-            "responses": "https://opencode.ai/zen/go/v1/responses",
-            "chat_completions": "https://opencode.ai/zen/go/v1/chat/completions",
-            "messages": "https://opencode.ai/zen/go/v1/messages",
+        base_urls={
+            "responses": "https://opencode.ai/zen/go/v1",
+            "chat_completions": "https://opencode.ai/zen/go/v1",
+            "messages": "https://opencode.ai/zen/go/v1",
         },
         models_url="https://opencode.ai/zen/go/v1/models",
         docs_url="https://opencode.ai/docs/go/",
@@ -125,7 +126,7 @@ def _public_preset(item: Mapping[str, Any]) -> dict[str, Any]:
         "id": item["id"],
         "name": item["name"],
         "auth": item["auth"],
-        "endpoints": dict(item["endpoints"]),
+        "base_urls": dict(item["base_urls"]),
         "models_url": item["models_url"],
         "docs_url": item["docs_url"],
         "header_profile": item["header_profile"],

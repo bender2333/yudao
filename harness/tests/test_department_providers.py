@@ -71,6 +71,48 @@ def _stream(output: list[dict[str, Any]], *, response_id: str, model: str, usage
     return _Reply(b"".join(frames))
 
 
+def _chat_stream(calls: list[dict[str, Any]], *, response_id: str, model: str) -> _Reply:
+    # Chat Completions 流：每个工具调用一个增量块，随后是结束块与用量块
+    def chunk(choices: list[dict[str, Any]], **extra: Any) -> bytes:
+        body = {"id": response_id, "object": "chat.completion.chunk", "created": 1, "model": model,
+                "choices": choices, **extra}
+        return f"data: {json.dumps(body)}\n\n".encode()
+
+    frames = [
+        chunk([{"index": 0, "finish_reason": None, "delta": {"tool_calls": [{
+            "index": index, "id": call["call_id"], "type": "function",
+            "function": {"name": call["name"], "arguments": call["arguments"]},
+        }]}}])
+        for index, call in enumerate(calls)
+    ]
+    frames.append(chunk([{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]))
+    frames.append(chunk([], usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}))
+    frames.append(b"data: [DONE]\n\n")
+    return _Reply(b"".join(frames))
+
+
+def _messages_stream(calls: list[dict[str, Any]], *, message_id: str, model: str, text: str = "") -> _Reply:
+    # Anthropic Messages 流：文本块与 tool_use 块依次开始、增量、结束
+    frames = [_event("message_start", message={
+        "id": message_id, "type": "message", "role": "assistant", "model": model, "content": [],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    })]
+    blocks: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    if text:
+        blocks.append(({"type": "text", "text": ""}, {"type": "text_delta", "text": text}))
+    for call in calls:
+        blocks.append(({"type": "tool_use", "id": call["call_id"], "name": call["name"], "input": {}},
+                       {"type": "input_json_delta", "partial_json": call["arguments"]}))
+    for index, (block, delta) in enumerate(blocks):
+        frames.append(_event("content_block_start", index=index, content_block=block))
+        frames.append(_event("content_block_delta", index=index, delta=delta))
+        frames.append(_event("content_block_stop", index=index))
+    frames.append(_event("message_delta", delta={"stop_reason": "tool_use" if calls else "end_turn"},
+                         usage={"output_tokens": 1}))
+    frames.append(_event("message_stop"))
+    return _Reply(b"".join(frames))
+
+
 def _error(status: int = 500) -> _Reply:
     return _Reply(
         b'{"error":{"code":"server_error","message":"transient"}}',
@@ -118,6 +160,7 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
                     "body": body,
                     "path": self.path,
                     "authorization": self.headers.get("Authorization"),
+                    "headers": {key.lower(): value for key, value in self.headers.items()},
                     "client_port": self.client_address[1],
                 })
                 reply = responder(body, len(captures))
@@ -739,3 +782,169 @@ def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
         assert audit["manifest_boundary"] is True
         assert audit["context_isolated"] is True
         assert audit["replay_consistent"] is True
+
+
+_MIXED_SECRETS = {"credential-p": "secret-messages-p", "credential-e": "secret-chat-e",
+                  "credential-q": "secret-responses-q"}
+
+
+def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: str) -> ProviderFacade:
+    # 三个部门各绑一条协议：产品 Messages（小窗口触发压缩）、工程 Chat Completions、质检 Responses
+    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade.store_document({
+        "providers": [
+            {"id": "provider-p", "name": "Messages 服务", "base_url": product_url,
+             "credential_ref": "credential-p", "timeout_sec": 10, "preset_id": "opencode-go"},
+            {"id": "provider-e", "name": "Chat 服务", "base_url": engineering_url,
+             "credential_ref": "credential-e", "timeout_sec": 10, "preset_id": "opencode-go"},
+            {"id": "provider-q", "name": "Responses 服务", "base_url": quality_url,
+             "credential_ref": "credential-q", "timeout_sec": 10, "preset_id": "opencode-go"},
+        ],
+        "models": [
+            {"id": "model-p", "provider_id": "provider-p", "model": "p-model", "protocol": "messages",
+             "context_window": 6_000, "max_output_tokens": 1_000},
+            {"id": "model-e", "provider_id": "provider-e", "model": "e-model", "protocol": "chat_completions",
+             "context_window": 20_000, "max_output_tokens": 1_000},
+            {"id": "model-q", "provider_id": "provider-q", "model": "q-model", "protocol": "responses",
+             "context_window": 20_000, "max_output_tokens": 1_000},
+        ],
+        "bindings": {
+            "product": {"provider_id": "provider-p", "model_id": "model-p"},
+            "engineering": {"provider_id": "provider-e", "model_id": "model-e"},
+            "quality": {"provider_id": "provider-q", "model_id": "model-q"},
+        },
+    })
+    for ref, secret in _MIXED_SECRETS.items():
+        facade.set_credential_override(ref, CredentialMaterial(secret, version=f"{ref}-v1"))
+    for provider_id, model_id, model in (("provider-p", "model-p", "p-model"),
+                                         ("provider-e", "model-e", "e-model"),
+                                         ("provider-q", "model-q", "q-model")):
+        facade.record_admission(provider_id, model_id, admitted_model=model)
+    return facade
+
+
+def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_department(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "RETRY_INITIAL_DELAY_SEC", 0.001)
+    monkeypatch.setattr(engine, "RETRY_MAX_DELAY_SEC", 0.001)
+    state = {"read": False}
+
+    def product(body: dict[str, Any], count: int) -> _Reply:
+        # 压缩请求不带工具；工作请求先读大文件，压缩后提交规格
+        assert body["model"] == "p-model"
+        if not body.get("tools"):
+            return _messages_stream([], message_id=f"p-compact-{count}", model="p-model-actual",
+                                    text="The large file was read and is ready for the product decision.")
+        if not state["read"]:
+            state["read"] = True
+            return _messages_stream([_call("read-large", "read_file", {"path": "large.txt"})],
+                                    message_id="p-read", model="p-model-actual")
+        payload = product_spec()
+        payload.pop("kind")
+        return _messages_stream([_call("product-spec", "submit_product_spec", payload)],
+                                message_id="p-spec", model="p-model-actual")
+
+    def engineering(body: dict[str, Any], count: int) -> _Reply:
+        # 第一次请求临时失败，重试后提交计划，下一次激活交付
+        assert body["model"] == "e-model"
+        if count == 1:
+            return _error()
+        if count == 2:
+            payload = engineering_plan()
+            payload.pop("kind")
+            return _chat_stream([_call("engineering-plan", "submit_plan", payload)],
+                                response_id="e-plan", model="e-model-actual")
+        payload = delivery(files=["src/echo.py"], check_names=["smoke"])
+        payload.pop("kind")
+        return _chat_stream([
+            _call("write-echo", "write_file", {"path": "src/echo.py", "content": "import sys\nprint(sys.argv[1])\n"}),
+            _call("engineering-check", "run_check",
+                  {"name": "smoke", "argv": [sys.executable, "-c", "print('engineering')"]}),
+            _call("engineering-delivery", "submit_delivery", payload),
+        ], response_id=f"e-delivery-{count}", model="e-model-actual")
+
+    def quality(body: dict[str, Any], count: int) -> _Reply:
+        assert body["model"] == "q-model"
+        payload = review("release", "The delivery passes.", checks=["smoke"], defects=[])
+        payload.pop("kind")
+        return _stream([
+            _call("quality-check", "collect_evidence",
+                  {"name": "smoke", "argv": [sys.executable, "-c", "print('quality')"]}),
+            _call("quality-review", "submit_review", payload),
+        ], response_id=f"q-review-{count}", model="q-model-actual")
+
+    with _provider_server("provider-p", "unused", product) as (config_p, captures_p, errors_p), \
+            _provider_server("provider-e", "unused", engineering) as (config_e, captures_e, errors_e), \
+            _provider_server("provider-q", "unused", quality) as (config_q, captures_q, errors_q):
+        system = LoopSystem(tmp_path, facade=_mixed_protocol_facade(
+            config_p.base_url, config_e.base_url, config_q.base_url))
+        run_id = system.create_run("build an echo command")
+        system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)
+        result = system.run_until_stop(run_id)
+        other_run = system.create_run("a second task")
+
+    assert not errors_p and not errors_e and not errors_q
+    assert result.phase == "DONE", result.error
+    # 每条协议按自己的路径与认证方式发送
+    assert {item["path"] for item in captures_p} == {"/v1/messages"}
+    assert {item["path"] for item in captures_e} == {"/v1/chat/completions"}
+    assert {item["path"] for item in captures_q} == {"/v1/responses"}
+    assert {item["headers"].get("x-api-key") for item in captures_p} == {_MIXED_SECRETS["credential-p"]}
+    assert {item["authorization"] for item in captures_e} == {f"Bearer {_MIXED_SECRETS['credential-e']}"}
+    assert {item["authorization"] for item in captures_q} == {f"Bearer {_MIXED_SECRETS['credential-q']}"}
+
+    # 工作、压缩与重试都记在发起请求的部门及其绑定的连接、协议与模型上
+    bound = {"product": ("provider-p", "model-p", "messages", "p-model"),
+             "engineering": ("provider-e", "model-e", "chat_completions", "e-model"),
+             "quality": ("provider-q", "model-q", "responses", "q-model")}
+    requests = result.model_requests
+    assert len(requests) == len(captures_p) + len(captures_e) + len(captures_q)
+    for item in requests:
+        assert (item["provider_config_id"], item["model_id"], item["requested_protocol"],
+                item["requested_model"]) == bound[item["department"]]
+    product_purposes = [item["purpose"] for item in requests if item["department"] == "product"]
+    assert product_purposes[0] == product_purposes[-1] == "work"
+    assert set(product_purposes[1:-1]) == {"compaction"}
+    assert result.compactions
+    assert {(item["department"], item["provider_config_id"], item["model_id"]) for item in result.compactions} == {
+        ("product", "provider-p", "model-p")}
+    assert all(not item["body"].get("tools") for item in captures_p[1:-1])
+    engineering_requests = [item for item in requests if item["department"] == "engineering"]
+    assert [item["attempt"] for item in engineering_requests] == [1, 2, 1]
+    assert engineering_requests[1]["retry_of_step_id"] == engineering_requests[0]["step_id"]
+    scheduled = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_RETRY_SCHEDULED]
+    assert [(event.role, event.payload["provider_config_id"]) for event in scheduled] == [("engineering", "provider-e")]
+    assert [item["purpose"] for item in requests if item["department"] == "quality"] == ["work"]
+
+    # 模型输出按统一输出项记录，跨激活回放的历史里只有真实的消息、工具调用与结果
+    for event in system.store.list_events(run_id):
+        if event.type == EventType.MODEL_MESSAGE:
+            item = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["message_ref"])))
+            assert item.get("type") in {"message", "function_call"}, item
+    delivery_messages = captures_e[-1]["body"]["messages"]
+    assert all(message.get("content") != "" for message in delivery_messages)
+    call_index = next(index for index, message in enumerate(delivery_messages) if message.get("tool_calls"))
+    assert [call["id"] for call in delivery_messages[call_index]["tool_calls"]] == ["engineering-plan"]
+    assert delivery_messages[call_index + 1] == {**delivery_messages[call_index + 1],
+                                                 "role": "tool", "tool_call_id": "engineering-plan"}
+    assert [message["tool_call_id"] for message in delivery_messages if message["role"] == "tool"] == [
+        "engineering-plan"]
+
+    # 会话身份：同部门跨激活、重试与压缩不变；部门之间、任务之间互相隔离
+    def run_sessions(target_run: str) -> dict[str, str]:
+        created = next(event for event in system.store.list_events(target_run) if event.type == EventType.RUN_CREATED)
+        return created.payload["sessions"]
+
+    sessions = run_sessions(run_id)
+    assert {item["headers"]["x-opencode-session"] for item in captures_p} == {sessions["product"]}
+    assert {item["headers"]["x-opencode-session"] for item in captures_e} == {sessions["engineering"]}
+    assert {item["headers"]["x-opencode-session"] for item in captures_q} == {sessions["quality"]}
+    assert len(set(sessions.values())) == 3
+    assert set(run_sessions(other_run).values()).isdisjoint(sessions.values())
+
+    public = _public_run_data(system, run_id)
+    assert not any(secret in public for secret in _MIXED_SECRETS.values())
+    audit = summarize_run(system, run_id, scenario="mixed-protocols")
+    assert audit["model_input_audit"]["status"] == "verified", audit["model_input_audit"]["notes"]
+    assert audit["context_isolated"] is True
+    assert audit["replay_consistent"] is True
+    assert audit["fake_used"] is False

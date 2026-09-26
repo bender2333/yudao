@@ -959,7 +959,7 @@ function providerFetch(routes) {
 function samplePreset() {
   return {
     id: "opencode-go", name: "OpenCode Go", auth: "api_key",
-    endpoints: {
+    base_urls: {
       responses: "https://go.example.com/v1",
       chat_completions: "https://go.example.com/v1",
       messages: "https://go.example.com/anthropic",
@@ -1012,7 +1012,10 @@ test("provider empty state lists presets and prefills the form without auto-savi
   assert.match(html, /OPENCODE_GO_KEY/);
   assert.match(html, /https:\/\/go\.example\.com\/v1/);
   assert.match(html, /https:\/\/go\.example\.com\/models/);
-  assert.match(html, /端点（按协议）/);
+  assert.match(html, /请求基址（按协议）/);
+  // 连接地址预填为请求基址，请求路径由协议适配器拼接
+  const providerFormAfter = root.querySelector("[data-pc-form='provider']");
+  assert.equal(providerFormAfter._fields.find(field => field.name === "base_url").node.value, "https://go.example.com/v1");
   assert.match(html, /官方文档与 Key 获取/);
   // 选择方案后展示 Key 输入与内存作用域说明
   assert.match(html, /name="secret"/);

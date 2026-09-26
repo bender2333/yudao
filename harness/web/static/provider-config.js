@@ -165,12 +165,13 @@
     return (presets.presets || []).find(item => item.id === presetId) || null;
   }
 
-  function primaryEndpoint(preset) {
-    const endpoints = preset.endpoints || {};
+  function primaryBaseUrl(preset) {
+    // 连接地址是请求基址，请求路径由各协议适配器拼接
+    const baseUrls = preset.base_urls || {};
     for (const protocol of PROTOCOL_ORDER) {
-      if (endpoints[protocol]) return endpoints[protocol];
+      if (baseUrls[protocol]) return baseUrls[protocol];
     }
-    return Object.values(endpoints)[0] || "";
+    return Object.values(baseUrls)[0] || "";
   }
 
   function defaultCredentialRef(presetId) {
@@ -187,7 +188,7 @@
     // 选择方案只预填表单，不自动保存任何配置或任务绑定
     providerForm.preset_id = preset.id;
     providerForm.name = preset.name || providerForm.name;
-    providerForm.base_url = primaryEndpoint(preset);
+    providerForm.base_url = primaryBaseUrl(preset);
     providerForm.models_url = preset.models_url || "";
     if (preset.auth === "api_key") providerForm.credential_ref = defaultCredentialRef(preset.id);
   }
@@ -213,14 +214,14 @@
   function presetDetailsMarkup() {
     const preset = presetById(providerForm.preset_id);
     if (!preset) return "";
-    const endpoints = PROTOCOL_ORDER
-      .filter(protocol => (preset.endpoints || {})[protocol])
-      .map(protocol => `<div class="yp-endpoint-line"><span>${escapeHtml(protocol)}</span><code>${escapeHtml(preset.endpoints[protocol])}</code></div>`)
+    const baseUrls = PROTOCOL_ORDER
+      .filter(protocol => (preset.base_urls || {})[protocol])
+      .map(protocol => `<div class="yp-endpoint-line"><span>${escapeHtml(protocol)}</span><code>${escapeHtml(preset.base_urls[protocol])}</code></div>`)
       .join("");
     return `<div class="yp-preset-panel" data-preset-panel>
       <strong>${escapeHtml(preset.name)}</strong>
       ${preset.notes ? `<p class="yp-small">${escapeHtml(preset.notes)}</p>` : ""}
-      ${endpoints ? `<div class="yp-small">端点（按协议）</div>${endpoints}` : ""}
+      ${baseUrls ? `<div class="yp-small">请求基址（按协议）</div>${baseUrls}` : ""}
       <p class="yp-small">模型列表地址 ${escapeHtml(preset.models_url || "—")}</p>
       ${preset.docs_url ? `<a class="yp-link" href="${escapeHtml(preset.docs_url)}" target="_blank" rel="noreferrer">官方文档与 Key 获取</a>` : ""}
       <p class="yp-small">来源 ${escapeHtml(preset.source || "—")} · 预置表版本 ${escapeHtml(presets.table_version || "—")}</p>
@@ -614,7 +615,7 @@
             <h3>选择服务方案</h3>
             ${presetError
               ? `<p class="yp-small bad" data-preset-error>服务方案列表读取失败：${escapeHtml(presetError)}；可先使用自定义连接。</p>`
-              : `<p class="yp-small">预置表版本 ${escapeHtml(presets.table_version || "—")}；选择后预填地址、端点、模型列表地址与凭据引用默认值。</p>`}
+              : `<p class="yp-small">预置表版本 ${escapeHtml(presets.table_version || "—")}；选择后预填请求基址、模型列表地址与凭据引用默认值。</p>`}
             ${presetCardsMarkup()}
           </div>
           <div class="yp-setup-path">
