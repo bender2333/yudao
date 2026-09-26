@@ -9,13 +9,19 @@
 
 claude-3-7-sonnet / 2026-09-24 14:26 / 初始化智能体执行日记，建立架构执行问题独立记录文件 docs/architecture-issues.md，更新 AGENTS.md 计划执行角色、GitHub Issues 提法、完成关闭闭环及问题追踪规则。
 
+claude-opus-5-5 / 2026-09-26 12:11 / 领取 #15 真实模型全链路验收。主工作区没有 .yudao/providers.json 与 .yudao/.env，凭据只在 provider.md（2026-09-24 更新，指定 OpenCode Go 免费模型 space-bunny-free，窗口 1048576、输出上限 524288，官方端点表为 Chat Completions）。在工作树 .yudao/acceptance-15/providers.json 建立配置，凭据经启动脚本注入进程环境。模型测试一次真实请求成功（3.2 秒，准入记录 revision 2），凭据可用。
+
 claude-opus-5-5 / 2026-09-26 12:12 / 领取 #46（提示词审计 T1 至 T4、S1）。核对位置：tools.py 的 TOOL_DEFS、处理函数表、错误文字、四个工具描述与 submit_review；collaboration.py 的 _CHECKS；department_prompts.py 质检指令；fake.py 质检检查工具名；smoke.py 回执审计；context.py 的 loop_limits 两处；两个测试文件的旧工具名。计划：先写测试（质检只有 run_check、请求没有剩余循环次数、描述与实际行为一致），再改代码。
+
+claude-opus-5-5 / 2026-09-26 12:27 / 第一次验收 run_c4e724a13fb14af0 在产品部门第二次模型请求即 FAILED / provider_error（HTTP 400）。把捕获的请求原样与逐项去除异常后回放给上游：原样 400，去掉重复的工具结果后 200，只去掉空 user 消息仍 400。根因两处：Chat 与 Messages 适配器把内核装配的 input（已含 function_call_output）翻译后又把 tool_results 追加一遍，同一 tool_call_id 出现两次；两个适配器另外上报一条聚合消息观测（{text, tool_calls}），身份与输出条目不同，未被内核去重，作为无类型条目进入部门历史，Chat 翻译成空 user 消息。测试先行（test_protocol_history_replay.py，本地回环服务，Chat 与 Messages 各一项，先红），修复：input 存在时不再追加 tool_results；删去两个适配器的聚合消息观测，输出条目只经内核按 Responses 形状记入历史（保留 1cc6858 的参数清洗路径）。相关测试通过，全量测试在跑；修复后的服务已重启，第二次验收 run_5f1aff849e244a37 进行中。
 
 claude-opus-5-5 / 2026-09-26 14:10 / 领取 #47（F2）。按 /diagnosing-bugs 建立反馈回路：LoopSystem 与 FakeAdapter 脚本（一次只含文字的回复，再提交 ProductSpec）产生的第二次请求，经 FacadeAdapter 按 Responses、Chat Completions、Messages 编码后发到本机捕获服务，三种协议的最后一条消息都是 assistant，测试失败，复现成立。
 
 claude-opus-5-5 / 2026-09-26 14:20 / 根因：engine.run_department 只遍历 function_call，没有工具调用时直接进入下一步，部门历史的最后一项是助手消息。参照 OMP fdfeef1f78（task/executor.ts:1942、2009-2038 的 yield 说明上限 3 次；session/turn-recovery.ts:74、800、812 的空回复连续计数上限 3 次）与 opencode 0027387（session/prompt.ts:1111-1129 没有工具调用即结束循环，1285 与 1311 要求结构化输出时没有调用工具记为错误）。Yudao 的部门没有用户接手，采用 OMP 的做法：追加 user 消息，写成 tool_call_required 事件进入部门历史，连续计数，第 4 次暂停，停止原因 no_tool_call。
 
 claude-opus-5-5 / 2026-09-26 15:00 / 实现与测试完成并提交 988693c；模型输入审计按事件核对追加的消息与计数。test_provider_retry_engine 中按 3 步一次空回复构造的测试原先依赖 MAX_MODEL_STEPS 为 999999，改为设定 32 步并用只读工具构造成功步骤。登记架构问题：主机消息与「通知」的关系、D09 停止原因、tool_choice。
+
+claude-opus-5-5 / 2026-09-26 15:09 / 第二次验收 run_5f1aff849e244a37 以 DONE / released 结束：834 条事件、7 次部门激活、47 次模型请求（1 次连接中断按重试恢复），04:26 至 04:34（UTC）。工程完成搜索、7 次区间阅读、6 次区间编辑、4 次登记命令 unit-tests（执行前记录登记名、完整参数与快照摘要，结果退出 0 并绑定快照与尝试次数）；交付前 3 次被拒（unit-tests 只有登记命令结果、没有工程检查回执；compile-delivery-files 回执改动了被测树），第 4 次激活补齐 run_check 回执后交付被接纳（seq 687）。质检用 collect_evidence 独立运行 5 项检查后放行（seq 831），事项已采纳（adopt_f6090c38b4bd4587），重放一致，从封存工件独立恢复后 10 条单元测试通过。
 
 claude-opus-5-5 / 2026-09-26 15:46 / 全量测试 1079 项：1076 通过、1 跳过、2 失败（test_range_edit 的符号链接测试、test_activation_responses 的 0.8 秒流超时测试），用 b2eb38c 的代码运行结果相同，与 #47 无关。rebase 到 origin/main 时 docs/CHANGELOG.md 冲突，按时间顺序保留双方记录；推送 e53e52c、4e40c4c。#47 评论写明诊断、参照与验证，因全量测试没有全部通过保持打开。
 
@@ -26,5 +32,7 @@ claude-opus-5-5 / 2026-09-26 16:25 / 流超时一项的根因：请求时限包�
 claude-opus-5-5 / 2026-09-26 17:22 / #101 验证：两项符号链接测试连续 20 次通过；流超时测试连续 20 次通过（与全量测试同时运行，机器负载高）；全量测试 1080 项：1079 通过、1 跳过（本机没有 FIFO），前端 41 项通过。rebase 到 origin/main 时 docs/CHANGELOG.md 与 docs/architecture-issues.md 冲突，按时间顺序保留双方记录；推送 004e139、ce758b8、80f2b2b、e02e3f1。
 
 claude-opus-5-5 / 2026-09-26 17:25 / #46 完成：先写的测试（质检的检查工具只有 run_check、请求中没有 loop_limits 与 cycles_remaining、四个工具的描述与实际行为一致）在修改前失败，修改后通过。全量测试（基于 55cc411）1087 项：1079 通过、1 跳过、7 失败；7 项是符号链接与流超时两项（#101 已修正）和 5 项依赖时间的网络测试，当时五套全量测试并行、CPU 占满，同样 5 项在 55cc411 的代码上同样失败，单独重跑时两边都通过。rebase 到 #101 之后，test_range_edit、test_activation_responses、test_responses、test_department_providers、test_tools、test_context、test_interaction_engine 共 183 项通过；前端 41 项通过。真实模型 smoke 需要 YUDAO_OPENCODE_GO_KEY，本机没有，没有运行。推送 2af0a4d、ce68d61。
+
+claude-opus-5-5 / 2026-09-26 18:26 / #15 全量测试核对：基于 e02e3f1 加适配器修复，57 个测试文件一次只运行一个，全部 exit 0（含 test_smoke 708 秒、test_provider_retry_engine 44 秒、test_activation_responses），前端 41 项通过。此前并发运行时出现的失败与超时（流超时、符号链接、test_responses 3 项、连接复用、两个文件超过 15 分钟）单独运行时都不再出现，属于多套全量测试并行造成的负载。
 
 claude-opus-5-5 / 2026-09-26 18:40 / #103 完成：`submit_delivery` 的描述与 `check_names` 的参数说明写明检查名称必须是本次激活中在当前工作区上调用 `run_check` 时使用的名称，检查之后修改过文件要重新调用 `run_check`，`run_command` 的结果是动作回执；`_accept_delivery` 缺少回执时的拒绝信息写明用这个名称调用 `run_check` 后再提交，`run_command` 的结果不算检查回执，校验规则不变。先写的两项测试在修改前失败：描述测试（`test_tools.py`）与从 `LoopSystem` 整体驱动的测试（`test_registered_commands.py`，工程部门只运行登记命令后提交被拒、检查之后又修改文件再次被拒、重新 `run_check` 后被接纳，质检放行，拒绝原因进入下一次激活的请求，重放一致）。修改后请求估算没有超过现有上限，不需要调整。`run_command` 的描述与提案合同中的「主机回执」两处文字不在工单范围内，登记到 docs/architecture-issues.md。全量测试 1090 项：1089 通过、1 跳过；前端 41 项通过；code-review 没有发现问题。
