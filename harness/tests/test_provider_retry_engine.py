@@ -43,24 +43,16 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_retry_reassembles_context_before_each_attempt(tmp_path, monkeypatch):
+def test_retry_reassembles_context_before_each_attempt(tmp_path):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("echo")
-    assemble_calls = 0
-    original_assemble = system.orchestrator.assembler.assemble
-
-    def assemble(*args, **kwargs):
-        nonlocal assemble_calls
-        assemble_calls += 1
-        return original_assemble(*args, **kwargs)
-
-    monkeypatch.setattr(system.orchestrator.assembler, "assemble", assemble)
     result = system.activate_once(run_id)
 
     assert result.phase == "ENGINEERING"
     first, second = adapter.invocations
-    assert assemble_calls == 4
+    assembled = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
+    assert [event.payload["attempt"] for event in assembled] == [1, 2]
     first_context, second_context = recorded_context(system, first), recorded_context(system, second)
     assert first_context.manifest.source_event_id != second_context.manifest.source_event_id
     assert first.input_items == second.input_items and first.tools == second.tools

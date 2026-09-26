@@ -325,25 +325,6 @@ def test_release_without_quality_evidence_is_rejected(data_dir):
     assert any("quality must run" in error["message"] for item in projection.rejections for error in item["errors"])
 
 
-def test_effective_limits_keep_the_wide_window_and_reserve_half_of_a_narrow_one():
-    from harness.models import RunProjection
-    from harness.orchestrator import Orchestrator
-    from harness.providers import FrozenTarget
-
-    def target(context_window, max_output_tokens):
-        return FrozenTarget(target_key="product", provider_id="fake", provider_name="Fake", model_id="model",
-                            protocol="fake", base_url="", model="model", context_window=context_window,
-                            max_output_tokens=max_output_tokens, timeout_sec=1.0)
-
-    projection = RunProjection(run_id="run_x", task="task", phase="PRODUCT_SPEC", context_window=32000)
-    # (effective window, declared output cap, response reserve). Wide windows keep the 15% reserve
-    # and the 4096 request limit they had before; the narrow window now reserves half of itself.
-    assert Orchestrator._effective_limits(projection, target(32000, 4096)) == (32000, 4096, 4800)
-    assert Orchestrator._effective_limits(projection, target(8000, 4096)) == (8000, 4096, 4000)
-    assert Orchestrator._effective_limits(projection, target(6000, 1000)) == (6000, 1000, 1000)
-    assert Orchestrator._effective_limits(projection, None) == (32000, None, 4800)
-
-
 def test_truncated_work_response_is_terminal_without_retry(data_dir):
     from harness.providers.call import ModelResponse
     from harness.models import EventType, json_dumps

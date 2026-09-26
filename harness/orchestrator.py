@@ -14,19 +14,16 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import (ToolPermission, WorkBasis, commit_decision, guidance_version, proposal_decision,
                            tool_permission)
 from .artifacts import ArtifactStore
-from .assembly import ContextAssembly
-from .context import ContextAssembler, department_work_text
+from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
-from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
-                         visible_history)
+from .compaction import CompactionError, finish_compaction
 from .event_store import EventStore
 from .engine import TOOL_CALL_REQUIRED_LIMIT, ModelCallLoop, StepLimits, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
     Event as RunEvent,
-    ArtifactRef,
     DEFAULT_MAX_CYCLES,
     DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
@@ -38,7 +35,6 @@ from .models import (
     Usage,
     canonical_hash,
     department_for_phase,
-    estimate_tokens,
     json_dumps,
     new_id,
     utc_now,
@@ -101,6 +97,11 @@ class _Activation:
     def basis(self) -> WorkBasis:
         return WorkBasis(self.effective_contract_hash, self.engineering_plan_hash, self.request_id,
                          self.input_version, self.guidance_version)
+
+    @property
+    def frame(self) -> StepFrame:
+        return StepFrame(self.department, self.session_id, self.activation_id, self.prompt, self.guidance_only,
+                         self.effective_contract_hash, self.engineering_plan_hash, self.input_version)
 
 
 @dataclass
@@ -296,7 +297,6 @@ class Orchestrator:
         test_adapter_factory: Any | None = None,
         test_provider: str = "test",
         test_adapter_name: str = "test",
-        assembler: ContextAssembler | None = None,
         sessions: SessionFactory | None = None,
         step_limits: StepLimits = StepLimits(),
     ) -> None:
@@ -312,7 +312,6 @@ class Orchestrator:
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
-        self.assembler = assembler or ContextAssembler(artifacts)
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
@@ -531,11 +530,6 @@ class Orchestrator:
                     or current.input_version != activation.input_version
                     or guidance_version(current, activation.department) > activation.guidance_version)
 
-    @staticmethod
-    def _pending_guidance(projection: RunProjection, department: str) -> list[Any]:
-        return [item for item in projection.department_guidance
-                if item.department == department and item.status in {"received", "in_input"}]
-
     def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
         request = projection.pending_request
@@ -655,14 +649,13 @@ class Orchestrator:
                        f"run wall-clock time {int(elapsed)}s exceeded limit of {projection.run_time_limit_sec}s")
             return None
         normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
-        pending_guidance = [item for item in projection.department_guidance
-                            if item.status in {"received", "in_input"}]
+        waiting_guidance = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
         guidance_only = False
         department = normal_department
         yielded_work = None
-        if projection.pending_request is None and pending_guidance:
-            if normal_department is None or pending_guidance[0].department != normal_department:
-                department = pending_guidance[0].department
+        if projection.pending_request is None and waiting_guidance:
+            if normal_department is None or waiting_guidance[0].department != normal_department:
+                department = waiting_guidance[0].department
                 guidance_only = department != "product"
                 yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
         if department is None:
@@ -731,7 +724,7 @@ class Orchestrator:
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": basis.effective_contract_hash,
                      "engineering_plan_hash": basis.engineering_plan_hash, "request_id": basis.request_id,
-                     "guidance_ids": [item.id for item in self._pending_guidance(projection, department)],
+                     "guidance_ids": [item.id for item in pending_guidance(projection, department)],
                      "guidance_only": guidance_only,
                      "yielded_work": yielded_work,
                      "guidance_version": basis.guidance_version,
@@ -746,7 +739,7 @@ class Orchestrator:
                            effective_contract_hash=basis.effective_contract_hash,
                            engineering_plan_hash=basis.engineering_plan_hash, request_id=basis.request_id,
                            guidance_version=basis.guidance_version,
-                           guidance_ids=tuple(item.id for item in self._pending_guidance(projection, department)),
+                           guidance_ids=tuple(item.id for item in pending_guidance(projection, department)),
                            guidance_only=guidance_only, yielded_work=yielded_work)
 
     @staticmethod
@@ -812,22 +805,6 @@ class Orchestrator:
             "context_window": target.context_window,
             "configured_max_output_tokens": target.max_output_tokens,
         }
-
-    @staticmethod
-    def _effective_limits(projection: RunProjection, target: FrozenTarget | None) -> tuple[int, int | None, int]:
-        """(effective window, model output cap, response reserve).
-
-        The reserve drives compaction and overflow decisions; each request's actual
-        max_output_tokens is settled at assembly as min(cap, window - input estimate).
-        """
-        if target is None:
-            window = projection.context_window
-            return window, None, response_reserve(window, None)
-        effective_window = min(projection.context_window, target.context_window)
-        reserve = response_reserve(effective_window, target.max_output_tokens)
-        if reserve < 1:
-            raise ValueError("the effective context window leaves no room for model output")
-        return effective_window, target.max_output_tokens, reserve
 
     def _invoke_activation(self, activation: _Activation, model_loop: ModelCallLoop) -> None:
         request = activation
@@ -924,24 +901,20 @@ class Orchestrator:
             current = self._close_obsolete_request(identity.run_id, current)
             if activation.basis.changed(current, activation.department):
                 return None
+            # 由 P 装配这一步；装配失败的原因在这里换成停止原因，部门工作消息与请求记录由编排器写入
+            target = identity.target
             try:
-                effective_window, output_limit, output_reserve = self._effective_limits(current, identity.target)
-                guidance_items = self._pending_guidance(current, identity.department) if step_id == 1 else []
+                limits = model_limits(current.context_window,
+                                      None if target is None else target.context_window,
+                                      None if target is None else target.max_output_tokens)
                 events = self.store.list_events(identity.run_id)
                 snapshot_hash = self.workspace(identity.run_id).snapshot().digest
-                pinned = self.assembler.assemble(
-                    current, department=identity.department, session_id=identity.session_id,
-                    activation_id=identity.activation_id, step_id=step_id, prompt=activation.prompt,
-                    context_window=effective_window, max_output_tokens=output_limit,
-                    guidance=guidance_items,
-                    guidance_only=identity.guidance_only,
-                    events=events, snapshot_hash=snapshot_hash,
-                )
+                pinned = self.assembly.pin(current, activation.frame, limits, step_id=step_id,
+                                           events=events, snapshot_hash=snapshot_hash)
             except ValueError as exc:
                 raise ProviderError(str(exc), reason="context_overflow") from exc
-            if step_id == 1:
-                content = department_work_text(pinned)
-                input_item = {"role": "user", "content": content}
+            input_item = pinned.department_input
+            if input_item is not None:
                 received_ref = self.artifacts.put(identity.run_id, "department_input", json_dumps(input_item), media_type="application/json")
                 self.store.append(identity.run_id, EventType.DEPARTMENT_INPUT, role=identity.department,
                                   parent_event_id=activation.parent_event_id, state_before=current.phase,
@@ -951,49 +924,14 @@ class Orchestrator:
                                            **activation.versions(),
                                            "effective_contract_hash": activation.effective_contract_hash,
                                            "engineering_plan_hash": activation.engineering_plan_hash, "request_id": activation.request_id})
-            records = self.assembly.department_history(self.store.list_events(identity.run_id), identity.department)
-            checkpoint_event = next((item for item in reversed(current.compactions)
-                                     if item["department"] == identity.department
-                                     and item["effective_contract_hash"] == activation.effective_contract_hash
-                                     and item["engineering_plan_hash"] == activation.engineering_plan_hash
-                                     and item["input_version"] == activation.input_version
-                                     and item["prompt_version"] == activation.prompt.version
-                                     and item["prompt_hash"] == activation.prompt.prompt_ref.content_hash), None)
-            checkpoint = None
-            checkpoint_id = None
+            history = self.assembly.department_history(self.store.list_events(identity.run_id), identity.department)
             try:
-                if checkpoint_event is not None:
-                    if checkpoint_event["run_id"] != identity.run_id:
-                        raise CompactionError("Compaction checkpoint belongs to a different run")
-                    checkpoint = CompactionCheckpoint(**checkpoint_event["checkpoint"])
-                    saved_summary = self.artifacts.get_for_run(identity.run_id, ArtifactRef(**checkpoint_event["summary_ref"])).decode("utf-8")
-                    if saved_summary != checkpoint.summary:
-                        raise CompactionError("Compaction summary does not match its original artifact")
-                    checkpoint_id = checkpoint_event["source_event_id"]
-                activation.compaction_plan = plan_compaction(
-                    records, checkpoint, effective_window, pinned.input_items, pinned.tools,
-                    output_limit=output_limit,
-                )
-                if activation.compaction_plan is not None:
-                    plan = activation.compaction_plan
-                    assembled = self.assembler.assemble_compaction(
-                        pinned, input_items=plan.input_items, source_refs=plan.source_refs,
-                        max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
-                    )
-                else:
-                    assembled = self.assembler.assemble(
-                        current, department=identity.department, session_id=identity.session_id,
-                        activation_id=identity.activation_id, step_id=step_id,
-                        prompt=activation.prompt,
-                        history=visible_history(records, checkpoint),
-                        compaction_event_id=checkpoint_id,
-                        context_window=effective_window, max_output_tokens=output_limit,
-                        guidance=guidance_items, guidance_only=identity.guidance_only,
-                        events=events, snapshot_hash=snapshot_hash,
-                    )
+                step = self.assembly.request(pinned, history)
             except (CompactionError, ValueError, FileNotFoundError) as exc:
-                reason = "context_overflow" if pinned.manifest.token_estimate >= effective_window - output_reserve else "compaction_failed"
+                reason = "context_overflow" if pinned.fills_window else "compaction_failed"
                 raise ProviderError(str(exc), reason=reason) from exc
+            assembled = step.context
+            activation.compaction_plan = step.compaction_plan
             logical_call_id = self._logical_call_id(
                 identity.activation_id, root_step_id, assembled.manifest.purpose,
             )
@@ -1013,30 +951,21 @@ class Orchestrator:
             activation.previous_usage = activation.usage if activation.has_usage else Usage(reported=True, cost_reported=True)
             activation.step_usage = None
             activation.raw_usage_ref = None
-            estimate = assembled.manifest.token_estimate
-            input_estimate = estimate_tokens(json_dumps({"input": request.input_items, "tools": request.tools}))
-            output_reserve = request.max_output_tokens or 0
-            overflow = input_estimate + output_reserve > effective_window
-            admitted = not overflow
-            request_payload = {"input": request.input_items, "tools": request.tools}
-            if request.max_output_tokens is not None:
-                request_payload["max_output_tokens"] = request.max_output_tokens
-            ref = self.artifacts.put(request.run_id, "model_request", json_dumps(request_payload), media_type="application/json")
-            parts = self._context_parts(assembled)
+            ref = self.artifacts.put(request.run_id, "model_request", json_dumps(step.payload), media_type="application/json")
             parts_ref = self.artifacts.put(
                 request.run_id,
                 "context_parts",
-                json_dumps(parts),
+                json_dumps(step.parts),
                 media_type="application/json",
             )
             payload = asdict(assembled.manifest)
-            payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=admitted,
+            payload.update(run_id=request.run_id, request_ref=asdict(ref), admitted=step.admitted,
                            tokens_charged=0, step_id=step_id, attempt=attempt, root_step_id=root_step_id,
                            retry_of_step_id=retry_of_step_id,
                            **self._target_metadata(identity.target, identity.adapter, identity.snapshot_id),
-                           effective_context_window=effective_window,
-                           input_token_estimate=input_estimate,
-                           output_reserve_tokens=output_reserve,
+                           effective_context_window=step.limits.context_window,
+                           input_token_estimate=step.input_token_estimate,
+                           output_reserve_tokens=step.output_reserve_tokens,
                            parts_ref=asdict(parts_ref),
                            snapshot_hash=snapshot_hash)
             payload.update(attempt_id=attempt_id, logical_call_id=logical_call_id,
@@ -1048,24 +977,10 @@ class Orchestrator:
                                               context_digest=assembled.manifest.digest,
                                               artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload)
             request.context_event_id = context_event.event_id
-            if overflow:
+            if not step.admitted:
                 self._fail(request.run_id, current, "context_overflow", "model request exceeds context_window")
                 return None
             return request
-
-    @staticmethod
-    def _context_parts(assembled: Any) -> list[dict[str, Any]]:
-        parts = list(getattr(assembled, "parts", []) or [])
-        injected = list(getattr(assembled.manifest, "injected", []) or [])
-        if len(parts) != len(injected):
-            raise ProviderError("assembled context sources do not match its manifest", reason="provider_protocol")
-        result = []
-        for part, source in zip(parts, injected):
-            digest = canonical_hash(part.text)
-            if source.digest != digest:
-                raise ProviderError("assembled context source digest is inconsistent", reason="provider_protocol")
-            result.append({"source": part.source, "version": part.version, "text": part.text, "digest": digest})
-        return result
 
     def _record_tool_call_required(self, activation: _Activation, request: ModelRequest,
                                    item: dict[str, Any], count: int) -> None:

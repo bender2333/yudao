@@ -4,15 +4,104 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any
 
+from .adapters.base import ProviderError
 from .artifacts import ArtifactStore
-from .models import ArtifactRef, Event, EventType, canonical_hash
+from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, plan_compaction, response_reserve,
+                         visible_history)
+from .context import AssembledContext, ContextAssembler, department_work_text
+from .models import (ArtifactRef, DepartmentGuidance, DepartmentPrompt, Event, EventType, RunProjection,
+                     canonical_hash, estimate_tokens, json_dumps)
+
+PENDING_GUIDANCE = frozenset({"received", "in_input"})
+
+
+def pending_guidance(projection: RunProjection, department: str) -> list[DepartmentGuidance]:
+    # 部门还没有回应的指导
+    return [item for item in projection.department_guidance
+            if item.department == department and item.status in PENDING_GUIDANCE]
+
+
+@dataclass(frozen=True)
+class ModelLimits:
+    # 按调用目标计算的有效窗口、模型声明的输出上限与为回复保留的空间；保留空间决定何时压缩历史
+    context_window: int
+    output_limit: int | None
+    reserve: int
+
+
+def model_limits(context_window: int, target_window: int | None = None,
+                 output_limit: int | None = None) -> ModelLimits:
+    # 没有调用目标（测试适配器）时只按 run 的窗口计算；每次请求实际的输出上限在装配时按输入估算确定
+    if target_window is None:
+        return ModelLimits(context_window, None, response_reserve(context_window, None))
+    window = min(context_window, target_window)
+    reserve = response_reserve(window, output_limit)
+    if reserve < 1:
+        raise ValueError("the effective context window leaves no room for model output")
+    return ModelLimits(window, output_limit, reserve)
+
+
+@dataclass(frozen=True)
+class StepFrame:
+    # 一次激活装配每一步所需的身份与激活时采用的版本；压缩检查点按这些版本选取
+    department: str
+    session_id: str
+    activation_id: str
+    prompt: DepartmentPrompt
+    guidance_only: bool
+    effective_contract_hash: str | None
+    engineering_plan_hash: str | None
+    input_version: int
+
+
+@dataclass(frozen=True)
+class PinnedStep:
+    # 一步中固定的部分：部门材料与工具定义，不含部门历史
+    projection: RunProjection
+    frame: StepFrame
+    limits: ModelLimits
+    step_id: int
+    guidance: list[DepartmentGuidance]
+    events: list[Event]
+    snapshot_hash: str
+    context: AssembledContext
+
+    @property
+    def department_input(self) -> dict[str, Any] | None:
+        # 激活第一步写入部门历史的工作消息
+        if self.step_id != 1:
+            return None
+        return {"role": "user", "content": department_work_text(self.context)}
+
+    @property
+    def fills_window(self) -> bool:
+        # 固定部分已经占满回复之外的窗口：历史无论怎样压缩都放不下
+        return self.context.manifest.token_estimate >= self.limits.context_window - self.limits.reserve
+
+
+@dataclass(frozen=True)
+class StepRequest:
+    # 一步装配好的请求：发给模型的内容、上下文清单与各段材料、这一步的压缩计划与估算
+    context: AssembledContext
+    compaction_plan: CompactionPlan | None
+    limits: ModelLimits
+    payload: dict[str, Any]
+    parts: list[dict[str, Any]]
+    input_token_estimate: int
+    output_reserve_tokens: int
+
+    @property
+    def admitted(self) -> bool:
+        return self.input_token_estimate + self.output_reserve_tokens <= self.limits.context_window
 
 
 class ContextAssembly:
     def __init__(self, artifacts: ArtifactStore) -> None:
         self.artifacts = artifacts
+        self.assembler = ContextAssembler(artifacts)
 
     def department_history(self, events: list[Event], department: str) -> list[dict[str, Any]]:
         # 部门历史按事件顺序排列：本部门的工作消息、模型输出、主机提示与工具结果；
@@ -45,3 +134,79 @@ class ContextAssembly:
                             "activation_id": event.payload["activation_id"], "step_id": event.payload["step_id"],
                             "type": event.type, "item": item, "item_digest": canonical_hash(item)})
         return records
+
+    def pin(self, projection: RunProjection, frame: StepFrame, limits: ModelLimits, *, step_id: int,
+            events: list[Event], snapshot_hash: str) -> PinnedStep:
+        # 装配这一步的固定部分。待处理指导的原文只在激活第一步交给部门；
+        # guidance_results 按给定的事件与工作区快照计算
+        guidance = pending_guidance(projection, frame.department) if step_id == 1 else []
+        context = self.assembler.assemble(
+            projection, department=frame.department, session_id=frame.session_id,
+            activation_id=frame.activation_id, step_id=step_id, prompt=frame.prompt,
+            context_window=limits.context_window, max_output_tokens=limits.output_limit,
+            guidance=guidance, guidance_only=frame.guidance_only, events=events, snapshot_hash=snapshot_hash,
+        )
+        return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash, context)
+
+    def request(self, pinned: PinnedStep, history: list[dict[str, Any]]) -> StepRequest:
+        # 在固定部分之后接上部门历史：按激活采用的版本取最近一次压缩的检查点，
+        # 历史放不进窗口时装配一次压缩请求，否则装配工作请求
+        frame, limits = pinned.frame, pinned.limits
+        checkpoint, checkpoint_id = self._checkpoint(pinned)
+        plan = plan_compaction(history, checkpoint, limits.context_window, pinned.context.input_items,
+                               pinned.context.tools, output_limit=limits.output_limit)
+        if plan is not None:
+            context = self.assembler.assemble_compaction(
+                pinned.context, input_items=plan.input_items, source_refs=plan.source_refs,
+                max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
+            )
+        else:
+            context = self.assembler.assemble(
+                pinned.projection, department=frame.department, session_id=frame.session_id,
+                activation_id=frame.activation_id, step_id=pinned.step_id, prompt=frame.prompt,
+                history=visible_history(history, checkpoint), compaction_event_id=checkpoint_id,
+                context_window=limits.context_window, max_output_tokens=limits.output_limit,
+                guidance=pinned.guidance, guidance_only=frame.guidance_only,
+                events=pinned.events, snapshot_hash=pinned.snapshot_hash,
+            )
+        payload: dict[str, Any] = {"input": context.input_items, "tools": context.tools}
+        if context.manifest.max_output_tokens is not None:
+            payload["max_output_tokens"] = context.manifest.max_output_tokens
+        return StepRequest(
+            context=context, compaction_plan=plan, limits=limits, payload=payload, parts=_context_parts(context),
+            input_token_estimate=estimate_tokens(json_dumps({"input": context.input_items, "tools": context.tools})),
+            output_reserve_tokens=context.manifest.max_output_tokens or 0,
+        )
+
+    def _checkpoint(self, pinned: PinnedStep) -> tuple[CompactionCheckpoint | None, str | None]:
+        # 摘要必须与它的原始工件一致
+        frame, projection = pinned.frame, pinned.projection
+        recorded = next((item for item in reversed(projection.compactions)
+                         if item["department"] == frame.department
+                         and item["effective_contract_hash"] == frame.effective_contract_hash
+                         and item["engineering_plan_hash"] == frame.engineering_plan_hash
+                         and item["input_version"] == frame.input_version
+                         and item["prompt_version"] == frame.prompt.version
+                         and item["prompt_hash"] == frame.prompt.prompt_ref.content_hash), None)
+        if recorded is None:
+            return None, None
+        if recorded["run_id"] != projection.run_id:
+            raise CompactionError("Compaction checkpoint belongs to a different run")
+        checkpoint = CompactionCheckpoint(**recorded["checkpoint"])
+        summary = self.artifacts.get_for_run(projection.run_id, ArtifactRef(**recorded["summary_ref"])).decode("utf-8")
+        if summary != checkpoint.summary:
+            raise CompactionError("Compaction summary does not match its original artifact")
+        return checkpoint, recorded["source_event_id"]
+
+
+def _context_parts(context: AssembledContext) -> list[dict[str, Any]]:
+    # 上下文清单列出的每一段材料连同原文，写成 context_parts 工件
+    if len(context.parts) != len(context.manifest.injected):
+        raise ProviderError("assembled context sources do not match its manifest", reason="provider_protocol")
+    result = []
+    for part, source in zip(context.parts, context.manifest.injected):
+        digest = canonical_hash(part.text)
+        if source.digest != digest:
+            raise ProviderError("assembled context source digest is inconsistent", reason="provider_protocol")
+        result.append({"source": part.source, "version": part.version, "text": part.text, "digest": digest})
+    return result
