@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial
@@ -477,9 +478,9 @@ class ProviderFacade:
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
                          model: Any) -> InvokeResult:
         # 诊断调用由接口层同步发起，在自己的事件循环中走与正式调用相同的协议与身份路径，
-        # 使用独立会话与尝试身份，每次新建客户端
+        # 使用独立会话，每次新建客户端；Web 服务多线程，同一个模型可能同时测试，每次调用使用唯一的尝试身份
         session_id = f"diagnostic:{target.provider_id}:{model.id}"
-        attempt_id = f"diagnostic:{model.id}:1"
+        attempt_id = f"diagnostic:{model.id}:{uuid4().hex}"
 
         async def run() -> InvokeResult:
             async with aclosing(stream_invocation(target, provider_input, session_id, attempt_id,

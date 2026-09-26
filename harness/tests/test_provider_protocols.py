@@ -249,6 +249,40 @@ def test_model_test_uses_its_own_diagnostic_session():
     assert capture.headers[0]["x-opencode-session"] == "diagnostic:go:m-go"
 
 
+def test_concurrent_model_tests_of_one_model_both_admit():
+    # Web 服务是多线程的：同一个模型的第一次模型测试还在等待提供方时发起第二次，两次都通过并记录准入
+    first_held = Event()
+    release = Event()
+
+    def gated(body: dict):
+        if not first_held.is_set():
+            first_held.set()
+            release.wait(60)
+        return responses_responder(body)
+
+    server, capture, base = serve(gated)
+    results: dict[str, dict] = {}
+    try:
+        facade = facade_with(base + "/v1", protocol="responses")
+        worker = threading.Thread(target=lambda: results.setdefault("first", facade.model_test("go", "m-go")))
+        worker.start()
+        assert first_held.wait(30)
+        results["second"] = facade.model_test("go", "m-go")
+        release.set()
+        worker.join(60)
+        assert not worker.is_alive()
+    finally:
+        release.set()
+        server.shutdown()
+        server.server_close()
+    assert [results[key]["ok"] for key in ("first", "second")] == [True, True], results
+    assert [results[key]["admitted"] for key in ("first", "second")] == [True, True]
+    assert len(capture.requests) == 2
+    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
+    assert stored["admitted_at"] is not None
+    assert stored["admitted_revision"] == max(results[key]["revision"] for key in ("first", "second"))
+
+
 def test_anthropic_base_url_does_not_duplicate_v1():
     assert anthropic_base_url("https://opencode.ai/zen/go/v1") == "https://opencode.ai/zen/go"
     assert anthropic_base_url("https://api.anthropic.com") == "https://api.anthropic.com"
