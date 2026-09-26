@@ -152,3 +152,5 @@ claude-opus-5-5 / 2026-09-26 15:10 / docs/architecture-issues.md 登记 #4、#5 
 claude-opus-5-5 / 2026-09-26 20:52 / docs/requirements/execution-limits.md（D09）与 docs/requirements/provider-retries.md（D17）中的模型步数上限改写为部门循环的参数 `max_model_steps` / #43 第 2 个提交把重试间隔、尝试次数与最大模型步数改为部门循环的参数（StepLimits），模块常量 `MAX_MODEL_STEPS` 已删除
 
 claude-opus-5-5 / 2026-09-26 20:55 / docs/architecture-issues.md 为 2.7 核对登记的问题追加处理结论（由 #84、#48、#91 覆盖）；docs/current-baseline.md 第 5 节写明 2.7 工单的核对结果与 #7 等待 Messages 模型 / 2.7 工单核对完成
+
+claude-opus-5-5 / 2026-09-26 21:40 / 新增 docs/research/fermat-formalization-prove2me.md，docs/research/README.md 登记新资料 / 用户要求在 research 下补充 Anthropic 费马大定理形式化博客与 Prove2Me 项目的一手来源调研及与 Yudao 的对照
