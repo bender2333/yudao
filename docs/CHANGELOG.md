@@ -144,3 +144,5 @@ claude-opus-5-5 / 2026-09-26 17:10 / docs/requirements/execution-limits.md（D09
 claude-opus-5-5 / 2026-09-26 17:50 / docs/architecture-issues.md 登记 #103 的架构问题：`run_command` 的描述与工程部门提案合同中的「主机回执」没有区分动作回执与交付的检查回执 / 实施 #103 时发现请求中另有两处相关文字不在工单范围内，交给架构师决定是否修改
 
 claude-opus-5-5 / 2026-09-26 18:22 / docs/architecture-issues.md 为 #103 登记的问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节加入 #106 / #103 发现请求中另有两处文字没有区分动作回执与检查回执，统一说法并排在 #43 之前
+
+claude-opus-5-5 / 2026-09-26 20:02 / docs/current-baseline.md、docs/stage-3-plan.md、docs/program-roadmap.md 与 docs/design/architecture/overall-architecture.md 第 10 节把 3.2A 改为已验收（#12 至 #15 关闭，真实模型全链路 run_5f1aff849e244a37），删除基线中 #15 受凭据阻塞的开放项 / #15 真实验收完成并关闭
