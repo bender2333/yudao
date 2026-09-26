@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import json
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Event
 
 import pytest
 
 from harness.providers import (
-    CredentialChain,
-    ProviderFacade,
     ProviderInput,
     ProviderMessage,
     ToolSpec,
@@ -17,132 +13,15 @@ from harness.providers import (
     to_provider_input,
 )
 from harness.providers.errors import ProviderError
-
-
-# 本地捕获服务：记录真实请求体与请求头，按协议回放流式响应
-class _Capture:
-    def __init__(self, responder) -> None:
-        self.responder = responder
-        self.requests: list[dict] = []
-        self.headers: list[dict] = []
-        self.paths: list[str] = []
-
-
-class _Handler(BaseHTTPRequestHandler):
-    def log_message(self, *args) -> None:
-        return
-
-    def do_POST(self) -> None:
-        length = int(self.headers.get("content-length") or 0)
-        raw = self.rfile.read(length) if length else b""
-        try:
-            body = json.loads(raw.decode("utf-8"))
-        except (UnicodeError, ValueError):
-            body = {"_raw": raw.decode("latin-1")}
-        capture = self.server.capture
-        capture.requests.append(body)
-        capture.headers.append({key.lower(): value for key, value in self.headers.items()})
-        capture.paths.append(self.path)
-        status, content_type, chunks = capture.responder(body)
-        self.send_response(status)
-        self.send_header("content-type", content_type)
-        self.end_headers()
-        for chunk in chunks:
-            self.wfile.write(chunk)
-            self.wfile.flush()
-
-
-def _serve(responder):
-    capture = _Capture(responder)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
-    server.capture = capture
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    return server, capture, f"http://127.0.0.1:{server.server_address[1]}"
-
-
-def _sse(*events: str) -> bytes:
-    return "".join(events).encode("utf-8")
-
-
-def _chat_responder(body: dict):
-    model = body.get("model") or "gpt-x"
-    def chunk(payload: dict) -> str:
-        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-    events = [
-        chunk({"id": "chat-1", "object": "chat.completion.chunk", "created": 1, "model": model,
-               "choices": [{"index": 0, "delta": {"tool_calls": [
-                   {"index": 0, "id": "call-1", "type": "function",
-                    "function": {"name": "write_file", "arguments": '{"path":'}}]}, "finish_reason": None}]}),
-        chunk({"id": "chat-1", "object": "chat.completion.chunk", "created": 1, "model": model,
-               "choices": [{"index": 0, "delta": {"tool_calls": [
-                   {"index": 0, "function": {"arguments": ' "a.txt"}'}}]}, "finish_reason": "tool_calls"}]}),
-        chunk({"id": "chat-1", "object": "chat.completion.chunk", "created": 1, "model": model,
-               "choices": [], "usage": {"prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17,
-                                        "prompt_tokens_details": {"cached_tokens": 2}}}),
-        "data: [DONE]\n\n",
-    ]
-    return 200, "text/event-stream", [_sse(*events)]
-
-
-def _messages_responder(body: dict):
-    model = body.get("model") or "claude-x"
-    def event(kind: str, payload: dict) -> str:
-        return f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-    events = [
-        event("message_start", {"type": "message_start", "message": {
-            "id": "msg-1", "type": "message", "role": "assistant", "model": model, "content": [],
-            "usage": {"input_tokens": 11, "output_tokens": 1,
-                      "cache_read_input_tokens": 3, "cache_creation_input_tokens": 2}}}),
-        event("content_block_start", {"type": "content_block_start", "index": 0,
-                                      "content_block": {"type": "tool_use", "id": "toolu-1",
-                                                        "name": "write_file", "input": {}}}),
-        event("content_block_delta", {"type": "content_block_delta", "index": 0,
-                                      "delta": {"type": "input_json_delta",
-                                                "partial_json": '{"path": "a.txt"}'}}),
-        event("content_block_stop", {"type": "content_block_stop", "index": 0}),
-        event("message_delta", {"type": "message_delta", "delta": {"stop_reason": "tool_use"},
-                                "usage": {"output_tokens": 7}}),
-        event("message_stop", {"type": "message_stop"}),
-    ]
-    return 200, "text/event-stream", [_sse(*events)]
-
-
-def _responses_responder(body: dict):
-    model = body.get("model") or "gpt-x"
-    def event(kind: str, payload: dict) -> str:
-        return f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-    item = {"id": "msg-1", "type": "message", "role": "assistant",
-            "content": [{"type": "output_text", "text": "ok"}]}
-    events = [
-        event("response.output_item.done", {"type": "response.output_item.done", "item": item}),
-        event("response.completed", {"type": "response.completed", "response": {
-            "id": "resp-1", "model": model, "status": "completed", "output": [item],
-            "usage": {"input_tokens": 9, "output_tokens": 2, "total_tokens": 11}}}),
-    ]
-    return 200, "text/event-stream", [_sse(*events)]
-
-
-def _facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
-                 model: str = "target-model") -> ProviderFacade:
-    facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
-    facade.store_document({
-        "providers": [{
-            "id": "go", "name": "Go", "base_url": base_url,
-            "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": preset_id,
-        }],
-        "models": [{
-            "id": "m-go", "provider_id": "go", "model": model,
-            "protocol": protocol, "context_window": 32000, "max_output_tokens": 2048,
-            "capability_source": "preset-v1",
-        }],
-        "bindings": {},
-    })
-    return facade
-
-
-def _target(facade: ProviderFacade):
-    return facade.resolve_snapshot([{"key": "k", "provider_id": "go", "model_id": "m-go"}]).target("k")
+from harness.tests.protocol_helpers import (
+    bound_target,
+    chat_responder,
+    facade_with,
+    messages_responder,
+    responses_responder,
+    serve,
+    sse,
+)
 
 
 def _input_with_tool(*, follow_up_result: str | None = None) -> ProviderInput:
@@ -164,10 +43,10 @@ def _input_with_tool(*, follow_up_result: str | None = None) -> ProviderInput:
 
 
 def test_chat_wire_format_tool_round_trip_and_identity_headers():
-    server, capture, base = _serve(_chat_responder)
+    server, capture, base = serve(chat_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="chat_completions")
-        target = _target(facade)
+        facade = facade_with(base + "/v1", protocol="chat_completions")
+        target = bound_target(facade)
         result = facade.invoke_once(
             target, _input_with_tool(), session_id="run-1:engineering", attempt_id="a1",
             abort_event=Event(),
@@ -196,11 +75,11 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
 
 
 def test_chat_sends_tool_result_paired_by_tool_call_id():
-    server, capture, base = _serve(_chat_responder)
+    server, capture, base = serve(chat_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="chat_completions")
+        facade = facade_with(base + "/v1", protocol="chat_completions")
         facade.invoke_once(
-            _target(facade), _input_with_tool(follow_up_result="已写入 a.txt"),
+            bound_target(facade), _input_with_tool(follow_up_result="已写入 a.txt"),
             session_id="run-1:engineering", attempt_id="a1", abort_event=Event(),
         )
     finally:
@@ -211,9 +90,9 @@ def test_chat_sends_tool_result_paired_by_tool_call_id():
 
 
 def test_messages_wire_format_system_split_tool_round_trip_and_usage():
-    server, capture, base = _serve(_messages_responder)
+    server, capture, base = serve(messages_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="messages")
+        facade = facade_with(base + "/v1", protocol="messages")
         input_items = [
             {"type": "message", "role": "system", "content": [{"type": "input_text", "text": "部门指令"}]},
             {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "请写文件"}]},
@@ -230,7 +109,7 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
             max_output_tokens=1024,
         )
         result = facade.invoke_once(
-            _target(facade), provider_input, session_id="run-1:product",
+            bound_target(facade), provider_input, session_id="run-1:product",
             attempt_id="a1", abort_event=Event(),
         )
     finally:
@@ -257,15 +136,15 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
 
 
 def test_messages_requires_max_output_tokens_before_connecting():
-    server, capture, base = _serve(_messages_responder)
+    server, capture, base = serve(messages_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="messages")
+        facade = facade_with(base + "/v1", protocol="messages")
         provider_input = ProviderInput(
             messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=None,
         )
         with pytest.raises(ProviderError) as exc_info:
             facade.invoke_once(
-                _target(facade), provider_input, session_id="s", attempt_id="a",
+                bound_target(facade), provider_input, session_id="s", attempt_id="a",
                 abort_event=Event(),
             )
         assert exc_info.value.reason == "provider_protocol"
@@ -276,11 +155,11 @@ def test_messages_requires_max_output_tokens_before_connecting():
 
 
 def test_responses_requests_carry_identity_headers():
-    server, capture, base = _serve(_responses_responder)
+    server, capture, base = serve(responses_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="responses")
+        facade = facade_with(base + "/v1", protocol="responses")
         result = facade.invoke_once(
-            _target(facade), to_provider_input([{"role": "user", "content": "hi"}]),
+            bound_target(facade), to_provider_input([{"role": "user", "content": "hi"}]),
             session_id="run-2:quality", attempt_id="a1", abort_event=Event(),
         )
     finally:
@@ -295,10 +174,10 @@ def test_facade_adapter_accepts_chat_targets():
     # 桥接层不能只认 Responses：Chat 与 Messages 目标同样可用
     from harness.adapters.facade_adapter import FacadeAdapter
 
-    server, _capture, base = _serve(_chat_responder)
+    server, _capture, base = serve(chat_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="chat_completions")
-        adapter = FacadeAdapter(facade, _target(facade))
+        facade = facade_with(base + "/v1", protocol="chat_completions")
+        adapter = FacadeAdapter(facade, bound_target(facade))
         assert adapter.availability().available is True
     finally:
         server.shutdown()
@@ -306,9 +185,9 @@ def test_facade_adapter_accepts_chat_targets():
 
 
 def test_model_test_uses_the_matching_execution_scope_for_chat():
-    server, _capture, base = _serve(_chat_responder)
+    server, _capture, base = serve(chat_responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="chat_completions")
+        facade = facade_with(base + "/v1", protocol="chat_completions")
         result = facade.model_test("go", "m-go")
     finally:
         server.shutdown()
@@ -330,14 +209,14 @@ def test_partial_stream_is_retryable():
     def responder(body: dict):
         # 只发一个事件就断开，模拟不完整流
         events = ['event: message_start\ndata: {"type":"message_start","message":{"id":"m","usage":{"input_tokens":1}}}\n\n']
-        return 200, "text/event-stream", [_sse(*events)]
+        return 200, "text/event-stream", [sse(*events)]
 
-    server, _capture, base = _serve(responder)
+    server, _capture, base = serve(responder)
     try:
-        facade = _facade_with(base + "/v1", protocol="messages")
+        facade = facade_with(base + "/v1", protocol="messages")
         with pytest.raises(ProviderError) as exc_info:
             facade.invoke_once(
-                _target(facade),
+                bound_target(facade),
                 ProviderInput(messages=(ProviderMessage(role="user", content="hi"),), max_output_tokens=64),
                 session_id="s", attempt_id="a", abort_event=Event(),
             )

@@ -17,6 +17,17 @@ MAX_MODEL_STEPS = 999_999
 MAX_PROVIDER_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SEC = 1.0
 RETRY_MAX_DELAY_SEC = 60.0
+# 连续没有调用工具的回复最多追加这么多次说明，再出现一次就结束激活（次数取自 OMP）
+TOOL_CALL_REQUIRED_LIMIT = 3
+
+
+def tool_call_required_text(count: int) -> str:
+    return (
+        f"上一次回复没有调用工具（连续第 {count} 次，最多 {TOOL_CALL_REQUIRED_LIMIT} 次）。"
+        "只回复文字不会推进工作，也不会结束本次激活。"
+        "工作没有完成时，调用下一个需要的工具；工作已经完成时，用本部门的提交工具提交提案。"
+        f"连续第 {TOOL_CALL_REQUIRED_LIMIT + 1} 次仍然没有调用工具时，运行暂停，等待用户处理。"
+    )
 
 
 @dataclass(frozen=True)
@@ -45,11 +56,13 @@ def run_department(
     record_attempt_finished: Callable[[ModelRequest, ModelResponse], None],
     record_attempt_failed: Callable[[ModelRequest, ProviderError, bool], None],
     record_retry_scheduled: Callable[[ModelRequest, ProviderError, float, int], bool],
+    require_tool_call: Callable[[ModelRequest, dict[str, Any], int], None],
     stopped: Callable[[], bool],
 ) -> DepartmentSubmission | None:
     attempt = 1
     root_step_id = 1
     retry_of_step_id = None
+    replies_without_tool_call = 0
     for step_id in range(1, MAX_MODEL_STEPS + 1):
         if stopped():
             return None
@@ -132,6 +145,21 @@ def run_department(
         if request.purpose == "compaction":
             finish_compaction(response)
             continue
+        if not any(item.get("type") == "function_call" for item in response.output):
+            # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
+            replies_without_tool_call += 1
+            if replies_without_tool_call > TOOL_CALL_REQUIRED_LIMIT:
+                raise ProviderError(
+                    f"department replied {replies_without_tool_call} times in a row without calling a tool",
+                    reason="no_tool_call",
+                )
+            require_tool_call(
+                request,
+                {"role": "user", "content": tool_call_required_text(replies_without_tool_call)},
+                replies_without_tool_call,
+            )
+            continue
+        replies_without_tool_call = 0
         for index, item in enumerate(response.output):
             if item.get("type") != "function_call":
                 continue

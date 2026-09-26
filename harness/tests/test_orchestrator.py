@@ -1,6 +1,6 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.engine import MAX_MODEL_STEPS
+from harness.engine import MAX_MODEL_STEPS, TOOL_CALL_REQUIRED_LIMIT
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, run_scripted
@@ -189,14 +189,12 @@ def test_illegal_workpiece_stays_in_department(data_dir):
     assert projection.rejections[0]["errors"][0]["field"] == "kind"
 
 
-def test_natural_language_completion_does_not_finish(data_dir, monkeypatch):
-    import harness.engine as engine
-    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
+def test_natural_language_completion_does_not_finish(data_dir):
     script = [
         product_spec(),
         plan_turn(),
         delivery_turn(),
-        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(32)],
+        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(TOOL_CALL_REQUIRED_LIMIT + 1)],
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
@@ -206,7 +204,7 @@ def test_natural_language_completion_does_not_finish(data_dir, monkeypatch):
     projection = system.activate_once(run_id)
     assert projection.phase == "PAUSED"
     assert projection.outcome != "done"
-    assert projection.stop_reason == "model_steps_exhausted"
+    assert projection.stop_reason == "no_tool_call"
     assert projection.last_review is None
 
 

@@ -8,7 +8,7 @@ from harness.engine import MAX_MODEL_STEPS
 from harness.models import DEFAULT_MAX_CYCLES, DEFAULT_RUN_TIME_LIMIT_SEC, EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, run_scripted
+from harness.tests.helpers import happy_script, list_files_turn, run_scripted
 
 
 def test_time_limit_stops_run_with_failed_state(data_dir):
@@ -46,7 +46,7 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     # 用 10 个激活（超过旧限制 8），验证不会暂停
     script = [
         product_spec(),
-        *[FakeTurn(proposal=None, transcript="working") for _ in range(50)],
+        *[list_files_turn for _ in range(50)],
         plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
@@ -64,7 +64,7 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
 def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     # 旧限制 MAX_MODEL_STEPS=32，新限制 999999
     # 用超过 32 个步骤后提交，验证不会暂停
-    many_steps = [FakeTurn(proposal=None, transcript=f"step {i}") for i in range(40)]
+    many_steps = [list_files_turn for _ in range(40)]
     script = [
         product_spec(),
         *many_steps,
@@ -116,7 +116,7 @@ def test_convergence_with_long_script_reaches_terminal(data_dir):
     # 用较长脚本验证收敛：即使有很多步骤，最终仍到达终态
     long_script = [
         product_spec(),
-        *[FakeTurn(proposal=None, transcript=f"step {i}") for i in range(100)],
+        *[list_files_turn for _ in range(100)],
         plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),

@@ -19,7 +19,7 @@ from .collaboration import guidance_resume_phase, request_basis, request_still_a
 from .compaction import (CompactionCheckpoint, CompactionError, finish_compaction, plan_compaction, response_reserve,
                          visible_history)
 from .event_store import EventStore
-from .engine import MAX_PROVIDER_ATTEMPTS, ToolAdmission, run_department
+from .engine import MAX_PROVIDER_ATTEMPTS, TOOL_CALL_REQUIRED_LIMIT, ToolAdmission, run_department
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -31,6 +31,7 @@ from .models import (
     DepartmentPrompt,
     EventType,
     HUMAN_ACTIONS,
+    PAUSED_REASONS,
     TERMINAL_PHASES,
     Usage,
     canonical_hash,
@@ -872,10 +873,13 @@ class Orchestrator:
                 record_retry_scheduled=lambda request, error, delay, next_step: self._record_retry_scheduled(
                     activation, request, error, delay, next_step,
                 ),
+                require_tool_call=lambda request, item, count: self._record_tool_call_required(
+                    activation, request, item, count,
+                ),
                 stopped=lambda: self._activation_stopped(activation),
             )
         except ProviderError as exc:
-            if exc.reason == "model_steps_exhausted":
+            if exc.reason in PAUSED_REASONS:
                 self._pause(run_id, projection, exc.reason)
             else:
                 self._fail(run_id, projection, exc.reason, str(exc))
@@ -1089,7 +1093,7 @@ class Orchestrator:
         for event in events:
             if event.role != department:
                 continue
-            if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT}:
+            if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED}:
                 if event.payload.get("purpose") == "compaction":
                     continue
                 if event.type == EventType.MODEL_MESSAGE and (
@@ -1108,6 +1112,26 @@ class Orchestrator:
                             "activation_id": event.payload["activation_id"], "step_id": event.payload["step_id"],
                             "type": event.type, "item": item, "item_digest": canonical_hash(item)})
         return records
+
+    def _record_tool_call_required(self, activation: _Activation, request: ModelRequest,
+                                   item: dict[str, Any], count: int) -> None:
+        # 模型回复没有调用工具：主机追加的 user 消息写成事件，进入部门历史
+        with self._state_lock:
+            current = self.project(activation.run_id)
+            ref = self.artifacts.put(activation.run_id, "tool_call_required", json_dumps(item),
+                                     media_type="application/json")
+            self.store.append(activation.run_id, EventType.TOOL_CALL_REQUIRED, role=activation.department,
+                              parent_event_id=activation.parent_event_id, state_before=current.phase,
+                              state_after=current.phase, session_id=activation.session_id,
+                              artifact_hashes=[ref.content_hash],
+                              payload={"activation_id": activation.activation_id, "step_id": request.step_id,
+                                       "attempt_id": request.attempt_id, "context_event_id": request.context_event_id,
+                                       "purpose": request.purpose, "count": count,
+                                       "limit": TOOL_CALL_REQUIRED_LIMIT, "input_ref": asdict(ref),
+                                       **activation.versions(),
+                                       "effective_contract_hash": activation.effective_contract_hash,
+                                       "engineering_plan_hash": activation.engineering_plan_hash,
+                                       "request_id": activation.request_id})
 
     def _finish_compaction(self, activation: _Activation, response: ModelResponse) -> None:
         with self._state_lock:

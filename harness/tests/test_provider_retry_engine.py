@@ -10,6 +10,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, Usage, json_dumps
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tests.helpers import list_files_turn
 
 
 def _fast_retries(monkeypatch):
@@ -133,10 +134,11 @@ def test_retry_after_over_max_stops_without_waiting(tmp_path, monkeypatch):
 
 def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path, monkeypatch):
     _fast_retries(monkeypatch)
+    monkeypatch.setattr(engine, "MAX_MODEL_STEPS", 32)
 
     def transient_until_step_limit(request):
         if request.step_id % 3 == 0:
-            return ModelResponse()
+            return list_files_turn(request)
         return ProviderError("temporary", retryable=True)
 
     adapter = FakeAdapter([transient_until_step_limit] * engine.MAX_MODEL_STEPS)

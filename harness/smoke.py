@@ -14,6 +14,7 @@ from .collaboration import tool_error
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES, CompactionCheckpoint, plan_compaction
 from .context import GUIDANCE_ONLY_TOOLS, ContextAssembler, department_work_text
 from .contracts import current_contract_hash, current_plan_hash
+from .engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
 from .event_store import EventStore
 from .git_audit import verify_git_history
 from .models import (ArtifactRef, EventType, RunProjection, canonical_hash, department_for_phase, estimate_tokens,
@@ -527,6 +528,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     failed_attempts: dict[tuple[str, int], dict[str, Any]] = {}
     step_meta: dict[tuple[str, int], dict[str, Any]] = {}
     retry_schedules: dict[tuple[str, int], dict[str, Any]] = {}
+    tool_steps: set[tuple[str, int]] = set()
+    replies_without_tool_call: dict[str, int] = {}
     intend_bytes = b""
     received_version = 0
     prompt_versions: dict[str, int] = {}
@@ -613,7 +616,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
                               EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
-                              *RETRY_EVENTS}:
+                              EventType.TOOL_CALL_REQUIRED, *RETRY_EVENTS}:
             continue
         try:
             if not activation or not event.role or not event.session_id:
@@ -921,9 +924,21 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if purposes[activation] == "compaction":
                         compacting[(activation, steps[activation])]["outputs"].append(item)
                         continue
+                elif event.type == EventType.TOOL_CALL_REQUIRED:
+                    # 主机只在工作步骤没有调用工具时追加这条消息，计数连续且不超过上限
+                    count = replies_without_tool_call.get(activation, 0) + 1
+                    item = _read_artifact(artifacts, run_id, payload["input_ref"])
+                    if (purposes[activation] != "work" or (activation, steps[activation]) in tool_steps
+                            or payload.get("count") != count or count > TOOL_CALL_REQUIRED_LIMIT
+                            or payload.get("limit") != TOOL_CALL_REQUIRED_LIMIT
+                            or item != {"role": "user", "content": tool_call_required_text(count)}):
+                        raise ValueError("appended tool call message does not follow a reply without tool calls")
+                    replies_without_tool_call[activation] = count
                 else:
                     if purposes[activation] == "compaction":
                         raise ValueError("compaction request executed a tool")
+                    tool_steps.add((activation, steps[activation]))
+                    replies_without_tool_call[activation] = 0
                     item = payload["input_item"]
                     if item.get("type") != "function_call_output" or item.get("call_id") != payload.get("id"):
                         raise ValueError("tool input item does not match its call")
