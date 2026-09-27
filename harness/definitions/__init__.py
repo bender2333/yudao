@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -110,6 +111,19 @@ class Tool(_Definition):
         return self
 
 
+class ProposalContract(_Definition):
+    # 提供给模型的提案合同：提交工具、各提案种类的说明与注意事项，整份写成 JSON 放进请求
+    submit_tools: tuple[Identifier, ...]
+    kinds: dict[Identifier, dict[str, Any]]
+    notes: tuple[str, ...]
+
+
+class ProposalContracts(_Definition):
+    # 各角色自己的部分；shared 是每个角色都有的部分（协作请求、回应与指导的回应），接在角色自己的部分之后
+    roles: dict[Identifier, ProposalContract]
+    shared: ProposalContract
+
+
 class StopReason(_Definition):
     # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
     outcome: Literal["done", "paused", "failed"]
@@ -124,6 +138,7 @@ class Definitions(_Definition):
     roles: dict[Identifier, Role]
     # 工具定义，键是工具名称
     tools: dict[Identifier, Tool]
+    proposal_contracts: ProposalContracts
     limits: Limits
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: dict[Identifier, StopReason]
@@ -135,6 +150,13 @@ class Definitions(_Definition):
     def role(self, department: str) -> Role:
         # 部门的角色（现在每个部门一个角色，编号与部门相同）
         return self.roles[department]
+
+    def proposal_contract(self, department: str) -> dict[str, Any]:
+        # 部门的角色的提案合同：角色自己的部分接上共同的部分；交回副本
+        own, shared = self.proposal_contracts.roles[department], self.proposal_contracts.shared
+        return copy.deepcopy({"submit_tools": [*own.submit_tools, *shared.submit_tools],
+                              "kinds": {**own.kinds, **shared.kinds},
+                              "notes": [*own.notes, *shared.notes]})
 
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因只来自定义中的清单
@@ -149,6 +171,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "organization.json": ("organization", TypeAdapter(Organization)),
     "roles.json": ("roles", TypeAdapter(dict[Identifier, Role])),
     "tools.json": ("tools", TypeAdapter(dict[Identifier, Tool])),
+    "proposal_contracts.json": ("proposal_contracts", TypeAdapter(ProposalContracts)),
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
 }
@@ -239,6 +262,33 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
                            f"提案种类 {tool.proposal} 已经由 {submitters[tool.proposal]} 提交"))
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
+    issues.extend(_contract_references(parts["proposal_contracts"], roles, tools))
+    return issues
+
+
+def _contract_references(contracts: ProposalContracts, roles: dict[str, Role],
+                         tools: dict[str, Tool]) -> list[tuple[str, str, str]]:
+    # 每个角色都有提案合同；合同的提交工具正是角色可以使用的主机工具，合同说明的提案种类正是这些工具提交的种类
+    issues: list[tuple[str, str, str]] = []
+    file = "proposal_contracts.json"
+    for role in sorted(set(roles) - set(contracts.roles)):
+        issues.append((file, f"roles.{role}", "角色没有提案合同"))
+    for role in sorted(set(contracts.roles) - set(roles)):
+        issues.append((file, f"roles.{role}", "提案合同不属于任何角色"))
+    for name, own in contracts.roles.items():
+        if name not in roles:
+            continue
+        submit_tools = [*own.submit_tools, *contracts.shared.submit_tools]
+        host_tools = [tool for tool in roles[name].tools if tool in tools and tools[tool].kind == "host"]
+        if len(submit_tools) != len(set(submit_tools)) or set(submit_tools) != set(host_tools):
+            issues.append((file, f"roles.{name}.submit_tools",
+                           "与共同部分合起来必须恰好是角色可以使用的主机工具：" + "、".join(host_tools)))
+            continue
+        kinds = {tools[tool].proposal for tool in submit_tools}
+        described = set(own.kinds) | set(contracts.shared.kinds)
+        if described != kinds:
+            issues.append((file, f"roles.{name}.kinds",
+                           "与共同部分合起来必须恰好说明这些提案种类：" + "、".join(sorted(kinds))))
     return issues
 
 

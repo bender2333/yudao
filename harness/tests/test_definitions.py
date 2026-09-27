@@ -122,16 +122,39 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
-    assert raised.value.issues == (
+    assert raised.value.issues[:2] == (
         ("roles.json", "engineering.tools[9]", "工具 run_command 没有定义"),
         ("tools.json", "submit_delivery.proposal", "提案种类 engineering_plan 已经由 submit_plan 提交"),
     )
+    # 工程部门的提案合同仍然说明 delivery_spec，与提交工具的种类不再相符
+    assert raised.value.issues[2][:2] == ("proposal_contracts.json", "roles.engineering.kinds")
 
 
-def test_tool_definitions_hand_out_copies(tmp_path):
+def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
+    directory = _copy(tmp_path)
+    contracts = _read(directory, "proposal_contracts.json")
+    contracts["roles"]["engineering"]["submit_tools"] = ["submit_delivery"]
+    del contracts["roles"]["quality"]["kinds"]["qa_review"]
+    del contracts["roles"]["product"]
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert [issue[:2] for issue in raised.value.issues] == [
+        ("proposal_contracts.json", "roles.product"),
+        ("proposal_contracts.json", "roles.engineering.submit_tools"),
+        ("proposal_contracts.json", "roles.quality.kinds"),
+    ]
+
+
+def test_tool_definitions_and_proposal_contracts_hand_out_copies(tmp_path):
     [definition] = tool_definitions(["submit_review"])
     definition["parameters"]["properties"].clear()
+    contract = DEFINITIONS.proposal_contract("quality")
+    contract["kinds"]["qa_review"]["verdict"].append("approve")
+    contract["submit_tools"].clear()
     assert DEFINITIONS.tools["submit_review"].parameters["properties"]["verdict"]["enum"] == [
+        "rework_product", "rework_engineering", "release"]
+    assert DEFINITIONS.proposal_contract("quality")["kinds"]["qa_review"]["verdict"] == [
         "rework_product", "rework_engineering", "release"]
     assert load_definitions() == DEFINITIONS
 

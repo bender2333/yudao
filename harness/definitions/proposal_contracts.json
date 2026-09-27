@@ -1,0 +1,104 @@
+{
+  "roles": {
+    "product": {
+      "submit_tools": ["submit_product_spec", "submit_product_decision"],
+      "kinds": {
+        "product_spec": {
+          "when": ["PRODUCT_SPEC", "REWORK_PRODUCT"],
+          "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria"],
+          "optional": ["boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes", "change_record"],
+          "decision_changes": [{"decision_hash": "every current decision", "disposition": "retain|integrate|retire", "rationale": "reason"}],
+          "change_record": {
+            "when": "required for every revision of an existing ProductSpec",
+            "changed": ["changed behavior"],
+            "retained": ["still valid behavior"],
+            "retired": ["legitimately removed behavior"],
+            "rationale": "reason for the revision"
+          }
+        },
+        "product_decision": {
+          "required": ["kind=product_decision", "statement", "rationale"],
+          "bind": ["current_product_spec.content_hash"]
+        }
+      },
+      "notes": [
+        "普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。",
+        "控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。"
+      ]
+    },
+    "engineering": {
+      "submit_tools": ["submit_plan", "submit_delivery"],
+      "kinds": {
+        "engineering_plan": {
+          "when": ["ENGINEERING", "REWORK_ENGINEERING"],
+          "required": ["kind=engineering_plan", "objective", "scope", "tasks"],
+          "optional": ["refactoring", "assumptions", "reason"],
+          "scope": "relative files, directories ending with /, or . for the full public workspace",
+          "tasks": [{"title": "ordered task", "outputs": ["verifiable output"], "verification": "how to verify"}],
+          "assumptions": [{"decision": "professional default", "basis": "project convention, standard, or maintained component"}],
+          "bind": ["current_contract.content_hash (bound by the host when the proposal is accepted)"]
+        },
+        "delivery_spec": {
+          "when": ["ENGINEERING", "REWORK_ENGINEERING"],
+          "required": ["kind=delivery_spec", "summary", "files", "check_names"],
+          "optional": ["known_risks"],
+          "bind": [
+            "current_contract.content_hash",
+            "current_engineering_plan.content_hash",
+            "workspace files must exist",
+            "run_check receipts from this activation on the current workspace"
+          ]
+        }
+      },
+      "notes": [
+        "先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。",
+        "已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。",
+        "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。"
+      ]
+    },
+    "quality": {
+      "submit_tools": ["submit_review"],
+      "kinds": {
+        "qa_review": {
+          "when": ["QUALITY"],
+          "required": ["kind=qa_review", "verdict", "rationale", "checks"],
+          "optional": ["defects"],
+          "verdict": ["rework_product", "rework_engineering", "release"],
+          "bind": [
+            "current_contract.content_hash",
+            "current_engineering_plan.content_hash",
+            "current_delivery_spec.content_hash",
+            "current code snapshot",
+            "quality host check receipts; engineering receipts are rejected"
+          ]
+        }
+      },
+      "notes": [
+        "release 要求缺陷为空且质量检查 exit_code 均为 0。",
+        "rework 至少包含一条缺陷。"
+      ]
+    }
+  },
+  "shared": {
+    "submit_tools": ["submit_request", "submit_response", "submit_guidance_response"],
+    "kinds": {
+      "collaboration_request": {
+        "required": ["recipient", "request_type", "question", "background", "expected_result"],
+        "request_type": ["consultation", "action"],
+        "action": ["inspect", "check", "revise_requirements", "revise_delivery"]
+      },
+      "collaboration_response": {
+        "required": ["request_id", "status", "text", "result_event_ids"],
+        "status": ["answered", "completed", "declined", "needs_work"],
+        "result_event_ids": "actual host event ids from request_results, never model call ids"
+      },
+      "department_guidance_response": {
+        "required": ["guidance_id", "status", "text", "result_event_ids"],
+        "status": ["explained", "completed", "declined", "needs_work"],
+        "result_event_ids": "optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action",
+        "bind": ["the target department guidance id and current host results"]
+      }
+    },
+    "notes": []
+  }
+}
