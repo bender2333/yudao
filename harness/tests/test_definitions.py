@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
@@ -275,6 +276,23 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
     assert counts == {EventType.RUN_CREATED: 1, EventType.MODEL_REQUESTED: 5,
                       EventType.PROPOSAL_SUBMITTED: 5, EventType.PROPOSAL_REJECTED: 1}
     system.close()
+
+
+@pytest.mark.parametrize("names", [
+    ("handoff_release", "quality_rework", "collaboration_request_answer", "guidance_response_explained",
+     "tool_denied_guidance_only", "compaction_success", "proposal_rejected"),
+    ("http_responses_handoff", "http_chat_handoff", "http_messages_handoff"),
+])
+def test_no_code_path_changes_the_loaded_definitions(tmp_path, names):
+    # 走完交接、退回、协作请求、指导、压缩与三种协议的真实请求以后，已加载的定义与重新读取文件的结果相同
+    from harness.tests.test_event_sequence import SCENARIOS
+
+    for name in names:
+        system, _run_id, _ = SCENARIOS[name].run(tmp_path / name)
+        system.close()
+    assert DEFINITIONS == load_definitions()
+    with pytest.raises(ValidationError):
+        DEFINITIONS.limits.max_cycles = 1
 
 
 def test_a_run_stopping_for_an_unlisted_reason_fails_to_record_the_stop(tmp_path):
