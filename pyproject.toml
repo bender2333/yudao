@@ -9,12 +9,12 @@ description = "Yudao Loop System: a native product/engineering/quality model loo
 requires-python = ">=3.11"
 dependencies = [
     "openai>=2.26,<3", "httpx>=0.23,<1", "anthropic>=1.7,<2", "httpx2>=2,<3", "pydantic>=2.11,<3",
-    "fastapi>=0.141,<1", "uvicorn>=0.54,<1", "filelock>=4,<5",
+    "fastapi>=0.141,<1", "uvicorn>=0.54,<1", "filelock>=4,<5", "truststore>=0.10,<1",
 ]
 
 # uv sync 默认安装 dev 组，测试在按锁文件安装的项目环境中运行
 [dependency-groups]
-dev = ["pytest>=8", "pytest-xdist>=3.8", "import-linter>=2.15,<3"]
+dev = ["pytest>=8", "pytest-xdist>=3.8", "import-linter>=2.15,<3", "trustme>=1.2,<2"]
 
 [tool.setuptools.packages.find]
 include = ["harness*"]

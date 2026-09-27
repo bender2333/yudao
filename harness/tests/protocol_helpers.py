@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import ssl
 import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import aclosing
@@ -121,10 +122,12 @@ class _Handler(BaseHTTPRequestHandler):
 
 class ScriptedProvider:
     # 测试内启动的 HTTP 服务：按请求顺序执行回复脚本，每一项自己写出这次请求的回复，可以保持不回复或在中途断开。
-    # requests 记录收到的请求体；held：服务端收到一个保持不回复的请求；release：测试结束，保持的请求不再等待
-    def __init__(self, replies: list[Callable[["ScriptedProvider", BaseHTTPRequestHandler], None]]) -> None:
+    # requests 记录收到的请求体（GET 请求没有请求体，记为 None）；held：服务端收到一个保持不回复的请求；
+    # release：测试结束，保持的请求不再等待。给出 tls（服务端的 TLS 上下文）时是 HTTPS 服务
+    def __init__(self, replies: list[Callable[["ScriptedProvider", BaseHTTPRequestHandler], None]], *,
+                 tls: ssl.SSLContext | None = None) -> None:
         self.replies = list(replies)
-        self.requests: list[dict[str, Any]] = []
+        self.requests: list[dict[str, Any] | None] = []
         self.held = threading.Event()
         self.release = threading.Event()
         provider = self
@@ -133,8 +136,21 @@ class ScriptedProvider:
             def log_message(self, *_args: Any) -> None:
                 return
 
+            def handle(self) -> None:
+                # HTTPS 服务：客户端拒绝证书时在握手之后关闭连接，服务端读取请求时得到的连接错误不是测试的失败
+                try:
+                    super().handle()
+                except (ssl.SSLError, ConnectionError):
+                    return
+
+            def do_GET(self) -> None:
+                self._reply(None)
+
             def do_POST(self) -> None:
-                provider.requests.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                self._reply(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+
+            def _reply(self, body: dict[str, Any] | None) -> None:
+                provider.requests.append(body)
                 if not provider.replies:
                     # 脚本之外的请求：明确的 HTTP 500，测试从 requests 的数量看到多出的请求
                     send_reply(self, 500, "application/json", b'{"error":{"message":"unexpected request"}}')
@@ -146,7 +162,12 @@ class ScriptedProvider:
                     return
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        scheme = "http"
+        if tls is not None:
+            # 每个连接在处理它的线程中读取请求时完成 TLS 握手；客户端拒绝证书时连接在发出请求之前关闭
+            self.server.socket = tls.wrap_socket(self.server.socket, server_side=True, do_handshake_on_connect=False)
+            scheme = "https"
+        self.base = f"{scheme}://127.0.0.1:{self.server.server_address[1]}"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     def close(self) -> None:

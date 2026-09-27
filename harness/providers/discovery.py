@@ -7,6 +7,7 @@ import httpx
 
 from .presets import USER_AGENT, preset_known_models, preset_models_url
 from .store import ProviderDefinition
+from .tls import certificate_verification_failed, service_address, ssl_context
 
 
 # 候选模型只服务本次设置页会话，不落盘、不自动绑定
@@ -21,13 +22,16 @@ def refresh_candidates(
     if not source_url:
         return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案")
     try:
-        with httpx.Client(timeout=timeout_sec) as client:
+        with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
             response = client.get(source_url, headers={"User-Agent": USER_AGENT})
         response.raise_for_status()
         payload = response.json()
     except httpx.HTTPStatusError as exc:
         return _unknown(provider, source_url, fetched_at, f"模型列表返回 HTTP {exc.response.status_code}")
     except httpx.HTTPError as exc:
+        if certificate_verification_failed(exc):
+            return _unknown(provider, source_url, fetched_at,
+                            f"模型列表请求失败：证书校验失败（{service_address(source_url)}）")
         return _unknown(provider, source_url, fetched_at, f"模型列表请求失败：{type(exc).__name__}")
     except ValueError:
         return _unknown(provider, source_url, fetched_at, "模型列表不是合法 JSON")

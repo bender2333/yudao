@@ -24,16 +24,14 @@ from .presets import build_identity_headers
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
-    _SSL_CONTEXT,
     _TransportTrace,
     _attach_transport_trace,
     _build_sdk_models,
+    _connection_error,
     _created_stream,
     _diagnostic_code,
     _error_code,
-    _has_nonretryable_connection_cause,
     _is_context_overflow,
-    _nonretryable_http_error,
     _provider_events,
     _retry_after,
     _retryable_code,
@@ -41,6 +39,7 @@ from .responses import (
     _sdk_json,
     _transport_diagnostics,
 )
+from .tls import ssl_context
 
 _build_sdk_models(ChatCompletionChunk)
 
@@ -93,10 +92,7 @@ async def invoke_chat(
             diagnostics=diagnostics,
         ) from exc
     except APIConnectionError as exc:
-        if _has_nonretryable_connection_cause(exc):
-            raise _nonretryable_http_error() from exc
-        raise ProviderError("Model provider connection failed", retryable=True,
-                            diagnostics=_transport_diagnostics("connection", exc)) from exc
+        raise _connection_error(exc, frozen_target.base_url) from exc
     except APIError as exc:
         code = _error_code(exc.body)
         reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
@@ -153,7 +149,7 @@ class _ChatInvoker:
             api_key=target.api_key, base_url=target.base_url,
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
-            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, verify=_SSL_CONTEXT, event_hooks={
+            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, verify=ssl_context(), event_hooks={
                 "request": [trace.attach, clock.request_sent], "response": [clock.response_started]}),
         ) as client:
             return await self._stream_with_client(invocation, trace, client, params, started)

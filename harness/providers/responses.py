@@ -33,6 +33,7 @@ from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
+from .tls import certificate_verification_failed, service_address, ssl_context
 
 
 def _build_sdk_models(root: Any) -> None:
@@ -63,12 +64,6 @@ _build_sdk_models(ResponseStreamEvent)
 # 两个 SDK 在每个客户端的第一次请求之前识别平台（platform.system 与 platform.platform），进程内第一次识别要查询
 # 系统信息；服务启动时先识别一次，之后读取标准库的缓存
 platform.platform()
-
-# 各次调用的客户端共用一个 SSL 上下文，信任 certifi 的证书列表。openai 的客户端使用 httpx，anthropic 的客户端使用
-# httpx2，没有给出上下文时两者都为每个客户端新建上下文（httpx 加载证书，本机负载高时每次约 1 秒），而 Chat Completions
-# 与 Messages 每次调用都新建客户端。httpcore 与 httpcore2 建立每个 TLS 连接时在上下文上设置 ALPN，全部客户端都只用
-# HTTP/1.1，设置的值相同
-_SSL_CONTEXT = httpx.create_ssl_context()
 
 
 @dataclass(frozen=True)
@@ -211,7 +206,7 @@ class ProviderConnections:
         client = self._clients.get(key)
         if client is None:
             http_client = DefaultAsyncHttpxClient(
-                timeout=config.timeout_sec, verify=_SSL_CONTEXT,
+                timeout=config.timeout_sec, verify=ssl_context(),
                 event_hooks={"request": [self._observe_request], "response": [self._observe_response]},
             )
             client = AsyncOpenAI(
@@ -320,10 +315,7 @@ async def invoke_responses(
             diagnostics=diagnostics,
         ) from exc
     except APIConnectionError as exc:
-        if _has_nonretryable_connection_cause(exc):
-            raise _nonretryable_http_error() from exc
-        raise ProviderError("Model provider connection failed", retryable=True,
-                            diagnostics=_transport_diagnostics("connection", exc)) from exc
+        raise _connection_error(exc, frozen_target.base_url) from exc
     except APIError as exc:
         code = _error_code(exc.body)
         reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
@@ -406,7 +398,7 @@ class _ResponsesInvoker:
             await _emit_request(invocation, http_request, observation_errors, clock)
 
         http_client = DefaultAsyncHttpxClient(
-            timeout=invocation.config.timeout_sec, verify=_SSL_CONTEXT,
+            timeout=invocation.config.timeout_sec, verify=ssl_context(),
             event_hooks={"request": [observe_request], "response": [clock.response_started]},
         )
         async with AsyncOpenAI(
@@ -913,6 +905,18 @@ def _nonretryable_http_error() -> ProviderError:
 
 def _has_nonretryable_connection_cause(exc: BaseException) -> bool:
     return isinstance(exc.__cause__, _NONRETRYABLE_CONNECTION_ERRORS)
+
+
+def _connection_error(exc: BaseException, base_url: str) -> ProviderError:
+    # SDK 报告的连接错误（D17）：证书校验失败属于配置问题，不重试，错误写明服务地址；客户端拒绝发出的请求不重试；
+    # 其余连接失败可以重试。诊断字段与其他传输错误相同
+    if certificate_verification_failed(exc):
+        return ProviderError(f"Model provider certificate verification failed: {service_address(base_url)}",
+                             diagnostics=_transport_diagnostics("certificate_verification", exc))
+    if _has_nonretryable_connection_cause(exc):
+        return _nonretryable_http_error()
+    return ProviderError("Model provider connection failed", retryable=True,
+                         diagnostics=_transport_diagnostics("connection", exc))
 
 
 async def _created_stream(create: Awaitable[Any], trace: _TransportTrace) -> Any:

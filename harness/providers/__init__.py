@@ -35,8 +35,10 @@ from .presets import (
 from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
 from .responses import ProviderConnections, ResponsesConfig, check_availability
 from .store import ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
+from .tls import ssl_context
 
 __all__ = [
+    "ssl_context",
     "ProviderFacade",
     "ProviderStore",
     "ProviderDefinition",
