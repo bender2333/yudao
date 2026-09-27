@@ -454,7 +454,8 @@ def test_generic_adapter_failure_closes_raw_capture_and_keeps_stream_evidence(tm
         async def stream(self, call):
             yield ModelStreamEvent(kind="stream_event", id="raw-1",
                                    payload={"type": "response.created", "response": {"model": self.model}},
-                                   source="sdk_decoded_stream", sequence=0)
+                                   source="sdk_decoded_stream", sequence=0, stage="response_created",
+                                   model=self.model)
             raise RuntimeError("decoder failed")
 
     system = LoopSystem.for_testing(tmp_path, BrokenAdapter())

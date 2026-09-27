@@ -27,6 +27,7 @@ from harness.tests.protocol_helpers import (
     model_call,
     provider_system,
     responses_responder,
+    send_reply,
     serve,
     sse,
 )
@@ -74,6 +75,26 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
     assert result.usage.input_tokens == 10
     assert result.usage.cache_read_tokens == 2
     assert result.usage.output_tokens == 5
+
+
+def test_chat_chunk_identity_that_is_not_a_string_is_not_recorded():
+    # OpenAI 兼容服务给出数字形式的块 id：SDK 不校验字段类型，调用照常完成，不记录回答身份
+    def numeric_identity(body: dict):
+        status, content_type, chunks = chat_responder(body)
+        return status, content_type, [chunk.replace(b'"id": "chat-1"', b'"id": 7') for chunk in chunks]
+
+    server, _capture, base = serve(numeric_identity)
+    events = []
+    try:
+        facade = facade_with(base + "/v1", protocol="chat_completions")
+        result = invoke(facade, bound_target(facade), _call_with_tool(), observe=events.append)
+    finally:
+        server.shutdown()
+        server.server_close()
+    streamed = [event for event in events if event.kind == "stream_event"]
+    assert streamed and all(event.payload["id"] == 7 and event.response_id is None for event in streamed)
+    assert result.response_id is None
+    assert any(item["type"] == "function_call" for item in result.output)
 
 
 def test_chat_sends_tool_result_paired_by_tool_call_id():
@@ -386,10 +407,22 @@ def test_stream_without_terminal_event_is_a_retryable_failure(protocol, first_ev
     assert exc_info.value.diagnostics["error_type"] == "stream_incomplete"
 
 
-@pytest.mark.parametrize("protocol", ["chat_completions", "messages"])
+# 接收回复体时连接中途断开：三种协议的诊断相同，写明实际的传输阶段与事件
+BROKEN_BODY_DIAGNOSTICS = {
+    "error_type": "connection", "trace_available": True, "transport_phase": "receive_response_body",
+    "transport_event": "http11.receive_response_body.failed", "cause_type": "RemoteProtocolError",
+}
+
+# 断开的流与之后成功的回复中，提供方给出的回答身份
+BROKEN_RESPONSE_IDS = {"responses": "resp-broken", "chat_completions": "chat-broken", "messages": "msg-broken"}
+REPLY_RESPONSE_IDS = {"responses": "resp-1", "chat_completions": "chat-1", "messages": "msg-1"}
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
 def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_succeeds(protocol, data_dir):
-    # 流式回复送出一段输出之后连接中途断开（D17）：尝试记为可重试的连接失败，安排重试，第二次成功；
-    # 已收到的部分输出只在失败尝试的审计记录中，不进入重试请求
+    # 流式回复送出一段输出之后连接中途断开（D17）：尝试记为可重试的连接失败，诊断写明传输阶段与事件，安排重试，
+    # 第二次成功；已收到的部分输出只在失败尝试的审计记录中，不进入重试请求。
+    # 失败与成功的尝试都记录提供方回答身份与第一次输出的时间
     provider = ScriptedProvider([BROKEN_STREAMS[protocol], product_spec_reply(protocol)])
     try:
         system, run_id = provider_system(data_dir, provider.base, protocol, step_limits=FAST_RETRIES)
@@ -397,6 +430,7 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
             result = system.activate_once(run_id)
             events = system.store.list_events(run_id)
             failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+            finished = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FINISHED]
             scheduled = [event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]
             audits = [system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["stream_events_ref"]))
                       .decode("utf-8") for event in failed]
@@ -408,14 +442,109 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
     assert [event.error for event in failed] == ["Model provider connection failed"]
     assert failed[0].payload["reason"] == "provider_error"
     assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
-    assert failed[0].payload["diagnostics"] == {
-        "error_type": "connection", "trace_available": False, "transport_phase": "unknown",
-        "transport_event": "unknown", "cause_type": "RemoteProtocolError",
-    }
+    assert failed[0].payload["diagnostics"] == BROKEN_BODY_DIAGNOSTICS
+    assert failed[0].payload["provider_response_id"] == BROKEN_RESPONSE_IDS[protocol]
+    assert failed[0].payload["stream_first_output_at"] is not None
+    assert len(finished) == 1
+    assert finished[0].payload["provider_response_id"] == REPLY_RESPONSE_IDS[protocol]
+    assert finished[0].payload["stream_first_output_at"] is not None
     assert len(scheduled) == 1
     assert PARTIAL_OUTPUT in audits[0]
     assert len(provider.requests) == 2
     assert PARTIAL_OUTPUT not in json.dumps(provider.requests[1])
+
+
+def _broken_error_reply(_provider: ScriptedProvider, handler) -> None:
+    # HTTP 500 的错误回复体没有送完连接就关闭
+    body = b'{"error": {"code": "server_error", "type": "server_error", "message": "partial'
+    send_reply(handler, 500, "application/json", body, declared_length=len(body) + 4096)
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_error_reply_broken_while_the_request_is_created_is_a_retryable_connection_failure(protocol):
+    # 创建请求时提供方回复 HTTP 500，SDK 读取错误回复体时连接中途断开：三种协议在创建请求阶段按同样的传输错误分类，
+    # 记为可重试的连接失败，诊断写明传输阶段与事件
+    provider = ScriptedProvider([_broken_error_reply])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    assert str(caught.value) == "Model provider connection failed"
+    assert caught.value.reason == "provider_error"
+    assert caught.value.retryable is True
+    assert caught.value.diagnostics == BROKEN_BODY_DIAGNOSTICS
+    assert len(provider.requests) == 1
+
+
+def _messages_stream_error(error_type: str):
+    # Messages 的流送出 message_start 之后送出 event: error（Anthropic 的错误以 type 区分）
+    def reply(_provider: ScriptedProvider, handler) -> None:
+        start = {"type": "message_start", "message": {
+            "id": "msg-stream-error", "type": "message", "role": "assistant", "model": "scenario-model-actual",
+            "content": [], "usage": {"input_tokens": 100, "output_tokens": 1}}}
+        error = {"type": "error", "error": {"type": error_type, "message": "scenario stream error"}}
+        body = sse(f"event: message_start\ndata: {json.dumps(start)}\n\n",
+                   f"event: error\ndata: {json.dumps(error)}\n\n")
+        send_reply(handler, 200, "text/event-stream", body)
+
+    return reply
+
+
+@pytest.mark.parametrize(("error_type", "retryable"), [
+    ("overloaded_error", True),
+    ("api_error", True),
+    ("invalid_request_error", False),
+    ("authentication_error", False),
+])
+def test_messages_stream_error_event_is_classified_by_its_type(error_type, retryable, data_dir):
+    # Anthropic SDK 把流中的 event: error 转换成状态码为 200 的错误：按错误的 type 分类，过载与服务端错误可以重试，
+    # 与 Responses 流中的 server_is_overloaded 相同；参数与认证错误不重试。错误事件同样记入流式记录
+    provider = ScriptedProvider([_messages_stream_error(error_type), product_spec_reply("messages")])
+    try:
+        system, run_id = provider_system(data_dir, provider.base, "messages", step_limits=FAST_RETRIES)
+        try:
+            result = system.activate_once(run_id)
+            events = system.store.list_events(run_id)
+            failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+            scheduled = [event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]
+        finally:
+            system.close()
+    finally:
+        provider.close()
+    assert [event.error for event in failed] == ["Model provider reported a stream error"]
+    assert failed[0].payload["reason"] == "provider_error"
+    assert failed[0].payload["retryable"] is retryable
+    assert failed[0].payload["will_retry"] is retryable
+    assert failed[0].payload["diagnostics"] == {"error_code": error_type}
+    assert failed[0].payload["provider_response_id"] == "msg-stream-error"
+    assert failed[0].payload["stream_last_stage"] == "error"
+    if retryable:
+        assert result.phase == "ENGINEERING", result.error
+        assert len(scheduled) == 1
+        assert len(provider.requests) == 2
+    else:
+        assert scheduled == []
+        assert len(provider.requests) == 1
+
+
+def test_messages_http_error_code_is_read_from_the_anthropic_error_type():
+    # Anthropic 的错误回复以 error.type 给出错误码
+    def overloaded(_provider: ScriptedProvider, handler) -> None:
+        body = json.dumps({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}})
+        send_reply(handler, 529, "application/json", body.encode("utf-8"))
+
+    provider = ScriptedProvider([overloaded])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol="messages")
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    assert caught.value.retryable is True
+    assert caught.value.diagnostics == {"status_code": 529, "request_observation_id": "a",
+                                        "error_code": "overloaded_error"}
 
 
 @pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])

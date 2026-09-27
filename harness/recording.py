@@ -70,7 +70,8 @@ class ActivationScope:
 
 @dataclass
 class _Observation:
-    # 一条要记录的观察：模型调用交回的流式输出，或者工具执行与跳过的结果
+    # 一条要记录的观察：模型调用交回的流式输出，或者工具执行与跳过的结果。
+    # 解码后的流事件带着协议实现读出的流式进度阶段与提供方回答身份
     id: str
     kind: str
     payload: dict[str, Any] = field(default_factory=dict)
@@ -79,12 +80,14 @@ class _Observation:
     provider: str | None = None
     model: str | None = None
     sequence: int | None = None
+    stage: str = "event"
+    response_id: str | None = None
 
     @classmethod
     def from_stream(cls, event: ModelStreamEvent) -> _Observation:
         usage = None if event.usage is None else Usage(**event.usage.model_dump())
         return cls(event.id, event.kind, dict(event.payload), event.text, usage, event.provider,
-                   event.model, event.sequence)
+                   event.model, event.sequence, event.stage, event.response_id)
 
 
 @dataclass
@@ -128,21 +131,6 @@ class _AttemptCapture:
     def close(self) -> None:
         if self.stream is not None:
             self.stream.close()
-
-
-def _stream_progress_stage(payload: dict[str, Any]) -> str:
-    event_type = str(payload.get("type") or "")
-    if event_type == "response.created":
-        return "response_created"
-    if "output_text.delta" in event_type or "output_item.added" in event_type:
-        return "output"
-    if event_type == "response.output_item.done":
-        return "output_item_done"
-    if event_type == "response.completed":
-        return "completed"
-    if event_type in {"response.incomplete", "response.failed", "error"}:
-        return "error"
-    return "event"
 
 
 def _stream_progress_summary(payload: dict[str, Any]) -> str:
@@ -646,14 +634,7 @@ class StepRecorder:
             observation.payload = _redact(observation.payload, secret=scope.secret)
             capture.actual_provider = observation.provider or capture.actual_provider
             capture.actual_model = observation.model or capture.actual_model
-            nested_response = observation.payload.get("response")
-            if isinstance(nested_response, dict):
-                response_id = nested_response.get("id")
-                if isinstance(response_id, str) and response_id:
-                    capture.provider_response_id = response_id
-                nested_model = nested_response.get("model")
-                if isinstance(nested_model, str) and nested_model.strip():
-                    capture.actual_model = nested_model.strip()
+            capture.provider_response_id = observation.response_id or capture.provider_response_id
             observed_at = utc_now()
             capture.add_stream_event(observation.sequence, observation.payload, observed_at)
             return self._stream_progress(request, capture, observation, observed_at)
@@ -758,7 +739,7 @@ class StepRecorder:
         # 流式进度：同一次调用尝试中阶段改变或距上一条 0.25 秒以后才记录一条
         scope = self.scope
         payload = observation.payload
-        stage = _stream_progress_stage(payload)
+        stage = observation.stage
         if capture.first_observed_at is None:
             capture.first_observed_at = observed_at
         if stage in {"output", "output_item_done"} and capture.first_output_at is None:

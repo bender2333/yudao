@@ -27,9 +27,11 @@ from .responses import (
     _ProviderClock,
     _SSL_CONTEXT,
     _TransportTrace,
+    _attach_transport_trace,
     _build_sdk_models,
+    _created_stream,
     _diagnostic_code,
-    _error_code,
+    _error_object,
     _has_nonretryable_connection_cause,
     _is_context_overflow,
     _nonretryable_http_error,
@@ -89,7 +91,7 @@ async def invoke_messages(
         raise ProviderError("Model request timed out", reason="provider_timeout", retryable=True,
                             diagnostics=_transport_diagnostics("timeout", exc)) from exc
     except APIStatusError as exc:
-        code = _error_code(exc.body)
+        code = _error_type(exc.body)
         reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
         diagnostics = {
             "status_code": exc.status_code,
@@ -110,7 +112,7 @@ async def invoke_messages(
         raise ProviderError("Model provider connection failed", retryable=True,
                             diagnostics=_transport_diagnostics("connection", exc)) from exc
     except APIError as exc:
-        code = _error_code(exc.body)
+        code = _error_type(exc.body)
         reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
         raise ProviderError(
             "Model provider returned an invalid API response", reason=reason,
@@ -130,6 +132,42 @@ def _check_availability(target: FrozenTarget) -> None:
         raise ProviderError("Missing provider base URL", reason="provider_unavailable")
 
 
+def _error_type(body: Any) -> str | None:
+    # Anthropic 的错误码是 error.type（overloaded_error、invalid_request_error 等）
+    error_type = _error_object(body).get("type")
+    return error_type if isinstance(error_type, str) else None
+
+
+def _stream_error(body: Any) -> ProviderError:
+    # 流中的 event: error 按错误的 type 分类：过载与服务端错误可以重试，认证、参数与内容错误不重试
+    code = _error_type(body)
+    return ProviderError("Model provider reported a stream error", retryable=_retryable_code(code),
+                         diagnostics=_diagnostic_code(code, "stream_error"))
+
+
+def _event_stage(payload: dict[str, Any]) -> str:
+    # Messages 流事件的进度阶段
+    event_type = payload.get("type")
+    if event_type == "message_start":
+        return "response_created"
+    if event_type in {"content_block_start", "content_block_delta"}:
+        return "output"
+    if event_type == "content_block_stop":
+        return "output_item_done"
+    if event_type == "message_stop":
+        return "completed"
+    if event_type == "error":
+        return "error"
+    return "event"
+
+
+def _event_response_id(payload: dict[str, Any]) -> str | None:
+    # 提供方的回答身份在 message_start 的 message 中
+    message = payload.get("message")
+    identity = message.get("id") if isinstance(message, dict) else None
+    return identity if isinstance(identity, str) and identity else None
+
+
 class _MessagesInvoker:
     async def complete(self, invocation: _MessagesInvocation) -> InvokeResult:
         # 取消由调用所在的任务传入：任务被取消时这里得到 asyncio.CancelledError，换成本次尝试已取消
@@ -140,6 +178,9 @@ class _MessagesInvoker:
                 return await self._stream_once(invocation, trace, clock)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
+        except Exception as exc:
+            _attach_transport_trace(exc, trace.snapshot())
+            raise
 
     async def _stream_once(self, invocation: _MessagesInvocation, trace: _TransportTrace,
                            clock: _ProviderClock) -> InvokeResult:
@@ -164,16 +205,32 @@ class _MessagesInvoker:
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
             http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, verify=_SSL_CONTEXT, event_hooks={
-                "request": [clock.request_sent], "response": [clock.response_started]}),
+                "request": [trace.attach, clock.request_sent], "response": [clock.response_started]}),
         ) as client:
             return await self._stream_with_client(invocation, trace, client, params, headers, started)
+
+    async def _emit_stream_event(self, invocation: _MessagesInvocation, payload: dict[str, Any], index: int) -> None:
+        message = payload.get("message")
+        await invocation.emit({
+            "kind": "stream_event",
+            "id": f"{_observation_id(invocation)}:stream-{index}",
+            "session_id": invocation.session_id,
+            "attempt_id": invocation.attempt_id,
+            "provider": invocation.frozen_target.provider_id,
+            "model": message.get("model") if isinstance(message, dict) else payload.get("model"),
+            "source": "sdk_decoded_stream",
+            "sequence": index,
+            "payload": payload,
+            "stage": _event_stage(payload),
+            "response_id": _event_response_id(payload),
+        })
 
     async def _stream_with_client(self, invocation: _MessagesInvocation, trace: _TransportTrace,
                                   client: AsyncAnthropic, params: dict[str, Any],
                                   headers: dict[str, str], started: float) -> InvokeResult:
-        stream = await client.messages.create(
+        stream = await _created_stream(client.messages.create(
             **(params | ({"extra_headers": headers} if headers else {})),
-        )
+        ), trace)
         text_parts: list[str] = []
         tool_blocks: dict[int, dict[str, Any]] = {}
         usage_raw: dict[str, Any] = {}
@@ -182,52 +239,49 @@ class _MessagesInvoker:
         stop_reason: str | None = None
         terminal = False
         event_index = 0
-        async for event in _provider_events(stream, trace):
-            payload = _sdk_json(event, secrets=(invocation.frozen_target.api_key,))
-            await invocation.emit({
-                "kind": "stream_event",
-                "id": f"{_observation_id(invocation)}:stream-{event_index}",
-                "session_id": invocation.session_id,
-                "attempt_id": invocation.attempt_id,
-                "provider": invocation.frozen_target.provider_id,
-                "model": payload.get("message", {}).get("model") if isinstance(payload.get("message"), dict) else payload.get("model"),
-                "source": "sdk_decoded_stream",
-                "sequence": event_index,
-                "payload": payload,
-            })
-            event_index += 1
-            event_type = payload.get("type")
-            if event_type == "message_start":
-                message = payload.get("message") or {}
-                response_id = message.get("id") or response_id
-                actual_model = message.get("model") or actual_model
-                usage = message.get("usage")
-                if isinstance(usage, dict):
-                    usage_raw.update(usage)
-            elif event_type == "content_block_start":
-                block = payload.get("content_block") or {}
-                if block.get("type") == "tool_use":
-                    tool_blocks[int(payload.get("index", 0))] = {
-                        "id": str(block.get("id") or ""),
-                        "name": str(block.get("name") or ""),
-                        "arguments": "",
-                    }
-            elif event_type == "content_block_delta":
-                delta = payload.get("delta") or {}
-                if delta.get("type") == "text_delta":
-                    text_parts.append(str(delta.get("text") or ""))
-                elif delta.get("type") == "input_json_delta":
-                    entry = tool_blocks.setdefault(int(payload.get("index", 0)),
-                                                   {"id": "", "name": "", "arguments": ""})
-                    entry["arguments"] += str(delta.get("partial_json") or "")
-            elif event_type == "message_delta":
-                delta = payload.get("delta") or {}
-                stop_reason = delta.get("stop_reason") or stop_reason
-                usage = payload.get("usage")
-                if isinstance(usage, dict):
-                    usage_raw.update(usage)
-            elif event_type == "message_stop":
-                terminal = True
+        try:
+            async for event in _provider_events(stream, trace):
+                payload = _sdk_json(event, secrets=(invocation.frozen_target.api_key,))
+                await self._emit_stream_event(invocation, payload, event_index)
+                event_index += 1
+                event_type = payload.get("type")
+                if event_type == "message_start":
+                    message = payload.get("message") or {}
+                    response_id = message.get("id") or response_id
+                    actual_model = message.get("model") or actual_model
+                    usage = message.get("usage")
+                    if isinstance(usage, dict):
+                        usage_raw.update(usage)
+                elif event_type == "content_block_start":
+                    block = payload.get("content_block") or {}
+                    if block.get("type") == "tool_use":
+                        tool_blocks[int(payload.get("index", 0))] = {
+                            "id": str(block.get("id") or ""),
+                            "name": str(block.get("name") or ""),
+                            "arguments": "",
+                        }
+                elif event_type == "content_block_delta":
+                    delta = payload.get("delta") or {}
+                    if delta.get("type") == "text_delta":
+                        text_parts.append(str(delta.get("text") or ""))
+                    elif delta.get("type") == "input_json_delta":
+                        entry = tool_blocks.setdefault(int(payload.get("index", 0)),
+                                                       {"id": "", "name": "", "arguments": ""})
+                        entry["arguments"] += str(delta.get("partial_json") or "")
+                elif event_type == "message_delta":
+                    delta = payload.get("delta") or {}
+                    stop_reason = delta.get("stop_reason") or stop_reason
+                    usage = payload.get("usage")
+                    if isinstance(usage, dict):
+                        usage_raw.update(usage)
+                elif event_type == "message_stop":
+                    terminal = True
+        except APIStatusError as exc:
+            # SDK 把流中的 event: error 转换成状态码为 200 的错误：错误事件同样记入流式记录，再按错误的 type 分类
+            if isinstance(exc.body, dict):
+                await self._emit_stream_event(
+                    invocation, _sdk_json(exc.body, secrets=(invocation.frozen_target.api_key,)), event_index)
+            raise _stream_error(exc.body) from exc
         if not terminal:
             # 完整结束事件缺失即视为不完整流，保留为可重试失败
             raise ProviderError(

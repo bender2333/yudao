@@ -24,10 +24,11 @@ from .presets import build_identity_headers
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
-    _RETRYABLE_HTTP_ERRORS,
     _SSL_CONTEXT,
     _TransportTrace,
+    _attach_transport_trace,
     _build_sdk_models,
+    _created_stream,
     _diagnostic_code,
     _error_code,
     _has_nonretryable_connection_cause,
@@ -39,7 +40,6 @@ from .responses import (
     _retryable_http_status,
     _sdk_json,
     _transport_diagnostics,
-    _transport_provider_error,
 )
 
 _build_sdk_models(ChatCompletionChunk)
@@ -128,6 +128,9 @@ class _ChatInvoker:
                 return await self._stream_once(invocation, trace, clock)
         except asyncio.CancelledError as exc:
             raise CancelledError() from exc
+        except Exception as exc:
+            _attach_transport_trace(exc, trace.snapshot())
+            raise
 
     async def _stream_once(self, invocation: _ChatInvocation, trace: _TransportTrace,
                            clock: _ProviderClock) -> InvokeResult:
@@ -151,7 +154,7 @@ class _ChatInvoker:
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
             http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, verify=_SSL_CONTEXT, event_hooks={
-                "request": [clock.request_sent], "response": [clock.response_started]}),
+                "request": [trace.attach, clock.request_sent], "response": [clock.response_started]}),
         ) as client:
             return await self._stream_with_client(invocation, trace, client, params, started)
 
@@ -165,14 +168,9 @@ class _ChatInvoker:
         response_id: str | None = None
         actual_model: str | None = None
         terminal = False
-        try:
-            stream = await client.chat.completions.create(
-                **(call_params | ({"extra_headers": headers} if headers else {})),
-            )
-        except Exception as exc:
-            if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
-                raise _transport_provider_error(exc, trace=trace) from exc
-            raise
+        stream = await _created_stream(client.chat.completions.create(
+            **(call_params | ({"extra_headers": headers} if headers else {})),
+        ), trace)
         event_index = 0
         async for chunk in _provider_events(stream, trace):
             payload = _sdk_json(chunk, secrets=(invocation.frozen_target.api_key,))
@@ -186,9 +184,11 @@ class _ChatInvoker:
                 "source": "sdk_decoded_stream",
                 "sequence": event_index,
                 "payload": payload,
+                "stage": _chunk_stage(payload),
+                "response_id": _chunk_id(payload),
             })
             event_index += 1
-            response_id = payload.get("id") or response_id
+            response_id = _chunk_id(payload) or response_id
             actual_model = payload.get("model") or actual_model
             if isinstance(payload.get("usage"), dict):
                 usage_raw = payload["usage"]
@@ -237,6 +237,26 @@ class _ChatInvoker:
             wire_evidence={"request": {key: value for key, value in params.items() if not key.startswith("_")},
                            "response_id": response_id},
         )
+
+
+def _chunk_stage(payload: dict[str, Any]) -> str:
+    # Chat Completions 流式块的进度阶段：带文字或工具调用增量的块是输出；带结束原因的块与结束以后只带用量的块
+    # （stream_options.include_usage，choices 为空）是完成；只带角色的块（第一块）是回答开始
+    choices = [choice for choice in payload.get("choices") or [] if isinstance(choice, dict)]
+    deltas = [choice.get("delta") or {} for choice in choices]
+    if any(delta.get("content") or delta.get("tool_calls") for delta in deltas):
+        return "output"
+    if any(choice.get("finish_reason") for choice in choices) or (not choices and payload.get("usage")):
+        return "completed"
+    if any(delta.get("role") for delta in deltas):
+        return "response_created"
+    return "event"
+
+
+def _chunk_id(payload: dict[str, Any]) -> str | None:
+    # 提供方的回答身份：每个流式块都带着同一个 id；SDK 不校验字段类型，只接受字符串
+    identity = payload.get("id")
+    return identity if isinstance(identity, str) and identity else None
 
 
 def _chat_request_params(invocation: _ChatInvocation, target: FrozenTarget) -> dict[str, Any]:

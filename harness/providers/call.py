@@ -48,7 +48,8 @@ class ModelCall(BaseModel):
 
 
 class ModelStreamEvent(BaseModel):
-    # 调用进行中交回的一条观察：发送的请求、解码后的流事件、完整响应、用量或一条输出
+    # 调用进行中交回的一条观察：发送的请求、解码后的流事件、完整响应、用量或一条输出。
+    # 解码后的流事件由协议实现按协议读出流式进度阶段（stage）与提供方的回答身份（response_id），调用方不解析协议的事件形状
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     kind: Literal["request", "stream_event", "response", "usage", "message"]
@@ -60,6 +61,8 @@ class ModelStreamEvent(BaseModel):
     model: str | None = None
     source: str = "provider_sdk"
     sequence: int | None = None
+    stage: Literal["response_created", "output", "output_item_done", "completed", "error", "event"] = "event"
+    response_id: str | None = None
 
 
 class ModelResponse(BaseModel):

@@ -538,7 +538,7 @@
     "context_event_id": "<evt#5>",
     "event_type": null,
     "first_observed_at": "<time>",
-    "first_output_at": null,
+    "first_output_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
@@ -550,7 +550,7 @@
     "root_step_id": 1,
     "sequence": 0,
     "source": "sdk_decoded_stream",
-    "stage": "event",
+    "stage": "output",
     "step_id": 1,
     "summary": "provider_event"
    }
@@ -593,9 +593,9 @@
     "diagnostics": {
      "cause_type": "RemoteProtocolError",
      "error_type": "connection",
-     "trace_available": false,
-     "transport_event": "unknown",
-     "transport_phase": "unknown"
+     "trace_available": true,
+     "transport_event": "http11.receive_response_body.failed",
+     "transport_phase": "receive_response_body"
     },
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
@@ -613,7 +613,7 @@
     "protocol": "chat_completions",
     "provider_config_id": "local",
     "provider_name": "Local",
-    "provider_response_id": null,
+    "provider_response_id": "chat-broken",
     "purpose": "work",
     "raw_usage_ref": null,
     "reason": "provider_error",
@@ -632,8 +632,8 @@
     "stream_event_count": 1,
     "stream_events_ref": "<art#9>",
     "stream_first_observed_at": "<time>",
-    "stream_first_output_at": null,
-    "stream_last_stage": "event",
+    "stream_first_output_at": "<time>",
+    "stream_last_stage": "output",
     "usage": null,
     "will_retry": true
    }
@@ -993,7 +993,7 @@
     "context_event_id": "<evt#11>",
     "event_type": null,
     "first_observed_at": "<time>",
-    "first_output_at": null,
+    "first_output_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
@@ -1005,13 +1005,52 @@
     "root_step_id": 1,
     "sequence": 0,
     "source": "sdk_decoded_stream",
-    "stage": "event",
+    "stage": "output",
     "step_id": 2,
     "summary": "provider_event"
    }
   },
   {
    "event": "<evt#15>",
+   "type": "model_stream_progress",
+   "role": "product",
+   "state_before": "PRODUCT_SPEC",
+   "state_after": "PRODUCT_SPEC",
+   "parent_event_id": "<evt#3>",
+   "session_id": "<ses_pro#1>",
+   "provider": "local",
+   "model": "scenario-model-actual",
+   "context_digest": "<sha256#6>",
+   "stop_reason": null,
+   "error": null,
+   "artifact_hashes": [],
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 2,
+    "attempt_id": "<act#1>:root-1:work:attempt-2",
+    "collaboration_request_id": null,
+    "context_event_id": "<evt#11>",
+    "event_type": null,
+    "first_observed_at": "<time>",
+    "first_output_at": "<time>",
+    "guidance_ids": [],
+    "guidance_only": false,
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-1:work",
+    "observed_at": "<time>",
+    "prompt_hash": "<sha256#3>",
+    "prompt_version": 1,
+    "purpose": "work",
+    "root_step_id": 1,
+    "sequence": 1,
+    "source": "sdk_decoded_stream",
+    "stage": "completed",
+    "step_id": 2,
+    "summary": "provider_event"
+   }
+  },
+  {
+   "event": "<evt#16>",
    "type": "tool_called",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1065,7 +1104,7 @@
    }
   },
   {
-   "event": "<evt#16>",
+   "event": "<evt#17>",
    "type": "model_message",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1115,7 +1154,7 @@
    }
   },
   {
-   "event": "<evt#17>",
+   "event": "<evt#18>",
    "type": "model_attempt_finished",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1179,8 +1218,8 @@
     "stream_event_count": 3,
     "stream_events_ref": "<art#13>",
     "stream_first_observed_at": "<time>",
-    "stream_first_output_at": null,
-    "stream_last_stage": "event",
+    "stream_first_output_at": "<time>",
+    "stream_last_stage": "completed",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -1196,7 +1235,7 @@
    }
   },
   {
-   "event": "<evt#18>",
+   "event": "<evt#19>",
    "type": "tool_started",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1253,7 +1292,7 @@
    }
   },
   {
-   "event": "<evt#19>",
+   "event": "<evt#20>",
    "type": "tool_called",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1331,7 +1370,7 @@
    }
   },
   {
-   "event": "<evt#20>",
+   "event": "<evt#21>",
    "type": "proposal_submitted",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1364,7 +1403,7 @@
    }
   },
   {
-   "event": "<evt#21>",
+   "event": "<evt#22>",
    "type": "spec_accepted",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1418,7 +1457,7 @@
    }
   },
   {
-   "event": "<evt#22>",
+   "event": "<evt#23>",
    "type": "contract_accepted",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -1450,7 +1489,7 @@
    }
   },
   {
-   "event": "<evt#23>",
+   "event": "<evt#24>",
    "type": "transition",
    "role": "engineering",
    "state_before": "PRODUCT_SPEC",
@@ -1470,7 +1509,7 @@
    }
   },
   {
-   "event": "<evt#24>",
+   "event": "<evt#25>",
    "type": "activation_finished",
    "role": "product",
    "state_before": "ENGINEERING",
@@ -1534,7 +1573,7 @@
   },
   "effective_contract": {
    "content_hash": "<sha256#27>",
-   "created_event_id": "<evt#22>",
+   "created_event_id": "<evt#23>",
    "decision_hashes": [],
    "input_version": 1,
    "prd_ref": "<art#15>",
@@ -1544,7 +1583,7 @@
   "effective_contracts": [
    {
     "content_hash": "<sha256#27>",
-    "created_event_id": "<evt#22>",
+    "created_event_id": "<evt#23>",
     "decision_hashes": [],
     "input_version": 1,
     "prd_ref": "<art#15>",
@@ -1572,7 +1611,7 @@
    },
    {
     "commit": "<git#3>",
-    "event_id": "<evt#21>",
+    "event_id": "<evt#22>",
     "parent_commit": "<git#1>",
     "tree": "<git#4>",
     "type": "spec_accepted"
@@ -1900,7 +1939,7 @@
     "provider": "local",
     "provider_config_id": "local",
     "provider_name": "Local",
-    "provider_response_id": null,
+    "provider_response_id": "chat-broken",
     "purpose": "work",
     "raw_usage_ref": null,
     "requested_model": "scenario-model",
@@ -2006,7 +2045,7 @@
     "single file implementation"
    ],
    "content_hash": "<sha256#26>",
-   "created_event_id": "<evt#21>",
+   "created_event_id": "<evt#22>",
    "decision_changes": [],
    "fatal_conditions": [
     "non-zero exit on valid input"
@@ -2039,7 +2078,7 @@
      "single file implementation"
     ],
     "content_hash": "<sha256#26>",
-    "created_event_id": "<evt#21>",
+    "created_event_id": "<evt#22>",
     "decision_changes": [],
     "fatal_conditions": [
      "non-zero exit on valid input"
@@ -2185,7 +2224,7 @@
   },
   "snapshot": null,
   "stop_reason": null,
-  "stream_version": 24,
+  "stream_version": 25,
   "task": "build an echo CLI",
   "token_used": 111,
   "tool_count": 1,

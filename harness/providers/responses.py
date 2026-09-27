@@ -8,6 +8,7 @@ import platform
 import re
 import time
 import typing
+from collections.abc import Awaitable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Mapping
@@ -96,6 +97,10 @@ class _TransportTrace:
     def __init__(self) -> None:
         self._last_event: dict[str, str | None] | None = None
         self._failure_event: dict[str, str | None] | None = None
+
+    async def attach(self, request: httpx.Request | httpx2.Request) -> None:
+        # 请求钩子：挂到请求上以后，httpcore 与 httpcore2 在建立连接、发送与接收的各阶段调用它
+        request.extensions["trace"] = self
 
     async def __call__(self, name: str, info: dict[str, Any]) -> None:
         failure_type = None
@@ -228,7 +233,7 @@ class ProviderConnections:
 
     async def _observe_request(self, http_request: httpx.Request) -> None:
         context = self._context()
-        http_request.extensions["trace"] = context.trace
+        await context.trace.attach(http_request)
         await _emit_request(context.invocation, http_request, context.observation_errors, context.clock)
 
     async def _observe_response(self, response: httpx.Response) -> None:
@@ -397,7 +402,7 @@ class _ResponsesInvoker:
                 self.connections.reset(token)
 
         async def observe_request(http_request: httpx.Request) -> None:
-            http_request.extensions["trace"] = trace
+            await trace.attach(http_request)
             await _emit_request(invocation, http_request, observation_errors, clock)
 
         http_client = DefaultAsyncHttpxClient(
@@ -430,6 +435,8 @@ class _ResponsesInvoker:
                 "source": "sdk_decoded_stream",
                 "sequence": event_index,
                 "payload": event_payload,
+                "stage": _stream_stage(event_payload),
+                "response_id": _stream_response_id(event_payload),
             })
             event_index += 1
             yield event
@@ -446,21 +453,17 @@ class _ResponsesInvoker:
         provider_input = invocation.provider_input
         output_limit = {} if provider_input.max_output_tokens is None else {"max_output_tokens": provider_input.max_output_tokens}
         try:
-            stream = await client.responses.create(
+            stream = await _created_stream(client.responses.create(
                 model=invocation.config.model,
                 input=_responses_input_items(provider_input),
                 tools=_responses_tools(provider_input),
                 store=False,
                 stream=True,
                 **output_limit,
-            )
-        except Exception as exc:
+            ), trace)
+        except Exception:
             if observation_errors:
                 raise observation_errors[0]
-            if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
-                raise _transport_provider_error(exc, trace=trace) from exc
-            if isinstance(exc, httpx.HTTPError):
-                raise _nonretryable_http_error() from exc
             raise
         if observation_errors:
             raise observation_errors[0]
@@ -598,6 +601,29 @@ class _ResponsesInvoker:
             "text": text,
             "payload": item,
         })
+
+
+def _stream_stage(payload: dict[str, Any]) -> str:
+    # Responses 流事件的进度阶段
+    event_type = str(payload.get("type") or "")
+    if event_type == "response.created":
+        return "response_created"
+    if "output_text.delta" in event_type or "output_item.added" in event_type:
+        return "output"
+    if event_type == "response.output_item.done":
+        return "output_item_done"
+    if event_type == "response.completed":
+        return "completed"
+    if event_type in {"response.incomplete", "response.failed", "error"}:
+        return "error"
+    return "event"
+
+
+def _stream_response_id(payload: dict[str, Any]) -> str | None:
+    # 提供方的回答身份在带着 response 的流事件中（response.created、response.completed 等）
+    response = payload.get("response")
+    identity = response.get("id") if isinstance(response, dict) else None
+    return identity if isinstance(identity, str) and identity else None
 
 
 def _responses_input_items(provider_input: ProviderInput) -> list[dict[str, Any]]:
@@ -771,9 +797,11 @@ def _retryable_code(code: Any) -> bool:
     return _safe_error_code(code) in _RETRYABLE_ERROR_CODES
 
 
+# 三种协议共用的错误码表；Anthropic 的错误码是 error.type（overloaded_error、api_error 等）
 _RETRYABLE_ERROR_CODES = frozenset({
     "server_error", "internal_server_error", "service_unavailable", "temporarily_unavailable",
     "timeout", "rate_limit_exceeded", "too_many_requests", "server_is_overloaded",
+    "overloaded_error", "api_error", "rate_limit_error", "timeout_error",
 })
 
 _KNOWN_ERROR_CODES = frozenset({
@@ -781,6 +809,7 @@ _KNOWN_ERROR_CODES = frozenset({
     "invalid_api_key", "authentication_error", "permission_denied", "insufficient_quota",
     "model_not_found", "not_found", "bad_request", "invalid_request", "invalid_request_error",
     "content_policy_violation",
+    "permission_error", "not_found_error", "billing_error", "request_too_large",
 })
 
 _NONRETRYABLE_ERROR_CODES = _KNOWN_ERROR_CODES - _RETRYABLE_ERROR_CODES
@@ -884,6 +913,16 @@ def _nonretryable_http_error() -> ProviderError:
 
 def _has_nonretryable_connection_cause(exc: BaseException) -> bool:
     return isinstance(exc.__cause__, _NONRETRYABLE_CONNECTION_ERRORS)
+
+
+async def _created_stream(create: Awaitable[Any], trace: _TransportTrace) -> Any:
+    # 创建流式请求，三种协议相同：SDK 读取错误回复体时直接报告传输错误，按传输错误分类；SDK 自己的错误交给调用方分类
+    try:
+        return await create
+    except _RETRYABLE_HTTP_ERRORS as exc:
+        raise _transport_provider_error(exc, trace=trace) from exc
+    except _HTTP_ERRORS as exc:
+        raise _nonretryable_http_error() from exc
 
 
 async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
