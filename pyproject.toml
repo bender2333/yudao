@@ -21,6 +21,23 @@ include = ["harness*"]
 [tool.setuptools.package-data]
 harness = ["web/static/*", "definitions/*.json"]
 
+# 分层的依赖规则（应用层与接口层设计说明第 2.4 节），由 harness/tests/test_layers.py 检查
+[tool.importlinter]
+root_package = "harness"
+
+[[tool.importlinter.contracts]]
+name = "接口层只导入应用层"
+type = "forbidden"
+source_modules = ["harness.api"]
+forbidden_modules = ["harness.*"]
+ignore_imports = ["harness.api.** -> harness.app.**"]
+
+[[tool.importlinter.contracts]]
+name = "控制核心不导入应用层与接口层，应用层不导入接口层"
+type = "protected"
+protected_modules = ["harness.app", "harness.api"]
+allowed_importers = ["harness.api", "harness.__main__", "harness.tests"]
+
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]
 pythonpath = ["."]
