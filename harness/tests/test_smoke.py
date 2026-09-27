@@ -532,6 +532,7 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     }), encoding="utf-8")
     report = run_smoke(tmp_path / "smoke", provider_config=config, scenarios=["happy"])
     scenario = report["scenarios"]["happy"]
+    assert "model_input_audit" in scenario, scenario
     text = (tmp_path / "smoke" / "smoke-report.md").read_text(encoding="utf-8")
     assert f"model input audit: `{scenario['model_input_audit']['status']}`" in text
     assert f"model requests: `{scenario['model_input_audit']['request_count']}`" in text
