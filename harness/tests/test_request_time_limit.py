@@ -66,18 +66,19 @@ def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
 
 
 def _calls_during(function, operation) -> int:
-    # 用 sys.monitoring 记录 function 在 operation 期间（任何线程中）开始执行的次数；只观察，不替换
-    tool = next(index for index in range(6) if sys.monitoring.get_tool(index) is None)
-    calls = []
-    sys.monitoring.use_tool_id(tool, "yudao-test-calls")
+    # 用 sys.setprofile 记录 function 在 operation 期间（当前线程中）被调用的次数；只观察，不替换
+    code, calls = function.__code__, []
+
+    def profile(frame, event, _arg):
+        if event == "call" and frame.f_code is code:
+            calls.append(1)
+
+    previous = sys.getprofile()
+    sys.setprofile(profile)
     try:
-        sys.monitoring.register_callback(tool, sys.monitoring.events.PY_START, lambda _code, _offset: calls.append(1))
-        sys.monitoring.set_local_events(tool, function.__code__, sys.monitoring.events.PY_START)
         operation()
     finally:
-        sys.monitoring.set_local_events(tool, function.__code__, 0)
-        sys.monitoring.register_callback(tool, sys.monitoring.events.PY_START, None)
-        sys.monitoring.free_tool_id(tool)
+        sys.setprofile(previous)
     return len(calls)
 
 
@@ -92,7 +93,7 @@ print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.pla
 
 
 def test_platform_is_identified_when_the_provider_module_is_imported():
-    # 两个 SDK 在每个客户端的第一次请求之前识别平台，进程内第一次识别要查询系统信息（Windows 上约 0.4 秒）；
+    # 两个 SDK 在每个客户端的第一次请求之前识别平台，进程内第一次识别在 Windows 上要查询系统版本（约 0.4 秒）；
     # 这项一次性工作在服务启动时完成
     completed = subprocess.run([sys.executable, "-c", PLATFORM_IDENTIFIED], cwd=REPOSITORY,
                                capture_output=True, text=True, timeout=300)
@@ -102,8 +103,7 @@ def test_platform_is_identified_when_the_provider_module_is_imported():
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_calls_reuse_one_ssl_context_instead_of_loading_certificates_each_time(protocol):
-    # 每次调用新建的客户端原来各自创建 SSL 上下文并加载证书（本机负载高时每次约 1 秒，在请求发出之前）；
-    # 各次调用的客户端共用服务启动时创建的上下文
+    # 各次调用的客户端共用服务启动时创建的 SSL 上下文，请求发出之前不再创建上下文、加载证书
     server, _capture, base = serve(lambda _body: (200, "text/event-stream", [_reply(protocol)]))
     try:
         facade = facade_with(base + "/v1", protocol=protocol)

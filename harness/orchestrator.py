@@ -425,15 +425,21 @@ class Orchestrator:
                 self._cancellers_changed.notify_all()
 
     def _settled(self, run_id: str) -> RunProjection:
-        # 激活与运行循环结束时交回的运行状态。运行已经中止而取消还没有写入时，等正在进行的取消（cancel 或 /stop）
-        # 结束，交回它写入以后的状态；没有正在进行的取消（例如它的写入失败了）时在这里写入取消
-        projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES or not (self._abort.get(run_id) and self._abort[run_id].is_set()):
-            return projection
-        with self._cancellers_changed:
-            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
+        # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop），或者运行已经中止而取消还没有写入时，
+        # 等待正在进行的取消结束，交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时
+        # 在这里写入取消
+        def aborted() -> bool:
+            return bool(self._abort.get(run_id) and self._abort[run_id].is_set())
+
         projection = self.project(run_id)
         if projection.phase in TERMINAL_PHASES:
+            return projection
+        with self._cancellers_changed:
+            if not self._cancellers.get(run_id) and not aborted():
+                return projection
+            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
+        projection = self.project(run_id)
+        if projection.phase in TERMINAL_PHASES or not aborted():
             return projection
         return self.cancel(run_id)
 

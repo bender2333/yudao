@@ -63,7 +63,8 @@ _build_sdk_models(ResponseStreamEvent)
 platform.platform()
 
 # 各次调用的客户端共用一个 SSL 上下文。httpx 为每个客户端新建上下文并加载证书，本机负载高时每次约 1 秒，
-# 而 Chat Completions 与 Messages 每次调用都新建客户端
+# 而 Chat Completions 与 Messages 每次调用都新建客户端。httpcore 建立每个 TLS 连接时在上下文上设置 ALPN，
+# 全部客户端都只用 HTTP/1.1，设置的值相同
 _SSL_CONTEXT = httpx.create_ssl_context()
 
 
