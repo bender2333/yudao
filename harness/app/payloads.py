@@ -6,11 +6,22 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..definitions import DEFINITIONS
 from ..models import DEPARTMENTS, PHASES, EventType, ProjectEventType
 
 Department = Literal[DEPARTMENTS]
 Phase = Literal[PHASES]
 Purpose = Literal["work", "compaction"]
+
+
+def _stop_reasons(outcome: str) -> Any:
+    # 定义中以这种方式结束运行的停止原因
+    return Literal[tuple(name for name, reason in DEFINITIONS.stop_reasons.items() if reason.outcome == outcome)]
+
+
+ReleasedReason = _stop_reasons("done")
+PausedReason = _stop_reasons("paused")
+FailedReason = _stop_reasons("failed")
 
 
 class Payload(BaseModel):
@@ -776,11 +787,11 @@ class TransitionPayload(Payload):
 
 
 class RunDonePayload(Payload):
-    stop_reason: Literal["released"]
+    stop_reason: ReleasedReason
 
 
 class RunPausedPayload(Payload):
-    stop_reason: Literal["max_cycles", "model_steps_exhausted", "no_tool_call"]
+    stop_reason: PausedReason
     human_action: str
     paused_at_phase: Phase
     cycle_count: int
@@ -796,7 +807,7 @@ class InputSaveFailure(Payload):
 
 class RunFailedPayload(Payload):
     # input_save_failure 在停止命令的原文没能保存时出现
-    stop_reason: str
+    stop_reason: FailedReason
     human_action: str | None
     message: str
     input_save_failure: InputSaveFailure | None = None

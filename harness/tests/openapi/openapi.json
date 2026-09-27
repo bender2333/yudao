@@ -12010,6 +12010,20 @@
         "additionalProperties": false,
         "properties": {
           "stop_reason": {
+            "enum": [
+              "time_limit",
+              "cancelled",
+              "provider_error",
+              "provider_timeout",
+              "provider_unavailable",
+              "provider_credentials_lost",
+              "provider_protocol",
+              "unsupported_protocol",
+              "retry_after_too_long",
+              "context_overflow",
+              "compaction_failed",
+              "host_commit_error"
+            ],
             "title": "Stop Reason",
             "type": "string"
           },
@@ -12193,7 +12207,8 @@
             "enum": [
               "max_cycles",
               "model_steps_exhausted",
-              "no_tool_call"
+              "no_tool_call",
+              "workspace_unrepresentable"
             ],
             "title": "Stop Reason",
             "type": "string"
