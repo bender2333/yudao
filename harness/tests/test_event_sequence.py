@@ -2,7 +2,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from typing import Any, Callable
 
 import pytest
@@ -19,7 +19,7 @@ from harness.proposals import (
 from harness.runtime import LoopSystem
 from harness.tests.event_sequence import compare_with_baseline, normalized_run
 from harness.tests.helpers import FAST_RETRIES
-from harness.tests.protocol_helpers import provider_system, serve, sse
+from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply, serve, sse
 
 # 每个场景用 FakeAdapter 脚本（或测试内启动的真实 HTTP 服务）驱动 LoopSystem，把规整后的事件序列与
 # harness/tests/event_sequences/<场景名>.json 比较；规整规则与基准文件的结构见 event_sequence.py。
@@ -461,83 +461,73 @@ def _http_scenario(protocol: str):
     return run
 
 
-# 真实 Provider 模块的失败、重试与取消：测试内启动的 HTTP 服务按请求顺序执行回复脚本，每一项自己写出这次请求的回复
-class _ScriptedProvider:
-    def __init__(self, replies: list[Callable[["_ScriptedProvider", BaseHTTPRequestHandler], None]]) -> None:
-        self.replies = list(replies)
-        # held：服务端收到一个保持不回复的请求；release：场景结束，保持的请求不再等待
-        self.held = threading.Event()
-        self.release = threading.Event()
-        provider = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *_args: Any) -> None:
-                return
-
-            def do_POST(self) -> None:
-                self.rfile.read(int(self.headers["Content-Length"]))
-                reply = provider.replies.pop(0)
-                try:
-                    reply(provider, self)
-                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-                    return
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
-
-    def close(self) -> None:
-        self.release.set()
-        self.server.shutdown()
-        self.server.server_close()
-
-
-def _held(provider: _ScriptedProvider, _handler: BaseHTTPRequestHandler) -> None:
+# 真实 Provider 模块的失败、重试与取消：测试内启动的 HTTP 服务（ScriptedProvider）按请求顺序执行回复脚本
+def _held(provider: ScriptedProvider, _handler: BaseHTTPRequestHandler) -> None:
     # 收到请求以后一直不回复，直到场景结束
     provider.held.set()
     provider.release.wait(60)
 
 
-def _send(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes, *,
-          headers: tuple[tuple[str, str], ...] = (), declared_length: int | None = None) -> None:
-    handler.send_response(status)
-    handler.send_header("Content-Type", content_type)
-    handler.send_header("Content-Length", str(len(body) if declared_length is None else declared_length))
-    for name, value in headers:
-        handler.send_header(name, value)
-    handler.end_headers()
-    handler.wfile.write(body)
-    handler.wfile.flush()
-
-
-def _product_spec_stream(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
-    _send(handler, 200, "text/event-stream", _responses_reply(1, HTTP_SCRIPT[0]))
-
-
-def _http_error(status: int, code: str, *headers: tuple[str, str]):
-    def reply(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
-        body = json.dumps({"error": {"code": code, "type": "server_error", "message": "scenario failure"}})
-        _send(handler, status, "application/json", body.encode("utf-8"), headers=headers)
+def product_spec_reply(protocol: str):
+    # 产品部门提交规格的完整流式回复
+    def reply(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+        send_reply(handler, 200, "text/event-stream", HTTP_REPLIES[protocol](1, HTTP_SCRIPT[0]))
 
     return reply
 
 
-def _broken_stream(_provider: _ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
-    # 送出 response.created 与一条完整的输出之后连接关闭：声明的长度没有送完，回复在中途断开
+def _http_error(status: int, code: str, *headers: tuple[str, str]):
+    def reply(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+        body = json.dumps({"error": {"code": code, "type": "server_error", "message": "scenario failure"}})
+        send_reply(handler, status, "application/json", body.encode("utf-8"), headers=headers)
+
+    return reply
+
+
+# 流式回复送出一段输出之后连接关闭：声明的长度没有送完，回复在中途断开
+PARTIAL_OUTPUT = "partial output before the connection broke"
+
+
+def _broken_responses_stream(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    # 送出 response.created 与一条完整的输出之后断开
     created = {"id": "resp-broken", "object": "response", "created_at": 1, "status": "in_progress",
                "model": "scenario-model-actual", "output": [], "usage": None, "error": None,
                "incomplete_details": None}
     item = {"id": "partial-message", "type": "message", "role": "assistant", "status": "completed",
-            "content": [{"type": "output_text", "text": "partial output before the connection broke",
-                         "annotations": []}]}
+            "content": [{"type": "output_text", "text": PARTIAL_OUTPUT, "annotations": []}]}
     body = sse(_sse_event("response.created", {"response": created, "sequence_number": 0}),
                _sse_event("response.output_item.done", {"item": item, "output_index": 0, "sequence_number": 1}))
-    _send(handler, 200, "text/event-stream", body, declared_length=len(body) + 4096)
+    send_reply(handler, 200, "text/event-stream", body, declared_length=len(body) + 4096)
+
+
+def _broken_chat_stream(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    # 送出一块文字增量之后断开
+    chunk = {"id": "chat-broken", "object": "chat.completion.chunk", "created": 1, "model": "scenario-model-actual",
+             "choices": [{"index": 0, "delta": {"role": "assistant", "content": PARTIAL_OUTPUT},
+                          "finish_reason": None}]}
+    body = sse(f"data: {json.dumps(chunk)}\n\n")
+    send_reply(handler, 200, "text/event-stream", body, declared_length=len(body) + 4096)
+
+
+def _broken_messages_stream(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    # 送出 message_start 与一个文字块的开始和增量之后断开
+    body = sse(
+        _sse_event("message_start", {"message": {
+            "id": "msg-broken", "type": "message", "role": "assistant", "model": "scenario-model-actual",
+            "content": [], "usage": {"input_tokens": 100, "output_tokens": 1}}}),
+        _sse_event("content_block_start", {"index": 0, "content_block": {"type": "text", "text": ""}}),
+        _sse_event("content_block_delta", {"index": 0, "delta": {"type": "text_delta", "text": PARTIAL_OUTPUT}}),
+    )
+    send_reply(handler, 200, "text/event-stream", body, declared_length=len(body) + 4096)
+
+
+BROKEN_STREAMS = {"responses": _broken_responses_stream, "chat_completions": _broken_chat_stream,
+                  "messages": _broken_messages_stream}
 
 
 def _cancel_while_provider_holds(protocol: str):
     def run(data_dir):
-        provider = _ScriptedProvider([_held])
+        provider = ScriptedProvider([_held])
         try:
             system, run_id = provider_system(data_dir, provider.base, protocol)
 
@@ -556,11 +546,12 @@ def _cancel_while_provider_holds(protocol: str):
     return run
 
 
-def _responses_failure_then_success(first, *, timeout_sec: float = 20.0, step_limits: StepLimits = FAST_RETRIES):
+def _failure_then_success(protocol: str, first, *, timeout_sec: float = 20.0,
+                          step_limits: StepLimits = FAST_RETRIES):
     def run(data_dir):
-        provider = _ScriptedProvider([first, _product_spec_stream])
+        provider = ScriptedProvider([first, product_spec_reply(protocol)])
         try:
-            system, run_id = provider_system(data_dir, provider.base, "responses", timeout_sec=timeout_sec,
+            system, run_id = provider_system(data_dir, provider.base, protocol, timeout_sec=timeout_sec,
                                              step_limits=step_limits)
             system.activate_once(run_id)
         finally:
@@ -673,20 +664,28 @@ SCENARIOS: dict[str, Scenario] = {
     "http_responses_retry_after_then_success": Scenario(
         "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 429 并带 Retry-After: 1，记录失败的尝试与按 Retry-After "
         "等待 1 秒的重试安排，同一个逻辑调用的第二次尝试成功，产品规格被接纳。",
-        _responses_failure_then_success(_http_error(429, "rate_limit_exceeded", ("Retry-After", "1")),
-                                        step_limits=StepLimits())),
+        _failure_then_success("responses", _http_error(429, "rate_limit_exceeded", ("Retry-After", "1")),
+                              step_limits=StepLimits())),
     "http_responses_server_error_then_success": Scenario(
         "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 500（server_error），记录可重试的失败与重试安排，"
         "第二次尝试成功，产品规格被接纳。",
-        _responses_failure_then_success(_http_error(500, "server_error"))),
+        _failure_then_success("responses", _http_error(500, "server_error"))),
     "http_responses_stream_broken_then_success": Scenario(
         "经真实 Provider 模块（Responses 协议）：流式回复送出 response.created 与一条输出之后连接中途断开："
         "已收到的输出只作为审计记录，不进入重试请求，失败可重试，第二次尝试成功，产品规格被接纳。",
-        _responses_failure_then_success(_broken_stream)),
+        _failure_then_success("responses", BROKEN_STREAMS["responses"])),
+    "http_chat_stream_broken_then_success": Scenario(
+        "经真实 Provider 模块（Chat Completions 协议）：流式回复送出一块文字增量之后连接中途断开："
+        "已收到的输出只作为审计记录，不进入重试请求，失败记为可重试的连接失败，第二次尝试成功，产品规格被接纳。",
+        _failure_then_success("chat_completions", BROKEN_STREAMS["chat_completions"])),
+    "http_messages_stream_broken_then_success": Scenario(
+        "经真实 Provider 模块（Messages 协议）：流式回复送出 message_start 与一个文字块的开始和增量之后连接中途断开："
+        "已收到的输出只作为审计记录，不进入重试请求，失败记为可重试的连接失败，第二次尝试成功，产品规格被接纳。",
+        _failure_then_success("messages", BROKEN_STREAMS["messages"])),
     "http_responses_timeout_then_success": Scenario(
         "经真实 Provider 模块（Responses 协议）：服务端收到请求后一直不回复，超过请求时限（10 秒）："
         "尝试记为 provider_timeout 的可重试失败，第二次尝试成功，产品规格被接纳。",
-        _responses_failure_then_success(_held, timeout_sec=10.0)),
+        _failure_then_success("responses", _held, timeout_sec=10.0)),
 }
 
 

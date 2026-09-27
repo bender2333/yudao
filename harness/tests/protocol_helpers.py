@@ -119,6 +119,51 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
 
+class ScriptedProvider:
+    # 测试内启动的 HTTP 服务：按请求顺序执行回复脚本，每一项自己写出这次请求的回复，可以保持不回复或在中途断开。
+    # requests 记录收到的请求体；held：服务端收到一个保持不回复的请求；release：测试结束，保持的请求不再等待
+    def __init__(self, replies: list[Callable[["ScriptedProvider", BaseHTTPRequestHandler], None]]) -> None:
+        self.replies = list(replies)
+        self.requests: list[dict[str, Any]] = []
+        self.held = threading.Event()
+        self.release = threading.Event()
+        provider = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args: Any) -> None:
+                return
+
+            def do_POST(self) -> None:
+                provider.requests.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                reply = provider.replies.pop(0)
+                try:
+                    reply(provider, self)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    return
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.release.set()
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def send_reply(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes, *,
+               headers: tuple[tuple[str, str], ...] = (), declared_length: int | None = None) -> None:
+    # declared_length 大于实际长度时，回复送完 body 以后随请求处理结束而关闭连接，客户端读到的回复在中途断开
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(body) if declared_length is None else declared_length))
+    for name, value in headers:
+        handler.send_header(name, value)
+    handler.end_headers()
+    handler.wfile.write(body)
+    handler.wfile.flush()
+
+
 def serve(responder) -> tuple[ThreadingHTTPServer, Capture, str]:
     capture = Capture(responder)
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
@@ -300,6 +345,7 @@ __all__ = [
     "Capture",
     "ConnectionLoop",
     "ResponsesAdapter",
+    "ScriptedProvider",
     "bound_target",
     "chat_responder",
     "complete",
@@ -309,6 +355,7 @@ __all__ = [
     "model_call",
     "provider_system",
     "responses_responder",
+    "send_reply",
     "serve",
     "sse",
 ]

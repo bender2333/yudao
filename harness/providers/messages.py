@@ -32,6 +32,7 @@ from .responses import (
     _has_nonretryable_connection_cause,
     _is_context_overflow,
     _nonretryable_http_error,
+    _provider_events,
     _retry_after,
     _retryable_code,
     _retryable_http_status,
@@ -178,7 +179,7 @@ class _MessagesInvoker:
         stop_reason: str | None = None
         terminal = False
         event_index = 0
-        async for event in stream:
+        async for event in _provider_events(stream, trace):
             payload = _sdk_json(event, secrets=(invocation.frozen_target.api_key,))
             await invocation.emit({
                 "kind": "stream_event",

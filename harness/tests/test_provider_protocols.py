@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
+from harness.models import ArtifactRef, EventType
 from harness.providers import (
     CredentialChain,
     ProviderFacade,
@@ -14,7 +15,9 @@ from harness.providers import (
     get_preset,
 )
 from harness.providers.errors import ProviderError
+from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import (
+    ScriptedProvider,
     bound_target,
     chat_responder,
     complete,
@@ -22,10 +25,12 @@ from harness.tests.protocol_helpers import (
     invoke,
     messages_responder,
     model_call,
+    provider_system,
     responses_responder,
     serve,
     sse,
 )
+from harness.tests.test_event_sequence import BROKEN_STREAMS, PARTIAL_OUTPUT, product_spec_reply
 
 HI = [{"role": "user", "content": "hi"}]
 
@@ -379,6 +384,38 @@ def test_stream_without_terminal_event_is_a_retryable_failure(protocol, first_ev
         server.server_close()
     assert exc_info.value.retryable is True
     assert exc_info.value.diagnostics["error_type"] == "stream_incomplete"
+
+
+@pytest.mark.parametrize("protocol", ["chat_completions", "messages"])
+def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_succeeds(protocol, data_dir):
+    # 流式回复送出一段输出之后连接中途断开（D17）：尝试记为可重试的连接失败，安排重试，第二次成功；
+    # 已收到的部分输出只在失败尝试的审计记录中，不进入重试请求
+    provider = ScriptedProvider([BROKEN_STREAMS[protocol], product_spec_reply(protocol)])
+    try:
+        system, run_id = provider_system(data_dir, provider.base, protocol, step_limits=FAST_RETRIES)
+        try:
+            result = system.activate_once(run_id)
+            events = system.store.list_events(run_id)
+            failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+            scheduled = [event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]
+            audit = system.artifacts.get_for_run(
+                run_id, ArtifactRef(**failed[0].payload["stream_events_ref"])).decode("utf-8")
+        finally:
+            system.close()
+    finally:
+        provider.close()
+    assert result.phase == "ENGINEERING", result.error
+    assert [event.error for event in failed] == ["Model provider connection failed"]
+    assert failed[0].payload["reason"] == "provider_error"
+    assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
+    assert failed[0].payload["diagnostics"] == {
+        "error_type": "connection", "trace_available": False, "transport_phase": "unknown",
+        "transport_event": "unknown", "cause_type": "RemoteProtocolError",
+    }
+    assert len(scheduled) == 1
+    assert PARTIAL_OUTPUT in audit
+    assert len(provider.requests) == 2
+    assert PARTIAL_OUTPUT not in json.dumps(provider.requests[1])
 
 
 def test_partial_stream_is_retryable():
