@@ -3,70 +3,15 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from ..definitions import DEFINITIONS, ServicePreset
 
-# 预置表是模块内数据，带版本与来源，不做远端热更（ADR-0003）
-PRESET_TABLE_VERSION = "2026-09-26.1"
-PRESET_TABLE_SOURCE = "https://opencode.ai/docs/go/ 与 https://opencode.ai/zen/go/v1/models（2026-09-19 采集）"
+# 服务方案预置表是带版本的定义（definitions/service_presets.json），整张表带 revision 与来源，
+# 不做远端热更（ADR-0003）；新增服务方案等于在定义中新增一项
+_TABLE = DEFINITIONS.service_presets
+PRESET_TABLE_VERSION = _TABLE.revision
+PRESET_TABLE_SOURCE = _TABLE.source
 
-
-def _preset(
-    preset_id: str,
-    name: str,
-    *,
-    auth: str,
-    base_urls: Mapping[str, str],
-    models_url: str,
-    docs_url: str,
-    header_profile: str = "",
-    source: str = "",
-    notes: str = "",
-    known_models: tuple[Mapping[str, str], ...] = (),
-) -> dict[str, Any]:
-    return {
-        "id": preset_id,
-        "name": name,
-        "auth": auth,
-        "base_urls": dict(base_urls),
-        "models_url": models_url,
-        "docs_url": docs_url,
-        "header_profile": header_profile,
-        "source": source,
-        "notes": notes,
-        "known_models": [dict(item) for item in known_models],
-    }
-
-
-# 每个模型访问定义只声明一条协议，同一服务下的不同模型可以走不同协议；
-# base_urls 是按协议的请求基址，请求路径由各协议适配器拼接
-_PRESETS: tuple[dict[str, Any], ...] = (
-    _preset(
-        "opencode-go",
-        "OpenCode Go",
-        auth="api_key",
-        base_urls={
-            "responses": "https://opencode.ai/zen/go/v1",
-            "chat_completions": "https://opencode.ai/zen/go/v1",
-            "messages": "https://opencode.ai/zen/go/v1",
-        },
-        models_url="https://opencode.ai/zen/go/v1/models",
-        docs_url="https://opencode.ai/docs/go/",
-        header_profile="opencode-go",
-        source="https://opencode.ai/docs/go/#endpoints（2026-09-19）",
-        notes=(
-            "订阅套餐使用 API Key；请求需带真实客户端 User-Agent 与 x-opencode-session。"
-            "模型列表只给 ID，协议与容量需按访问定义声明并测试准入。"
-        ),
-        known_models=(
-            {"model_id": "gpt-5.6-luna", "protocol": "responses", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"},
-            {"model_id": "glm-5.1", "protocol": "chat_completions", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"},
-            {"model_id": "minimax-m2.7", "protocol": "messages", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"},
-        ),
-    ),
-)
-
-_PRESET_INDEX: Mapping[str, dict[str, Any]] = MappingProxyType(
-    {item["id"]: item for item in _PRESETS}
-)
+_PRESET_INDEX: Mapping[str, ServicePreset] = MappingProxyType({item.id: item for item in _TABLE.presets})
 
 
 # Yudao 自己的客户端身份，不冒充其他编码代理
@@ -75,7 +20,7 @@ USER_AGENT = "Yudao-Loop-System/0.1 (+https://github.com/bender2333/yudao)"
 
 def list_presets() -> list[dict[str, Any]]:
     # 按声明顺序返回，OpenCode Go 是第一个落地的服务方案
-    return [_public_preset(item) for item in _PRESETS]
+    return [_public_preset(item) for item in _TABLE.presets]
 
 
 def get_preset(preset_id: str) -> dict[str, Any] | None:
@@ -89,12 +34,12 @@ def preset_exists(preset_id: str) -> bool:
 
 def preset_models_url(preset_id: str) -> str:
     item = _PRESET_INDEX.get(str(preset_id))
-    return "" if item is None else str(item["models_url"])
+    return "" if item is None else item.models_url
 
 
 def preset_header_profile(preset_id: str) -> str:
     item = _PRESET_INDEX.get(str(preset_id))
-    return "" if item is None else str(item["header_profile"])
+    return "" if item is None else item.header_profile
 
 
 def preset_known_models(preset_id: str) -> dict[str, dict[str, str]]:
@@ -103,11 +48,8 @@ def preset_known_models(preset_id: str) -> dict[str, dict[str, str]]:
     if item is None:
         return {}
     return {
-        str(hint["model_id"]): {
-            "protocol": str(hint["protocol"]),
-            "capability_source": str(hint["capability_source"]),
-        }
-        for hint in item["known_models"]
+        hint.model_id: {"protocol": hint.protocol, "capability_source": hint.capability_source}
+        for hint in item.known_models
     }
 
 
@@ -121,19 +63,9 @@ def build_identity_headers(header_profile: str, session_id: str) -> dict[str, st
     return headers
 
 
-def _public_preset(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "id": item["id"],
-        "name": item["name"],
-        "auth": item["auth"],
-        "base_urls": dict(item["base_urls"]),
-        "models_url": item["models_url"],
-        "docs_url": item["docs_url"],
-        "header_profile": item["header_profile"],
-        "source": item["source"],
-        "notes": item["notes"],
-        "known_models": [dict(hint) for hint in item["known_models"]],
-    }
+def _public_preset(item: ServicePreset) -> dict[str, Any]:
+    # 每次交回新的字典，调用方改不到定义
+    return item.model_dump(mode="json")
 
 
 __all__ = [

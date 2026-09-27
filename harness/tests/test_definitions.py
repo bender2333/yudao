@@ -12,6 +12,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
+from harness.providers.presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, get_preset, list_presets
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tools import tool_definitions
@@ -157,6 +158,30 @@ def test_tool_definitions_and_proposal_contracts_hand_out_copies(tmp_path):
     assert DEFINITIONS.proposal_contract("quality")["kinds"]["qa_review"]["verdict"] == [
         "rework_product", "rework_engineering", "release"]
     assert load_definitions() == DEFINITIONS
+
+
+def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
+    assert (PRESET_TABLE_VERSION, PRESET_TABLE_SOURCE) == (
+        DEFINITIONS.service_presets.revision, DEFINITIONS.service_presets.source)
+    [preset] = list_presets()
+    preset["base_urls"].clear()
+    assert get_preset("opencode-go")["base_urls"]["responses"] == "https://opencode.ai/zen/go/v1"
+
+    directory = _copy(tmp_path)
+    table = _read(directory, "service_presets.json")
+    original = table["presets"][0]["known_models"][0]["protocol"]
+    table["presets"][0]["known_models"][0]["protocol"] = "grpc"
+    _write(directory, "service_presets.json", table)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("service_presets.json", "presets[0].known_models[0].protocol")
+    table["presets"][0]["known_models"][0]["protocol"] = original
+    table["presets"].append(table["presets"][0])
+    _write(directory, "service_presets.json", table)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (("service_presets.json", "presets[1].id", "重复的服务方案 opencode-go"),)
 
 
 def test_role_visibility_is_a_closed_list(tmp_path):

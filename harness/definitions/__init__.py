@@ -124,6 +124,37 @@ class ProposalContracts(_Definition):
     shared: ProposalContract
 
 
+Protocol = Literal["responses", "chat_completions", "messages"]
+
+
+class KnownModel(_Definition):
+    # 预置提示：来源写明是否验证过，不当成已验证的能力
+    model_id: str = Field(min_length=1)
+    protocol: Protocol
+    capability_source: str = Field(min_length=1)
+
+
+class ServicePreset(_Definition):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    auth: str = Field(min_length=1)
+    # 按协议的请求基址，请求路径由各协议适配器拼接
+    base_urls: dict[Protocol, str]
+    models_url: str
+    docs_url: str
+    header_profile: str
+    source: str
+    notes: str
+    known_models: tuple[KnownModel, ...]
+
+
+class ServicePresets(_Definition):
+    # 服务方案预置表（ADR-0003）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    revision: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    presets: tuple[ServicePreset, ...]
+
+
 class StopReason(_Definition):
     # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
     outcome: Literal["done", "paused", "failed"]
@@ -142,6 +173,7 @@ class Definitions(_Definition):
     limits: Limits
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: dict[Identifier, StopReason]
+    service_presets: ServicePresets
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -174,6 +206,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "proposal_contracts.json": ("proposal_contracts", TypeAdapter(ProposalContracts)),
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
+    "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
 }
 
 
@@ -230,7 +263,8 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
 
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
-    # 文件之间的引用：部门与角色一一对应，角色的工具都有定义且不重复，一种提案只由一个工具提交
+    # 类型以外的核对：部门与角色一一对应，角色的工具都有定义且不重复，一种提案只由一个工具提交，
+    # 提案合同与角色的提交工具相符，服务方案的编号不重复
     issues: list[tuple[str, str, str]] = []
     organization: Organization = parts["organization"]
     roles: dict[str, Role] = parts["roles"]
@@ -263,6 +297,11 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools))
+    presets: ServicePresets = parts["service_presets"]
+    identities = [preset.id for preset in presets.presets]
+    for index, identity in enumerate(identities):
+        if identities.index(identity) != index:
+            issues.append(("service_presets.json", f"presets[{index}].id", f"重复的服务方案 {identity}"))
     return issues
 
 
