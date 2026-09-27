@@ -1130,11 +1130,14 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入
-        if DEFINITIONS.stop_reason(reason).outcome == "paused":
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入
+        outcome = DEFINITIONS.stop_reason(reason).outcome
+        if outcome == "paused":
             self._pause(transaction, reason)
-        else:
+        elif outcome == "failed":
             self._fail(transaction, reason, message)
+        else:
+            raise ValueError(f"stop reason {reason} ends a run by release, which only an accepted QA review records")
 
     def _pause(self, transaction: Transaction, reason: str) -> None:
         projection = transaction.projection

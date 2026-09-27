@@ -25,7 +25,7 @@ from typing import Any
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
 from .public_tree import capture_public_tree, is_private_path
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, DefinitionError
 from .redact import redact_text, sanitized_env
 from .tools import normalize_registered_commands
 from .workspace import Workspace, WorkspaceSnapshot
@@ -41,6 +41,25 @@ TIMEOUT_EXIT_CODE = 124
 CANCELLED_EXIT_CODE = 130
 
 _PYTHON_NAMES = {"python", "python3", "py", "python.exe", "python3.exe"}
+
+# 环境工具与执行它的方法：直接执行的工具，与以进程执行、可以超时与取消的工具
+_HANDLERS = {
+    "read_file": "_read_file",
+    "list_files": "_list_files",
+    "search": "_search",
+    "read_range": "_read_range",
+    "write_file": "_write_file",
+    "edit_range": "_edit_range",
+    "delete_file": "_delete_file",
+    "move_file": "_move_file",
+}
+_PROCESSES = {"run_check": "_run_check", "run_command": "_run_command"}
+
+# 定义中的每个环境工具都要在这里有执行方法，否则启动失败
+_UNIMPLEMENTED = sorted(name for name, tool in DEFINITIONS.tools.items()
+                        if tool.kind == "environment" and name not in _HANDLERS and name not in _PROCESSES)
+if _UNIMPLEMENTED:
+    raise DefinitionError([("tools.json", name, "执行环境没有这个环境工具的实现") for name in _UNIMPLEMENTED])
 
 
 @dataclass(frozen=True)
@@ -64,19 +83,9 @@ class LocalEnvironment:
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
         self._cancelled: set[str] = set()
         self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
-            "read_file": self._read_file,
-            "list_files": self._list_files,
-            "search": self._search,
-            "read_range": self._read_range,
-            "write_file": self._write_file,
-            "edit_range": self._edit_range,
-            "delete_file": self._delete_file,
-            "move_file": self._move_file,
-        }
+            name: getattr(self, method) for name, method in _HANDLERS.items()}
         self._processes: dict[str, Callable[[Action, asyncio.Event], Awaitable[tuple[Any, str]]]] = {
-            "run_check": self._run_check,
-            "run_command": self._run_command,
-        }
+            name: getattr(self, method) for name, method in _PROCESSES.items()}
 
     async def perform(self, action: Action) -> ActionReceipt:
         # 工具的执行出错时回执为 failed，错误说明交回模型

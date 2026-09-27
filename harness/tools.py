@@ -4,11 +4,10 @@
 
 from __future__ import annotations
 
-import copy
 import re
 from typing import Any
 
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, thaw
 
 # 登记命令名只允许简单标识，避免路径与 shell 元字符进入注册表
 _COMMAND_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
@@ -84,6 +83,6 @@ def usable_when_guidance_only(name: str) -> bool:
 
 
 def tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:
-    # 请求中提供给模型的工具：名称、描述与参数的副本（参数按定义中的键顺序）
+    # 请求中提供给模型的工具：名称、描述与参数（参数是普通的 JSON 结构，按定义中的键顺序）
     return [{"name": name, "description": DEFINITIONS.tools[name].description,
-             "parameters": copy.deepcopy(DEFINITIONS.tools[name].parameters)} for name in tool_names]
+             "parameters": thaw(DEFINITIONS.tools[name].parameters)} for name in tool_names]

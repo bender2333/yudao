@@ -557,7 +557,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.RUN_DONE:
         state.phase = "DONE"
         state.outcome = "done"
-        state.stop_reason = event.stop_reason or "released"
+        state.stop_reason = event.stop_reason
         state.active_department = None
         return
 

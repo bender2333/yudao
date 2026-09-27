@@ -74,7 +74,7 @@ def offered_tools(projection: RunProjection, department: str, *, guidance_only: 
 def facts_query(call: dict[str, Any]) -> FactsQuery:
     # 工具许可依据的工作区事实：写入的目标路径在工作区中的规范形式，登记命令执行依据中的公开树摘要
     name, args = call["name"], call["args"]
-    if name == "run_command":
+    if tool_action(name) == "command":
         return FactsQuery(tree=True)
     if _is_write(name):
         return FactsQuery(paths=tuple(target for target in _write_targets(name, args) if isinstance(target, str)))
@@ -103,7 +103,7 @@ def tool_permission(
     if reason:
         return ToolPermission(reason=reason)
     command_basis: dict[str, Any] = {}
-    if name == "run_command":
+    if tool_action(name) == "command":
         # 登记命令在执行前核对冻结的登记表：未登记的名称与越界参数在这里拒绝，不执行
         reason, command_basis = _run_command_basis(projection, args, facts)
         if reason:

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, DefinitionError
 
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
@@ -790,6 +790,13 @@ def department_for_phase(phase: str) -> str | None:
     if phase in QUALITY_ACTIVE:
         return "quality"
     return None
+
+
+# 阶段迁移是控制核心的状态机，只为这些部门写了阶段；定义中的部门必须与它们相同，否则启动失败
+_PHASE_DEPARTMENTS = [department_for_phase(phase) for phase in ("PRODUCT_SPEC", "ENGINEERING", "QUALITY")]
+if list(DEPARTMENTS) != _PHASE_DEPARTMENTS:
+    raise DefinitionError([("organization.json", "departments",
+                            "控制核心的阶段迁移按顺序支持部门 " + "、".join(_PHASE_DEPARTMENTS))])
 
 
 def waiting_reason_for(phase: str, stop_reason: str | None = None) -> str | None:

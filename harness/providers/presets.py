@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from ..definitions import DEFINITIONS, ServicePreset
+from ..definitions import DEFINITIONS, ServicePreset, thaw
 
 # 服务方案预置表是带版本的定义（definitions/service_presets.json），整张表带 revision 与来源，
 # 不做远端热更（ADR-0003）；新增服务方案等于在定义中新增一项
@@ -64,8 +64,20 @@ def build_identity_headers(header_profile: str, session_id: str) -> dict[str, st
 
 
 def _public_preset(item: ServicePreset) -> dict[str, Any]:
-    # 每次交回新的字典，调用方改不到定义
-    return item.model_dump(mode="json")
+    # 每次交回新的字典
+    return {
+        "id": item.id,
+        "name": item.name,
+        "auth": item.auth,
+        "base_urls": thaw(item.base_urls),
+        "models_url": item.models_url,
+        "docs_url": item.docs_url,
+        "header_profile": item.header_profile,
+        "source": item.source,
+        "notes": item.notes,
+        "known_models": [{"model_id": hint.model_id, "protocol": hint.protocol,
+                          "capability_source": hint.capability_source} for hint in item.known_models],
+    }
 
 
 __all__ = [

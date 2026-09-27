@@ -22,8 +22,9 @@ T = TypeVar("T")
 # 超过这个次数时交回最后一次的版本冲突
 MAX_JUDGMENTS = 100
 
-# 结束运行的事件与它承载的停止原因规定的结束方式
-_STOP_EVENTS = {EventType.RUN_DONE: "done", EventType.RUN_PAUSED: "paused", EventType.RUN_FAILED: "failed"}
+# 结束运行的事件：它承载的停止原因规定的结束方式，与事件写入的终态
+_STOP_EVENTS = {EventType.RUN_DONE: ("done", "DONE"), EventType.RUN_PAUSED: ("paused", "PAUSED"),
+                EventType.RUN_FAILED: ("failed", "FAILED")}
 
 
 @dataclass(frozen=True)
@@ -207,12 +208,16 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int) -> Even
 
 
 def _check_stop_reason(entry: NewEvent) -> None:
-    # 停止原因只来自定义中的清单，只由结束运行的事件承载，并且与原因规定的结束方式一致；否则这次写入失败
-    outcome = _STOP_EVENTS.get(entry.type)
+    # 停止原因只来自定义中的清单，只由结束运行的事件承载，与原因规定的结束方式及事件写入的终态一致，
+    # 载荷中的停止原因与事件的停止原因相同；否则这次写入失败
+    ending = _STOP_EVENTS.get(entry.type)
     if entry.stop_reason is None:
-        if outcome is not None:
+        if ending is not None:
             raise ValueError(f"{entry.type} requires a stop reason")
         return
     defined = DEFINITIONS.stop_reason(entry.stop_reason).outcome
-    if defined != outcome:
+    if ending is None or defined != ending[0]:
         raise ValueError(f"stop reason {entry.stop_reason} ends a run as {defined}; it cannot be recorded on {entry.type}")
+    if entry.state_after != ending[1] or entry.payload.get("stop_reason") != entry.stop_reason:
+        raise ValueError(f"{entry.type} with stop reason {entry.stop_reason} must end in {ending[1]} "
+                         "and carry the same stop reason in its payload")

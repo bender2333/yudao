@@ -10,12 +10,14 @@ from .models import (
     DEPARTMENTS, PRODUCT_ACTIVE, QUALITY_ACTIVE, TERMINAL_PHASES, CollaborationRequest, Event,
     EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
 )
+from .definitions import DEFINITIONS
 from .tools import proposal_kind, tool_action
 
 
-_MUTATIONS = {"write_file", "edit_range", "delete_file", "move_file"}
-_READS = {"read_file", "list_files"}
-_CHECKS = {"run_check"}
+# 写入与检查的工具按定义中的动作类别；inspect 请求只认读取整个文件与列出文件这两种读取的结果
+_MUTATIONS = frozenset(name for name, tool in DEFINITIONS.tools.items() if tool.action == "write")
+_READS = frozenset({"read_file", "list_files"})
+_CHECKS = frozenset(name for name, tool in DEFINITIONS.tools.items() if tool.action == "check")
 _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
 _ACCEPTED_RESULTS = {
     EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,

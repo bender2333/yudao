@@ -6,6 +6,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, EventType
 
 # 事件序列对照：把一次 run 的完整事件序列规整成与运行时刻、机器路径无关的形式，与 event_sequences/ 下的基准比较。
@@ -36,7 +37,8 @@ from harness.models import ArtifactRef, EventType
 #    （python、python3、python.exe）单独出现或作为带引号的字符串出现时也写成 <python>；
 #    场景给出的其他值（例如本机 HTTP 服务的地址）写成场景指定的占位。
 # 7. 长度不少于 300 个字符的文字、序列化后不少于 1500 个字符的结构，出现两次及以上时移入 shared，原处写 <shared#N>。
-# 8. 定义的版本（definitions_version 字段）是全部定义文件内容的摘要，随定义的内容改变，写成 <definitions>。
+# 8. 定义的版本（definitions_version 字段）是全部定义文件内容的摘要，随定义的内容改变：等于当前加载的定义的版本时
+#    写成 <definitions>，其他值（缺少、空或旧的版本）原样保留，与基准不同。
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
 
@@ -113,7 +115,7 @@ class _Normalizer:
     def value(self, value: Any, key: str | None = None) -> Any:
         if key in _TIME_KEYS and value is not None:
             return "<duration>"
-        if key == "definitions_version":
+        if key == "definitions_version" and value == DEFINITIONS.version:
             return "<definitions>"
         if isinstance(value, dict):
             if set(value) == _ARTIFACT_KEYS and isinstance(value.get("content_hash"), str):

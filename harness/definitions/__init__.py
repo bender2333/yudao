@@ -2,22 +2,43 @@
 # 导入本模块时读取并校验全部定义文件：标准库解析 JSON（重复的键不合法），pydantic 类型校验每个文件的结构，
 # 任何一项不合法都抛出 DefinitionError，写明文件与字段，导入本模块的程序因此无法启动。
 # 定义的版本是全部定义文件内容的摘要：每个文件解析以后按原来的键顺序写成紧凑的 JSON，只改格式不改变版本。
-# 运行中任何代码都不修改定义：类型不可改写，可变的结构交回副本；项目部门设置中的 Prompt 与模型属于设置，不在这里。
+# 运行中任何代码都不能修改定义：类型不可改写，映射是只读映射、列表是元组；请求等需要普通 JSON 结构的地方用 thaw
+# 取得副本。项目部门设置中的 Prompt 与模型属于设置，不在这里。
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
+                      field_validator, model_validator)
 
 DEFINITIONS_DIR = Path(__file__).parent
 
 # 定义中的编号：小写字母开头，由小写字母、数字与下划线组成
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
+
+
+def _freeze(value: Any) -> Any:
+    # 逐层把字典换成只读映射、把列表换成元组，键的顺序不变
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def thaw(value: Any) -> Any:
+    # 定义中只读的 JSON 结构的普通副本（字典与列表），键的顺序不变
+    if isinstance(value, Mapping):
+        return {key: thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [thaw(item) for item in value]
+    return value
 
 
 class DefinitionError(ValueError):
@@ -39,6 +60,11 @@ class _Definition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
+def _frozen(*fields: str) -> Any:
+    # 这些字段校验以后逐层换成只读结构
+    return field_validator(*fields, mode="after")(lambda cls, value: _freeze(value))
+
+
 class Limits(_Definition):
     # 运行时间上限（秒）：达到时运行失败（time_limit）
     run_time_limit_sec: int = Field(gt=0)
@@ -48,8 +74,8 @@ class Limits(_Definition):
     max_model_steps: int = Field(gt=0)
     # 一次模型调用的最多尝试次数，与重试的初始间隔、最大间隔（秒）
     max_provider_attempts: int = Field(gt=0)
-    retry_initial_delay_sec: float = Field(gt=0)
-    retry_max_delay_sec: float = Field(gt=0)
+    retry_initial_delay_sec: float = Field(gt=0, allow_inf_nan=False)
+    retry_max_delay_sec: float = Field(gt=0, allow_inf_nan=False)
     # 连续没有调用工具的回复最多追加说明的次数，再出现一次运行暂停（no_tool_call）
     tool_call_required_limit: int = Field(gt=0)
     # 检查的时限（秒），也是登记命令没有写明时限时的默认值
@@ -58,6 +84,14 @@ class Limits(_Definition):
     tool_output_limit: int = Field(gt=0)
     # 登记命令时限的最大值（秒）
     command_timeout_max_sec: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Limits:
+        if self.retry_initial_delay_sec > self.retry_max_delay_sec:
+            raise ValueError("retry_initial_delay_sec cannot exceed retry_max_delay_sec")
+        if self.check_timeout_sec > self.command_timeout_max_sec:
+            raise ValueError("check_timeout_sec cannot exceed command_timeout_max_sec")
+        return self
 
 
 class Department(_Definition):
@@ -100,7 +134,9 @@ class Tool(_Definition):
     guidance_only: bool
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
     description: str = Field(min_length=1)
-    parameters: dict[str, Any]
+    parameters: Mapping[str, Any]
+
+    freeze_parameters = _frozen("parameters")
 
     @model_validator(mode="after")
     def _category(self) -> Tool:
@@ -114,14 +150,18 @@ class Tool(_Definition):
 class ProposalContract(_Definition):
     # 提供给模型的提案合同：提交工具、各提案种类的说明与注意事项，整份写成 JSON 放进请求
     submit_tools: tuple[Identifier, ...]
-    kinds: dict[Identifier, dict[str, Any]]
+    kinds: Mapping[Identifier, Mapping[str, Any]]
     notes: tuple[str, ...]
+
+    freeze_kinds = _frozen("kinds")
 
 
 class ProposalContracts(_Definition):
     # 各角色自己的部分；shared 是每个角色都有的部分（协作请求、回应与指导的回应），接在角色自己的部分之后
-    roles: dict[Identifier, ProposalContract]
+    roles: Mapping[Identifier, ProposalContract]
     shared: ProposalContract
+
+    freeze_roles = _frozen("roles")
 
 
 Protocol = Literal["responses", "chat_completions", "messages"]
@@ -139,13 +179,15 @@ class ServicePreset(_Definition):
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
     # 按协议的请求基址，请求路径由各协议适配器拼接
-    base_urls: dict[Protocol, str]
+    base_urls: Mapping[Protocol, str]
     models_url: str
     docs_url: str
     header_profile: str
     source: str
     notes: str
     known_models: tuple[KnownModel, ...]
+
+    freeze_base_urls = _frozen("base_urls")
 
 
 class ServicePresets(_Definition):
@@ -166,14 +208,16 @@ class Definitions(_Definition):
     version: str
     organization: Organization
     # 角色定义，键是角色编号
-    roles: dict[Identifier, Role]
+    roles: Mapping[Identifier, Role]
     # 工具定义，键是工具名称
-    tools: dict[Identifier, Tool]
+    tools: Mapping[Identifier, Tool]
     proposal_contracts: ProposalContracts
     limits: Limits
     # 停止原因的封闭清单，键是停止原因
-    stop_reasons: dict[Identifier, StopReason]
+    stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
+
+    freeze_collections = _frozen("roles", "tools", "stop_reasons")
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -184,11 +228,11 @@ class Definitions(_Definition):
         return self.roles[department]
 
     def proposal_contract(self, department: str) -> dict[str, Any]:
-        # 部门的角色的提案合同：角色自己的部分接上共同的部分；交回副本
+        # 部门的角色的提案合同：角色自己的部分接上共同的部分，交回普通的 JSON 结构
         own, shared = self.proposal_contracts.roles[department], self.proposal_contracts.shared
-        return copy.deepcopy({"submit_tools": [*own.submit_tools, *shared.submit_tools],
-                              "kinds": {**own.kinds, **shared.kinds},
-                              "notes": [*own.notes, *shared.notes]})
+        return {"submit_tools": [*own.submit_tools, *shared.submit_tools],
+                "kinds": thaw({**own.kinds, **shared.kinds}),
+                "notes": [*own.notes, *shared.notes]}
 
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因只来自定义中的清单
@@ -241,7 +285,14 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
         if not path.is_file():
             issues.append((file, "（整个文件）", "定义文件不存在"))
             continue
-        text = path.read_text(encoding="utf-8")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            issues.append((file, f"第 {exc.start} 个字节", "不是 UTF-8 编码的文本"))
+            continue
+        except OSError as exc:
+            issues.append((file, "（整个文件）", f"无法读取：{exc.strerror or exc}"))
+            continue
         try:
             contents[file] = json.loads(text, object_pairs_hook=_unique_keys)
         except json.JSONDecodeError as exc:
@@ -325,7 +376,10 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role],
             continue
         kinds = {tools[tool].proposal for tool in submit_tools}
         described = set(own.kinds) | set(contracts.shared.kinds)
-        if described != kinds:
+        overlap = sorted(set(own.kinds) & set(contracts.shared.kinds))
+        if overlap:
+            issues.append((file, f"roles.{name}.kinds", "与共同部分重复说明 " + "、".join(overlap)))
+        elif described != kinds:
             issues.append((file, f"roles.{name}.kinds",
                            "与共同部分合起来必须恰好说明这些提案种类：" + "、".join(sorted(kinds))))
     return issues

@@ -148,17 +148,60 @@ def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
     ]
 
 
-def test_tool_definitions_and_proposal_contracts_hand_out_copies(tmp_path):
+def test_a_role_and_the_shared_part_cannot_describe_the_same_proposal_kind(tmp_path):
+    directory = _copy(tmp_path)
+    contracts = _read(directory, "proposal_contracts.json")
+    contracts["roles"]["product"]["kinds"]["collaboration_request"] = {"required": ["recipient"]}
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 collaboration_request"),)
+
+
+def test_loaded_definitions_are_read_only_and_hand_out_plain_copies(tmp_path):
+    # 映射是只读映射、列表是元组，改不到；请求与界面用的是普通 JSON 结构的副本
+    review = DEFINITIONS.tools["submit_review"]
+    assert isinstance(review.parameters["properties"]["verdict"]["enum"], tuple)
+    with pytest.raises(TypeError):
+        review.parameters["properties"]["verdict"]["enum"][0] = "approve"
+    with pytest.raises(TypeError):
+        del review.parameters["properties"]["defects"]
+    with pytest.raises(TypeError):
+        DEFINITIONS.tools["fetch_url"] = review
+    with pytest.raises(TypeError):
+        del DEFINITIONS.stop_reasons["max_cycles"]
     [definition] = tool_definitions(["submit_review"])
     definition["parameters"]["properties"].clear()
     contract = DEFINITIONS.proposal_contract("quality")
     contract["kinds"]["qa_review"]["verdict"].append("approve")
     contract["submit_tools"].clear()
-    assert DEFINITIONS.tools["submit_review"].parameters["properties"]["verdict"]["enum"] == [
-        "rework_product", "rework_engineering", "release"]
+    assert list(review.parameters["properties"]["verdict"]["enum"]) == ["rework_product", "rework_engineering", "release"]
     assert DEFINITIONS.proposal_contract("quality")["kinds"]["qa_review"]["verdict"] == [
         "rework_product", "rework_engineering", "release"]
     assert load_definitions() == DEFINITIONS
+
+
+@pytest.mark.parametrize(("change", "field", "message"), [
+    (lambda limits: {**limits, "retry_max_delay_sec": float("inf")}, "retry_max_delay_sec", "finite number"),
+    (lambda limits: {**limits, "retry_initial_delay_sec": 90.0}, "（整个文件）", "retry_initial_delay_sec cannot exceed"),
+    (lambda limits: {**limits, "check_timeout_sec": 900}, "（整个文件）", "check_timeout_sec cannot exceed"),
+])
+def test_limits_are_finite_and_consistent(tmp_path, change, field, message):
+    directory = _copy(tmp_path)
+    _write(directory, "limits.json", change(_read(directory, "limits.json")))
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[0] == "limits.json" and issue[1] == field and message in issue[2]
+
+
+def test_a_definition_file_that_is_not_utf8_names_the_file(tmp_path):
+    directory = _copy(tmp_path)
+    (directory / "roles.json").write_bytes('{"product": "café"}'.encode("latin-1"))
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (("roles.json", "第 16 个字节", "不是 UTF-8 编码的文本"),)
 
 
 def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
@@ -215,18 +258,44 @@ def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
     assert raised.value.issues == (("limits.json", "（整个文件）", "定义文件不存在"),)
 
 
-def test_startup_fails_when_a_definition_is_invalid(tmp_path):
+def _without_quality(directory: Path) -> None:
+    organization = _read(directory, "organization.json")
+    organization["departments"] = organization["departments"][:2]
+    _write(directory, "organization.json", organization)
+    for name, key in (("roles.json", None), ("proposal_contracts.json", "roles")):
+        content = _read(directory, name)
+        del (content if key is None else content[key])["quality"]
+        _write(directory, name, content)
+
+
+def _with_unimplemented_tool(directory: Path) -> None:
+    tools = _read(directory, "tools.json")
+    tools["fetch_url"] = {**tools["read_file"], "description": "Fetch one registered URL."}
+    _write(directory, "tools.json", tools)
+    roles = _read(directory, "roles.json")
+    roles["product"]["tools"].append("fetch_url")
+    _write(directory, "roles.json", roles)
+
+
+@pytest.mark.parametrize(("change", "expected"), [
+    (lambda directory: _write(directory, "limits.json", {**_read(directory, "limits.json"), "max_cycles": -1}),
+     "limits.json max_cycles："),
+    # 控制核心的阶段迁移只为产品、工程、质检写了阶段
+    (_without_quality, "organization.json departments：控制核心的阶段迁移按顺序支持部门 product、engineering、quality"),
+    # 执行环境没有实现的环境工具
+    (_with_unimplemented_tool, "tools.json fetch_url：执行环境没有这个环境工具的实现"),
+])
+def test_startup_fails_when_a_definition_is_invalid(tmp_path, change, expected):
     # 在程序的一份副本中把定义改为不合法的内容：命令行启动失败，错误写明文件与字段
     copy = tmp_path / "program"
     shutil.copytree(REPO_ROOT / "harness", copy / "harness",
                     ignore=shutil.ignore_patterns("tests", "__pycache__", "*.pyc"))
-    directory = copy / "harness" / "definitions"
-    _write(directory, "limits.json", {**_read(directory, "limits.json"), "max_cycles": -1})
+    change(copy / "harness" / "definitions")
     completed = subprocess.run([sys.executable, "-m", "harness", "--help"], cwd=copy,
                                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
                                capture_output=True, text=True, encoding="utf-8")
     assert completed.returncode != 0
-    assert "DefinitionError" in completed.stderr and "limits.json max_cycles：" in completed.stderr
+    assert "DefinitionError" in completed.stderr and expected in completed.stderr
     assert "usage" not in completed.stdout
 
 
@@ -250,6 +319,15 @@ def test_stop_reasons_outside_the_definitions_cannot_be_written(tmp_path):
         system.writes.append(run_stream(run_id), _terminal(EventType.RUN_PAUSED, None))
     with pytest.raises(ValueError, match="cannot be recorded on transition"):
         system.writes.append(run_stream(run_id), _terminal(EventType.TRANSITION, "cancelled"))
+    # 结束事件的终态与载荷中的停止原因都要与事件的停止原因一致
+    paused = NewEvent(EventType.RUN_PAUSED, role="product", state_before="PRODUCT_SPEC", state_after="FAILED",
+                      stop_reason="max_cycles", payload={"stop_reason": "max_cycles"})
+    with pytest.raises(ValueError, match="must end in PAUSED"):
+        system.writes.append(run_stream(run_id), paused)
+    with pytest.raises(ValueError, match="same stop reason in its payload"):
+        system.writes.append(run_stream(run_id), NewEvent(
+            EventType.RUN_FAILED, role="product", state_before="PRODUCT_SPEC", state_after="FAILED",
+            stop_reason="cancelled", payload={"stop_reason": "made_up_reason"}))
     assert system.store.list_events(run_id) == before
     system.close()
 
