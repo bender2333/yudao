@@ -178,3 +178,5 @@ claude-opus-5-5 / 2026-09-27 12:55 / docs/architecture-issues.md 登记三条：
 claude-opus-5-5 / 2026-09-27 16:55 / docs/architecture-issues.md 登记一条：两个运行同时进行的测试按墙钟时限等待的主机工作包含接纳规格时的 16 个 Git 子进程（#107） / 负载更高时这项测试仍有失败，工单不允许加长等待，需要架构师决定减少子进程或调整测试核对的内容
 
 claude-opus-5-5 / 2026-09-27 17:40 / docs/design/architecture/overall-architecture.md 第 5 节写明取消由发起的一方写入、交回的运行状态包含已经开始的取消；docs/architecture-issues.md 为 #107、#108 登记的四条问题追加处理结论（#111、#112） / #105、#107、#108 完成后处理登记的问题
+
+claude-opus-5-5 / 2026-09-27 18:04 / docs/architecture-issues.md 登记四条：anthropic 的声明范围与锁定版本和 Messages 协议的计时不一致、事件对象中不由命令写入的事件的 actor 与 role、能力清单的覆盖层没有标识与负责的工单、命令行的其他子命令与数据目录的进程锁 / #72 执行与代码审查中发现，需要架构师决定
