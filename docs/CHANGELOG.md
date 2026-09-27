@@ -192,3 +192,5 @@ claude-opus-5-5 / 2026-09-27 21:05 / docs/architecture-issues.md 登记两条：
 claude-opus-5-5 / 2026-09-27 21:25 / docs/architecture-issues.md 登记两条：观测查询中估计用量的 source、旧格式的流事件记录与负的用时没有写入方；测试中以替换读取结果模拟篡改的写法与「不使用 mock」的规则不一致 / #109 把观测与 smoke 的测试改为经公开接口核对时发现，需要架构师决定
 
 claude-opus-5-5 / 2026-09-27 21:49 / docs/requirements/provider-retries.md（D17）写明证书校验失败不重试、三种协议共用信任操作系统证书库的 TLS 上下文；docs/architecture-issues.md 为 #113、#109 登记的四条问题追加处理结论（#114、#115） / #113 与 #109 登记的问题
+
+claude-opus-5-5 / 2026-09-27 22:54 / docs/stage-3/organization-comparison-samples.md 第 29、348、444 行去掉估计用量（estimated）的来源与 estimated_totals / #109 按规则 1 删除了没有写入方的估计用量读取

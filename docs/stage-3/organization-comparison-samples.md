@@ -26,7 +26,7 @@
 | 部门指导 | `EventType.DEPARTMENT_GUIDANCE_*`；`harness/collaboration.py::guidance_response_errors` | 研发者对当前部门的有限 steering，不是子循环 |
 | 循环上限 | `harness/orchestrator.py::Orchestrator.create_run`（默认 `max_cycles=8`）；`_prepare_activation` 在 `cycle_count >= max_cycles` 时暂停 | 停止原因 `max_cycles` |
 | 步骤上限 | `harness/orchestrator.py` 捕获 `ProviderError.reason == "model_steps_exhausted"`；`harness/models.py::PAUSED_REASONS` | 暂停，不是失败 |
-| 用量派生 | `harness/observability.py::USAGE_SOURCES`、`_usage_source`、`ObservabilityQuery.model_usage` | 来源集合：`reported` / `estimated` / `missing` / `unknown`；合计默认只加 `reported` |
+| 用量派生 | `harness/observability.py::USAGE_SOURCES`、`_usage_source`、`ObservabilityQuery.model_usage` | 来源集合：`reported` / `missing` / `unknown`；合计只加 `reported` |
 | 用量记账事件 | `harness/orchestrator.py::Orchestrator._record_usage` | 复用 `EventType.TOOL_CALLED`，`payload.name == "provider_usage"` |
 | 默认 Prompt | `harness/department_prompts.py::DEFAULT_PROMPTS` | 工程：先计划、写文件、`run_check`、提交 DeliverySpec；不能自报完成 |
 
@@ -345,7 +345,7 @@ I 启动时只能使用**非未知**的可用额度，并再扣收尾预留。
 
 | 3.3 量纲 | 现有实值 | 缺口 |
 | --- | --- | --- |
-| 模型用量 | `Usage`：`input_tokens`、`output_tokens`、`cache_read_tokens`、`cache_write_tokens`、`total_tokens`、`reported`；`model_usage` 按 `reported` 合计，估计值在 `estimated_totals`；覆盖率 `coverage.reported_attempts/attempts`；字段级 `coverage.fields` | 无预留、无按子任务拆账、无「未知占用不可挪用」 |
+| 模型用量 | `Usage`：`input_tokens`、`output_tokens`、`cache_read_tokens`、`cache_write_tokens`、`total_tokens`、`reported`；`model_usage` 按 `reported` 合计；覆盖率 `coverage.reported_attempts/attempts`；字段级 `coverage.fields` | 无预留、无按子任务拆账、无「未知占用不可挪用」 |
 | 执行调用 | `projection.py` 对非 `provider_usage` 的 `TOOL_CALLED` 累加 `tool_count` | 无授权上限、无预留、无子单元分项 |
 | 资金 | `Usage.cost` / `cost_reported`；`model_usage.cost_status` 为 `reported` / `missing` / `mixed_currency` | 无根任务资金授权、无收尾预留；超时未知不形成 `budget_unknown` |
 | 并发槽位 | 无。现况是每进程一个活动 run（第三阶段计划第 2 节） | 需 `slot_held` / `slot_released` |
@@ -441,7 +441,7 @@ I 启动时只能使用**非未知**的可用额度，并再扣收尾预留。
 | --- | --- |
 | 质量结果 | QA verdict、缺陷列表、是否错误放行 |
 | 返工次数 | `projection.rework_count`（现有） |
-| 模型用量 | `model_usage.totals`（`reported`）+ `coverage` + `estimated_totals` 分列 |
+| 模型用量 | `model_usage.totals`（`reported`）+ `coverage` 分列 |
 | 执行调用 | 非 `provider_usage` 的 `TOOL_CALLED` 次数 |
 | 资金 | `cost` + `cost_status` |
 | 墙钟 | 事项起止（现缺事项级字段，待 3.4） |
