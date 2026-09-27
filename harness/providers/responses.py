@@ -4,6 +4,7 @@ import asyncio
 import email.utils
 import json
 import math
+import platform
 import re
 import time
 import typing
@@ -56,6 +57,14 @@ def _collect_models(annotation: Any, seen: set[type], order: list[type[pydantic.
 
 
 _build_sdk_models(ResponseStreamEvent)
+
+# 两个 SDK 在每个客户端的第一次请求之前识别平台（platform.system 与 platform.platform），进程内第一次识别要查询
+# 系统信息；服务启动时先识别一次，之后读取标准库的缓存
+platform.platform()
+
+# 各次调用的客户端共用一个 SSL 上下文。httpx 为每个客户端新建上下文并加载证书，本机负载高时每次约 1 秒，
+# 而 Chat Completions 与 Messages 每次调用都新建客户端
+_SSL_CONTEXT = httpx.create_ssl_context()
 
 
 @dataclass(frozen=True)
@@ -194,7 +203,7 @@ class ProviderConnections:
         client = self._clients.get(key)
         if client is None:
             http_client = DefaultAsyncHttpxClient(
-                timeout=config.timeout_sec,
+                timeout=config.timeout_sec, verify=_SSL_CONTEXT,
                 event_hooks={"request": [self._observe_request], "response": [self._observe_response]},
             )
             client = AsyncOpenAI(
@@ -389,7 +398,7 @@ class _ResponsesInvoker:
             await _emit_request(invocation, http_request, observation_errors, clock)
 
         http_client = DefaultAsyncHttpxClient(
-            timeout=invocation.config.timeout_sec,
+            timeout=invocation.config.timeout_sec, verify=_SSL_CONTEXT,
             event_hooks={"request": [observe_request], "response": [clock.response_started]},
         )
         async with AsyncOpenAI(

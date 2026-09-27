@@ -1,4 +1,5 @@
 import json
+import ssl
 import subprocess
 import sys
 import time
@@ -62,6 +63,61 @@ def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
     assert completed.returncode == 0, completed.stderr
     built = json.loads(completed.stdout.strip().splitlines()[-1])
     assert built and all(built.values()), built
+
+
+def _calls_during(function, operation) -> int:
+    # 用 sys.monitoring 记录 function 在 operation 期间（任何线程中）开始执行的次数；只观察，不替换
+    tool = next(index for index in range(6) if sys.monitoring.get_tool(index) is None)
+    calls = []
+    sys.monitoring.use_tool_id(tool, "yudao-test-calls")
+    try:
+        sys.monitoring.register_callback(tool, sys.monitoring.events.PY_START, lambda _code, _offset: calls.append(1))
+        sys.monitoring.set_local_events(tool, function.__code__, sys.monitoring.events.PY_START)
+        operation()
+    finally:
+        sys.monitoring.set_local_events(tool, function.__code__, 0)
+        sys.monitoring.register_callback(tool, sys.monitoring.events.PY_START, None)
+        sys.monitoring.free_tool_id(tool)
+    return len(calls)
+
+
+# 新进程中只导入 Provider 模块（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
+# 打印识别期间查询系统版本（platform.win32_ver）的次数
+PLATFORM_IDENTIFIED = """
+import platform
+import harness.providers
+from harness.tests.test_request_time_limit import _calls_during
+print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.platform())))
+"""
+
+
+def test_platform_is_identified_when_the_provider_module_is_imported():
+    # 两个 SDK 在每个客户端的第一次请求之前识别平台，进程内第一次识别要查询系统信息（Windows 上约 0.4 秒）；
+    # 这项一次性工作在服务启动时完成
+    completed = subprocess.run([sys.executable, "-c", PLATFORM_IDENTIFIED], cwd=REPOSITORY,
+                               capture_output=True, text=True, timeout=300)
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip().splitlines()[-1] == "0"
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_calls_reuse_one_ssl_context_instead_of_loading_certificates_each_time(protocol):
+    # 每次调用新建的客户端原来各自创建 SSL 上下文并加载证书（本机负载高时每次约 1 秒，在请求发出之前）；
+    # 各次调用的客户端共用服务启动时创建的上下文
+    server, _capture, base = serve(lambda _body: (200, "text/event-stream", [_reply(protocol)]))
+    try:
+        facade = facade_with(base + "/v1", protocol=protocol)
+        target = bound_target(facade)
+
+        def two_calls():
+            for attempt_id in ("activation:1:attempt-1", "activation:2:attempt-1"):
+                invoke(facade, target, model_call([{"role": "user", "content": "write the spec"}],
+                                                  max_output_tokens=256, attempt_id=attempt_id))
+
+        created = _calls_during(ssl.create_default_context, two_calls)
+    finally:
+        _close(server)
+    assert created == 0
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)

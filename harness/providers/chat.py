@@ -25,6 +25,7 @@ from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
     _RETRYABLE_HTTP_ERRORS,
+    _SSL_CONTEXT,
     _TransportTrace,
     _build_sdk_models,
     _diagnostic_code,
@@ -149,7 +150,7 @@ class _ChatInvoker:
             api_key=target.api_key, base_url=target.base_url,
             timeout=target.timeout_sec, max_retries=0,
             default_headers=headers or None,
-            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, event_hooks={
+            http_client=DefaultAsyncHttpxClient(timeout=target.timeout_sec, verify=_SSL_CONTEXT, event_hooks={
                 "request": [clock.request_sent], "response": [clock.response_started]}),
         ) as client:
             return await self._stream_with_client(invocation, trace, client, params, started)
