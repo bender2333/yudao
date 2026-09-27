@@ -398,8 +398,8 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
             events = system.store.list_events(run_id)
             failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
             scheduled = [event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]
-            audit = system.artifacts.get_for_run(
-                run_id, ArtifactRef(**failed[0].payload["stream_events_ref"])).decode("utf-8")
+            audits = [system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["stream_events_ref"]))
+                      .decode("utf-8") for event in failed]
         finally:
             system.close()
     finally:
@@ -413,7 +413,7 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
         "transport_event": "unknown", "cause_type": "RemoteProtocolError",
     }
     assert len(scheduled) == 1
-    assert PARTIAL_OUTPUT in audit
+    assert PARTIAL_OUTPUT in audits[0]
     assert len(provider.requests) == 2
     assert PARTIAL_OUTPUT not in json.dumps(provider.requests[1])
 

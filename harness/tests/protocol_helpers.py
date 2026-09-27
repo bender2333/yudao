@@ -135,6 +135,10 @@ class ScriptedProvider:
 
             def do_POST(self) -> None:
                 provider.requests.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                if not provider.replies:
+                    # 脚本之外的请求：明确的 HTTP 500，测试从 requests 的数量看到多出的请求
+                    send_reply(self, 500, "application/json", b'{"error":{"message":"unexpected request"}}')
+                    return
                 reply = provider.replies.pop(0)
                 try:
                     reply(provider, self)
