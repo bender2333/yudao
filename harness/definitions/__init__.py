@@ -9,11 +9,14 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError
 
 DEFINITIONS_DIR = Path(__file__).parent
+
+# 定义中的编号：小写字母开头，由小写字母、数字与下划线组成
+Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 class DefinitionError(ValueError):
@@ -22,6 +25,13 @@ class DefinitionError(ValueError):
         self.issues = tuple(issues)
         super().__init__("定义不合法：\n" + "\n".join(
             f"  {file} {field}：{message}" for file, field, message in self.issues))
+
+
+class UnknownStopReason(ValueError):
+    # 停止原因不在定义的清单中
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"stop reason {reason!r} is not in the stop reason definitions (stop_reasons.json)")
+        self.reason = reason
 
 
 class _Definition(BaseModel):
@@ -49,14 +59,31 @@ class Limits(_Definition):
     command_timeout_max_sec: int = Field(gt=0)
 
 
+class StopReason(_Definition):
+    # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
+    outcome: Literal["done", "paused", "failed"]
+    # 写进暂停或失败事件的处理说明；没有说明时为 null
+    human_action: str | None
+
+
 class Definitions(_Definition):
     version: str
     limits: Limits
+    # 停止原因的封闭清单，键是停止原因
+    stop_reasons: dict[Identifier, StopReason]
+
+    def stop_reason(self, reason: str) -> StopReason:
+        # 停止原因只来自定义中的清单
+        definition = self.stop_reasons.get(reason)
+        if definition is None:
+            raise UnknownStopReason(reason)
+        return definition
 
 
 # 定义文件与它在 Definitions 中的字段、类型
-_FILES: dict[str, tuple[str, type[BaseModel]]] = {
-    "limits.json": ("limits", Limits),
+_FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
+    "limits.json": ("limits", TypeAdapter(Limits)),
+    "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
 }
 
 
@@ -85,8 +112,8 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
     # 读取并校验 directory 中的全部定义文件；不合法时抛出 DefinitionError
     issues: list[tuple[str, str, str]] = []
     contents: dict[str, Any] = {}
-    parts: dict[str, BaseModel] = {}
-    for file, (field, model) in _FILES.items():
+    parts: dict[str, Any] = {}
+    for file, (field, adapter) in _FILES.items():
         path = directory / file
         if not path.is_file():
             issues.append((file, "（整个文件）", "定义文件不存在"))
@@ -101,7 +128,7 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
             issues.append((file, exc.key, "重复的键"))
             continue
         try:
-            parts[field] = model.model_validate_json(text)
+            parts[field] = adapter.validate_json(text, strict=True)
         except ValidationError as exc:
             issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
     if issues:

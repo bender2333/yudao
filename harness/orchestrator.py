@@ -35,8 +35,6 @@ from .models import (
     DEPARTMENTS,
     DepartmentPrompt,
     EventType,
-    HUMAN_ACTIONS,
-    PAUSED_REASONS,
     TERMINAL_PHASES,
     canonical_hash,
     department_for_phase,
@@ -1110,8 +1108,8 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按停止原因暂停或结束运行；已经结束的运行不再写入
-        if reason in PAUSED_REASONS:
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入
+        if DEFINITIONS.stop_reason(reason).outcome == "paused":
             self._pause(transaction, reason)
         else:
             self._fail(transaction, reason, message)
@@ -1129,7 +1127,7 @@ class Orchestrator:
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
-                "human_action": HUMAN_ACTIONS[reason],
+                "human_action": DEFINITIONS.stop_reason(reason).human_action,
                 "paused_at_phase": projection.phase,
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,
@@ -1140,17 +1138,7 @@ class Orchestrator:
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
-        human = {
-            "provider_unavailable": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。",
-            "provider_credentials_lost": "任务创建时冻结的 provider 凭据已不在当前进程中。请新建 run，不能用新凭据续跑旧任务。",
-            "provider_error": "模型提供方失败。查看错误事件后新建 run 或更换 provider。",
-            "provider_timeout": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。",
-            "cancelled": "运行已被取消。如需继续，新建 run。",
-            "context_overflow": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
-            "compaction_failed": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
-            "host_commit_error": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。",
-            "time_limit": HUMAN_ACTIONS["time_limit"],
-        }.get(reason)
+        human = DEFINITIONS.stop_reason(reason).human_action
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
             return

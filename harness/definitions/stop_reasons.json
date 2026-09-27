@@ -1,0 +1,70 @@
+{
+  "released": {
+    "outcome": "done",
+    "human_action": null
+  },
+  "max_cycles": {
+    "outcome": "paused",
+    "human_action": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。"
+  },
+  "model_steps_exhausted": {
+    "outcome": "paused",
+    "human_action": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。"
+  },
+  "no_tool_call": {
+    "outcome": "paused",
+    "human_action": "部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。"
+  },
+  "workspace_unrepresentable": {
+    "outcome": "paused",
+    "human_action": "工作区中有公开树无法表示的条目（链接、特殊文件等），停止说明列出了它们在工作区内的相对路径。把这些路径加入项目的忽略规则或者删除它们以后新建运行。"
+  },
+  "time_limit": {
+    "outcome": "failed",
+    "human_action": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。"
+  },
+  "cancelled": {
+    "outcome": "failed",
+    "human_action": "运行已被取消。如需继续，新建 run。"
+  },
+  "provider_error": {
+    "outcome": "failed",
+    "human_action": "模型提供方失败。查看错误事件后新建 run 或更换 provider。"
+  },
+  "provider_timeout": {
+    "outcome": "failed",
+    "human_action": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。"
+  },
+  "provider_unavailable": {
+    "outcome": "failed",
+    "human_action": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。"
+  },
+  "provider_credentials_lost": {
+    "outcome": "failed",
+    "human_action": "任务创建时冻结的 provider 凭据已不在当前进程中。请新建 run，不能用新凭据续跑旧任务。"
+  },
+  "provider_protocol": {
+    "outcome": "failed",
+    "human_action": null
+  },
+  "unsupported_protocol": {
+    "outcome": "failed",
+    "human_action": null
+  },
+  "retry_after_too_long": {
+    "outcome": "failed",
+    "human_action": null
+  },
+  "context_overflow": {
+    "outcome": "failed",
+    "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。"
+  },
+  "compaction_failed": {
+    "outcome": "failed",
+    "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。"
+  },
+  "host_commit_error": {
+    "outcome": "failed",
+    "human_action": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。"
+  }
+}

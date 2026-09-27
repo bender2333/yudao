@@ -1,4 +1,4 @@
-"""Loop System 领域对象：工件、事件、阶段和停止原因。"""
+# Loop System 领域对象：工件、事件与阶段。停止原因的清单在定义中（definitions/stop_reasons.json）
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from .definitions import DEFINITIONS
 
-DEPARTMENTS =("product", "engineering", "quality")
+DEPARTMENTS = ("product", "engineering", "quality")
 
 PHASES = (
     "CREATED",
@@ -43,28 +43,6 @@ PROPOSAL_KINDS = (
     "delivery_spec",
     "qa_review",
 )
-
-PAUSED_REASONS = frozenset({"max_cycles", "model_steps_exhausted", "no_tool_call"})
-FAILED_REASONS = frozenset(
-    {
-        "provider_error",
-        "provider_timeout",
-        "provider_unavailable",
-        "provider_credentials_lost",
-        "cancelled",
-        "context_overflow",
-        "compaction_failed",
-        "host_commit_error",
-        "time_limit",
-    }
-)
-
-HUMAN_ACTIONS = {
-    "model_steps_exhausted": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。",
-    "no_tool_call": "部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。",
-    "max_cycles": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。",
-    "time_limit": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。",
-}
 
 
 class EventType:

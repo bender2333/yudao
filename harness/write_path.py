@@ -11,8 +11,9 @@ from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, TypeVar
 
+from .definitions import DEFINITIONS
 from .event_store import Command, EventStore, SavedProjection, StreamVersionConflict, is_run_stream
-from .models import DEPARTMENTS, Event, ProjectEvent, json_dumps, new_id, utc_now
+from .models import DEPARTMENTS, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now
 from .projection import Projection, dump_projection, empty_projection, fold, load_projection, replay
 
 T = TypeVar("T")
@@ -20,6 +21,9 @@ T = TypeVar("T")
 # 一次写入因为另一方先写入同一个流而重新判断的最多次数；每次被拒绝都说明另一方的写入已经提交，
 # 超过这个次数时交回最后一次的版本冲突
 MAX_JUDGMENTS = 100
+
+# 结束运行的事件与它承载的停止原因规定的结束方式
+_STOP_EVENTS = {EventType.RUN_DONE: "done", EventType.RUN_PAUSED: "paused", EventType.RUN_FAILED: "failed"}
 
 
 @dataclass(frozen=True)
@@ -185,6 +189,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int) -> Even
     # 载荷取它在日志中保存的形式（JSON），并入投影的内容与从日志重放时读到的完全相同
     payload = json.loads(json_dumps(entry.payload))
     if isinstance(entry, NewEvent):
+        _check_stop_reason(entry)
         return Event(
             event_id=new_id("evt"), run_id=identity, type=entry.type, role=entry.role,
             parent_event_id=entry.parent_event_id, state_before=entry.state_before, state_after=entry.state_after,
@@ -199,3 +204,15 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int) -> Even
         position=0, stream=stream, stream_version=version, work_item_id=payload.get("work_item_id"),
         run_id=payload.get("run_id"), department=payload.get("department"),
     )
+
+
+def _check_stop_reason(entry: NewEvent) -> None:
+    # 停止原因只来自定义中的清单，只由结束运行的事件承载，并且与原因规定的结束方式一致；否则这次写入失败
+    outcome = _STOP_EVENTS.get(entry.type)
+    if entry.stop_reason is None:
+        if outcome is not None:
+            raise ValueError(f"{entry.type} requires a stop reason")
+        return
+    defined = DEFINITIONS.stop_reason(entry.stop_reason).outcome
+    if defined != outcome:
+        raise ValueError(f"stop reason {entry.stop_reason} ends a run as {defined}; it cannot be recorded on {entry.type}")
