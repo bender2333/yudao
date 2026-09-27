@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from threading import Event
+from threading import Condition, Event
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts
@@ -212,8 +212,9 @@ class Orchestrator:
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
-        # 每个 run 正在进行的取消（cancel 或 /stop）
+        # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
+        self._cancellers_changed = Condition()
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
@@ -414,11 +415,27 @@ class Orchestrator:
     def _cancelling(self, run_id: str) -> Iterator[None]:
         # 登记一个正在进行的取消：运行循环看到中止时，由它写入取消（它可能还在保存命令原文）
         token = object()
-        self._cancellers.setdefault(run_id, set()).add(token)
+        with self._cancellers_changed:
+            self._cancellers.setdefault(run_id, set()).add(token)
         try:
             yield
         finally:
-            self._cancellers[run_id].discard(token)
+            with self._cancellers_changed:
+                self._cancellers[run_id].discard(token)
+                self._cancellers_changed.notify_all()
+
+    def _settled(self, run_id: str) -> RunProjection:
+        # 激活与运行循环结束时交回的运行状态。运行已经中止而取消还没有写入时，等正在进行的取消（cancel 或 /stop）
+        # 结束，交回它写入以后的状态；没有正在进行的取消（例如它的写入失败了）时在这里写入取消
+        projection = self.project(run_id)
+        if projection.phase in TERMINAL_PHASES or not (self._abort.get(run_id) and self._abort[run_id].is_set()):
+            return projection
+        with self._cancellers_changed:
+            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
+        projection = self.project(run_id)
+        if projection.phase in TERMINAL_PHASES:
+            return projection
+        return self.cancel(run_id)
 
     def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
         if department not in DEPARTMENTS:
@@ -584,11 +601,7 @@ class Orchestrator:
                 if projection.phase in TERMINAL_PHASES:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
-                    # 已经中止：正在进行的取消（cancel 或 /stop，可能还在保存命令原文）由它自己写入；
-                    # 没有正在进行的取消（例如它的写入失败了）时在这里写入
-                    if self._cancellers.get(run_id):
-                        return projection
-                    return self.cancel(run_id)
+                    return await asyncio.to_thread(self._settled, run_id)
                 await self._activate_once(run_id, connections)
         finally:
             await connections.aclose()
@@ -608,7 +621,7 @@ class Orchestrator:
             activation = self.writes.transact(
                 run_stream(run_id), lambda transaction: self._prepare_activation(run_id, transaction, connections))
             if activation is None:
-                return self.project(run_id)
+                return await asyncio.to_thread(self._settled, run_id)
             self._active[run_id] = activation
             started = time.monotonic()
             try:
@@ -636,7 +649,7 @@ class Orchestrator:
                 self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)
-            return self.project(run_id)
+            return await asyncio.to_thread(self._settled, run_id)
         finally:
             self._running.pop(run_id, None)
 

@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 
 from harness.adapters.fake import FakeAdapter
@@ -5,7 +7,7 @@ from harness.models import EventType
 from harness.projects import WorkItemInProgressError
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import from_another_thread, happy_script
+from harness.tests.helpers import after_event, from_another_thread, happy_script
 
 # 同时到达的用户命令：写入口不持有锁，另一方的写入使提交被拒绝后按写入以后的状态重新判断。
 # 这里的操作在写入方的判断以后、提交之前从另一个线程完成（包装公开的 EventStore.commit 与流程编排的公开方法）。
@@ -81,6 +83,52 @@ def test_a_cancellation_that_could_not_be_written_is_written_by_the_run_loop(tmp
     result = system.run_until_stop(run_id)
     assert result.phase == "FAILED" and result.stop_reason == "cancelled"
     assert not system.test_adapter.invocations
+
+
+@pytest.mark.parametrize("operation", ["activate_once", "run_until_stop"])
+def test_a_run_cancelled_from_another_thread_during_a_model_call_returns_cancelled(tmp_path, monkeypatch, operation):
+    # 模型调用进行中另一个线程取消运行：取消的一方先中止运行、取消这次调用，激活随即结束；取消在激活读取结束时的
+    # 运行状态以后才写入。激活与运行循环交回的都是写入取消以后的运行状态
+    cancel_started, activation_read = threading.Event(), threading.Event()
+    finished, errors, cancellers = [], [], []
+
+    def cancel():
+        try:
+            system.cancel(run_id)
+        except Exception as exc:
+            errors.append(exc)
+
+    def cancel_during_call(_call):
+        cancellers.append(threading.Thread(target=cancel))
+        cancellers[0].start()
+        assert cancel_started.wait(10)
+        return product_spec()
+
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([cancel_during_call]))
+    run_id = system.create_run("original")
+    commit, project = system.store.commit, system.orchestrator.project
+
+    def commit_cancellation_after_the_activation_read(stream, expected_version, events, *args, **kwargs):
+        if any(event.type == EventType.RUN_FAILED for event in events):
+            cancel_started.set()
+            assert activation_read.wait(10)
+        return commit(stream, expected_version, events, *args, **kwargs)
+
+    def project_after_finish(requested_run_id):
+        projection = project(requested_run_id)
+        if finished:
+            activation_read.set()
+        return projection
+
+    after_event(system, EventType.ACTIVATION_FINISHED, finished.append)
+    monkeypatch.setattr(system.store, "commit", commit_cancellation_after_the_activation_read)
+    monkeypatch.setattr(system.orchestrator, "project", project_after_finish)
+
+    result = getattr(system, operation)(run_id)
+    cancellers[0].join(10)
+
+    assert not errors
+    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
 
 
 def test_archiving_while_a_work_item_is_starting_is_rejected(tmp_path, monkeypatch):
