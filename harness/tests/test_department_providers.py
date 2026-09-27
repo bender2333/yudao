@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from threading import Event, Thread
 from typing import Any, Callable, Iterator
 
 import pytest
+from openai import DEFAULT_CONNECTION_LIMITS
 
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
@@ -155,15 +157,17 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
             return
 
         def do_POST(self) -> None:
+            capture: dict[str, Any] = {"arrived": time.monotonic(), "finished": None}
             try:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                captures.append({
+                capture.update({
                     "body": body,
                     "path": self.path,
                     "authorization": self.headers.get("Authorization"),
                     "headers": {key.lower(): value for key, value in self.headers.items()},
                     "client_port": self.client_address[1],
                 })
+                captures.append(capture)
                 reply = responder(body, len(captures))
             except BaseException as exc:
                 errors.append(exc)
@@ -180,6 +184,7 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
                 return
+            capture["finished"] = time.monotonic()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
@@ -197,6 +202,16 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
         server.shutdown()
         server.server_close()
         worker.join(timeout=2)
+
+
+def _connections_kept_alive(captures: list[dict[str, Any]]) -> list[tuple[int, int]]:
+    # 连接池中的空闲连接超过保持时限（SDK 的 DEFAULT_CONNECTION_LIMITS）就关闭。相邻两次请求之间，
+    # 服务端送完回复到收到下一次请求的时间长于客户端连接的空闲时间；这段时间短于保持时限时，
+    # 两次请求必须使用同一个连接。返回这些相邻请求的端口
+    keepalive = DEFAULT_CONNECTION_LIMITS.keepalive_expiry
+    return [(earlier["client_port"], later["client_port"])
+            for earlier, later in zip(captures, captures[1:])
+            if later["arrived"] - earlier["finished"] < keepalive]
 
 
 def _part(body: dict[str, Any], name: str) -> str | None:
@@ -380,8 +395,8 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert all(item["authorization"] == "Bearer provider-b-key-v1" for item in captures_b)
         assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product", "a-quality", "a-quality"]
         assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 4
-        assert len({item["client_port"] for item in captures_a}) == 1
-        assert len({item["client_port"] for item in captures_b}) == 1
+        for captures in (captures_a, captures_b):
+            assert all(earlier == later for earlier, later in _connections_kept_alive(captures)), captures
         assert {item["client_port"] for item in captures_a}.isdisjoint(
             item["client_port"] for item in captures_b
         )
