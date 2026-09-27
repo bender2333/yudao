@@ -184,3 +184,5 @@ claude-opus-5-5 / 2026-09-27 18:04 / docs/architecture-issues.md 登记四条：
 claude-opus-5-5 / 2026-09-27 18:10 / docs/design/app-and-interface.md 第 5.2 节写明 actor 由写入方经写入口声明、role 在 Stage 4 之前为空，第 6.1 节给出五个覆盖层的标识与由 #73 加入，第 7.2 节写明写入的子命令取得进程锁、只读的子命令以只读方式打开数据目录；docs/architecture-issues.md 为 #72 登记的四条问题追加处理结论 / #72 完成后处理登记的问题
 
 claude-opus-5-5 / 2026-09-27 16:25 / docs/architecture-issues.md 登记两条：组织定义中的流转规则（交接顺序与阶段迁移、质检退回的去向、询问动作的含义、事项种类）仍是状态机代码（#48）；事项记录的定义版本与运行实际使用的定义、限额可能不同（#48） / #48 迁入定义的是写在代码中的文字、清单与参数，流转规则由定义驱动、升级以后继续旧事项的处理需要架构师决定
+
+claude-opus-5-5 / 2026-09-27 21:05 / #48 完成后更新：docs/design/architecture/overall-architecture.md 第 6.1 节写明定义层、应用层与接口层的代码位置；docs/design/semantic-system.md 第 11 节工具一行改为定义与执行环境的位置；docs/architecture-issues.md 为 #48 登记的两条问题追加处理结论 / #48 于 2026-09-27 关闭

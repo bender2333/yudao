@@ -120,7 +120,7 @@ flowchart TB
 | 裁决规则（U） | 提案校验、记录与尝试按本体校验、工具许可；许可规则可以增加，只能收紧 | `adjudication.py`（工具许可、提案校验与提交判断的入口）；`validation.py` |
 | 写入口与事件日志 | 执行权与流版本的核对、追加事件、更新保存的投影、通知订阅方 | `write_path.py`（写入口 `WritePath`：同一事务中读取保存的投影、判断并追加，期望版本、命令身份与执行权编号的核对）、`event_store.py`（一份事件日志、按全局位置与范围读取、订阅）、`projection.py`（保存的投影、重放核对） |
 
-执行层中，执行环境在 `environment.py`（本机实现 `LocalEnvironment` 与只读查询 `FactsQuery`），动作合同在 `actions.py`，模型调用合同在 `providers/call.py`。
+执行层中，执行环境在 `environment.py`（本机实现 `LocalEnvironment` 与只读查询 `FactsQuery`），动作合同在 `actions.py`，模型调用合同在 `providers/call.py`。定义层在 `harness/definitions/`：限额、停止原因、组织、角色、工具、提案合同与服务方案预置表七个 JSON 文件，加载与 pydantic 校验在 `__init__.py`，版本由全部文件的内容摘要确定。应用层与接口层在 `harness/app/` 与 `harness/api/`。
 
 - 流程编排只调用步骤驱动的开始、取消与取得结果，不接触步骤内部。
 - 步骤驱动只通过 P 与 U 的接口取得请求与裁决结果。
