@@ -1,8 +1,10 @@
-"""Persist accepted department artifacts and publish their shared materials."""
+# 保存接纳的部门工件并发布共享材料：工件、Git 版本与材料在这里写好，接纳的全部事件在调用方的事务中一起追加；
+# 事务没有提交时恢复原来的材料。
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from copy import deepcopy
 import json
 import os
@@ -13,7 +15,7 @@ from typing import Any
 from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
 from .event_store import run_stream
-from .write_path import NewEvent, WritePath
+from .write_path import NewEvent, Transaction
 from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
@@ -22,15 +24,40 @@ from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
 
+@dataclass(frozen=True)
+class Acceptance:
+    # 准备好的一次接纳：要追加的全部事件、其中承载接纳结果的那一条，以及恢复原来材料的补偿
+    events: list[NewEvent]
+    source: int
+    restore: Callable[[], None]
+
+    def append(self, transaction: Transaction) -> Event:
+        # 在事务中追加接纳的全部事件；事务没有提交时恢复原来的材料
+        committed = transaction.append(*self.events)
+        transaction.on_abort(self.restore)
+        return committed[self.source]
+
+
 class SubmissionWriter:
-    def __init__(self, writes: WritePath, artifacts: ArtifactStore, materials_root: Path,
-                 git_versions: GitVersionStore) -> None:
-        self.writes, self.artifacts, self.materials_root = writes, artifacts, materials_root
+    def __init__(self, artifacts: ArtifactStore, materials_root: Path, git_versions: GitVersionStore) -> None:
+        self.artifacts, self.materials_root = artifacts, materials_root
         self.git_versions = git_versions
 
-    def commit(self, *, projection: RunProjection, snapshot: WorkspaceSnapshot, workspace_root: Path, artifact: dict[str, Any],
-               department: str, parent_event_id: str, session_id: str,
-               provider: str | None, model: str | None) -> Event:
+    def commit(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
+               workspace_root: Path, artifact: dict[str, Any], department: str, parent_event_id: str,
+               session_id: str, provider: str | None, model: str | None) -> Event:
+        # 准备并在事务中追加一次接纳
+        return self.prepare(
+            transaction, projection=projection, snapshot=snapshot, workspace_root=workspace_root, artifact=artifact,
+            department=department, parent_event_id=parent_event_id, session_id=session_id, provider=provider,
+            model=model,
+        ).append(transaction)
+
+    def prepare(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
+                workspace_root: Path, artifact: dict[str, Any], department: str, parent_event_id: str,
+                session_id: str, provider: str | None, model: str | None) -> Acceptance:
+        # 接纳之前的全部准备：工件、Git 版本、交付封存与材料。projection 是接纳所依据的运行状态，
+        # 流程编排给出事务中的运行状态。出错时事务中没有追加任何事件，已经写出的材料恢复原样
         run_id = projection.run_id
         artifact = dict(artifact)
         metadata = dict(role=department, parent_event_id=parent_event_id, state_before=projection.phase,
@@ -146,6 +173,14 @@ class SubmissionWriter:
         if kind in {"delivery_spec", "qa_review"}:
             verify_public_tree(workspace_root, snapshot.tree.manifest)
         previous_materials: dict[str, bytes | None] = {}
+
+        def restore_materials() -> None:
+            for name, raw in previous_materials.items():
+                if raw is None:
+                    (self.materials_root / run_id / name).unlink(missing_ok=True)
+                else:
+                    self._write_material(run_id, name, raw)
+
         try:
             for name, raw in materials.items():
                 if name == "PRD.md":
@@ -154,19 +189,12 @@ class SubmissionWriter:
                     ref = projection.engineering_plans[-1].plan_ref if projection.engineering_plans else None
                 previous_materials[name] = None if ref is None else self.artifacts.get_for_run(run_id, ref)
                 self._write_material(run_id, name, raw)
-            # Git objects and materials are ready; the complete formal event set is accepted atomically.
-            committed = self.writes.append(run_id, *(
-                NewEvent(event_type, **metadata, payload=payload, artifact_hashes=hashes)
-                for event_type, payload, hashes in prepared
-            ))
         except Exception:
-            for name, raw in previous_materials.items():
-                if raw is None:
-                    (self.materials_root / run_id / name).unlink(missing_ok=True)
-                else:
-                    self._write_material(run_id, name, raw)
+            restore_materials()
             raise
-        return committed[event]
+        # Git 对象与材料已经就绪，接纳的全部事件一起追加，在事务中一起提交
+        return Acceptance([NewEvent(event_type, **metadata, payload=payload, artifact_hashes=hashes)
+                           for event_type, payload, hashes in prepared], event, restore_materials)
 
     def _write_material(self, run_id: str, name: str, raw: bytes) -> None:
         folder = (self.materials_root / run_id).resolve()

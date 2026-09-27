@@ -10,7 +10,9 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.context import ContextAssembler
 from harness.department_prompts import DEFAULT_PROMPTS
 from harness.engine import StepLimits
+from harness.event_store import project_stream
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
+from harness.write_path import NewProjectEvent
 from harness.projects import (
     ProjectArchivedError,
     ProjectNotFoundError,
@@ -729,14 +731,14 @@ def test_source_run_from_another_project_cannot_be_baseline(data_dir):
     system.projects.settle(run_a)
     adoption = system.projects.projection(project_a).current_adoption
     project_b = system.projects.register("B", GOAL)
-    system.writes.append_project(project_b, ProjectEventType.DELIVERABLE_ADOPTED, {
+    system.writes.append(project_stream(project_b), NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, {
         "adoption_id": adoption.adoption_id, "work_item_id": adoption.work_item_id,
         "run_id": adoption.run_id, "delivery_event_id": adoption.delivery_event_id,
         "qa_event_id": adoption.qa_event_id, "tree_ref": adoption.tree_ref,
         "code_tree_digest": adoption.code_tree_digest, "summary": adoption.summary,
         "files": list(adoption.files), "check_names": list(adoption.check_names),
         "known_risks": list(adoption.known_risks), "previous_adoption_id": None,
-    })
+    }))
     assert system.projects.projection(project_b).current_adoption.run_id == run_a
     with pytest.raises(ValueError):
         system.projects.start_work_item(project_b, "偷树")
@@ -749,12 +751,12 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     work_a, run_a = system.projects.start_work_item(project_a, "A的事项")
     assert system.projects.projection(project_a).work_item(work_a).status == "in_progress"
     project_b = system.projects.register("B", GOAL)
-    system.writes.append_project(project_b, ProjectEventType.WORK_ITEM_CREATED, {
+    system.writes.append(project_stream(project_b), NewProjectEvent(ProjectEventType.WORK_ITEM_CREATED, {
         "work_item_id": "wi_forged", "title": "伪造", "text": "伪造", "run_id": run_a, "baseline": None,
         "project_context_ref": {"kind": "project_context"},
         "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0},
         "max_cycles": 8, "context_window": 32_000,
-    })
+    }))
     forged = system.projects.projection(project_b).work_item("wi_forged")
     assert forged.status == "not_started"
     assert forged.phase is None and forged.department is None

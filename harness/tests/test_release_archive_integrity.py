@@ -5,6 +5,7 @@ import shutil
 import pytest
 
 from harness.adapters.fake import FakeAdapter
+from harness.event_store import run_stream
 from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
@@ -30,6 +31,20 @@ def _quality_ready(tmp_path, *, runs=1):
 
 def _events(system, run_id):
     return system.store.list_events(run_id)
+
+
+def _accept_with(monkeypatch, system, run_id, change_delivery):
+    # 放行的接纳所依据的运行状态中，当前交付被 change_delivery 改动
+    original_prepare = system.orchestrator.submissions.prepare
+
+    def prepare(transaction, **kwargs):
+        projection = kwargs["projection"]
+        if projection.run_id == run_id and projection.phase == "QUALITY":
+            kwargs = {**kwargs, "projection": replace(projection,
+                                                      delivery_spec=change_delivery(projection.delivery_spec))}
+        return original_prepare(transaction, **kwargs)
+
+    monkeypatch.setattr(system.orchestrator.submissions, "prepare", prepare)
 
 
 @pytest.mark.parametrize("damage", ["manifest_missing", "manifest_corrupt", "blob_missing", "blob_corrupt"])
@@ -77,16 +92,7 @@ def test_release_rejects_a_delivery_archive_bound_to_another_run(tmp_path, monke
     system, run_ids, ready = _quality_ready(tmp_path, runs=2)
     first_run, second_run = run_ids
     other_tree_ref = ready[1].delivery_spec.tree_ref
-    original_project = system.orchestrator.project
-
-    def project(run_id):
-        projection = original_project(run_id)
-        if run_id == first_run and projection.phase == "QUALITY":
-            delivery = replace(projection.delivery_spec, tree_ref=other_tree_ref)
-            return replace(projection, delivery_spec=delivery)
-        return projection
-
-    monkeypatch.setattr(system.orchestrator, "project", project)
+    _accept_with(monkeypatch, system, first_run, lambda delivery: replace(delivery, tree_ref=other_tree_ref))
     result = system.activate_once(first_run)
 
     assert result.phase == "FAILED"
@@ -102,15 +108,7 @@ def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(tmp_pa
     delivery = ready[0].delivery_spec
     archive = json.loads(system.artifacts.get_for_run(run_id, delivery.tree_ref))
     wrong_ref = ArtifactRef(**archive["blobs"][0]["artifact"])
-    original_project = system.orchestrator.project
-
-    def project(identity):
-        projection = original_project(identity)
-        if identity == run_id and projection.phase == "QUALITY":
-            return replace(projection, delivery_spec=replace(projection.delivery_spec, tree_ref=wrong_ref))
-        return projection
-
-    monkeypatch.setattr(system.orchestrator, "project", project)
+    _accept_with(monkeypatch, system, run_id, lambda delivery: replace(delivery, tree_ref=wrong_ref))
     result = system.activate_once(run_id)
 
     assert result.phase == "FAILED"
@@ -122,16 +120,17 @@ def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(tmp_pa
 def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tmp_path, monkeypatch):
     system, run_ids, ready = _quality_ready(tmp_path)
     run_id = run_ids[0]
-    original_project = system.orchestrator.project
+    original_read = system.writes.read
 
-    def project(identity):
-        projection = original_project(identity)
-        if identity == run_id and projection.phase == "QUALITY":
-            delivery = replace(projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
-            return replace(projection, delivery_spec=delivery)
-        return projection
+    def read(stream):
+        # 提案校验读取的运行状态中，当前交付的摘要与工作区不同
+        snapshot = original_read(stream)
+        if stream == run_stream(run_id) and snapshot.projection.phase == "QUALITY":
+            delivery = replace(snapshot.projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
+            snapshot.projection = replace(snapshot.projection, delivery_spec=delivery)
+        return snapshot
 
-    monkeypatch.setattr(system.orchestrator, "project", project)
+    monkeypatch.setattr(system.writes, "read", read)
     result = system.activate_once(run_id)
     recorded = system.project(run_id)
 
@@ -145,9 +144,9 @@ def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tm
 def test_release_rejects_a_snapshot_that_differs_before_submission_commit(tmp_path, monkeypatch):
     system, run_ids, ready = _quality_ready(tmp_path)
     run_id = run_ids[0]
-    original_commit = system.orchestrator.submissions.commit
+    original_prepare = system.orchestrator.submissions.prepare
 
-    def commit(**kwargs):
+    def prepare(transaction, **kwargs):
         snapshot = kwargs["snapshot"]
         if kwargs["artifact"]["kind"] == "qa_review" and kwargs["artifact"]["verdict"] == "release":
             changed_tree = CapturedTree(
@@ -155,9 +154,9 @@ def test_release_rejects_a_snapshot_that_differs_before_submission_commit(tmp_pa
                 snapshot.tree.files + (CapturedFile("unreviewed.txt", b"changed"),),
             )
             kwargs = {**kwargs, "snapshot": replace(snapshot, tree=changed_tree)}
-        return original_commit(**kwargs)
+        return original_prepare(transaction, **kwargs)
 
-    monkeypatch.setattr(system.orchestrator.submissions, "commit", commit)
+    monkeypatch.setattr(system.orchestrator.submissions, "prepare", prepare)
     result = system.activate_once(run_id)
 
     assert result.phase == "FAILED"

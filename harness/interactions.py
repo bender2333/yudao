@@ -1,4 +1,5 @@
-"""Persist user inputs and department prompts without routing department work."""
+# 保存用户的输入、部门指导与部门提示词：工件、原始意图材料与 Git 版本在这里写好，事件在调用方的事务中追加；
+# 不分派部门的工作。
 
 from __future__ import annotations
 
@@ -10,10 +11,10 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
-from .write_path import NewEvent, WritePath
+from .write_path import NewEvent, Transaction
 from .git_versions import GitVersionStore
 from .materials import append_intend
-from .models import ArtifactRef, DEPARTMENTS, Event, EventType, RunProjection, new_id
+from .models import ArtifactRef, DEPARTMENTS, Event, EventType, new_id
 
 
 class RunTerminalError(ValueError):
@@ -29,9 +30,8 @@ class CancelledInputSaveError(RuntimeError):
 
 
 class InteractionWriter:
-    def __init__(self, writes: WritePath, artifacts: ArtifactStore, materials_root: Path,
-                 git_versions: GitVersionStore) -> None:
-        self.writes, self.artifacts, self.materials_root = writes, artifacts, materials_root
+    def __init__(self, artifacts: ArtifactStore, materials_root: Path, git_versions: GitVersionStore) -> None:
+        self.artifacts, self.materials_root = artifacts, materials_root
         self.git_versions = git_versions
 
     def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
@@ -43,36 +43,39 @@ class InteractionWriter:
         return {"initial_input": received, "department_prompts": prompts,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
-    def receive(self, projection: RunProjection, text: str, *, command: bool) -> Event:
+    def receive(self, transaction: Transaction, text: str, *, command: bool) -> Event:
+        # 保存输入的原文：更新并发布原始意图，在事务中追加 user_input_received；
+        # 事务没有提交时重新发布原来的原始意图
+        projection = transaction.projection
         payload = self._input(projection.run_id, text, version=projection.input_version + 1,
                               kind="command" if command else "text",
                               previous_ref=ArtifactRef(**projection.intend_ref),
                               parent_commit=projection.git_version["commit"])
-        try:
-            return self.writes.append(projection.run_id, NewEvent(
-                EventType.USER_INPUT_RECEIVED, role="user",
-                state_before=projection.phase, state_after=projection.phase, payload=payload,
-                artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
-            ))[0]
-        except Exception:
-            self._publish(projection.run_id, self.artifacts.get_for_run(
-                projection.run_id, ArtifactRef(**projection.intend_ref)))
-            raise
+        previous = ArtifactRef(**projection.intend_ref)
+        transaction.on_abort(lambda: self._publish(projection.run_id, self.artifacts.get_for_run(
+            projection.run_id, previous)))
+        return transaction.append(NewEvent(
+            EventType.USER_INPUT_RECEIVED, role="user",
+            state_before=projection.phase, state_after=projection.phase, payload=payload,
+            artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
+        ))[0]
 
-    def update_prompt(self, projection: RunProjection, department: str, text: str) -> Event:
+    def update_prompt(self, transaction: Transaction, department: str, text: str) -> Event:
+        projection = transaction.projection
         payload = self._prompt(projection.run_id, department, text,
                                projection.department_prompts[department].version + 1)
-        return self.writes.append(projection.run_id, NewEvent(
+        return transaction.append(NewEvent(
             EventType.DEPARTMENT_PROMPT_UPDATED, role="user",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["prompt_ref"]["content_hash"]],
         ))[0]
 
-    def receive_guidance(self, projection: RunProjection, department: str, text: str) -> Event:
+    def receive_guidance(self, transaction: Transaction, department: str, text: str) -> Event:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("guidance must be a non-empty string")
+        projection = transaction.projection
         previous = [item.version for item in projection.department_guidance if item.department == department]
         version = max(previous, default=0) + 1
         ref = self.artifacts.put(projection.run_id, "department_guidance", text, media_type="text/plain")
@@ -84,7 +87,7 @@ class InteractionWriter:
             "guidance_ref": asdict(ref),
             "status": "received",
         }
-        return self.writes.append(projection.run_id, NewEvent(
+        return transaction.append(NewEvent(
             EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             role="user",
             state_before=projection.phase,

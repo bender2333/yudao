@@ -1,5 +1,4 @@
 import json
-import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -15,8 +14,8 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history, recorded_context,
-                                   start_waiting_for_writes, wait_for_file)
+from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history, from_another_thread,
+                                   recorded_context, wait_for_file)
 
 
 CHANGE_RECORD = {
@@ -55,8 +54,8 @@ def _manifest(system, request):
 
 
 @pytest.mark.parametrize("operation", ["input", "stop", "guidance", "prompt"])
-def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_path, monkeypatch, operation):
-    # 请求装配完成但超过窗口：请求的记录与运行的结束在同一次持锁中完成，其间在写入锁上等待的操作得到 RunTerminalError
+def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_path, operation):
+    # 请求装配完成但超过窗口：请求的记录与运行的结束在同一个事务中提交，紧接着到达的操作得到 RunTerminalError
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
@@ -70,12 +69,11 @@ def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_p
 
     def arrive(event):
         if not event.payload["admitted"]:
-            waiting.append(start_waiting_for_writes(operations[operation]))
+            waiting.append(from_another_thread(operations[operation]))
 
-    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, arrive)
+    after_event(system, EventType.CONTEXT_ASSEMBLED, arrive)
     result = system.activate_once(run_id)
     [late] = waiting
-    late.join()
     assert result.phase == "FAILED" and result.stop_reason == "context_overflow"
     assert len(late.errors) == 1 and isinstance(late.errors[0], RunTerminalError)
     assert not adapter.invocations
@@ -218,7 +216,7 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
     assert [_manifest(system, request).input_version for request in system.test_adapter.invocations] == [1, 2]
 
 
-def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path, monkeypatch):
+def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("build echo")
     received = False
@@ -229,7 +227,7 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
             received = True
             system.add_input(run_id, "Confirm uppercase output")
 
-    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, receive_before_start)
+    after_event(system, EventType.CONTEXT_ASSEMBLED, receive_before_start)
     stopped = system.activate_once(run_id)
     assert stopped.phase == "PRODUCT_SPEC" and not system.test_adapter.invocations
     assert not _events(system, run_id, EventType.MODEL_REQUESTED)
@@ -306,38 +304,31 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
 
 
-def test_release_commit_and_later_input_share_one_control_order(tmp_path, monkeypatch):
+def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_path, monkeypatch):
+    # 质检放行正在准备接纳时另一个线程写入新输入：放行的提交因流版本改变被写入口拒绝，按写入以后的状态重新判断；
+    # 激活开始以后输入改变，放行按 execution_basis 拒绝，新输入保留，运行没有结束
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Current check passed"),
     ]))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 3)
-    commit = system.orchestrator.submissions.commit
-    attempted = threading.Event()
-    errors = []
-    workers = []
+    prepare = system.orchestrator.submissions.prepare
+    receivers = []
 
-    def receive():
-        attempted.set()
-        try:
-            system.add_input(run_id, "This must become an explicit new task")
-        except Exception as exc:
-            errors.append(exc)
+    def prepare_with_input(transaction, **arguments):
+        if not receivers:
+            receivers.append(from_another_thread(lambda: system.add_input(run_id, "This arrives during the release")))
+        return prepare(transaction, **arguments)
 
-    def commit_with_waiting_input(**arguments):
-        worker = threading.Thread(target=receive)
-        workers.append(worker)
-        worker.start()
-        assert attempted.wait(2)
-        return commit(**arguments)
-
-    monkeypatch.setattr(system.orchestrator.submissions, "commit", commit_with_waiting_input)
+    monkeypatch.setattr(system.orchestrator.submissions, "prepare", prepare_with_input)
     current = system.activate_once(run_id)
-    for worker in workers:
-        worker.join(5)
-        assert not worker.is_alive()
-    assert current.phase == "DONE" and len(errors) == 1 and isinstance(errors[0], RunTerminalError)
-    assert system.project(run_id).input_version == 1 and not _events(system, run_id, EventType.USER_INPUT_RECEIVED)
+    [receiver] = receivers
+    assert not receiver.errors
+    assert current.phase != "DONE" and current.input_version == 2
+    assert not _events(system, run_id, EventType.RUN_DONE) and not _events(system, run_id, EventType.QA_SUBMITTED)
+    [rejected] = _events(system, run_id, EventType.PROPOSAL_REJECTED)
+    assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
+    assert current.canonical_state() == system.replay(run_id).canonical_state()
 
 
 @pytest.mark.parametrize("command", ["/stop", "  /cancel\r\n"])

@@ -1,6 +1,8 @@
 # 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止）、激活的准备与收尾、新输入的分派、
 # 提案接纳以后的流转、暂停与失败。一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；
 # 同时为步骤驱动实现安全节点接口。流程编排不调用模型。
+# 每一处「读取运行状态、判断、写入」都是写入口的一个事务（WritePath.transact）：判断期间不持有锁，
+# 另一方在读取以后写入了同一个 run，提交被拒绝，按写入以后的状态重新判断。
 
 from __future__ import annotations
 
@@ -20,8 +22,8 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .environment import LocalEnvironment
-from .event_store import EventStore
-from .write_path import NewEvent, WritePath
+from .event_store import EventStore, run_stream
+from .write_path import NewEvent, Transaction, WritePath
 from .engine import StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
@@ -41,7 +43,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .providers.resolve import FrozenTarget, ResolveSnapshot
-from .projection import RunProjection, project_run
+from .projection import RunNotFoundError, RunProjection, project_run
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .recording import ActivationScope
 from .sessions import SessionFactory
@@ -81,14 +83,14 @@ class _SafeNode:
     def proceed(self) -> bool:
         return self._orchestrator._at_safe_node(self._activation)
 
-    def settle(self) -> RunProjection:
-        return self._orchestrator._settle(self._activation)
+    def settle(self, transaction: Transaction) -> RunProjection:
+        return self._orchestrator._close_obsolete_request(transaction)
 
     async def wait(self, seconds: float) -> bool:
         return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
 
-    def end(self, reason: str, message: str) -> None:
-        self._orchestrator._end_run(self._activation.run_id, reason, message)
+    def end(self, transaction: Transaction, reason: str, message: str) -> None:
+        self._orchestrator._end(transaction, reason, message)
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
@@ -200,8 +202,8 @@ class Orchestrator:
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
-        self.submissions = SubmissionWriter(self.writes, artifacts, self.materials_root, self.git_versions)
-        self.interactions = InteractionWriter(self.writes, artifacts, self.materials_root, self.git_versions)
+        self.submissions = SubmissionWriter(artifacts, self.materials_root, self.git_versions)
+        self.interactions = InteractionWriter(artifacts, self.materials_root, self.git_versions)
         self.facade = facade
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
@@ -209,6 +211,8 @@ class Orchestrator:
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
+        # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
+        self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
         self._snapshots: dict[str, ResolveSnapshot] = {}
         self._run_start_times: dict[str, float] = {}
@@ -283,7 +287,7 @@ class Orchestrator:
             project_context_ref = asdict(self.artifacts.put(
                 run_id, "project_context", project_context, media_type="text/markdown",
             ))
-        self.writes.append(run_id, NewEvent(
+        run_created = NewEvent(
             EventType.RUN_CREATED,
             role="product",
             state_before="CREATED",
@@ -309,14 +313,17 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
             },
-        ))
-        self.writes.append(run_id, NewEvent(
+        )
+        transition = NewEvent(
             EventType.TRANSITION,
             role="product",
             state_before="CREATED",
             state_after="PRODUCT_SPEC",
             payload={"from": "CREATED", "to": "PRODUCT_SPEC", "route": "CREATED->PRODUCT_SPEC"},
-        ))
+        )
+        # 新的 run 流从版本 0 开始；同一编号的 run 已经存在时拒绝
+        self.writes.transact(run_stream(run_id), lambda transaction: transaction.append(run_created, transition),
+                             expected_version=0)
         return run_id
 
     def project(self, run_id: str) -> RunProjection:
@@ -331,43 +338,58 @@ class Orchestrator:
     def add_input(self, run_id: str, text: str) -> RunProjection:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("input must be a non-empty string")
-        command = text.strip() in {"/stop", "/cancel"}
-        activation = None
-        abort_notified = False
-        save_error = stop_error = None
+        if text.strip() in {"/stop", "/cancel"}:
+            return self._stop_by_command(run_id, text)
+
+        def receive(transaction: Transaction) -> None:
+            self._require_open(run_id, transaction.projection, "This run has ended; create a new task for this input.")
+            self.interactions.receive(transaction, text, command=False)
+
+        self.writes.transact(run_stream(run_id), receive)
+        self._wake(run_id)
+        return self.project(run_id)
+
+    def _stop_by_command(self, run_id: str, text: str) -> RunProjection:
+        # /stop 与 /cancel：保存命令原文并取消运行。先中止并取消正在进行的步骤，再记录命令；
+        # 命令原文没有保存成功时仍然记录取消，并在取消的事件中说明保存失败的原因
+        message = "This run has ended; create a new task for this input."
+        self._require_open(run_id, self.project(run_id), message)
+        self._abort.setdefault(run_id, Event()).set()
+        activation = self._active.get(run_id)
+        notified = False
+        stop_error = None
+        if activation is not None:
+            try:
+                self._cancel_driver(activation)
+                notified = True
+            except Exception as exc:
+                stop_error = exc
+
+        def receive(transaction: Transaction) -> None:
+            if transaction.projection.phase in TERMINAL_PHASES:
+                raise RunTerminalError(message)
+            self.interactions.receive(transaction, text, command=True)
+
+        save_error = None
         cancellation_recorded = False
         try:
-            with self.writes.lock:
-                current = self.project(run_id)
-                if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
-                    raise RunTerminalError("This run has ended; create a new task for this input.")
-                if not command:
-                    self.interactions.receive(current, text, command=False)
-                    self._wake(run_id)
-                else:
-                    activation = self._active.get(run_id)
-                    self._abort.setdefault(run_id, Event()).set()
-                    if activation is not None:
-                        try:
-                            self._cancel_driver(activation)
-                            abort_notified = True
-                        except Exception as exc:
-                            stop_error = exc
-                    try:
-                        self.interactions.receive(current, text, command=True)
-                    except Exception as exc:
-                        save_error = exc
-                    failure = None if save_error is None else {
-                        "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
-                    }
-                    try:
-                        self._fail(run_id, self.project(run_id), "cancelled", "run cancelled by user command",
-                                   input_save_failure=failure)
-                        cancellation_recorded = True
-                    except Exception as exc:
-                        stop_error = exc
+            try:
+                self.writes.transact(run_stream(run_id), receive)
+            except RunTerminalError:
+                raise
+            except Exception as exc:
+                save_error = exc
+            failure = None if save_error is None else {
+                "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
+            }
+            try:
+                self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+                    transaction, "cancelled", "run cancelled by user command", input_save_failure=failure))
+                cancellation_recorded = True
+            except Exception as exc:
+                stop_error = exc
         finally:
-            if command and activation is not None and not abort_notified:
+            if activation is not None and not notified:
                 try:
                     self._cancel_driver(activation)
                 except Exception as exc:
@@ -383,44 +405,56 @@ class Orchestrator:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("prompt must be a non-empty string")
-        with self.writes.lock:
-            current = self.project(run_id)
-            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
-                raise RunTerminalError("This run has ended; prompts can be edited in a new task.")
-            self.interactions.update_prompt(current, department, text)
-            return self.project(run_id)
+
+        def update(transaction: Transaction) -> None:
+            self._require_open(run_id, transaction.projection, "This run has ended; prompts can be edited in a new task.")
+            self.interactions.update_prompt(transaction, department, text)
+
+        self.writes.transact(run_stream(run_id), update)
+        return self.project(run_id)
 
     def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        with self.writes.lock:
-            current = self.project(run_id)
-            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
-                raise RunTerminalError("This run has ended; guidance can be sent to a new task.")
-            self.interactions.receive_guidance(current, department, text)
-            self._wake(run_id)
-            return self.project(run_id)
 
-    def _assign_new_inputs(self, run_id: str, projection: RunProjection) -> RunProjection:
+        def receive(transaction: Transaction) -> None:
+            self._require_open(run_id, transaction.projection, "This run has ended; guidance can be sent to a new task.")
+            self.interactions.receive_guidance(transaction, department, text)
+
+        self.writes.transact(run_stream(run_id), receive)
+        self._wake(run_id)
+        return self.project(run_id)
+
+    def _require_open(self, run_id: str, projection: RunProjection, message: str) -> None:
+        # 已经结束或已经中止的运行不再接收输入、指导与提示词
+        if not projection.run_id:
+            raise RunNotFoundError(run_id)
+        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+            raise RunTerminalError(message)
+
+    def _assign_new_inputs(self, transaction: Transaction) -> RunProjection:
+        projection = transaction.projection
         if projection.phase in TERMINAL_PHASES or projection.input_version <= projection.product_work_input_version:
             return projection
-        projection = self._close_request(run_id, projection, status="superseded",
+        projection = self._close_request(transaction, status="superseded",
                                          reason="New user input requires updated product work.",
                                          return_phase="PRODUCT_SPEC", return_work_valid=False)
-        self.writes.append(run_id, NewEvent(
+        transaction.append(NewEvent(
             EventType.PRODUCT_INPUT_ASSIGNED, role="product",
             state_before=projection.phase, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
         ))
-        return self.project(run_id)
+        return transaction.projection
 
     def _at_safe_node(self, activation: _Activation) -> bool:
         # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续
-        with self.writes.lock:
-            projection = self.project(activation.run_id)
+        def judge(transaction: Transaction) -> bool:
+            projection = transaction.projection
             if not (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)):
-                projection = self._assign_new_inputs(activation.run_id, projection)
+                projection = self._assign_new_inputs(transaction)
             return not self._stop_requested(activation, projection)
+
+        return self.writes.transact(run_stream(activation.run_id), judge)
 
     def _stop_requested(self, activation: _Activation, projection: RunProjection) -> bool:
         # 停止判断：中止、运行时间用完、终态、输入版本改变或有新的指导；只读取，不写入
@@ -436,24 +470,18 @@ class Orchestrator:
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
         return projection.run_time_limit_sec - (time.monotonic() - self._run_start_times.get(run_id, time.monotonic()))
 
-    def _settle(self, activation: _Activation) -> RunProjection:
-        # 安全节点：分派新输入并关闭因此或因依据改变而过时的协作请求，交回当前的运行状态
-        with self.writes.lock:
-            return self._close_obsolete_request(activation.run_id, self.project(activation.run_id))
-
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> bool:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
-        # 醒来以后回到安全节点判断。唤醒在判断之前登记，判断之后到达的改变不会漏掉
+        # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
         loop = asyncio.get_running_loop()
         deadline = loop.time() + seconds
         try:
             while True:
                 changed = asyncio.Event()
-                with self.writes.lock:
-                    activation.wakeup = (loop, changed)
-                    if not self._at_safe_node(activation):
-                        return False
-                    time_left = self._time_left(activation.run_id, self.project(activation.run_id))
+                activation.wakeup = (loop, changed)
+                if not self._at_safe_node(activation):
+                    return False
+                time_left = self._time_left(activation.run_id, self.project(activation.run_id))
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     return True
@@ -462,60 +490,66 @@ class Orchestrator:
                 except TimeoutError:
                     pass
         finally:
-            with self.writes.lock:
-                activation.wakeup = None
+            activation.wakeup = None
 
     def _wake(self, run_id: str) -> None:
-        # 在安全节点等待重试的激活立即回到安全节点判断
-        with self.writes.lock:
-            activation = self._active.get(run_id)
-            if activation is not None and activation.wakeup is not None:
-                loop, changed = activation.wakeup
-                loop.call_soon_threadsafe(changed.set)
+        # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用
+        activation = self._active.get(run_id)
+        wakeup = None if activation is None else activation.wakeup
+        if wakeup is not None:
+            loop, changed = wakeup
+            loop.call_soon_threadsafe(changed.set)
 
-    def _close_request(self, run_id: str, projection: RunProjection, *, status: str, reason: str,
+    def _close_request(self, transaction: Transaction, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
+        projection = transaction.projection
         request = projection.pending_request
         if request is None:
             return projection
-        self.writes.append(run_id, NewEvent(
+        transaction.append(NewEvent(
             EventType.COLLABORATION_CLOSED, role=request.recipient,
             parent_event_id=request.created_event_id, state_before=projection.phase, state_after=return_phase,
             session_id=projection.sessions[request.recipient].session_id,
             payload={"request_id": request.id, "status": status, "reason": reason,
                      "return_phase": return_phase, "return_work_valid": return_work_valid},
         ))
-        return self.project(run_id)
+        return transaction.projection
 
-    def _close_obsolete_request(self, run_id: str, projection: RunProjection) -> RunProjection:
-        projection = self._assign_new_inputs(run_id, projection)
+    def _close_obsolete_request(self, transaction: Transaction) -> RunProjection:
+        # 分派新输入，关闭因此或因依据改变而过时的协作请求，交回事务中当前的运行状态
+        projection = self._assign_new_inputs(transaction)
         request = projection.pending_request
         if request is None or projection.phase in TERMINAL_PHASES:
             return projection
-        events = self.store.list_events(run_id)
+        events = transaction.events()
         if request_still_applicable(request, projection, events):
             return projection
-        tree = self._environment(run_id).query(FactsQuery(tree=True)).tree
+        tree = self._environment(projection.run_id).query(FactsQuery(tree=True)).tree
         phase, _valid = resume_phase(request, projection, events, snapshot_hash=tree.digest)
-        return self._close_request(run_id, projection, status="superseded", reason="The request basis changed outside its authorized work.",
+        return self._close_request(transaction, status="superseded", reason="The request basis changed outside its authorized work.",
                                    return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str) -> RunProjection:
         activation = None
-        abort_notified = False
+        notified = False
+
+        def cancel(transaction: Transaction) -> None:
+            nonlocal activation, notified
+            if not transaction.projection.run_id:
+                raise RunNotFoundError(run_id)
+            if transaction.projection.phase in TERMINAL_PHASES:
+                return
+            self._abort.setdefault(run_id, Event()).set()
+            activation = self._active.get(run_id)
+            if activation is not None and not notified:
+                self._cancel_driver(activation)
+                notified = True
+            self._fail(transaction, "cancelled", "run cancelled")
+
         try:
-            with self.writes.lock:
-                projection = self.project(run_id)
-                if projection.phase in TERMINAL_PHASES:
-                    return projection
-                self._abort.setdefault(run_id, Event()).set()
-                activation = self._active.get(run_id)
-                if activation is not None:
-                    self._cancel_driver(activation)
-                    abort_notified = True
-                self._fail(run_id, projection, "cancelled", "run cancelled")
+            self.writes.transact(run_stream(run_id), cancel)
         finally:
-            if activation is not None and not abort_notified:
+            if activation is not None and not notified:
                 self._cancel_driver(activation)
         return self.project(run_id)
 
@@ -536,7 +570,8 @@ class Orchestrator:
                 if projection.phase in TERMINAL_PHASES:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
-                    return self.cancel(run_id)
+                    # 已经中止：取消由发起取消的一方（cancel 或 /stop）写入，它可能还在保存命令原文
+                    return projection
                 await self._activate_once(run_id, connections)
         finally:
             await connections.aclose()
@@ -549,53 +584,63 @@ class Orchestrator:
             await connections.aclose()
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
-        with self.writes.lock:
-            if run_id in self._active:
-                raise RuntimeError("run already has an active department invocation")
-            activation = self._prepare_activation(run_id, connections)
+        claim = object()
+        if self._running.setdefault(run_id, claim) is not claim:
+            raise RuntimeError("run already has an active department invocation")
+        try:
+            activation = self.writes.transact(
+                run_stream(run_id), lambda transaction: self._prepare_activation(run_id, transaction, connections))
             if activation is None:
                 return self.project(run_id)
             self._active[run_id] = activation
-        started = time.monotonic()
-        try:
-            await self._invoke_activation(activation)
-        finally:
-            with self.writes.lock:
-                current = self.project(run_id)
+            started = time.monotonic()
+            try:
+                await self._invoke_activation(activation)
+            finally:
                 scope = activation.scope
-                self.writes.append(run_id, NewEvent(
-                    EventType.ACTIVATION_FINISHED,
-                    role=scope.department,
-                    parent_event_id=scope.parent_event_id,
-                    state_before=current.phase,
-                    state_after=current.phase,
-                    session_id=scope.session_id,
-                    payload={
-                        "activation_id": scope.activation_id,
-                        **scope.versions(),
-                        "latency_ms": int((time.monotonic() - started) * 1000),
-                        "stop_reason": current.stop_reason,
-                    },
-                ))
+
+                def finish(transaction: Transaction) -> None:
+                    current = transaction.projection
+                    transaction.append(NewEvent(
+                        EventType.ACTIVATION_FINISHED,
+                        role=scope.department,
+                        parent_event_id=scope.parent_event_id,
+                        state_before=current.phase,
+                        state_after=current.phase,
+                        session_id=scope.session_id,
+                        payload={
+                            "activation_id": scope.activation_id,
+                            **scope.versions(),
+                            "latency_ms": int((time.monotonic() - started) * 1000),
+                            "stop_reason": current.stop_reason,
+                        },
+                    ))
+
+                self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)
-        return self.project(run_id)
+            return self.project(run_id)
+        finally:
+            self._running.pop(run_id, None)
 
-    def _prepare_activation(self, run_id: str, connections: ProviderConnections) -> _Activation | None:
+    def _prepare_activation(self, run_id: str, transaction: Transaction,
+                            connections: ProviderConnections) -> _Activation | None:
+        projection = transaction.projection
+        if not projection.run_id:
+            raise RunNotFoundError(run_id)
         if run_id not in self._run_start_times:
             self._run_start_times[run_id] = time.monotonic()
-        projection = self.project(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
-        projection = self._close_obsolete_request(run_id, projection)
+        projection = self._close_obsolete_request(transaction)
         if projection.phase in TERMINAL_PHASES:
             return None
         if projection.cycle_count >= projection.max_cycles:
-            self._pause(run_id, projection, "max_cycles")
+            self._pause(transaction, "max_cycles")
             return None
         elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
         if elapsed >= projection.run_time_limit_sec:
-            self._fail(run_id, projection, "time_limit",
+            self._fail(transaction, "time_limit",
                        f"run wall-clock time {int(elapsed)}s exceeded limit of {projection.run_time_limit_sec}s")
             return None
         normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
@@ -609,7 +654,7 @@ class Orchestrator:
                 guidance_only = department != "product"
                 yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
         if department is None:
-            self._fail(run_id, projection, "provider_error", f"no department for phase {projection.phase}")
+            self._fail(transaction, "provider_error", f"no department for phase {projection.phase}")
             return None
 
         target: FrozenTarget | None = None
@@ -619,8 +664,7 @@ class Orchestrator:
         if run_has_frozen_provider or snapshot is not None:
             if snapshot is None or self.facade is None:
                 self._fail(
-                    run_id,
-                    projection,
+                    transaction,
                     "provider_credentials_lost",
                     "The task's frozen provider credentials are unavailable after restart; create a new run.",
                 )
@@ -631,13 +675,12 @@ class Orchestrator:
                 # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
                 adapter = FacadeAdapter(self.facade, target, connections=connections)
             except (KeyError, ValueError) as exc:
-                self._fail(run_id, projection, "provider_unavailable", str(exc))
+                self._fail(transaction, "provider_unavailable", str(exc))
                 return None
         else:
             if self.test_adapter_factory is None:
                 self._fail(
-                    run_id,
-                    projection,
+                    transaction,
                     "provider_credentials_lost",
                     "The task's model credentials are unavailable in this process; create a new run.",
                 )
@@ -645,12 +688,12 @@ class Orchestrator:
             try:
                 adapter = self.test_adapter_factory(department)
             except Exception as exc:
-                self._fail(run_id, projection, "provider_unavailable", f"test adapter creation failed: {exc}")
+                self._fail(transaction, "provider_unavailable", f"test adapter creation failed: {exc}")
                 return None
 
         availability = adapter.availability()
         if not availability.available:
-            self._fail(run_id, projection, availability.reason or "provider_unavailable", availability.message)
+            self._fail(transaction, availability.reason or "provider_unavailable", availability.message)
             return None
 
         try:
@@ -665,7 +708,7 @@ class Orchestrator:
         basis = WorkBasis.current(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         target_metadata = self._target_metadata(target, adapter, snapshot_id)
-        parent = self.writes.append(run_id, NewEvent(
+        parent = transaction.append(NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
             role=department,
             state_before=projection.phase,
@@ -761,14 +804,14 @@ class Orchestrator:
                 engineering_plan_hash=scope.basis.engineering_plan_hash,
             )
             activation.driver = StepDriver.start(
-                scope, activation.prompt, store=self.store, writes=self.writes, artifacts=self.artifacts,
+                scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, target=activation.target,
                 environment=LocalEnvironment(workspace, registered_commands=dict(projection.registered_commands)),
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
             result = await activation.driver.result()
         except Exception as exc:
-            self._fail(run_id, projection, "provider_error", f"{type(exc).__name__}: {exc}")
+            self._end_run(run_id, "provider_error", f"{type(exc).__name__}: {exc}")
             return
         if isinstance(result, Stopped) and result.reason is not None:
             self._end_run(run_id, result.reason, result.message)
@@ -780,8 +823,8 @@ class Orchestrator:
         if isinstance(result, Stopped):
             elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
             if elapsed >= current.run_time_limit_sec:
-                self._fail(run_id, current, "time_limit",
-                           f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s")
+                self._end_run(run_id, "time_limit",
+                              f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s")
             return
         submission = result
 
@@ -800,7 +843,7 @@ class Orchestrator:
                 model=submission.response.model,
             )
         except Exception as exc:
-            self._fail(run_id, self.project(run_id), "host_commit_error", f"{type(exc).__name__}: {exc}")
+            self._end_run(run_id, "host_commit_error", f"{type(exc).__name__}: {exc}")
 
     def _apply_proposal(
         self,
@@ -817,42 +860,43 @@ class Orchestrator:
         model: str | None,
         yielded_work: dict[str, Any] | None = None,
     ) -> None:
-        # 提案先在锁外校验；锁内关闭过时的协作请求以后，由 U 按最新的投影与工作区事实作提交判断。
+        # 提案先按读取时的运行状态与工作区事实校验；提交的事务中关闭过时的协作请求以后，由 U 按事务中的运行状态与
+        # 工作区事实作提交判断，再写入提交、拒绝或接纳的事件。
         # 工作区事实向执行环境查询；提交需要带文件内容的公开树（交付封存），提交判断使用同一次读取的事实
         environment = self._environment(run_id)
-        evaluated = self.project(run_id)
+        evaluated = self.writes.read(run_stream(run_id))
         facts = environment.query(FactsQuery(tree=True)).tree
-        decision = proposal_decision(evaluated, department=department, proposal=proposal, facts=facts,
-                                     events=self.store.list_events(run_id))
-        with self.writes.lock:
-            current = self.project(run_id)
+        decision = proposal_decision(evaluated.projection, department=department, proposal=proposal, facts=facts,
+                                     events=evaluated.events())
+
+        def commit(transaction: Transaction) -> None:
+            current = transaction.projection
             if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
                 return
-            current = self._close_obsolete_request(run_id, current)
+            current = self._close_obsolete_request(transaction)
             snapshot = environment.snapshot()
-            decision = commit_decision(
+            judged = commit_decision(
                 decision, department=department, proposal=proposal, basis=basis, started=projection,
-                evaluated=evaluated, facts=facts, current=current, current_facts=snapshot.facts,
-                events=self.store.list_events(run_id),
+                evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
+                events=transaction.events(),
             )
-            projection = current
             if proposal is not None:
-                self.writes.append(run_id, NewEvent(
+                transaction.append(NewEvent(
                     EventType.PROPOSAL_SUBMITTED, role=department,
                     parent_event_id=parent_event_id,
-                    state_before=projection.phase, state_after=projection.phase,
+                    state_before=current.phase, state_after=current.phase,
                     session_id=session_id, provider=provider, model=model,
                     payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
                              "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
                 ))
-            if not decision.accepted:
-                self.writes.append(run_id, NewEvent(
+            if not judged.accepted:
+                transaction.append(NewEvent(
                     EventType.PROPOSAL_REJECTED, role=department,
                     parent_event_id=parent_event_id,
-                    state_before=projection.phase, state_after=projection.phase,
+                    state_before=current.phase, state_after=current.phase,
                     session_id=session_id, provider=provider, model=model,
                     payload={
-                        "errors": decision.error_dicts,
+                        "errors": judged.error_dicts,
                         "transcript_ref": transcript_ref,
                         "kind": None if proposal is None else proposal.get("kind"),
                         "input_version": basis.input_version,
@@ -860,18 +904,19 @@ class Orchestrator:
                 ))
                 return
             self._commit_accepted(
-                run_id, department=department, projection=projection, snapshot=snapshot,
-                artifact=decision.artifact or {}, transitions=decision.transitions,
+                transaction, department=department, snapshot=snapshot,
+                artifact=judged.artifact or {}, transitions=judged.transitions,
                 parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
                 yielded_work=yielded_work,
             )
 
+        self.writes.transact(run_stream(run_id), commit)
+
     def _commit_accepted(
         self,
-        run_id: str,
+        transaction: Transaction,
         *,
         department: str,
-        projection: RunProjection,
         snapshot: WorkspaceSnapshot,
         artifact: dict[str, Any],
         transitions: list[tuple[str, str]],
@@ -881,18 +926,26 @@ class Orchestrator:
         model: str | None,
         yielded_work: dict[str, Any] | None = None,
     ) -> None:
-        if self.project(run_id).phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        projection = transaction.projection
+        run_id = projection.run_id
+        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
-        source_event = self.submissions.commit(
-            projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
-            artifact=artifact,
-            department=department, parent_event_id=parent_event_id, session_id=session_id,
-            provider=provider, model=model,
-        )
+        try:
+            acceptance = self.submissions.prepare(
+                transaction, projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
+                artifact=artifact,
+                department=department, parent_event_id=parent_event_id, session_id=session_id,
+                provider=provider, model=model,
+            )
+        except Exception as exc:
+            # 接纳所需的工件、材料或 Git 版本没有保存成功：提交的记录保留，运行在同一事务中以 host_commit_error 结束
+            self._fail(transaction, "host_commit_error", f"{type(exc).__name__}: {exc}")
+            return
+        source_event = acceptance.append(transaction)
         if artifact["kind"] == "qa_review" and artifact["verdict"] in {"rework_product", "rework_engineering"}:
-            self._record_lesson_candidate(source_event, projection)
+            self._record_lesson_candidate(transaction, source_event, projection)
         for source, target in transitions:
-            self.writes.append(run_id, NewEvent(
+            transaction.append(NewEvent(
                 EventType.TRANSITION,
                 role=department_for_phase(target) or department,
                 parent_event_id=parent_event_id,
@@ -902,7 +955,7 @@ class Orchestrator:
                 payload={"from": source, "to": target, "route": f"{source}->{target}"},
             ))
             if target == "DONE":
-                self.writes.append(run_id, NewEvent(
+                transaction.append(NewEvent(
                     EventType.RUN_DONE,
                     role="quality",
                     parent_event_id=parent_event_id,
@@ -914,13 +967,13 @@ class Orchestrator:
                 ))
                 self.sessions.close_run(run_id)
         self._resume_yielded_work(
-            run_id, artifact=artifact, yielded_work=yielded_work,
+            transaction, artifact=artifact, yielded_work=yielded_work,
             parent_event_id=parent_event_id, session_id=session_id, department=department,
         )
 
     def _resume_yielded_work(
         self,
-        run_id: str,
+        transaction: Transaction,
         *,
         artifact: dict[str, Any],
         yielded_work: dict[str, Any] | None,
@@ -928,7 +981,7 @@ class Orchestrator:
         session_id: str,
         department: str,
     ) -> None:
-        current = self.project(run_id)
+        current = transaction.projection
         basis = current.yielded_work or yielded_work
         if artifact.get("kind") != "department_guidance_response" or not basis:
             return
@@ -937,7 +990,7 @@ class Orchestrator:
         target = guidance_resume_phase(basis, current)
         if target == current.phase:
             return
-        self.writes.append(run_id, NewEvent(
+        transaction.append(NewEvent(
             EventType.TRANSITION,
             role=department_for_phase(target) or department,
             parent_event_id=parent_event_id,
@@ -948,7 +1001,8 @@ class Orchestrator:
                      "yielded_work_resolved": True, "yielded_work": dict(basis)},
         ))
 
-    def _record_lesson_candidate(self, source: RunEvent, projection: RunProjection) -> None:
+    @staticmethod
+    def _record_lesson_candidate(transaction: Transaction, source: RunEvent, projection: RunProjection) -> None:
         if source.type == EventType.QA_SUBMITTED:
             observed = source.payload
             observation = {key: observed[key] for key in ("verdict", "rationale", "defects")}
@@ -968,7 +1022,7 @@ class Orchestrator:
             delivery_hash = delivery.content_hash if delivery is not None else None
             checks = delivery.checks if delivery is not None else []
             refs = [asdict(delivery.tree_ref)] if delivery is not None else []
-        self.writes.append(source.run_id, NewEvent(
+        transaction.append(NewEvent(
             EventType.LESSON_CANDIDATE_RECORDED,
             role=source.role, parent_event_id=source.event_id,
             state_before=source.state_after, state_after=source.state_after,
@@ -983,36 +1037,39 @@ class Orchestrator:
         ))
 
     def _end_run(self, run_id: str, reason: str, message: str) -> None:
-        # 按停止原因暂停或结束运行
+        # 在一个事务中按停止原因暂停或结束运行
+        self.writes.transact(run_stream(run_id), lambda transaction: self._end(transaction, reason, message))
+
+    def _end(self, transaction: Transaction, reason: str, message: str) -> None:
+        # 按停止原因暂停或结束运行；已经结束的运行不再写入
         if reason in PAUSED_REASONS:
-            self._pause(run_id, self.project(run_id), reason)
+            self._pause(transaction, reason)
         else:
-            self._fail(run_id, self.project(run_id), reason, message)
+            self._fail(transaction, reason, message)
 
-    def _pause(self, run_id: str, projection: RunProjection, reason: str) -> None:
-        with self.writes.lock:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
-                return
-            department = projection.active_department
-            projection = self._close_request(run_id, projection, status="stopped", reason=reason,
-                                             return_phase=projection.phase, return_work_valid=False)
-            self.writes.append(run_id, NewEvent(
-                EventType.RUN_PAUSED, role=department,
-                state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
-                provider=projection.provider, model=projection.model,
-                payload={
-                    "stop_reason": reason,
-                    "human_action": HUMAN_ACTIONS[reason],
-                    "paused_at_phase": projection.phase,
-                    "cycle_count": projection.cycle_count,
-                    "max_cycles": projection.max_cycles,
-                    "token_used": projection.token_used,
-                },
-            ))
-            self.sessions.close_run(run_id)
+    def _pause(self, transaction: Transaction, reason: str) -> None:
+        projection = transaction.projection
+        if projection.phase in TERMINAL_PHASES:
+            return
+        department = projection.active_department
+        projection = self._close_request(transaction, status="stopped", reason=reason,
+                                         return_phase=projection.phase, return_work_valid=False)
+        transaction.append(NewEvent(
+            EventType.RUN_PAUSED, role=department,
+            state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
+            provider=projection.provider, model=projection.model,
+            payload={
+                "stop_reason": reason,
+                "human_action": HUMAN_ACTIONS[reason],
+                "paused_at_phase": projection.phase,
+                "cycle_count": projection.cycle_count,
+                "max_cycles": projection.max_cycles,
+                "token_used": projection.token_used,
+            },
+        ))
+        self.sessions.close_run(projection.run_id)
 
-    def _fail(self, run_id: str, projection: RunProjection, reason: str, message: str,
+    def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
         human = {
             "provider_unavailable": "模型提供方未配置或不可用。检查模型与 API 配置后新建运行。",
@@ -1025,21 +1082,20 @@ class Orchestrator:
             "host_commit_error": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。",
             "time_limit": HUMAN_ACTIONS["time_limit"],
         }.get(reason)
-        with self.writes.lock:
-            projection = self.project(run_id)
-            if projection.phase in TERMINAL_PHASES:
-                return
-            department = projection.active_department
-            status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
-            projection = self._close_request(run_id, projection, status=status, reason=reason,
-                                             return_phase=projection.phase, return_work_valid=False)
-            source_event = self.writes.append(run_id, NewEvent(
-                EventType.RUN_FAILED, role=department,
-                state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
-                provider=projection.provider, model=projection.model,
-                payload={"stop_reason": reason, "human_action": human, "message": message,
-                         **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
-            ))[0]
-            self.sessions.close_run(run_id)
-            if reason != "cancelled":
-                self._record_lesson_candidate(source_event, projection)
+        projection = transaction.projection
+        if projection.phase in TERMINAL_PHASES:
+            return
+        department = projection.active_department
+        status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
+        projection = self._close_request(transaction, status=status, reason=reason,
+                                         return_phase=projection.phase, return_work_valid=False)
+        source_event = transaction.append(NewEvent(
+            EventType.RUN_FAILED, role=department,
+            state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
+            provider=projection.provider, model=projection.model,
+            payload={"stop_reason": reason, "human_action": human, "message": message,
+                     **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
+        ))[0]
+        self.sessions.close_run(projection.run_id)
+        if reason != "cancelled":
+            self._record_lesson_candidate(transaction, source_event, projection)

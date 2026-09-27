@@ -124,7 +124,7 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
     assert any("failed model step produced output" in note for note in residue["notes"])
 
 
-def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_path, monkeypatch):
+def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_path):
     adapter = FakeAdapter([ModelResponse(), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("prepared but not sent")
@@ -134,7 +134,7 @@ def test_model_input_audit_counts_prepared_step_without_request_separately(tmp_p
         if event.payload["step_id"] == 2:
             system.add_input(run_id, "a new input before the second request")
 
-    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, input_after_second_preparation)
+    after_event(system, EventType.CONTEXT_ASSEMBLED, input_after_second_preparation)
     result = system.activate_once(run_id)
     assert result.phase == "PRODUCT_SPEC"
 

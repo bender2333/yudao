@@ -1,8 +1,8 @@
 # 步骤驱动：一次激活内的步骤循环，以异步方式执行。每一步先在安全节点得到继续或停止，经上下文装配（P）取得请求，
 # 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
 # 以后执行：主机工具（提交）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
-# 提交提案时结束。所有记录经过记录接口，
-# 需要核对运行状态的记录在写入锁之内判断并写入。
+# 提交提案时结束。所有记录经过记录接口；需要核对运行状态的记录在写入口的一个事务中读取运行状态、判断并写入，
+# 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：提交或停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
 
@@ -24,10 +24,9 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
 from .environment import LocalEnvironment
-from .event_store import EventStore
-from .write_path import WritePath
+from .event_store import run_stream
+from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
-from .projection import project_run
 from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget
 from .recording import ActivationScope, StepRecorder
@@ -46,16 +45,16 @@ class SafeNode(Protocol):
         # 分派新输入，回答是否继续
         ...
 
-    def settle(self) -> RunProjection:
-        # 分派新输入并关闭过时的协作请求，返回当前的运行状态；调用方持有写入锁，随后判断并写入
+    def settle(self, transaction: Transaction) -> RunProjection:
+        # 在调用方的事务中分派新输入并关闭过时的协作请求，返回事务中当前的运行状态；调用方随后判断并写入
         ...
 
     async def wait(self, seconds: float) -> bool:
         # 在安全节点等待至多 seconds 秒，其间有新输入、指导或取消时提前回答；回答是否继续
         ...
 
-    def end(self, reason: str, message: str) -> None:
-        # 以停止原因结束运行；调用方持有写入锁，运行的结束与调用方刚写下的记录在同一次持锁中完成
+    def end(self, transaction: Transaction, reason: str, message: str) -> None:
+        # 以停止原因结束运行：运行的结束与调用方在同一事务中刚写下的记录一起提交
         ...
 
 
@@ -96,21 +95,28 @@ class Stopped:
 StepResult = Submitted | Stopped
 
 
+@dataclass(frozen=True)
+class _Unassembled:
+    # 这一步的请求没有装配成：停止原因与原来的错误。事务提交以后以这个原因停止
+    reason: str
+    error: Exception
+
+
 class StepDriver:
     # 一次激活的步骤驱动。cancelled 是这次激活的取消信号，由流程编排持有；cancel() 可以从任何线程调用
     @classmethod
-    def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
+    def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
               cancelled: Event, limits: StepLimits) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
-        driver = cls(scope, prompt, store=store, writes=writes, artifacts=artifacts, assembly=assembly,
+        driver = cls(scope, prompt, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, target=target, environment=environment, nodes=nodes,
                      cancelled=cancelled, limits=limits)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
-    def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, store: EventStore, writes: WritePath,
+    def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
                  cancelled: Event, limits: StepLimits) -> None:
@@ -118,10 +124,10 @@ class StepDriver:
         basis = scope.basis
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
                                 basis.effective_contract_hash, basis.engineering_plan_hash, basis.input_version)
-        self._store = store
+        self._stream = run_stream(scope.run_id)
         self._writes = writes
         self._assembly = assembly
-        self._recorder = StepRecorder(store, writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
+        self._recorder = StepRecorder(writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
         self._adapter = adapter
         self._target = target
         self._environment = environment
@@ -315,13 +321,15 @@ class StepDriver:
 
     def _prepare(self, step_id: int, attempt: int, root_step_id: int,
                  retry_of_step_id: int | None) -> ModelRequest | None:
-        # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出
+        # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
+        # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止
         scope = self._scope
-        with self._writes.lock:
-            projection = self._project()
+
+        def prepare(transaction: Transaction) -> tuple[ModelRequest, StepRequest] | _Unassembled | None:
+            projection = transaction.projection
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return None
-            projection = self._nodes.settle()
+            projection = self._nodes.settle(transaction)
             if scope.basis.changed(projection, scope.department):
                 return None
             target = self._target
@@ -329,23 +337,20 @@ class StepDriver:
                 limits = model_limits(projection.context_window,
                                       None if target is None else target.context_window,
                                       None if target is None else target.max_output_tokens)
-                events = self._store.list_events(scope.run_id)
                 snapshot_hash = self._environment.query(FactsQuery(tree=True)).tree.digest
                 pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
-                                            events=events, snapshot_hash=snapshot_hash)
+                                            events=transaction.events(), snapshot_hash=snapshot_hash)
             except ValueError as exc:
-                raise ProviderError(str(exc), reason="context_overflow") from exc
+                return _Unassembled("context_overflow", exc)
             department_input = pinned.department_input
             if department_input is not None:
-                self._recorder.department_input(projection.phase, step_id, department_input)
-            history = self._assembly.department_history(self._store.list_events(scope.run_id), scope.department)
+                self._recorder.department_input(transaction, step_id, department_input)
+            history = self._assembly.department_history(transaction.events(), scope.department)
             try:
                 step = self._assembly.request(pinned, history)
             except (CompactionError, ValueError, FileNotFoundError) as exc:
-                reason = "context_overflow" if pinned.fills_window else "compaction_failed"
-                raise ProviderError(str(exc), reason=reason) from exc
+                return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
-            self._step = step
             logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
             request = ModelRequest(scope.run_id, scope.department, scope.session_id, scope.activation_id,
                                    step_id, assembled, assembled.tools,
@@ -359,24 +364,34 @@ class StepDriver:
                                    attempt_id=f"{logical_call_id}:attempt-{attempt}",
                                    logical_call_id=logical_call_id,
                                    guidance_version=scope.basis.guidance_version, **scope.versions())
-            self._request = request
-            self._recorder.request_assembled(projection.phase, request, step, snapshot_hash)
+            self._recorder.request_assembled(transaction, request, step, snapshot_hash)
             if not step.admitted:
-                # 请求没有获准：在写下请求记录的同一次持锁中结束运行
-                self._nodes.end("context_overflow", "model request exceeds context_window")
+                # 请求没有获准：运行的结束与请求的记录在同一个事务中提交
+                self._nodes.end(transaction, "context_overflow", "model request exceeds context_window")
                 return None
-            return request
+            return request, step
+
+        prepared = self._writes.transact(self._stream, prepare)
+        if isinstance(prepared, _Unassembled):
+            raise ProviderError(str(prepared.error), reason=prepared.reason) from prepared.error
+        if prepared is None:
+            return None
+        self._request, self._step = prepared
+        return self._request
 
     def _start_request(self, request: ModelRequest) -> bool:
         scope = self._scope
-        with self._writes.lock:
-            projection = self._nodes.settle()
+
+        def start(transaction: Transaction) -> bool:
+            projection = self._nodes.settle(transaction)
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return False
             if scope.basis.changed(projection, scope.department):
                 return False
-            self._recorder.request_started(projection.phase, request)
+            self._recorder.request_started(transaction, request)
             return True
+
+        return self._writes.transact(self._stream, start)
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
         # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果
@@ -389,18 +404,22 @@ class StepDriver:
 
     def _schedule_retry(self, request: ModelRequest, error: ProviderError, delay: float, next_step_id: int) -> bool:
         scope = self._scope
-        with self._writes.lock:
-            projection = self._nodes.settle()
+
+        def schedule(transaction: Transaction) -> bool:
+            projection = self._nodes.settle(transaction)
             if (projection.phase in TERMINAL_PHASES or self._cancelled.is_set()
                     or scope.basis.changed(projection, scope.department)):
                 return False
-            self._recorder.retry_scheduled(projection.phase, request, error, delay, next_step_id)
+            self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
             return True
+
+        return self._writes.transact(self._stream, schedule)
 
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> None:
         scope = self._scope
-        with self._writes.lock:
-            projection = self._project()
+
+        def finish(transaction: Transaction) -> None:
+            projection = transaction.projection
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return
             if scope.basis.changed(projection, scope.department):
@@ -411,21 +430,26 @@ class StepDriver:
                 raise ProviderError(str(exc), reason="compaction_failed") from exc
             if result is None:
                 return
-            self._recorder.compaction(projection.phase, request, result, response)
+            self._recorder.compaction(transaction, request, result, response)
+
+        self._writes.transact(self._stream, finish)
 
     def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> tuple[ToolPermission, WorkspaceFacts]:
         # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U；同一份事实是动作的前置条件
         scope = self._scope
-        with self._writes.lock:
-            projection = self._nodes.settle()
+
+        def begin(transaction: Transaction) -> tuple[ToolPermission, WorkspaceFacts]:
+            projection = self._nodes.settle(transaction)
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
                 projection, call, department=scope.department, guidance_only=scope.guidance_only,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
             if permission.allowed:
-                self._recorder.tool_started(projection.phase, request, call, permission.command_basis)
+                self._recorder.tool_started(transaction, request, call, permission.command_basis)
             return permission, facts
+
+        return self._writes.transact(self._stream, begin)
 
     async def _perform(self, action: Action) -> ActionReceipt:
         # 先登记正在进行的动作，再看取消信号：取消落在登记之前时在这里交给执行环境，动作不开始；
@@ -447,9 +471,6 @@ class StepDriver:
                 "error": error, "step_id": request.step_id,
                 "input_item": {"type": "function_call_output", "call_id": item["call_id"],
                                "output": json_dumps({"ok": False, "output": None, "error": error})}})
-
-    def _project(self) -> RunProjection:
-        return project_run(self._store, self._scope.run_id)
 
 
 def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:

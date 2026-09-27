@@ -5,6 +5,7 @@ import pytest
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id, prompt_parts
+from harness.event_store import run_stream
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn, plan_turn,
@@ -332,11 +333,11 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
                                  }))
     assert decision.accepted
     # 运行之外接纳新的产品规格（经提交的写入函数），协作请求的依据随之改变
-    system.orchestrator.submissions.commit(
-        projection=external, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
+    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+        transaction, projection=external, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
         artifact=decision.artifact, department="product", parent_event_id=before.last_event_id,
         session_id=before.sessions["product"].session_id, provider="fake", model="fake-script",
-    )
+    ))
     current = system.activate_once(run_id)
     assert current.phase == "ENGINEERING" and current.pending_request is None
     assert current.requests[-1].status == "superseded" and current.requests[-1].basis == before.pending_request.basis

@@ -5,6 +5,7 @@ import pytest
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.contracts import contract_payload, normalize_scope, path_in_scope, render_plan, render_prd
+from harness.event_store import run_stream
 from harness.models import EventType, json_dumps
 from harness.proposals import (collaboration_request, delivery, delivery_turn, engineering_plan, plan_turn,
                                product_decision, product_spec, response_turn, review_turn)
@@ -27,11 +28,12 @@ def _accept_new_spec(system, run_id):
                                  }))
     assert decision.accepted
     # 运行之外接纳新的产品规格（经提交的写入函数），有效合同随之改变
-    system.orchestrator.submissions.commit(
-        projection=projection, snapshot=system.workspace(run_id).snapshot(), workspace_root=system.workspace(run_id).root,
-        artifact=decision.artifact, department="product", parent_event_id=projection.last_event_id,
-        session_id=projection.sessions["product"].session_id, provider="fake", model="fake-script",
-    )
+    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+        transaction, projection=projection, snapshot=system.workspace(run_id).snapshot(),
+        workspace_root=system.workspace(run_id).root, artifact=decision.artifact, department="product",
+        parent_event_id=projection.last_event_id, session_id=projection.sessions["product"].session_id,
+        provider="fake", model="fake-script",
+    ))
 
 
 def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):

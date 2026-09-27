@@ -7,13 +7,13 @@
 
 from __future__ import annotations
 
-import threading
-from dataclasses import asdict
+from copy import deepcopy
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .artifacts import ArtifactStore
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
-from .event_store import EventStore
+from .event_store import EventStore, project_stream
 from .materials import save_text_material
 from .models import (
     Adoption,
@@ -36,7 +36,7 @@ from .models import (
     new_id,
 )
 from .projection import RunNotFoundError, project_run, saved_project
-from .write_path import WritePath
+from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
 from .tree_archive import load_tree
@@ -78,6 +78,12 @@ def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: 
     state = saved_project(store, project_id)
     if state is None:
         raise ProjectNotFoundError(project_id)
+    return _compose(store, state)
+
+
+def _compose(store: EventStore, state: ProjectProjection) -> ProjectProjection:
+    # 在给出的项目投影上补齐默认 Prompt 与事项状态
+    project_id = state.project_id
     for department in DEPARTMENTS:
         state.prompt_configs.setdefault(department, PromptConfig(
             department=department, version=0, text=DEFAULT_PROMPTS[department], source="default",
@@ -273,12 +279,12 @@ def work_item_title(text: str) -> str:
 
 
 class ProjectService:
+    # 项目的命令：每一次「读取项目投影、判断、追加」是写入口在项目流上的一个事务
     def __init__(self, store: EventStore, writes: WritePath, artifacts: ArtifactStore, orchestrator: Any) -> None:
         self.store = store
         self.writes = writes
         self.artifacts = artifacts
         self.orchestrator = orchestrator
-        self._lock = threading.RLock()
 
     # 读
 
@@ -315,37 +321,46 @@ class ProjectService:
         _require_text("goal", goal)
         project_id = new_id("proj")
         goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
-        with self._lock:
-            self.writes.append_project(project_id, ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
-            })
+        self.writes.append(project_stream(project_id), NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
+            "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
+        }), expected_version=0)
         return project_id
 
     def rename(self, project_id: str, name: str) -> None:
         _require_text("name", name)
-        with self._lock:
-            self._writable(project_id)
-            self.writes.append_project(project_id, ProjectEventType.PROJECT_RENAMED, {"name": name})
+
+        def rename(transaction: Transaction) -> None:
+            self._writable_in(transaction, project_id)
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}))
+
+        self.writes.transact(project_stream(project_id), rename)
 
     def pin(self, project_id: str, pinned: bool) -> None:
         if not isinstance(pinned, bool):
             raise ValueError("pinned must be a boolean")
-        with self._lock:
-            self._writable(project_id)
-            self.writes.append_project(project_id, ProjectEventType.PROJECT_PINNED, {"pinned": pinned})
+
+        def pin(transaction: Transaction) -> None:
+            self._writable_in(transaction, project_id)
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_PINNED, {"pinned": pinned}))
+
+        self.writes.transact(project_stream(project_id), pin)
 
     def archive(self, project_id: str) -> None:
-        with self._lock:
-            project = self.projection(project_id)
+        def archive(transaction: Transaction) -> None:
+            project = self._project_in(transaction, project_id)
             if project.archived:
                 return
             _reject_in_progress(project)
-            self.writes.append_project(project_id, ProjectEventType.PROJECT_ARCHIVED, {})
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_ARCHIVED))
+
+        self.writes.transact(project_stream(project_id), archive)
 
     def restore(self, project_id: str) -> None:
-        with self._lock:
-            if self.projection(project_id).archived:
-                self.writes.append_project(project_id, ProjectEventType.PROJECT_RESTORED, {})
+        def restore(transaction: Transaction) -> None:
+            if self._project_in(transaction, project_id).archived:
+                transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RESTORED))
+
+        self.writes.transact(project_stream(project_id), restore)
 
     # 事项
 
@@ -353,10 +368,13 @@ class ProjectService:
                         max_cycles: int = DEFAULT_MAX_CYCLES, run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
                         context_window: int = 32_000) -> tuple[str, str]:
         _require_text("text", text)
-        with self._lock:
-            self._writable(project_id)
-            self.settle_pending(project_id)
-            project = self.projection(project_id)
+        _require_title(title)
+        self._writable(project_id)
+        self.settle_pending(project_id)
+
+        def create(transaction: Transaction) -> _NewWorkItem:
+            # 事项的基线、Prompt 与登记命令取自事务中的项目投影
+            project = self._writable_in(transaction, project_id)
             baseline = None
             initial_tree = None
             source_run = None
@@ -373,11 +391,14 @@ class ProjectService:
                 initial_tree = load_tree(self.artifacts, adoption.run_id, ArtifactRef(**adoption.tree_ref))
                 if initial_tree.digest != adoption.code_tree_digest:
                     raise ValueError("archived tree does not match the adopted deliverable digest")
-            return self._emit_work_item(
-                project, text, title=title, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
-                context_window=context_window,
+            return self._work_item_created(
+                transaction, project, text, title=title, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+                work_item_id=new_id("wi"), run_id=new_id("run"),
             )
+
+        return self._start_run(project_id, self.writes.transact(project_stream(project_id), create))
 
     def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
                                       title: str | None = None, max_cycles: int = DEFAULT_MAX_CYCLES,
@@ -385,28 +406,30 @@ class ProjectService:
                                       context_window: int = 32_000) -> tuple[str, str]:
         # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
         _require_text("text", text)
+        _require_title(title)
         if not isinstance(source_dir, str) or not source_dir.strip():
             raise ValueError("source_dir must be a non-empty string")
-        with self._lock:
-            self._writable(project_id)
-            self.settle_pending(project_id)
-            project = self.projection(project_id)
-            work_item_id, run_id = new_id("wi"), new_id("run")
-            tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
-            return self._emit_work_item(
-                project, text, title=title, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
-                context_window=context_window,
+        self._writable(project_id)
+        self.settle_pending(project_id)
+        work_item_id, run_id = new_id("wi"), new_id("run")
+        tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
+
+        def create(transaction: Transaction) -> _NewWorkItem:
+            project = self._writable_in(transaction, project_id)
+            return self._work_item_created(
+                transaction, project, text, title=title, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
                 work_item_id=work_item_id, run_id=run_id,
             )
 
-    def _emit_work_item(self, project: ProjectProjection, text: str, *, title: str | None,
-                        max_cycles: int, run_time_limit_sec: int, context_window: int, baseline: dict[str, Any] | None,
-                        initial_tree: Any, snapshot: dict[str, Any] | None,
-                        source_run: Any, work_item_id: str | None = None,
-                        run_id: str | None = None) -> tuple[str, str]:
-        if title is not None and (not isinstance(title, str) or not title.strip()):
-            raise ValueError("title must be a non-empty string when given")
+        return self._start_run(project_id, self.writes.transact(project_stream(project_id), create))
+
+    def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
+                           title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
+                           baseline: dict[str, Any] | None, initial_tree: Any, snapshot: dict[str, Any] | None,
+                           source_run: Any, work_item_id: str, run_id: str) -> _NewWorkItem:
+        # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
         prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
@@ -414,61 +437,64 @@ class ProjectService:
         frozen_commands = {name: config.frozen() for name, config in project.commands.items()}
         command_versions = {name: config.version for name, config in project.commands.items()}
         context_text = project_context_text(project, title, source_run)
-        work_item_id, run_id = work_item_id or new_id("wi"), run_id or new_id("run")
         # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
         context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
-        self.writes.append_project(project.project_id, ProjectEventType.WORK_ITEM_CREATED, {
+        transaction.append(NewProjectEvent(ProjectEventType.WORK_ITEM_CREATED, {
             "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
             "command_versions": command_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
-        })
-        try:
-            self.orchestrator.create_run(
-                text, run_id=run_id, max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec,
-                context_window=context_window,
-                project_id=project.project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
-                code_snapshot=snapshot,
-                project_context=context_text, department_prompts=department_prompts,
-                prompt_config_versions=prompt_config_versions,
+        }))
+        return _NewWorkItem(
+            work_item_id=work_item_id, run_id=run_id, text=text,
+            run_options=dict(
+                max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec, context_window=context_window,
+                project_id=project.project_id, work_item_id=work_item_id, baseline=baseline,
+                initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
+                department_prompts=department_prompts, prompt_config_versions=prompt_config_versions,
                 registered_commands=frozen_commands, command_versions=command_versions,
-            )
+            ),
+        )
+
+    def _start_run(self, project_id: str, item: _NewWorkItem) -> tuple[str, str]:
+        # 事项已经登记以后创建它的 run；创建失败时在项目流记下失败的原因
+        try:
+            self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
         except Exception as exc:
-            self.writes.append_project(project.project_id, ProjectEventType.WORK_ITEM_START_FAILED, {
-                "work_item_id": work_item_id, "run_id": run_id, "error": str(exc) or type(exc).__name__,
-            })
+            self.writes.append(project_stream(project_id), NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
+                "work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__,
+            }))
             raise
-        return work_item_id, run_id
+        return item.work_item_id, item.run_id
 
     # 结算
 
     def settle(self, run_id: str) -> ProjectEvent | None:
         """幂等：run 非 DONE、不属于事项或已结算时无事件。"""
-        with self._lock:
-            try:
-                run = project_run(self.store, run_id)
-            except RunNotFoundError:
-                return None
-            if run.project_id is None or run.work_item_id is None:
-                return None
-            return self._settle_run(self.projection(run.project_id), run)
+        try:
+            run = project_run(self.store, run_id)
+        except RunNotFoundError:
+            return None
+        if run.project_id is None or run.work_item_id is None:
+            return None
+        return self.writes.transact(project_stream(run.project_id),
+                                    lambda transaction: self._settle_run(transaction, run))
 
     def settle_pending(self, project_id: str) -> list[ProjectEvent]:
         """补跑结算：覆盖进程在 RUN_DONE 与结算之间中断的情形。"""
-        with self._lock:
-            project = self.projection(project_id)
-            written: list[ProjectEvent] = []
-            for item in project.work_items:
-                if item.status != "released_unsettled":
-                    continue
-                event = self._settle_run(project, project_run(self.store, item.run_id))
-                if event is not None:
-                    written.append(event)
-                    project = self.projection(project_id)
-            return written
+        written: list[ProjectEvent] = []
+        for item in self.projection(project_id).work_items:
+            if item.status != "released_unsettled":
+                continue
+            event = self.settle(item.run_id)
+            if event is not None:
+                written.append(event)
+        return written
 
-    def _settle_run(self, project: ProjectProjection, run: RunProjection) -> ProjectEvent | None:
+    @staticmethod
+    def _settle_run(transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
+        project = transaction.projection
         if run.phase != "DONE":
             return None
         if any(item.run_id == run.run_id for item in project.adoptions) or any(item.run_id == run.run_id for item in project.held):
@@ -485,18 +511,18 @@ class ProjectService:
         expected = None if item.baseline is None else item.baseline["adoption_id"]
         current = None if project.current_adoption is None else project.current_adoption.adoption_id
         if expected != current:
-            return self.writes.append_project(project.project_id, ProjectEventType.ADOPTION_HELD, {
+            return transaction.append(NewProjectEvent(ProjectEventType.ADOPTION_HELD, {
                 "work_item_id": item.work_item_id, "run_id": run.run_id,
                 "delivery_event_id": delivery.created_event_id, "code_tree_digest": delivery.code_tree_digest,
                 "reason": "baseline_changed", "expected_adoption_id": expected, "current_adoption_id": current,
-            })
-        return self.writes.append_project(project.project_id, ProjectEventType.DELIVERABLE_ADOPTED, {
+            }))[0]
+        return transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, {
             "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
             "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
             "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
             "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
             "known_risks": list(delivery.known_risks), "previous_adoption_id": current,
-        })
+        }))[0]
 
     # 部门 Prompt 项目配置
 
@@ -507,19 +533,22 @@ class ProjectService:
             raise ValueError("prompt text must be a non-empty string")
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
-        with self._lock:
-            project = self._writable(project_id)
-            current = project.prompt_configs[department]
+
+        def configure(transaction: Transaction) -> dict[str, Any] | None:
+            current = self._writable_in(transaction, project_id).prompt_configs[department]
             if base_version != current.version:
                 raise PromptConfigConflict(_prompt_view(current))
             if text == current.text:
                 return {**_prompt_view(current), "unchanged": True}
             ref = save_department_prompt(self.artifacts, project_id, department, text)
-            self.writes.append_project(project_id, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
+            transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
                 "department": department, "version": current.version + 1, "text": text,
                 "prompt_ref": asdict(ref), "base_version": base_version,
-            })
-            return {**self.read_prompt(project_id, department), "unchanged": False}
+            }))
+            return None
+
+        unchanged = self.writes.transact(project_stream(project_id), configure)
+        return unchanged or {**self.read_prompt(project_id, department), "unchanged": False}
 
     # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
 
@@ -528,9 +557,9 @@ class ProjectService:
                           output_limit: int | None = None, base_version: int = 0) -> dict[str, Any]:
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
-        with self._lock:
-            project = self._writable(project_id)
-            current = project.commands.get(name)
+
+        def configure(transaction: Transaction) -> dict[str, Any] | None:
+            current = self._writable_in(transaction, project_id).commands.get(name)
             current_version = 0 if current is None else current.version
             if base_version != current_version:
                 raise CommandConfigConflict({} if current is None else _command_view(current))
@@ -541,10 +570,13 @@ class ProjectService:
             })
             if current is not None and current.frozen() == normalized:
                 return {**_command_view(current), "unchanged": True}
-            self.writes.append_project(project_id, ProjectEventType.COMMAND_CONFIGURED, {
+            transaction.append(NewProjectEvent(ProjectEventType.COMMAND_CONFIGURED, {
                 "name": name, "version": current_version + 1, **normalized, "base_version": base_version,
-            })
-            return {**self.read_command(project_id, name), "unchanged": False}
+            }))
+            return None
+
+        unchanged = self.writes.transact(project_stream(project_id), configure)
+        return unchanged or {**self.read_command(project_id, name), "unchanged": False}
 
     # 材料（D-H：无活跃事项时记录原文）
 
@@ -552,21 +584,49 @@ class ProjectService:
         _require_text("text", text)
         if department is not None and department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        with self._lock:
-            project = self._writable(project_id)
-            _reject_in_progress(project)
+
+        def record(transaction: Transaction) -> str:
+            _reject_in_progress(self._writable_in(transaction, project_id))
             ref = save_text_material(self.artifacts, project_id, "project_material", text)
             material_id = new_id("material")
-            self.writes.append_project(project_id, ProjectEventType.MATERIAL_RECORDED, {
+            transaction.append(NewProjectEvent(ProjectEventType.MATERIAL_RECORDED, {
                 "material_id": material_id, "text": text, "material_ref": asdict(ref), "department": department,
-            })
+            }))
             return material_id
+
+        return self.writes.transact(project_stream(project_id), record)
 
     def _writable(self, project_id: str) -> ProjectProjection:
         project = self.projection(project_id)
         if project.archived:
             raise ProjectArchivedError(f"project is archived: {project_id}")
         return project
+
+    def _project_in(self, transaction: Transaction, project_id: str) -> ProjectProjection:
+        # 事务中的项目读取模型：在保存的项目投影的副本上补齐默认 Prompt 与事项状态，事务中的投影不变
+        if transaction.version == 0:
+            raise ProjectNotFoundError(project_id)
+        return _compose(self.store, deepcopy(transaction.projection))
+
+    def _writable_in(self, transaction: Transaction, project_id: str) -> ProjectProjection:
+        project = self._project_in(transaction, project_id)
+        if project.archived:
+            raise ProjectArchivedError(f"project is archived: {project_id}")
+        return project
+
+
+@dataclass(frozen=True)
+class _NewWorkItem:
+    # 已经在项目流登记的事项与创建它的 run 需要的内容
+    work_item_id: str
+    run_id: str
+    text: str
+    run_options: dict[str, Any]
+
+
+def _require_title(title: str | None) -> None:
+    if title is not None and (not isinstance(title, str) or not title.strip()):
+        raise ValueError("title must be a non-empty string when given")
 
 
 def _reject_in_progress(project: ProjectProjection) -> None:

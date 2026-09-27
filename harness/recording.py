@@ -1,13 +1,14 @@
 # 记录接口：一次激活内每一步的记录都经过这里写成工件与事件——部门工作消息、请求（装配结果与开始）、
 # 序列化请求、流式进度、模型输出、用量、调用尝试的完成与失败、重试安排、主机提示、压缩检查点、
 # 工具开始、完成与跳过。只记录，不判断：是否仍然可以记录由调用方决定。
-# 带 phase 参数的方法由调用方在同一次持有写入锁期间读取运行状态、判断以后调用；其余方法自己持有写入锁。
-# 事件经过写入口唯一的写入函数追加。
+# 带 transaction 参数的方法在调用方的事务中追加：调用方在同一事务中读取运行状态、判断以后调用；
+# 其余方法自己在写入口开一个事务追加。一次调用的记录在同一个事务中追加，记录的阶段取追加时的运行状态。
 
 from __future__ import annotations
 
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -15,11 +16,13 @@ from .adapters.base import ModelRequest, ProviderError
 from .adjudication import WorkBasis
 from .artifacts import ArtifactStore
 from .assembly import CompactionResult, StepRequest
-from .event_store import EventStore
-from .write_path import NewEvent, WritePath
-from .models import EventType, Usage, canonical_hash, json_dumps, utc_now
-from .projection import project_run
+from .event_store import run_stream
+from .write_path import NewEvent, Transaction, WritePath
+from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
 from .providers.call import ModelResponse, ModelStreamEvent
+
+# 一条待追加的记录：阶段在追加的事务中填入
+Draft = Callable[[str], NewEvent]
 
 _SENSITIVE_OBSERVATION_KEYS = frozenset({
     "authorization", "api_key", "apikey", "access_token", "refresh_token",
@@ -196,9 +199,8 @@ def _duration_ms(request: ModelRequest) -> int | None:
 
 class StepRecorder:
     # 一次激活的记录接口；也持有记录需要的累计状态：用量计费、每次调用尝试的采集、观察的去重与部门的发言
-    def __init__(self, store: EventStore, writes: WritePath, artifacts: ArtifactStore, scope: ActivationScope,
+    def __init__(self, writes: WritePath, artifacts: ArtifactStore, scope: ActivationScope,
                  *, max_attempts: int) -> None:
-        self._store = store
         self._writes = writes
         self._artifacts = artifacts
         self.scope = scope
@@ -217,7 +219,6 @@ class StepRecorder:
         self._messages: list[str] = []
         self._message_steps: list[tuple[str, int]] = []
         self._captures: dict[str, _AttemptCapture] = {}
-        self._guidance_applied = False
 
     @property
     def transcript(self) -> str:
@@ -228,17 +229,16 @@ class StepRecorder:
         for capture in self._captures.values():
             capture.close()
 
-    def department_input(self, phase: str, step_id: int, item: dict[str, Any]) -> None:
+    def department_input(self, transaction: Transaction, step_id: int, item: dict[str, Any]) -> None:
         scope = self.scope
         ref = self._artifacts.put(scope.run_id, "department_input", json_dumps(item), media_type="application/json")
-        self._append(NewEvent(
-            EventType.DEPARTMENT_INPUT, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
-            artifact_hashes=[ref.content_hash],
+        self._record_in(transaction, self._draft(
+            EventType.DEPARTMENT_INPUT, artifact_hashes=[ref.content_hash],
             payload={"activation_id": scope.activation_id, "step_id": step_id, "input_ref": asdict(ref),
                      **scope.versions(), **scope.work_basis()}))
 
-    def request_assembled(self, phase: str, request: ModelRequest, step: StepRequest, snapshot_hash: str) -> None:
+    def request_assembled(self, transaction: Transaction, request: ModelRequest, step: StepRequest,
+                          snapshot_hash: str) -> None:
         # 一步装配好的请求：发给模型的内容与各段材料写成工件，上下文清单写成 context_assembled；
         # 这一步观察到的提供方、模型与用量从这里重新开始
         scope = self.scope
@@ -263,32 +263,31 @@ class StepRecorder:
                        snapshot_hash=snapshot_hash)
         payload.update(attempt_id=request.attempt_id, logical_call_id=request.logical_call_id,
                        collaboration_request_id=scope.basis.request_id)
-        event = self._append(NewEvent(
-            EventType.CONTEXT_ASSEMBLED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id, provider=scope.provider,
-            context_digest=assembled.manifest.digest, artifact_hashes=[ref.content_hash, parts_ref.content_hash],
-            payload=payload))
+        [event] = self._record_in(transaction, self._draft(
+            EventType.CONTEXT_ASSEMBLED, provider=scope.provider, context_digest=assembled.manifest.digest,
+            artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload))
         request.context_event_id = event.event_id
 
-    def request_started(self, phase: str, request: ModelRequest) -> None:
-        # 请求开始：激活第一次带着待处理指导发出请求时记录指导已经采用，然后记录这次调用尝试开始
+    def request_started(self, transaction: Transaction, request: ModelRequest) -> None:
+        # 请求开始：激活第一次带着待处理指导发出请求时记录指导已经采用，然后记录这次调用尝试开始。
+        # 指导是否已由这次激活采用取自运行状态：同一事务重新判断时结果不变
         scope = self.scope
-        if request.context.manifest.guidance_ids and not self._guidance_applied:
-            self._append(NewEvent(
-                EventType.DEPARTMENT_GUIDANCE_APPLIED, role=scope.department, parent_event_id=scope.parent_event_id,
-                state_before=phase, state_after=phase, session_id=scope.session_id,
+        drafts = []
+        guidance_ids = request.context.manifest.guidance_ids
+        applied = {item.id for item in transaction.projection.department_guidance
+                   if item.applied_activation_id == scope.activation_id}
+        if guidance_ids and not set(guidance_ids) <= applied:
+            drafts.append(self._draft(
+                EventType.DEPARTMENT_GUIDANCE_APPLIED,
                 payload={
-                    "guidance_ids": list(request.context.manifest.guidance_ids),
+                    "guidance_ids": list(guidance_ids),
                     "activation_id": scope.activation_id,
                     "context_event_id": request.context_event_id,
                     "input_version": request.input_version,
                 }))
-            self._guidance_applied = True
         request.attempt_started_at = request.attempt_started_at or utc_now()
-        self._append(NewEvent(
-            EventType.MODEL_REQUESTED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id, provider=scope.provider,
-            context_digest=request.context.manifest.digest,
+        drafts.append(self._draft(
+            EventType.MODEL_REQUESTED, provider=scope.provider, context_digest=request.context.manifest.digest,
             payload={"activation_id": scope.activation_id, "step_id": request.step_id,
                      **scope.versions(),
                      "attempt": request.attempt,
@@ -307,62 +306,57 @@ class StepRecorder:
                      **scope.target,
                      "effective_context_window": request.context.manifest.budget,
                      "max_output_tokens": request.max_output_tokens}))
+        self._record_in(transaction, *drafts)
 
     def stream(self, request: ModelRequest, event: ModelStreamEvent) -> None:
         # 模型调用交回的一条流式输出：序列化请求、解码后的流事件、完整响应、用量或一条输出
-        with self._writes.lock:
-            self._observe(request, _Observation.from_stream(event))
+        self._record(*self._observe(request, _Observation.from_stream(event)))
 
     def response(self, request: ModelRequest, result: ModelResponse) -> None:
         # 调用尝试的结果：每个输出条目写成模型输出，再按这一步报告的用量记账
         provider = result.provider or self.scope.provider
         model = result.model
-        with self._writes.lock:
-            for index, item in enumerate(result.output):
-                content = item.get("content") or []
-                text = "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict)) if isinstance(content, list) else str(content)
-                self._observe(request, _Observation(
-                    str(item.get("id") or f"output-{index}"), "message", item, text,
-                    provider=provider, model=model,
-                ))
-            usage = Usage(**result.usage.model_dump())
-            if not (usage.reported or usage.total_tokens or usage.cost):
-                usage = self._step_usage or Usage(reported=False)
-            self._step_usage = usage
-            self._charge(
-                request,
-                self._previous_usage.plus(usage),
-                provider=provider,
-                model=model,
-                force=bool(result.model) and self._model != result.model,
-                reported=usage.reported,
-            )
+        drafts: list[Draft] = []
+        for index, item in enumerate(result.output):
+            content = item.get("content") or []
+            text = "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict)) if isinstance(content, list) else str(content)
+            drafts.extend(self._observe(request, _Observation(
+                str(item.get("id") or f"output-{index}"), "message", item, text,
+                provider=provider, model=model,
+            )))
+        usage = Usage(**result.usage.model_dump())
+        if not (usage.reported or usage.total_tokens or usage.cost):
+            usage = self._step_usage or Usage(reported=False)
+        self._step_usage = usage
+        drafts.extend(self._charge(
+            request,
+            self._previous_usage.plus(usage),
+            provider=provider,
+            model=model,
+            force=bool(result.model) and self._model != result.model,
+            reported=usage.reported,
+        ))
+        self._record(*drafts)
 
     def tool_called(self, request: ModelRequest, call: dict[str, Any]) -> None:
-        with self._writes.lock:
-            self._observe(request, _Observation(call["id"], "tool", call))
+        self._record(*self._observe(request, _Observation(call["id"], "tool", call)))
 
     def tool_skipped(self, request: ModelRequest, call: dict[str, Any]) -> None:
-        with self._writes.lock:
-            self._observe(request, _Observation(call["id"], "skipped_tool", call))
+        self._record(*self._observe(request, _Observation(call["id"], "skipped_tool", call)))
 
     def attempt_finished(self, request: ModelRequest, response: ModelResponse) -> None:
-        with self._writes.lock:
-            self._attempt_finished(request, response)
+        self._record(self._attempt_finished(request, response))
 
     def attempt_failed(self, request: ModelRequest, error: ProviderError, will_retry: bool) -> None:
         # 失败尝试的发言不进入提交的发言记录；它的输出与工具结果只作为审计证据保留
-        with self._writes.lock:
-            self._attempt_failed(request, error, will_retry)
+        self._record(self._attempt_failed(request, error, will_retry))
 
     def tool_call_required(self, request: ModelRequest, item: dict[str, Any], count: int, limit: int) -> None:
         # 模型回复没有调用工具：主机追加的 user 消息写成事件，进入部门历史
-        with self._writes.lock:
-            self._tool_call_required(request, item, count, limit)
+        self._record(self._tool_call_required(request, item, count, limit))
 
-    def _attempt_finished(self, request: ModelRequest, response: ModelResponse) -> None:
+    def _attempt_finished(self, request: ModelRequest, response: ModelResponse) -> Draft:
         scope = self.scope
-        phase = self._phase()
         finished_at = utc_now()
         duration_ms = _duration_ms(request)
         capture = self._finalize_capture(request)
@@ -409,16 +403,14 @@ class StepRecorder:
             **scope.versions(),
             **scope.target,
         }
-        self._append(NewEvent(
-            EventType.MODEL_ATTEMPT_FINISHED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
+        return self._draft(
+            EventType.MODEL_ATTEMPT_FINISHED,
             provider=provider, model=model or None, context_digest=request.context.manifest.digest,
             artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, capture.stream_ref) if ref],
-            payload=payload))
+            payload=payload)
 
-    def _attempt_failed(self, request: ModelRequest, error: ProviderError, will_retry: bool) -> None:
+    def _attempt_failed(self, request: ModelRequest, error: ProviderError, will_retry: bool) -> Draft:
         scope = self.scope
-        phase = self._phase()
         failed_key = (request.activation_id, request.step_id)
         kept = [(text, key) for text, key in zip(self._messages, self._message_steps) if key != failed_key]
         self._messages = [text for text, _key in kept]
@@ -429,9 +421,8 @@ class StepRecorder:
         status = "cancelled" if error.reason == "cancelled" else "failed"
         safe_error = _redact(str(error), secret=scope.secret)
         safe_diagnostics = _redact(dict(error.diagnostics or {}), secret=scope.secret)
-        self._append(NewEvent(
-            EventType.MODEL_ATTEMPT_FAILED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
+        return self._draft(
+            EventType.MODEL_ATTEMPT_FAILED,
             provider=self._provider or scope.provider, model=self._model,
             context_digest=request.context.manifest.digest, error=safe_error,
             artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, capture.stream_ref) if ref],
@@ -473,29 +464,24 @@ class StepRecorder:
                 "will_retry": will_retry,
                 "diagnostics": safe_diagnostics,
                 **scope.target,
-            }))
+            })
 
-    def _tool_call_required(self, request: ModelRequest, item: dict[str, Any], count: int, limit: int) -> None:
+    def _tool_call_required(self, request: ModelRequest, item: dict[str, Any], count: int, limit: int) -> Draft:
         scope = self.scope
-        phase = self._phase()
         ref = self._artifacts.put(scope.run_id, "tool_call_required", json_dumps(item), media_type="application/json")
-        self._append(NewEvent(
-            EventType.TOOL_CALL_REQUIRED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
-            artifact_hashes=[ref.content_hash],
+        return self._draft(
+            EventType.TOOL_CALL_REQUIRED, artifact_hashes=[ref.content_hash],
             payload={"activation_id": scope.activation_id, "step_id": request.step_id,
                      "attempt_id": request.attempt_id, "context_event_id": request.context_event_id,
                      "purpose": request.purpose, "count": count,
                      "limit": limit, "input_ref": asdict(ref),
-                     **scope.versions(), **scope.work_basis()}))
+                     **scope.versions(), **scope.work_basis()})
 
-    def retry_scheduled(self, phase: str, request: ModelRequest, error: ProviderError, delay: float,
+    def retry_scheduled(self, transaction: Transaction, request: ModelRequest, error: ProviderError, delay: float,
                         next_step_id: int) -> None:
         scope = self.scope
-        self._append(NewEvent(
-            EventType.MODEL_RETRY_SCHEDULED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id, provider=scope.provider,
-            context_digest=request.context.manifest.digest,
+        self._record_in(transaction, self._draft(
+            EventType.MODEL_RETRY_SCHEDULED, provider=scope.provider, context_digest=request.context.manifest.digest,
             payload={
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,
@@ -520,7 +506,7 @@ class StepRecorder:
                 **scope.target,
             }))
 
-    def compaction(self, phase: str, request: ModelRequest, result: CompactionResult,
+    def compaction(self, transaction: Transaction, request: ModelRequest, result: CompactionResult,
                    response: ModelResponse) -> None:
         # 压缩请求的回答生成的检查点：摘要与压缩计划写成工件，检查点写成 compaction_recorded
         scope = self.scope
@@ -529,10 +515,8 @@ class StepRecorder:
                                           media_type="text/plain")
         plan_ref = self._artifacts.put(scope.run_id, "compaction_plan", json_dumps(asdict(plan)),
                                        media_type="application/json")
-        self._append(NewEvent(
-            EventType.COMPACTION_RECORDED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
-            provider=response.provider or scope.provider, model=response.model,
+        self._record_in(transaction, self._draft(
+            EventType.COMPACTION_RECORDED, provider=response.provider or scope.provider, model=response.model,
             context_digest=request.context.manifest.digest,
             artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
             payload={"run_id": scope.run_id, "department": scope.department,
@@ -546,13 +530,12 @@ class StepRecorder:
                      **scope.target,
                      "previous_compaction_event_id": result.previous_compaction_event_id}))
 
-    def tool_started(self, phase: str, request: ModelRequest, call: dict[str, Any],
+    def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
                      command_basis: dict[str, Any]) -> None:
         # 工具许可允许以后、执行之前记录；登记命令带着许可时的执行依据
         scope = self.scope
-        self._append(NewEvent(
-            EventType.TOOL_STARTED, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
+        self._record_in(transaction, self._draft(
+            EventType.TOOL_STARTED,
             payload={**call, "activation_id": request.activation_id,
                      "attempt_id": request.attempt_id,
                      "logical_call_id": request.logical_call_id,
@@ -563,11 +546,24 @@ class StepRecorder:
                      **scope.work_basis(),
                      **command_basis}))
 
-    def _append(self, event: NewEvent):
-        return self._writes.append(self.scope.run_id, event)[0]
+    def _draft(self, type: str, **fields: Any) -> Draft:
+        # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入
+        scope = self.scope
+        return lambda phase: NewEvent(type, state_before=phase, state_after=phase, role=scope.department,
+                                      parent_event_id=scope.parent_event_id, session_id=scope.session_id, **fields)
 
-    def _phase(self) -> str:
-        return project_run(self._store, self.scope.run_id).phase
+    def _record(self, *drafts: Draft) -> list[Event]:
+        # 在写入口开一个事务追加一次调用的全部记录
+        if not drafts:
+            return []
+        return self._writes.transact(run_stream(self.scope.run_id),
+                                     lambda transaction: self._record_in(transaction, *drafts))
+
+    @staticmethod
+    def _record_in(transaction: Transaction, *drafts: Draft) -> list[Event]:
+        # 在调用方的事务中追加记录，阶段取这个事务中的运行状态
+        phase = transaction.projection.phase
+        return transaction.append(*(draft(phase) for draft in drafts))
 
     def _capture(self, request: ModelRequest) -> _AttemptCapture:
         capture = self._captures.get(request.attempt_id)
@@ -593,15 +589,15 @@ class StepRecorder:
             capture.close()
         return capture
 
-    def _observe(self, request: ModelRequest, observation: _Observation) -> None:
+    def _observe(self, request: ModelRequest, observation: _Observation) -> list[Draft]:
+        # 一条观察要追加的记录；工件在这里写好，累计状态在这里更新
         scope = self.scope
         if observation.kind != "stream_event":
             key = (f"{request.attempt_id or request.step_id}:{observation.kind}", observation.id)
             if key in self._seen:
-                return
+                return []
             self._seen.add(key)
         if observation.kind == "request":
-            phase = self._phase()
             if not isinstance(observation.payload, dict):
                 raise ProviderError("Serialized provider request is not a JSON object", reason="provider_protocol")
             ref = self._artifacts.put(
@@ -628,12 +624,10 @@ class StepRecorder:
                 **scope.versions(),
                 **scope.target,
             }
-            self._append(NewEvent(
-                EventType.MODEL_REQUEST_SERIALIZED, role=scope.department, parent_event_id=scope.parent_event_id,
-                state_before=phase, state_after=phase, session_id=scope.session_id, provider=scope.provider,
+            return [self._draft(
+                EventType.MODEL_REQUEST_SERIALIZED, provider=scope.provider,
                 context_digest=request.context.manifest.digest, artifact_hashes=[ref.content_hash],
-                payload=payload))
-            return
+                payload=payload)]
         if observation.provider:
             self._provider = observation.provider
         if observation.model:
@@ -657,8 +651,7 @@ class StepRecorder:
                     capture.actual_model = nested_model.strip()
             observed_at = utc_now()
             capture.add_stream_event(observation.sequence, observation.payload, observed_at)
-            self._stream_progress(request, capture, observation, observed_at)
-            return
+            return self._stream_progress(request, capture, observation, observed_at)
         if observation.kind == "response":
             if not isinstance(observation.payload, dict):
                 raise ProviderError("Provider response is not a JSON object", reason="provider_protocol")
@@ -676,41 +669,40 @@ class StepRecorder:
             capture.provider_response_id = (
                 observation.payload.get("id") if isinstance(observation.payload.get("id"), str) else observation.id
             )
-            return
+            return []
         if observation.kind == "usage":
-            if observation.usage is not None:
-                capture = self._capture(request)
-                safe_usage = _redact(observation.payload, secret=scope.secret)
-                ref = self._artifacts.put(scope.run_id, "model_usage", json_dumps(safe_usage),
-                                          media_type="application/json")
-                self._raw_usage_ref = asdict(ref)
-                capture.usage = observation.usage
-                capture.usage_ref = asdict(ref)
-                has_usage = bool(
-                    observation.usage.reported
-                    or observation.usage.total_tokens
-                    or observation.usage.cost
-                )
-                if has_usage:
-                    self._step_usage = observation.usage
-                    usage = self._previous_usage.plus(observation.usage)
-                else:
-                    usage = self._usage if self._has_usage else Usage(reported=False)
-                self._charge(
-                    request,
-                    usage,
-                    provider=provider,
-                    model=model,
-                    force=bool(observation.model),
-                    reported=(observation.usage.reported if has_usage else False),
-                )
-            return
-        phase = self._phase()
+            if observation.usage is None:
+                return []
+            capture = self._capture(request)
+            safe_usage = _redact(observation.payload, secret=scope.secret)
+            ref = self._artifacts.put(scope.run_id, "model_usage", json_dumps(safe_usage),
+                                      media_type="application/json")
+            self._raw_usage_ref = asdict(ref)
+            capture.usage = observation.usage
+            capture.usage_ref = asdict(ref)
+            has_usage = bool(
+                observation.usage.reported
+                or observation.usage.total_tokens
+                or observation.usage.cost
+            )
+            if has_usage:
+                self._step_usage = observation.usage
+                usage = self._previous_usage.plus(observation.usage)
+            else:
+                usage = self._usage if self._has_usage else Usage(reported=False)
+            return self._charge(
+                request,
+                usage,
+                provider=provider,
+                model=model,
+                force=bool(observation.model),
+                reported=(observation.usage.reported if has_usage else False),
+            )
         if observation.kind in {"tool", "skipped_tool"}:
             payload = _redact(dict(observation.payload), secret=scope.secret)
             tool_id = f"{request.step_id}:{payload.get('id') or observation.id}"
             if tool_id in self._tool_ids:
-                return
+                return []
             self._tool_ids.add(tool_id)
             output = payload.pop("output", None)
             if output is not None:
@@ -748,17 +740,16 @@ class StepRecorder:
         payload.update(scope.work_basis())
         payload.update(scope.versions())
         payload.update(scope.target)
-        self._append(NewEvent(
-            event_type, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
-            provider=provider, model=model, payload=payload))
+        drafts = [self._draft(event_type, provider=provider, model=model, payload=payload)]
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):
             self._step_usage = observation.usage
-            self._charge(request, self._previous_usage.plus(observation.usage), provider=provider, model=model)
+            drafts.extend(self._charge(request, self._previous_usage.plus(observation.usage), provider=provider,
+                                       model=model))
+        return drafts
 
     def _stream_progress(self, request: ModelRequest, capture: _AttemptCapture, observation: _Observation,
-                         observed_at: str) -> None:
+                         observed_at: str) -> list[Draft]:
         # 流式进度：同一次调用尝试中阶段改变或距上一条 0.25 秒以后才记录一条
         scope = self.scope
         payload = observation.payload
@@ -772,12 +763,10 @@ class StepRecorder:
         due = capture.progress_last_emitted_monotonic is None or now - capture.progress_last_emitted_monotonic >= 0.25
         capture.progress_stage = stage
         if not changed and not due:
-            return
+            return []
         capture.progress_last_emitted_monotonic = now
-        phase = self._phase()
-        self._append(NewEvent(
-            EventType.MODEL_STREAM_PROGRESS, role=scope.department, parent_event_id=scope.parent_event_id,
-            state_before=phase, state_after=phase, session_id=scope.session_id,
+        return [self._draft(
+            EventType.MODEL_STREAM_PROGRESS,
             provider=self._provider or scope.provider, model=observation.model or self._model,
             context_digest=request.context.manifest.digest,
             payload={
@@ -799,10 +788,10 @@ class StepRecorder:
                 "first_output_at": capture.first_output_at,
                 "summary": _stream_progress_summary(payload),
                 **scope.versions(),
-            }))
+            })]
 
     def _charge(self, request: ModelRequest, usage: Usage, *, provider: str, model: str | None,
-                force: bool = False, reported: bool | None = None) -> None:
+                force: bool = False, reported: bool | None = None) -> list[Draft]:
         # 用量按激活累计，每条记录带着相对上一条的增量；增量为零且不是第一条时不记录
         scope = self.scope
         token_delta = usage.total_tokens - self._tokens_charged
@@ -812,30 +801,28 @@ class StepRecorder:
         self._usage = usage
         self._tokens_charged = usage.total_tokens
         self._cost_charged = usage.cost
-        phase = self._phase()
-        if first or token_delta or cost_delta or force:
-            self._append(NewEvent(
-                EventType.TOOL_CALLED, role=scope.department, parent_event_id=scope.parent_event_id,
-                state_before=phase, state_after=phase, session_id=scope.session_id,
-                provider=provider, model=model,
-                payload={
-                    "name": "provider_usage", "ok": True,
-                    **scope.versions(),
-                    "activation_id": request.activation_id,
-                    "step_id": request.step_id,
-                    "purpose": request.purpose,
-                    "accounting": "activation_total_with_charge_delta",
-                    "scope": "observable_main_dialogue",
-                    "source": "reported" if (usage.reported if reported is None else reported) else "unreported",
-                    "cost_reported": usage.cost_reported,
-                    "raw_usage_ref": self._raw_usage_ref,
-                    "tokens_charged": token_delta,
-                    "total_tokens": usage.total_tokens,
-                    "input_tokens": usage.input_tokens,
-                    "cache_read_tokens": usage.cache_read_tokens,
-                    "cache_write_tokens": usage.cache_write_tokens,
-                    "input_total_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
-                    "output_tokens": usage.output_tokens,
-                    "cost": cost_delta, "total_cost": usage.cost,
-                    **scope.target,
-                }))
+        if not (first or token_delta or cost_delta or force):
+            return []
+        return [self._draft(
+            EventType.TOOL_CALLED, provider=provider, model=model,
+            payload={
+                "name": "provider_usage", "ok": True,
+                **scope.versions(),
+                "activation_id": request.activation_id,
+                "step_id": request.step_id,
+                "purpose": request.purpose,
+                "accounting": "activation_total_with_charge_delta",
+                "scope": "observable_main_dialogue",
+                "source": "reported" if (usage.reported if reported is None else reported) else "unreported",
+                "cost_reported": usage.cost_reported,
+                "raw_usage_ref": self._raw_usage_ref,
+                "tokens_charged": token_delta,
+                "total_tokens": usage.total_tokens,
+                "input_tokens": usage.input_tokens,
+                "cache_read_tokens": usage.cache_read_tokens,
+                "cache_write_tokens": usage.cache_write_tokens,
+                "input_total_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
+                "output_tokens": usage.output_tokens,
+                "cost": cost_delta, "total_cost": usage.cost,
+                **scope.target,
+            })]

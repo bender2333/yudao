@@ -6,6 +6,7 @@ import pytest
 
 import harness.interactions as interactions
 from harness.adapters.fake import FakeAdapter
+from harness.event_store import run_stream
 from harness.write_path import NewEvent
 from harness.git_versions import GitVersionError
 from harness.models import EventType, GIT_VERSION_EVENTS
@@ -38,11 +39,11 @@ def _commit_spec(system, run_id, proposal):
     decision = evaluate_proposal(phase=projection.phase, department="product", projection=projection,
                                  facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
     assert decision.accepted, decision.error_dicts
-    return system.orchestrator.submissions.commit(
-        projection=projection, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
+    return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+        transaction, projection=projection, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
         artifact=decision.artifact, department="product", parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake",
-    )
+    ))
 
 
 def test_new_input_and_requirement_diff_form_one_accepted_history_through_redelivery(tmp_path):
@@ -163,7 +164,7 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     system.activate_once(run_id)
     received = system.add_input(run_id, "Print uppercase")
     # 新输入交给产品工作（与激活开始时流程编排写入的事件相同），产品规格的修订才能接纳
-    system.orchestrator.writes.append(run_id, NewEvent(
+    system.writes.append(run_stream(run_id), NewEvent(
         EventType.PRODUCT_INPUT_ASSIGNED, role="product", state_before=received.phase, state_after="PRODUCT_SPEC",
         payload={"through_version": received.input_version}))
     before = system.project(run_id)
@@ -231,7 +232,7 @@ def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("build echo")
     before = system.project(run_id)
-    system.orchestrator.writes.append(run_id, NewEvent(
+    system.writes.append(run_stream(run_id), NewEvent(
         EventType.MODEL_MESSAGE, role="product", state_before=before.phase, state_after=before.phase,
         payload={"git_version": {"commit": "unaccepted"}}))
     after = system.project(run_id)

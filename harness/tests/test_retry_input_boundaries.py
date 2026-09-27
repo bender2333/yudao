@@ -39,13 +39,14 @@ def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_
     assert len(failed) == 1 and failed[0].payload["will_retry"] is False
 
 
-def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeypatch):
+def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
+    # 重试等待 30 秒：新输入在等待中提交，等待立即结束，这次激活不再重试
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
-                                    step_limits=StepLimits(retry_initial_delay_sec=0.2, retry_max_delay_sec=0.2))
+                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
     run_id = system.create_run("original task")
-    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(5)
@@ -64,14 +65,14 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize("action", ["input", "guidance"])
-def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path, monkeypatch, action):
+def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path, action):
     # 重试等待 30 秒；等待期间到达的新输入或指导使激活立即回到安全节点并停止，不等到间隔结束
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
                                     step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
     run_id = system.create_run("original task")
-    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(5)
@@ -93,14 +94,14 @@ class _CancelFailsAdapter(FakeAdapter):
         raise RuntimeError("the model adapter could not cancel the attempt")
 
 
-def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(tmp_path, monkeypatch):
+def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(tmp_path):
     # 取消时模型接入取消调用尝试出错：错误交给取消的调用方，重试等待仍然立即醒来，不再重试
     scheduled = Event()
     adapter = _CancelFailsAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
                                     step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
     run_id = system.create_run("original task")
-    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(5)
@@ -130,7 +131,7 @@ def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
 
 
 @pytest.mark.parametrize("action", ["input", "cancel"])
-def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, monkeypatch, action):
+def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, action):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("original task")
@@ -143,7 +144,7 @@ def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, 
         else:
             system.cancel(run_id)
 
-    after_event(monkeypatch, system, EventType.MODEL_ATTEMPT_FAILED, interleave)
+    after_event(system, EventType.MODEL_ATTEMPT_FAILED, interleave)
     result = system.activate_once(run_id)
 
     events = system.store.list_events(run_id)

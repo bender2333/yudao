@@ -147,12 +147,12 @@ def test_nonretryable_provider_error_is_never_retried(tmp_path, reason):
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
 
 
-def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path, monkeypatch):
+def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path):
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(retry_initial_delay_sec=5.0))
     run_id = system.create_run("echo")
-    after_event(monkeypatch, system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(3)

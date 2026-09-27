@@ -1,19 +1,17 @@
 # 写入口：所有领域写入唯一的入口。流程编排、步骤驱动的记录、提交、交互与项目服务写入事件都经过这里。
 # 一次写入是一个事务（transact）：读取流保存的投影与流版本，由调用方判断并追加事件，提交时在同一个数据库事务中
 # 核对流版本、执行权编号与命令身份，追加事件并更新保存的投影；提交以后事件日志通知订阅方。
-# 判断期间不持有锁：另一方在读取以后写入了同一个流时，提交因版本不符被拒绝，调用方按写入以后的状态重新判断。
-# lock 是「读取运行状态、判断、追加」期间持有的锁，#44 以 transact 代替它
+# 判断期间不持有锁：另一方在读取以后写入了同一个流时，提交因版本不符被拒绝，调用方按写入以后的状态重新判断；
+# 互斥由提交时的版本核对与数据库的写入事务完成，不依赖线程身份，也没有调用方在另一方的判断期间等待。
 
 from __future__ import annotations
 
 import json
-import threading
 from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, TypeVar
 
-from .event_store import Command, EventStore, SavedProjection, StreamVersionConflict, is_run_stream, project_stream, \
-    run_stream
+from .event_store import Command, EventStore, SavedProjection, StreamVersionConflict, is_run_stream
 from .models import DEPARTMENTS, Event, ProjectEvent, json_dumps, new_id, utc_now
 from .projection import Projection, dump_projection, empty_projection, fold, load_projection, replay
 
@@ -74,15 +72,15 @@ class Transaction(Snapshot):
         self._compensations: list[Callable[[], None]] = []
 
     def append(self, *entries: NewEvent | NewProjectEvent) -> list[Any]:
-        events = []
-        for entry in entries:
-            event = _event(self.stream, entry, self.version + len(self.appended) + 1)
+        # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影
+        first = self.version + len(self.appended) + 1
+        events = [_event(self.stream, entry, first + offset) for offset, entry in enumerate(entries)]
+        for event in events:
             fold(self.projection, event)
             if isinstance(event, Event):
                 # run 所属的项目与事项取自它的 run_created 事件
                 event.project_id, event.work_item_id = self.projection.project_id, self.projection.work_item_id
             self.appended.append(event)
-            events.append(event)
         return events
 
     def events(self) -> list[Any]:
@@ -100,7 +98,6 @@ class Transaction(Snapshot):
 class WritePath:
     def __init__(self, store: EventStore) -> None:
         self._store = store
-        self.lock = threading.RLock()
 
     def read(self, stream: str) -> Snapshot:
         # 读取流保存的投影与流版本，用于之后以这个版本作为期望版本提交的判断
@@ -135,14 +132,11 @@ class WritePath:
                 raise
             return result
 
-    def append(self, run_id: str, *events: NewEvent) -> list[Event]:
-        with self.lock:
-            return self.transact(run_stream(run_id), lambda transaction: transaction.append(*events))
-
-    def append_project(self, project_id: str, type: str, payload: dict[str, Any] | None = None) -> ProjectEvent:
-        with self.lock:
-            return self.transact(project_stream(project_id), lambda transaction: transaction.append(
-                NewProjectEvent(type, dict(payload or {}))))[0]
+    def append(self, stream: str, *entries: NewEvent | NewProjectEvent, expected_version: int | None = None,
+               epoch: int | None = None) -> list[Any]:
+        # 不需要读取投影作判断的追加
+        return self.transact(stream, lambda transaction: transaction.append(*entries),
+                             expected_version=expected_version, epoch=epoch)
 
     def rebuild(self, stream: str) -> Projection:
         # 从这个流的第一条事件重放投影，替换保存的投影

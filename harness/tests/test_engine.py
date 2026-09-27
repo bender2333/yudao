@@ -9,7 +9,7 @@ from harness.proposals import collaboration_request, delivery_turn, plan_turn, p
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (FAST_RETRIES, WAIT_FOR_RELEASE, after_event, recorded_context,
-                                   start_waiting_for_writes, wait_for_file)
+                                   from_another_thread, wait_for_file)
 from harness.tests.protocol_helpers import complete, model_call
 
 
@@ -104,20 +104,19 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
     assert tool.payload["output_ref"]
 
 
-def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path, monkeypatch):
-    # 请求装配完成以后，另一个线程取消运行：取消在开始请求之前取得写入锁，这一步不开始模型调用
+def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path):
+    # 请求装配完成以后，另一个线程取消运行：取消在开始请求之前提交，这一步不开始模型调用
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     cancelled = []
     waiting = []
-    after_event(monkeypatch, system, EventType.CONTEXT_ASSEMBLED, lambda _event: waiting.append(
-        start_waiting_for_writes(lambda: cancelled.append(system.cancel(run_id).stop_reason))))
+    after_event(system, EventType.CONTEXT_ASSEMBLED, lambda _event: waiting.append(
+        from_another_thread(lambda: cancelled.append(system.cancel(run_id).stop_reason))))
 
     result = system.activate_once(run_id)
 
     [canceller] = waiting
-    canceller.join()
     assert not canceller.errors
     assert cancelled == ["cancelled"]
     assert result.stop_reason == "cancelled"
@@ -193,14 +192,14 @@ def test_cancel_stops_the_running_command_and_does_not_start_following_tool(tmp_
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path, monkeypatch):
-    # 工具许可已经允许、动作还没有开始时取消到达（在写下 tool_started 的时点、写入方的线程中取消）：进程不启动
+def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
+    # 工具许可已经允许、动作还没有开始时取消到达（在 tool_started 提交的时点、写入方的线程中取消）：进程不启动
     signals = tmp_path / "signals"
     signals.mkdir()
     registry = {"wait": {"argv": ["python", "-c", WAIT_FOR_RELEASE, str(signals)], "args": [],
                          "timeout_sec": 60, "output_limit": 4000}}
     system, run_id = _command_run(tmp_path, registry, [ModelResponse(output=[_command_call("command-1", "wait")])])
-    after_event(monkeypatch, system, EventType.TOOL_STARTED, lambda _event: system.cancel(run_id))
+    after_event(system, EventType.TOOL_STARTED, lambda _event: system.cancel(run_id))
     result = system.activate_once(run_id)
     assert result.stop_reason == "cancelled"
     assert not (signals / "started").exists()
