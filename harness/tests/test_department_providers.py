@@ -250,15 +250,16 @@ def _facade(
     product_context_window: int = 20_000,
     product_provider: str = "provider-a",
     credentials: dict | None = None,
+    timeout_sec: float = 10,
 ) -> ProviderFacade:
     product_model_id = "model-a-product" if product_provider == "provider-a" else "model-b-product"
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store_document({
         "providers": [
             {"id": "provider-a", "name": "Provider A", "base_url": product_url,
-             "credential_ref": "credential-a", "timeout_sec": 10},
+             "credential_ref": "credential-a", "timeout_sec": timeout_sec},
             {"id": "provider-b", "name": "Provider B", "base_url": engineering_url,
-             "credential_ref": "credential-b", "timeout_sec": 10},
+             "credential_ref": "credential-b", "timeout_sec": timeout_sec},
         ],
         "models": [
             {"id": "model-a-product", "provider_id": "provider-a", "model": "a-product",
@@ -485,14 +486,19 @@ def test_provider_credentials_are_frozen_per_run_and_rotated_for_new_runs(tmp_pa
 
 
 def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
+    # 两个运行共用 Provider 适配器：要取消的运行的请求一直保持，另一个运行在这期间完成激活；
+    # 之后取消要取消的运行，再释放请求。等待上限只用来防止测试一直等待，远大于正常用时，请求时限同样放宽
+    wait_limit_sec = 120
     entered_cancel = Event()
     release_cancel = Event()
+    replied_cancel = Event()
 
     def shared(body: dict[str, Any], _count: int) -> _Reply:
         task = body["input"][0]["content"]
         if "cancel-me" in task:
             entered_cancel.set()
-            release_cancel.wait(5)
+            release_cancel.wait(wait_limit_sec)
+            replied_cancel.set()
             return _error()
         payload = product_spec()
         payload.pop("kind")
@@ -502,7 +508,7 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
     with _provider_server("provider-a", "provider-a-key", shared) as (config_a, captures_a, errors_a), \
             _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
         system = LoopSystem(tmp_path, facade=_facade(
-            config_a.base_url, config_b.base_url, credentials={
+            config_a.base_url, config_b.base_url, timeout_sec=wait_limit_sec, credentials={
                 "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
                 "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
             }))
@@ -511,11 +517,16 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
         with ThreadPoolExecutor(max_workers=2) as pool:
             cancelled_future = pool.submit(system.activate_once, cancel_run)
             successful_future = pool.submit(system.activate_once, other_run)
-            assert entered_cancel.wait(3)
-            successful = successful_future.result(timeout=5)
-            cancelled = system.cancel(cancel_run)
-            release_cancel.set()
-            cancelled_result = cancelled_future.result(timeout=5)
+            try:
+                assert entered_cancel.wait(wait_limit_sec)
+                successful = successful_future.result(timeout=wait_limit_sec)
+                # 另一个运行完成激活时，要取消的运行的请求仍被保持，它的激活仍在等待回复
+                assert not replied_cancel.is_set()
+                assert not cancelled_future.done()
+                cancelled = system.cancel(cancel_run)
+            finally:
+                release_cancel.set()
+            cancelled_result = cancelled_future.result(timeout=wait_limit_sec)
 
         assert not errors_a
         assert successful.phase == "ENGINEERING"
