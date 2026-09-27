@@ -12,14 +12,15 @@ import pytest
 
 from harness.artifacts import ArtifactStore
 from harness.adapters.base import Availability, ProviderError
+from harness.event_store import EventStore
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, Usage
-from harness.observability import ObservabilityQuery, _detail_events, _usage_totals
+from harness.observability import ObservabilityQuery
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
-from harness.tests.test_responses import _server, _stream, _submit_stream
+from harness.tests.test_responses import _event, _response, _send, _server, _stream, _submit_stream
 from harness.web.server import serve
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.proposals import product_spec
@@ -101,30 +102,67 @@ def test_stream_artifact_cleanup_closes_temp_file_before_cleanup(tmp_path: Path)
     assert not list((tmp_path / "artifacts" / "run").glob(".stream-*"))
 
 
+def _submit_call() -> dict:
+    proposal = product_spec()
+    proposal.pop("kind")
+    return {"id": "fc-submit", "type": "function_call", "name": "submit_product_spec", "call_id": "call-submit",
+            "arguments": json.dumps(proposal), "status": "completed"}
+
+
+def _usage_query(tmp_path: Path) -> ObservabilityQuery:
+    return ObservabilityQuery(EventStore(tmp_path / "events.sqlite"), ArtifactStore(tmp_path / "artifacts"))
+
+
 def test_invalid_usage_numbers_are_unknown_in_queries(tmp_path: Path):
-    query = ObservabilityQuery(
-        LoopSystem.for_testing(tmp_path, FakeAdapter([])).store,
-        ArtifactStore(tmp_path / "artifacts"),
-    )
-    normalized = query._attempt_usage("run", {
-        "raw_usage_ref": None,
-        "usage_summary": {
-            "input_tokens": -1,
-            "output_tokens": 1.5,
-            "cache_read_tokens": math.inf,
-            "cache_write_tokens": 0,
-            "total_tokens": -3,
-            "cost": -0.1,
-        },
-        "duration_ms": -4,
-    })
+    # 模型提供方上报的用量中的负数、小数与无穷大在查询中都是未知，0 保持为 0
+    raw_usage = {
+        "input_tokens": -1,
+        "output_tokens": 1.5,
+        "total_tokens": -3,
+        "input_tokens_details": {"cached_tokens": math.inf, "cache_write_tokens": 0},
+        "cost": -0.1,
+        "currency": "CNY",
+    }
+    with _server([_stream([_submit_call()], usage=raw_usage, response_id="resp-invalid-usage")]) as (config, *_):
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        run_id = system.create_run("invalid usage numbers")
+        system.activate_once(run_id)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert row["status"] == "success"
+    # 保存的原始用量保留提供方上报的数值
+    raw_ref = query.model_attempt_detail(run_id, row["id"])["artifact_refs"]["usage"]
+    raw = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**raw_ref)))["usage"]
+    assert (raw["input_tokens"], raw["output_tokens"], raw["total_tokens"], raw["cost"]) == (-1, 1.5, -3, -0.1)
+    normalized = row["usage"]
+    assert normalized["source"] == "reported"
     assert normalized["input_tokens"] is None
     assert normalized["output_tokens"] is None
     assert normalized["cache_read_tokens"] is None
     assert normalized["cache_write_tokens"] == 0
     assert normalized["total_tokens"] is None
     assert normalized["cost"] is None
-    assert normalized["latency_ms"] is None
+
+
+def test_invalid_usage_numbers_in_saved_usage_summaries_are_unknown(tmp_path: Path):
+    # 没有原始用量时按事件中保存的用量摘要读取：负数同样是未知，0 保持为 0
+    usage = Usage(input_tokens=-1, output_tokens=-2, total_tokens=-3, cost=-0.1, cost_reported=True)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([FakeTurn(proposal=product_spec(), usage=usage)]))
+    run_id = system.create_run("negative usage summary")
+    system.activate_once(run_id)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    assert query.model_attempt_detail(run_id, row["id"])["artifact_refs"]["usage"] is None
+    normalized = row["usage"]
+    assert normalized["source"] == "reported"
+    assert normalized["input_tokens"] is None
+    assert normalized["output_tokens"] is None
+    assert normalized["total_tokens"] is None
+    assert normalized["cost"] is None
+    assert normalized["cache_read_tokens"] == 0
+    assert normalized["cache_write_tokens"] == 0
 
 
 def test_cancelled_attempt_is_independently_filterable(tmp_path: Path):
@@ -224,44 +262,41 @@ def test_unreported_normalized_usage_keeps_unknown_source_and_is_excluded_from_p
     assert summary["totals"]["total_tokens"] is None
     assert summary["estimated_totals"]["total_tokens"] is None
 
-    estimated = query._attempt_usage(run_id, {
-        "raw_usage_ref": None,
-        "usage_summary": {"total_tokens": 9, "reported": False, "source": "estimated"},
-        "duration_ms": None,
-    })
-    assert estimated["source"] == "estimated"
-    assert estimated["total_tokens"] == 9
-    estimated_totals = _usage_totals([{"status": "completed", "usage": estimated}], source="estimated")
-    assert estimated_totals["total_tokens"] == 9
+    # 估计的用量单独合计，不计入上报的合计
+    estimated = query.usage_summary([
+        {"sent": True, "status": "completed", "usage": {"source": "estimated", "reported": False, "total_tokens": 9}},
+    ])
+    assert estimated["estimated_totals"]["total_tokens"] == 9
+    assert estimated["totals"]["total_tokens"] is None
 
 
-def test_usage_totals_reported_cost_sums_same_currency():
-    total = _usage_totals([
-        {"status": "completed", "usage": {"source": "reported", "cost": 1.25, "currency": "CNY"}},
-        {"status": "completed", "usage": {"source": "reported", "cost": 2.75, "currency": "CNY"}},
-    ], source="reported")
-    assert total["cost"] == 4.0
-    assert total["currency"] == "CNY"
-    assert total["cost_status"] == "reported"
+def test_usage_totals_reported_cost_sums_same_currency(tmp_path: Path):
+    summary = _usage_query(tmp_path).usage_summary([
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "cost": 1.25, "currency": "CNY"}},
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "cost": 2.75, "currency": "CNY"}},
+    ])
+    assert summary["totals"]["cost"] == 4.0
+    assert summary["currency"] == "CNY"
+    assert summary["cost_status"] == "reported"
 
 
-def test_usage_totals_mixed_currency_leaves_cost_null():
-    total = _usage_totals([
-        {"status": "completed", "usage": {"source": "reported", "cost": 1, "currency": "CNY"}},
-        {"status": "completed", "usage": {"source": "reported", "cost": 2, "currency": "USD"}},
-    ], source="reported")
-    assert total["cost"] is None
-    assert total["currency"] is None
-    assert total["cost_status"] == "mixed_currency"
+def test_usage_totals_mixed_currency_leaves_cost_null(tmp_path: Path):
+    summary = _usage_query(tmp_path).usage_summary([
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "cost": 1, "currency": "CNY"}},
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "cost": 2, "currency": "USD"}},
+    ])
+    assert summary["totals"]["cost"] is None
+    assert summary["currency"] is None
+    assert summary["cost_status"] == "mixed_currency"
 
 
-def test_usage_totals_missing_cost_is_not_zero():
-    total = _usage_totals([
-        {"status": "completed", "usage": {"source": "reported", "input_tokens": 4}},
-        {"status": "completed", "usage": {"source": "reported", "output_tokens": 2}},
-    ], source="reported")
-    assert total["cost"] is None
-    assert total["cost_status"] == "missing"
+def test_usage_totals_missing_cost_is_not_zero(tmp_path: Path):
+    summary = _usage_query(tmp_path).usage_summary([
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "input_tokens": 4}},
+        {"sent": True, "status": "completed", "usage": {"source": "reported", "output_tokens": 2}},
+    ])
+    assert summary["totals"]["cost"] is None
+    assert summary["cost_status"] == "missing"
 
 
 def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):
@@ -302,32 +337,56 @@ def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):
     assert sum(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id)) == 1
 
 
-def test_legacy_stream_events_keep_unknown_time_and_provider_sequence():
-    events = _detail_events([], [{"sequence": 7, "event": {"type": "response.created"}}])
-    assert events == [{
-        "event_id": None,
-        "time": None,
-        "type": "response.created",
-        "summary": "response.created",
-        "raw": {"type": "response.created"},
-        "source": "sdk_decoded_stream",
-        "event_group": "provider_stream",
-        "sequence": 7,
-        "sequence_source": "provider",
-        "observed_at": None,
-    }]
+def test_stream_events_keep_provider_order_and_type_in_attempt_detail(tmp_path: Path):
+    # 调用尝试详情中的提供方流事件按提供方送出的先后编号，类型与原文取自事件本身，时间是收到事件的时刻
+    with _server([_submit_stream()]) as (config, *_):
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        run_id = system.create_run("stream order")
+        system.activate_once(run_id)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    events = [item for item in query.model_attempt_detail(run_id, row["id"])["events"]
+              if item["source"] == "sdk_decoded_stream"]
+    assert [item["type"] for item in events] == ["response.created", "response.output_item.done", "response.completed"]
+    assert [item["sequence"] for item in events] == [0, 1, 2]
+    for item in events:
+        assert item["event_id"] is None
+        assert item["summary"] == item["type"] == item["raw"]["type"]
+        assert item["event_group"] == "provider_stream"
+        assert item["sequence_source"] == "provider"
+        assert item["observed_at"] is not None
+        assert item["time"] == item["observed_at"]
 
 
 def test_sdk_json_observation_redacts_configured_credential(tmp_path: Path):
-    from harness.providers.responses import _redact_sdk_json
+    # 提供方回复中的凭据原文与敏感键（headers）在保存的 SDK JSON 与流事件中都被替换
+    def reply(handler, _body):
+        response = _response([_submit_call()], response_id="resp-redacted", error={
+            "code": "server_error", "message": f"failed with {config.api_key}",
+            "headers": {"authorization": config.api_key},
+        })
+        _send(handler, b"".join([
+            _event("response.created", response={**response, "status": "in_progress", "output": [], "usage": None},
+                   sequence_number=0),
+            _event("response.output_item.done", item=response["output"][0], output_index=0, sequence_number=1),
+            _event("response.completed", response=response, sequence_number=2),
+        ]))
 
-    secret = "credential-sentinel"
-    payload = _redact_sdk_json(
-        {"error": {"message": f"failed with {secret}", "headers": {"authorization": secret}}, "text": secret},
-        secrets=(secret,),
-    )
-    assert secret not in json.dumps(payload)
-    assert payload["error"]["headers"] == "[REDACTED]"
+    with _server([reply]) as (config, *_):
+        system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
+        run_id = system.create_run("redacted sdk json")
+        system.activate_once(run_id)
+
+    query = ObservabilityQuery(system.store, system.artifacts)
+    row = query.list_model_attempts(run_id)["items"][0]
+    detail = query.model_attempt_detail(run_id, row["id"])
+    assert config.api_key not in json.dumps(detail, ensure_ascii=False)
+    assert detail["response"]["error"]["headers"] == "[REDACTED]"
+    assert detail["response"]["error"]["message"] == "failed with [REDACTED]"
+    stream_ref = detail["artifact_refs"]["events"]
+    stream_text = system.artifacts.get_for_run(run_id, ArtifactRef(**stream_ref)).decode("utf-8")
+    assert config.api_key not in stream_text
 
 
 def test_sse_response_message_and_stream_artifacts_are_redacted_end_to_end(tmp_path: Path):
@@ -337,7 +396,6 @@ def test_sse_response_message_and_stream_artifacts_are_redacted_end_to_end(tmp_p
         "id": "fc-secret-submit", "type": "function_call", "name": "submit_product_spec",
         "call_id": "call-secret-submit", "arguments": json.dumps(proposal), "status": "completed",
     }
-    from harness.tests.test_responses import _send
 
     def reply(handler, _body):
         secret_message = {"id": "msg-secret", "type": "message", "role": "assistant",

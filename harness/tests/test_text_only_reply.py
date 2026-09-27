@@ -12,7 +12,7 @@ from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.smoke import _model_input_audit
+from harness.smoke import isolation_fields
 from harness.tests.helpers import department_history, list_files_turn
 
 # 连续没有调用工具的回复最多追加说明的次数，取自定义
@@ -43,7 +43,7 @@ def _events(system, run_id, event_type):
 
 def _assert_replayable(system, run_id, result):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
-    audit = _model_input_audit(system.store, system.artifacts, run_id)
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit["notes"]
 
 

@@ -112,37 +112,29 @@ def test_no_config_start(tmp_path):
 # 2. CLI 默认命令
 # ---------------------------------------------------------------------------
 
-def test_cli_default_command(tmp_path, monkeypatch):
-    """无参调用 main([]) -> 返回 0，_serve 被调用一次，host=127.0.0.1 port=8765，
-    创建的 system 报告空态而不崩溃。"""
-    import harness.__main__ as cli_mod
+def test_cli_default_command(tmp_path, monkeypatch, capsys):
+    # 不写子命令时启动控制台。默认端口是 8765；只给端口时，地址是 127.0.0.1，数据目录与模型目录取当前目录的
+    # .yudao 下的默认位置；没有模型目录时以空态启动，停止时正常退出
+    from harness.__main__ import build_parser
+    from harness.tests.console_helpers import run_console
+    from harness.tests.test_provider_config_web import get_json
 
-    # 设置默认路径指向临时目录
-    monkeypatch.setattr(cli_mod, "DEFAULT_DIR", tmp_path / "native-loop")
-    monkeypatch.setattr(cli_mod, "DEFAULT_PROVIDER_CONFIG", tmp_path / "providers.json")
+    assert build_parser().parse_args([]).port == 8765
+    monkeypatch.chdir(tmp_path)
+    seen = {}
 
-    # 捕获 _serve 调用参数
-    calls: list[tuple] = []
+    def check(host: str, port: int) -> None:
+        seen["address"] = (host, port)
+        seen["health"] = get_json(host, port, "/api/health")
 
-    def _stub_serve(system: LoopSystem, host: str, port: int) -> int:
-        calls.append((system, host, port))
-        return 0
-
-    monkeypatch.setattr(cli_mod, "_serve", _stub_serve)
-
-    rc = cli_mod.main([])
-
-    assert rc == 0
-    assert len(calls) == 1
-    captured_system, captured_host, captured_port = calls[0]
-    assert captured_host == "127.0.0.1"
-    assert captured_port == 8765
-
-    # 空态启动不崩溃
-    ps = captured_system.provider_status()
-    assert ps["available"] is False
-    cfg = captured_system.facade.config_status()
-    assert cfg["reload_error"] is None
+    assert run_console(["--port", "0"], check) == 0
+    assert seen["address"][0] == "127.0.0.1"
+    health = seen["health"]
+    assert health["provider_available"] is False
+    assert health["provider_reload_error"] is None
+    assert health["provider_config"] == str((tmp_path / ".yudao" / "providers.json").resolve())
+    assert (tmp_path / ".yudao" / "native-loop" / "events.sqlite").is_file()
+    assert "stopped" in capsys.readouterr().out
 
 
 _ABSENT_KEY = "YUDAO_STARTUP_ABSENT_KEY"
@@ -169,13 +161,14 @@ def _startup_config(state: str):
 
 @pytest.mark.parametrize("state", ["missing", "invalid_json", "empty_catalog", "unbound", "missing_key"])
 def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, monkeypatch, state):
-    """缺文件、坏 JSON、空目录、未绑定、缺 Key：CLI 装配与控制台照常启动，新建任务被拒绝。"""
-    import harness.__main__ as cli_mod
+    # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：命令行装配的系统与控制台照常启动，新建任务被拒绝。
+    # 当前目录是测试目录，默认的凭据文件 .yudao/.env 落在这里
+    from harness.__main__ import production_system
     from harness.providers import CatalogValidationError
     from harness.tests.test_provider_config_web import get_json, request, running_server
 
     monkeypatch.delenv(_ABSENT_KEY, raising=False)
-    monkeypatch.setattr(cli_mod, "DEFAULT_DOTENV", tmp_path / ".env")
+    monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "providers.json"
     content = _startup_config(state)
     if isinstance(content, str):
@@ -183,7 +176,7 @@ def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, mo
     elif content is not None:
         _write_json(config_path, content)
 
-    system = cli_mod._production_system(tmp_path / "data", config_path)
+    system = production_system(tmp_path / "data", config_path)
     with running_server(system) as (_server, host, port):
         status, html = request(host, port, "GET", "/")
         assert status == 200
@@ -193,6 +186,7 @@ def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, mo
     assert health["provider_available"] is False
     assert isinstance(listed["providers"], list)
     status_view = system.facade.config_status()
+    assert status_view["dotenv_path"] == str((tmp_path / ".yudao" / ".env").resolve())
     if state == "invalid_json":
         assert status_view["reload_error"]
         assert health["provider_reload_error"]

@@ -11,7 +11,7 @@ from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
 from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run, _markdown, _receipt_evidence, _archive_evidence, _collaboration_evidence, _git_evidence
+from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run
 from harness.tests.helpers import recorded_context, run_scripted
 
 
@@ -114,32 +114,29 @@ def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(na
     )
     system.git_versions.verify(run_id, wrong)
     event.payload["git_version"] = wrong
-    assert _git_evidence(system, run_id)["status"] == "unverified"
+    assert summarize_run(system, run_id, scenario="happy")["git_audit"]["status"] == "unverified"
 
 
 @pytest.mark.parametrize("changed", ["effective_contract", "engineering_plan"])
 def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and_tree(native_run, monkeypatch, changed):
     system, run_id = native_run
     projection = system.project(run_id)
-    receipts = [asdict(item) for item in system.workspace(run_id).receipts()]
     changed_item = replace(getattr(projection, changed), content_hash=canonical_hash("new accepted content"))
     changed_projection = replace(projection, **{changed: changed_item})
     monkeypatch.setattr(system, "project", lambda _run_id: changed_projection)
-    valid, notes = _receipt_evidence(system, run_id, receipts)
-    assert valid is False
+    summary = summarize_run(system, run_id, scenario="happy")
+    assert summary["check_receipts"]
+    assert summary["check_receipts_verified"] is False
+    notes = summary["check_receipt_notes"]
     assert "engineering: no successful host check bound to the final contract and snapshot" in notes
     assert "quality: no successful host check bound to the final contract and snapshot" in notes
 
 
-def test_archive_audit_restores_from_persisted_bytes_after_workspace_changes(native_run, monkeypatch):
+def test_archive_audit_restores_from_persisted_bytes_after_workspace_changes(native_run):
+    # 交付以后工作区的文件改变：核对仍按封存的内容恢复，所以结果与交付时一致
     system, run_id = native_run
     system.workspace(run_id).write_file("src/echo.py", "changed after delivery\n")
-
-    def no_workspace(_run_id):
-        raise AssertionError("archive audit must not read the current workspace")
-
-    monkeypatch.setattr(system, "workspace", no_workspace)
-    result = _archive_evidence(system, run_id)
+    result = summarize_run(system, run_id, scenario="happy")["delivery_archive"]
     assert result["status"] == "verified", result
     assert result["files"] == 1
 
@@ -154,7 +151,7 @@ def test_archive_audit_rejects_missing_or_modified_persisted_bytes(native_run, d
         blob.unlink()
     else:
         blob.write_bytes(b"changed artifact bytes")
-    result = _archive_evidence(system, run_id)
+    result = summarize_run(system, run_id, scenario="happy")["delivery_archive"]
     assert result["status"] == "unverified"
     assert result["notes"]
 
@@ -164,7 +161,7 @@ def test_archive_audit_rejects_unrelated_delivery_digest(native_run, monkeypatch
     projection = system.project(run_id)
     delivery = replace(projection.delivery_spec, code_tree_digest=canonical_hash("unrelated tree"))
     monkeypatch.setattr(system, "project", lambda _run_id: replace(projection, delivery_spec=delivery))
-    assert _archive_evidence(system, run_id)["status"] == "unverified"
+    assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "unverified"
 
 
 @pytest.fixture
@@ -176,7 +173,7 @@ def collaboration_run(data_dir):
 
 def test_collaboration_audit_requires_actual_consultation_and_accepted_action_results(collaboration_run):
     system, run_id = collaboration_run
-    audit = _collaboration_evidence(system, run_id)
+    audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
     assert audit["status"] == "verified", audit
     assert audit["pre_spec_consultation"] is True
     assert audit["requirements_action"] is True
@@ -251,7 +248,7 @@ def test_collaboration_audit_rejects_results_from_another_request(collaboration_
     next(event for event in events if event.event_id == result_id).payload["request_id"] = "unrelated-request"
     monkeypatch.setattr(system, "project", lambda _run_id: projection)
     monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
-    audit = _collaboration_evidence(system, run_id)
+    audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
     assert audit["status"] == "unverified"
     assert audit["requirements_action"] is False
     assert any("result is not bound" in note for note in audit["notes"])
@@ -522,16 +519,22 @@ def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
     assert report["scenarios"] == {}
 
 
-def test_smoke_markdown_reports_model_input_audit():
-    text = _markdown({
-        "adapter": "responses", "available": True,
-        "scenarios": {"happy": {
-            "manifest_boundary": True, "model_input_audit": {"status": "unverified", "request_count": 2},
-            "context_isolated": False, "check_receipts_verified": False,
-        }},
-    })
-    assert "model input audit: `unverified`" in text
-    assert "model requests: `2`" in text
-    assert "context isolated: `False`" in text
-    assert "host receipts verified: `False`" in text
+def test_smoke_markdown_reports_model_input_audit(tmp_path):
+    # smoke 报告的 Markdown 写出每个场景的模型输入核对、请求数、上下文隔离与检查回执的结论。
+    # 模型目录使用 fake 协议，场景照常运行并写出报告
+    config = tmp_path / "providers.json"
+    config.write_text(json.dumps({
+        "providers": [{"id": "fake-provider", "name": "Fake"}],
+        "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "protocol": "fake", "context_window": 32_000, "max_output_tokens": 4_096}],
+        "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
+                     for department in ("product", "engineering", "quality")},
+    }), encoding="utf-8")
+    report = run_smoke(tmp_path / "smoke", provider_config=config, scenarios=["happy"])
+    scenario = report["scenarios"]["happy"]
+    text = (tmp_path / "smoke" / "smoke-report.md").read_text(encoding="utf-8")
+    assert f"model input audit: `{scenario['model_input_audit']['status']}`" in text
+    assert f"model requests: `{scenario['model_input_audit']['request_count']}`" in text
+    assert f"context isolated: `{scenario['context_isolated']}`" in text
+    assert f"host receipts verified: `{scenario['check_receipts_verified']}`" in text
     assert "omp" not in text.lower()

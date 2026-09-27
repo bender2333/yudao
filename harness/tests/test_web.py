@@ -14,6 +14,7 @@ import pytest
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
 from harness.providers import ResponsesConfig
+from harness.tests.console_helpers import accepts_connections, run_console
 from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
@@ -790,62 +791,58 @@ def test_compaction_details_link_to_complete_original_tool_output(tmp_path):
 
 
 def test_serve_cli_requires_provider_config(monkeypatch, tmp_path):
+    # serve 按选项读取模型目录，并在给定的端口上启动控制台。当前目录是测试目录，默认的凭据文件落在这里
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MISSING_PROVIDER_KEY", raising=False)
+    config = provider_config(tmp_path)
     seen = {}
 
-    def fake_serve(system, host, port):
-        seen["config"] = system.facade.config_path
-        seen["host"] = host
+    def check(host, port):
         seen["port"] = port
-        return 0
+        seen.update(get_json(host, port, "/api/health"))
 
-    monkeypatch.setattr("harness.__main__._serve", fake_serve)
-    config = provider_config(tmp_path)
-    assert main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"]) == 0
-    assert seen["config"] is not None
-    assert seen["port"] == 0
+    argv = ["serve", "--provider-config", str(config), "--data-dir", str(tmp_path / "data"), "--port", "0"]
+    assert run_console(argv, check) == 0
+    # 端口 0 由系统分配空闲端口，控制台没有使用默认端口 8765
+    assert seen["port"] not in (0, 8765)
+    assert seen["provider_config"] == str(config.resolve())
 
 
 def test_serve_cli_unconfigured_responses_prints_error_but_starts(monkeypatch, tmp_path, capsys):
-    started = {}
-
-    class Dummy:
-        base_url = "http://127.0.0.1:0"
-
-        def serve_forever(self):
-            started["ok"] = True
-            raise KeyboardInterrupt()
-
-        def server_close(self):
-            started["closed"] = True
-
-    monkeypatch.setattr("harness.__main__.serve", lambda system, host, port: Dummy())
+    # 模型目录缺少凭据时说明原因，控制台照常启动；按下 Ctrl+C 时停止，关闭监听并以 0 退出
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MISSING_PROVIDER_KEY", raising=False)
     config = provider_config(tmp_path)
-    code = main(["serve", "--provider-config", str(config), "--data-dir", str(tmp_path), "--port", "0"])
-    assert code == 0
-    err = capsys.readouterr().err
-    assert "MISSING_PROVIDER_KEY" in err
-    assert "product" in err
-    assert started["ok"] is True
-    assert started["closed"] is True
+    seen = {}
+
+    def check(host, port):
+        seen["address"] = (host, port)
+        seen.update(get_json(host, port, "/api/health"))
+
+    argv = ["serve", "--provider-config", str(config), "--data-dir", str(tmp_path / "data"), "--port", "0"]
+    assert run_console(argv, check) == 0
+    assert seen["ok"] is True
+    captured = capsys.readouterr()
+    assert "MISSING_PROVIDER_KEY" in captured.err
+    assert "product" in captured.err
+    assert "stopped" in captured.out
+    assert not accepts_connections(*seen["address"])
 
 
-def test_serve_cli_starts_without_provider_config_and_rejects_removed_flags(monkeypatch, tmp_path):
-    started = {}
+def test_serve_cli_starts_without_provider_config_and_rejects_removed_flags(monkeypatch, tmp_path, capsys):
+    # 不写模型目录时按当前目录下的默认位置读取，文件不存在时以空态启动；已经删除的选项被拒绝
+    monkeypatch.chdir(tmp_path)
+    seen = {}
 
-    class Dummy:
-        base_url = "http://127.0.0.1:0"
+    def check(host, port):
+        seen["address"] = (host, port)
+        seen.update(get_json(host, port, "/api/health"))
 
-        def serve_forever(self):
-            started["ok"] = True
-            raise KeyboardInterrupt()
-
-        def server_close(self):
-            started["closed"] = True
-
-    monkeypatch.setattr("harness.__main__.serve", lambda system, host, port: Dummy())
-    assert main(["serve", "--data-dir", str(tmp_path)]) == 0
-    assert started["ok"] is True
-    assert started["closed"] is True
+    assert run_console(["serve", "--data-dir", str(tmp_path / "data"), "--port", "0"], check) == 0
+    assert seen["ok"] is True
+    assert seen["provider_available"] is False
+    assert "stopped" in capsys.readouterr().out
+    assert not accepts_connections(*seen["address"])
     with pytest.raises(SystemExit):
         main(["serve", "--adapter", "fake", "--provider-config", str(provider_config(tmp_path)), "--data-dir", str(tmp_path)])
 

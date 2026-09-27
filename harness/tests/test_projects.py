@@ -33,7 +33,7 @@ from harness.projection import RunNotFoundError
 from harness.providers.call import ModelResponse
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
-from harness.smoke import _model_input_audit, summarize_run
+from harness.smoke import isolation_fields, summarize_run
 from harness.tests.helpers import happy_script, recorded_context
 from harness.tree_archive import load_tree
 
@@ -367,7 +367,7 @@ def test_project_context_part_is_pinned_between_current_work_and_department_rule
         item = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["input_ref"])))
         assert "[project]" not in item["content"]
     # smoke 审计把 project 视为合法钉住材料。
-    audit = _model_input_audit(system.store, system.artifacts, run_id)
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit["notes"]
     summary = summarize_run(system, run_id, scenario="happy")
     assert summary["model_input_audit"]["status"] == "verified"
@@ -419,7 +419,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
         assert pinned.index("[current_work]") < pinned.index(f"[project]\n{project_text}") < pinned.index("[department_rules]")
         pinned_work = next(part for part in recorded_context(system, request).parts if part.source == "pinned_work")
         assert f"[project]\n{project_text}" in pinned_work.text
-    audit = _model_input_audit(system.store, system.artifacts, run_id)
+    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit["notes"]
     assert audit["compaction_count"] >= 1
 

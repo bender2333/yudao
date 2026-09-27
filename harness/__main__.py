@@ -24,7 +24,8 @@ DEFAULT_DOTENV = Path(".yudao") / ".env"
 SERVICE_LOCK = "service.lock"
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    # 命令行的子命令、选项与默认值
     parser = argparse.ArgumentParser(description="Yudao Loop System")
     parser.add_argument("--data-dir", default=str(DEFAULT_DIR))
     parser.add_argument("--host", default="127.0.0.1")
@@ -63,6 +64,11 @@ def main(argv: list[str] | None = None) -> int:
     project_show = project_sub.add_parser("show", help="print one project projection")
     project_show.add_argument("project_id")
     project_show.add_argument("--data-dir", default=str(DEFAULT_DIR))
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     command = args.command or "serve"
 
@@ -85,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         lock = _lock_data_dir(args.data_dir)
         if lock is None:
             return 1
-        system = _production_system(args.data_dir, args.provider_config)
+        system = production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
     if command == "api":
         if args.host not in LOOPBACK_HOSTS:
@@ -192,8 +198,9 @@ def _provider_paths(provider_config: str | Path | None) -> tuple[Path | None, Pa
     return config, DEFAULT_DOTENV.resolve()
 
 
-def _production_system(data_dir: str | Path, provider_config: str | Path | None) -> LoopSystem:
-    # 启动读取一致版本：路径解析为固定绝对路径，缺文件/坏内容均空态启动
+def production_system(data_dir: str | Path, provider_config: str | Path | None) -> LoopSystem:
+    # serve 使用的系统：模型目录与当前目录下的凭据文件 .yudao/.env 解析为固定绝对路径并读取一致版本，
+    # 文件缺少或内容损坏时都以空态启动
     facade = ProviderFacade()
     config, dotenv = _provider_paths(provider_config)
     facade.configure_paths(config, dotenv)
