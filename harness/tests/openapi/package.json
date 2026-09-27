@@ -1,0 +1,13 @@
+{
+  "name": "yudao-openapi-check",
+  "private": true,
+  "type": "module",
+  "description": "由接口层的 OpenAPI 快照生成 TypeScript 接口类型并编译，核对合同能被客户端使用",
+  "scripts": {
+    "check": "openapi-ts && tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "typescript": "6.0.3"
+  }
+}

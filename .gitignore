@@ -11,6 +11,7 @@ third_party/
 # --- node / build ---
 node_modules/
 dist/
+harness/tests/openapi/generated/
 test-results/
 .vite/
 

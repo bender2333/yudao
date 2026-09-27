@@ -117,6 +117,12 @@ python -m pytest harness/tests -q
 node --test harness/tests/test_web_ui.js
 ```
 
+应用接口的 OpenAPI 快照（`harness/tests/openapi/openapi.json`）由 `test_openapi_snapshot.py` 与运行中的服务比较；由快照生成 TypeScript 接口类型并编译：
+
+```bash
+cd harness/tests/openapi && npm ci && npm run check
+```
+
 按目录绑定执行三部门真实 smoke（凭据引用从环境解析，应用不读取 `provider.md`）：
 
 ```bash
