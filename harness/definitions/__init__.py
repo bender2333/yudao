@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError, model_validator
 
 DEFINITIONS_DIR = Path(__file__).parent
 
@@ -87,6 +87,29 @@ class Role(_Definition):
     visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects"], ...]
 
 
+class Tool(_Definition):
+    # host：主机工具，由控制核心执行（现在只有提交类工具）；environment：环境工具，每次调用是一个动作，
+    # 经过工具许可以后在执行环境中执行
+    kind: Literal["host", "environment"]
+    # 环境工具的动作类别：读取、写入、检查、登记的本地命令；许可规则按动作类别适用（写入要在工程计划的范围之内等）
+    action: Literal["read", "write", "check", "command"] | None = None
+    # 提交类主机工具提交的提案种类
+    proposal: Identifier | None = None
+    # 许可规则：因待处理指导被提前安排、只能回应指导的激活可以使用
+    guidance_only: bool
+    # 提供给模型的描述与参数（JSON Schema），原样放进请求
+    description: str = Field(min_length=1)
+    parameters: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _category(self) -> Tool:
+        if self.kind == "environment" and (self.action is None or self.proposal is not None):
+            raise ValueError("an environment tool requires action and has no proposal")
+        if self.kind == "host" and (self.proposal is None or self.action is not None):
+            raise ValueError("a host tool requires proposal and has no action")
+        return self
+
+
 class StopReason(_Definition):
     # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
     outcome: Literal["done", "paused", "failed"]
@@ -99,6 +122,8 @@ class Definitions(_Definition):
     organization: Organization
     # 角色定义，键是角色编号
     roles: dict[Identifier, Role]
+    # 工具定义，键是工具名称
+    tools: dict[Identifier, Tool]
     limits: Limits
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: dict[Identifier, StopReason]
@@ -123,6 +148,7 @@ class Definitions(_Definition):
 _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "organization.json": ("organization", TypeAdapter(Organization)),
     "roles.json": ("roles", TypeAdapter(dict[Identifier, Role])),
+    "tools.json": ("tools", TypeAdapter(dict[Identifier, Tool])),
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
 }
@@ -181,10 +207,11 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
 
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
-    # 文件之间的引用：部门与角色一一对应，角色的工具不重复
+    # 文件之间的引用：部门与角色一一对应，角色的工具都有定义且不重复，一种提案只由一个工具提交
     issues: list[tuple[str, str, str]] = []
     organization: Organization = parts["organization"]
     roles: dict[str, Role] = parts["roles"]
+    tools: dict[str, Tool] = parts["tools"]
     seen: set[str] = set()
     for index, department in enumerate(organization.departments):
         if department.id in seen:
@@ -202,6 +229,16 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         repeated = sorted({tool for tool in role.tools if role.tools.count(tool) > 1})
         if repeated:
             issues.append(("roles.json", f"{name}.tools", "重复的工具 " + "、".join(repeated)))
+        for index, tool in enumerate(role.tools):
+            if tool not in tools:
+                issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
+    submitters: dict[str, str] = {}
+    for name, tool in tools.items():
+        if tool.proposal is not None and tool.proposal in submitters:
+            issues.append(("tools.json", f"{name}.proposal",
+                           f"提案种类 {tool.proposal} 已经由 {submitters[tool.proposal]} 提交"))
+        elif tool.proposal is not None:
+            submitters[tool.proposal] = name
     return issues
 
 

@@ -34,16 +34,8 @@ ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
 QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
 
 QA_VERDICTS = ("rework_product", "rework_engineering", "release")
-PROPOSAL_KINDS = (
-    "product_spec",
-    "engineering_plan",
-    "collaboration_request",
-    "collaboration_response",
-    "department_guidance_response",
-    "product_decision",
-    "delivery_spec",
-    "qa_review",
-)
+# 提案种类：定义中提交类工具提交的种类
+PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
 
 
 class EventType:

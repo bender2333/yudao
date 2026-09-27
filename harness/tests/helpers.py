@@ -20,7 +20,7 @@ from harness.proposals import delivery_turn, plan_turn, product_spec, review_tur
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tools import TOOL_DEFS
+from harness.tools import tool_action
 
 # 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
 FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
@@ -29,7 +29,7 @@ FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02
 def action(name: str, args: dict[str, Any], *, department: str = "engineering",
            preconditions: Preconditions = Preconditions()) -> Action:
     # 一个环境工具调用的动作合同，动作身份每次不同
-    return Action(action_id=f"test:{uuid.uuid4().hex}", kind=TOOL_DEFS[name]["action"], tool=name,
+    return Action(action_id=f"test:{uuid.uuid4().hex}", kind=tool_action(name), tool=name,
                   department=department, input=args, preconditions=preconditions)
 
 

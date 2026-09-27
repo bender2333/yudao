@@ -10,7 +10,7 @@ from .models import (
     DEPARTMENTS, PRODUCT_ACTIVE, QUALITY_ACTIVE, TERMINAL_PHASES, CollaborationRequest, Event,
     EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
 )
-from .tools import SUBMIT_KINDS, TOOL_DEFS
+from .tools import proposal_kind, tool_action
 
 
 _MUTATIONS = {"write_file", "edit_range", "delete_file", "move_file"}
@@ -102,14 +102,15 @@ def request_errors(proposal: dict[str, Any], projection: RunProjection,
 
 def tool_error(projection: RunProjection, department: str, name: str,
                args: dict[str, Any]) -> str | None:
-    if name in SUBMIT_KINDS and SUBMIT_KINDS[name] not in allowed_proposal_kinds(projection, department):
+    kind = proposal_kind(name)
+    if kind is not None and kind not in allowed_proposal_kinds(projection, department):
         return "This proposal is not permitted in the current department work."
     request = projection.pending_request
     if request is None:
         return None
     if request.status != "open" or department != request.recipient or projection.phase in TERMINAL_PHASES:
         return "Only the recipient of the open request may act."
-    if TOOL_DEFS.get(name, {}).get("action") == "write" and not (
+    if tool_action(name) == "write" and not (
         request.request_type == "action" and request.action == "revise_delivery"
     ):
         return "This request permits reading and checking, but does not authorize file changes."

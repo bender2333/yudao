@@ -4,7 +4,7 @@ import pytest
 
 from harness.environment import LocalEnvironment
 from harness.tests.helpers import perform
-from harness.tools import TOOL_DEFS, tools_for
+from harness.tools import tool_action, tool_kind, tools_for
 from harness.workspace import Workspace
 
 
@@ -15,7 +15,7 @@ def _environment(root):
 
 def test_search_tools_are_read_only_for_all_departments():
     for name in ("search", "read_range"):
-        assert TOOL_DEFS[name]["kind"] == "environment" and TOOL_DEFS[name]["action"] == "read"
+        assert tool_kind(name) == "environment" and tool_action(name) == "read"
         for department in ("product", "engineering", "quality"):
             assert name in tools_for(department)
 

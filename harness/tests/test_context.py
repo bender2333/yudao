@@ -14,7 +14,7 @@ from harness.smoke import summarize_run
 from harness.tests.helpers import developer_text, happy_script, recorded_context, run_scripted
 from harness.tests.protocol_helpers import serve
 from harness.tests.test_event_sequence import HTTP_REPLIES, HTTP_SCRIPT
-from harness.tools import TOOL_DEFS
+from harness.tools import tool_action
 
 
 def _part(call, source: str):
@@ -112,10 +112,10 @@ def test_quality_runs_its_checks_through_run_check(data_dir):
     run_id = system.create_run("build echo")
     assert system.run_until_stop(run_id).phase == "DONE"
     [quality] = [item for item in adapter.invocations if item.department == "quality"]
-    assert [tool["name"] for tool in quality.tools if TOOL_DEFS[tool["name"]].get("action") == "check"] == ["run_check"]
+    assert [tool["name"] for tool in quality.tools if tool_action(tool["name"]) == "check"] == ["run_check"]
     checks = [event.payload["name"] for event in system.store.list_events(run_id)
               if event.type == EventType.TOOL_CALLED and event.role == "quality"
-              and TOOL_DEFS.get(event.payload["name"], {}).get("action") == "check"]
+              and tool_action(event.payload["name"]) == "check"]
     assert checks == ["run_check"]
 
 

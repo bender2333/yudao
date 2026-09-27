@@ -10,13 +10,8 @@ from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import request_basis, tool_error
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .models import TERMINAL_PHASES, Event, RunProjection
-from .tools import TOOL_DEFS, has_tool, tools_for
+from .tools import has_tool, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
-
-# 因待处理指导被提前安排、只能回应指导的激活可以使用的工具
-GUIDANCE_ONLY_TOOLS = frozenset({
-    "read_file", "list_files", "run_check", "submit_guidance_response", "submit_request",
-})
 
 _STALE_BASIS = ("The input, contract, plan, or current work changed after this activation began; "
                 "stale results cannot be rebound.")
@@ -72,7 +67,7 @@ def offered_tools(projection: RunProjection, department: str, *, guidance_only: 
     # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交
     available = tools_for(department)
     if guidance_only:
-        available = [name for name in available if name in GUIDANCE_ONLY_TOOLS]
+        available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in available if tool_error(projection, department, name, {}) is None]
 
 
@@ -102,7 +97,7 @@ def tool_permission(
     name, args = call["name"], call["args"]
     if not has_tool(department, name):
         return ToolPermission(reason=f"{department} cannot use {name}")
-    if guidance_only and name not in GUIDANCE_ONLY_TOOLS:
+    if guidance_only and not usable_when_guidance_only(name):
         return ToolPermission(reason="This guidance activation cannot change files or submit normal department work.")
     reason = tool_error(projection, department, name, args)
     if reason:
@@ -160,7 +155,7 @@ def commit_decision(
 
 
 def _is_write(name: str) -> bool:
-    return TOOL_DEFS.get(name, {}).get("action") == "write"
+    return tool_action(name) == "write"
 
 
 def _write_targets(name: str, args: dict[str, Any]) -> list[Any]:

@@ -8,7 +8,7 @@ from typing import Any
 
 from ..models import Usage, json_dumps
 from ..providers.call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
-from ..tools import SUBMIT_KINDS
+from ..tools import submit_tool
 from .base import Availability, ProviderError
 
 # 确定性的模型回答；工具仍由原生循环执行。脚本的一项可以是回答本身，也可以是接收模型调用合同的函数；
@@ -161,7 +161,4 @@ def _fake_check_payload(name: str, spec: int | dict[str, Any]) -> dict[str, Any]
 
 
 def _submit_tool_for(kind: Any) -> str | None:
-    for tool_name, mapped in SUBMIT_KINDS.items():
-        if mapped == kind:
-            return tool_name
-    return None
+    return submit_tool(kind) if isinstance(kind, str) else None

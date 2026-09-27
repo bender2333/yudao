@@ -1,0 +1,368 @@
+{
+  "read_file": {
+    "kind": "environment",
+    "action": "read",
+    "guidance_only": true,
+    "description": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Workspace-relative file path"}
+      },
+      "additionalProperties": false,
+      "required": ["path"]
+    }
+  },
+  "list_files": {
+    "kind": "environment",
+    "action": "read",
+    "guidance_only": true,
+    "description": "List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \"src/\" keeps only the src directory, while \"src\" also keeps paths such as \"src2/a.py\". Paths under .checks are never listed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "prefix": {"type": "string", "description": "Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "search": {
+    "kind": "environment",
+    "action": "read",
+    "guidance_only": false,
+    "description": "Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {"type": "string", "description": "Python re regex searched per line"},
+        "path": {"type": ["string", "null"], "description": "Optional file or directory scope within the public tree"},
+        "max_results": {"type": ["integer", "null"], "description": "Maximum matches per page"},
+        "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated search"}
+      },
+      "additionalProperties": false,
+      "required": ["pattern"]
+    }
+  },
+  "read_range": {
+    "kind": "environment",
+    "action": "read",
+    "guidance_only": false,
+    "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Workspace-relative file path"},
+        "start_line": {"type": "integer", "description": "First line to read, 1-based"},
+        "end_line": {"type": ["integer", "null"], "description": "Last line to read, inclusive; omit for end of file"},
+        "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated read"}
+      },
+      "additionalProperties": false,
+      "required": ["path", "start_line"]
+    }
+  },
+  "write_file": {
+    "kind": "environment",
+    "action": "write",
+    "guidance_only": false,
+    "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Workspace-relative file path"},
+        "content": {"type": "string", "description": "Full file contents"}
+      },
+      "additionalProperties": false,
+      "required": ["path", "content"]
+    }
+  },
+  "edit_range": {
+    "kind": "environment",
+    "action": "write",
+    "guidance_only": false,
+    "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Workspace-relative file path"},
+        "start_line": {"type": "integer", "description": "First line to replace, 1-based"},
+        "end_line": {"type": "integer", "description": "Last line to replace, inclusive"},
+        "expected_text": {"type": "string", "description": "Exact original lines previously read, joined by newline without a trailing newline"},
+        "new_text": {"type": "string", "description": "Replacement text for the span, lines joined by newline"},
+        "expected_digest": {"type": ["string", "null"], "description": "File content_hash observed when the span was read; omit to skip the digest check"}
+      },
+      "additionalProperties": false,
+      "required": ["path", "start_line", "end_line", "expected_text", "new_text"]
+    }
+  },
+  "delete_file": {
+    "kind": "environment",
+    "action": "write",
+    "guidance_only": false,
+    "description": "Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false,
+      "required": ["path", "reason"]
+    }
+  },
+  "move_file": {
+    "kind": "environment",
+    "action": "write",
+    "guidance_only": false,
+    "description": "Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "source": {"type": "string"},
+        "destination": {"type": "string"},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false,
+      "required": ["source", "destination", "reason"]
+    }
+  },
+  "run_check": {
+    "kind": "environment",
+    "action": "check",
+    "guidance_only": true,
+    "description": "Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\"python\", \"src/echo.py\", \"hello\"].",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "Check name, e.g. smoke"},
+        "argv": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Argument vector executed by the host, e.g. [\"python\", \"src/echo.py\", \"hello\"]"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name", "argv"]
+    }
+  },
+  "run_command": {
+    "kind": "environment",
+    "action": "command",
+    "guidance_only": false,
+    "description": "Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read. run_command results are action receipts and cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "Registered command name frozen for this run"},
+        "args": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Extra arguments; every item must be in the registered allowlist"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name"]
+    }
+  },
+  "submit_product_spec": {
+    "kind": "host",
+    "proposal": "product_spec",
+    "guidance_only": false,
+    "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "goal": {"type": "string"},
+        "requirements": {"type": "array", "items": {"type": "string"}, "description": "Must contain at least one item"},
+        "acceptance_criteria": {"type": "array", "items": {"type": "string"}, "description": "Must contain at least one item"},
+        "boundaries": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
+        "constraints": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
+        "fatal_conditions": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
+        "non_goals": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
+        "change_record": {
+          "type": "object",
+          "properties": {
+            "changed": {"type": "array", "items": {"type": "string"}, "description": "Requirements added or changed in this revision"},
+            "retained": {"type": "array", "items": {"type": "string"}, "description": "Requirements explicitly preserved"},
+            "retired": {"type": "array", "items": {"type": "string"}, "description": "Requirements explicitly removed"},
+            "rationale": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false,
+          "required": ["changed", "retained", "retired", "rationale"],
+          "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec."
+        },
+        "decision_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision_hash": {"type": "string"},
+              "disposition": {"type": "string", "enum": ["retain", "integrate", "retire"]},
+              "rationale": {"type": "string"}
+            },
+            "additionalProperties": false,
+            "required": ["decision_hash", "disposition", "rationale"]
+          },
+          "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec."
+        }
+      },
+      "additionalProperties": false,
+      "required": ["goal", "requirements", "acceptance_criteria"]
+    }
+  },
+  "submit_product_decision": {
+    "kind": "host",
+    "proposal": "product_decision",
+    "guidance_only": false,
+    "description": "Publish an explicit product requirement decision with its rationale. This changes the effective contract. A consultation response alone does not change product requirements.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "statement": {"type": "string"},
+        "rationale": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["statement", "rationale"]
+    }
+  },
+  "submit_request": {
+    "kind": "host",
+    "proposal": "collaboration_request",
+    "guidance_only": true,
+    "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "recipient": {"type": "string", "enum": ["product", "engineering", "quality"]},
+        "request_type": {"type": "string", "enum": ["consultation", "action"]},
+        "question": {"type": "string"},
+        "background": {"type": "string"},
+        "expected_result": {"type": "string"},
+        "action": {"type": ["string", "null"], "enum": [null, "inspect", "check", "revise_requirements", "revise_delivery"]}
+      },
+      "additionalProperties": false,
+      "required": ["recipient", "request_type", "question", "background", "expected_result", "action"]
+    }
+  },
+  "submit_response": {
+    "kind": "host",
+    "proposal": "collaboration_response",
+    "guidance_only": false,
+    "description": "Respond to the pending request addressed to your department. For completed actions, first produce normal accepted artifacts or host checks and cite their actual event IDs. Do not invent evidence or use a response as a product decision.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "request_id": {"type": "string"},
+        "status": {"type": "string", "enum": ["answered", "completed", "declined", "needs_work"]},
+        "text": {"type": "string"},
+        "result_event_ids": {"type": "array", "items": {"type": "string"}, "description": "Actual accepted result or host tool event IDs for this request"}
+      },
+      "additionalProperties": false,
+      "required": ["request_id", "status", "text", "result_event_ids"]
+    }
+  },
+  "submit_guidance_response": {
+    "kind": "host",
+    "proposal": "department_guidance_response",
+    "guidance_only": true,
+    "description": "Respond to one persisted department guidance item. Use explained when the handling is an explanation, no change is required, or this department cannot apply it. Use completed only when host-verified actions after this guidance was adopted are listed in guidance_results; the host binds those results and result_event_ids cannot enlarge that set. Empty, rejected, failed, or earlier-unrelated results cannot complete an action. This response does not change the contract, plan, files, or QA result by itself.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "guidance_id": {"type": "string"},
+        "status": {"type": "string", "enum": ["explained", "completed", "declined", "needs_work"]},
+        "text": {"type": "string"},
+        "result_event_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional. completed must be a subset of guidance_results; the host binds those results. explained, declined, and needs_work do not require results."}
+      },
+      "additionalProperties": false,
+      "required": ["guidance_id", "status", "text", "result_event_ids"]
+    }
+  },
+  "submit_plan": {
+    "kind": "host",
+    "proposal": "engineering_plan",
+    "guidance_only": false,
+    "description": "Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "objective": {"type": "string"},
+        "scope": {"type": "array", "items": {"type": "string"}, "description": "Relative files or directories ending with /; . means the entire public workspace"},
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {"type": "string"},
+              "outputs": {"type": "array", "items": {"type": "string"}, "description": "Observable outputs of this task"},
+              "verification": {"type": "string", "description": "How to verify these outputs"}
+            },
+            "additionalProperties": false,
+            "required": ["title", "outputs", "verification"]
+          },
+          "description": "Non-empty tasks in execution order"
+        },
+        "refactoring": {"type": "array", "items": {"type": "string"}, "description": "Necessary structural changes, or an empty list"},
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision": {"type": "string"},
+              "basis": {"type": "string"}
+            },
+            "additionalProperties": false,
+            "required": ["decision", "basis"]
+          },
+          "description": "Professional defaults and their basis; do not present defaults as user statements"
+        },
+        "reason": {"type": "string", "description": "Reason for adjusting an existing plan; may be empty for the first plan"}
+      },
+      "additionalProperties": false,
+      "required": ["objective", "scope", "tasks", "refactoring", "assumptions", "reason"]
+    }
+  },
+  "submit_delivery": {
+    "kind": "host",
+    "proposal": "delivery_spec",
+    "guidance_only": false,
+    "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. run_command results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "summary": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}, "description": "Workspace-relative files included in the delivery"},
+        "check_names": {"type": "array", "items": {"type": "string"}, "description": "Names passed to run_check in this activation on the current workspace; run_command results do not count"},
+        "known_risks": {"type": "array", "items": {"type": "string"}, "description": "Optional"}
+      },
+      "additionalProperties": false,
+      "required": ["summary", "files", "check_names"]
+    }
+  },
+  "submit_review": {
+    "kind": "host",
+    "proposal": "qa_review",
+    "guidance_only": false,
+    "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. Engineering receipts are not accepted as QA evidence. checks are check names.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "verdict": {"type": "string", "enum": ["rework_product", "rework_engineering", "release"]},
+        "rationale": {"type": "string"},
+        "checks": {"type": "array", "items": {"type": "string"}, "description": "Quality check names run via run_check"},
+        "defects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "severity": {"type": "string", "enum": ["blocker", "major", "minor"]},
+              "summary": {"type": "string"}
+            },
+            "required": ["severity", "summary"]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": ["verdict", "rationale", "checks"]
+    }
+  }
+}

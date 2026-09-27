@@ -7,7 +7,7 @@ from dataclasses import asdict
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.adjudication import GUIDANCE_ONLY_TOOLS
+from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
     collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec, response_turn, review_turn,
@@ -99,7 +99,7 @@ def test_combined_run_shape(combined_run):
                      if recorded_context(system, request).manifest.guidance_only]
     assert {request.department for request in guidance_only} == {"engineering"}
     assert len({request.activation_id for request in guidance_only}) == 2
-    assert all({tool["name"] for tool in request.tools} <= GUIDANCE_ONLY_TOOLS for request in guidance_only)
+    assert all(usable_when_guidance_only(tool["name"]) for request in guidance_only for tool in request.tools)
     results = next(json.loads(text) for request in guidance_only
                    if (text := prompt_part(request, "guidance_results")) and json.loads(text))
     assert results[0]["name"] == "run_check"

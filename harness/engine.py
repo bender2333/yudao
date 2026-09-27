@@ -31,7 +31,7 @@ from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
 from .providers.call import ModelResponse
 from .providers.resolve import FrozenTarget
 from .recording import ActivationScope, StepRecorder
-from .tools import SUBMIT_KINDS, TOOL_DEFS
+from .tools import proposal_kind, tool_action, tool_kind
 
 
 @dataclass(frozen=True)
@@ -321,12 +321,12 @@ class StepDriver:
                         return Stopped(self._version)
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
-                    elif TOOL_DEFS[name]["kind"] == "host":
+                    elif tool_kind(name) == "host":
                         ok, output, error = True, _run_host_tool(name, args), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要
                         receipt = await self._perform(Action(
-                            action_id=f"{request.activation_id}:{step_id}:{identity}", kind=TOOL_DEFS[name]["action"],
+                            action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
                             tool=name, department=request.department, input=args,
                             preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                         ))
@@ -340,10 +340,11 @@ class StepDriver:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
                     return Stopped(self._version)
-                if name in SUBMIT_KINDS:
+                kind = proposal_kind(name)
+                if kind is not None:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
-                    proposal = output if ok else {**args, "kind": SUBMIT_KINDS[name]}
+                    proposal = output if ok else {**args, "kind": kind}
                     return Submitted(proposal, response, self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
@@ -506,7 +507,7 @@ class StepDriver:
 def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
     payload = dict(args)
-    payload["kind"] = SUBMIT_KINDS[name]
+    payload["kind"] = proposal_kind(name)
     payload.pop("exit_code", None)
     return payload
 

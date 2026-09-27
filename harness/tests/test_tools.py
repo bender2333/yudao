@@ -15,8 +15,11 @@ from harness.proposals import delivery_turn, plan_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import LONG_RUNNING_TREE, action, perform, wait_for_file, wait_until_stopped
-from harness.tools import TOOL_SCHEMAS, TOOL_DEFS, tools_for
+from harness.definitions import DEFINITIONS
+from harness.tools import tools_for
 from harness.workspace import Workspace
+
+TOOLS = DEFINITIONS.tools
 
 
 def _call(identity, name, **arguments):
@@ -24,9 +27,8 @@ def _call(identity, name, **arguments):
             "arguments": json_dumps(arguments)}
 
 
-def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check(tmp_path):
-    assert set(TOOL_SCHEMAS) == set(TOOL_DEFS)
-    assert [name for name in tools_for("quality") if TOOL_DEFS[name].get("action") == "check"] == ["run_check"]
+def test_quality_checks_only_through_run_check(tmp_path):
+    assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
     result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "ok.py"]},
@@ -38,9 +40,9 @@ def test_every_tool_has_one_definition_and_quality_checks_only_through_run_check
 
 def test_tools_are_host_tools_or_environment_actions():
     # 主机工具只有提交类工具；其余工具是环境工具，各有动作类别
-    assert {name for name, spec in TOOL_DEFS.items() if spec["kind"] == "host"} == {
-        name for name in TOOL_DEFS if name.startswith("submit_")}
-    assert {name: spec["action"] for name, spec in TOOL_DEFS.items() if spec["kind"] == "environment"} == {
+    assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
+        name for name in TOOLS if name.startswith("submit_")}
+    assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
         "run_check": "check", "run_command": "command",
@@ -48,35 +50,35 @@ def test_tools_are_host_tools_or_environment_actions():
 
 
 def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
-    review = TOOL_SCHEMAS["submit_review"]
-    assert "Engineering receipts are not accepted as QA evidence." in review["description"]
-    assert review["parameters"]["properties"]["checks"]["description"] == "Quality check names run via run_check"
+    review = TOOLS["submit_review"]
+    assert "Engineering receipts are not accepted as QA evidence." in review.description
+    assert review.parameters["properties"]["checks"]["description"] == "Quality check names run via run_check"
 
 
 def test_submit_delivery_description_states_that_check_receipts_come_from_run_check():
-    delivery = TOOL_SCHEMAS["submit_delivery"]
-    text = delivery["description"]
+    delivery = TOOLS["submit_delivery"]
+    text = delivery.description
     assert "Every name in check_names must be a name you passed to run_check in this activation on the current workspace" in text
     assert "if any file changes after a check, call run_check again before submitting" in text
     assert "run_command results are action receipts and are not accepted as delivery check receipts" in text
-    names = delivery["parameters"]["properties"]["check_names"]["description"]
+    names = delivery.parameters["properties"]["check_names"]["description"]
     assert "Names passed to run_check in this activation on the current workspace" in names
     assert "run_command results do not count" in names
 
 
 def test_run_command_description_separates_action_receipts_from_delivery_check_receipts():
-    text = TOOL_SCHEMAS["run_command"]["description"]
+    text = TOOLS["run_command"].description
     assert "The host-observed exit status is the evidence; a self-reported exit_code is never read." in text
     assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in text
     assert "run the checks a delivery needs with run_check" in text
 
 
 def test_write_tool_descriptions_state_the_plan_requirement():
-    write = TOOL_SCHEMAS["write_file"]["description"]
+    write = TOOLS["write_file"].description
     assert "replace its entire content" in write and "missing parent directories are created" in write
     assert "Use edit_range to change part of an existing file." in write
     for name in ("write_file", "edit_range"):
-        text = TOOL_SCHEMAS[name]["description"]
+        text = TOOLS[name].description
         assert "Requires an accepted engineering plan for the current effective contract" in text
         assert "the path must be inside that plan's scope" in text
 
@@ -90,7 +92,7 @@ def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
 
 
 def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_utf8(tmp_path):
-    description = TOOL_SCHEMAS["read_file"]["description"]
+    description = TOOLS["read_file"].description
     assert "entire content" in description and "without line numbers or truncation" in description
     assert "Files that are not valid UTF-8 are rejected." in description
     assert "Use read_range for large files" in description and "content_hash" in description
@@ -107,10 +109,10 @@ def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_u
 
 
 def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
-    description = TOOL_SCHEMAS["list_files"]["description"]
+    description = TOOLS["list_files"].description
     assert "recursively" in description and '"src2/a.py"' in description
     assert "end it with / to limit the list to one directory" in (
-        TOOL_SCHEMAS["list_files"]["parameters"]["properties"]["prefix"]["description"])
+        TOOLS["list_files"].parameters["properties"]["prefix"]["description"])
     workspace = Workspace(tmp_path)
     environment = LocalEnvironment(workspace)
     for path in ("src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"):

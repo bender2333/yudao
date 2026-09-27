@@ -14,6 +14,7 @@ from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
+from harness.tools import tool_definitions
 from harness.write_path import NewEvent
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -103,6 +104,36 @@ def test_departments_and_roles_must_refer_to_each_other(tmp_path):
         ("roles.json", "product", "角色不属于任何部门"),
         ("roles.json", "quality.tools", "重复的工具 read_file"),
     )
+
+
+def test_tool_categories_and_references_are_checked(tmp_path):
+    directory = _copy(tmp_path)
+    tools = _read(directory, "tools.json")
+    tools["submit_plan"]["action"] = "write"
+    tools["submit_delivery"]["proposal"] = "engineering_plan"
+    del tools["run_command"]
+    _write(directory, "tools.json", tools)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("tools.json", "submit_plan") and "a host tool requires proposal and has no action" in issue[2]
+
+    tools["submit_plan"].pop("action")
+    _write(directory, "tools.json", tools)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("roles.json", "engineering.tools[9]", "工具 run_command 没有定义"),
+        ("tools.json", "submit_delivery.proposal", "提案种类 engineering_plan 已经由 submit_plan 提交"),
+    )
+
+
+def test_tool_definitions_hand_out_copies(tmp_path):
+    [definition] = tool_definitions(["submit_review"])
+    definition["parameters"]["properties"].clear()
+    assert DEFINITIONS.tools["submit_review"].parameters["properties"]["verdict"]["enum"] == [
+        "rework_product", "rework_engineering", "release"]
+    assert load_definitions() == DEFINITIONS
 
 
 def test_role_visibility_is_a_closed_list(tmp_path):
