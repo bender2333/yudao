@@ -453,6 +453,7 @@ class ProjectService:
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
             "command_versions": command_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
+            "definitions_version": DEFINITIONS.version,
         }))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,

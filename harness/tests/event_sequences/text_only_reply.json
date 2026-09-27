@@ -21,6 +21,7 @@
     "baseline": null,
     "command_versions": {},
     "context_window": 32000,
+    "definitions_version": "<definitions>",
     "department_prompts": {
      "engineering": {
       "department": "engineering",
@@ -372,6 +373,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -803,6 +805,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -1097,6 +1100,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "product_spec",
     "raw_keys": [

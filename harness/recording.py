@@ -16,6 +16,7 @@ from .adapters.base import ModelRequest, ProviderError
 from .adjudication import WorkBasis
 from .artifacts import ArtifactStore
 from .assembly import CompactionResult, StepRequest
+from .definitions import DEFINITIONS
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction, WritePath
 from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
@@ -308,7 +309,8 @@ class StepRecorder:
                      "request_id": scope.basis.request_id,
                      **scope.target,
                      "effective_context_window": request.context.manifest.budget,
-                     "max_output_tokens": request.max_output_tokens}))
+                     "max_output_tokens": request.max_output_tokens,
+                     "definitions_version": DEFINITIONS.version}))
         self._record_in(transaction, *drafts)
 
     def stream(self, request: ModelRequest, event: ModelStreamEvent) -> None:

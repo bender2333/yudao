@@ -11,8 +11,9 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
 from harness.event_store import run_stream
-from harness.models import EventType
+from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
+from harness.tests.helpers import happy_script
 from harness.write_path import NewEvent
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -141,6 +142,30 @@ def test_stop_reasons_outside_the_definitions_cannot_be_written(tmp_path):
     with pytest.raises(ValueError, match="cannot be recorded on transition"):
         system.writes.append(run_stream(run_id), _terminal(EventType.TRANSITION, "cancelled"))
     assert system.store.list_events(run_id) == before
+    system.close()
+
+
+def test_work_item_creation_model_requests_and_proposal_decisions_record_the_definitions_version(tmp_path):
+    invalid_spec = {"kind": "product_spec", "goal": "", "requirements": ["print"], "acceptance_criteria": ["prints"]}
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([invalid_spec, *happy_script()]))
+    project_id = system.projects.register("定义版本", "做一个命令行回显工具。")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "回显参数")
+    assert system.run_until_stop(run_id).phase == "DONE"
+
+    [created] = [event for event in system.store.list_project_events(project_id)
+                 if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    assert created.payload["work_item_id"] == work_item_id
+    assert created.payload["definitions_version"] == DEFINITIONS.version
+    events = system.store.list_events(run_id)
+    recorded = {EventType.RUN_CREATED, EventType.MODEL_REQUESTED, EventType.PROPOSAL_SUBMITTED,
+                EventType.PROPOSAL_REJECTED}
+    counts = {kind: 0 for kind in recorded}
+    for event in events:
+        if event.type in recorded:
+            counts[event.type] += 1
+            assert event.payload["definitions_version"] == DEFINITIONS.version, event.type
+    assert counts == {EventType.RUN_CREATED: 1, EventType.MODEL_REQUESTED: 5,
+                      EventType.PROPOSAL_SUBMITTED: 5, EventType.PROPOSAL_REJECTED: 1}
     system.close()
 
 

@@ -21,6 +21,7 @@
     "baseline": null,
     "command_versions": {},
     "context_window": 1500,
+    "definitions_version": "<definitions>",
     "department_prompts": {
      "engineering": {
       "department": "engineering",

@@ -23,6 +23,7 @@
      "unit-tests": 1
     },
     "context_window": 32000,
+    "definitions_version": "<definitions>",
     "department_prompts": {
      "engineering": {
       "department": "engineering",
@@ -385,6 +386,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -733,6 +735,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "product_spec",
     "raw_keys": [
@@ -1157,6 +1160,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": null,
@@ -1495,6 +1499,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "engineering_plan",
     "raw_keys": [
@@ -1867,6 +1872,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -2486,6 +2492,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
     "raw_keys": [
@@ -2513,6 +2520,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "errors": [
      {
       "field": "check_names",
@@ -2734,6 +2742,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -3356,6 +3365,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
     "raw_keys": [
@@ -3383,6 +3393,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "errors": [
      {
       "field": "check_names",
@@ -3604,6 +3615,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -4079,6 +4091,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
     "raw_keys": [
@@ -4400,6 +4413,7 @@
     "context_window": null,
     "credential_ref": null,
     "credential_version": null,
+    "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -4875,6 +4889,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "qa_review",
     "raw_keys": [

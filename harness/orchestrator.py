@@ -315,6 +315,7 @@ class Orchestrator:
                 "prompt_config_versions": dict(prompt_config_versions or {}),
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
+                "definitions_version": DEFINITIONS.version,
             },
         )
         transition = NewEvent(
@@ -940,7 +941,8 @@ class Orchestrator:
                 state_before=current.phase, state_after=current.phase,
                 session_id=session_id, provider=provider, model=model,
                 payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
-                         "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
+                         "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version,
+                         "definitions_version": DEFINITIONS.version},
             ))
         if not judged.accepted:
             transaction.append(NewEvent(
@@ -953,6 +955,7 @@ class Orchestrator:
                     "transcript_ref": transcript_ref,
                     "kind": None if proposal is None else proposal.get("kind"),
                     "input_version": basis.input_version,
+                    "definitions_version": DEFINITIONS.version,
                 },
             ))
             return
