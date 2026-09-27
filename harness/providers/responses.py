@@ -14,6 +14,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import httpx
+import httpx2
 import pydantic
 # openai 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
 import openai.resources.responses
@@ -62,9 +63,9 @@ _build_sdk_models(ResponseStreamEvent)
 # 系统信息；服务启动时先识别一次，之后读取标准库的缓存
 platform.platform()
 
-# 各次调用的客户端共用一个 SSL 上下文。httpx 为每个客户端新建上下文并加载证书，本机负载高时每次约 1 秒，
-# 而 Chat Completions 与 Messages 每次调用都新建客户端。httpcore 建立每个 TLS 连接时在上下文上设置 ALPN，
-# 全部客户端都只用 HTTP/1.1，设置的值相同
+# 各次调用的客户端共用一个 SSL 上下文。openai 的客户端使用 httpx，anthropic 的客户端使用 httpx2，两者都为每个客户端
+# 新建上下文并加载证书，本机负载高时每次约 1 秒，而 Chat Completions 与 Messages 每次调用都新建客户端。
+# httpcore 与 httpcore2 建立每个 TLS 连接时在上下文上设置 ALPN，全部客户端都只用 HTTP/1.1，设置的值相同
 _SSL_CONTEXT = httpx.create_ssl_context()
 
 
@@ -145,17 +146,17 @@ class _ProviderClock:
         self.pause()
         self._stopped = True
 
-    async def request_sent(self, _request: httpx.Request) -> None:
+    async def request_sent(self, _request: httpx.Request | httpx2.Request) -> None:
         self.resume()
 
-    async def response_started(self, response: httpx.Response) -> None:
+    async def response_started(self, response: httpx.Response | httpx2.Response) -> None:
         self.pause()
         response.stream = _ClockedBody(response.stream, self)
 
 
-class _ClockedBody(httpx.AsyncByteStream):
-    # 回复体：读取每一段期间计时
-    def __init__(self, stream: httpx.AsyncByteStream, clock: _ProviderClock) -> None:
+class _ClockedBody(httpx.AsyncByteStream, httpx2.AsyncByteStream):
+    # 回复体：读取每一段期间计时。httpx 与 httpx2 的回复都只从各自的 AsyncByteStream 读取，这个流同时属于两者
+    def __init__(self, stream: httpx.AsyncByteStream | httpx2.AsyncByteStream, clock: _ProviderClock) -> None:
         self._stream = stream
         self._clock = clock
 
@@ -457,7 +458,7 @@ class _ResponsesInvoker:
                 raise observation_errors[0]
             if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
                 raise _transport_provider_error(exc, trace=trace) from exc
-            if isinstance(exc, httpx.HTTPError):
+            if isinstance(exc, _HTTP_ERRORS):
                 raise _nonretryable_http_error() from exc
             raise
         if observation_errors:
@@ -783,16 +784,21 @@ _KNOWN_ERROR_CODES = frozenset({
 
 _NONRETRYABLE_ERROR_CODES = _KNOWN_ERROR_CODES - _RETRYABLE_ERROR_CODES
 
+# 传输错误按类型分类：openai 的客户端报告 httpx 的错误，anthropic 的客户端报告 httpx2 的同名错误
+_HTTP_ERRORS = (httpx.HTTPError, httpx2.HTTPError)
+
+_TIMEOUT_ERRORS = (httpx.TimeoutException, httpx2.TimeoutException)
+
 _RETRYABLE_HTTP_ERRORS = (
-    httpx.TimeoutException,
-    httpx.NetworkError,
-    httpx.RemoteProtocolError,
+    *_TIMEOUT_ERRORS,
+    httpx.NetworkError, httpx2.NetworkError,
+    httpx.RemoteProtocolError, httpx2.RemoteProtocolError,
 )
 
 _NONRETRYABLE_CONNECTION_ERRORS = (
-    httpx.LocalProtocolError,
-    httpx.UnsupportedProtocol,
-    httpx.InvalidURL,
+    httpx.LocalProtocolError, httpx2.LocalProtocolError,
+    httpx.UnsupportedProtocol, httpx2.UnsupportedProtocol,
+    httpx.InvalidURL, httpx2.InvalidURL,
 )
 
 
@@ -858,7 +864,7 @@ def _safe_cause_type(exc: BaseException) -> str | None:
 
 
 def _transport_provider_error(exc: BaseException, *, trace: _TransportTrace | None = None) -> ProviderError:
-    error_type = "timeout" if isinstance(exc, httpx.TimeoutException) else "connection"
+    error_type = "timeout" if isinstance(exc, _TIMEOUT_ERRORS) else "connection"
     return ProviderError(
         "Model request timed out" if error_type == "timeout" else "Model provider connection failed",
         reason="provider_timeout" if error_type == "timeout" else "provider_error",
@@ -888,7 +894,7 @@ async def _provider_events(stream: Any, trace: _TransportTrace | None = None):
             return
         except _RETRYABLE_HTTP_ERRORS as exc:
             raise _transport_provider_error(exc, trace=trace) from exc
-        except httpx.HTTPError as exc:
+        except _HTTP_ERRORS as exc:
             raise _nonretryable_http_error() from exc
         yield event
 

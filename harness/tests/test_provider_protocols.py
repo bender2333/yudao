@@ -418,6 +418,24 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
     assert PARTIAL_OUTPUT not in json.dumps(provider.requests[1])
 
 
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_request_the_client_refuses_to_send_is_not_retryable(protocol):
+    # 会话标识中的换行使请求头不合法，客户端在发出之前拒绝（LocalProtocolError）：openai 的客户端经 httpx、
+    # anthropic 的客户端经 httpx2 报告，都记为不可重试的协议错误，请求没有到达服务
+    server, capture, base = serve(lambda _body: (200, "text/event-stream", [b""]))
+    try:
+        facade = facade_with(base + "/v1", protocol=protocol)
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade),
+                   model_call(HI, max_output_tokens=64, session_id="run-1\nproduct", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert caught.value.retryable is False
+    assert caught.value.diagnostics == {"error_type": "provider_protocol"}
+    assert capture.requests == []
+
+
 def test_partial_stream_is_retryable():
     def responder(body: dict):
         # 只发一个事件就断开，模拟不完整流

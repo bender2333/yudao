@@ -157,6 +157,8 @@ class _MessagesInvoker:
             "evidence_source": "constructed_request_params",
         })
         headers = build_identity_headers(target.header_profile, invocation.session_id)
+        # anthropic 1.x 只接受 httpx2 的客户端；DefaultAsyncHttpxClient 是带 SDK 默认设置的 httpx2 客户端，
+        # 挂上共用的 SSL 上下文与计时钩子
         async with AsyncAnthropic(
             api_key=target.api_key, base_url=anthropic_base_url(target.base_url),
             timeout=target.timeout_sec, max_retries=0,
