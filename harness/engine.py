@@ -36,12 +36,19 @@ from .tools import SUBMIT_KINDS, TOOL_DEFS
 TOOL_CALL_REQUIRED_LIMIT = 3
 
 
+@dataclass(frozen=True)
+class Judgment:
+    # 安全节点的回答：是否继续，以及作出判断时 run 流的版本
+    proceed: bool
+    version: int
+
+
 class SafeNode(Protocol):
     # 安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，回答继续还是停止。
     # 这是唯一一处由下层调用上层的接口，按依赖倒置处理：接口在步骤驱动一侧定义，流程编排实现并在开始时交给步骤驱动，
     # 步骤驱动不引用流程编排
 
-    def proceed(self) -> bool:
+    def proceed(self) -> Judgment:
         # 分派新输入，回答是否继续
         ...
 
@@ -49,7 +56,7 @@ class SafeNode(Protocol):
         # 在调用方的事务中分派新输入并关闭过时的协作请求，返回事务中当前的运行状态；调用方随后判断并写入
         ...
 
-    async def wait(self, seconds: float) -> bool:
+    async def wait(self, seconds: float) -> Judgment:
         # 在安全节点等待至多 seconds 秒，其间有新输入、指导或取消时提前回答；回答是否继续
         ...
 
@@ -87,7 +94,9 @@ class Submitted:
 @dataclass(frozen=True)
 class Stopped:
     # 步骤驱动停止。reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由流程编排按当时的
-    # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行
+    # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行。
+    # version 是步骤驱动作出停止判断时（最后一次核对运行状态时）run 流的版本
+    version: int
     reason: str | None = None
     message: str = ""
 
@@ -138,6 +147,8 @@ class StepDriver:
         self._action: Action | None = None
         self._step: StepRequest | None = None
         self._task: asyncio.Task[StepResult] | None = None
+        # 最后一次核对运行状态时 run 流的版本，随停止结果交回
+        self._version = 0
 
     def cancel(self) -> None:
         # 之后的核对都得到停止；正在进行的动作按动作身份取消（进程类动作结束整个进程树，回执记为已取消）；
@@ -158,9 +169,28 @@ class StepDriver:
         try:
             return await self._steps()
         except ProviderError as exc:
-            return Stopped(exc.reason, str(exc))
+            return Stopped(self._version, exc.reason, str(exc))
+        except Exception as exc:
+            # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
+            return Stopped(self._version, "provider_error", f"{type(exc).__name__}: {exc}")
         finally:
             self._recorder.close()
+
+    def _proceed(self) -> bool:
+        judgment = self._nodes.proceed()
+        self._version = judgment.version
+        return judgment.proceed
+
+    async def _wait(self, seconds: float) -> bool:
+        judgment = await self._nodes.wait(seconds)
+        self._version = judgment.version
+        return judgment.proceed
+
+    def _settle(self, transaction: Transaction) -> RunProjection:
+        # 在这个事务中分派新输入并关闭过时的协作请求；随后的判断依据这时的运行状态
+        projection = self._nodes.settle(transaction)
+        self._version = projection.stream_version
+        return projection
 
     async def _steps(self) -> StepResult:
         limits = self._limits
@@ -169,11 +199,11 @@ class StepDriver:
         retry_of_step_id = None
         replies_without_tool_call = 0
         for step_id in range(1, limits.max_model_steps + 1):
-            if not self._nodes.proceed():
-                return Stopped()
+            if not self._proceed():
+                return Stopped(self._version)
             request = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
             if request is None or not self._start_request(request):
-                return Stopped()
+                return Stopped(self._version)
             request.attempt_started_monotonic = time.monotonic()
             try:
                 response = await self._call_model(request)
@@ -206,10 +236,10 @@ class StepDriver:
                     and attempt < limits.max_provider_attempts
                     and step_id < limits.max_model_steps
                 )
-                will_retry = can_retry and self._nodes.proceed()
+                will_retry = can_retry and self._proceed()
                 self._recorder.attempt_failed(request, retry_error, will_retry)
-                if not self._nodes.proceed():
-                    return Stopped()
+                if not self._proceed():
+                    return Stopped(self._version)
                 if not will_retry:
                     if retry_error.retryable and step_id >= limits.max_model_steps:
                         raise ProviderError(
@@ -220,9 +250,9 @@ class StepDriver:
                     diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
                     raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
                 if not self._schedule_retry(request, retry_error, delay, step_id + 1):
-                    return Stopped()
-                if not await self._nodes.wait(delay):
-                    return Stopped()
+                    return Stopped(self._version)
+                if not await self._wait(delay):
+                    return Stopped(self._version)
                 attempt += 1
                 retry_of_step_id = step_id
                 continue
@@ -243,10 +273,10 @@ class StepDriver:
             attempt = 1
             root_step_id = step_id + 1
             retry_of_step_id = None
-            if not self._nodes.proceed():
+            if not self._proceed():
                 self._skip(request, response.output,
                            "Not executed because this activation ended or its input changed during the model request.")
-                return Stopped()
+                return Stopped(self._version)
             if request.purpose == "compaction":
                 self._finish_compaction(request, response)
                 continue
@@ -269,10 +299,10 @@ class StepDriver:
             for index, item in enumerate(response.output):
                 if item.get("type") != "function_call":
                     continue
-                if not self._nodes.proceed():
+                if not self._proceed():
                     self._skip(request, response.output[index:],
                                "Not executed because this activation ended or its input changed before these tools started.")
-                    return Stopped()
+                    return Stopped(self._version)
                 identity = str(item.get("call_id") or "")
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
@@ -289,7 +319,7 @@ class StepDriver:
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
-                        return Stopped()
+                        return Stopped(self._version)
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
                     elif TOOL_DEFS[name]["kind"] == "host":
@@ -307,10 +337,10 @@ class StepDriver:
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
                 self._recorder.tool_called(request, call)
-                if not self._nodes.proceed():
+                if not self._proceed():
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
-                    return Stopped()
+                    return Stopped(self._version)
                 if name in SUBMIT_KINDS:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
@@ -329,7 +359,7 @@ class StepDriver:
             projection = transaction.projection
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return None
-            projection = self._nodes.settle(transaction)
+            projection = self._settle(transaction)
             if scope.basis.changed(projection, scope.department):
                 return None
             target = self._target
@@ -383,7 +413,7 @@ class StepDriver:
         scope = self._scope
 
         def start(transaction: Transaction) -> bool:
-            projection = self._nodes.settle(transaction)
+            projection = self._settle(transaction)
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return False
             if scope.basis.changed(projection, scope.department):
@@ -406,7 +436,7 @@ class StepDriver:
         scope = self._scope
 
         def schedule(transaction: Transaction) -> bool:
-            projection = self._nodes.settle(transaction)
+            projection = self._settle(transaction)
             if (projection.phase in TERMINAL_PHASES or self._cancelled.is_set()
                     or scope.basis.changed(projection, scope.department)):
                 return False
@@ -420,6 +450,7 @@ class StepDriver:
 
         def finish(transaction: Transaction) -> None:
             projection = transaction.projection
+            self._version = projection.stream_version
             if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
                 return
             if scope.basis.changed(projection, scope.department):
@@ -439,7 +470,7 @@ class StepDriver:
         scope = self._scope
 
         def begin(transaction: Transaction) -> tuple[ToolPermission, WorkspaceFacts]:
-            projection = self._nodes.settle(transaction)
+            projection = self._settle(transaction)
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
                 projection, call, department=scope.department, guidance_only=scope.guidance_only,

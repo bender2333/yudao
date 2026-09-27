@@ -60,7 +60,10 @@ class Snapshot:
         return list(self._committed)
 
     def events_after(self, version: int) -> list[Any]:
-        return [event for event in self.events() if event.stream_version > version]
+        # 流中版本大于 version、到读取时的版本为止的事件
+        if self._committed is not None:
+            return [event for event in self._committed if event.stream_version > version]
+        return self._store.stream_events(self.stream, after_version=version, through_version=self.version)
 
 
 class Transaction(Snapshot):
@@ -85,6 +88,9 @@ class Transaction(Snapshot):
 
     def events(self) -> list[Any]:
         return super().events() + self.appended
+
+    def events_after(self, version: int) -> list[Any]:
+        return super().events_after(version) + [event for event in self.appended if event.stream_version > version]
 
     def on_abort(self, compensation: Callable[[], None]) -> None:
         # 登记事务没有提交时要撤回的外部效果（例如已经发布的材料）

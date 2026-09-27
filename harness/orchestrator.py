@@ -24,7 +24,7 @@ from .collaboration import guidance_resume_phase, request_still_applicable, resu
 from .environment import LocalEnvironment
 from .event_store import EventStore, run_stream
 from .write_path import NewEvent, Transaction, WritePath
-from .engine import StepDriver, StepLimits, Stopped
+from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .models import (
@@ -55,13 +55,14 @@ from .workspace import Workspace, WorkspaceSnapshot
 @dataclass
 class _Activation:
     # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词、调用目标与适配器，
-    # 中止信号，步骤驱动，以及在安全节点等待重试时的唤醒
+    # 中止信号，激活开始时 run 流的版本，步骤驱动，以及在安全节点等待重试时的唤醒
     scope: ActivationScope
     prompt: DepartmentPrompt
     abort_flag: Event
     adapter: ModelAdapter
     target: FrozenTarget | None
     yielded_work: dict[str, Any] | None
+    version: int
     driver: StepDriver | None = None
     wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
 
@@ -80,13 +81,13 @@ class _SafeNode:
         self._orchestrator = orchestrator
         self._activation = activation
 
-    def proceed(self) -> bool:
+    def proceed(self) -> Judgment:
         return self._orchestrator._at_safe_node(self._activation)
 
     def settle(self, transaction: Transaction) -> RunProjection:
         return self._orchestrator._close_obsolete_request(transaction)
 
-    async def wait(self, seconds: float) -> bool:
+    async def wait(self, seconds: float) -> Judgment:
         return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
 
     def end(self, transaction: Transaction, reason: str, message: str) -> None:
@@ -446,13 +447,13 @@ class Orchestrator:
         ))
         return transaction.projection
 
-    def _at_safe_node(self, activation: _Activation) -> bool:
-        # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续
-        def judge(transaction: Transaction) -> bool:
+    def _at_safe_node(self, activation: _Activation) -> Judgment:
+        # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续与判断时的流版本
+        def judge(transaction: Transaction) -> Judgment:
             projection = transaction.projection
             if not (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)):
                 projection = self._assign_new_inputs(transaction)
-            return not self._stop_requested(activation, projection)
+            return Judgment(not self._stop_requested(activation, projection), projection.stream_version)
 
         return self.writes.transact(run_stream(activation.run_id), judge)
 
@@ -470,7 +471,7 @@ class Orchestrator:
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
         return projection.run_time_limit_sec - (time.monotonic() - self._run_start_times.get(run_id, time.monotonic()))
 
-    async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> bool:
+    async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
         # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
         loop = asyncio.get_running_loop()
@@ -479,12 +480,13 @@ class Orchestrator:
             while True:
                 changed = asyncio.Event()
                 activation.wakeup = (loop, changed)
-                if not self._at_safe_node(activation):
-                    return False
+                judgment = self._at_safe_node(activation)
+                if not judgment.proceed:
+                    return judgment
                 time_left = self._time_left(activation.run_id, self.project(activation.run_id))
                 remaining = deadline - loop.time()
                 if remaining <= 0:
-                    return True
+                    return judgment
                 try:
                     await asyncio.wait_for(changed.wait(), max(0.0, min(remaining, time_left)))
                 except TimeoutError:
@@ -732,7 +734,8 @@ class Orchestrator:
             guidance_only=guidance_only, basis=basis, provider=self._configured_provider(target, adapter),
             target=target_metadata, secret=getattr(target, "api_key", None),
         )
-        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, target, yielded_work)
+        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, target, yielded_work,
+                           transaction.projection.stream_version)
 
     @staticmethod
     def _work_basis(projection: RunProjection) -> dict[str, Any]:
@@ -811,10 +814,11 @@ class Orchestrator:
             )
             result = await activation.driver.result()
         except Exception as exc:
-            self._end_run(run_id, "provider_error", f"{type(exc).__name__}: {exc}")
+            # 步骤驱动没有开始：依据是激活开始时的运行状态
+            self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
             return
         if isinstance(result, Stopped) and result.reason is not None:
-            self._end_run(run_id, result.reason, result.message)
+            self._end_run(activation, result.reason, result.message, result.version)
             return
 
         current = self.project(run_id)
@@ -823,8 +827,9 @@ class Orchestrator:
         if isinstance(result, Stopped):
             elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
             if elapsed >= current.run_time_limit_sec:
-                self._end_run(run_id, "time_limit",
-                              f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s")
+                self._end_run(activation, "time_limit",
+                              f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s",
+                              result.version)
             return
         submission = result
 
@@ -843,7 +848,7 @@ class Orchestrator:
                 model=submission.response.model,
             )
         except Exception as exc:
-            self._end_run(run_id, "host_commit_error", f"{type(exc).__name__}: {exc}")
+            self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
 
     def _apply_proposal(
         self,
@@ -1036,9 +1041,25 @@ class Orchestrator:
             },
         ))
 
-    def _end_run(self, run_id: str, reason: str, message: str) -> None:
-        # 在一个事务中按停止原因暂停或结束运行
-        self.writes.transact(run_stream(run_id), lambda transaction: self._end(transaction, reason, message))
+    def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None) -> None:
+        # 在一个事务中按停止原因暂停或结束运行。version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有
+        # 用户的命令或输入写入；有写入、并且写入改变了这次激活的依据（输入或指导）时，停止判断已经过期，
+        # 按安全节点停止处理，运行继续，由下一次激活处理新的输入或指导。运行时间用完不因此改变；
+        # 已经结束（例如已经取消）的运行不再写入
+        def end(transaction: Transaction) -> None:
+            if version is not None and reason != "time_limit" and self._superseded(transaction, activation, version):
+                return
+            self._end(transaction, reason, message)
+
+        self.writes.transact(run_stream(activation.run_id), end)
+
+    def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
+        if not any(event.role == "user" for event in transaction.events_after(version)):
+            return False
+        projection = transaction.projection
+        basis = activation.scope.basis
+        return (projection.input_version != basis.input_version
+                or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
         # 按停止原因暂停或结束运行；已经结束的运行不再写入
