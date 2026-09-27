@@ -238,8 +238,12 @@ def _tail_server(mode, *, timeout_sec=5):
                     self.wfile.flush()
                     return
                 if mode == "done":
-                    self._send(response + b"data: [DONE]\n\n", keep_open=True)
+                    # [DONE] 之后既不送完声明的长度，也不关闭连接
+                    body = response + b"data: [DONE]\n\n"
+                    self._send(body, content_length=len(body) + 10, keep_open=True)
                     terminal_sent.set()
+                    release.wait(5)
+                    self.close_connection = True
                     return
                 if mode == "hold":
                     self._send(response, content_length=len(response) + 10, keep_open=True)
@@ -647,29 +651,25 @@ def test_completed_stream_with_segmented_eof_is_reused_and_does_not_observe_tail
 
 
 def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_connection():
-    # 从交回终态的用量到调用返回（排空与关闭）的用时；服务端在 [DONE] 之后保持连接不关闭
-    finished_after_terminal = []
-
-    def complete(loop, session_id):
-        terminal = []
-        result = ResponsesAdapter(config, loop=loop).complete(
-            _request(session_id=session_id),
-            lambda event: terminal.append(time.monotonic()) if event.kind == "usage" else None,
-        )
-        finished_after_terminal.append(time.monotonic() - terminal[0])
-        return result
-
+    # 第一次回复在 [DONE] 之后既不送完声明的长度也不关闭连接：读到 [DONE] 流就结束，调用不等待服务端，
+    # 用不上 5 秒的排空时限；连接没有读完，不能复用。计时从交回终态的用量到调用返回
+    terminal = []
     with _tail_server("done") as (config, captures, client_ports, terminal_sent, _release, errors):
-        with ConnectionLoop() as loop:
-            first = complete(loop, "first")
+        with ConnectionLoop(ProviderConnections(drain_timeout_sec=5)) as loop:
+            first = ResponsesAdapter(config, loop=loop).complete(
+                _request(session_id="first"),
+                lambda event: terminal.append(time.monotonic()) if event.kind == "usage" else None,
+            )
+            returned = time.monotonic()
             assert terminal_sent.is_set()
-            second = complete(loop, "second")
+            second = ResponsesAdapter(config, loop=loop).complete(_request(session_id="second"))
 
     assert not errors
     assert first.output == second.output == [TEXT]
     assert len(captures) == 2
     assert len(set(client_ports)) == 2
-    assert all(duration < 1 for duration in finished_after_terminal), finished_after_terminal
+    assert len(terminal) == 1
+    assert returned - terminal[0] < 1
 
 
 def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeypatch):

@@ -157,7 +157,7 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
             return
 
         def do_POST(self) -> None:
-            capture: dict[str, Any] = {"arrived": time.monotonic(), "finished": None}
+            capture: dict[str, Any] = {"arrived": time.monotonic()}
             try:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 capture.update({
@@ -172,6 +172,8 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
             except BaseException as exc:
                 errors.append(exc)
                 reply = _error()
+            # 开始送出回复的时刻：客户端在这之前收不到回复，连接最早从这以后才空闲
+            capture["replied"] = time.monotonic()
             self.send_response(reply.status)
             self.send_header("Content-Type", reply.content_type)
             self.send_header("Content-Length", str(len(reply.body)))
@@ -184,7 +186,6 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
                 return
-            capture["finished"] = time.monotonic()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
@@ -205,13 +206,13 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
 
 
 def _connections_kept_alive(captures: list[dict[str, Any]]) -> list[tuple[int, int]]:
-    # 连接池中的空闲连接超过保持时限（SDK 的 DEFAULT_CONNECTION_LIMITS）就关闭。相邻两次请求之间，
-    # 服务端送完回复到收到下一次请求的时间长于客户端连接的空闲时间；这段时间短于保持时限时，
-    # 两次请求必须使用同一个连接。返回这些相邻请求的端口
+    # Responses 的连接池使用 SDK 的默认连接限制（DEFAULT_CONNECTION_LIMITS），空闲超过保持时限的连接关闭。
+    # 相邻两次请求之间，服务端开始送出回复到收到下一次请求的时间不短于客户端连接的空闲时间；这段时间短于
+    # 保持时限时，两次请求必须使用同一个连接。运行按顺序发出请求，两次请求不会同时进行。返回这些相邻请求的端口
     keepalive = DEFAULT_CONNECTION_LIMITS.keepalive_expiry
     return [(earlier["client_port"], later["client_port"])
             for earlier, later in zip(captures, captures[1:])
-            if later["arrived"] - earlier["finished"] < keepalive]
+            if 0 <= later["arrived"] - earlier["replied"] < keepalive]
 
 
 def _part(body: dict[str, Any], name: str) -> str | None:
@@ -395,8 +396,11 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert all(item["authorization"] == "Bearer provider-b-key-v1" for item in captures_b)
         assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product", "a-quality", "a-quality"]
         assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 4
-        for captures in (captures_a, captures_b):
-            assert all(earlier == later for earlier, later in _connections_kept_alive(captures)), captures
+        timeline = [(item["client_port"], round(item["arrived"], 2), round(item["replied"], 2))
+                    for item in captures_a + captures_b]
+        kept_alive = _connections_kept_alive(captures_a) + _connections_kept_alive(captures_b)
+        assert kept_alive, timeline
+        assert all(earlier == later for earlier, later in kept_alive), timeline
         assert {item["client_port"] for item in captures_a}.isdisjoint(
             item["client_port"] for item in captures_b
         )
