@@ -13,7 +13,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any
 
-from .actions import FactsQuery
+from .actions import FactsQuery, TreeFacts
 from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
@@ -22,8 +22,8 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .environment import LocalEnvironment
-from .event_store import EventStore, run_stream
-from .write_path import NewEvent, Transaction, WritePath
+from .event_store import EventStore, StreamVersionConflict, run_stream
+from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
@@ -49,6 +49,7 @@ from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import normalize_registered_commands
+from .validation import ProposalDecision
 from .workspace import Workspace, WorkspaceSnapshot
 
 
@@ -865,57 +866,88 @@ class Orchestrator:
         model: str | None,
         yielded_work: dict[str, Any] | None = None,
     ) -> None:
-        # 提案先按读取时的运行状态与工作区事实校验；提交的事务中关闭过时的协作请求以后，由 U 按事务中的运行状态与
-        # 工作区事实作提交判断，再写入提交、拒绝或接纳的事件。
+        # 提案先按读取时的运行状态与工作区事实校验，并记下读取的流版本；提交以这个版本作为期望版本：
+        # 事务中关闭过时的协作请求以后，由 U 按事务中的运行状态与工作区事实作提交判断，再写入提交、拒绝或接纳的事件。
+        # 校验以后另一方写入了这个 run 时写入口拒绝提交，按写入以后的状态重新校验与判断（仍然有效就提交，
+        # 否则按 execution_basis 拒绝）。
         # 工作区事实向执行环境查询；提交需要带文件内容的公开树（交付封存），提交判断使用同一次读取的事实
         environment = self._environment(run_id)
-        evaluated = self.writes.read(run_stream(run_id))
-        facts = environment.query(FactsQuery(tree=True)).tree
-        decision = proposal_decision(evaluated.projection, department=department, proposal=proposal, facts=facts,
-                                     events=evaluated.events())
-
-        def commit(transaction: Transaction) -> None:
-            current = transaction.projection
-            if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        while True:
+            evaluated = self.writes.read(run_stream(run_id))
+            facts = environment.query(FactsQuery(tree=True)).tree
+            decision = proposal_decision(evaluated.projection, department=department, proposal=proposal,
+                                         facts=facts, events=evaluated.events())
+            try:
+                self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
+                    transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
+                    department=department, started=projection, basis=basis, proposal=proposal,
+                    transcript_ref=transcript_ref, parent_event_id=parent_event_id, session_id=session_id,
+                    provider=provider, model=model, yielded_work=yielded_work,
+                ), expected_version=evaluated.version)
                 return
-            current = self._close_obsolete_request(transaction)
-            snapshot = environment.snapshot()
-            judged = commit_decision(
-                decision, department=department, proposal=proposal, basis=basis, started=projection,
-                evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
-                events=transaction.events(),
-            )
-            if proposal is not None:
-                transaction.append(NewEvent(
-                    EventType.PROPOSAL_SUBMITTED, role=department,
-                    parent_event_id=parent_event_id,
-                    state_before=current.phase, state_after=current.phase,
-                    session_id=session_id, provider=provider, model=model,
-                    payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
-                             "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
-                ))
-            if not judged.accepted:
-                transaction.append(NewEvent(
-                    EventType.PROPOSAL_REJECTED, role=department,
-                    parent_event_id=parent_event_id,
-                    state_before=current.phase, state_after=current.phase,
-                    session_id=session_id, provider=provider, model=model,
-                    payload={
-                        "errors": judged.error_dicts,
-                        "transcript_ref": transcript_ref,
-                        "kind": None if proposal is None else proposal.get("kind"),
-                        "input_version": basis.input_version,
-                    },
-                ))
-                return
-            self._commit_accepted(
-                transaction, department=department, snapshot=snapshot,
-                artifact=judged.artifact or {}, transitions=judged.transitions,
-                parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
-                yielded_work=yielded_work,
-            )
+            except StreamVersionConflict:
+                continue
 
-        self.writes.transact(run_stream(run_id), commit)
+    def _commit_proposal(
+        self,
+        transaction: Transaction,
+        *,
+        evaluated: Snapshot,
+        facts: TreeFacts,
+        decision: ProposalDecision,
+        environment: LocalEnvironment,
+        department: str,
+        started: RunProjection,
+        basis: WorkBasis,
+        proposal: dict[str, Any] | None,
+        transcript_ref: dict[str, Any] | None,
+        parent_event_id: str,
+        session_id: str,
+        provider: str | None,
+        model: str | None,
+        yielded_work: dict[str, Any] | None,
+    ) -> None:
+        # 提交的事务：读取的流版本就是校验时的版本
+        run_id = transaction.projection.run_id
+        current = transaction.projection
+        if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+            return
+        current = self._close_obsolete_request(transaction)
+        snapshot = environment.snapshot()
+        judged = commit_decision(
+            decision, department=department, proposal=proposal, basis=basis, started=started,
+            evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
+            events=transaction.events(),
+        )
+        if proposal is not None:
+            transaction.append(NewEvent(
+                EventType.PROPOSAL_SUBMITTED, role=department,
+                parent_event_id=parent_event_id,
+                state_before=current.phase, state_after=current.phase,
+                session_id=session_id, provider=provider, model=model,
+                payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
+                         "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version},
+            ))
+        if not judged.accepted:
+            transaction.append(NewEvent(
+                EventType.PROPOSAL_REJECTED, role=department,
+                parent_event_id=parent_event_id,
+                state_before=current.phase, state_after=current.phase,
+                session_id=session_id, provider=provider, model=model,
+                payload={
+                    "errors": judged.error_dicts,
+                    "transcript_ref": transcript_ref,
+                    "kind": None if proposal is None else proposal.get("kind"),
+                    "input_version": basis.input_version,
+                },
+            ))
+            return
+        self._commit_accepted(
+            transaction, department=department, snapshot=snapshot,
+            artifact=judged.artifact or {}, transitions=judged.transitions,
+            parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
+            yielded_work=yielded_work,
+        )
 
     def _commit_accepted(
         self,
