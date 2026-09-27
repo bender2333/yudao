@@ -248,7 +248,7 @@ def test_unreported_normalized_usage_keeps_unknown_source_and_is_excluded_from_p
         tmp_path,
         FakeAdapter([FakeTurn(proposal=product_spec(), usage=usage)]),
     )
-    run_id = system.create_run("estimated usage")
+    run_id = system.create_run("unreported usage")
     system.activate_once(run_id)
 
     query = ObservabilityQuery(system.store, system.artifacts)
@@ -258,16 +258,7 @@ def test_unreported_normalized_usage_keeps_unknown_source_and_is_excluded_from_p
     assert row["usage"]["total_tokens"] == 7
     summary = query.model_usage(run_id)
     assert summary["coverage"]["reported_attempts"] == 0
-    assert summary["coverage"]["estimated_attempts"] == 0
     assert summary["totals"]["total_tokens"] is None
-    assert summary["estimated_totals"]["total_tokens"] is None
-
-    # 估计的用量单独合计，不计入上报的合计
-    estimated = query.usage_summary([
-        {"sent": True, "status": "completed", "usage": {"source": "estimated", "reported": False, "total_tokens": 9}},
-    ])
-    assert estimated["estimated_totals"]["total_tokens"] == 9
-    assert estimated["totals"]["total_tokens"] is None
 
 
 def test_usage_totals_reported_cost_sums_same_currency(tmp_path: Path):
