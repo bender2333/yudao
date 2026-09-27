@@ -1,6 +1,7 @@
-# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止）、激活的准备与收尾、新输入的分派、
-# 提案接纳以后的流转、暂停与失败。一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；
-# 同时为步骤驱动实现安全节点接口。流程编排不调用模型。
+# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止、作为任务开始）、激活的准备与收尾、
+# 新输入的分派、提案接纳以后的流转、用户决定（发出决定请求、按回答解除阻塞、运行结束时撤销）、暂停与失败。
+# 一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；同时为步骤驱动实现安全节点接口。
+# 流程编排不调用模型。
 # 每一处「读取运行状态、判断、写入」都是写入口的一个事务（WritePath.transact）：判断期间不持有锁，
 # 另一方在读取以后写入了同一个 run，提交被拒绝，按写入以后的状态重新判断。
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,8 +24,11 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
+from .decisions import (
+    MODEL_UNAVAILABLE, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision, blocks_run,
+)
 from .environment import LocalEnvironment
-from .event_store import EventStore, StreamVersionConflict, run_stream
+from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
@@ -33,6 +37,7 @@ from .definitions import DEFINITIONS
 from .models import (
     Event as RunEvent,
     DEPARTMENTS,
+    DecisionRequest,
     DepartmentPrompt,
     EventType,
     TERMINAL_PHASES,
@@ -42,7 +47,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .providers.resolve import FrozenTarget, ResolveSnapshot
-from .projection import RunNotFoundError, RunProjection, project_run
+from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .recording import ActivationScope
 from .sessions import SessionFactory
@@ -220,6 +225,8 @@ class Orchestrator:
         self._active: dict[str, _Activation] = {}
         self._snapshots: dict[str, ResolveSnapshot] = {}
         self._run_start_times: dict[str, float] = {}
+        # 作为任务开始（start）的 run 与它的任务；任务结束时移除
+        self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
 
     def create_run(
         self,
@@ -495,15 +502,18 @@ class Orchestrator:
             projection = transaction.projection
             if not (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)):
                 projection = self._assign_new_inputs(transaction)
-            return Judgment(not self._stop_requested(activation, projection), projection.stream_version)
+            stop = self._stop_requested(activation, projection, transaction.decisions.values())
+            return Judgment(not stop, projection.stream_version)
 
         return self.writes.transact(run_stream(activation.run_id), judge)
 
-    def _stop_requested(self, activation: _Activation, projection: RunProjection) -> bool:
-        # 停止判断：中止、运行时间用完、终态、输入版本改变或有新的指导；只读取，不写入
+    def _stop_requested(self, activation: _Activation, projection: RunProjection,
+                        decisions: Iterable[DecisionRequest]) -> bool:
+        # 停止判断：中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、输入版本改变或有新的指导；
+        # 只读取，不写入
         basis = activation.scope.basis
         return (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)
-                or projection.phase in TERMINAL_PHASES
+                or projection.phase in TERMINAL_PHASES or blocks_run(decisions)
                 or projection.input_version != basis.input_version
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
@@ -599,18 +609,50 @@ class Orchestrator:
             self._wake(activation.run_id)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
+        # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
         # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用
         connections = ProviderConnections()
         try:
             while True:
-                projection = self.project(run_id)
+                snapshot = self.writes.read(run_stream(run_id))
+                projection = snapshot.projection
+                if not projection.run_id:
+                    raise RunNotFoundError(run_id)
                 if projection.phase in TERMINAL_PHASES:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
                     return await asyncio.to_thread(self._settled, run_id)
+                if blocks_run(snapshot.decisions.values()):
+                    return projection
                 await self._activate_once(run_id, connections)
         finally:
             await connections.aclose()
+
+    def start(self, run_id: str) -> asyncio.Task[RunProjection]:
+        # 在当前事件循环中把这个 run 作为任务运行到停止（run_until_stop）；这个 run 已有任务时，新任务在它结束以后开始。
+        # 任务出错时交给事件循环的异常处理报告
+        previous = self._tasks.get(run_id)
+        task = asyncio.get_running_loop().create_task(self._run_after(previous, run_id))
+        self._tasks[run_id] = task
+        task.add_done_callback(lambda done: self._task_done(run_id, done))
+        return task
+
+    def execution(self, run_id: str) -> asyncio.Task[RunProjection] | None:
+        # 这个 run 正在进行的任务；没有时为空
+        return self._tasks.get(run_id)
+
+    async def _run_after(self, previous: asyncio.Task[RunProjection] | None, run_id: str) -> RunProjection:
+        if previous is not None:
+            await asyncio.wait([previous])
+        return await self.run_until_stop(run_id)
+
+    def _task_done(self, run_id: str, task: asyncio.Task[RunProjection]) -> None:
+        if self._tasks.get(run_id) is task:
+            del self._tasks[run_id]
+        if not task.cancelled() and task.exception() is not None:
+            task.get_loop().call_exception_handler({
+                "message": f"run {run_id} stopped with an error", "exception": task.exception(), "task": task,
+            })
 
     async def activate_once(self, run_id: str) -> RunProjection:
         connections = ProviderConnections()
@@ -668,6 +710,9 @@ class Orchestrator:
             self._run_start_times[run_id] = time.monotonic()
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
+        if blocks_run(transaction.decisions.values()):
+            # 等待用户回答阻塞 run 的决定请求：不开始新的激活，什么也不写
+            return None
         projection = self._close_obsolete_request(transaction)
         if projection.phase in TERMINAL_PHASES:
             return None
@@ -711,7 +756,7 @@ class Orchestrator:
                 # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
                 adapter = FacadeAdapter(self.facade, target, connections=connections)
             except (KeyError, ValueError) as exc:
-                self._fail(transaction, "provider_unavailable", str(exc))
+                self._await_model(transaction, department, None, "provider_unavailable", str(exc))
                 return None
         else:
             if self.test_adapter_factory is None:
@@ -724,12 +769,15 @@ class Orchestrator:
             try:
                 adapter = self.test_adapter_factory(department)
             except Exception as exc:
-                self._fail(transaction, "provider_unavailable", f"test adapter creation failed: {exc}")
+                self._await_model(transaction, department, None, "provider_unavailable",
+                                  f"test adapter creation failed: {exc}")
                 return None
 
         availability = adapter.availability()
         if not availability.available:
-            self._fail(transaction, availability.reason or "provider_unavailable", availability.message)
+            # 这次激活的第一次请求之前模型引用就无法使用：run 停在这次请求之前，等待用户修复配置后回答
+            self._await_model(transaction, department, self._target_metadata(target, adapter, snapshot_id),
+                              availability.reason or "provider_unavailable", availability.message)
             return None
 
         try:
@@ -1028,6 +1076,7 @@ class Orchestrator:
                 payload={"from": source, "to": target, "route": f"{source}->{target}"},
             ))
             if target == "DONE":
+                self._withdraw_decisions(transaction, "released")
                 transaction.append(NewEvent(
                     EventType.RUN_DONE,
                     role="quality",
@@ -1110,16 +1159,87 @@ class Orchestrator:
         ))
 
     def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None) -> None:
-        # 在一个事务中按停止原因暂停或结束运行。version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有
-        # 用户的命令或输入写入；有写入、并且写入改变了这次激活的依据（输入或指导）时，停止判断已经过期，
-        # 按安全节点停止处理，运行继续，由下一次激活处理新的输入或指导。运行时间用完不因此改变；
-        # 已经结束（例如已经取消）的运行不再写入
+        # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）时 run 进入待恢复。
+        # version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有用户的命令或输入写入；有写入、并且写入
+        # 改变了这次激活的依据（输入或指导）时，停止判断已经过期，按安全节点停止处理，运行继续，由下一次激活处理
+        # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入
         def end(transaction: Transaction) -> None:
             if version is not None and reason != "time_limit" and self._superseded(transaction, activation, version):
+                return
+            if reason == "provider_unavailable":
+                scope = activation.scope
+                self._await_model(transaction, scope.department, scope.target, reason, message,
+                                  facts=self._failed_attempts(transaction, scope.activation_id))
                 return
             self._end(transaction, reason, message)
 
         self.writes.transact(run_stream(activation.run_id), end)
+
+    @staticmethod
+    def _failed_attempts(transaction: Transaction, activation_id: str) -> list[str]:
+        # 这次激活中最后一次失败的调用尝试（这次请求无法发送或被拒绝的记录）
+        failed = [event.event_id for event in transaction.events()
+                  if event.type == EventType.MODEL_ATTEMPT_FAILED and event.payload["activation_id"] == activation_id]
+        return failed[-1:]
+
+    def _await_model(self, transaction: Transaction, department: str, target: dict[str, Any] | None,
+                     reason: str, message: str, *, facts: list[str] | None = None) -> None:
+        # 模型引用无法使用（模型管理设计说明第 5.5 节）：run 进入待恢复，停在这次请求之前，发出待恢复的决定请求，
+        # 写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的运行不再写入
+        projection = transaction.projection
+        run_id = projection.run_id
+        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+            return
+        kind = MODEL_UNAVAILABLE
+        model = "（没有找到调用目标）" if target is None else target["requested_model"]
+        transaction.append(NewEvent(
+            EventType.DECISION_REQUESTED, actor="system", role=department,
+            state_before=projection.phase, state_after=projection.phase,
+            payload={
+                "kind": kind.name, "blocks": kind.blocks,
+                "options": [{"id": option.id, "label": option.label} for option in kind.options],
+                "description": (f"部门 {department} 的模型 {model} 无法使用：{message}。修复模型配置或凭据以后选择"
+                                "「继续执行」，事项从这次请求接着进行，已完成的工作与已用限额保留；"
+                                "选择「停止事项」则运行结束。"),
+                "facts": list(facts or []), "department": department, "target": target,
+                "reason": reason, "message": message,
+            },
+        ))
+        transaction.on_commit(lambda: self._wake(run_id))
+
+    def answer_decision(self, decision_id: str, option: str, note: str | None, *, base_version: int,
+                        command: Command) -> str | None:
+        # 回答一个决定请求：在写入口的一个事务中登记命令身份，核对请求仍未回答、基准版本等于请求的版本、选项是
+        # 请求给出的选项，追加回答，并按回答解除阻塞（待恢复选择停止事项时在同一事务中结束运行）。
+        # 核对不通过时抛出 DecisionClosed、StaleDecision 或 InvalidOption，什么也不写，命令不登记。
+        # 返回回答以后需要继续执行的 run，由调用方开始（start）；没有时为空
+        saved = saved_decision(self.store, decision_id)
+        if saved is None:
+            raise DecisionNotFound(decision_id)
+
+        def answer(transaction: Transaction) -> str | None:
+            decision = transaction.decisions[decision_id]
+            if decision.status != "open":
+                raise DecisionClosed(decision)
+            if base_version != decision.version:
+                raise StaleDecision(decision, base_version)
+            if option not in [item["id"] for item in decision.request["options"]]:
+                raise InvalidOption(decision, option)
+            projection = transaction.projection
+            transaction.append(NewEvent(
+                EventType.DECISION_ANSWERED, role=decision.request["department"], parent_event_id=decision_id,
+                state_before=projection.phase, state_after=projection.phase,
+                payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
+            ))
+            transaction.on_commit(lambda: self._wake(projection.run_id))
+            if decision.kind == MODEL_UNAVAILABLE.name and option == "stop":
+                self._fail(transaction, "cancelled", "run stopped by the user's decision")
+                return None
+            if blocks_run(transaction.decisions.values()):
+                return None
+            return projection.run_id
+
+        return self.writes.transact(saved.stream, answer, command=command)
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         if not any(event.role == "user" for event in transaction.events_after(version)):
@@ -1139,6 +1259,18 @@ class Orchestrator:
         else:
             raise ValueError(f"stop reason {reason} ends a run by release, which only an accepted QA review records")
 
+    def _withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
+        # 运行结束：撤销未回答的决定请求，reason 是结束运行的停止原因
+        projection = transaction.projection
+        for decision in list(transaction.decisions.values()):
+            if decision.status != "open":
+                continue
+            transaction.append(NewEvent(
+                EventType.DECISION_WITHDRAWN, actor="system", role=decision.request["department"],
+                parent_event_id=decision.decision_id, state_before=projection.phase, state_after=projection.phase,
+                payload={"decision_id": decision.decision_id, "reason": reason},
+            ))
+
     def _pause(self, transaction: Transaction, reason: str) -> None:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
@@ -1146,6 +1278,7 @@ class Orchestrator:
         department = projection.active_department
         projection = self._close_request(transaction, status="stopped", reason=reason,
                                          return_phase=projection.phase, return_work_valid=False)
+        self._withdraw_decisions(transaction, reason)
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, role=department,
             state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
@@ -1171,6 +1304,7 @@ class Orchestrator:
         status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
         projection = self._close_request(transaction, status=status, reason=reason,
                                          return_phase=projection.phase, return_work_valid=False)
+        self._withdraw_decisions(transaction, reason)
         source_event = transaction.append(NewEvent(
             EventType.RUN_FAILED, role=department,
             state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,

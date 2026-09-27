@@ -16,7 +16,7 @@ from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
 from .contracts import current_contract_hash, current_plan_hash
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
-from .event_store import EventStore
+from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
 from .models import (ArtifactRef, EventType, RunProjection, canonical_hash, department_for_phase, estimate_tokens,
                      json_dumps)
@@ -137,6 +137,10 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "outcome": projection.outcome,
         "stop_reason": projection.stop_reason,
         "error": projection.error,
+        # 运行停下等待用户回答时，未回答的请求说明原因（例如模型引用无法使用时的待恢复）
+        "decisions": [{"kind": decision.kind, "status": decision.status,
+                       "description": decision.request["description"]}
+                      for decision in system.writes.read(run_stream(run_id)).decisions.values()],
         "adapter": projection.adapter,
         "provider": projection.provider,
         "model": projection.model,
