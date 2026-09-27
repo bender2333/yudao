@@ -176,3 +176,5 @@ claude-opus-5-5 / 2026-09-27 11:44 / #44 完成后更新：docs/design/architect
 claude-opus-5-5 / 2026-09-27 12:55 / docs/architecture-issues.md 登记三条：取消进行中时激活与运行循环交回的运行状态（#107）、三种协议的传输诊断只有 Responses 有传输阶段（#108）、Messages 流中的过载错误与流式进度的协议差异（#108 代码审查） / #107 修正了取消与激活结束之间的先后，需要写进总体架构；#108 按工单保持 Chat Completions 的结果不变，另外发现的协议差异需要架构师决定是否开工单
 
 claude-opus-5-5 / 2026-09-27 16:55 / docs/architecture-issues.md 登记一条：两个运行同时进行的测试按墙钟时限等待的主机工作包含接纳规格时的 16 个 Git 子进程（#107） / 负载更高时这项测试仍有失败，工单不允许加长等待，需要架构师决定减少子进程或调整测试核对的内容
+
+claude-opus-5-5 / 2026-09-27 17:40 / docs/design/architecture/overall-architecture.md 第 5 节写明取消由发起的一方写入、交回的运行状态包含已经开始的取消；docs/architecture-issues.md 为 #107、#108 登记的四条问题追加处理结论（#111、#112） / #105、#107、#108 完成后处理登记的问题
