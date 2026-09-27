@@ -22,6 +22,7 @@ def _stop_reasons(outcome: str) -> Any:
 ReleasedReason = _stop_reasons("done")
 PausedReason = _stop_reasons("paused")
 FailedReason = _stop_reasons("failed")
+StopReason = Literal[tuple(DEFINITIONS.stop_reasons)]
 
 
 class Payload(BaseModel):
@@ -813,6 +814,47 @@ class RunFailedPayload(Payload):
     input_save_failure: InputSaveFailure | None = None
 
 
+# 用户决定（总体架构第 7.4 节）：决定请求的身份是请求事件的编号
+
+
+class DecisionOption(Payload):
+    id: str
+    label: str
+
+
+class ModelUnavailableRequested(Payload):
+    # 待恢复：模型引用无法使用（模型管理设计说明第 5.5 节），回答之前整个 run 不推进。
+    # description 写明部门、模型与具体问题；facts 是涉及的事实（失败的调用尝试等事件的编号）；
+    # target 是调用目标的公开部分（没有找到调用目标时为空）；reason 与 message 是 Provider 或主机给出的原因与说明
+    kind: Literal["model_unavailable"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    target: CallTarget | None
+    reason: str
+    message: str
+
+
+# 决定请求的载荷：以 kind 区分的各种决定请求
+DecisionRequestedPayload = ModelUnavailableRequested
+
+
+class DecisionAnsweredPayload(Payload):
+    # 用户的回答：所回答的请求、所选的选项、说明（可以为空）与回答所依据的请求版本
+    decision_id: str
+    option: str
+    note: str | None
+    base_version: int
+
+
+class DecisionWithdrawnPayload(Payload):
+    # 运行结束时撤销未回答的请求；reason 是结束运行的停止原因
+    decision_id: str
+    reason: StopReason
+
+
 # ---------------------------------------------------------------------------
 # 项目事件
 
@@ -950,6 +992,9 @@ PAYLOADS: dict[str, Any] = {
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
+    EventType.DECISION_REQUESTED: DecisionRequestedPayload,
+    EventType.DECISION_ANSWERED: DecisionAnsweredPayload,
+    EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,
     ProjectEventType.PROJECT_REGISTERED: ProjectRegisteredPayload,
     ProjectEventType.PROJECT_RENAMED: ProjectRenamedPayload,
     ProjectEventType.PROJECT_PINNED: ProjectPinnedPayload,

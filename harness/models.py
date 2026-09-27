@@ -79,6 +79,9 @@ class EventType:
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
     RUN_FAILED = "run_failed"
+    DECISION_REQUESTED = "decision_requested"
+    DECISION_ANSWERED = "decision_answered"
+    DECISION_WITHDRAWN = "decision_withdrawn"
 
 
 class ProjectEventType:
@@ -413,7 +416,8 @@ class ContextManifest:
 class Event:
     # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本；
     # project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号；
-    # command_id 与 actor 是写入它的命令与提出者，不是由命令写入时为空
+    # command_id 是写入它的命令，不是由命令写入时为空；actor 是提出者：命令写入的事件为命令的提出者，
+    # 其余事件为写入方声明的提出者，没有声明时为空
     event_id: str
     run_id: str
     type: str
@@ -480,6 +484,32 @@ class ProjectEvent:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class DecisionRequest:
+    # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。
+    # 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）；
+    # version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
+    decision_id: str
+    stream: str
+    run_id: str | None
+    project_id: str | None
+    work_item_id: str | None
+    requested_at: str
+    request: dict[str, Any]
+    version: int = 1
+    status: str = "open"
+    answer: dict[str, Any] | None = None
+    withdrawal: dict[str, Any] | None = None
+
+    @property
+    def kind(self) -> str:
+        return self.request["kind"]
+
+    @property
+    def blocks(self) -> str:
+        return self.request["blocks"]
 
 
 @dataclass

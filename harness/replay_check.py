@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 from .artifacts import ArtifactStore
-from .event_store import EventStore
+from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
 from .git_versions import GitVersionStore
 from .models import GIT_VERSION_EVENTS, DeliverySpec, RunProjection
-from .projection import project_run, replay_run
+from .projection import load_decisions, project_run, replay_decisions, replay_run
 from .tree_archive import load_tree
 
 
@@ -31,14 +31,17 @@ def verify_replay(
     versions: GitVersionStore,
     run_id: str,
 ) -> RunProjection:
-    # 重放 run 的全部事件，与保存的投影比较，再核对交付封存与 Git 历史；返回重放得到的投影
+    # 重放 run 的全部事件，与保存的投影及决定请求比较，再核对交付封存与 Git 历史；返回重放得到的投影
     first = replay_run(store, run_id)
     if first.to_dict() != project_run(store, run_id).to_dict():
         raise ReplayIntegrityError("the saved projection differs from the replayed projection",
                                    reason=PROJECTION_REASON)
+    events = store.list_events(run_id)
+    if replay_decisions(events) != load_decisions(store.projection(run_stream(run_id))):
+        raise ReplayIntegrityError("the saved decision requests differ from the replayed decision requests",
+                                   reason=PROJECTION_REASON)
     for delivery in first.delivery_specs:
         _verify_delivery_tree(artifacts, run_id, delivery)
-    events = store.list_events(run_id)
     if any(event.type in GIT_VERSION_EVENTS for event in events):
         try:
             verify_git_history(versions, artifacts, events)

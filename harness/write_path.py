@@ -1,6 +1,6 @@
 # 写入口：所有领域写入唯一的入口。流程编排、步骤驱动的记录、提交、交互与项目服务写入事件都经过这里。
-# 一次写入是一个事务（transact）：读取流保存的投影与流版本，由调用方判断并追加事件，提交时在同一个数据库事务中
-# 核对流版本、执行权编号与命令身份，追加事件并更新保存的投影；提交以后事件日志通知订阅方。
+# 一次写入是一个事务（transact）：读取流保存的投影、决定请求与流版本，由调用方判断并追加事件，提交时在同一个
+# 数据库事务中核对流版本、执行权编号与命令身份，追加事件并更新保存的投影与改变的决定请求；提交以后事件日志通知订阅方。
 # 判断期间不持有锁：另一方在读取以后写入了同一个流时，提交因版本不符被拒绝，调用方按写入以后的状态重新判断；
 # 互斥由提交时的版本核对与数据库的写入事务完成，不依赖线程身份，也没有调用方在另一方的判断期间等待。
 
@@ -12,9 +12,12 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, TypeVar
 
 from .definitions import DEFINITIONS
-from .event_store import Command, EventStore, SavedProjection, StreamVersionConflict, is_run_stream
-from .models import DEPARTMENTS, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now
-from .projection import Projection, dump_projection, empty_projection, fold, load_projection, replay
+from .event_store import Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, is_run_stream
+from .models import DEPARTMENTS, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now
+from .projection import (
+    Projection, apply_decision_event, dump_decision, dump_projection, empty_projection, fold, load_decisions,
+    load_projection, replay, replay_decisions,
+)
 
 T = TypeVar("T")
 
@@ -29,11 +32,13 @@ _STOP_EVENTS = {EventType.RUN_DONE: ("done", "DONE"), EventType.RUN_PAUSED: ("pa
 
 @dataclass(frozen=True)
 class NewEvent:
-    # 一条要追加的 run 事件；事件编号、日志位置、流内版本与创建时间在追加时确定
+    # 一条要追加的 run 事件；事件编号、日志位置、流内版本与创建时间在追加时确定。
+    # actor 是写入方声明的提出者；由命令写入时提出者是命令的提出者
     type: str
     _: KW_ONLY
     state_before: str
     state_after: str
+    actor: str | None = None
     role: str | None = None
     parent_event_id: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
@@ -54,11 +59,12 @@ class NewProjectEvent:
 
 
 class Snapshot:
-    # 一个流在某个版本的只读视图：保存的投影与它的流版本，以及到这个版本为止的事件
+    # 一个流在某个版本的只读视图：保存的投影与它的流版本、这个流中的决定请求（按身份），以及到这个版本为止的事件
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None) -> None:
         self.stream = stream
         self.version = 0 if saved is None else saved.version
         self.projection: Projection = empty_projection(stream) if saved is None else load_projection(saved, stream)
+        self.decisions: dict[str, DecisionRequest] = load_decisions(saved)
         self._store = store
         self._committed: list[Any] | None = None
 
@@ -76,26 +82,37 @@ class Snapshot:
 
 
 class Transaction(Snapshot):
-    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection 与 events()，提交时一起写入。
+    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection、decisions 与 events()，提交时一起写入。
     # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
     # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
-    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None) -> None:
+    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
+                 command: Command | None = None) -> None:
         super().__init__(store, stream, saved)
         self.appended: list[Any] = []
+        self._command = command
+        self._changed_decisions: list[str] = []
         self._compensations: list[Callable[[], None]] = []
         self._committed_effects: list[Callable[[], None]] = []
 
     def append(self, *entries: NewEvent | NewProjectEvent) -> list[Any]:
-        # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影
+        # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影与决定请求。
+        # 由命令写入的事件记下命令身份，提出者是命令的提出者
         first = self.version + len(self.appended) + 1
-        events = [_event(self.stream, entry, first + offset) for offset, entry in enumerate(entries)]
+        events = [_event(self.stream, entry, first + offset, self._command) for offset, entry in enumerate(entries)]
         for event in events:
             fold(self.projection, event)
             if isinstance(event, Event):
                 # run 所属的项目与事项取自它的 run_created 事件
                 event.project_id, event.work_item_id = self.projection.project_id, self.projection.work_item_id
+            changed = apply_decision_event(self.decisions, event)
+            if changed is not None and changed not in self._changed_decisions:
+                self._changed_decisions.append(changed)
             self.appended.append(event)
         return events
+
+    def changed_decisions(self) -> list[SavedDecision]:
+        # 这次事务改变的决定请求要保存的投影
+        return [dump_decision(self.decisions[decision_id]) for decision_id in self._changed_decisions]
 
     def events(self) -> list[Any]:
         return super().events() + self.appended
@@ -142,14 +159,15 @@ class WritePath:
             attempt += 1
             if command is not None:
                 self._store.check_command(command)
-            transaction = Transaction(self._store, stream, self._store.projection(stream))
+            transaction = Transaction(self._store, stream, self._store.projection(stream), command)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
                 result = decide(transaction)
                 if transaction.appended or command is not None:
                     self._store.commit(stream, transaction.version, transaction.appended,
-                                       dump_projection(transaction.projection), epoch=epoch, command=command)
+                                       dump_projection(transaction.projection), epoch=epoch, command=command,
+                                       decisions=transaction.changed_decisions())
             except StreamVersionConflict as conflict:
                 transaction._abort()
                 if expected_version is not None or conflict.stream != stream or attempt == MAX_JUDGMENTS:
@@ -169,10 +187,12 @@ class WritePath:
                              expected_version=expected_version, epoch=epoch)
 
     def rebuild(self, stream: str) -> Projection:
-        # 从这个流的第一条事件重放投影，替换保存的投影
+        # 从这个流的第一条事件重放投影与决定请求，替换保存的投影
         events = self._store.stream_events(stream)
         state = replay(stream, events)
-        self._store.replace_projection(stream, len(events), dump_projection(state))
+        decisions = replay_decisions(events)
+        self._store.replace_projection(stream, len(events), dump_projection(state),
+                                       [dump_decision(decision) for decision in decisions.values()])
         return state
 
     def rebuild_missing(self) -> list[str]:
@@ -183,12 +203,14 @@ class WritePath:
         return streams
 
 
-def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int) -> Event | ProjectEvent:
+def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int,
+           command: Command | None) -> Event | ProjectEvent:
     identity = stream.split(":", 1)[1]
     if is_run_stream(stream) != isinstance(entry, NewEvent):
         raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     # 载荷取它在日志中保存的形式（JSON），并入投影的内容与从日志重放时读到的完全相同
     payload = json.loads(json_dumps(entry.payload))
+    command_id = None if command is None else command.command_id
     if isinstance(entry, NewEvent):
         _check_stop_reason(entry)
         return Event(
@@ -199,11 +221,13 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int) -> Even
             stop_reason=entry.stop_reason, error=entry.error, created_at=utc_now(), position=0, stream=stream,
             stream_version=version, project_id=None, work_item_id=None,
             department=entry.role if entry.role in DEPARTMENTS else None,
+            command_id=command_id, actor=entry.actor if command is None else command.actor,
         )
     return ProjectEvent(
         event_id=new_id("pevt"), project_id=identity, type=entry.type, payload=payload, created_at=utc_now(),
         position=0, stream=stream, stream_version=version, work_item_id=payload.get("work_item_id"),
         run_id=payload.get("run_id"), department=payload.get("department"),
+        command_id=command_id, actor=None if command is None else command.actor,
     )
 
 

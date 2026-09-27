@@ -1,4 +1,5 @@
-# 状态投影：运行状态投影由 run 流的事件折叠而成，项目投影由项目流的事件折叠而成。Agent 不能写投影。
+# 状态投影：运行状态投影由 run 流的事件折叠而成，项目投影由项目流的事件折叠而成，决定请求由所在流中的
+# 请求、回答与撤销事件折叠而成。Agent 不能写投影。
 # 投影随写入保存（写入口在追加事件的同一个事务中更新），读取时直接读取保存的投影；
 # 从头重放只用于重建保存的投影与核对它与重放结果一致。
 
@@ -9,11 +10,12 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from .event_store import EventStore, SavedProjection, is_run_stream, project_stream, run_stream
+from .event_store import EventStore, SavedDecision, SavedProjection, is_run_stream, project_stream, run_stream
 from .models import (
     Adoption,
     CollaborationRequest,
     CollaborationResponse,
+    DecisionRequest,
     DepartmentGuidance,
     DepartmentPrompt,
     ArtifactRef,
@@ -52,6 +54,9 @@ Projection = RunProjection | ProjectProjection
 # 保存的投影以 JSON 存放，由 pydantic 按数据类的类型序列化与还原
 _RUN_STATE = TypeAdapter(RunProjection)
 _PROJECT_STATE = TypeAdapter(ProjectProjection)
+_DECISION_STATE = TypeAdapter(DecisionRequest)
+
+DECISION_EVENTS = frozenset({EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN})
 
 
 class RunNotFoundError(KeyError):
@@ -122,6 +127,70 @@ def project_events(events: list[Event]) -> RunProjection:
         apply_event(state, event)
     _settle_run_state(state)
     return state
+
+
+# ---------------------------------------------------------------------------
+# 决定请求：由请求、回答与撤销三种事件折叠而成，每个决定请求另存一份投影，与事件在同一事务中更新
+
+
+def saved_decision(store: EventStore, decision_id: str) -> DecisionRequest | None:
+    # 按身份读取一个决定请求保存的投影；没有时为空
+    saved = store.decision(decision_id)
+    return None if saved is None else load_decision(saved)
+
+
+def saved_decisions(store: EventStore, *, projects: tuple[str, ...] = (), work_items: tuple[str, ...] = (),
+                    kinds: tuple[str, ...] = (), statuses: tuple[str, ...] = ()) -> tuple[int, list[DecisionRequest]]:
+    # 按项目、事项、种类与状态列出决定请求保存的投影，与它们所反映的日志末尾位置
+    position, rows = store.decisions(projects=projects, work_items=work_items, kinds=kinds, statuses=statuses)
+    return position, [load_decision(row) for row in rows]
+
+
+def load_decision(saved: SavedDecision) -> DecisionRequest:
+    return _DECISION_STATE.validate_json(saved.state)
+
+
+def load_decisions(saved: SavedProjection | None) -> dict[str, DecisionRequest]:
+    # 一个流保存的决定请求，按身份
+    return {} if saved is None else {item.decision_id: load_decision(item) for item in saved.decisions}
+
+
+def dump_decision(decision: DecisionRequest) -> SavedDecision:
+    return SavedDecision(decision.decision_id, decision.stream, decision.project_id, decision.work_item_id,
+                         decision.run_id, decision.kind, decision.status,
+                         _DECISION_STATE.dump_json(decision).decode("utf-8"))
+
+
+def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | ProjectEvent) -> str | None:
+    # 把一条事件并入这个流的决定请求，返回改变的决定请求的身份；不是决定事件时什么也不改变，返回空
+    payload = event.payload
+    if event.type == EventType.DECISION_REQUESTED:
+        decisions[event.event_id] = DecisionRequest(
+            decision_id=event.event_id, stream=event.stream, run_id=event.run_id, project_id=event.project_id,
+            work_item_id=event.work_item_id, requested_at=event.created_at, request=dict(payload),
+        )
+        return event.event_id
+    if event.type == EventType.DECISION_ANSWERED:
+        decision = decisions[payload["decision_id"]]
+        decision.status = "answered"
+        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
+                           "base_version": payload["base_version"], "actor": event.actor,
+                           "command_id": event.command_id, "answered_at": event.created_at}
+        return decision.decision_id
+    if event.type == EventType.DECISION_WITHDRAWN:
+        decision = decisions[payload["decision_id"]]
+        decision.status = "withdrawn"
+        decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
+                               "withdrawn_at": event.created_at}
+        return decision.decision_id
+    return None
+
+
+def replay_decisions(events: list[Event] | list[ProjectEvent]) -> dict[str, DecisionRequest]:
+    decisions: dict[str, DecisionRequest] = {}
+    for event in events:
+        apply_decision_event(decisions, event)
+    return decisions
 
 
 def _settle_run_state(state: RunProjection) -> None:

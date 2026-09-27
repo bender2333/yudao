@@ -1,8 +1,9 @@
 # 事件日志：系统唯一的事实来源。run 事件与项目事件在同一份日志中：每条事件有全局位置（跨项目递增）、
 # 所属的流（run:<run_id>、project:<project_id>）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
-# 建立索引供范围读取；由命令写入的事件另存命令身份与提出者。日志只追加，日志身份在建立日志时生成，不再改变。
-# 每个流保存一份投影（投影的内容由写入口计算，这里按 JSON 文本存放）。提交在一个数据库事务中核对流版本、
-# 执行权编号与命令身份，追加事件并保存投影；提交以后在进程内通知订阅方。
+# 建立索引供范围读取；另存引起事件的命令身份与事件的提出者。日志只追加，日志身份在建立日志时生成，不再改变。
+# 每个流保存一份投影，流中的每个决定请求另存一份投影（按身份查找，按项目、事项、种类与状态列出）；
+# 投影的内容由写入口计算，这里按 JSON 文本存放。提交在一个数据库事务中核对流版本、执行权编号与命令身份，
+# 追加事件并保存投影；提交以后在进程内通知订阅方。
 # 连接取自连接池：读取各用自己的连接，不等待写入；写入由 SQLite 的写入事务互斥，不依赖线程身份。
 
 from __future__ import annotations
@@ -74,6 +75,18 @@ CREATE TABLE IF NOT EXISTS commands (
     position INTEGER NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS decisions (
+    decision_id TEXT PRIMARY KEY,
+    stream TEXT NOT NULL,
+    project_id TEXT,
+    work_item_id TEXT,
+    run_id TEXT,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    state TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_decisions_stream ON decisions(stream);
+CREATE INDEX IF NOT EXISTS idx_decisions_scope ON decisions(project_id, work_item_id);
 """
 
 _RUN = "run:"
@@ -146,12 +159,27 @@ class CommandIdReused(Exception):
 
 
 @dataclass(frozen=True)
+class SavedDecision:
+    # 一个决定请求保存的投影：身份（请求事件的编号）、所属的流与对象、种类、状态与投影的 JSON 文本
+    decision_id: str
+    stream: str
+    project_id: str | None
+    work_item_id: str | None
+    run_id: str | None
+    kind: str
+    status: str
+    state: str
+
+
+@dataclass(frozen=True)
 class SavedProjection:
-    # 一个流保存的投影：投影所反映的流版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本
+    # 一个流保存的投影：投影所反映的流版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本，
+    # 以及这个流中的决定请求保存的投影（按请求的先后）
     version: int
     position: int
     epoch: int | None
     state: str
+    decisions: tuple[SavedDecision, ...] = ()
 
 
 class EventStore:
@@ -169,10 +197,14 @@ class EventStore:
             self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
 
     def commit(self, stream: str, expected_version: int, events: Sequence[Event | ProjectEvent], state: str, *,
-               epoch: int | None = None, command: Command | None = None) -> None:
+               epoch: int | None = None, command: Command | None = None,
+               decisions: Sequence[SavedDecision] = ()) -> None:
         # 在一个事务中：核对流的当前版本等于 expected_version，核对执行权编号不小于这个流已经记录的编号，
-        # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号、命令身份和提出者一起写回事件）、
-        # 保存这个流的投影、登记命令。任何一项核对不通过都拒绝，什么也不写。订阅方由写入口在提交成功以后经 notify 通知
+        # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号一起写回事件）、
+        # 保存这个流的投影与这次改变的决定请求、登记命令。任何一项核对不通过都拒绝，什么也不写。
+        # 订阅方由写入口在提交成功以后经 notify 通知
+        if decisions and not events:
+            raise ValueError("decision requests change only together with the events that change them")
         with self._transaction() as connection:
             saved = connection.execute(
                 "SELECT version, position, epoch FROM projections WHERE stream = ?", (stream,)
@@ -187,8 +219,6 @@ class EventStore:
                 _check_command(_command_record(connection, command.command_id), command)
             for event in events:
                 event.epoch = epoch
-                event.command_id = None if command is None else command.command_id
-                event.actor = None if command is None else command.actor
                 event.position = _insert(connection, event)
             if events:
                 connection.execute(
@@ -198,6 +228,8 @@ class EventStore:
                     (stream, expected_version + len(events), events[-1].position,
                      max((value for value in (epoch, recorded) if value is not None), default=None), state),
                 )
+            for decision in decisions:
+                _save_decision(connection, stream, decision)
             if command is not None:
                 position = events[-1].position if events else _end_position(connection)
                 connection.execute(
@@ -213,8 +245,9 @@ class EventStore:
             for listener in list(self._listeners):
                 listener(committed)
 
-    def replace_projection(self, stream: str, version: int, state: str) -> None:
-        # 用重放得到的投影替换这个流保存的投影；version 是重放到的流版本，流在重放以后又有写入时拒绝
+    def replace_projection(self, stream: str, version: int, state: str,
+                           decisions: Sequence[SavedDecision] = ()) -> None:
+        # 用重放得到的投影与决定请求替换这个流保存的投影；version 是重放到的流版本，流在重放以后又有写入时拒绝
         with self._transaction() as connection:
             row = connection.execute(
                 "SELECT COALESCE(MAX(stream_version), 0) AS version, COALESCE(MAX(position), 0) AS position, "
@@ -228,6 +261,9 @@ class EventStore:
                 "epoch = excluded.epoch, state = excluded.state",
                 (stream, version, row["position"], row["epoch"], state),
             )
+            connection.execute("DELETE FROM decisions WHERE stream = ?", (stream,))
+            for decision in decisions:
+                _save_decision(connection, stream, decision)
 
     def subscribe(self, listener: Callable[[list[Event | ProjectEvent]], None]) -> Callable[[], None]:
         # 登记订阅方：每次提交以后在提交的线程中收到这次提交的事件（已有全局位置），此时不持有任何锁；
@@ -254,11 +290,45 @@ class EventStore:
         return [_from_row(row) for row in rows]
 
     def projection(self, stream: str) -> SavedProjection | None:
-        with self._connection() as connection:
+        # 流保存的投影与它的决定请求，在同一个读取事务中读取
+        with self._reading() as connection:
             row = connection.execute(
                 "SELECT version, position, epoch, state FROM projections WHERE stream = ?", (stream,)
             ).fetchone()
-        return None if row is None else SavedProjection(row["version"], row["position"], row["epoch"], row["state"])
+            decisions = connection.execute(
+                "SELECT d.* FROM decisions d JOIN events e ON e.event_id = d.decision_id WHERE d.stream = ? "
+                "ORDER BY e.position ASC", (stream,),
+            ).fetchall()
+        if row is None:
+            return None
+        return SavedProjection(row["version"], row["position"], row["epoch"], row["state"],
+                               tuple(_decision_from_row(item) for item in decisions))
+
+    def decision(self, decision_id: str) -> SavedDecision | None:
+        # 按身份读取一个决定请求保存的投影；没有时为空
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM decisions WHERE decision_id = ?", (decision_id,)).fetchone()
+        return None if row is None else _decision_from_row(row)
+
+    def decisions(self, *, projects: Sequence[str] = (), work_items: Sequence[str] = (), kinds: Sequence[str] = (),
+                  statuses: Sequence[str] = ()) -> tuple[int, list[SavedDecision]]:
+        # 按项目、事项、种类与状态列出决定请求保存的投影（按请求的先后），与日志末尾的全局位置在同一个读取事务中读取。
+        # 各个条件之间取交集，同一个条件的多个值取并集；省略的条件不限制
+        clauses: list[str] = []
+        params: list[Any] = []
+        for column, values in (("project_id", projects), ("work_item_id", work_items), ("kind", kinds),
+                               ("status", statuses)):
+            if values:
+                clauses.append(f"d.{column} IN ({', '.join('?' * len(values))})")
+                params.extend(values)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._reading() as connection:
+            position = _end_position(connection)
+            rows = connection.execute(
+                f"SELECT d.* FROM decisions d JOIN events e ON e.event_id = d.decision_id {where} "
+                "ORDER BY e.position ASC", params,
+            ).fetchall()
+        return position, [_decision_from_row(row) for row in rows]
 
     def streams_without_projection(self) -> list[str]:
         # 有事件但没有保存投影的流
@@ -363,6 +433,16 @@ class EventStore:
             self._idle.put(connection)
 
     @contextmanager
+    def _reading(self) -> Iterator[sqlite3.Connection]:
+        # 读取事务：其间的各次读取看到同一个已提交的状态，不等待写入
+        with self._connection() as connection:
+            connection.execute("BEGIN")
+            try:
+                yield connection
+            finally:
+                connection.execute("COMMIT")
+
+    @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
         # 写入事务：开始时取得数据库的写入锁，其他写入在 SQLite 中等待这个短事务结束。
         # 提交或其间的任何一步出错都回滚，连接放回连接池时不带着未结束的事务
@@ -391,6 +471,23 @@ def _command_record(connection: sqlite3.Connection, command_id: str) -> CommandR
     ).fetchone()
     return None if row is None else CommandRecord(row["command_id"], row["name"], row["digest"], row["stream"],
                                                   row["position"])
+
+
+def _save_decision(connection: sqlite3.Connection, stream: str, decision: SavedDecision) -> None:
+    if decision.stream != stream:
+        raise ValueError(f"decision request {decision.decision_id} belongs to {decision.stream}, not {stream}")
+    connection.execute(
+        "INSERT INTO decisions (decision_id, stream, project_id, work_item_id, run_id, kind, status, state) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(decision_id) DO UPDATE SET status = excluded.status, "
+        "state = excluded.state",
+        (decision.decision_id, decision.stream, decision.project_id, decision.work_item_id, decision.run_id,
+         decision.kind, decision.status, decision.state),
+    )
+
+
+def _decision_from_row(row: sqlite3.Row) -> SavedDecision:
+    return SavedDecision(row["decision_id"], row["stream"], row["project_id"], row["work_item_id"], row["run_id"],
+                         row["kind"], row["status"], row["state"])
 
 
 def _end_position(connection: sqlite3.Connection) -> int:
