@@ -55,9 +55,13 @@ claude-opus-5-5 / 2026-09-27 16:55 / #107 测试中按墙钟时限等待的主�
 处理：采用（2）。这项测试要证明的是两个运行互相隔离：取消用的请求一直保持到另一个运行完成，再核对先后；墙钟时限只用来防止测试一直等待，设为远大于正常用时的值。Git 版本库写入的子进程数量不影响正确性，接纳一次规格用时数秒，不单独优化。由 #112 修改。
 
 claude-opus-5-5 / 2026-09-27 17:25 / #72 依赖的锁定版本 / `pyproject.toml` 声明 `anthropic>=1.7,<2`，`uv.lock` 锁定 1.7.0；1.7.0 改用 httpx2，Messages 协议的计时把回复体换成 httpx 的逐段读取流（#105 的 `_ClockedBody`），在 httpx2 上报告「Attempted to call an async iterator on a sync stream」，按锁文件安装的环境中 `http_messages_handoff` 与 `http_messages_stream_broken_then_success` 两个事件序列场景失败（在 `ce8312c` 的导出副本上用 `uv sync --frozen` 建立的环境核对过）。各执行者的全局环境是 anthropic 0.112.0（不在声明的范围内），这两个场景通过。#72 的测试环境与全局环境一样使用 0.112.0。 / 建议：由 Provider 的工单决定支持的 anthropic 版本，使声明的范围、锁文件与 Messages 协议的计时一致，并在按锁文件安装的环境中运行事件序列对照
+处理：按锁文件安装的项目环境（`uv sync --frozen`）是唯一的测试环境，测试一律在其中运行；Provider 适配器支持锁定的 SDK 版本。由 #113 让 Messages 协议的计时在锁定的 anthropic 版本上工作，并在项目环境中跑通全部测试；#111 依赖 #113。
 
 claude-opus-5-5 / 2026-09-27 17:25 / #72 事件对象的 actor 与 role / 设计说明第 5.2 节的事件对象每条都有 `actor`（`user:<令牌名称>`、`department:<部门>`、`system`、`observer:<名称>`）与 `role`（Stage 4 起）。#72 让写入口只为命令写入的事件保存 `command_id` 与 `actor`（命令带着提出者），其余事件这两列为空；现在的 run 事件在 `role` 列中保存的是部门。合同中的 `EventEnvelope.actor` 为必填、`role` 可以为空。 / 建议架构师在 #75（事件对象的生成）之前决定：不由命令写入的事件的 actor 由应用层按事件的部门列得出（有部门为 `department:<部门>`，否则为 `system`），还是由每个写入方经写入口声明；事件对象的 `role` 在 Stage 4 之前为空还是取现在的 `role` 列
+处理：由写入方经写入口声明，不由应用层按部门推断（例如运行时间用完的停止带有部门，但它是控制核心的判断）。命令写入的事件为命令的提出者，角色任务中的记录与提案为 `department:<部门>`，流程编排与控制核心自己的判断为 `system`，观察者的提案为 `observer:<名称>`；`role` 在 Stage 4 之前为空，现在存放部门的 `role` 列改为空，部门只在 `department` 列。写入 docs/design/app-and-interface.md 第 5.2 节，由 #75 实施。
 
 claude-opus-5-5 / 2026-09-27 17:25 / #72 能力清单的覆盖层 / 设计说明第 6.1 节的能力清单有 `overlays`（覆盖层的名称与它依赖的查询，依赖的查询都已登记时才列出），覆盖层只有中文名称（交接流向、等待关系、待核实与风险、上下文占用、语义记录），没有客户端使用的标识；#73 至 #77 都没有写明由谁加入覆盖层。#72 的能力清单列出 deployment、queries、commands、decisions 与 event_types，没有 overlays；`stream` 与访问方式分别随 #75、#76 加入。 / 建议架构师给出覆盖层的标识，并指定加入覆盖层的工单（依赖的查询 `project.flow`、`project.loop` 属于 #73）
+处理：标识为 `flow`、`waiting`、`recovery`、`context_usage`、`semantic_records`；覆盖层的定义登记在注册表中，能力清单按依赖的查询是否都已登记自动列出；`overlays` 字段与五个定义由 #73 加入。写入 docs/design/app-and-interface.md 第 6.1 节。
 
 claude-opus-5-5 / 2026-09-27 18:04 / #72 命令行的其他子命令与数据目录的进程锁（代码审查） / 进程锁按设计说明第 7.2 节只由服务进程（`api`、`serve`、`demo --serve`）取得。`demo`（不带 `--serve`）、`replay`、`project list/show` 在同一个数据目录上建立 `LoopSystem`：`demo` 写入一整个 run，`LoopSystem` 建立时还会为缺少保存投影的流重放并保存投影。服务进程运行时这些写入由 SQLite 的事务保证一致，但服务进程的订阅方收不到另一个进程提交的通知，#75 的事件流会漏掉这些事件，直到按位置补齐。 / 建议架构师决定：写入的子命令（`demo`、`smoke`）也取得进程锁，服务运行时拒绝；只读的子命令按设计说明第 7.4 节改为经应用层的查询（#73），是否也需要锁由那张工单确定
+处理：写入数据目录的子命令（`demo`、`smoke`）取得进程锁，服务运行时拒绝；只读的子命令经应用层的查询，以只读方式打开数据目录，不写入保存的投影，不需要锁。写入 docs/design/app-and-interface.md 第 7.2 节，由 #73 实施。

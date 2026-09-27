@@ -180,3 +180,5 @@ claude-opus-5-5 / 2026-09-27 16:55 / docs/architecture-issues.md 登记一条：
 claude-opus-5-5 / 2026-09-27 17:40 / docs/design/architecture/overall-architecture.md 第 5 节写明取消由发起的一方写入、交回的运行状态包含已经开始的取消；docs/architecture-issues.md 为 #107、#108 登记的四条问题追加处理结论（#111、#112） / #105、#107、#108 完成后处理登记的问题
 
 claude-opus-5-5 / 2026-09-27 18:04 / docs/architecture-issues.md 登记四条：anthropic 的声明范围与锁定版本和 Messages 协议的计时不一致、事件对象中不由命令写入的事件的 actor 与 role、能力清单的覆盖层没有标识与负责的工单、命令行的其他子命令与数据目录的进程锁 / #72 执行与代码审查中发现，需要架构师决定
+
+claude-opus-5-5 / 2026-09-27 18:10 / docs/design/app-and-interface.md 第 5.2 节写明 actor 由写入方经写入口声明、role 在 Stage 4 之前为空，第 6.1 节给出五个覆盖层的标识与由 #73 加入，第 7.2 节写明写入的子命令取得进程锁、只读的子命令以只读方式打开数据目录；docs/architecture-issues.md 为 #72 登记的四条问题追加处理结论 / #72 完成后处理登记的问题
