@@ -12,7 +12,7 @@ from typing import Any
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
-from .event_store import EventStore, project_stream
+from .event_store import Command, EventStore, project_stream
 from .materials import save_text_material
 from .models import (
     Adoption,
@@ -322,14 +322,20 @@ class ProjectService:
 
     # 项目登记与状态
 
-    def register(self, name: str, goal: str) -> str:
+    def register(self, name: str, goal: str, *, command: Command | None = None) -> str:
+        # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
+        # 不保存目标原文，也不新建项目
         _require_text("name", name)
         _require_text("goal", goal)
         project_id = new_id("proj")
-        goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
-        self.writes.append(project_stream(project_id), NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-            "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
-        }), expected_version=0)
+
+        def register(transaction: Transaction) -> None:
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
+                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
+            }))
+
+        self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
 
     def rename(self, project_id: str, name: str) -> None:
