@@ -26,14 +26,19 @@ Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并
 ### 前置要求
 
 - Python 3.11 或更新版本
+- uv（建立与使用项目环境）
 - Git CLI（可从 `PATH` 调用）
 - 模型 API 密钥（如 OpenAI、Anthropic 或兼容服务）
 
 ### 安装
 
+按锁文件 `uv.lock` 在仓库内建立项目环境（`.venv`，包含测试依赖）：
+
 ```bash
-python -m pip install -e ".[dev]"
+uv sync --frozen
 ```
+
+之后的命令用 `uv run` 在项目环境中运行，例如 `uv run python -m harness`。
 
 ### 配置 Provider
 
@@ -112,8 +117,10 @@ python -m harness replay <run_id>
 
 ## 测试
 
+Python 测试在项目环境中运行：
+
 ```bash
-python -m pytest harness/tests -q
+uv run python -m pytest harness/tests -q
 node --test harness/tests/test_web_ui.js
 ```
 
@@ -274,7 +281,7 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 模型接入由独立的 Provider 模块承担（`harness/providers/`），三部门循环、Web、CLI 与 smoke 都经同一接口调用，不各自直连 SDK。Provider 配置、模型访问定义与部门绑定统一管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定、凭据与模型准入；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
 
-需要 Python 3.11 或更新版本，`pip install -e ".[dev]"` 会安装 SDK（OpenAI、Anthropic、HTTPX）。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
+需要 Python 3.11 或更新版本，`uv sync --frozen` 按锁文件安装 SDK：OpenAI SDK 经 HTTPX 连接，Anthropic SDK 经 HTTPX2 连接。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
 
 目录格式见 [Provider 与三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 与 `max_output_tokens` 必须明确；协议在模型访问定义上声明，`responses`、`chat_completions`、`messages` 三条已接入，一条定义只走一条协议。有效窗口取任务限制与模型窗口较小值，工作与压缩输出均受该模型限制。
 

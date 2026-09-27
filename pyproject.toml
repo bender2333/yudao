@@ -12,7 +12,8 @@ dependencies = [
     "fastapi>=0.141,<1", "uvicorn>=0.54,<1", "filelock>=4,<5",
 ]
 
-[project.optional-dependencies]
+# uv sync 默认安装 dev 组，测试在按锁文件安装的项目环境中运行
+[dependency-groups]
 dev = ["pytest>=8", "pytest-xdist>=3.8", "import-linter>=2.15,<3"]
 
 [tool.setuptools.packages.find]
