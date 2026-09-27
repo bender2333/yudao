@@ -17,6 +17,7 @@ from harness.proposals import (
     product_spec, response_turn, review, review_turn,
 )
 from harness.runtime import LoopSystem
+from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.event_sequence import compare_with_baseline, normalized_run
 from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply, serve, sse
@@ -694,5 +695,7 @@ def test_event_sequence_matches_its_baseline(name, data_dir, request):
     scenario = SCENARIOS[name]
     system, run_id, replacements = scenario.run(data_dir)
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
+    # 每条事件的载荷都符合应用层合同中的载荷类型
+    assert_payloads_follow_contract(system.store.list_events(run_id))
     compare_with_baseline(name, scenario.covers, normalized_run(system, run_id, replacements),
                           write=request.config.getoption("--write-event-baselines"))
