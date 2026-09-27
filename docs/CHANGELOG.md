@@ -172,3 +172,5 @@ claude-opus-5-5 / 2026-09-27 05:04 / docs/architecture-issues.md 登记：提案
 claude-opus-5-5 / 2026-09-27 05:22 / #43 完成后更新：docs/design/architecture/overall-architecture.md 第 5 节写明安全节点接口的四个操作，第 6.1 节写明流程编排、步骤驱动、写入口与执行层的代码位置，第 10 节写明已完成的工作与接下来的顺序；docs/program-roadmap.md 第 2 节第 5 项写明 #43 的完成情况；docs/current-baseline.md 第 1 节新增控制核心一行；docs/architecture-issues.md 为提案校验与提交判断之间的核对追加处理结论（由 #44 的流版本核对处理） / #43 于 2026-09-27 关闭
 
 claude-opus-5-5 / 2026-09-27 11:44 / #44 完成后更新：docs/design/architecture/overall-architecture.md 第 5 节结束运行改为按流版本核对，第 6.1 节写入口一行改为 write_path.py、event_store.py 与 projection.py 的职责，第 10 节写明 #44 已完成；docs/program-roadmap.md 第 2 节第 6 项与 docs/current-baseline.md 控制核心一行写明 #44 的完成情况 / #44 于 2026-09-27 关闭
+
+claude-opus-5-5 / 2026-09-27 12:55 / docs/architecture-issues.md 登记三条：取消进行中时激活与运行循环交回的运行状态（#107）、三种协议的传输诊断只有 Responses 有传输阶段（#108）、Messages 流中的过载错误与流式进度的协议差异（#108 代码审查） / #107 修正了取消与激活结束之间的先后，需要写进总体架构；#108 按工单保持 Chat Completions 的结果不变，另外发现的协议差异需要架构师决定是否开工单
