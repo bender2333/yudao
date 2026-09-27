@@ -8,7 +8,7 @@ from http.client import HTTPConnection
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.department_prompts import DEFAULT_PROMPTS
+from harness.definitions import DEFINITIONS
 from harness.models import EventType, ProjectEventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
@@ -215,7 +215,8 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         assert status == 400, raw
 
         prompt = get_json(host, port, f"/api/projects/{project_id}/prompts/quality")
-        assert prompt == {"department": "quality", "text": DEFAULT_PROMPTS["quality"], "default_text": DEFAULT_PROMPTS["quality"],
+        quality_prompt = DEFINITIONS.role("quality").prompt
+        assert prompt == {"department": "quality", "text": quality_prompt, "default_text": quality_prompt,
                           "version": 0, "updated_at": None, "source": "default"}
 
         # GET /api/runs 仍列出项目 run 与 bare run；POST /api/runs 已删除。
@@ -332,7 +333,7 @@ def test_prompt_config_endpoints(data_dir):
         assert get_json(host, port, path)["version"] == 0
         status, body = _put(host, port, path, {"text": "工程 v1", "base_version": 0})
         assert status == 200 and body["version"] == 1 and body["source"] == "configured" and body["unchanged"] is False
-        assert body["text"] == "工程 v1" and body["default_text"] == DEFAULT_PROMPTS["engineering"]
+        assert body["text"] == "工程 v1" and body["default_text"] == DEFINITIONS.role("engineering").prompt
         status, body = _put(host, port, path, {"text": "工程 v1", "base_version": 1})
         assert status == 200 and body["version"] == 1 and body["unchanged"] is True
         status, body = _put(host, port, path, {"text": "   ", "base_version": 1})

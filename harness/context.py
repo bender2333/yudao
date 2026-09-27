@@ -10,6 +10,7 @@ from .adjudication import offered_tools
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_result_summaries
 from .artifacts import ArtifactStore
+from .definitions import DEFINITIONS
 from .models import (
     ArtifactRef,
     ContextExclusion,
@@ -172,6 +173,9 @@ class ContextAssembler:
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
         tool_names = offered_tools(projection, department, guidance_only=guidance_only)
+        # 全体角色共同的规则文字与本角色的可见范围取自定义
+        rules = DEFINITIONS.organization.rules
+        visible = DEFINITIONS.role(department).visibility
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
@@ -211,20 +215,9 @@ class ContextAssembler:
                 "received": projection.input_version, "assigned_to_product": projection.product_work_input_version,
                 "accepted_in_requirements": projection.processed_input_version,
             })),
-            ContextPart("input_handling", None,
-                        "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。"
-                        "修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；"
-                        "decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。"
-                        "部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。"),
-            ContextPart("professional_completion", None,
-                        "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。"
-                        "模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。"
-                        "产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。"),
-            ContextPart("collaboration_rules", None,
-                        "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。"
-                        "动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。"
-                        "普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。"
-                        "每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。"),
+            ContextPart("input_handling", None, rules.input_handling),
+            ContextPart("professional_completion", None, rules.professional_completion),
+            ContextPart("collaboration_rules", None, rules.collaboration_rules),
             ContextPart("proposal_contract", department, json_dumps(PROPOSAL_CONTRACTS[department])),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
@@ -295,27 +288,28 @@ class ContextAssembler:
                     json_dumps([_decision_payload(item) for item in projection.effective_decisions]),
                 )
             )
-        if department in {"engineering", "quality"}:
-            current_delivery = projection.delivery_spec
-            if current_delivery is not None and current_delivery.status == "active":
+        current_delivery = projection.delivery_spec
+        if current_delivery is not None and current_delivery.status != "active":
+            current_delivery = None
+        if current_delivery is not None and "current_delivery_spec" in visible:
+            parts.append(
+                ContextPart(
+                    "current_delivery_spec",
+                    f"r{current_delivery.revision}",
+                    json_dumps(_delivery_payload(current_delivery)),
+                )
+            )
+        elif current_delivery is None and "prior_delivery" in visible:
+            prior = _prior_delivery_for_repair(projection)
+            if prior is not None:
                 parts.append(
                     ContextPart(
-                        "current_delivery_spec",
-                        f"r{current_delivery.revision}",
-                        json_dumps(_delivery_payload(current_delivery)),
+                        "prior_delivery",
+                        f"r{prior.revision}",
+                        json_dumps(_delivery_payload(prior, purpose="repair_basis")),
                     )
                 )
-            elif department == "engineering":
-                prior = _prior_delivery_for_repair(projection)
-                if prior is not None:
-                    parts.append(
-                        ContextPart(
-                            "prior_delivery",
-                            f"r{prior.revision}",
-                            json_dumps(_delivery_payload(prior, purpose="repair_basis")),
-                        )
-                    )
-        if department in {"product", "engineering"} and projection.last_review and projection.last_review.verdict.startswith("rework"):
+        if "qa_defects" in visible and projection.last_review and projection.last_review.verdict.startswith("rework"):
             review = projection.last_review
             parts.append(
                 ContextPart(

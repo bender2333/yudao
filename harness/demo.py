@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adapters.fake import FakeAdapter
-from .department_prompts import DEFAULT_PROMPTS
+from .definitions import DEFINITIONS
 from .proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from .runtime import LoopSystem
 
@@ -134,7 +134,7 @@ def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
     if system.project(run_id).engineering_plan is None:
         raise RuntimeError("demo did not reach its initial accepted engineering plan")
     system.add_input(run_id, DEMO_CHANGE)
-    system.update_prompt(run_id, "product", DEFAULT_PROMPTS["product"] + "\nExplicitly account for changed, retained, and retired requirements.")
+    system.update_prompt(run_id, "product", DEFINITIONS.role("product").prompt + "\nExplicitly account for changed, retained, and retired requirements.")
     projection = system.run_until_stop(run_id)
     if projection.phase != "DONE":
         raise RuntimeError(f"demo did not finish: {projection.phase} {projection.stop_reason} {projection.error}")

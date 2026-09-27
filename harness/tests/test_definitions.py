@@ -87,6 +87,35 @@ def test_invalid_stop_reason_names_the_file_and_the_field(tmp_path):
     assert issue[:2] == ("stop_reasons.json", "max_cycles.outcome") and "'done', 'paused' or 'failed'" in issue[2]
 
 
+def test_departments_and_roles_must_refer_to_each_other(tmp_path):
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["departments"][0]["roles"] = ["manager"]
+    _write(directory, "organization.json", organization)
+    roles = _read(directory, "roles.json")
+    roles["quality"]["tools"].append("read_file")
+    _write(directory, "roles.json", roles)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "departments[0].roles", "每个部门现在只有一个角色，角色编号与部门编号相同"),
+        ("roles.json", "manager", "组织中的角色没有定义"),
+        ("roles.json", "product", "角色不属于任何部门"),
+        ("roles.json", "quality.tools", "重复的工具 read_file"),
+    )
+
+
+def test_role_visibility_is_a_closed_list(tmp_path):
+    directory = _copy(tmp_path)
+    roles = _read(directory, "roles.json")
+    roles["product"]["visibility"] = ["other_department_transcript"]
+    _write(directory, "roles.json", roles)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("roles.json", "product.visibility[0]")
+
+
 def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
     directory = _copy(tmp_path)
     (directory / "limits.json").write_text('{\n  "max_cycles": 3,\n  "max_cycles": 4\n}', encoding="utf-8")

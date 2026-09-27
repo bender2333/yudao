@@ -42,7 +42,6 @@ def _edit_call(identity, path, start, end, expected, new, digest):
 
 def test_edit_range_is_an_engineering_only_write_tool():
     assert TOOL_DEFS["edit_range"]["kind"] == "environment" and TOOL_DEFS["edit_range"]["action"] == "write"
-    assert TOOL_DEFS["edit_range"]["departments"] == ("engineering",)
     assert "edit_range" in tools_for("engineering")
     assert "edit_range" not in tools_for("product")
     assert "edit_range" not in tools_for("quality")

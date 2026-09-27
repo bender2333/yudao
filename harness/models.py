@@ -11,7 +11,8 @@ from uuid import uuid4
 
 from .definitions import DEFINITIONS
 
-DEPARTMENTS = ("product", "engineering", "quality")
+# 部门来自定义中的组织
+DEPARTMENTS = DEFINITIONS.departments
 
 PHASES = (
     "CREATED",

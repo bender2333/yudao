@@ -1,14 +1,15 @@
 import pytest
 
 from harness.artifacts import ArtifactStore
-from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from harness.definitions import DEFINITIONS
+from harness.department_prompts import save_department_prompt
 from harness.models import DEPARTMENTS, hash_bytes
 
 
 @pytest.mark.parametrize("department", DEPARTMENTS)
 def test_default_prompt_is_saved_verbatim_and_can_be_edited_without_changing_defaults(tmp_path, department):
     store = ArtifactStore(tmp_path / "artifacts")
-    initial_text = DEFAULT_PROMPTS[department]
+    initial_text = DEFINITIONS.role(department).prompt
     initial = save_department_prompt(store, "run", department, initial_text)
     edited_text = "  updated\r\n\u4e2d\u6587 instructions\n\t"
     edited = save_department_prompt(store, "run", department, edited_text)
@@ -17,7 +18,7 @@ def test_default_prompt_is_saved_verbatim_and_can_be_edited_without_changing_def
     assert initial.kind == edited.kind == "department_prompt"
     assert edited.content_hash == hash_bytes(edited_text.encode("utf-8"))
     assert initial.content_hash != edited.content_hash
-    assert DEFAULT_PROMPTS[department] == initial_text
+    assert DEFINITIONS.role(department).prompt == initial_text
 
 
 def test_prompt_reference_is_scoped_to_its_run(tmp_path):

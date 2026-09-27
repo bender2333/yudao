@@ -8,10 +8,10 @@ from harness.__main__ import main
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.context import ContextAssembler
-from harness.department_prompts import DEFAULT_PROMPTS
+from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.event_store import project_stream
-from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
+from harness.models import DEPARTMENTS, ArtifactRef, EventType, ProjectEventType, json_dumps
 from harness.write_path import NewProjectEvent
 from harness.projects import (
     ProjectArchivedError,
@@ -270,8 +270,8 @@ def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, ca
 def _ownership(project_id="proj_x", work_item_id="wi_x"):
     return {
         "project_id": project_id, "work_item_id": work_item_id, "project_context": "项目：X",
-        "department_prompts": dict(DEFAULT_PROMPTS),
-        "prompt_config_versions": {department: 0 for department in DEFAULT_PROMPTS},
+        "department_prompts": {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS},
+        "prompt_config_versions": {department: 0 for department in DEPARTMENTS},
     }
 
 
@@ -433,12 +433,13 @@ def test_prompt_configuration_versions_conflicts_and_freezing(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("Prompts", GOAL)
     default = system.projects.read_prompt(project_id, "engineering")
-    assert default == {"department": "engineering", "text": DEFAULT_PROMPTS["engineering"],
-                       "default_text": DEFAULT_PROMPTS["engineering"], "version": 0, "updated_at": None, "source": "default"}
+    default_text = DEFINITIONS.role("engineering").prompt
+    assert default == {"department": "engineering", "text": default_text,
+                       "default_text": default_text, "version": 0, "updated_at": None, "source": "default"}
     v1 = "工程 Prompt v1：先写计划再写代码。"
     saved = system.projects.configure_prompt(project_id, "engineering", v1, 0)
     assert (saved["version"], saved["source"], saved["unchanged"], saved["text"]) == (1, "configured", False, v1)
-    assert saved["updated_at"] is not None and saved["default_text"] == DEFAULT_PROMPTS["engineering"]
+    assert saved["updated_at"] is not None and saved["default_text"] == default_text
     again = system.projects.configure_prompt(project_id, "engineering", v1, 1)
     assert (again["version"], again["unchanged"]) == (1, True)
     with pytest.raises(ValueError):
@@ -453,7 +454,7 @@ def test_prompt_configuration_versions_conflicts_and_freezing(data_dir):
     _work_item_a, run_a = system.projects.start_work_item(project_id, "v1 期间的事项")
     run = system.project(run_a)
     assert run.department_prompts["engineering"].text == v1 and run.department_prompts["engineering"].version == 1
-    assert run.department_prompts["product"].text == DEFAULT_PROMPTS["product"]
+    assert run.department_prompts["product"].text == DEFINITIONS.role("product").prompt
     assert run.prompt_config_versions == {"product": 0, "engineering": 1, "quality": 0}
     assert system.run_until_stop(run_a).phase == "DONE"
     system.projects.settle(run_a)

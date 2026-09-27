@@ -9,7 +9,7 @@ from harness.compare import (
     comparison_script,
     run_a4_comparison,
 )
-from harness.department_prompts import DEFAULT_PROMPTS
+from harness.definitions import DEFINITIONS
 from harness.tests.helpers import system_with
 
 
@@ -40,9 +40,9 @@ def test_baseline_writes_before_plan_candidate_plans_first(comparison):
 def test_candidate_engineering_initial_prompt_contains_protocol_paragraphs(comparison):
     system, report, _out = comparison
     addendum = candidate_engineering_prompt()
-    assert addendum.startswith(DEFAULT_PROMPTS["engineering"])
+    assert addendum.startswith(DEFINITIONS.role("engineering").prompt)
     assert all(paragraph in addendum for paragraph in CANDIDATE_PARAGRAPHS)
-    assert all(paragraph not in DEFAULT_PROMPTS["engineering"] for paragraph in CANDIDATE_PARAGRAPHS)
+    assert all(paragraph not in DEFINITIONS.role("engineering").prompt for paragraph in CANDIDATE_PARAGRAPHS)
 
     candidate_runs = {trial["run_id"] for trial in report["trials"] if trial["group"] == "candidate"}
     baseline_runs = {trial["run_id"] for trial in report["trials"] if trial["group"] == "baseline"}
@@ -57,13 +57,13 @@ def test_candidate_engineering_initial_prompt_contains_protocol_paragraphs(compa
             assert trial["prompt_config_versions"]["engineering"] == 1
         else:
             assert all(paragraph not in engineering for paragraph in CANDIDATE_PARAGRAPHS)
-            assert engineering == DEFAULT_PROMPTS["engineering"]
+            assert engineering == DEFINITIONS.role("engineering").prompt
             assert trial["engineering_prompt_has_candidate_addendum"] is False
             assert trial["prompt_config_versions"]["engineering"] == 0
         assert all(paragraph not in product for paragraph in CANDIDATE_PARAGRAPHS)
         assert all(paragraph not in quality for paragraph in CANDIDATE_PARAGRAPHS)
-        assert product == DEFAULT_PROMPTS["product"]
-        assert quality == DEFAULT_PROMPTS["quality"]
+        assert product == DEFINITIONS.role("product").prompt
+        assert quality == DEFINITIONS.role("quality").prompt
 
     adapter = system.test_adapter
     assert isinstance(adapter, FakeAdapter)
@@ -90,7 +90,7 @@ def test_baseline_requests_unaffected_after_candidate_v1(comparison):
 
     baseline_id = projects["baseline"]["project_id"]
     current = system.projects.read_prompt(baseline_id, "engineering")
-    assert current["version"] == 0 and current["text"] == DEFAULT_PROMPTS["engineering"]
+    assert current["version"] == 0 and current["text"] == DEFINITIONS.role("engineering").prompt
     for trial in report["trials"]:
         if trial["group"] != "baseline":
             continue

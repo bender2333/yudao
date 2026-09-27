@@ -1,5 +1,6 @@
-# 工具定义：各部门可以使用的工具、主机工具与环境工具的分类、提交类工具对应的提案种类、登记命令的校验，
-# 以及请求中提供给模型的工具定义。主机工具由步骤驱动执行，环境工具的动作由执行环境（environment.py）执行。
+# 工具定义：主机工具与环境工具的分类、提交类工具对应的提案种类、登记命令的校验，以及请求中提供给模型的工具定义；
+# 各部门可以使用的工具在定义的角色中（definitions/roles.json）。主机工具由步骤驱动执行，环境工具的动作由执行环境
+# （environment.py）执行。
 
 from __future__ import annotations
 
@@ -11,24 +12,24 @@ from .definitions import DEFINITIONS
 # kind：主机工具（host）由控制核心执行，现在只有提交类工具；环境工具（environment）的每次调用是一个动作，
 # 经过工具许可以后在执行环境中执行，action 是动作类别（读取、写入、检查、登记的本地命令）
 TOOL_DEFS = {
-    "read_file": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
-    "list_files": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
-    "search": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
-    "read_range": {"kind": "environment", "action": "read", "departments": ("product", "engineering", "quality")},
-    "write_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
-    "edit_range": {"kind": "environment", "action": "write", "departments": ("engineering",)},
-    "delete_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
-    "move_file": {"kind": "environment", "action": "write", "departments": ("engineering",)},
-    "run_check": {"kind": "environment", "action": "check", "departments": ("product", "engineering", "quality")},
-    "run_command": {"kind": "environment", "action": "command", "departments": ("engineering",)},
-    "submit_product_spec": {"kind": "host", "departments": ("product",)},
-    "submit_product_decision": {"kind": "host", "departments": ("product",)},
-    "submit_request": {"kind": "host", "departments": ("product", "engineering", "quality")},
-    "submit_response": {"kind": "host", "departments": ("product", "engineering", "quality")},
-    "submit_guidance_response": {"kind": "host", "departments": ("product", "engineering", "quality")},
-    "submit_plan": {"kind": "host", "departments": ("engineering",)},
-    "submit_delivery": {"kind": "host", "departments": ("engineering",)},
-    "submit_review": {"kind": "host", "departments": ("quality",)},
+    "read_file": {"kind": "environment", "action": "read"},
+    "list_files": {"kind": "environment", "action": "read"},
+    "search": {"kind": "environment", "action": "read"},
+    "read_range": {"kind": "environment", "action": "read"},
+    "write_file": {"kind": "environment", "action": "write"},
+    "edit_range": {"kind": "environment", "action": "write"},
+    "delete_file": {"kind": "environment", "action": "write"},
+    "move_file": {"kind": "environment", "action": "write"},
+    "run_check": {"kind": "environment", "action": "check"},
+    "run_command": {"kind": "environment", "action": "command"},
+    "submit_product_spec": {"kind": "host"},
+    "submit_product_decision": {"kind": "host"},
+    "submit_request": {"kind": "host"},
+    "submit_response": {"kind": "host"},
+    "submit_guidance_response": {"kind": "host"},
+    "submit_plan": {"kind": "host"},
+    "submit_delivery": {"kind": "host"},
+    "submit_review": {"kind": "host"},
 }
 
 SUBMIT_KINDS = {
@@ -78,12 +79,12 @@ def normalize_registered_commands(registry: dict[str, Any] | None) -> dict[str, 
 
 
 def tools_for(department: str) -> list[str]:
-    return [name for name, spec in TOOL_DEFS.items() if department in spec["departments"]]
+    # 部门的角色可以使用的工具，按角色定义中的顺序
+    return list(DEFINITIONS.role(department).tools)
 
 
 def has_tool(department: str, name: str) -> bool:
-    spec = TOOL_DEFS.get(name)
-    return bool(spec and department in spec["departments"])
+    return name in DEFINITIONS.role(department).tools
 
 
 def tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:

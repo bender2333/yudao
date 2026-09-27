@@ -11,7 +11,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
-from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from .department_prompts import save_department_prompt
 from .event_store import EventStore, project_stream
 from .materials import save_text_material
 from .models import (
@@ -94,7 +94,7 @@ def _default_prompts(state: ProjectProjection) -> ProjectProjection:
     # 没有配置过的部门使用默认 Prompt
     for department in DEPARTMENTS:
         state.prompt_configs.setdefault(department, PromptConfig(
-            department=department, version=0, text=DEFAULT_PROMPTS[department], source="default",
+            department=department, version=0, text=DEFINITIONS.role(department).prompt, source="default",
         ))
     return state
 
@@ -658,7 +658,7 @@ def _prompt_view(config: PromptConfig) -> dict[str, Any]:
     return {
         "department": config.department,
         "text": config.text,
-        "default_text": DEFAULT_PROMPTS[config.department],
+        "default_text": DEFINITIONS.role(config.department).prompt,
         "version": config.version,
         "updated_at": config.updated_at,
         "source": config.source,

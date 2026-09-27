@@ -4,7 +4,7 @@ import pytest
 
 from harness.adapters.base import ProviderError
 from harness.context import ContextAssembler
-from harness.department_prompts import DEFAULT_PROMPTS
+from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, EventType, json_dumps
 from harness.projection import project_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
@@ -82,7 +82,7 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
 
 
 def test_candidate_is_never_injected_into_department_context(tmp_path):
-    rules = dict(DEFAULT_PROMPTS)
+    rules = {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS}
     system, result = run_scripted(tmp_path, rework_script())
     candidate = result.lesson_candidates[0]
     for department in DEPARTMENTS:
@@ -96,7 +96,7 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
         assert candidate.suggestion not in json_dumps(invocation.input_items)
         injected = recorded_context(system, invocation).manifest.injected
         assert all("lesson" not in item.source for item in injected)
-    assert DEFAULT_PROMPTS == rules
+    assert {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS} == rules
     assert (system.test_adapter.name, system.test_adapter.model) == ("fake", "fake-script")
 
 

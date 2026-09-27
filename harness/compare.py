@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from .department_prompts import DEFAULT_PROMPTS
+from .definitions import DEFINITIONS
 from .models import EventType, ProjectEventType
 from .proposals import delivery_turn, engineering_plan, product_spec, review_turn
 from .public_tree import materialize_tree
@@ -92,7 +92,7 @@ TASKS = (
 
 
 def candidate_engineering_prompt() -> str:
-    return DEFAULT_PROMPTS["engineering"] + "\n" + "\n".join(CANDIDATE_PARAGRAPHS)
+    return DEFINITIONS.role("engineering").prompt + "\n" + "\n".join(CANDIDATE_PARAGRAPHS)
 
 
 def comparison_script() -> list:

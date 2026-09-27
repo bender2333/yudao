@@ -59,6 +59,34 @@ class Limits(_Definition):
     command_timeout_max_sec: int = Field(gt=0)
 
 
+class Department(_Definition):
+    id: Identifier
+    # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
+    roles: tuple[Identifier, ...] = Field(min_length=1)
+
+
+class OrganizationRules(_Definition):
+    # 全体角色共同的规则文字，每次请求原样放进上下文：输入的处理、专业补全、协作规则
+    input_handling: str = Field(min_length=1)
+    professional_completion: str = Field(min_length=1)
+    collaboration_rules: str = Field(min_length=1)
+
+
+class Organization(_Definition):
+    # 部门按这个顺序排列
+    departments: tuple[Department, ...] = Field(min_length=1)
+    rules: OrganizationRules
+
+
+class Role(_Definition):
+    # 内置默认 Prompt：项目部门设置没有写入时使用；用户在项目部门设置中写入的 Prompt 属于设置
+    prompt: str = Field(min_length=1)
+    # 可以使用的工具，按这个顺序提供给模型
+    tools: tuple[Identifier, ...]
+    # 可见范围：除全体角色共同的材料以外，本角色还能看到的材料
+    visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects"], ...]
+
+
 class StopReason(_Definition):
     # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
     outcome: Literal["done", "paused", "failed"]
@@ -68,9 +96,20 @@ class StopReason(_Definition):
 
 class Definitions(_Definition):
     version: str
+    organization: Organization
+    # 角色定义，键是角色编号
+    roles: dict[Identifier, Role]
     limits: Limits
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: dict[Identifier, StopReason]
+
+    @property
+    def departments(self) -> tuple[str, ...]:
+        return tuple(department.id for department in self.organization.departments)
+
+    def role(self, department: str) -> Role:
+        # 部门的角色（现在每个部门一个角色，编号与部门相同）
+        return self.roles[department]
 
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因只来自定义中的清单
@@ -82,6 +121,8 @@ class Definitions(_Definition):
 
 # 定义文件与它在 Definitions 中的字段、类型
 _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
+    "organization.json": ("organization", TypeAdapter(Organization)),
+    "roles.json": ("roles", TypeAdapter(dict[Identifier, Role])),
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
 }
@@ -133,7 +174,35 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
             issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
     if issues:
         raise DefinitionError(issues)
+    issues = _references(parts)
+    if issues:
+        raise DefinitionError(issues)
     return Definitions(version=_version(contents), **parts)
+
+
+def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
+    # 文件之间的引用：部门与角色一一对应，角色的工具不重复
+    issues: list[tuple[str, str, str]] = []
+    organization: Organization = parts["organization"]
+    roles: dict[str, Role] = parts["roles"]
+    seen: set[str] = set()
+    for index, department in enumerate(organization.departments):
+        if department.id in seen:
+            issues.append(("organization.json", f"departments[{index}].id", f"重复的部门 {department.id}"))
+        seen.add(department.id)
+        if department.roles != (department.id,):
+            issues.append(("organization.json", f"departments[{index}].roles",
+                           "每个部门现在只有一个角色，角色编号与部门编号相同"))
+    members = {role for department in organization.departments for role in department.roles}
+    for role in sorted(members - set(roles)):
+        issues.append(("roles.json", role, "组织中的角色没有定义"))
+    for role in sorted(set(roles) - members):
+        issues.append(("roles.json", role, "角色不属于任何部门"))
+    for name, role in roles.items():
+        repeated = sorted({tool for tool in role.tools if role.tools.count(tool) > 1})
+        if repeated:
+            issues.append(("roles.json", f"{name}.tools", "重复的工具 " + "、".join(repeated)))
+    return issues
 
 
 def _version(contents: dict[str, Any]) -> str:

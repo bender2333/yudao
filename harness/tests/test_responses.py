@@ -19,7 +19,7 @@ from harness.adapters.base import ProviderError
 from harness.providers import ProviderConnections, ResponsesConfig
 from harness.tests.protocol_helpers import ConnectionLoop, ResponsesAdapter, model_call
 from harness.context import ContextAssembler
-from harness.department_prompts import DEFAULT_PROMPTS
+from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -55,7 +55,7 @@ def _submit_stream(response_id="resp-submit"):
 
 
 def _request(*, session_id="session", history=None, max_output_tokens=None, attempt_id="activation:1:attempt-1"):
-    prompt_text = DEFAULT_PROMPTS["product"]
+    prompt_text = DEFINITIONS.role("product").prompt
     prompt_hash = hash_bytes(prompt_text.encode("utf-8"))
     prompt_ref = ArtifactRef("department_prompt", prompt_hash, f"run/{prompt_hash[7:9]}/{prompt_hash[7:]}")
     projection = RunProjection(task="local request", department_prompts={

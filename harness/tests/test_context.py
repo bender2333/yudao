@@ -4,7 +4,8 @@ from contextlib import contextmanager
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.artifacts import ArtifactStore
 from harness.context import ContextAssembler
-from harness.department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from harness.definitions import DEFINITIONS
+from harness.department_prompts import save_department_prompt
 from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, product_decision, response_turn, review_turn
 from harness.providers import CredentialChain, ProviderFacade
@@ -409,7 +410,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
 
 
 def test_assembler_records_budget_and_digest(tmp_path):
-    prompt_text = DEFAULT_PROMPTS["engineering"]
+    prompt_text = DEFINITIONS.role("engineering").prompt
     prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
     projection = RunProjection(
         run_id="run_x",
@@ -430,7 +431,7 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     from harness.compaction import plan_compaction
     from harness.models import canonical_hash
 
-    prompt_text = DEFAULT_PROMPTS["engineering"]
+    prompt_text = DEFINITIONS.role("engineering").prompt
     prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
     projection = RunProjection(
         run_id="run_x", task="task", phase="ENGINEERING", context_window=8000,

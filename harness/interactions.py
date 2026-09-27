@@ -11,7 +11,8 @@ import threading
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from .definitions import DEFINITIONS
+from .department_prompts import save_department_prompt
 from .event_store import EventStore
 from .projection import project_run
 from .write_path import NewEvent, Transaction
@@ -41,9 +42,10 @@ class InteractionWriter:
         self._publication = threading.Lock()
 
     def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
-        """写入首个输入与三部门初始 Prompt；项目层可用项目配置替代默认 Prompt。"""
+        # 写入首个输入与各部门的初始 Prompt：内置默认 Prompt 取自定义，项目层用项目部门设置替代
         received = self._input(run_id, text, version=1, kind="text", previous_ref=None, parent_commit=None)
-        prompt_texts = DEFAULT_PROMPTS if department_prompts is None else department_prompts
+        prompt_texts = ({department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS}
+                        if department_prompts is None else department_prompts)
         prompts = {department: self._prompt(run_id, department, text, 1)
                    for department, text in prompt_texts.items()}
         return {"initial_input": received, "department_prompts": prompts,
