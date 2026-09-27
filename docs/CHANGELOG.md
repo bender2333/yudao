@@ -190,3 +190,5 @@ claude-opus-5-5 / 2026-09-27 21:05 / #48 完成后更新：docs/design/architect
 claude-opus-5-5 / 2026-09-27 21:05 / docs/architecture-issues.md 登记两条：AGENTS.md 的安装与测试命令与 dev 依赖组和项目环境不一致、Provider 连接信任的证书来源（共用的 SSL 上下文只信任 certifi，httpx2 默认使用操作系统证书库） / #113 执行与代码审查中发现，需要架构师决定
 
 claude-opus-5-5 / 2026-09-27 21:25 / docs/architecture-issues.md 登记两条：观测查询中估计用量的 source、旧格式的流事件记录与负的用时没有写入方；测试中以替换读取结果模拟篡改的写法与「不使用 mock」的规则不一致 / #109 把观测与 smoke 的测试改为经公开接口核对时发现，需要架构师决定
+
+claude-opus-5-5 / 2026-09-27 21:49 / docs/requirements/provider-retries.md（D17）写明证书校验失败不重试、三种协议共用信任操作系统证书库的 TLS 上下文；docs/architecture-issues.md 为 #113、#109 登记的四条问题追加处理结论（#114、#115） / #113 与 #109 登记的问题
