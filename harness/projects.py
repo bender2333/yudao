@@ -10,14 +10,13 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .artifacts import ArtifactStore
+from .definitions import DEFINITIONS
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
 from .event_store import EventStore, project_stream
 from .materials import save_text_material
 from .models import (
     Adoption,
     ArtifactRef,
-    DEFAULT_MAX_CYCLES,
-    DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
     Event,
     EventType,
@@ -371,7 +370,8 @@ class ProjectService:
     # 事项
 
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
-                        max_cycles: int = DEFAULT_MAX_CYCLES, run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
+                        max_cycles: int = DEFINITIONS.limits.max_cycles,
+                        run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
                         context_window: int = 32_000) -> tuple[str, str]:
         _require_text("text", text)
         _require_title(title)
@@ -408,8 +408,9 @@ class ProjectService:
         return self._start(project_id, create)
 
     def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
-                                      title: str | None = None, max_cycles: int = DEFAULT_MAX_CYCLES,
-                                      run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
+                                      title: str | None = None,
+                                      max_cycles: int = DEFINITIONS.limits.max_cycles,
+                                      run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
                                       context_window: int = 32_000) -> tuple[str, str]:
         # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
         _require_text("text", text)

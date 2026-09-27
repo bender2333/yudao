@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-DEPARTMENTS = ("product", "engineering", "quality")
+from .definitions import DEFINITIONS
+
+DEPARTMENTS =("product", "engineering", "quality")
 
 PHASES = (
     "CREATED",
@@ -63,9 +65,6 @@ HUMAN_ACTIONS = {
     "max_cycles": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。",
     "time_limit": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。",
 }
-
-DEFAULT_MAX_CYCLES = 999_999
-DEFAULT_RUN_TIME_LIMIT_SEC = 7200
 
 
 class EventType:
@@ -559,8 +558,8 @@ class RunProjection:
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None
-    max_cycles: int = DEFAULT_MAX_CYCLES
-    run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC
+    max_cycles: int = DEFINITIONS.limits.max_cycles
+    run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec
     context_window: int = 32_000
     cycle_count: int = 0
     token_used: int = 0

@@ -29,10 +29,9 @@ from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
+from .definitions import DEFINITIONS
 from .models import (
     Event as RunEvent,
-    DEFAULT_MAX_CYCLES,
-    DEFAULT_RUN_TIME_LIMIT_SEC,
     DEPARTMENTS,
     DepartmentPrompt,
     EventType,
@@ -227,8 +226,8 @@ class Orchestrator:
         self,
         task: str,
         *,
-        max_cycles: int = DEFAULT_MAX_CYCLES,
-        run_time_limit_sec: int = DEFAULT_RUN_TIME_LIMIT_SEC,
+        max_cycles: int = DEFINITIONS.limits.max_cycles,
+        run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
         context_window: int = 32_000,
         run_id: str | None = None,
         project_id: str | None = None,

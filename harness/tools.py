@@ -6,8 +6,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-CHECK_TIMEOUT_SEC = 30
-CHECK_OUTPUT_LIMIT = 4000
+from .definitions import DEFINITIONS
 
 # kind：主机工具（host）由控制核心执行，现在只有提交类工具；环境工具（environment）的每次调用是一个动作，
 # 经过工具许可以后在执行环境中执行，action 是动作类别（读取、写入、检查、登记的本地命令）
@@ -45,12 +44,11 @@ SUBMIT_KINDS = {
 
 # 登记命令名只允许简单标识，避免路径与 shell 元字符进入注册表
 _COMMAND_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
-# 超时上限 10 分钟：登记命令是受信构建/测试入口，不是常驻服务
-COMMAND_TIMEOUT_MAX_SEC = 600
 
 
 def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, Any]:
-    # 校验一条项目登记命令，返回冻结用的规范形态；任一非法直接报错
+    # 校验一条项目登记命令，返回冻结用的规范形态；任一非法直接报错。时限与输出上限的默认值、时限的最大值取自定义
+    limits = DEFINITIONS.limits
     if not isinstance(name, str) or not _COMMAND_NAME_PATTERN.fullmatch(name):
         raise ValueError("command name must match [A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
     if not isinstance(config, dict):
@@ -61,10 +59,10 @@ def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, 
     extra_args = config.get("args", [])
     if not isinstance(extra_args, list) or any(not isinstance(item, str) or not item for item in extra_args):
         raise ValueError(f"registered command {name} allowlist args must be a list of non-empty strings")
-    timeout_sec = config.get("timeout_sec", CHECK_TIMEOUT_SEC)
-    if type(timeout_sec) is not int or not 1 <= timeout_sec <= COMMAND_TIMEOUT_MAX_SEC:
-        raise ValueError(f"registered command {name} timeout_sec must be an integer in 1..{COMMAND_TIMEOUT_MAX_SEC}")
-    output_limit = config.get("output_limit", CHECK_OUTPUT_LIMIT)
+    timeout_sec = config.get("timeout_sec", limits.check_timeout_sec)
+    if type(timeout_sec) is not int or not 1 <= timeout_sec <= limits.command_timeout_max_sec:
+        raise ValueError(f"registered command {name} timeout_sec must be an integer in 1..{limits.command_timeout_max_sec}")
+    output_limit = config.get("output_limit", limits.tool_output_limit)
     if type(output_limit) is not int or output_limit < 1:
         raise ValueError(f"registered command {name} output_limit must be an integer >= 1")
     return {"argv": list(argv), "args": list(extra_args), "timeout_sec": timeout_sec, "output_limit": output_limit}

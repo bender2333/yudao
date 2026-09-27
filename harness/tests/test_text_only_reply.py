@@ -6,13 +6,17 @@ import pytest
 
 from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
+from harness.definitions import DEFINITIONS
+from harness.engine import tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import _model_input_audit
 from harness.tests.helpers import department_history, list_files_turn
+
+# 连续没有调用工具的回复最多追加说明的次数，取自定义
+LIMIT = DEFINITIONS.limits.tool_call_required_limit
 from harness.tests.protocol_helpers import (
     bound_target,
     chat_responder,
@@ -57,7 +61,7 @@ def test_text_only_reply_appends_user_message_to_history_and_events(tmp_path):
     [event] = _events(system, run_id, EventType.TOOL_CALL_REQUIRED)
     assert event.role == "product"
     assert event.payload["activation_id"] == first.activation_id and event.payload["step_id"] == first.step_id
-    assert event.payload["count"] == 1 and event.payload["limit"] == TOOL_CALL_REQUIRED_LIMIT
+    assert event.payload["count"] == 1 and event.payload["limit"] == LIMIT
     stored = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["input_ref"])))
     assert stored == appended
 
@@ -80,7 +84,7 @@ def test_empty_reply_is_followed_by_the_same_user_message(tmp_path):
 
 
 def test_consecutive_text_only_replies_pause_the_run_and_keep_every_reply(tmp_path):
-    replies = [f"第 {index} 次只回复文字" for index in range(1, TOOL_CALL_REQUIRED_LIMIT + 2)]
+    replies = [f"第 {index} 次只回复文字" for index in range(1, LIMIT + 2)]
     adapter = FakeAdapter([FakeTurn(transcript=text) for text in replies])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build echo")
@@ -88,9 +92,9 @@ def test_consecutive_text_only_replies_pause_the_run_and_keep_every_reply(tmp_pa
 
     assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
     assert result.product_spec is None
-    assert len(adapter.invocations) == TOOL_CALL_REQUIRED_LIMIT + 1
+    assert len(adapter.invocations) == LIMIT + 1
     required = _events(system, run_id, EventType.TOOL_CALL_REQUIRED)
-    assert [event.payload["count"] for event in required] == list(range(1, TOOL_CALL_REQUIRED_LIMIT + 1))
+    assert [event.payload["count"] for event in required] == list(range(1, LIMIT + 1))
     for request in adapter.invocations[1:]:
         assert request.input_items[-1]["role"] == "user"
     # 每一次只含文字的回复都保留为事件，并留在部门历史中
@@ -106,7 +110,7 @@ def test_consecutive_text_only_replies_pause_the_run_and_keep_every_reply(tmp_pa
 
 
 def test_tool_call_resets_the_count_of_replies_without_tool_calls(tmp_path):
-    limit = TOOL_CALL_REQUIRED_LIMIT
+    limit = LIMIT
     script = [*[FakeTurn(transcript="只回复文字") for _ in range(limit)], list_files_turn,
               FakeTurn(transcript="再次只回复文字"), product_spec()]
     adapter = FakeAdapter(script)

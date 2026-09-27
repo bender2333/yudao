@@ -186,7 +186,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             state.prompt_versions.append(prompt)
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
-        state.run_time_limit_sec = int(payload.get("run_time_limit_sec", 7200))
+        state.run_time_limit_sec = int(payload["run_time_limit_sec"])
         state.context_window = int(payload.get("context_window", 32_000))
         state.provider = payload.get("provider", "fake")
         state.adapter = payload["adapter"]
@@ -802,7 +802,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             prompt_config_versions=dict(payload["prompt_config_versions"]),
             command_versions=dict(payload.get("command_versions") or {}),
             max_cycles=int(payload["max_cycles"]),
-            run_time_limit_sec=int(payload.get("run_time_limit_sec", 7200)),
+            run_time_limit_sec=int(payload["run_time_limit_sec"]),
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
         ))

@@ -14,7 +14,8 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
 from .contracts import current_contract_hash, current_plan_hash
-from .engine import TOOL_CALL_REQUIRED_LIMIT, tool_call_required_text
+from .definitions import DEFINITIONS
+from .engine import tool_call_required_text
 from .event_store import EventStore
 from .git_audit import verify_git_history
 from .models import (ArtifactRef, EventType, RunProjection, canonical_hash, department_for_phase, estimate_tokens,
@@ -839,9 +840,10 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     # 主机只在工作步骤没有调用工具时追加这条消息，计数连续且不超过上限
                     count = replies_without_tool_call.get(activation, 0) + 1
                     item = _read_artifact(artifacts, run_id, payload["input_ref"])
+                    limit = DEFINITIONS.limits.tool_call_required_limit
                     if (purposes[activation] != "work" or (activation, steps[activation]) in tool_steps
-                            or payload.get("count") != count or count > TOOL_CALL_REQUIRED_LIMIT
-                            or payload.get("limit") != TOOL_CALL_REQUIRED_LIMIT
+                            or payload.get("count") != count or count > limit
+                            or payload.get("limit") != limit
                             or item != {"role": "user", "content": tool_call_required_text(count)}):
                         raise ValueError("appended tool call message does not follow a reply without tool calls")
                     replies_without_tool_call[activation] = count

@@ -25,11 +25,14 @@ from typing import Any
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
 from .public_tree import capture_public_tree, is_private_path
+from .definitions import DEFINITIONS
 from .redact import redact_text, sanitized_env
-from .tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, normalize_registered_commands
+from .tools import normalize_registered_commands
 from .workspace import Workspace, WorkspaceSnapshot
 
-# 单页默认命中数；单页输出同样受 CHECK_OUTPUT_LIMIT 约束
+# 一次工具结果的输出上限，取自定义中的限额
+_OUTPUT_LIMIT = DEFINITIONS.limits.tool_output_limit
+# 单页默认命中数；单页输出同样受 _OUTPUT_LIMIT 约束
 SEARCH_DEFAULT_PAGE = 50
 # 单行过长时保留的片段长度，避免一行占满整页输出
 SEARCH_SNIPPET_LIMIT = 1000
@@ -51,7 +54,7 @@ class _Finished:
 
 class LocalEnvironment:
     def __init__(self, workspace: Workspace, *, registered_commands: dict[str, Any] | None = None,
-                 check_timeout_sec: int = CHECK_TIMEOUT_SEC) -> None:
+                 check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> None:
         self.workspace = workspace
         self._registered_commands = normalize_registered_commands(registered_commands)
         self._check_timeout_sec = check_timeout_sec
@@ -554,8 +557,8 @@ def _display_argv(argv: list[str]) -> str:
 
 def _summarize_output(stdout: str, stderr: str) -> str:
     text = "\n".join(part for part in (stdout.strip(), stderr.strip()) if part)
-    if len(text) > CHECK_OUTPUT_LIMIT:
-        text = text[:CHECK_OUTPUT_LIMIT] + "\n...truncated..."
+    if len(text) > _OUTPUT_LIMIT:
+        text = text[:_OUTPUT_LIMIT] + "\n...truncated..."
     return text
 
 
@@ -594,13 +597,13 @@ def _result_size(result: dict[str, Any]) -> int:
 def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[dict[str, Any]], bool]:
     # 按输出上限收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
     probe = {"matches": page}
-    while len(page) > 1 and _result_size({**probe, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+    while len(page) > 1 and _result_size({**probe, "truncated": True}) > _OUTPUT_LIMIT:
         page = page[:-1]
         truncated = True
-    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > _OUTPUT_LIMIT:
         only = dict(page[0])
         snippet = only["snippet"]
-        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > CHECK_OUTPUT_LIMIT:
+        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > _OUTPUT_LIMIT:
             snippet = snippet[:len(snippet) // 2]
         only["snippet"] = snippet + "\n...truncated..."
         page = [only]
@@ -613,13 +616,13 @@ def _fit_line_entries(wanted: list[tuple[int, str]]) -> tuple[list[dict[str, Any
     entries: list[dict[str, Any]] = []
     for number, text in wanted:
         candidate = entries + [{"line": number, "text": text}]
-        if _result_size({"lines": candidate, "truncated": True}) > CHECK_OUTPUT_LIMIT:
+        if _result_size({"lines": candidate, "truncated": True}) > _OUTPUT_LIMIT:
             break
         entries = candidate
     if not entries and wanted:
         number, text = wanted[0]
         clipped = text
-        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > CHECK_OUTPUT_LIMIT:
+        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > _OUTPUT_LIMIT:
             clipped = clipped[:len(clipped) // 2]
         entries = [{"line": number, "text": clipped + "\n...truncated..."}]
         return entries, 1

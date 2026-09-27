@@ -755,7 +755,7 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
         "work_item_id": "wi_forged", "title": "伪造", "text": "伪造", "run_id": run_a, "baseline": None,
         "project_context_ref": {"kind": "project_context"},
         "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0},
-        "max_cycles": 8, "context_window": 32_000,
+        "max_cycles": 8, "run_time_limit_sec": 600, "context_window": 32_000,
     }))
     forged = system.projects.projection(project_b).work_item("wi_forged")
     assert forged.status == "not_started"

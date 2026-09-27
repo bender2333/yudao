@@ -1,8 +1,9 @@
 import time
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
-from harness.models import DEFAULT_MAX_CYCLES, DEFAULT_RUN_TIME_LIMIT_SEC, EventType
+from harness.models import EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, list_files_turn, run_scripted
@@ -57,10 +58,10 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
-    # 默认 max_cycles 应该是 DEFAULT_MAX_CYCLES
+    # 默认的激活次数上限与运行时间上限取自定义
     projection = system.project(run_id)
-    assert projection.max_cycles == DEFAULT_MAX_CYCLES
-    assert projection.run_time_limit_sec == DEFAULT_RUN_TIME_LIMIT_SEC
+    assert projection.max_cycles == DEFINITIONS.limits.max_cycles
+    assert projection.run_time_limit_sec == DEFINITIONS.limits.run_time_limit_sec
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
 

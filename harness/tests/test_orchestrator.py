@@ -1,6 +1,6 @@
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.engine import TOOL_CALL_REQUIRED_LIMIT
+from harness.definitions import DEFINITIONS
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history, happy_script, run_scripted
@@ -194,7 +194,7 @@ def test_natural_language_completion_does_not_finish(data_dir):
         product_spec(),
         plan_turn(),
         delivery_turn(),
-        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(TOOL_CALL_REQUIRED_LIMIT + 1)],
+        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(DEFINITIONS.limits.tool_call_required_limit + 1)],
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")

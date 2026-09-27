@@ -17,7 +17,8 @@ from harness.environment import LocalEnvironment
 from harness.tests.helpers import (LONG_RUNNING_TREE, action, happy_script, perform, recorded_context,
                                    wait_for_file, wait_until_stopped)
 from harness.tests.test_web import get_json, request, running_server
-from harness.tools import CHECK_OUTPUT_LIMIT, CHECK_TIMEOUT_SEC, TOOL_SCHEMAS
+from harness.definitions import DEFINITIONS
+from harness.tools import TOOL_SCHEMAS
 from harness.workspace import Workspace
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -308,7 +309,8 @@ def test_registry_freezes_at_work_item_creation(data_dir):
     project_id = system.projects.register("Cmd", GOAL)
     first = system.projects.configure_command(project_id, "itest", ["python", "-c", "print(1)"], base_version=0)
     assert first["version"] == 1 and first["unchanged"] is False
-    assert first["timeout_sec"] == CHECK_TIMEOUT_SEC and first["output_limit"] == CHECK_OUTPUT_LIMIT
+    limits = DEFINITIONS.limits
+    assert first["timeout_sec"] == limits.check_timeout_sec and first["output_limit"] == limits.tool_output_limit
     with pytest.raises(CommandConfigConflict):
         system.projects.configure_command(project_id, "itest", ["python", "-c", "print(9)"], base_version=0)
     with pytest.raises(ValueError):
@@ -319,7 +321,7 @@ def test_registry_freezes_at_work_item_creation(data_dir):
     run = system.project(run_id)
     assert run.registered_commands == {
         "itest": {"argv": ["python", "-c", "print(1)"], "args": [],
-                  "timeout_sec": CHECK_TIMEOUT_SEC, "output_limit": CHECK_OUTPUT_LIMIT},
+                  "timeout_sec": limits.check_timeout_sec, "output_limit": limits.tool_output_limit},
     }
     assert run.command_versions == {"itest": 1}
     assert system.projects.projection(project_id).work_item(work_item_id).command_versions == {"itest": 1}
