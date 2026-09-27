@@ -5,6 +5,10 @@ import json
 import sys
 from pathlib import Path
 
+from filelock import FileLock, Timeout
+
+from .api.server import serve as serve_api
+from .app.application import Application
 from .demo import run_demo
 from .providers import ProviderFacade
 from .runtime import LoopSystem
@@ -15,6 +19,8 @@ from .web.server import serve
 DEFAULT_DIR = Path(".yudao") / "native-loop"
 DEFAULT_PROVIDER_CONFIG = Path(".yudao") / "providers.json"
 DEFAULT_DOTENV = Path(".yudao") / ".env"
+# 数据目录的进程锁：同一个数据目录只允许一个服务进程（应用层与接口层设计说明第 7.2 节），锁在进程退出时释放
+SERVICE_LOCK = "service.lock"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,6 +40,11 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--provider-config", default=str(DEFAULT_PROVIDER_CONFIG))
+    api = sub.add_parser("api", help="serve the application interface (commands, queries, capabilities)")
+    api.add_argument("--data-dir", default=str(DEFAULT_DIR))
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8765)
+    api.add_argument("--provider-config", default=str(DEFAULT_PROVIDER_CONFIG))
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
@@ -54,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     command = args.command or "serve"
 
     if command == "demo":
+        lock = _lock_data_dir(args.data_dir) if args.serve else None
+        if args.serve and lock is None:
+            return 1
         system, run_id = run_demo(args.data_dir)
         projection = system.project(run_id)
         print(f"demo run: {run_id}")
@@ -66,8 +80,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "serve":
         # 无参等价全默认 serve：缺配置空态启动，只读任务与配置管理可用
+        lock = _lock_data_dir(args.data_dir)
+        if lock is None:
+            return 1
         system = _production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
+    if command == "api":
+        lock = _lock_data_dir(args.data_dir)
+        if lock is None:
+            return 1
+        config = None if args.provider_config in (None, "") else Path(args.provider_config).resolve()
+        dotenv = DEFAULT_DOTENV.resolve()
+        serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
+                  host=args.host, port=args.port)
+        return 0
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):
             parser.error("replay needs exactly one of: run_id or --project <project_id>")
@@ -140,6 +166,20 @@ def _serve(system: LoopSystem, host: str, port: int) -> int:
         server.server_close()
         system.close()
     return 0
+
+
+def _lock_data_dir(data_dir: str | Path) -> FileLock | None:
+    # 取得数据目录的进程锁；另一个服务进程持有时说明原因并返回空，调用方以非零状态退出。
+    # 返回的锁在服务进程结束之前保持引用
+    directory = Path(data_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(directory / SERVICE_LOCK)
+    try:
+        lock.acquire(timeout=0)
+    except Timeout:
+        print(f"data directory is in use by another service process: {directory.resolve()}", file=sys.stderr)
+        return None
+    return lock
 
 
 def _production_system(data_dir: str | Path, provider_config: str | Path | None) -> LoopSystem:

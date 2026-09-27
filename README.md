@@ -88,6 +88,14 @@ python -m harness
 
 界面保存、磁盘修改（约 1 秒轮询，按内容哈希核对）与手动重载都对新建事项生效；已创建事项继续使用创建时冻结的模型、协议与凭据。
 
+桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）单独启动，参数与 `serve` 相同：
+
+```bash
+python -m harness api --data-dir .yudao/native-loop --port 8765
+```
+
+同一个数据目录只允许一个服务进程：`api` 与 `serve`（含 `demo --serve`）启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出。
+
 ### 运行演示（无需 API 密钥）
 
 ```bash
@@ -220,7 +228,9 @@ Prompt 在下次该部门激活时生效，当前激活不受影响。
 
 ## HTTP 接口
 
-查询接口只读。创建 run 和取消走控制层，界面不能直接改 spec、投影或完成状态。
+`python -m harness api` 提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。
+
+下表是旧 Web 控制台（`python -m harness serve`）的接口，冻结，桌面客户端完成以后删除。查询接口只读。创建 run 和取消走控制层，界面不能直接改 spec、投影或完成状态。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
