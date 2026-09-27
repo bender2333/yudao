@@ -63,9 +63,10 @@ _build_sdk_models(ResponseStreamEvent)
 # 系统信息；服务启动时先识别一次，之后读取标准库的缓存
 platform.platform()
 
-# 各次调用的客户端共用一个 SSL 上下文。openai 的客户端使用 httpx，anthropic 的客户端使用 httpx2，两者都为每个客户端
-# 新建上下文并加载证书，本机负载高时每次约 1 秒，而 Chat Completions 与 Messages 每次调用都新建客户端。
-# httpcore 与 httpcore2 建立每个 TLS 连接时在上下文上设置 ALPN，全部客户端都只用 HTTP/1.1，设置的值相同
+# 各次调用的客户端共用一个 SSL 上下文，信任 certifi 的证书列表。openai 的客户端使用 httpx，anthropic 的客户端使用
+# httpx2，没有给出上下文时两者都为每个客户端新建上下文（httpx 加载证书，本机负载高时每次约 1 秒），而 Chat Completions
+# 与 Messages 每次调用都新建客户端。httpcore 与 httpcore2 建立每个 TLS 连接时在上下文上设置 ALPN，全部客户端都只用
+# HTTP/1.1，设置的值相同
 _SSL_CONTEXT = httpx.create_ssl_context()
 
 
@@ -458,7 +459,7 @@ class _ResponsesInvoker:
                 raise observation_errors[0]
             if isinstance(exc, _RETRYABLE_HTTP_ERRORS):
                 raise _transport_provider_error(exc, trace=trace) from exc
-            if isinstance(exc, _HTTP_ERRORS):
+            if isinstance(exc, httpx.HTTPError):
                 raise _nonretryable_http_error() from exc
             raise
         if observation_errors:

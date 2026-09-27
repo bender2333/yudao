@@ -38,11 +38,11 @@ Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并
 uv sync --frozen
 ```
 
-之后的命令用 `uv run` 在项目环境中运行，例如 `uv run python -m harness`。
+之后的命令都用 `uv run` 在项目环境中运行。
 
 ### 配置 Provider
 
-无配置也能启动控制台：`python -m harness` 直接使用默认路径，配置缺失时进入空态，可以在页面里逐项完成接入。非敏感配置写在 `.yudao/providers.json`；凭据默认只在进程内存中有效，需要跨重启时写入 `.yudao/.env`。
+无配置也能启动控制台：`uv run python -m harness` 直接使用默认路径，配置缺失时进入空态，可以在页面里逐项完成接入。非敏感配置写在 `.yudao/providers.json`；凭据默认只在进程内存中有效，需要跨重启时写入 `.yudao/.env`。
 
 ```json
 {
@@ -85,8 +85,8 @@ uv sync --frozen
 ### 启动服务
 
 ```bash
-# 等价于 python -m harness serve，默认 data-dir .yudao/native-loop、provider-config .yudao/providers.json、端口 8765
-python -m harness
+# 等价于 uv run python -m harness serve，默认 data-dir .yudao/native-loop、provider-config .yudao/providers.json、端口 8765
+uv run python -m harness
 ```
 
 访问 [http://localhost:8765](http://localhost:8765) 打开 Web 控制台。
@@ -96,7 +96,7 @@ python -m harness
 桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）单独启动，参数与 `serve` 相同：
 
 ```bash
-python -m harness api --data-dir .yudao/native-loop --port 8765
+uv run python -m harness api --data-dir .yudao/native-loop --port 8765
 ```
 
 同一个数据目录只允许一个服务进程：`api` 与 `serve`（含 `demo --serve`）启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出。
@@ -104,13 +104,13 @@ python -m harness api --data-dir .yudao/native-loop --port 8765
 ### 运行演示（无需 API 密钥）
 
 ```bash
-python -m harness demo --serve --port 8765
+uv run python -m harness demo --serve --port 8765
 ```
 
 ### 重放历史任务
 
 ```bash
-python -m harness replay <run_id>
+uv run python -m harness replay <run_id>
 ```
 
 默认数据目录是 `.yudao/native-loop`。
@@ -133,9 +133,9 @@ cd harness/tests/openapi && npm ci && npm run check
 按目录绑定执行三部门真实 smoke（凭据引用从环境解析，应用不读取 `provider.md`）：
 
 ```bash
-python -m harness smoke --provider-config .yudao/providers.json --data-dir .yudao/native-validation
-python -m harness smoke --provider-config .yudao/providers.json --scenario happy
-python -m harness smoke --provider-config .yudao/providers.json --scenario collaboration
+uv run python -m harness smoke --provider-config .yudao/providers.json --data-dir .yudao/native-validation
+uv run python -m harness smoke --provider-config .yudao/providers.json --scenario happy
+uv run python -m harness smoke --provider-config .yudao/providers.json --scenario collaboration
 ```
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
@@ -289,7 +289,7 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ```powershell
 $env:YUDAO_OPENCODE_GO_KEY = '<your-api-key>'
-python -m harness
+uv run python -m harness
 ```
 
 `credential_ref` 对应环境变量名称；应用不读取 `provider.md`。旧的 `YUDAO_MODEL_*` 单配置入口与 Provider 级 `protocol` 字段已移除，旧的目录文件按新结构明确报错，不做迁移。任务创建时冻结三部门的目标与认证句柄，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。Provider 模块在后台轮询本地配置与 `.env`（约 1 秒，按内容核对），界面保存与手动重载也经同一接口发布；文件损坏时保留上一有效版本并持续显示重载错误。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。
