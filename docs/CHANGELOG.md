@@ -170,3 +170,5 @@ claude-opus-5-5 / 2026-09-27 03:03 / docs/design/architecture/overall-architectu
 claude-opus-5-5 / 2026-09-27 05:04 / docs/architecture-issues.md 登记：提案校验之后、提交之前的变化没有公开的时点，替换 evaluate_proposal 的 6 项端到端测试已删除 / #43 第 15 个提交清理测试时发现
 
 claude-opus-5-5 / 2026-09-27 05:22 / #43 完成后更新：docs/design/architecture/overall-architecture.md 第 5 节写明安全节点接口的四个操作，第 6.1 节写明流程编排、步骤驱动、写入口与执行层的代码位置，第 10 节写明已完成的工作与接下来的顺序；docs/program-roadmap.md 第 2 节第 5 项写明 #43 的完成情况；docs/current-baseline.md 第 1 节新增控制核心一行；docs/architecture-issues.md 为提案校验与提交判断之间的核对追加处理结论（由 #44 的流版本核对处理） / #43 于 2026-09-27 关闭
+
+claude-opus-5-5 / 2026-09-27 11:44 / #44 完成后更新：docs/design/architecture/overall-architecture.md 第 5 节结束运行改为按流版本核对，第 6.1 节写入口一行改为 write_path.py、event_store.py 与 projection.py 的职责，第 10 节写明 #44 已完成；docs/program-roadmap.md 第 2 节第 6 项与 docs/current-baseline.md 控制核心一行写明 #44 的完成情况 / #44 于 2026-09-27 关闭
