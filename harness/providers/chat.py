@@ -16,6 +16,7 @@ from openai import (
     AsyncOpenAI,
     DefaultAsyncHttpxClient,
 )
+from openai.types.chat import ChatCompletionChunk
 
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
@@ -25,6 +26,7 @@ from .responses import (
     _ProviderClock,
     _RETRYABLE_HTTP_ERRORS,
     _TransportTrace,
+    _build_sdk_models,
     _diagnostic_code,
     _error_code,
     _has_nonretryable_connection_cause,
@@ -38,6 +40,8 @@ from .responses import (
     _transport_diagnostics,
     _transport_provider_error,
 )
+
+_build_sdk_models(ChatCompletionChunk)
 
 
 # Chat Completions 单次调用：SDK 内部重试关闭，错误分类与 Responses 共用同一套码表

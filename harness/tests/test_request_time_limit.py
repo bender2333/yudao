@@ -39,6 +39,31 @@ def _close(server) -> None:
     server.server_close()
 
 
+# 新进程中只导入 Provider 模块（服务启动），列出解析流事件要用的 SDK 模型是否已经构建
+SDK_MODELS_BUILT = """
+import json
+import harness.providers
+from anthropic.types import RawContentBlockDeltaEvent, RawMessageStartEvent
+from openai.types.chat import ChatCompletionChunk
+from openai.types.responses import (
+    Response, ResponseCompletedEvent, ResponseFunctionToolCall, ResponseOutputMessage, ResponseUsage,
+)
+from pydantic_core import SchemaSerializer, SchemaValidator
+models = [Response, ResponseCompletedEvent, ResponseFunctionToolCall, ResponseOutputMessage, ResponseUsage,
+          ChatCompletionChunk, RawMessageStartEvent, RawContentBlockDeltaEvent]
+print(json.dumps({model.__name__: isinstance(model.__pydantic_validator__, SchemaValidator)
+                  and isinstance(model.__pydantic_serializer__, SchemaSerializer) for model in models}))
+"""
+
+
+def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
+    completed = subprocess.run([sys.executable, "-c", SDK_MODELS_BUILT], cwd=REPOSITORY,
+                               capture_output=True, text=True, timeout=300)
+    assert completed.returncode == 0, completed.stderr
+    built = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert built and all(built.values()), built
+
+
 @pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_first_request_in_a_new_process_fits_provider_delay_plus_one_second(protocol, tmp_path):
     delay = 1.0

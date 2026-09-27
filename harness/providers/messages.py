@@ -17,6 +17,7 @@ from anthropic import (
     AsyncAnthropic,
     DefaultAsyncHttpxClient,
 )
+from anthropic.types import RawMessageStreamEvent
 
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
@@ -25,6 +26,7 @@ from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
     _TransportTrace,
+    _build_sdk_models,
     _diagnostic_code,
     _error_code,
     _has_nonretryable_connection_cause,
@@ -36,6 +38,8 @@ from .responses import (
     _sdk_json,
     _transport_diagnostics,
 )
+
+_build_sdk_models(RawMessageStreamEvent)
 
 
 # Anthropic Messages 单次调用：系统指令独立传参，工具配对按 tool_use/tool_result

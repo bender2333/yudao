@@ -6,12 +6,14 @@ import json
 import math
 import re
 import time
+import typing
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import httpx
+import pydantic
 # openai 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
 import openai.resources.responses
 from openai import (
@@ -22,11 +24,38 @@ from openai import (
     AsyncOpenAI,
     DefaultAsyncHttpxClient,
 )
+from openai.types.responses import ResponseStreamEvent
 
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .resolve import FrozenTarget
+
+
+def _build_sdk_models(root: Any) -> None:
+    # SDK 的一次性初始化在服务启动时完成（D09）：openai 与 anthropic 的 pydantic 模型推迟到第一次解析时才构建，
+    # 第一次请求解析流事件时要构建几百个模型。协议模块导入时（服务启动）从流事件的类型出发全部构建：
+    # 先构建字段中出现的模型，再构建引用它们的模型，后者直接使用前者已经构建的结果
+    order: list[type[pydantic.BaseModel]] = []
+    _collect_models(root, set(), order)
+    for model in order:
+        model.model_rebuild(force=True)
+
+
+def _collect_models(annotation: Any, seen: set[type], order: list[type[pydantic.BaseModel]]) -> None:
+    if isinstance(annotation, type) and issubclass(annotation, pydantic.BaseModel):
+        if annotation in seen:
+            return
+        seen.add(annotation)
+        for model_field in annotation.model_fields.values():
+            _collect_models(model_field.annotation, seen, order)
+        order.append(annotation)
+        return
+    for argument in typing.get_args(annotation):
+        _collect_models(argument, seen, order)
+
+
+_build_sdk_models(ResponseStreamEvent)
 
 
 @dataclass(frozen=True)
