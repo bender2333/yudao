@@ -186,3 +186,5 @@ claude-opus-5-5 / 2026-09-27 18:10 / docs/design/app-and-interface.md 第 5.2 �
 claude-opus-5-5 / 2026-09-27 16:25 / docs/architecture-issues.md 登记两条：组织定义中的流转规则（交接顺序与阶段迁移、质检退回的去向、询问动作的含义、事项种类）仍是状态机代码（#48）；事项记录的定义版本与运行实际使用的定义、限额可能不同（#48） / #48 迁入定义的是写在代码中的文字、清单与参数，流转规则由定义驱动、升级以后继续旧事项的处理需要架构师决定
 
 claude-opus-5-5 / 2026-09-27 21:05 / #48 完成后更新：docs/design/architecture/overall-architecture.md 第 6.1 节写明定义层、应用层与接口层的代码位置；docs/design/semantic-system.md 第 11 节工具一行改为定义与执行环境的位置；docs/architecture-issues.md 为 #48 登记的两条问题追加处理结论 / #48 于 2026-09-27 关闭
+
+claude-opus-5-5 / 2026-09-27 21:20 / docs/architecture-issues.md 登记两条：AGENTS.md 的安装与测试命令与 dev 依赖组和项目环境不一致、Provider 连接信任的证书来源（共用的 SSL 上下文只信任 certifi，httpx2 默认使用操作系统证书库） / #113 执行与代码审查中发现，需要架构师决定
