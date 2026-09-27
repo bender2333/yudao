@@ -1,6 +1,6 @@
 # 事件日志：系统唯一的事实来源。run 事件与项目事件在同一份日志中：每条事件有全局位置（跨项目递增）、
 # 所属的流（run:<run_id>、project:<project_id>）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
-# 建立索引供范围读取。日志只追加。
+# 建立索引供范围读取；由命令写入的事件另存命令身份与提出者。日志只追加，日志身份在建立日志时生成，不再改变。
 # 每个流保存一份投影（投影的内容由写入口计算，这里按 JSON 文本存放）。提交在一个数据库事务中核对流版本、
 # 执行权编号与命令身份，追加事件并保存投影；提交以后在进程内通知订阅方。
 # 连接取自连接池：读取各用自己的连接，不等待写入；写入由 SQLite 的写入事务互斥，不依赖线程身份。
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .models import Event, ProjectEvent, json_dumps, utc_now
+from .models import Event, ProjectEvent, json_dumps, new_id, utc_now
 
 
 SCHEMA = """
@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS events (
     department TEXT,
     type TEXT NOT NULL,
     epoch INTEGER,
+    command_id TEXT,
+    actor TEXT,
     role TEXT,
     parent_event_id TEXT,
     state_before TEXT,
@@ -52,6 +54,11 @@ CREATE INDEX IF NOT EXISTS idx_events_work_item ON events(work_item_id, position
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, position);
 CREATE INDEX IF NOT EXISTS idx_events_department ON events(department, position);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, position);
+CREATE INDEX IF NOT EXISTS idx_events_command ON events(command_id, position) WHERE command_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS log (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    log_id TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS projections (
     stream TEXT PRIMARY KEY,
     version INTEGER NOT NULL,
@@ -106,10 +113,12 @@ class StaleExecutionRight(Exception):
 
 @dataclass(frozen=True)
 class Command:
-    # 命令身份：客户端生成的身份、命令名称与请求内容的摘要（应用层的命令查重使用）
+    # 一次命令：客户端生成的身份、命令名称、请求内容的摘要（应用层的命令查重使用）与提出者。
+    # 同一身份是否重复只比较名称与摘要；这次提交追加的事件都记下身份与提出者
     command_id: str
     name: str
     digest: str
+    actor: str
 
 
 @dataclass(frozen=True)
@@ -156,12 +165,14 @@ class EventStore:
         with self._connection() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(SCHEMA)
+            connection.execute("INSERT OR IGNORE INTO log (singleton, log_id) VALUES (1, ?)", (new_id("log"),))
+            self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
 
     def commit(self, stream: str, expected_version: int, events: Sequence[Event | ProjectEvent], state: str, *,
                epoch: int | None = None, command: Command | None = None) -> None:
         # 在一个事务中：核对流的当前版本等于 expected_version，核对执行权编号不小于这个流已经记录的编号，
-        # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，写回事件）、保存这个流的投影、登记命令。
-        # 任何一项核对不通过都拒绝，什么也不写。订阅方由写入口在提交成功以后经 notify 通知
+        # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号、命令身份和提出者一起写回事件）、
+        # 保存这个流的投影、登记命令。任何一项核对不通过都拒绝，什么也不写。订阅方由写入口在提交成功以后经 notify 通知
         with self._transaction() as connection:
             saved = connection.execute(
                 "SELECT version, position, epoch FROM projections WHERE stream = ?", (stream,)
@@ -176,6 +187,8 @@ class EventStore:
                 _check_command(_command_record(connection, command.command_id), command)
             for event in events:
                 event.epoch = epoch
+                event.command_id = None if command is None else command.command_id
+                event.actor = None if command is None else command.actor
                 event.position = _insert(connection, event)
             if events:
                 connection.execute(
@@ -226,6 +239,19 @@ class EventStore:
         # 命令身份已经登记时拒绝：内容相同为 DuplicateCommand，不同为 CommandIdReused，异常带着原来的登记
         with self._connection() as connection:
             _check_command(_command_record(connection, command.command_id), command)
+
+    def command(self, command_id: str) -> CommandRecord | None:
+        # 登记过的命令；没有登记时为空
+        with self._connection() as connection:
+            return _command_record(connection, command_id)
+
+    def command_events(self, command_id: str) -> list[Event | ProjectEvent]:
+        # 一次命令追加的事件，按位置排列
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM events WHERE command_id = ? ORDER BY position ASC", (command_id,)
+            ).fetchall()
+        return [_from_row(row) for row in rows]
 
     def projection(self, stream: str) -> SavedProjection | None:
         with self._connection() as connection:
@@ -383,13 +409,13 @@ def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent) -> int:
         """
         INSERT INTO events (
             event_id, stream, stream_version, project_id, work_item_id, run_id, department, type, epoch,
-            role, parent_event_id, state_before, state_after, artifact_hashes_json,
+            command_id, actor, role, parent_event_id, state_before, state_after, artifact_hashes_json,
             session_id, provider, model, context_digest, stop_reason, error, payload_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (event.event_id, event.stream, event.stream_version, event.project_id, event.work_item_id,
-         event.run_id, event.department, event.type, event.epoch, *run_columns, json_dumps(event.payload),
-         event.created_at),
+         event.run_id, event.department, event.type, event.epoch, event.command_id, event.actor, *run_columns,
+         json_dumps(event.payload), event.created_at),
     )
     return int(cursor.lastrowid)
 
@@ -405,11 +431,12 @@ def _from_row(row: sqlite3.Row) -> Event | ProjectEvent:
             stop_reason=row["stop_reason"], error=row["error"], created_at=row["created_at"],
             position=row["position"], stream=row["stream"], stream_version=row["stream_version"],
             project_id=row["project_id"], work_item_id=row["work_item_id"], department=row["department"],
-            epoch=row["epoch"],
+            epoch=row["epoch"], command_id=row["command_id"], actor=row["actor"],
         )
     return ProjectEvent(
         event_id=row["event_id"], project_id=row["project_id"], type=row["type"],
         payload=json.loads(row["payload_json"]), created_at=row["created_at"], position=row["position"],
         stream=row["stream"], stream_version=row["stream_version"], work_item_id=row["work_item_id"],
-        run_id=row["run_id"], department=row["department"], epoch=row["epoch"],
+        run_id=row["run_id"], department=row["department"], epoch=row["epoch"], command_id=row["command_id"],
+        actor=row["actor"],
     )

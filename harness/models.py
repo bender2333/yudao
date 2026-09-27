@@ -420,7 +420,8 @@ class ContextManifest:
 @dataclass
 class Event:
     # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本；
-    # project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号
+    # project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号；
+    # command_id 与 actor 是写入它的命令与提出者，不是由命令写入时为空
     event_id: str
     run_id: str
     type: str
@@ -444,6 +445,8 @@ class Event:
     work_item_id: str | None
     department: str | None
     epoch: int | None = None
+    command_id: str | None = None
+    actor: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -480,6 +483,8 @@ class ProjectEvent:
     run_id: str | None
     department: str | None
     epoch: int | None = None
+    command_id: str | None = None
+    actor: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

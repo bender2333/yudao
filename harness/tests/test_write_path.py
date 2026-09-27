@@ -109,23 +109,40 @@ def test_one_command_identity_is_registered_once(data_dir):
         calls.append(transaction.version)
         transaction.append(_rename(f"名字 {len(calls)}"))
 
-    command = Command("command-1", "project.rename", "sha256:first")
+    command = Command("command-1", "project.rename", "sha256:first", "user:local")
     system.writes.transact(stream, rename, command=command)
-    position = system.store.list_project_events(project_id)[-1].position
+    renamed = system.store.list_project_events(project_id)[-1]
+    position = renamed.position
+    # 命令追加的事件记下命令身份与提出者；不是由命令写入的事件没有
+    assert (renamed.command_id, renamed.actor) == ("command-1", "user:local")
+    assert (system.store.list_project_events(project_id)[0].command_id,
+            system.store.list_project_events(project_id)[0].actor) == (None, None)
+    assert [event.event_id for event in system.store.command_events("command-1")] == [renamed.event_id]
+    record = system.store.command("command-1")
+    assert (record.name, record.digest, record.stream, record.position) == (
+        "project.rename", "sha256:first", stream, position)
+    assert system.store.command("command-unknown") is None
     with pytest.raises(DuplicateCommand) as duplicate:
         system.writes.transact(stream, rename, command=command)
     assert (duplicate.value.record.position, duplicate.value.record.stream) == (position, stream)
+    # 重复与否只比较名称与摘要，不比较提出者
+    with pytest.raises(DuplicateCommand):
+        system.writes.transact(stream, rename, command=Command("command-1", "project.rename", "sha256:first",
+                                                               "user:laptop"))
     with pytest.raises(CommandIdReused):
-        system.writes.transact(stream, rename, command=Command("command-1", "project.rename", "sha256:other"))
+        system.writes.transact(stream, rename, command=Command("command-1", "project.rename", "sha256:other",
+                                                               "user:local"))
     assert len(calls) == 1 and len(system.store.list_project_events(project_id)) == 2
 
     # 被拒绝的命令不登记，同一身份重试时重新判断
     def refuse(_transaction):
         raise ValueError("stale_base")
 
+    second = Command("command-2", "project.rename", "sha256:second", "user:local")
     with pytest.raises(ValueError):
-        system.writes.transact(stream, refuse, command=Command("command-2", "project.rename", "sha256:second"))
-    system.writes.transact(stream, rename, command=Command("command-2", "project.rename", "sha256:second"))
+        system.writes.transact(stream, refuse, command=second)
+    assert system.store.command("command-2") is None
+    system.writes.transact(stream, rename, command=second)
     assert len(calls) == 2
 
     # 同一命令同时提交两次：只有一次写入，另一次得到原来的结果
@@ -138,7 +155,8 @@ def test_one_command_identity_is_registered_once(data_dir):
             transaction.append(_rename("同时提交"))
 
         try:
-            system.writes.transact(stream, decide, command=Command("command-3", "project.rename", "sha256:third"))
+            system.writes.transact(stream, decide,
+                                   command=Command("command-3", "project.rename", "sha256:third", "user:local"))
             outcomes.append("committed")
         except DuplicateCommand as exc:
             outcomes.append(exc.record.position)
@@ -151,6 +169,25 @@ def test_one_command_identity_is_registered_once(data_dir):
     events = system.store.list_project_events(project_id)
     assert sorted(outcomes, key=str) == sorted(["committed", events[-1].position], key=str)
     assert [event.payload["name"] for event in events[1:]] == ["名字 1", "名字 2", "同时提交"]
+
+
+def test_a_command_that_appends_nothing_is_registered_at_the_end_of_the_log(data_dir):
+    system, project_id, stream = _project(data_dir)
+    end = system.store.end_position()
+    system.writes.transact(stream, lambda _transaction: None,
+                           command=Command("command-1", "project.restore", "sha256:first", "user:local"))
+    assert system.store.command("command-1").position == end
+    assert system.store.command_events("command-1") == []
+    assert system.store.end_position() == end
+
+
+def test_the_log_identity_stays_with_the_data_directory(tmp_path):
+    first = LoopSystem.for_testing(tmp_path / "first", FakeAdapter([]))
+    identity = first.store.log_id
+    first.close()
+    # 重新打开同一个数据目录得到同一个日志身份；另一个数据目录的日志身份不同
+    assert LoopSystem.for_testing(tmp_path / "first", FakeAdapter([])).store.log_id == identity
+    assert LoopSystem.for_testing(tmp_path / "second", FakeAdapter([])).store.log_id != identity
 
 
 def test_the_execution_right_number_is_recorded_and_an_older_number_is_refused(data_dir):

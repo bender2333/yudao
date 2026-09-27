@@ -132,8 +132,8 @@ class WritePath:
         # 在一个事务中读取保存的投影、由 decide 判断并追加事件、提交。
         # expected_version 为空时，提交因另一方的写入被拒绝就按写入以后的状态重新调用 decide，直到提交成功；
         # 给出 expected_version 时，读取或提交时流版本与它不同都拒绝（StreamVersionConflict），不重新判断。
-        # command 是命令身份：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateCommand，不同为
-        # CommandIdReused；被拒绝的命令不登记。epoch 是写入方的执行权编号，随事件记录，
+        # command 是引起这次写入的命令：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateCommand，不同为
+        # CommandIdReused；被拒绝的命令不登记；追加的事件记下命令身份与提出者。epoch 是写入方的执行权编号，随事件记录，
         # 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入。
         # 提交以后执行 on_commit 登记的效果，再通知事件日志的订阅方；这以后出的错不影响已经提交的写入
         attempt = 0
