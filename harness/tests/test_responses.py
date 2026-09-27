@@ -647,18 +647,29 @@ def test_completed_stream_with_segmented_eof_is_reused_and_does_not_observe_tail
 
 
 def test_completed_stream_with_done_marker_finishes_promptly_but_does_not_reuse_connection():
+    # 从交回终态的用量到调用返回（排空与关闭）的用时；服务端在 [DONE] 之后保持连接不关闭
+    finished_after_terminal = []
+
+    def complete(loop, session_id):
+        terminal = []
+        result = ResponsesAdapter(config, loop=loop).complete(
+            _request(session_id=session_id),
+            lambda event: terminal.append(time.monotonic()) if event.kind == "usage" else None,
+        )
+        finished_after_terminal.append(time.monotonic() - terminal[0])
+        return result
+
     with _tail_server("done") as (config, captures, client_ports, terminal_sent, _release, errors):
         with ConnectionLoop() as loop:
-            started = time.monotonic()
-            first = ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
+            first = complete(loop, "first")
             assert terminal_sent.is_set()
-            second = ResponsesAdapter(config, loop=loop).complete(_request(session_id="second"))
+            second = complete(loop, "second")
 
     assert not errors
     assert first.output == second.output == [TEXT]
     assert len(captures) == 2
     assert len(set(client_ports)) == 2
-    assert time.monotonic() - started < 1
+    assert all(duration < 1 for duration in finished_after_terminal), finished_after_terminal
 
 
 def test_terminal_near_request_deadline_is_not_reclassified_during_drain(monkeypatch):
