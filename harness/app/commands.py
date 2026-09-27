@@ -35,7 +35,7 @@ async def execute(application: Application, definition: CommandDefinition, reque
                   actor: str) -> Accepted | Rejected:
     if type(request) is not definition.request:
         raise TypeError(f"command {definition.name} takes {definition.request.__name__}, not {type(request).__name__}")
-    command = Command(str(request.command_id), definition.name, command_digest(definition.name, request), actor)
+    command = Command(request.command_id, definition.name, command_digest(definition.name, request), actor)
     try:
         await definition.handle(application, command, request)
     except DuplicateCommand:
@@ -55,10 +55,9 @@ def _accepted(application: Application, definition: CommandDefinition, request: 
               duplicate: bool) -> Accepted:
     # 位置与 refs 都取自命令的登记与它追加的事件，第一次接受与重复提交得到同样的结果
     store = application.system.store
-    command_id = str(request.command_id)
-    record = store.command(command_id)
+    record = store.command(request.command_id)
     if record is None:
-        raise RuntimeError(f"command {definition.name} returned without registering {command_id} at the write path")
-    refs = definition.derive_refs(store.command_events(command_id))
+        raise RuntimeError(f"command {definition.name} returned without registering {request.command_id} at the write path")
+    refs = definition.derive_refs(store.command_events(request.command_id))
     return Accepted[definition.refs](command_id=request.command_id, position=record.position, refs=refs,
                                      duplicate=duplicate)

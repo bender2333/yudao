@@ -2,9 +2,8 @@
 # 只含可以序列化的数据；OpenAPI 与客户端的接口类型都由这里的 pydantic 类型生成。
 
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union, get_args
-from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, create_model
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, create_model
 
 from .payloads import PAYLOADS, Department
 
@@ -14,8 +13,17 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+def _not_blank(value: str) -> str:
+    # 与控制核心的判断相同：去掉首尾空白（str.strip）以后不能为空
+    if not value.strip():
+        raise ValueError("must contain a non-whitespace character")
+    return value
+
+
 # 至少含一个非空白字符的文字
-Text = Annotated[str, StringConstraints(pattern=r"\S")]
+Text = Annotated[str, StringConstraints(min_length=1), AfterValidator(_not_blank)]
+# 命令身份：客户端生成的 UUID，小写的标准形式；响应与事件中原样出现
+CommandId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")]
 
 
 # 拒绝原因的封闭清单（第 3.1 节）；每个命令在注册表中声明自己可能返回的原因
@@ -34,7 +42,7 @@ REJECTION_REASONS: tuple[str, ...] = get_args(RejectionReason)
 class CommandRequest(Contract):
     # 每个命令请求的公共字段：命令身份由客户端生成，重试使用同一个值；基准版本是用户作出操作时所依据对象的版本。
     # 新建类命令没有依据的对象，把 base_version 限定为空
-    command_id: UUID
+    command_id: CommandId
     base_version: int | None = None
 
 
@@ -44,7 +52,7 @@ Refs = TypeVar("Refs", bound=BaseModel)
 class Accepted(Contract, Generic[Refs]):
     # 命令被接受：事件已经追加。position 是这次命令最后一条事件的全局位置（没有追加事件时是接受时的日志末尾）；
     # refs 是新建对象的标识；duplicate 表示同一命令身份以前已经被接受，这次没有再执行
-    command_id: UUID
+    command_id: CommandId
     position: int
     refs: Refs
     duplicate: bool
@@ -52,7 +60,7 @@ class Accepted(Contract, Generic[Refs]):
 
 class Rejected(Contract):
     # 命令被拒绝：什么也没有写入，也没有登记命令身份；修改类命令版本不符时带当前版本
-    command_id: UUID
+    command_id: CommandId
     reason: RejectionReason
     message: str
     current_version: int | None = None
@@ -94,7 +102,7 @@ class EventEnvelope(Contract):
     department: Department | None
     role: str | None
     actor: str
-    command_id: str | None
+    command_id: CommandId | None
     label: str
 
 

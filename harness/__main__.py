@@ -7,6 +7,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
+from .api.server import LOOPBACK_HOSTS
 from .api.server import serve as serve_api
 from .app.application import Application
 from .demo import run_demo
@@ -40,11 +41,12 @@ def main(argv: list[str] | None = None) -> int:
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--provider-config", default=str(DEFAULT_PROVIDER_CONFIG))
+    # 写在 api 之前或之后的选项都有效；没有写时取上面的默认值
     api = sub.add_parser("api", help="serve the application interface (commands, queries, capabilities)")
-    api.add_argument("--data-dir", default=str(DEFAULT_DIR))
-    api.add_argument("--host", default="127.0.0.1")
-    api.add_argument("--port", type=int, default=8765)
-    api.add_argument("--provider-config", default=str(DEFAULT_PROVIDER_CONFIG))
+    api.add_argument("--data-dir", default=argparse.SUPPRESS)
+    api.add_argument("--host", default=argparse.SUPPRESS)
+    api.add_argument("--port", type=int, default=argparse.SUPPRESS)
+    api.add_argument("--provider-config", default=argparse.SUPPRESS)
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
@@ -86,11 +88,13 @@ def main(argv: list[str] | None = None) -> int:
         system = _production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
     if command == "api":
+        if args.host not in LOOPBACK_HOSTS:
+            print(f"the local access mode only listens on a loopback address, not {args.host}", file=sys.stderr)
+            return 1
         lock = _lock_data_dir(args.data_dir)
         if lock is None:
             return 1
-        config = None if args.provider_config in (None, "") else Path(args.provider_config).resolve()
-        dotenv = DEFAULT_DOTENV.resolve()
+        config, dotenv = _provider_paths(args.provider_config)
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
                   host=args.host, port=args.port)
         return 0
@@ -182,11 +186,16 @@ def _lock_data_dir(data_dir: str | Path) -> FileLock | None:
     return lock
 
 
+def _provider_paths(provider_config: str | Path | None) -> tuple[Path | None, Path]:
+    # 服务进程读取的模型目录与凭据文件：解析为固定的绝对路径；目录文件为空字符串时不读取
+    config = None if provider_config in (None, "") else Path(provider_config).resolve()
+    return config, DEFAULT_DOTENV.resolve()
+
+
 def _production_system(data_dir: str | Path, provider_config: str | Path | None) -> LoopSystem:
     # 启动读取一致版本：路径解析为固定绝对路径，缺文件/坏内容均空态启动
     facade = ProviderFacade()
-    config = None if provider_config in (None, "") else Path(provider_config).resolve()
-    dotenv = DEFAULT_DOTENV.resolve()
+    config, dotenv = _provider_paths(provider_config)
     facade.configure_paths(config, dotenv)
     facade.reload()
     system = LoopSystem(data_dir, facade=facade)

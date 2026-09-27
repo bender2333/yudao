@@ -8,6 +8,8 @@ from pathlib import Path
 
 import httpx
 
+from harness.__main__ import main
+
 # 同一个数据目录只允许一个服务进程（应用层与接口层设计说明第 7.2 节）：新接口（python -m harness api）与旧控制台
 # （serve）取得同一个数据目录的进程锁。测试启动真实的服务进程，经 HTTP 确认服务在运行。
 
@@ -23,16 +25,19 @@ def _free_port() -> int:
         return probe.getsockname()[1]
 
 
-def _start(workdir: Path, command: str, data_dir: Path, port: int, log: Path) -> subprocess.Popen:
+def _start(workdir: Path, command: str, data_dir: Path, port: int, log: Path, *,
+           options_first: bool = False) -> subprocess.Popen:
     # 工作目录放在测试目录中，默认的模型目录与凭据文件路径都落在这里；PYTHONPATH 指向本仓库的 harness。
+    # options_first 时选项写在子命令之前。
     # 虚拟环境在 Windows 上的 python.exe 会再启动真正的解释器，所以服务在新的进程组（会话）中启动，按进程树结束
     environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
+    options = ["--data-dir", str(data_dir), "--port", str(port), "--provider-config", ""]
+    arguments = [*options, command] if options_first else [command, *options]
     with log.open("wb") as output:
         return subprocess.Popen(
-            [sys.executable, "-m", "harness", command, "--data-dir", str(data_dir), "--port", str(port),
-             "--provider-config", ""],
+            [sys.executable, "-m", "harness", *arguments],
             cwd=workdir, env=environment, stdout=output, stderr=subprocess.STDOUT, **spawn,
         )
 
@@ -80,11 +85,12 @@ def test_two_service_processes_cannot_use_the_same_data_directory(tmp_path):
         assert IN_USE in _refused(second, tmp_path / "second.log")
         console = _start(tmp_path, "serve", data_dir, _free_port(), tmp_path / "console.log")
         assert IN_USE in _refused(console, tmp_path / "console.log")
-        # 另一个数据目录不受影响
+        # 另一个数据目录不受影响；选项写在子命令之前同样有效
         other_port = _free_port()
-        other = _start(tmp_path, "api", tmp_path / "other", other_port, tmp_path / "other.log")
+        other = _start(tmp_path, "api", tmp_path / "other", other_port, tmp_path / "other.log", options_first=True)
         try:
             _wait_until_serving(other, f"http://127.0.0.1:{other_port}/api/capabilities", tmp_path / "other.log")
+            assert (tmp_path / "other" / "events.sqlite").is_file() and (tmp_path / "other" / "service.lock").exists()
         finally:
             _stop(other)
     finally:
@@ -99,3 +105,10 @@ def test_two_service_processes_cannot_use_the_same_data_directory(tmp_path):
         assert IN_USE in _refused(refused, tmp_path / "refused.log")
     finally:
         _stop(console)
+
+
+def test_the_api_only_listens_on_a_loopback_address(tmp_path, capsys):
+    # 本机访问方式（设计说明第 6.2 节）：设置非回环地址时拒绝启动，不取得锁，也不建立数据目录
+    assert main(["api", "--host", "0.0.0.0", "--data-dir", str(tmp_path / "data")]) == 1
+    assert "only listens on a loopback address, not 0.0.0.0" in capsys.readouterr().err
+    assert not (tmp_path / "data").exists()

@@ -239,7 +239,12 @@ def test_requests_outside_the_contract_are_refused_and_documentation_pages_are_c
         command_id = str(uuid.uuid4())
         for body in ({"name": "项目", "goal": "目标"},
                      {"command_id": "not-a-uuid", "name": "项目", "goal": "目标"},
+                     # 命令身份只接受小写的标准形式，响应与事件中原样出现
+                     {"command_id": command_id.upper(), "name": "项目", "goal": "目标"},
+                     {"command_id": command_id.replace("-", ""), "name": "项目", "goal": "目标"},
                      {"command_id": command_id, "name": "  ", "goal": "目标"},
+                     # 控制核心按 str.strip 判断空白，分隔符等控制字符同样算空白
+                     {"command_id": command_id, "name": "\u001f", "goal": "目标"},
                      {"command_id": command_id, "name": "项目", "goal": "目标", "base_version": 3},
                      {"command_id": command_id, "name": "项目", "goal": "目标", "owner": "someone"}):
             response = client.post("/api/commands/project.create", json=body)

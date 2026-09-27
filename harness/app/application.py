@@ -27,6 +27,7 @@ class Application:
         # 本次启动的身份与时间：服务重启以后改变，客户端据此重新读取能力清单并重新同步
         self.boot_id = new_id("boot")
         self.started_at = utc_now()
+        self.version = version("yudao-harness")
 
     @classmethod
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
@@ -50,6 +51,6 @@ class Application:
 
     def capabilities(self, contract_digest: str) -> Capabilities:
         return self.registry.capabilities(Deployment(
-            log_id=self.system.store.log_id, boot_id=self.boot_id, version=version("yudao-harness"),
+            log_id=self.system.store.log_id, boot_id=self.boot_id, version=self.version,
             contract_digest=contract_digest,
         ))
