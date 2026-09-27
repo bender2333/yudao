@@ -332,12 +332,12 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
                                      "retired": ["Original casing"], "rationale": "The current product goal changed",
                                  }))
     assert decision.accepted
-    # 运行之外接纳新的产品规格（经提交的写入函数），协作请求的依据随之改变
-    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+    # 运行之外接纳新的产品规格（经写入口的事务），协作请求的依据随之改变
+    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
         transaction, projection=external, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
         artifact=decision.artifact, department="product", parent_event_id=before.last_event_id,
         session_id=before.sessions["product"].session_id, provider="fake", model="fake-script",
-    ))
+    ).append(transaction))
     current = system.activate_once(run_id)
     assert current.phase == "ENGINEERING" and current.pending_request is None
     assert current.requests[-1].status == "superseded" and current.requests[-1].basis == before.pending_request.basis

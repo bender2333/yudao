@@ -219,6 +219,7 @@ class StepRecorder:
         self._messages: list[str] = []
         self._message_steps: list[tuple[str, int]] = []
         self._captures: dict[str, _AttemptCapture] = {}
+        self._guidance_applied = False
 
     @property
     def transcript(self) -> str:
@@ -228,6 +229,9 @@ class StepRecorder:
     def close(self) -> None:
         for capture in self._captures.values():
             capture.close()
+
+    def _mark_guidance_applied(self) -> None:
+        self._guidance_applied = True
 
     def department_input(self, transaction: Transaction, step_id: int, item: dict[str, Any]) -> None:
         scope = self.scope
@@ -270,13 +274,12 @@ class StepRecorder:
 
     def request_started(self, transaction: Transaction, request: ModelRequest) -> None:
         # 请求开始：激活第一次带着待处理指导发出请求时记录指导已经采用，然后记录这次调用尝试开始。
-        # 指导是否已由这次激活采用取自运行状态：同一事务重新判断时结果不变
+        # 「已经记录」在事务提交以后才标记，事务重新判断时照样记录
         scope = self.scope
         drafts = []
         guidance_ids = request.context.manifest.guidance_ids
-        applied = {item.id for item in transaction.projection.department_guidance
-                   if item.applied_activation_id == scope.activation_id}
-        if guidance_ids and not set(guidance_ids) <= applied:
+        if guidance_ids and not self._guidance_applied:
+            transaction.on_commit(self._mark_guidance_applied)
             drafts.append(self._draft(
                 EventType.DEPARTMENT_GUIDANCE_APPLIED,
                 payload={

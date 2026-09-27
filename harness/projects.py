@@ -1,12 +1,10 @@
-"""项目层：登记、事项创建、采纳结算、继承恢复、部门 Prompt 项目配置、项目材料与项目读模型。
-
-只通过 `Orchestrator.create_run(...)` 与运行内核交互，且只在事项创建时；
-只读 run 投影（`project_run`）与 run 工件，不生成运行事实、不改 run 流、不调用模型。
-项目事件经过写入口追加到项目流。
-"""
+# 项目层：登记、事项创建、采纳结算、继承恢复、部门 Prompt 项目配置、项目材料与项目读模型。
+# 只通过 Orchestrator.create_run 与运行内核交互，且只在事项创建时；只读 run 投影（project_run）与 run 工件，
+# 不生成运行事实、不改 run 流、不调用模型。项目事件经过写入口追加到项目流。
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -84,15 +82,21 @@ def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: 
 def _compose(store: EventStore, state: ProjectProjection) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
-    for department in DEPARTMENTS:
-        state.prompt_configs.setdefault(department, PromptConfig(
-            department=department, version=0, text=DEFAULT_PROMPTS[department], source="default",
-        ))
+    _default_prompts(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
         _derive_work_item(store, item, adopted, held, project_id)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
+    return state
+
+
+def _default_prompts(state: ProjectProjection) -> ProjectProjection:
+    # 没有配置过的部门使用默认 Prompt
+    for department in DEPARTMENTS:
+        state.prompt_configs.setdefault(department, PromptConfig(
+            department=department, version=0, text=DEFAULT_PROMPTS[department], source="default",
+        ))
     return state
 
 
@@ -285,6 +289,9 @@ class ProjectService:
         self.writes = writes
         self.artifacts = artifacts
         self.orchestrator = orchestrator
+        # 每个项目正在开始的事项：事项已经登记、它的 run 还没有创建时，事项的状态看起来是没有开始，
+        # 归档与记录材料按这里判断有事项进行中
+        self._starting: dict[str, set[object]] = {}
 
     # 读
 
@@ -347,17 +354,16 @@ class ProjectService:
 
     def archive(self, project_id: str) -> None:
         def archive(transaction: Transaction) -> None:
-            project = self._project_in(transaction, project_id)
-            if project.archived:
+            if self._saved_in(transaction, project_id).archived:
                 return
-            _reject_in_progress(project)
+            self._reject_in_progress(transaction, project_id)
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_ARCHIVED))
 
         self.writes.transact(project_stream(project_id), archive)
 
     def restore(self, project_id: str) -> None:
         def restore(transaction: Transaction) -> None:
-            if self._project_in(transaction, project_id).archived:
+            if self._saved_in(transaction, project_id).archived:
                 transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RESTORED))
 
         self.writes.transact(project_stream(project_id), restore)
@@ -371,10 +377,11 @@ class ProjectService:
         _require_title(title)
         self._writable(project_id)
         self.settle_pending(project_id)
+        work_item_id, run_id = new_id("wi"), new_id("run")
 
         def create(transaction: Transaction) -> _NewWorkItem:
             # 事项的基线、Prompt 与登记命令取自事务中的项目投影
-            project = self._writable_in(transaction, project_id)
+            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
             baseline = None
             initial_tree = None
             source_run = None
@@ -395,10 +402,10 @@ class ProjectService:
                 transaction, project, text, title=title, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
-                work_item_id=new_id("wi"), run_id=new_id("run"),
+                work_item_id=work_item_id, run_id=run_id,
             )
 
-        return self._start_run(project_id, self.writes.transact(project_stream(project_id), create))
+        return self._start(project_id, create)
 
     def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
                                       title: str | None = None, max_cycles: int = DEFAULT_MAX_CYCLES,
@@ -415,7 +422,7 @@ class ProjectService:
         tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
 
         def create(transaction: Transaction) -> _NewWorkItem:
-            project = self._writable_in(transaction, project_id)
+            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
             return self._work_item_created(
                 transaction, project, text, title=title, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
@@ -423,7 +430,7 @@ class ProjectService:
                 work_item_id=work_item_id, run_id=run_id,
             )
 
-        return self._start_run(project_id, self.writes.transact(project_stream(project_id), create))
+        return self._start(project_id, create)
 
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
                            title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
@@ -457,15 +464,23 @@ class ProjectService:
             ),
         )
 
-    def _start_run(self, project_id: str, item: _NewWorkItem) -> tuple[str, str]:
-        # 事项已经登记以后创建它的 run；创建失败时在项目流记下失败的原因
+    def _start(self, project_id: str, create: Callable[[Transaction], _NewWorkItem]) -> tuple[str, str]:
+        # 在项目流登记事项，再创建它的 run；创建失败时在项目流记下失败的原因。
+        # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
+        token = object()
+        self._starting.setdefault(project_id, set()).add(token)
         try:
-            self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
-        except Exception as exc:
-            self.writes.append(project_stream(project_id), NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
-                "work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__,
-            }))
-            raise
+            item = self.writes.transact(project_stream(project_id), create)
+            try:
+                self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
+            except Exception as exc:
+                self.writes.append(project_stream(project_id), NewProjectEvent(
+                    ProjectEventType.WORK_ITEM_START_FAILED,
+                    {"work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__},
+                ))
+                raise
+        finally:
+            self._starting[project_id].discard(token)
         return item.work_item_id, item.run_id
 
     # 结算
@@ -535,7 +550,7 @@ class ProjectService:
             raise ValueError("base_version must be a non-negative integer")
 
         def configure(transaction: Transaction) -> dict[str, Any] | None:
-            current = self._writable_in(transaction, project_id).prompt_configs[department]
+            current = _default_prompts(deepcopy(self._writable_in(transaction, project_id))).prompt_configs[department]
             if base_version != current.version:
                 raise PromptConfigConflict(_prompt_view(current))
             if text == current.text:
@@ -586,7 +601,8 @@ class ProjectService:
             raise ValueError("unknown department")
 
         def record(transaction: Transaction) -> str:
-            _reject_in_progress(self._writable_in(transaction, project_id))
+            self._writable_in(transaction, project_id)
+            self._reject_in_progress(transaction, project_id)
             ref = save_text_material(self.artifacts, project_id, "project_material", text)
             material_id = new_id("material")
             transaction.append(NewProjectEvent(ProjectEventType.MATERIAL_RECORDED, {
@@ -602,17 +618,24 @@ class ProjectService:
             raise ProjectArchivedError(f"project is archived: {project_id}")
         return project
 
-    def _project_in(self, transaction: Transaction, project_id: str) -> ProjectProjection:
-        # 事务中的项目读取模型：在保存的项目投影的副本上补齐默认 Prompt 与事项状态，事务中的投影不变
+    @staticmethod
+    def _saved_in(transaction: Transaction, project_id: str) -> ProjectProjection:
+        # 事务中保存的项目投影（只有项目事件折叠出的内容）；不要修改它
         if transaction.version == 0:
             raise ProjectNotFoundError(project_id)
-        return _compose(self.store, deepcopy(transaction.projection))
+        return transaction.projection
 
     def _writable_in(self, transaction: Transaction, project_id: str) -> ProjectProjection:
-        project = self._project_in(transaction, project_id)
+        project = self._saved_in(transaction, project_id)
         if project.archived:
             raise ProjectArchivedError(f"project is archived: {project_id}")
         return project
+
+    def _reject_in_progress(self, transaction: Transaction, project_id: str) -> None:
+        # 有事项进行中（包括正在开始、run 还没有创建的事项）时拒绝；事项状态由所属 run 的投影派生
+        project = _compose(self.store, deepcopy(self._saved_in(transaction, project_id)))
+        if self._starting.get(project_id) or any(item.status == "in_progress" for item in project.work_items):
+            raise WorkItemInProgressError(f"work item in progress: {project_id}")
 
 
 @dataclass(frozen=True)
@@ -627,11 +650,6 @@ class _NewWorkItem:
 def _require_title(title: str | None) -> None:
     if title is not None and (not isinstance(title, str) or not title.strip()):
         raise ValueError("title must be a non-empty string when given")
-
-
-def _reject_in_progress(project: ProjectProjection) -> None:
-    if any(item.status == "in_progress" for item in project.work_items):
-        raise WorkItemInProgressError(f"work item in progress: {project.project_id}")
 
 
 def _prompt_view(config: PromptConfig) -> dict[str, Any]:

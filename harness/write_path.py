@@ -17,6 +17,10 @@ from .projection import Projection, dump_projection, empty_projection, fold, loa
 
 T = TypeVar("T")
 
+# 一次写入因为另一方先写入同一个流而重新判断的最多次数；每次被拒绝都说明另一方的写入已经提交，
+# 超过这个次数时交回最后一次的版本冲突
+MAX_JUDGMENTS = 100
+
 
 @dataclass(frozen=True)
 class NewEvent:
@@ -67,12 +71,14 @@ class Snapshot:
 
 
 class Transaction(Snapshot):
-    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection 与 events()，提交时一起写入；
-    # 没有提交（判断出错、版本冲突或存储失败）时依次执行 on_abort 登记的补偿
+    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection 与 events()，提交时一起写入。
+    # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
+    # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None) -> None:
         super().__init__(store, stream, saved)
         self.appended: list[Any] = []
         self._compensations: list[Callable[[], None]] = []
+        self._committed_effects: list[Callable[[], None]] = []
 
     def append(self, *entries: NewEvent | NewProjectEvent) -> list[Any]:
         # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影
@@ -96,9 +102,17 @@ class Transaction(Snapshot):
         # 登记事务没有提交时要撤回的外部效果（例如已经发布的材料）
         self._compensations.append(compensation)
 
+    def on_commit(self, effect: Callable[[], None]) -> None:
+        # 登记事务提交以后才发生的效果（例如进程内的状态），判断重新进行时不会重复
+        self._committed_effects.append(effect)
+
     def _abort(self) -> None:
         for compensation in reversed(self._compensations):
             compensation()
+
+    def _after_commit(self) -> None:
+        for effect in self._committed_effects:
+            effect()
 
 
 class WritePath:
@@ -116,8 +130,11 @@ class WritePath:
         # 给出 expected_version 时，读取或提交时流版本与它不同都拒绝（StreamVersionConflict），不重新判断。
         # command 是命令身份：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateCommand，不同为
         # CommandIdReused；被拒绝的命令不登记。epoch 是写入方的执行权编号，随事件记录，
-        # 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入
+        # 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入。
+        # 提交以后执行 on_commit 登记的效果，再通知事件日志的订阅方；这以后出的错不影响已经提交的写入
+        attempt = 0
         while True:
+            attempt += 1
             if command is not None:
                 self._store.check_command(command)
             transaction = Transaction(self._store, stream, self._store.projection(stream))
@@ -128,14 +145,16 @@ class WritePath:
                 if transaction.appended or command is not None:
                     self._store.commit(stream, transaction.version, transaction.appended,
                                        dump_projection(transaction.projection), epoch=epoch, command=command)
-            except StreamVersionConflict:
+            except StreamVersionConflict as conflict:
                 transaction._abort()
-                if expected_version is not None:
+                if expected_version is not None or conflict.stream != stream or attempt == MAX_JUDGMENTS:
                     raise
                 continue
             except BaseException:
                 transaction._abort()
                 raise
+            transaction._after_commit()
+            self._store.notify(transaction.appended)
             return result
 
     def append(self, stream: str, *entries: NewEvent | NewProjectEvent, expected_version: int | None = None,

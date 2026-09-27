@@ -43,16 +43,6 @@ class SubmissionWriter:
         self.artifacts, self.materials_root = artifacts, materials_root
         self.git_versions = git_versions
 
-    def commit(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
-               workspace_root: Path, artifact: dict[str, Any], department: str, parent_event_id: str,
-               session_id: str, provider: str | None, model: str | None) -> Event:
-        # 准备并在事务中追加一次接纳
-        return self.prepare(
-            transaction, projection=projection, snapshot=snapshot, workspace_root=workspace_root, artifact=artifact,
-            department=department, parent_event_id=parent_event_id, session_id=session_id, provider=provider,
-            model=model,
-        ).append(transaction)
-
     def prepare(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
                 workspace_root: Path, artifact: dict[str, Any], department: str, parent_event_id: str,
                 session_id: str, provider: str | None, model: str | None) -> Acceptance:

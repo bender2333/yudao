@@ -16,11 +16,10 @@ class DepartmentSession:
     activations: int = 0
     last_activation_id: str | None = None
 
-    def activate(self) -> str:
+    def activate(self, activation_id: str) -> None:
         self.status = "active"
         self.activations += 1
-        self.last_activation_id = new_id("act")
-        return self.last_activation_id
+        self.last_activation_id = activation_id
 
     def idle(self) -> None:
         if self.status != "closed":

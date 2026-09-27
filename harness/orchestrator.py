@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event
@@ -205,7 +207,7 @@ class Orchestrator:
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(artifacts, self.materials_root, self.git_versions)
-        self.interactions = InteractionWriter(artifacts, self.materials_root, self.git_versions)
+        self.interactions = InteractionWriter(store, artifacts, self.materials_root, self.git_versions)
         self.facade = facade
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
@@ -213,6 +215,8 @@ class Orchestrator:
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
+        # 每个 run 正在进行的取消（cancel 或 /stop）
+        self._cancellers: dict[str, set[object]] = {}
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
@@ -355,52 +359,68 @@ class Orchestrator:
         # /stop 与 /cancel：保存命令原文并取消运行。先中止并取消正在进行的步骤，再记录命令；
         # 命令原文没有保存成功时仍然记录取消，并在取消的事件中说明保存失败的原因
         message = "This run has ended; create a new task for this input."
-        self._require_open(run_id, self.project(run_id), message)
-        self._abort.setdefault(run_id, Event()).set()
-        activation = self._active.get(run_id)
-        notified = False
-        stop_error = None
-        if activation is not None:
-            try:
-                self._cancel_driver(activation)
-                notified = True
-            except Exception as exc:
-                stop_error = exc
+        with self._cancelling(run_id):
+            self._require_open(run_id, self.project(run_id), message)
+            activation, cancel_error = self._abort_run(run_id)
+            stop_error = cancel_error
 
-        def receive(transaction: Transaction) -> None:
-            if transaction.projection.phase in TERMINAL_PHASES:
-                raise RunTerminalError(message)
-            self.interactions.receive(transaction, text, command=True)
+            def receive(transaction: Transaction) -> None:
+                if transaction.projection.phase in TERMINAL_PHASES:
+                    raise RunTerminalError(message)
+                self.interactions.receive(transaction, text, command=True)
 
-        save_error = None
-        cancellation_recorded = False
-        try:
+            save_error = None
+            cancellation_recorded = False
             try:
-                self.writes.transact(run_stream(run_id), receive)
-            except RunTerminalError:
-                raise
-            except Exception as exc:
-                save_error = exc
-            failure = None if save_error is None else {
-                "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
-            }
-            try:
-                self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
-                    transaction, "cancelled", "run cancelled by user command", input_save_failure=failure))
-                cancellation_recorded = True
-            except Exception as exc:
-                stop_error = exc
-        finally:
-            if activation is not None and not notified:
                 try:
-                    self._cancel_driver(activation)
+                    self.writes.transact(run_stream(run_id), receive)
+                except RunTerminalError:
+                    raise
+                except Exception as exc:
+                    save_error = exc
+                failure = None if save_error is None else {
+                    "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
+                }
+                try:
+                    self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+                        transaction, "cancelled", "run cancelled by user command", input_save_failure=failure))
+                    cancellation_recorded = True
                 except Exception as exc:
                     stop_error = stop_error or exc
+            finally:
+                if cancel_error is not None:
+                    # 取消正在进行的步骤出过错：再通知一次
+                    try:
+                        self._cancel_driver(activation)
+                    except Exception as exc:
+                        stop_error = stop_error or exc
         if save_error is not None:
             raise CancelledInputSaveError(run_id, cancellation_recorded=cancellation_recorded) from save_error
         if stop_error is not None:
             raise stop_error
         return self.project(run_id)
+
+    def _abort_run(self, run_id: str) -> tuple[_Activation | None, Exception | None]:
+        # 中止运行：之后的核对都得到停止，正在进行的步骤立即取消；交回正在进行的激活与取消它时的错误
+        self._abort.setdefault(run_id, Event()).set()
+        activation = self._active.get(run_id)
+        if activation is None:
+            return None, None
+        try:
+            self._cancel_driver(activation)
+        except Exception as exc:
+            return activation, exc
+        return activation, None
+
+    @contextmanager
+    def _cancelling(self, run_id: str) -> Iterator[None]:
+        # 登记一个正在进行的取消：运行循环看到中止时，由它写入取消（它可能还在保存命令原文）
+        token = object()
+        self._cancellers.setdefault(run_id, set()).add(token)
+        try:
+            yield
+        finally:
+            self._cancellers[run_id].discard(token)
 
     def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
         if department not in DEPARTMENTS:
@@ -533,27 +553,20 @@ class Orchestrator:
                                    return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str) -> RunProjection:
-        activation = None
-        notified = False
-
-        def cancel(transaction: Transaction) -> None:
-            nonlocal activation, notified
-            if not transaction.projection.run_id:
-                raise RunNotFoundError(run_id)
-            if transaction.projection.phase in TERMINAL_PHASES:
-                return
-            self._abort.setdefault(run_id, Event()).set()
-            activation = self._active.get(run_id)
-            if activation is not None and not notified:
-                self._cancel_driver(activation)
-                notified = True
-            self._fail(transaction, "cancelled", "run cancelled")
-
-        try:
-            self.writes.transact(run_stream(run_id), cancel)
-        finally:
-            if activation is not None and not notified:
-                self._cancel_driver(activation)
+        # 已经结束的运行不变；否则中止并取消正在进行的步骤，再写入取消。取消正在进行的步骤出错时，
+        # 取消照常写入，再通知一次，错误交给调用方
+        with self._cancelling(run_id):
+            if self.project(run_id).phase in TERMINAL_PHASES:
+                return self.project(run_id)
+            activation, cancel_error = self._abort_run(run_id)
+            try:
+                self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+                    transaction, "cancelled", "run cancelled"))
+            finally:
+                if cancel_error is not None:
+                    self._cancel_driver(activation)
+        if cancel_error is not None:
+            raise cancel_error
         return self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
@@ -573,8 +586,11 @@ class Orchestrator:
                 if projection.phase in TERMINAL_PHASES:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
-                    # 已经中止：取消由发起取消的一方（cancel 或 /stop）写入，它可能还在保存命令原文
-                    return projection
+                    # 已经中止：正在进行的取消（cancel 或 /stop，可能还在保存命令原文）由它自己写入；
+                    # 没有正在进行的取消（例如它的写入失败了）时在这里写入
+                    if self._cancellers.get(run_id):
+                        return projection
+                    return self.cancel(run_id)
                 await self._activate_once(run_id, connections)
         finally:
             await connections.aclose()
@@ -706,7 +722,8 @@ class Orchestrator:
             self.sessions.create_run_sessions(run_id, ids)
             session = self.sessions.get(run_id, department)
 
-        activation_id = session.activate()
+        activation_id = new_id("act")
+        transaction.on_commit(lambda: session.activate(activation_id))
         prompt = projection.department_prompts[department]
         basis = WorkBasis.current(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
@@ -1002,7 +1019,7 @@ class Orchestrator:
                     stop_reason="released",
                     payload={"stop_reason": "released"},
                 ))
-                self.sessions.close_run(run_id)
+                transaction.on_commit(lambda: self.sessions.close_run(run_id))
         self._resume_yielded_work(
             transaction, artifact=artifact, yielded_work=yielded_work,
             parent_event_id=parent_event_id, session_id=session_id, department=department,
@@ -1120,7 +1137,7 @@ class Orchestrator:
                 "token_used": projection.token_used,
             },
         ))
-        self.sessions.close_run(projection.run_id)
+        transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
@@ -1149,6 +1166,6 @@ class Orchestrator:
             payload={"stop_reason": reason, "human_action": human, "message": message,
                      **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
         ))[0]
-        self.sessions.close_run(projection.run_id)
+        transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
         if reason != "cancelled":
             self._record_lesson_candidate(transaction, source_event, projection)

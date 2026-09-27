@@ -7,10 +7,13 @@ from dataclasses import asdict
 import os
 from pathlib import Path
 import tempfile
+import threading
 from typing import Any
 
 from .artifacts import ArtifactStore
 from .department_prompts import DEFAULT_PROMPTS, save_department_prompt
+from .event_store import EventStore
+from .projection import project_run
 from .write_path import NewEvent, Transaction
 from .git_versions import GitVersionStore
 from .materials import append_intend
@@ -30,9 +33,12 @@ class CancelledInputSaveError(RuntimeError):
 
 
 class InteractionWriter:
-    def __init__(self, artifacts: ArtifactStore, materials_root: Path, git_versions: GitVersionStore) -> None:
-        self.artifacts, self.materials_root = artifacts, materials_root
+    def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path,
+                 git_versions: GitVersionStore) -> None:
+        self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
         self.git_versions = git_versions
+        # 原始意图材料的发布依次进行：「读取已经提交的原始意图、写出文件」之间不插入另一次发布
+        self._publication = threading.Lock()
 
     def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
         """写入首个输入与三部门初始 Prompt；项目层可用项目配置替代默认 Prompt。"""
@@ -44,16 +50,17 @@ class InteractionWriter:
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
     def receive(self, transaction: Transaction, text: str, *, command: bool) -> Event:
-        # 保存输入的原文：更新并发布原始意图，在事务中追加 user_input_received；
-        # 事务没有提交时重新发布原来的原始意图
+        # 保存输入的原文：更新并发布原始意图，在事务中追加 user_input_received。
+        # 事务提交或没有提交以后，都按已经提交的运行状态重新发布原始意图：同时到达的几次输入各自发布了
+        # 没有提交的内容，最后一次发布总是已经提交的内容
         projection = transaction.projection
-        payload = self._input(projection.run_id, text, version=projection.input_version + 1,
+        run_id = projection.run_id
+        payload = self._input(run_id, text, version=projection.input_version + 1,
                               kind="command" if command else "text",
                               previous_ref=ArtifactRef(**projection.intend_ref),
                               parent_commit=projection.git_version["commit"])
-        previous = ArtifactRef(**projection.intend_ref)
-        transaction.on_abort(lambda: self._publish(projection.run_id, self.artifacts.get_for_run(
-            projection.run_id, previous)))
+        transaction.on_abort(lambda: self._publish_committed(run_id))
+        transaction.on_commit(lambda: self._publish_committed(run_id))
         return transaction.append(NewEvent(
             EventType.USER_INPUT_RECEIVED, role="user",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
@@ -110,6 +117,16 @@ class InteractionWriter:
                 "byte_start": material.byte_start, "byte_end": material.byte_end, "git_version": revision}
 
     def _publish(self, run_id: str, original: bytes) -> None:
+        with self._publication:
+            self._write_intend(run_id, original)
+
+    def _publish_committed(self, run_id: str) -> None:
+        # 发布已经提交的运行状态中的原始意图
+        with self._publication:
+            ref = ArtifactRef(**project_run(self.store, run_id).intend_ref)
+            self._write_intend(run_id, self.artifacts.get_for_run(run_id, ref))
+
+    def _write_intend(self, run_id: str, original: bytes) -> None:
         folder = (self.materials_root / run_id).resolve()
         if folder == self.materials_root.resolve() or not folder.is_relative_to(self.materials_root.resolve()):
             raise ValueError("run_id must stay within the run materials directory")

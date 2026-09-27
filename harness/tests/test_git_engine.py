@@ -39,11 +39,11 @@ def _commit_spec(system, run_id, proposal):
     decision = evaluate_proposal(phase=projection.phase, department="product", projection=projection,
                                  facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
     assert decision.accepted, decision.error_dicts
-    return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+    return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
         transaction, projection=projection, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
         artifact=decision.artifact, department="product", parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake",
-    ))
+    ).append(transaction))
 
 
 def test_new_input_and_requirement_diff_form_one_accepted_history_through_redelivery(tmp_path):

@@ -8,7 +8,7 @@ from harness.event_store import (
 )
 from harness.models import ProjectEventType
 from harness.runtime import LoopSystem
-from harness.write_path import NewEvent, NewProjectEvent
+from harness.write_path import MAX_JUDGMENTS, NewEvent, NewProjectEvent
 
 # 写入口：在同一事务中读取保存的投影、判断并追加；提交时核对流版本、命令身份与执行权编号，提交以后通知订阅方。
 # 系统整体运行，模型回答由 FakeAdapter 脚本给出，事件库是真实的 SQLite 文件。
@@ -196,3 +196,35 @@ def test_subscribers_are_notified_after_each_commit_without_any_lock_held(data_d
     assert received == [[(ProjectEventType.PROJECT_RENAMED, renamed.position)],
                         [(ProjectEventType.PROJECT_PINNED, pinned.position)]]
     assert len(system.store.list_project_events(project_id)) == 4
+
+
+def test_a_failing_subscriber_does_not_undo_a_committed_write(data_dir):
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    run_id = system.create_run("original")
+
+    def failing(_events):
+        raise RuntimeError("subscriber failed")
+
+    system.store.subscribe(failing)
+    with pytest.raises(RuntimeError, match="subscriber failed"):
+        system.add_input(run_id, " and more")
+    # 写入已经提交：事件与投影都在，发布的原始意图没有被撤回
+    assert system.project(run_id).input_version == 2
+    assert (data_dir / "materials" / run_id / "intend.md").read_bytes() == b"original and more"
+
+
+def test_a_judgment_that_keeps_losing_to_other_writes_gives_up_with_the_conflict(data_dir):
+    system, project_id, stream = _project(data_dir)
+    attempts = []
+
+    def rename_while_others_write(transaction):
+        attempts.append(transaction.version)
+        other = threading.Thread(target=system.projects.pin, args=(project_id, len(attempts) % 2 == 1))
+        other.start()
+        other.join(10)
+        transaction.append(_rename("不会写入"))
+
+    with pytest.raises(StreamVersionConflict):
+        system.writes.transact(stream, rename_while_others_write)
+    assert len(attempts) == MAX_JUDGMENTS
+    assert ProjectEventType.PROJECT_RENAMED not in _types(system, project_id)

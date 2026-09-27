@@ -161,7 +161,7 @@ class EventStore:
                epoch: int | None = None, command: Command | None = None) -> None:
         # 在一个事务中：核对流的当前版本等于 expected_version，核对执行权编号不小于这个流已经记录的编号，
         # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，写回事件）、保存这个流的投影、登记命令。
-        # 任何一项核对不通过都拒绝，什么也不写。提交以后通知订阅方
+        # 任何一项核对不通过都拒绝，什么也不写。订阅方由写入口在提交成功以后经 notify 通知
         with self._transaction() as connection:
             saved = connection.execute(
                 "SELECT version, position, epoch FROM projections WHERE stream = ?", (stream,)
@@ -192,6 +192,9 @@ class EventStore:
                     "VALUES (?, ?, ?, ?, ?, ?)",
                     (command.command_id, command.name, command.digest, stream, position, utc_now()),
                 )
+
+    def notify(self, events: Sequence[Event | ProjectEvent]) -> None:
+        # 把一次已经提交的写入交给订阅方；在提交的线程中调用，此时不持有任何锁
         if events:
             committed = list(events)
             for listener in list(self._listeners):
@@ -335,15 +338,17 @@ class EventStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        # 写入事务：开始时取得数据库的写入锁，其他写入在 SQLite 中等待这个短事务结束
+        # 写入事务：开始时取得数据库的写入锁，其他写入在 SQLite 中等待这个短事务结束。
+        # 提交或其间的任何一步出错都回滚，连接放回连接池时不带着未结束的事务
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 yield connection
+                connection.execute("COMMIT")
             except BaseException:
-                connection.execute("ROLLBACK")
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
                 raise
-            connection.execute("COMMIT")
 
 
 def _check_command(record: CommandRecord | None, command: Command) -> None:

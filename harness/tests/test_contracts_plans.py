@@ -27,13 +27,13 @@ def _accept_new_spec(system, run_id):
                                      "retired": ["Preserve the original case"], "rationale": "The product now requires uppercase output",
                                  }))
     assert decision.accepted
-    # 运行之外接纳新的产品规格（经提交的写入函数），有效合同随之改变
-    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.commit(
+    # 运行之外接纳新的产品规格（经写入口的事务），有效合同随之改变
+    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
         transaction, projection=projection, snapshot=system.workspace(run_id).snapshot(),
         workspace_root=system.workspace(run_id).root, artifact=decision.artifact, department="product",
         parent_event_id=projection.last_event_id, session_id=projection.sessions["product"].session_id,
         provider="fake", model="fake-script",
-    ))
+    ).append(transaction))
 
 
 def test_prd_and_plan_are_rebuildable_from_the_same_accepted_contract(tmp_path):
