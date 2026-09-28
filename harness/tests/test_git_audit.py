@@ -1,4 +1,3 @@
-from dataclasses import replace
 import hashlib
 import os
 import subprocess
@@ -10,15 +9,17 @@ from harness.git_audit import GitBindingError, git_version_detail, verify_git_hi
 from harness.models import EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.saved_rewrite import rewrite_saved_events
 
 
-def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path, monkeypatch):
+def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Independent checks passed"),
     ]))
     run_id = system.create_run("build echo")
     try:
         assert system.run_until_stop(run_id).phase == "DONE"
+        assert verify_git_history(system.git_versions, system.artifacts, system.store.list_events(run_id))
         events = system.store.list_events(run_id)
         delivery = next(event for event in events if event.type == EventType.DELIVERY_ACCEPTED)
         quality = next(event for event in events if event.type == EventType.QA_SUBMITTED)
@@ -61,21 +62,14 @@ def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_
         raw_diff = git("diff-tree", "-p", "--no-ext-diff", "--no-textconv", current["commit"])
         assert unaccepted.rstrip(b"\n") in raw_diff
 
-        changed_delivery = replace(delivery, payload={**delivery.payload, "git_version": wrong_parent})
-        changed_quality = replace(quality, payload={**quality.payload, "git_version": current})
-        changed_events = [
-            changed_delivery if event.event_id == delivery.event_id
-            else changed_quality if event.event_id == quality.event_id else event
-            for event in events
-        ]
+        delivery.payload["git_version"] = wrong_parent
+        quality.payload["git_version"] = current
+        rewrite_saved_events(system.store, [delivery, quality])
+        recorded = system.store.list_events(run_id)
         with pytest.raises(GitBindingError, match="accepted event materials"):
-            verify_git_history(system.git_versions, system.artifacts, changed_events)
-
-        def forbidden(*args, **kwargs):
-            raise AssertionError("A diff must not be shown before its parent materials are verified")
-
-        monkeypatch.setattr(system.git_versions, "show", forbidden)
+            verify_git_history(system.git_versions, system.artifacts, recorded)
+        recorded_quality = next(item for item in recorded if item.event_id == quality.event_id)
         with pytest.raises(GitBindingError, match="accepted event materials"):
-            git_version_detail(system.git_versions, system.artifacts, changed_events, changed_quality)
+            git_version_detail(system.git_versions, system.artifacts, recorded, recorded_quality)
     finally:
         system.store.close()

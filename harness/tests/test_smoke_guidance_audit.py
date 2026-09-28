@@ -1,6 +1,5 @@
 """组合 run 的模型输入审计：连续输入 v2 + 部门指导（guidance_only 激活）+ 专家协作 + 最终独立 QA 放行。"""
 
-import copy
 import json
 from dataclasses import asdict
 
@@ -16,6 +15,7 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
 from harness.tests.helpers import recorded_context
+from harness.tests.saved_rewrite import rewrite_saved_event, rewrite_saved_events
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
 
@@ -155,9 +155,10 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     ("other_snapshot", "pinned developer input differs"),
     ("missing_snapshot", "does not record the workspace snapshot"),
 ])
-def test_model_input_audit_rejects_tampered_or_missing_snapshot_record(combined_run, monkeypatch, mutation, expected):
+def test_model_input_audit_rejects_tampered_or_missing_snapshot_record(combined_run, mutation, expected):
     system, _, run_id, _ = combined_run
-    events = _mutable_events(system, run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     assembled = next(
         event for event in events if event.type == EventType.CONTEXT_ASSEMBLED
         and any(part["source"] == "guidance_results" and json.loads(part["text"])
@@ -167,15 +168,15 @@ def test_model_input_audit_rejects_tampered_or_missing_snapshot_record(combined_
         assembled.payload["snapshot_hash"] = canonical_hash("another workspace")
     else:
         del assembled.payload["snapshot_hash"]
+    rewrite_saved_event(system.store, assembled)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any(expected in note for note in audit["notes"]), audit["notes"]
 
 
-def _mutable_events(system, run_id, monkeypatch):
-    events = copy.deepcopy(system.store.list_events(run_id))
-    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
-    return events
+def _saved_events(system, run_id):
+    # 审计读到的必须是事件库中保存的事件；测试改动以后写回事件行，再经公开接口运行审计
+    return system.store.list_events(run_id)
 
 
 def _rehash_request(system, events, assembled, request):
@@ -187,15 +188,17 @@ def _rehash_request(system, events, assembled, request):
                      and item.payload["activation_id"] == assembled.payload["activation_id"]
                      and item.payload["step_id"] == assembled.payload["step_id"])
     attempted.context_digest = assembled.context_digest
+    rewrite_saved_events(system.store, [assembled, attempted])
 
 
 @pytest.mark.parametrize("mutation,expected", [
     ("private_text_in_guidance", "pinned developer input differs"),
     ("full_tools_in_guidance_only", "guidance_only does not match"),
 ])
-def test_model_input_audit_rejects_tampered_guidance_request(combined_run, monkeypatch, mutation, expected):
+def test_model_input_audit_rejects_tampered_guidance_request(combined_run, mutation, expected):
     system, _, run_id, _ = combined_run
-    events = _mutable_events(system, run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
                      and event.payload.get("guidance_only") is True)
     if mutation == "private_text_in_guidance":
@@ -209,6 +212,7 @@ def test_model_input_audit_rejects_tampered_guidance_request(combined_run, monke
         _rehash_request(system, events, assembled, request)
     else:
         activated.payload["guidance_only"] = False
+        rewrite_saved_event(system.store, activated)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any(expected in note for note in audit["notes"]), audit["notes"]
