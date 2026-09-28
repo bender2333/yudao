@@ -359,7 +359,7 @@ const room = Y8.pixel.createRoomScene(canvas, { department });
 room.setModel(roomModel); room.playEvent(event); room.resize(); room.destroy();
 ```
 
-`roomModel` 沿用 v7 构建约定第 5.2 节，字段改为 snake_case，另有：`machine`（终端屏幕上显示的执行机器名称，3.2C）、`remote_unknown`（远程动作结果未知，终端显示雪花）、`trial`（质检试用台：`{ screenshot, text_lines, step }`，3.2D）、`tool_panel`（MCP 工具按钮与亮灯的按钮，3.2B）、`waiting_provider`（等待模型服务，看着墙上的时钟）、`pipes`（交接管道口与传信管口的状态：`{ out: 'idle'|'flowing'|'stopped', letters_waiting: n }`）。
+`roomModel` 沿用 v7 构建约定第 5.2 节，字段改为 snake_case，另有：`machine`（终端屏幕上显示的执行机器名称，3.2C）、`remote_unknown`（远程动作结果未知，终端显示雪花）、`trial`（质检试用台：`{ screenshot, text_lines, step }`，3.2D）、`tool_panel`（MCP 工具按钮与亮灯的按钮，3.2B）、`waiting_provider`（等待模型服务，看着墙上的时钟）、`pipes`（交接管道口与传信管口的状态：`{ out: 'idle'|'flowing'|'stopped', letters_waiting: n }`）、`existing_read`（阅读已有项目，白板出现「现有行为」清单，3.8）、`self_test`（工程自测网页时显示器上的截图，3.2D）、`ops`（运维房间：`{ version, backup }`，备份柜亮起的格数，S4）、`monitor_alarm`（运维监控屏告警，S4）。完整说明见 `room.js` 的 `setModel` 与任务 D 的交付说明。
 
 ### 7.3 项目楼层（floor.js）
 
