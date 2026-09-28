@@ -1,21 +1,24 @@
 import json
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import pytest
 
-from harness.adapters.base import ProviderError
+from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.engine import StepLimits
+from harness.event_store import Command
+from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelResponse
-from harness.models import json_dumps
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, engineering_plan, guidance_response, plan_turn,
     product_spec, response_turn, review, review_turn,
 )
+from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.event_sequence import compare_with_baseline, normalized_run
@@ -485,6 +488,12 @@ def _http_error(status: int, code: str, *headers: tuple[str, str]):
     return reply
 
 
+def _messages_credential_rejected(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
+    # Messages 的错误码是 error.type：凭据拒绝用 authentication_error，与 Responses/Chat 的 code 形状不同
+    body = json.dumps({"type": "error", "error": {"type": "authentication_error", "message": "scenario failure"}})
+    send_reply(handler, 401, "application/json", body.encode("utf-8"))
+
+
 # 流式回复送出一段输出之后连接关闭：声明的长度没有送完，回复在中途断开
 PARTIAL_OUTPUT = "partial output before the connection broke"
 
@@ -555,6 +564,117 @@ def _failure_then_success(protocol: str, first, *, timeout_sec: float = 20.0,
             system, run_id = provider_system(data_dir, provider.base, protocol, timeout_sec=timeout_sec,
                                              step_limits=step_limits)
             system.activate_once(run_id)
+        finally:
+            provider.close()
+        return system, run_id, {provider.base: "<provider>"}
+
+    return run
+
+
+_UNAVAILABLE_MESSAGE = "Missing configuration: provider credential"
+
+
+def _answer_open_decision(system: LoopSystem, option: str) -> str:
+    # 只经公开接口回答待恢复：按保存的投影列出未回答的决定请求，经流程编排的回答入口回答
+    _position, decisions = saved_decisions(system.store, statuses=("open",))
+    assert len(decisions) == 1, [decision.decision_id for decision in decisions]
+    [decision] = decisions
+    assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
+    assert decision.request["reason"] == "provider_unavailable"
+    command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
+    system.orchestrator.answer_decision(decision.decision_id, option, None, base_version=1, command=command)
+    return decision.decision_id
+
+
+def _request_time_unavailable_script() -> list[Any]:
+    # 请求时模型引用不可用：产品规格被接纳以后工程部门的请求被提供方报告为不可用
+    return [
+        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
+        ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"),
+        plan_turn(),
+        delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
+        review_turn("release", "checks passed on the current snapshot"),
+    ]
+
+
+def request_time_unavailable(data_dir):
+    system, _, run_id = _system(data_dir, _request_time_unavailable_script())
+    blocked = system.run_until_stop(run_id)
+    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    assert blocked.product_spec is not None
+    _answer_open_decision(system, "continue")
+    assert system.run_until_stop(run_id).phase == "DONE"
+    return system, run_id, {}
+
+
+def request_time_unavailable_stop(data_dir):
+    system, _, run_id = _system(data_dir, _request_time_unavailable_script())
+    blocked = system.run_until_stop(run_id)
+    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    _answer_open_decision(system, "stop")
+    finished = system.run_until_stop(run_id)
+    assert (finished.phase, finished.stop_reason) == ("FAILED", "cancelled")
+    events = system.store.list_events(run_id)
+    assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
+    return system, run_id, {}
+
+
+def request_time_unavailable_cancel(data_dir):
+    system, _, run_id = _system(data_dir, _request_time_unavailable_script())
+    blocked = system.run_until_stop(run_id)
+    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    _position, decisions = saved_decisions(system.store, statuses=("open",))
+    assert len(decisions) == 1
+    cancelled = system.cancel(run_id)
+    assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
+    events = system.store.list_events(run_id)
+    assert [event.type for event in events[-2:]] == [EventType.DECISION_WITHDRAWN, EventType.RUN_FAILED]
+    _position, withdrawn = saved_decisions(system.store, statuses=("withdrawn",))
+    assert [decision.decision_id for decision in withdrawn] == [decisions[0].decision_id]
+    return system, run_id, {}
+
+
+class _FlakyAvailabilityAdapter(FakeAdapter):
+    # 激活开始时的可用性检查分支：先报告模型引用不可用，回答待恢复以后恢复可用
+    def __init__(self, script: Sequence[Any] | None = None) -> None:
+        super().__init__(script)
+        self.flaky = True
+
+    def availability(self) -> Availability:
+        if self.flaky:
+            return Availability(False, "provider_unavailable", _UNAVAILABLE_MESSAGE)
+        return Availability(True)
+
+
+def activation_start_unavailable(data_dir):
+    adapter = _FlakyAvailabilityAdapter(_handoff_script())
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build an echo CLI")
+    blocked = system.run_until_stop(run_id)
+    assert (blocked.phase, blocked.outcome) == ("PRODUCT_SPEC", "running")
+    assert len(adapter.invocations) == 0
+    adapter.flaky = False
+    _answer_open_decision(system, "continue")
+    assert system.run_until_stop(run_id).phase == "DONE"
+    return system, run_id, {}
+
+
+def _credential_rejected_then_continue(protocol: str, first):
+    # 真实本地 Provider 上游拒绝凭据（HTTP 401）：第一次请求记为不可重试的 provider_unavailable 进入待恢复，
+    # 回答继续执行以后走完交接与放行；四个成功回复按交接脚本顺序回放
+    def run(data_dir):
+        replies = [first]
+        for index, calls in enumerate(HTTP_SCRIPT, start=1):
+            replies.append((lambda index, calls: lambda _provider, handler: send_reply(
+                handler, 200, "text/event-stream", HTTP_REPLIES[protocol](index, calls)))(index, calls))
+        provider = ScriptedProvider(replies)
+        try:
+            system, run_id = provider_system(data_dir, provider.base, protocol)
+            blocked = system.run_until_stop(run_id)
+            assert blocked.outcome == "running"
+            _answer_open_decision(system, "continue")
+            finished = system.run_until_stop(run_id)
+            assert finished.phase == "DONE"
         finally:
             provider.close()
         return system, run_id, {provider.base: "<provider>"}
@@ -687,6 +807,34 @@ SCENARIOS: dict[str, Scenario] = {
         "经真实 Provider 模块（Responses 协议）：服务端收到请求后一直不回复，超过请求时限（10 秒）："
         "尝试记为 provider_timeout 的可重试失败，第二次尝试成功，产品规格被接纳。",
         _failure_then_success("responses", _held, timeout_sec=10.0)),
+    "activation_start_unavailable": Scenario(
+        "激活开始时模型引用不可用：可用性检查不通过时没有模型调用，run 停在这次请求之前进入待恢复；"
+        "恢复可用以后回答继续执行，走完交接与放行。",
+        activation_start_unavailable),
+    "request_time_unavailable": Scenario(
+        "请求时提供方报告模型引用不可用：工程部门的请求记为不可重试的 provider_unavailable 进入待恢复，"
+        "run 停在这次请求之前；回答继续执行以后从这次请求接着进行，走完交付与放行。",
+        request_time_unavailable),
+    "http_responses_credential_rejected_then_continue": Scenario(
+        "经真实 Provider 模块（Responses 协议）：第一次请求被上游拒绝凭据（HTTP 401）："
+        "记为不可重试的 provider_unavailable 进入待恢复；回答继续执行以后走完交接与放行。",
+        _credential_rejected_then_continue("responses", _http_error(401, "invalid_api_key"))),
+    "http_chat_credential_rejected_then_continue": Scenario(
+        "经真实 Provider 模块（Chat Completions 协议）：第一次请求被上游拒绝凭据（HTTP 401）："
+        "记为不可重试的 provider_unavailable 进入待恢复；回答继续执行以后走完交接与放行。",
+        _credential_rejected_then_continue("chat_completions", _http_error(401, "invalid_api_key"))),
+    "http_messages_credential_rejected_then_continue": Scenario(
+        "经真实 Provider 模块（Messages 协议）：第一次请求被上游拒绝凭据（HTTP 401）："
+        "记为不可重试的 provider_unavailable 进入待恢复；回答继续执行以后走完交接与放行。",
+        _credential_rejected_then_continue("messages", _messages_credential_rejected)),
+    "request_time_unavailable_stop": Scenario(
+        "请求时模型引用不可用进入待恢复以后回答停止事项：回答与运行结束在同一个事务中写入，"
+        "运行以 cancelled 结束，不再调用模型。",
+        request_time_unavailable_stop),
+    "request_time_unavailable_cancel": Scenario(
+        "请求时模型引用不可用进入待恢复以后取消运行：未回答的决定请求被撤销，运行以 cancelled 结束；"
+        "此后的回答被拒绝，不再写入。",
+        request_time_unavailable_cancel),
 }
 
 
