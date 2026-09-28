@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-更新：2026-09-28。状态：设计，场景与评分方法经用户确认，未实施。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。
+更新：2026-09-28。状态：设计，场景与评分方法经用户确认，未实施，没有建立工单。用户把评测列为最重要的工作，实施之前由用户逐项审阅本文，审阅以后再整理成工单。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。选题依据：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 
 ## 1. 用途
 

@@ -36,8 +36,8 @@
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），含模块交互图。
-  - 状态：2026-09-28 设计，场景与评分方法经用户确认，未实施；界面智能体与裁判的模型、质检浏览器工具的路线位置待定。
-  - 需求：[D32](../requirements/comparison-experiment.md)。
+  - 状态：2026-09-28 设计，场景与评分方法经用户确认，未实施，没有建立工单；用户把评测列为最重要的工作，实施之前逐项审阅；界面智能体与裁判的模型、质检浏览器工具的路线位置待定。
+  - 需求：[D32](../requirements/comparison-experiment.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
   - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节），未实现；对应工单 #16、#17、#18。

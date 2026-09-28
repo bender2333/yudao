@@ -7,6 +7,7 @@
   - 版本回归与 OpenCode 对照共用三个场景：WebGen-Bench 000080 待办清单、FeatBench openai-agents-python-842、PRDBench 44 北京地铁票价。
   - 先用 OpenCode 运行基础分；后续对 Yudao 的优化以这三个场景为依据。
   - 质检部门具备浏览器与 computer use 工具，从 PRD 生成测试并操作交付的界面。
+  - 评测是最重要的工作；现在只记录需求与设计，不建立工单，实施之前由用户逐项审阅设计。
 - 架构师决定：Yudao 按平时的入口运行，不接入 Harbor；完成度按需求条目统计，失败分为「没有做」与「做了但结果不对」；场景 3 的命令行检查改写成确定的断言，不使用裁判模型；评测工具放在 `evals/`，只通过 HTTP 接口与事件日志导出观察 Yudao。
 - 文档：[评测场景设计](design/evaluation-scenarios.md)、[D32](requirements/comparison-experiment.md)。
 
