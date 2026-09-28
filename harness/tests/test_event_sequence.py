@@ -10,6 +10,7 @@ import pytest
 
 from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.decisions import DecisionClosed
 from harness.engine import StepLimits
 from harness.event_store import Command
 from harness.models import EventType, Usage, json_dumps
@@ -618,7 +619,6 @@ def request_time_unavailable_stop(data_dir):
     assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
     return system, run_id, {}
 
-
 def request_time_unavailable_cancel(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
@@ -631,6 +631,14 @@ def request_time_unavailable_cancel(data_dir):
     assert [event.type for event in events[-2:]] == [EventType.DECISION_WITHDRAWN, EventType.RUN_FAILED]
     _position, withdrawn = saved_decisions(system.store, statuses=("withdrawn",))
     assert [decision.decision_id for decision in withdrawn] == [decisions[0].decision_id]
+    end = system.store.end_position()
+    command = Command(str(uuid.uuid4()), "decision.answer", "sha256:continue:1", "user:local")
+    with pytest.raises(DecisionClosed):
+        system.orchestrator.answer_decision(decisions[0].decision_id, "continue", None, base_version=1,
+                                            command=command)
+    assert system.store.end_position() == end
+    _position, still_withdrawn = saved_decisions(system.store, statuses=("withdrawn",))
+    assert [decision.decision_id for decision in still_withdrawn] == [decisions[0].decision_id]
     return system, run_id, {}
 
 
