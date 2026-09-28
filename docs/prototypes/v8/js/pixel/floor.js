@@ -103,7 +103,7 @@
     add('quality>product', 'return', [[r.quality.outPort - 8, PIPE_Y - 8], [r.quality.outPort - 8, DUCT_Y], [r.product.inPort + 8, DUCT_Y], [r.product.inPort + 8, PIPE_Y - 8]]);
     add('product~engineering', 'tube', [[r.product.outPort, TUBE_Y], [r.engineering.inPort, TUBE_Y]]);
     add('engineering~quality', 'tube', [[r.engineering.outPort, TUBE_Y], [r.quality.inPort, TUBE_Y]]);
-    add('product~quality', 'tube', [[r.product.x + 30, TUBE_Y - 12], [r.product.x + 30, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 30, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 30, TUBE_Y - 12]]);
+    add('product~quality', 'tube', [[r.product.x + 22, TUBE_Y - 12], [r.product.x + 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, TUBE_Y - 12]]);
     if (lay.ops) {
       add('library>operations', 'handoff', [[lay.lib.outPort, PIPE_Y], [lay.ops.inPort, PIPE_Y]]);
       add('operations>machine_room', 'handoff', [[lay.ops.outPort, PIPE_Y], [lay.ops.outPort, ROOM_B + 10], [lay.door.x + 14, ROOM_B + 10], [lay.door.x + 14, lay.door.y + 12]]);
@@ -650,7 +650,7 @@
       const D = P.DEPTS[d];
       const here = itemsIn(d);
       const working = here.some((it) => ACTIVE.includes(it.status));
-      const sx = r.x + 30, sy = TOP + 18;
+      const sx = r.x + Math.round(r.w / 2) - 22, sy = TOP + 18;
       RB(c, sx - 2, sy - 2, 32, 22, PAL.beige2);
       paint.screen(c, sx, sy, 28, 18, model.interrupted ? 'off' : working ? 'code' : 'idle', t, { seed: r.x });
       paint.scanlines(c, sx, sy, 28, 18, 0.18);
@@ -750,8 +750,10 @@
       if (lines.length) {
         const w = 74;
         const h = lines.length * 8 + 4;
-        RB(c, d.x + d.w - w, d.y - h - 4, w, h, PAL.paper);
-        lines.forEach((line, i) => P.text(c, line, d.x + d.w - w + 3, d.y - h - 4 + 6 + i * 8, { size: 5.5, weight: 600, color: PAL.ink, max: w - 6 }));
+        // 牌子挂在走廊里门的左边，不遮住上面的房间
+        const px = d.x - w - 4, py = d.y + 2;
+        RB(c, px, py, w, h, PAL.paper);
+        lines.forEach((line, i) => P.text(c, line, px + 3, py + 6 + i * 8, { size: 5.5, weight: 600, color: PAL.ink, max: w - 6 }));
       }
       if (unknown) P.drawBitmap(c, 'question', d.x + 10, d.y + 14);
       st.remoteDots.forEach((dot) => {
@@ -941,7 +943,7 @@
       const x = ((ev.clientX - rect.left) / rect.width) * W;
       const y = ((ev.clientY - rect.top) / rect.height) * H;
       const d = lay.door;
-      if (model.machines && x >= d.x - 50 && x <= d.x + d.w && y >= d.y - 40 && y <= d.y + d.h && o.onDoorClick) {
+      if (model.machines && x >= d.x - 80 && x <= d.x + d.w && y >= d.y && y <= d.y + d.h && o.onDoorClick) {
         o.onDoorClick(model.machines.map((m) => m.id));
       }
     });
