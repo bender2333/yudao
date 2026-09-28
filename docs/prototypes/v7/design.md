@@ -1,6 +1,6 @@
 # 界面原型 v7 设计说明
 
-日期：2026-09-24。状态：原型已完成（2026-09-25）；2026-09-28 本说明的阶段编号按路线图修改，原型文件中的档位与阶段标注仍是修改之前的编号。取代 [v6 原型](../../archive/prototypes/department-workspace-v6.html)。
+日期：2026-09-24。状态：原型已完成（2026-09-25）；2026-09-28 本说明的阶段编号按路线图修改，原型文件中的档位与阶段标注仍是修改之前的编号。将由 v8 取代（[D30](../../requirements/web-game-frontend.md)「长时间运行以后的界面」，v8 尚未制作）。取代 [v6 原型](../../archive/prototypes/department-workspace-v6.html)。
 
 依据：[总体路线图](../../program-roadmap.md)、[Stage 3 计划](../../stage-3-plan.md)、[模型管理设计说明](../../design/model-management.md)第 9 节、[恢复契约](../../design/recovery-contract-and-fault-matrix.md)、[部门内多角色设计说明](../../design/department-roles.md)（草案）、[语义系统设计说明](../../design/semantic-system.md)（草案）、[D19 按原型建设 Web 工作台](../../requirements/web-workspace-prototype.md)、D27 与 D28 需求记录、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条。用词以 [CONTEXT.md](../../../CONTEXT.md) 为准。
 
