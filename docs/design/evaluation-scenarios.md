@@ -165,7 +165,7 @@ flowchart LR
 
 ## 9. 前提与未决事项
 
-- 场景 1 的 Yudao 一侧需要质检部门具备浏览器与 computer use 工具，按 PRD 自行生成测试并操作页面。两个工具由 Stage 3 的 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)），质检部门的模型必须具有视觉能力。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
+- 场景 1 的 Yudao 一侧需要质检部门具备浏览器与 computer use 工具，按 PRD 自行生成测试并操作页面。两个工具由 Stage 3 的 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力，质检两个工具都可以使用。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
 - 场景 2 的 Yudao 一侧使用 3.2A 的可信代码快照接入，测试命令登记为在场景镜像中执行。
 - 界面智能体与裁判使用的模型由用户提供：要能看图、版本固定、与被测模型不同。
 
