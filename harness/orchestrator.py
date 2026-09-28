@@ -48,13 +48,13 @@ from .models import (
 from .providers import ProviderConnections, ProviderFacade
 from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree, capture_public_tree, materialize_tree
+from .public_tree import CapturedTree
 from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import normalize_registered_commands
 from .validation import ProposalDecision
-from .workspace import Workspace, WorkspaceSnapshot
+from .workspace import WorkspaceSnapshot
 
 
 @dataclass
@@ -275,13 +275,9 @@ class Orchestrator:
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
             raise ValueError("run_id must stay within the run materials directory")
-        # 工作区先于其余材料落盘：继承树无法恢复时不留下半个 run。
-        workspace_dir = self.workspace_root / run_id
-        if initial_tree is not None:
-            self.workspace_root.mkdir(parents=True, exist_ok=True)
-            materialize_tree(initial_tree, workspace_dir)
-        workspace = Workspace(workspace_dir)
-        workspace_digest = capture_public_tree(workspace.root).digest
+        # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
+        environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
+        workspace_digest = environment.snapshot().digest
         initial = self.interactions.initial(run_id, task, department_prompts=department_prompts)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
@@ -341,11 +337,8 @@ class Orchestrator:
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
 
-    def workspace(self, run_id: str) -> Workspace:
-        return Workspace(self.workspace_root / run_id)
-
     def _environment(self, run_id: str) -> LocalEnvironment:
-        return LocalEnvironment(self.workspace(run_id))
+        return LocalEnvironment.open(self.workspace_root / run_id)
 
     def add_input(self, run_id: str, text: str) -> RunProjection:
         if not isinstance(text, str) or not text.strip():
@@ -881,8 +874,9 @@ class Orchestrator:
         run_id, department = scope.run_id, scope.department
         projection = self.project(run_id)
         try:
-            workspace = self.workspace(run_id)
-            workspace.bind_check(
+            environment = LocalEnvironment.open(
+                self.workspace_root / run_id, registered_commands=dict(projection.registered_commands))
+            environment.bind_check(
                 activation_id=scope.activation_id,
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
                 delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
@@ -892,7 +886,7 @@ class Orchestrator:
             activation.driver = StepDriver.start(
                 scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, target=activation.target,
-                environment=LocalEnvironment(workspace, registered_commands=dict(projection.registered_commands)),
+                environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
             result = await activation.driver.result()
@@ -1027,7 +1021,7 @@ class Orchestrator:
             ))
             return
         self._commit_accepted(
-            transaction, department=department, snapshot=snapshot,
+            transaction, department=department, snapshot=snapshot, environment=environment,
             artifact=judged.artifact or {}, transitions=judged.transitions,
             parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
             yielded_work=yielded_work,
@@ -1039,6 +1033,7 @@ class Orchestrator:
         *,
         department: str,
         snapshot: WorkspaceSnapshot,
+        environment: LocalEnvironment,
         artifact: dict[str, Any],
         transitions: list[tuple[str, str]],
         parent_event_id: str,
@@ -1053,7 +1048,7 @@ class Orchestrator:
             return
         try:
             acceptance = self.submissions.prepare(
-                transaction, projection=projection, snapshot=snapshot, workspace_root=self.workspace_root / run_id,
+                transaction, projection=projection, snapshot=snapshot, environment=environment,
                 artifact=artifact,
                 department=department, parent_event_id=parent_event_id, session_id=session_id,
                 provider=provider, model=model,
