@@ -1,8 +1,8 @@
 # 系统架构原理：控制核心与可替换的材料
 
-更新：2026-09-26。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
+更新：2026-09-28，第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
 
-依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 分布式部署](../../requirements/distributed-deployment.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
+依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
 ## 1. 出发点
 
@@ -170,13 +170,15 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 
 用户的方向（2026-09-25）：考虑 RPC 是为了分布式部署与微服务化，希望把部门或其中的 agent 角色单独做成服务，通过集群部署 Yudao，成为云原生应用。
 
+用户的说明（2026-09-28）：可以预见的时间内只有用户一个人使用，会部署到多台电脑与树莓派一类的板子上。多台机器的用途是执行，部署形态按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)：控制核心、事件日志（SQLite）、工件存储、Provider 模块与观察者在一台控制主机上运行；执行环境是一个服务，有本机进程、本机容器与远程执行代理三种实现，执行代理运行在用户登记的其他电脑或树莓派上。本节的执行节点指执行环境。
+
 ### 7.1 对照原理核对
 
 | 原理 | 分布式部署 | 外包角色 |
 | --- | --- | --- |
-| U ≠ f | 提交只在控制核心进行，执行节点只交回模型输出与工具回执 | agent 宣布完成只算交回提案 |
+| U ≠ f | 提交只在控制核心进行，执行节点只交回动作回执 | agent 宣布完成只算交回提案 |
 | 权威拓扑是设计时的常量 | 执行节点之间没有直接通道，询问与交接都经过编排器 | agent 提出询问只能调用 Yudao 提供的请求工具，由编排器派发 |
-| 会话一次性，每次调用重新装配上下文 | 执行节点不保存状态，任何一台都能处理任何一次模型调用或工具调用；角色任务的状态在事件中 | 每次激活开新会话，使用全新的 agent 状态目录，不续接旧会话 |
+| 会话一次性，每次调用重新装配上下文 | 执行节点不保存状态，工作区每次从封存快照建立；动作与角色任务的状态在事件中 | 每次激活开新会话，使用全新的 agent 状态目录，不续接旧会话 |
 | 独立性靠结构成立 | 执行节点只收到本次调用需要的内容，机器上没有别的资料 | 容器里只放这个角色的资料，工作区从不带历史的快照重建 |
 | 单一会话内部的累加也是污染 | 与单机部署相同 | agent 自己压缩上下文，Yudao 用预算限制单个会话 |
 | 核验有效的条件是错误独立 | 质检可以在不同平台上运行，得到新的独立证据 | 核验它的下游角色使用不同的证据来源与不同的模型 |
@@ -186,8 +188,8 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 
 用户贴出的三条理由说明了分布式为什么容易：会话可以丢弃，任何节点都能接手；没有连续记忆，不需要迁移状态；一次性循环天然是实例池。
 
-- 做成服务池、按需扩容的是执行环境、Provider 与外包 agent 的运行容器。
-- 控制核心（编排器、步骤驱动、上下文装配器、裁决规则、事件库与状态库）的裁决不使用模型，每一步的工作量很小，等待模型与工具时不占用其他任务；拆成多个服务会把 U 与权威关系分散到多处，所以保持一份，为可用性做主备。
+- 分布到多台机器的是执行环境：本机容器与登记机器上的执行代理；外包 agent 的运行容器同样属于执行层。Provider 模块在控制主机上运行，模型凭据只保存在控制主机。
+- 控制核心（编排器、步骤驱动、上下文装配器、裁决规则、事件库与状态库）的裁决不使用模型，每一步的工作量很小，等待模型与工具时不占用其他任务；拆成多个服务会把 U 与权威关系分散到多处，所以保持一份，在控制主机上运行，停机后重新启动时由 3.1 的恢复从已提交的状态继续。
 - 「把部门做成服务」对应把这个部门需要的执行环境与外包 agent 做成服务池，部门的身份与每一步的控制留在控制核心。
 - 执行环境可以保持温热：依赖缓存、编译缓存与工具链可以复用；工作区内容每次从封存快照重建，上一次被拒绝的尝试留下的文件同样是污染。
 
@@ -197,18 +199,18 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 
 会话可以丢弃，恢复时丢弃旧会话、从已提交的状态重新装配，从来不需要恢复会话的内存。控制核心本身就是按事件重放的确定性状态机。外部工作流引擎的核心能力是让执行到一半的代码接着运行，Yudao 用不上；引擎的执行历史还会成为事件库之外的第二份事实，违背「事件库是唯一的事实来源」。
 
-外包 agent 的派发用事件库中的派发记录与执行权编号实现，外包 agent 领取派发、交回提案与证据；模型调用与工具调用带身份，按身份去重。[恢复契约](../recovery-contract-and-fault-matrix.md)第 3 节的执行权与一致边界是正确的基础；执行权编号需要在不同机器之间也能核对（ADR-0007 第 3 条）。
+外包 agent 的派发用事件库中的派发记录与执行权编号实现，外包 agent 领取派发、交回提案与证据；模型调用与工具调用带身份，按身份去重。[恢复契约](../recovery-contract-and-fault-matrix.md)第 3 节的执行权与一致边界是正确的基础；执行权由控制主机上的控制核心持有，没有期限与续期，远程执行代理上的动作按动作身份与心跳判断存活（ADR-0018）。
 
 ```mermaid
 flowchart LR
   Desktop["桌面客户端"] -->|"HTTP、OpenAPI、SSE"| Gateway["接口服务"]
   Gateway --> Core["控制核心：编排器、步骤驱动、上下文装配器、裁决规则"]
   Core --> Events[("事件库：事实、派发记录、执行权编号")]
-  Core -->|"模型调用"| Provider["Provider 服务"]
-  Core -->|"工具调用"| Tools["执行环境与工具服务"]
-  Ext["外包 agent 服务池"] -->|"领取派发、工具调用请求、交回提案与证据"| Core
+  Core -->|"模型调用"| Provider["Provider 模块"]
+  Core -->|"工具调用"| Tools["执行环境服务：本机进程、本机容器、远程执行代理"]
+  Ext["外包 agent 的运行容器"] -->|"领取派发、工具调用请求、交回提案与证据"| Core
   Ext --> Provider
-  Tools --> Objects[("对象存储：工件与封存快照")]
+  Tools --> Objects[("工件存储：工件与封存快照")]
 ```
 
 ### 7.4 协议

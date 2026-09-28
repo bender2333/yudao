@@ -1,6 +1,6 @@
 # 语义系统设计说明
 
-日期：2026-09-26。状态：设计说明，规则已由用户确认（[D25](../requirements/semantic-system.md) 2026-09-25 至 2026-09-26）；2026-09-26 按[总体架构](architecture/overall-architecture.md)与用户的决定修改：第 4 节写明语义系统在总体架构中的位置，教训与洞见由教训发现模块找出（第 8、15 节）。未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。需求：[D25 语义系统](../requirements/semantic-system.md)。调研：[Semantica 参照调研](../research/semantica-reference.md)、[上下文组装：参照调研](../research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../research/semantic-system-and-department-roles.md)。ADR：[0008](../adr/0008-trajectory-and-graph-as-event-projections.md)、[0009](../adr/0009-deterministic-context-assembly.md)、[0010](../adr/0010-control-core-drives-role-steps.md)。相关设计：[总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)第 8 节、[部门内多角色设计说明](department-roles.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
+日期：2026-09-26。状态：设计说明，规则已由用户确认（[D25](../requirements/semantic-system.md) 2026-09-25 至 2026-09-26）；2026-09-26 按[总体架构](architecture/overall-architecture.md)与用户的决定修改：第 4 节写明语义系统在总体架构中的位置，教训与洞见由教训发现模块找出（第 8、15 节）。未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。需求：[D25 语义系统](../requirements/semantic-system.md)。调研：[Semantica 参照调研](../research/semantica-reference.md)、[上下文组装：参照调研](../research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../research/semantic-system-and-department-roles.md)。ADR：[0008](../adr/0008-trajectory-and-graph-as-event-projections.md)、[0009](../adr/0009-deterministic-context-assembly.md)、[0010](../adr/0010-control-core-drives-role-steps.md)。相关设计：[总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)第 8 节、[部门内多角色设计说明](department-roles.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
 ## 1. 要解决的问题
 
@@ -11,7 +11,7 @@ Agent 最重要的是上下文管理。一个长任务运行很久以后，只�
 1. **整理**：把工作过程记录成轨迹，把工作中得到的内容记录成图谱。轨迹与图谱是事件的投影，可以完整重放。
 2. **上下文组装**：每次模型请求时，从轨迹、图谱与材料中选出正确、当前有效的内容，按固定的栏目交给角色；其余内容由角色按需取得。
 
-语义系统还承担第二项职责：为系统演化（Stage 7）提供过程记录（轨迹与决定）与语义工程（项目术语、教训、洞见）。
+语义系统还承担第二项职责：为系统演化（Stage 6）提供过程记录（轨迹与决定）与语义工程（项目术语、教训、洞见）。
 
 现行实现的具体问题（调研第 1 节）：
 
@@ -158,7 +158,7 @@ flowchart TB
 
 ## 5. 本体
 
-本体由系统定义，随系统版本发布；本体的变化属于 Stage 7 的演化。主机按本体校验每次记录，不符合时拒绝并说明原因。
+本体由系统定义，随系统版本发布；本体的变化属于 Stage 6 的演化。主机按本体校验每次记录，不符合时拒绝并说明原因。
 
 ### 5.1 内容种类
 
@@ -289,7 +289,7 @@ sequenceDiagram
 - JEV 请求失败时按 D17 的规则有界重试，仍然失败时写入核对失败事件并附原因，该事实显示为「未核对」。
 - 组装时只读取记录的结果，每次请求不调用 JEV。
 
-**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[ADR-0001](../adr/0001-endpoints-by-protocol-not-vendor.md)、[ADR-0004](../adr/0004-one-protocol-per-connection.md)），在 Stage 4 完成；准入以判定点为单位，依靠校准。
+**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[ADR-0001](../adr/0001-endpoints-by-protocol-not-vendor.md)、[ADR-0004](../adr/0004-one-protocol-per-connection.md)），在 Stage 5 完成；准入以判定点为单位，依靠校准。
 
 **校准**（D28 的规则）：
 
@@ -332,7 +332,7 @@ sequenceDiagram
 - **教训与洞见**由教训发现模块找出：这个模块单独审查事件与事实，找出以后应该怎样做或应该避免什么（教训），以及从多条内容中归纳出的规律或判断（洞见），作为提案交给 U，按本体校验后写成事件；合并重复的教训与洞见、把被证明错误的标为失效，也由这个模块进行。模块可能与元观察（[D28](../requirements/meta-observer.md)）结合，参考主动推断与自由能原理，待设计，见 [D25](../requirements/semantic-system.md)「TODO：惊讶机制与教训发现模块」。设计完成之前，系统中没有教训与洞见。
 - 教训关联实体时，通过接触时附加进入上下文；与具体实体无关的教训进入常驻栏目（第 10.2 节）。
 - 洞见只能通过查询取得，主机不主动放入上下文。
-- 教训是参考内容，主机不强制执行。需要强制执行的教训成为规则的候选，按 Stage 7 的规则变更流程处理，或由用户写进部门 Prompt。
+- 教训是参考内容，主机不强制执行。需要强制执行的教训成为规则的候选，按 Stage 6 的规则变更流程处理，或由用户写进部门 Prompt。
 - **复盘**由部门的中心角色进行，时间点是部门交出的成果被主机接纳之后，以及事项结束时。复盘由流程编排安排，中心角色通过一次单独的请求完成：读取本部门的轨迹与图谱，写出或更新画像，合并重复的实体；产出作为提案经过 U。D26 的角色机制实现之前，复盘由部门的单个 Agent 通过一次单独的复盘请求完成。
 - **画像**按部门各自编写，每份上限 2000 token，写入时校验，超过时主机拒绝并说明原因。项目实体的画像称为项目画像。
 - 抽象内容属于部门私有，在同一项目的后续事项中继续有效。跨项目复用属于持续改进工作线，重复出现的教训作为候选，经过独立验证才能采用。
@@ -357,7 +357,6 @@ sequenceDiagram
 - 项目内各事项确立的要求类条目构成项目的要求集合，新事项的产品部门从这个集合开始（第 5.5 节）。
 - 已采纳事项中记录的内容在后续事项中继续有效，照常进入目录、接触时附加与查询。
 - 未采纳事项中，知识与教训继续有效，处理与已采纳事项相同；事实、决定、推测与画像只能查询取得，标注「来自未采纳事项」。
-- 同一项目中进行中的其他事项（3.4B），其内容在该事项结束之前不可见，结束后按上面的规则处理。
 - 还没有画像时，画像栏目写「尚无画像」；部门交出的成果第一次被接纳后的复盘写出画像。
 
 ## 10. 上下文组装
@@ -607,7 +606,7 @@ flowchart TB
 | [模型管理设计说明](model-management.md) | 第 8.3 节压缩阈值加入工作上限；第 8.4 节摘要请求由整理请求代替；第 8.5 节保留规则加入旧工具结果清理；第 12 节 TODO 指向本说明 |
 | [部门内多角色设计说明](department-roles.md) | 各角色的上下文、查询工具、分派说明的引用与焦点、账本的显示、停滞后的历史，按本说明第 10 节 |
 | [D08](../requirements/department-history.md)、[D10](../requirements/context-compaction.md) | 压缩由尝试、图谱内容与轨迹节录代替被移出的历史；新到达的输入作为通知追加进历史 |
-| [D28](../requirements/meta-observer.md)、[总体路线图](../program-roadmap.md) | JEV 同时用于证据核对，协议接入在 Stage 4 |
+| [D28](../requirements/meta-observer.md)、[总体路线图](../program-roadmap.md) | JEV 同时用于证据核对，协议接入在 Stage 5 |
 | 提案合同 | ProductSpec、工程计划、交付说明、质检结论的条目带编号与引用（第 5.5 节）；质检放行增加验收条件覆盖检查 |
 | 上下文装配（`harness/context.py`） | 按第 10 节的栏目与顺序重写；上下文清单记录每条内容的放入原因 |
 | 项目上下文（`harness/projects.py`） | 只保留项目名称、长期目标、当前采用的成果与本事项 |

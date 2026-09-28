@@ -5,11 +5,11 @@
 - 总体架构设计（`architecture/`）
   - [总体架构：职责分层](architecture/overall-architecture.md)
     - 内容：分层图（客户端、接口层、应用层、控制核心、定义、知识层、观察层、观察者、执行层）、各层职责与边界、十项长期决定、语义系统在各层中的位置、依赖方向、控制核心内部的模块与一步的顺序、两类工具、合同（身份、五种合同、动作契约、用户决定）、路线图对照、使用的技术、近期实施顺序、待讨论的事项。
-    - 状态：2026-09-26 设计，用户已确认（ADR-0010 至 ADR-0015 与十项长期决定）；第 11 节的事项继续讨论。
+    - 状态：2026-09-26 设计，用户已确认（ADR-0010 至 ADR-0015 与十项长期决定）；2026-09-28 按 ADR-0018 修改部署形态与执行环境服务；第 11 节的事项继续讨论。
   - [系统架构原理：控制核心与可替换的材料](architecture/core-and-materials.md)
-    - 内容：出发点、核心公式与部门的身份、三个控制层次、确定性流程能消除什么、循环系统（Ralph 与 GPT-6 Astra）与控制的位置、与 2026 年 loop 工程、graph 工程、AI-native SDLC 的对照、原生核心与材料、分布式部署、外包角色、界面与后端的技术方向、项目的意义，含两张架构图。
-    - 状态：2026-09-26 架构讨论记录；用户陈述与确认单独标注，第 2、4.2、6 至 9 节已按 ADR-0010 至 ADR-0015 与用户同日的决定修改，第 11 节只剩 D31 的待确认规则。
-  - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）。需求：[D29](../requirements/distributed-deployment.md)、[D31](../requirements/outsourced-agent-roles.md)。
+    - 内容：出发点、核心公式与部门的身份、三个控制层次、确定性流程能消除什么、循环系统（Ralph 与 GPT-6 Astra）与控制的位置、与 2026 年 loop 工程、graph 工程、AI-native SDLC 的对照、原生核心与材料、分布式部署（一台控制主机，执行环境分布到多台机器）、外包角色、界面与后端的技术方向、项目的意义，含两张架构图。
+    - 状态：2026-09-26 架构讨论记录；用户陈述与确认单独标注，第 2、4.2、6 至 9 节已按 ADR-0010 至 ADR-0015 与用户同日的决定修改，第 7 节 2026-09-28 按 ADR-0018 修改，第 11 节只剩 D31 的待确认规则。
+  - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）、[ADR-0018](../adr/0018-single-control-host-remote-execution.md)。需求：[D29](../requirements/remote-execution.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
   - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。工单：#45（调用目标每次请求解析，3.1 之前），父工单 #83（子工单 #84 至 #96）。
@@ -28,13 +28,13 @@
   - 需求：[D20](../requirements/department-guidance.md)。
 - [语义系统](semantic-system.md)
   - 内容：整理（轨迹、七类图谱内容与抽象层、写入与证据核对）与上下文组装（栏目、目录、接触时附加、通知、查询、各角色的上下文、长度控制、提示缓存）。
-  - 状态：2026-09-26 设计说明，规则已由用户确认，未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。第 4 节按总体架构写明语义系统在各层中的位置；教训由教训发现模块找出，它与惊讶机制放到后面设计，设计中保留扩展点。
+  - 状态：2026-09-26 设计说明，规则已由用户确认，未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。第 4 节按总体架构写明语义系统在各层中的位置；教训由教训发现模块找出，它与惊讶机制放到后面设计，设计中保留扩展点。
   - 需求：[D25](../requirements/semantic-system.md)。ADR：0008、0009、0010。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)、[Semantica 参照调研](../research/semantica-reference.md)、[上下文组装：参照调研](../research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)。
 - [部门内多角色](department-roles.md)
   - 内容：中心型协作（中心角色、经理、探索者、主程、审查者）、角色清单、内部循环、角色任务、预测性探索与执行槽位、部门账本与交出检查、角色模型设置，含概念图、模块关系图、内部循环图与角色任务状态图。
-  - 状态：2026-09-25 设计草案，2026-09-26 按总体架构（各角色的步骤由控制核心驱动）与反复退回时提醒用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；规则已由用户确认，未实施；路线位置为 Stage 4（部门内协作、上下文与界面）。
+  - 状态：2026-09-25 设计草案，2026-09-26 按总体架构（各角色的步骤由控制核心驱动）与反复退回时提醒用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；规则已由用户确认，未实施；路线位置为 Stage 5（部门内协作、上下文与界面），对产品、工程、质检、运维四个部门一起引入。
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
-  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），未实现；对应工单 #16、#17、#18。
+  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节），未实现；对应工单 #16、#17、#18。
   - 计划：[Stage 3 计划](../stage-3-plan.md) 3.1。

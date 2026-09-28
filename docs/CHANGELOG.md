@@ -196,3 +196,11 @@ claude-opus-5-5 / 2026-09-27 21:49 / docs/requirements/provider-retries.md（D17
 claude-opus-5-5 / 2026-09-27 22:54 / docs/stage-3/organization-comparison-samples.md 第 29、348、444 行去掉估计用量（estimated）的来源与 estimated_totals / #109 按规则 1 删除了没有写入方的估计用量读取
 
 claude-opus-5-5 / 2026-09-28 16:40 / docs/design/app-and-interface.md 第 4.3 节 decisions.list：返回内容加入所属的项目、事项与 run，筛选条件由「是否已回答」改为可多选的状态（等待回答、已回答、已撤销），写明等待用户的列表只取等待回答 / #49 核对：已撤销的请求混在「未回答」中，界面按项目列出时需要知道所属事项；参照 OpenCode 与 OMP 的等待请求做法，用户确认
+
+claude-opus-5-5 / 2026-09-28 17:55 / 新增 docs/adr/0018-single-control-host-remote-execution.md（一台控制主机，执行环境有本机进程、本机容器、远程执行代理三种实现，执行权没有期限与续期）；ADR-0007、ADR-0012 的状态说明写明被取代的部分；ADR-0013 的数据库一条改为 SQLite 保存在控制主机上，删去 3.4B 的理由；ADR-0008、ADR-0014、ADR-0016 的 Stage 7 改为 Stage 6 / 用户确认 Yudao 只有一个人使用，会部署到多台电脑与树莓派，多机需求在执行环境
+
+claude-opus-5-5 / 2026-09-28 17:55 / 重写 docs/program-roadmap.md：阶段按执行顺序重新编号（Stage 3 通用工具、可靠恢复与执行环境，新增 3.2C、删除 3.4B；Stage 4 运维部门与长时间运行；Stage 5 部门内协作、上下文与界面；Stage 6 受治理的系统演化，暂时不做），3.1 改为启动时自动继续，3.9 第一次执行 D32 对照实验 / 用户确认的成功标准：独立高质量交付，长时间自我运行并自我修复交付的软件
+
+claude-opus-5-5 / 2026-09-28 17:55 / 需求记录：D29 由 distributed-deployment.md 改名为 remote-execution.md 并改写为远程执行环境；D27 写入 2026-09-28 确认的运维规则（单循环形态、观察日志状态与交互日志、修复事项自动开始、常设授权清单、同项目按优先级排队、紧急故障先回滚）；新增 D32 comparison-experiment.md；D09、D17 写入等待模型服务；D25、D26、D28、D31、D30、索引与各阶段需求概览按新编号修改 / 同上
+
+claude-opus-5-5 / 2026-09-28 17:55 / 设计文档同步：stage-3-plan.md、恢复契约（启动时自动继续，上游拒绝凭据进入等待模型服务）、总体架构、系统架构原理、应用层与接口层设计说明（删除 3.4B 的命令与未采纳候选，决定种类加入等待模型服务的通知）、模型管理设计说明第 5.5 节、语义系统与部门内多角色设计说明、设计索引、当前验收基线、原型 v7 设计说明（删除 3.4B 的元素）、运行责任样例、decision.md 与 CONTEXT.md 的新术语 / 同上；各处链接改为 remote-execution.md
