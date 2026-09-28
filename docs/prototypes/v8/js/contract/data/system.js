@@ -150,7 +150,7 @@
         network: {
           scope: '只读取回。各项目在设置中授权域名；超出授权时逐次批准，批准一次不作为永久授权。',
           grants: [
-            { project_id: 'p-todo', scope: '只读取回：尚未授权域名', approval: '超出范围时逐次批准' },
+            { project_id: 'p-todo', scope: '只读取回：registry.npmjs.org', approval: '超出范围时逐次批准' },
             { project_id: 'p-metro', scope: '只读取回：docs.python.org、pypi.org', approval: '超出范围时逐次批准' },
             { project_id: 'p-sensor', scope: '未授权', approval: '每次使用逐次批准' },
             { project_id: 'p-agents', scope: '未授权', approval: '每次使用逐次批准', level: '3.8' }
@@ -429,12 +429,7 @@
           },
           {
             delay: 1200, go: '#/p/p-metro/materials?w=w-metro-transfer',
-            event: {
-              type: 'material_recorded', project_id: 'p-metro', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
-              label: '资料页只读列出旧 run 的事件，Yudao 版本为升级前的 0.8.0',
-              payload: { yudao_version: '0.8.0', readonly: true }
-            },
-            patch: []
+            label: '资料页只读列出旧 run 的事件，Yudao 版本为升级前的 0.8.0'
           }
         ]
       },
@@ -539,67 +534,49 @@
           },
           {
             delay: 1200, go: '#/home',
-            event: {
-              type: 'x_slots_set',
-              label: '回到首页：槽位 2/2，温湿度服务与地铁票价各占一个，入口阀门都打开',
-              payload: {}
-            },
-            patch: []
+            label: '回到首页：槽位 2/2，温湿度服务与地铁票价各占一个，入口阀门都打开'
           }
         ]
       },
       {
         no: 19, id: 'sc-return-home', name: '离开三天后回来', level: 'ui', go: '#/home',
-        setup: [
-          { path: 'decisions', push: {
-            id: 'd-todo-key', kind: 'waiting_resume', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-            status: 'waiting', issued_at: '2026-09-29T15:30:00+08:00', born_at: '2026-09-29T15:30:00+08:00', version: 1,
-            blocks: { scope: 'run', work_item_id: 'w-todo-due', queued_behind: [] },
-            materials: { department: 'quality', model: 'opencode-go-chat/mimo-v2.5', problem: '凭据被上游拒绝：OPENCODE_GO_LAB_KEY', links: ['#/sys/models', '#/p/p-todo/settings'] },
-            view: '#/p/p-todo/w/w-todo-due/recovery', answer: null,
-            options: [
-              { id: 'resume', label: '继续执行', kind: 'primary', requires: 'model_ok', events: [] },
-              { id: 'stop', label: '停止这个事项', kind: 'danger', events: [] }
-            ]
-          } }
-        ],
+        setup: [],
         steps: [
           {
-            delay: 1600, go: '#/home', act: 'replay.start',
-            label: '从上次查看的位置开始播放（9月26日 21:10）：状态项是离开时的数字，决定卡片里还没有离开期间发出的请求，报告的汇总为空，时间轴停在范围的起点。'
+            delay: 1800, go: '#/home',
+            label: '回到首页，先看顶部的状态项：每一项来自事实，正常的显示灰色的「无」，亮起的项写明数量，点击跳到对应位置。'
+          },
+          {
+            delay: 1800, go: '#/home',
+            label: '往下是「待你决定」：跨项目的决定卡片按发出时间排列，写明等了多久、挡住了哪个事项，展开可以看到这个决定需要的材料。'
+          },
+          {
+            delay: 1800, go: '#/home',
+            label: '再往下是离开期间的报告：汇总项的数字都能点开，看到来源事件，并在时间轴上标出对应的刻度。'
+          },
+          {
+            delay: 1600, act: 'replay.start',
+            label: '开始回放：楼的画面回到上次查看时（9月26日 21:10）的状态；状态项、决定卡片与报告保持现在的内容。'
           },
           {
             delay: 1400, act: 'replay.step',
-            label: '时间轴前进到离开期间的第一件关键事实：楼层的灯与小旗按该时刻更新，报告的汇总出现对应来源，决定卡片仍为空。'
+            label: '时间轴前进到离开期间的第一件关键事实：对应楼层闪一下，灯与小旗按该时刻更新。'
           },
           {
             delay: 1400, act: 'replay.step',
-            label: '继续前进：时间轴跨过没有关键事实的时段，用折断符号标出跳过的时长，画面直接跳到下一件关键事实。'
+            label: '继续前进：没有关键事实的时段直接跳过，时间轴上用折断符号标出跳过的时长。'
           },
           {
             delay: 1400, act: 'replay.step',
-            label: '继续前进：决定卡片按位置增删，只有已经发出的决定请求出现在卡片里，状态项与报告的汇总同步变化。'
-          },
-          {
-            delay: 1600,
-            event: {
-              type: 'x_decision_issued', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-              label: '回放期间发出一条新的决定请求：待办清单质检部门的凭据被上游拒绝，工具条显示这条实时事件。',
-              payload: { decision_id: 'd-todo-key', kind: 'waiting_resume' }
-            },
-            patch: []
+            label: '继续前进：返工、故障、决定请求等不同种类的刻度用不同颜色，已经播放过的刻度变淡。'
           },
           {
             delay: 1400, act: 'replay.step',
-            label: '继续前进：时间轴走到 9月29日，自动继续与其余关键事实依次出现，报告的汇总接近当前值。'
-          },
-          {
-            delay: 1400, act: 'replay.step',
-            label: '走到离开期间的最后一件关键事实：时间轴上已播放与未播放的刻度用颜色区分，画面显示该时刻的状态。'
+            label: '继续前进：地下室机房的设备与管线同样按该时刻显示，例如笔记本在 9月29日 03:10 以后离线。'
           },
           {
             delay: 1600, act: 'replay.live',
-            label: '回到现在（9月29日 15:30）：状态项、决定卡片、报告汇总与时间轴恢复当前值，新的决定请求已经出现在「待你决定」里。'
+            label: '回到现在：楼的画面恢复实时状态。看完以后点「已看过」，下次的报告从这里开始。'
           }
         ]
       }
