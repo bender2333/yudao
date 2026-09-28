@@ -120,7 +120,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 流程：
 1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，在后台运行
-   `omp -p --prewalk --mode json --auto-approve --max-time 2h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+   `omp -p --prewalk --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
 2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
    `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
 3. 收尾：

@@ -1,6 +1,7 @@
 # 浏览器与 computer use 调研
 
 日期：2026-09-28。用途：[D34 浏览器与 computer use](../requirements/browser-and-computer-use.md)的依据。用户要求参考 Codex 的做法。
+实现细节（虚拟屏幕、截图尺寸、动作集合、坐标空间）见 [computer use 实现调研](computer-use-implementations.md)。
 
 ## 1. Codex
 
