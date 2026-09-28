@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-更新：2026-09-28。状态：设计，场景与评分方法经用户确认，未实施，没有建立工单。用户把评测列为最重要的工作，实施之前由用户逐项审阅本文，审阅以后再整理成工单。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。选题依据：[评测场景选题调研](../research/evaluation-benchmarks.md)。
+更新：2026-09-28。状态：设计，场景与评分方法经用户确认，未实施，没有建立工单。用户把评测列为最重要的工作，实施之前由用户逐项审阅本文，审阅以后再整理成工单。路线位置：Stage 3 的评测工作线，与界面工作线和后端工单并行进行，Stage 3 结束之前必须完成。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。选题依据：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 
 ## 1. 用途
 
@@ -9,7 +9,7 @@
 | 用途 | 比较的对象 | 何时运行 |
 | --- | --- | --- |
 | 版本回归 | Yudao 的新版本与上一个版本 | 每个工作包验收时；平时手动运行 |
-| OpenCode 对照 | Yudao 与单独运行的 OpenCode | OpenCode 的基础分现在运行一次；Yudao 一侧在第 9 节的前提满足后运行；之后每个阶段结束时重复 |
+| OpenCode 对照 | Yudao 与单独运行的 OpenCode | OpenCode 的基础分在评测工具完成后运行一次；Yudao 一侧在第 9 节的前提满足后运行；之后每个阶段结束时重复 |
 
 后续对 Yudao 的优化以这三个场景的结果为依据。三个场景的材料对 Yudao 与 OpenCode 都隐藏，部门 Prompt、定义与工具说明中不写入任何场景专属的内容（第 8 节）。
 

@@ -27,6 +27,8 @@ flowchart LR
     DONE --> UIL["界面工作线：应用层与接口层 #70、客户端外壳 #79"]
     UIL --> R
     UIL --> PG["当前档页面 #71，删除旧 Web 控制台 #78"]
+    DONE --> EVL["评测工作线：评测工具、OpenCode 基础分（D32）"]
+    EVL --> C
     CT --> R["3.1 可靠恢复：启动时自动继续"]
     R --> ENV["3.2C 执行环境服务：本机容器、远程执行代理"]
     R --> P["3.4A 不同项目并行"]
@@ -43,13 +45,14 @@ flowchart LR
 1. **已完成的前置工作**：3.2A 本地通用工具；提示词审计补丁与请求结构（#46、#47、#101、#103、#106）；控制核心重构（[#43](https://github.com/bender2333/yudao/issues/43)，[ADR-0010](adr/0010-control-core-drives-role-steps.md)、[ADR-0011](adr/0011-async-control-core.md)）；一份事件日志（[#44](https://github.com/bender2333/yudao/issues/44)，[ADR-0013](adr/0013-event-log-and-single-write-path.md)）；带版本的定义（[#48](https://github.com/bender2333/yudao/issues/48)，[ADR-0014](adr/0014-versioned-definitions.md)）；应用层与接口层的骨架（[#72](https://github.com/bender2333/yudao/issues/72)，[应用层与接口层设计说明](design/app-and-interface.md)）。
 2. **用户决定**（[#49](https://github.com/bender2333/yudao/issues/49)）：所有等待用户的事项使用同一种机制（[总体架构](design/architecture/overall-architecture.md)第 7.4 节），第一种是模型引用无法使用时的待恢复；3.1 的核实未知动作与 Stage 4 运维清单以外的动作按同一机制加入。
 3. **调用目标每次请求解析**（[#45](https://github.com/bender2333/yudao/issues/45)）：[ADR-0005](adr/0005-resolve-call-target-per-request.md) 的部分提前到 3.1 之前；控制核心不持有明文凭据，进程重启后按当时的设置与凭据来源继续。
-4. **界面工作线**（[D30](requirements/web-game-frontend.md)、[ADR-0015](adr/0015-desktop-client-and-http-contracts.md)、[应用层与接口层设计说明](design/app-and-interface.md)）：与 #49、#45、3.1 同时进行。#70 剩下的子工单排在 3.1 之前，然后是客户端外壳（#79）与当前档页面（#71），当前档页面通过验收以后删除旧 Web 控制台（#78）。客户端有系统首页（待你决定、离开期间的报告、项目列表）与托盘提醒，连接控制主机使用访问令牌加 TLS，只在局域网内访问，连接时核对接口版本。此后 3.1、3.2C、3.8 与 Stage 4 运维各自连同界面一起验收。原型依据改为 v8（尚未制作）。
-5. **3.1 可靠恢复**：先核对执行权和未完成动作，再继续同一 run。Yudao 启动时自动继续所有中断的 run，只有结果未知的外部动作通过用户决定交给用户。恢复与 replay 分开，恢复不能重置限额或复活已取消任务。进行中的角色任务由步骤驱动从已提交的状态重新装配后继续。执行权在写入口与领域写入一起核对（[ADR-0012](adr/0012-single-control-core-scalable-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）。
-6. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供本机容器与远程执行代理两种新实现；用户在项目中登记机器。依赖 3.1 的动作核实与 #110。排在 3.2B 之前，外部内容进入模型输入之前，任意代码已经可以隔离运行。
-7. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
-8. **3.2B 网络与 MCP、3.7 扩展接口**：每个新工具单独验收。
-9. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
-10. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
+4. **界面工作线**（[D30](requirements/web-game-frontend.md)、[ADR-0015](adr/0015-desktop-client-and-http-contracts.md)、[应用层与接口层设计说明](design/app-and-interface.md)）：与 #49、#45、3.1 同时进行。#70 剩下的子工单排在 3.1 之前，然后是客户端外壳（#79）与当前档页面（#71），当前档页面通过验收以后删除旧 Web 控制台（#78）。客户端有系统首页（待你决定、离开期间的报告、项目列表）与托盘提醒，只在局域网内连接控制主机，认证与加密保留位置并标为 TODO，连接时核对接口版本。此后 3.1、3.2C、3.8 与 Stage 4 运维各自连同界面一起验收。原型依据改为 v8（尚未制作）。
+5. **评测工作线**（[D32](requirements/comparison-experiment.md)、[评测场景设计](design/evaluation-scenarios.md)）：与界面工作线和后端工单并行进行，不要求排在其他工作之前。按评测场景设计第 10 节建立场景材料、评分器与 OpenCode 运行器，运行 OpenCode 基础分；再建立 Yudao 运行器，在前提满足时运行 Yudao 一侧。设计经用户逐项审阅以后建立工单。Stage 3 结束之前必须完成，没有完成时 Stage 3 不能关闭。
+6. **3.1 可靠恢复**：先核对执行权和未完成动作，再继续同一 run。Yudao 启动时自动继续所有中断的 run，只有结果未知的外部动作通过用户决定交给用户。恢复与 replay 分开，恢复不能重置限额或复活已取消任务。进行中的角色任务由步骤驱动从已提交的状态重新装配后继续。执行权在写入口与领域写入一起核对（[ADR-0012](adr/0012-single-control-core-scalable-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）。
+7. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供本机容器与远程执行代理两种新实现；用户在项目中登记机器。依赖 3.1 的动作核实与 #110。排在 3.2B 之前，外部内容进入模型输入之前，任意代码已经可以隔离运行。
+8. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
+9. **3.2B 网络与 MCP、3.7 扩展接口**：每个新工具单独验收。
+10. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
+11. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
 
 已有 Provider 配置页复用；其他 Provider/订阅和推理设置留在 3.3，按用户明确的服务推进。
 
@@ -73,7 +76,7 @@ flowchart LR
 | 单项局部改进 | 固定重试等执行规则；尚无证据驱动的比较结论 | 针对已观察问题比较固定策略与一项有界调整，质量不降并报告额外成本 |
 | 项目记忆 | 项目上下文文本随采纳增长，只携带最近一次采纳成果的产品合同 | 由 Stage 5 语义系统承担：项目内的轨迹与图谱跨事项延续，替代长期记忆 |
 | 跨任务经验 | 候选仅保存，不自动注入 | 随 Stage 6 进行：候选、独立验证、适用检索、限定采用、冲突处理、反例与停用贯通 |
-| 综合比较 | D32 与单个 agent 的对照实验：OpenCode 基础分现在运行，3.9 与之后每个阶段结束时重复 | 在未见任务上比较固定基线、仅控制、仅经验、组合方案 |
+| 综合比较 | D32 与单个 agent 的对照实验：Stage 3 的评测工作线完成评测工具与 OpenCode 基础分，3.9 与之后每个阶段结束时重复 | 在未见任务上比较固定基线、仅控制、仅经验、组合方案 |
 
 语义与关系查询服务于具体问题：“这条经验由哪些经历支持”“要求变化后哪些经验需要重验”。已有存储能满足时不新增图数据库或向量库。相似文本不能直接证明同一问题或同一根因。项目内的轨迹与图谱由 Stage 5 语义系统维护，作为事件的投影存放在现有 SQLite 中，查询只用结构条件与全文检索，不使用向量检索（[D25](requirements/semantic-system.md)）。
 
