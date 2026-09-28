@@ -262,7 +262,7 @@ Y8.backend.command('work_item.reorder', (params, db) => ({ reject: { reason, mes
 1. 任何对象都可以带 `level` 与 `until`：档位不在范围内时，解析后的数据中没有这个对象。事件同样带 `level`、`until`，档位不在范围内的事件不参与折叠，也不出现在事件流与报告中。
 2. 任何对象都可以带 `born_at`（ISO 时间）：按位置读取时，`born_at` 晚于该位置时间的对象不出现。窗口内新建的项目、事项、run、询问、决定请求、故障记录都要写 `born_at`，并由一条事件在同一时间表示它的出现（例如 `work_item_created`、`x_decision_issued`）。
 3. 事件的补丁只修改状态字段：事项的 `status`、`queue_pos`；run 的 `phase`、`department`、`last_department`、`cycle`、`elapsed_sec`、`stop_reason`、`recovery.state` 等；项目的 `adoption`、`last_activity_at`；询问的 `status`；决定请求的 `status` 与 `answer`；机器的 `online`、`last_heartbeat_at`、`actions`；执行槽位与队列；运维状态。调用尝试、动作、消息、上下文、资料等详细记录直接写在初始数据中（写最终的内容），事件不追加它们。
-4. 补丁的形式：`{ path, value }` 修改字段；`{ path, push }` 追加到数组；`{ path, remove: { key, value } }` 从数组删除。`path` 用点号分隔，按 `id` 找数组中的对象写作 `runs[id=r-metro-2].recovery.state`，其他键名写作 `work_items[id=w-1].status`、`project_settings.p-todo.version`。路径不存在时抛出错误。
+4. 补丁的形式：`{ path, value }` 修改字段；`{ path, push }` 追加到数组；`{ path, remove: { key, value } }` 从数组删除；`{ path, put: { key, value } }` 向对象增加一个键（例如新建项目时向 `project_settings` 增加该项目）。`path` 用点号分隔，按 `id` 找数组中的对象写作 `runs[id=r-metro-2].recovery.state`，其他键名写作 `work_items[id=w-1].status`、`project_settings.p-todo.version`。路径不存在时抛出错误。
 5. 每个对象的 `version` 在补丁修改它时由后端自动加一，作为命令的基准版本。
 
 启动时 `Y8.backend.validate()` 检查：标识唯一；引用的项目、事项、run、机器、决定请求存在；决定种类、事件种类在登记表中；每条事件的补丁都能应用；`born_at` 的对象都有对应的出现事件。检查不通过时抛出错误。

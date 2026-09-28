@@ -89,7 +89,7 @@
     const runs = db.workItemsOf(projectId).map((item) => (item.run_id ? db.run(item.run_id) : null)).filter(Boolean);
     const openRequests = [];
     runs.forEach((run) => (run.requests || []).forEach((r) => {
-      if (r.status === 'open') openRequests.push({ from: r.from, to: r.to, work_item_id: run.work_item_id, request_id: r.id });
+      if (r.status === 'open') openRequests.push({ from: r.from, to: r.to, work_item_id: run.work_item_id, request_id: r.id, since: r.born_at || null, question: r.question || null });
     }));
     const project = db.project(projectId);
     const out = {
