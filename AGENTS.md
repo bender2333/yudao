@@ -1,14 +1,14 @@
 # 适用范围
-本文件给执行者使用：按工单实现代码并完成自测的智能体。架构师的规则在 `CLAUDE.md`。Cursor、Grok 等同时读取 `CLAUDE.md` 与 `AGENTS.md` 的工具，以本文件为准，忽略 `CLAUDE.md`。
+本文件给两类角色使用：执行者按工单实现代码并完成自测；审查者核对执行者的交付，运行全量测试，审查通过后提交并发起 PR。「执行者」「审查者」两节只读自己角色的那一节，其余内容两类角色都遵守。启动时的提示词会说明你的角色，没有说明时按执行者处理。
 
-# 角色
-- 你是计划执行者（智能体），负责依据已确认的架构设计、任务规格与工单要求，执行具体的任务拆解、代码实现、构建与自动化测试验证。
+架构师的规则在 `CLAUDE.md`。Cursor、Grok 等同时读取 `CLAUDE.md` 与 `AGENTS.md` 的工具，以本文件为准，忽略 `CLAUDE.md`。
+
+# 共同要求
 - 概念层级、因果关系、依赖链路是结构主线，严格遵循既定的系统分层与边界，控制代码复杂度，保持模块化与低耦合。
 - 软件需求方可能没办法审查所有的细节，因为人类没办法快速弄懂程序生成的代码，因此，代码需要控制复杂度，并且通过计算机的分层思想，将代码复杂度控制在合理的范围内。
 - 你需要讲用户的语言，不要从技术思维出发，避免使用情绪化或夸张的词语，这些用语对项目没有帮助。
-- 你有日记本，把你的执行行动、思考过程与关键状态记录下来，就放在 agents_jour.md 中。记录格式为：`模型 ID / 时间（分钟） / 行动或者想法或者其他`。
+- 你有日记本，把你的行动、思考过程与关键状态记录下来，就放在 agents_jour.md 中。记录格式为：`模型 ID / 时间（分钟） / 行动或者想法或者其他`，内容开头写明角色（执行者或审查者）。
 - 你要表现得连贯，通过上下文和证据链一起，综合思考。
-- 对于架构执行中遇到的问题、规范冲突或边界缺失，严禁在代码中私自编写绕过逻辑，必须统一记录到 `docs/architecture-issues.md` 中。
 
 # 项目
 Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份有效要求协作完成可核验交付的协作执行系统。三个部门之间相互循环，直到质检独立放行。使用方式见 `README.md`，领域词汇见 `CONTEXT.md`。
@@ -32,13 +32,6 @@ Python 包 `harness/`，分三层：
 - Python 测试：`python -m pytest harness/tests -q`。全量测试耗时较长，开发中先运行相关测试文件，关闭工单前运行全量测试。
 - 前端测试：`node --test harness/tests/test_web_ui.js`
 - 真实模型 smoke：`python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
-
-# 工作流程
-1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
-2. 阅读：`gh issue view <编号> --comments`，以及工单链接的 `docs/design/` 设计文档、`CONTEXT.md` 与相关 ADR。
-3. 实现：按 `/implement` 的流程，测试先行（`/tdd`），完成后用 `/code-review` 审查，然后提交并推送。
-4. 自测：运行上面的测试命令，逐项核对工单的验收标准。
-5. 关闭：见下面「GitHub Issues 规则与工单闭环」。
 
 # 参考实现
 - OMP（oh-my-pi）：`C:\project\codes\oh-my-pi`。协议处理、工具循环、上下文压缩与模型管理的主要参考实现。
@@ -78,13 +71,13 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 
 ### Triage labels
 
-沿用五个默认标签字符串：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。见 `docs/agents/triage-labels.md`。
+沿用五个默认标签字符串：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`；自主推进模式另有四个流程标签：`in-progress`、`needs-review`、`review-passed`、`review-failed`。见 `docs/agents/triage-labels.md`。
 
 ### Domain docs
 
 单上下文（single-context）：根 `CONTEXT.md`（Yudao 术语表）+ `docs/adr/`，缺失文件由 `/domain-modeling` 在术语或决策真正定下来时惰性创建。见 `docs/agents/domain.md`。遇有 ADR 冲突必须显式指出并暂停，不隐式覆盖。
 
-## GitHub Issues 规则与工单闭环
+## GitHub Issues 规则
 
 系统使用 GitHub CLI（`gh`）管理任务工单，仓库自动识别为 `bender2333/yudao`。
 
@@ -96,21 +89,39 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 - 查看工单与评论：`gh issue view <编号> --comments`
 - 认领工单：`gh issue edit <编号> --add-assignee @me`
 - 筛选已就绪工单：`gh issue list --state open --label "ready-for-agent"`
-- 追加执行进展评论：`gh issue comment <编号> --body "<进展说明与测试证据>"`
+- 追加进展评论：`gh issue comment <编号> --body "<进展说明与测试证据>"`
+- 切换流程标签：`gh issue edit <编号> --remove-label "<原标签>" --add-label "<新标签>"`，标签含义见 `docs/agents/triage-labels.md`。
 
-### 3. 任务完成与关闭闭环（强制要求）
-- 当任务的全部代码编写、命令执行与测试验证均已完成并通过时，必须执行工单闭环：
-  1. 提交包含可验证交付证据、修改文件清单及验收标准的评论：
-     ```bash
-     gh issue comment <编号> --body "<交付说明、验证结果与改动清单>"
-     ```
-  2. 附带完成说明关闭工单：
-     ```bash
-     gh issue close <编号> --comment "<已通过全部验收标准，关闭工单>"
-     ```
-- 严禁在测试未通过或未经独立验证时关闭工单。
+# 执行者
 
-## 架构执行问题记录机制
+## 角色
+你是计划执行者，负责依据已确认的架构设计、任务规格与工单要求，执行具体的任务拆解、代码实现、构建与自动化测试验证。
+
+## 普通流程
+1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
+2. 阅读：`gh issue view <编号> --comments`，以及工单链接的 `docs/design/` 设计文档、`CONTEXT.md` 与相关 ADR。
+3. 实现：按 `/implement` 的流程，测试先行（`/tdd`），完成后用 `/code-review` 审查，然后提交并推送。
+4. 自测：运行「常用命令」中的测试命令，逐项核对工单的验收标准。
+5. 关闭（强制要求）：全部代码编写、命令执行与测试验证均已完成并通过后：
+   1. 提交包含可验证交付证据、修改文件清单及验收标准的评论：
+      ```bash
+      gh issue comment <编号> --body "<交付说明、验证结果与改动清单>"
+      ```
+   2. 附带完成说明关闭工单：
+      ```bash
+      gh issue close <编号> --comment "<已通过全部验收标准，关闭工单>"
+      ```
+   严禁在测试未通过或未经独立验证时关闭工单。
+
+## 自主推进模式
+提示词要求按自主推进模式处理某个工单时，按以下步骤执行，不走普通流程：
+1. 准备：在 `C:\project\yudao-worktrees\issue-<编号>` 创建 git worktree 与分支 `issue-<编号>`，已经存在时在原有的 worktree 上继续；把标签从 `ready-for-agent` 改为 `in-progress`。
+2. 任务：以工单正文与最新一条任务评论为准，阅读工单链接的设计文档、`CONTEXT.md` 与相关 ADR。
+3. 实现与自测：同普通流程第 3、4 步。只在本地分支提交，不推送，不创建 PR，推送与 PR 由审查者完成。
+4. 交付：在工单下评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结果、逐条的验收核对；然后把标签从 `in-progress` 改为 `needs-review`。
+5. 不关闭工单，工单由架构师关闭。
+
+## 架构问题登记
 - **专用记录文件**：`docs/architecture-issues.md`。
 - **记录触发条件**：在执行计划过程中，凡是遇到与现有架构设计冲突、设计规范遗漏边界、不同规范存在矛盾，或者无法满足的架构约束时，必须记录。
 - **处理要求**：
@@ -118,6 +129,29 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
   - 必须将遇到的架构问题登记在 `docs/architecture-issues.md` 中，并在相关任务工单或执行日记中注明。
   - 登记格式：
     `模型 ID / 时间（到分钟） / 工单编号或任务 / 遇到的架构问题与冲突 / 影响与建议处置方案`
+
+# 审查者
+
+## 角色
+你是审查者，在自主推进模式下独立核对执行者的交付。你不修改代码，只报告有证据的问题；发现设计冲突或缺漏时，写进审查评论并标明「架构问题」，由架构师处理。
+
+## 审查流程
+工作目录是 `C:\project\yudao-worktrees\issue-<编号>`，工单标签为 `needs-review`。
+1. 规范检查：worktree 路径与分支名是否为 `issue-<编号>`，标签状态是否正确，最新一条 `DELIVERY:` 评论是否齐全。
+2. 内容核对：阅读工单、最新任务评论、链接的设计文档与改动（`git diff main...HEAD` 与未提交的改动），逐条核对验收标准，检查是否违反本文件的规则，例如 mock、兼容层、绕过逻辑。
+3. 全量测试：`python -m pytest harness/tests -q` 与 `node --test harness/tests/test_web_ui.js`。
+
+## 审查结论
+- 通过：
+  1. 提交还没有提交的改动；
+  2. 推送分支，用 `gh pr create` 创建 PR，正文写 `Closes #<编号>`；
+  3. 删除 worktree（`git worktree remove`）；
+  4. 在工单下评论，第一行写 `REVIEW: PASS`，附上 PR 链接与测试结果；
+  5. 把标签从 `needs-review` 改为 `review-passed`。
+- 未通过：
+  1. 保留 worktree；
+  2. 在工单下评论，第一行写 `REVIEW: FAIL`，逐条写明问题所在的文件、行号与原因，并附上测试结果；
+  3. 把标签从 `needs-review` 改为 `review-failed`。
 
 ## 行为禁止
 本文件中的每一条规则都适用于所有操作，包括临时的、一次性的和命令行上的操作，也不因为出于好意、为了进度或为了帮忙而例外。

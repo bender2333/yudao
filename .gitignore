@@ -38,4 +38,5 @@ ref/
 
 .omo/
 .agents/
-.opencode/
+.opencode/*
+!.opencode/agent/

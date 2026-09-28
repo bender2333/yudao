@@ -113,6 +113,23 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 架构问题：执行者把执行中遇到的设计冲突与缺漏登记在 `docs/architecture-issues.md`。架构师每次会话开始时查看其中未处理的条目，处理结论写入对应设计文档或 ADR，并在该条下追加一行 `处理：<结论与文档位置>`。
 
+## 自主推进模式
+只有用户明确说“自主推进”并指定范围（一个父工单、一组子工单或一个阶段）时进入这个模式，其余时候按「工作流程」执行。在范围之内，Claude 自行拆分工单、创建 issue、派发任务、转交审查、合并 PR、关闭工单，并在搁置卡住的工单后推进下一个，不逐项询问用户。修改规则文件与已有设计文档仍然先经用户确认。
+
+分工：Claude 建立工单并推进流程，omp 担任执行者，OpenCode 担任审查者。三方通过 issue 评论、标签与 PR 交换信息，执行者与审查者的规则都在 `AGENTS.md`。
+
+流程：
+1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，在后台运行
+   `omp -p --mode json --auto-approve --max-time 2h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
+   `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
+3. 收尾：
+   - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
+   - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
+4. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
+
+命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。
+
 ## 工单规范
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。
 - 标题格式：`[阶段或工作包] 动作与交付目标`，例如 `[3.1] 恢复入口与执行权限`。
@@ -179,7 +196,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 
 ### Triage labels
 
-沿用五个默认标签字符串：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。见 `docs/agents/triage-labels.md`。
+沿用五个默认标签字符串：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`；自主推进模式另有四个流程标签：`in-progress`、`needs-review`、`review-passed`、`review-failed`。见 `docs/agents/triage-labels.md`。
 
 ### Domain docs
 
