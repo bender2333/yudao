@@ -797,7 +797,7 @@ def test_null_terminal_output_is_explicit_error_and_preserves_usage(status):
 
 @pytest.mark.parametrize("status,code,reason", [
     (400, "context_length_exceeded", "context_overflow"),
-    (401, "invalid_api_key", "provider_error"),
+    (401, "invalid_api_key", "provider_unavailable"),
     (429, "rate_limit_exceeded", "provider_error"),
     (500, "server_error", "provider_error"),
 ])

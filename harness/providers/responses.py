@@ -304,14 +304,15 @@ async def invoke_responses(
                             diagnostics=_transport_diagnostics("timeout", exc)) from exc
     except APIStatusError as exc:
         code = _error_code(exc.body)
-        reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+        status_reason = _http_status_reason(exc.status_code)
+        reason = status_reason or ("context_overflow" if _is_context_overflow(code) else "provider_error")
         diagnostics = _http_status_diagnostics(exc, _request_observation_id(invocation), secrets=(config.api_key,))
         retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
         if retry_after is not None:
             diagnostics["retry_after_sec"] = retry_after
         raise ProviderError(
             f"Model provider returned HTTP {exc.status_code}", reason=reason,
-            retryable=_retryable_http_status(exc.status_code, code),
+            retryable=False if status_reason is not None else _retryable_http_status(exc.status_code, code),
             diagnostics=diagnostics,
         ) from exc
     except APIConnectionError as exc:
@@ -774,6 +775,17 @@ def _request_body(http_request: httpx.Request) -> dict[str, Any]:
     if not isinstance(body, dict):
         raise ProviderError("Model request body was not a JSON object", reason="provider_protocol")
     return body
+
+
+# HTTP 401、403 是上游拒绝凭据：状态本身就是凭据拒绝事实，错误体不可信，不参与分类；不可重试
+_CREDENTIAL_REJECTED_STATUSES = frozenset({401, 403})
+
+
+def _http_status_reason(status: int) -> str | None:
+    # 上游拒绝凭据时返回 provider_unavailable；其他状态返回空，由调用方按错误体分类
+    if status in _CREDENTIAL_REJECTED_STATUSES:
+        return "provider_unavailable"
+    return None
 
 
 def _retryable_status(status: int) -> bool:

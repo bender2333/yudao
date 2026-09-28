@@ -31,6 +31,7 @@ from .responses import (
     _created_stream,
     _diagnostic_code,
     _error_code,
+    _http_status_reason,
     _is_context_overflow,
     _provider_events,
     _retry_after,
@@ -76,7 +77,8 @@ async def invoke_chat(
                             diagnostics=_transport_diagnostics("timeout", exc)) from exc
     except APIStatusError as exc:
         code = _error_code(exc.body)
-        reason = "context_overflow" if _is_context_overflow(code) else "provider_error"
+        status_reason = _http_status_reason(exc.status_code)
+        reason = status_reason or ("context_overflow" if _is_context_overflow(code) else "provider_error")
         diagnostics = {
             "status_code": exc.status_code,
             "request_observation_id": _observation_id(invocation),
@@ -88,7 +90,7 @@ async def invoke_chat(
             diagnostics["retry_after_sec"] = retry_after
         raise ProviderError(
             f"Model provider returned HTTP {exc.status_code}", reason=reason,
-            retryable=_retryable_http_status(exc.status_code, code),
+            retryable=False if status_reason is not None else _retryable_http_status(exc.status_code, code),
             diagnostics=diagnostics,
         ) from exc
     except APIConnectionError as exc:

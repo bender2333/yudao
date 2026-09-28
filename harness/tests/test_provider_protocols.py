@@ -580,3 +580,36 @@ def test_partial_stream_is_retryable():
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+@pytest.mark.parametrize("status", [401, 403])
+def test_credential_rejection_is_unavailable_and_never_retried(protocol, status):
+    # 上游拒绝凭据（HTTP 401、403）：状态本身就是凭据拒绝事实，错误体不可信只做诊断；
+    # 记为不可重试的 provider_unavailable，上游修复凭据后由待恢复继续
+    secret = "credential-that-provider-echoed"
+
+    def rejected(_provider: ScriptedProvider, handler) -> None:
+        body = json.dumps({"error": {"code": "server_error", "type": "server_error",
+                                     "message": secret, "param": "store"}})
+        send_reply(handler, status, "application/json", body.encode("utf-8"))
+
+    provider = ScriptedProvider([rejected])
+    key = "local-secret"
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        target = bound_target(facade)
+        key = target.api_key
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, target, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    error = caught.value
+    assert error.reason == "provider_unavailable"
+    assert error.retryable is False
+    assert f"HTTP {status}" in str(error)
+    assert secret not in str(error) and secret not in json.dumps(error.diagnostics, ensure_ascii=False)
+    assert key not in str(error) and key not in json.dumps(error.diagnostics, ensure_ascii=False)
+    assert error.diagnostics["status_code"] == status
+    assert error.diagnostics["request_observation_id"] == "a"
+    assert len(provider.requests) == 1
