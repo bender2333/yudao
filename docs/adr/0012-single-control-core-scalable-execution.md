@@ -1,6 +1,6 @@
 # 控制核心逻辑上只有一份并持有执行权，执行层与观察者可以扩展
 
-Status: 「为可用性做主备」「Stage 6 为执行权加入期限与续期」「需要时按项目把 run 分给多个控制核心实例」「服务端数据库的选择在 Stage 6 按故障场景与总成本比较」由 [ADR-0018](0018-single-control-host-remote-execution.md) 取代：控制核心、事件日志、工件存储、Provider 模块与观察者在一台控制主机上运行，事件日志使用 SQLite，执行权没有期限与续期；「后果」中路线图 Stage 6 与 D29 的理解改为 3.2C 执行环境服务把执行环境分布到登记的机器上。其余决定继续有效。
+Status: 「为可用性做主备」「Stage 6 为执行权加入期限与续期」「服务端数据库的选择在 Stage 6 按故障场景与总成本比较」由 [ADR-0018](0018-single-control-host-remote-execution.md) 取代：控制核心、事件日志、工件存储、Provider 模块与观察者在一台控制主机上运行，事件日志使用 SQLite，执行权没有期限与续期；「需要时按项目把 run 分给多个控制核心实例」作为扩展途径保留，触发条件见 ADR-0018；「后果」中路线图 Stage 6 与 D29 的理解改为 3.2C 执行环境服务把执行环境分布到登记的机器上。其余决定继续有效。
 
 路线图与 [D29](../requirements/remote-execution.md) 设想把部门或角色做成独立服务、以集群方式部署；[ADR-0010](0010-control-core-drives-role-steps.md) 规定每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动。两者需要统一部署单位，并定义 [ADR-0007](0007-boundaries-for-distributed-deployment.md) 第 3 条中持有执行权的「执行者」。决定：
 
