@@ -120,7 +120,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 流程：
 1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，在后台运行
-   `omp -p --mode json --auto-approve --max-time 2h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+   `omp -p --prewalk --mode json --auto-approve --max-time 2h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
 2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
    `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
 3. 收尾：
@@ -128,7 +128,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
 4. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
 
-命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。
+命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。omp 使用 prewalk：用默认模型阅读与规划，写下 todo 列表后第一次修改文件时切换到 smol 模型；omp 的错误输出出现 `prewalk disabled` 时，说明 smol 模型无法使用，本轮按异常结束处理。
 
 ## 工单规范
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。
