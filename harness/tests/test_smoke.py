@@ -1,4 +1,3 @@
-import copy
 import json
 from dataclasses import asdict, replace
 
@@ -13,6 +12,8 @@ from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run
 from harness.tests.helpers import recorded_context, run_scripted
+from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
+                                         rewrite_saved_projection)
 
 
 def test_smoke_requires_current_input_audit_and_host_receipts():
@@ -101,9 +102,10 @@ def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
 
 
-def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(native_run, monkeypatch):
+def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(native_run):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    assert summarize_run(system, run_id, scenario="happy")["git_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     event = next(item for item in reversed(events) if item.type == EventType.QA_SUBMITTED)
     original = event.payload["git_version"]
     accepted_files = system.git_versions.read_files(run_id, original)
@@ -114,16 +116,18 @@ def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(na
     )
     system.git_versions.verify(run_id, wrong)
     event.payload["git_version"] = wrong
+    rewrite_saved_event(system.store, event)
     assert summarize_run(system, run_id, scenario="happy")["git_audit"]["status"] == "unverified"
 
 
 @pytest.mark.parametrize("changed", ["effective_contract", "engineering_plan"])
-def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and_tree(native_run, monkeypatch, changed):
+def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and_tree(native_run, changed):
     system, run_id = native_run
+    assert summarize_run(system, run_id, scenario="happy")["check_receipts_verified"] is True
     projection = system.project(run_id)
     changed_item = replace(getattr(projection, changed), content_hash=canonical_hash("new accepted content"))
     changed_projection = replace(projection, **{changed: changed_item})
-    monkeypatch.setattr(system, "project", lambda _run_id: changed_projection)
+    rewrite_saved_projection(system.store, run_id, changed_projection)
     summary = summarize_run(system, run_id, scenario="happy")
     assert summary["check_receipts"]
     assert summary["check_receipts_verified"] is False
@@ -156,11 +160,12 @@ def test_archive_audit_rejects_missing_or_modified_persisted_bytes(native_run, d
     assert result["notes"]
 
 
-def test_archive_audit_rejects_unrelated_delivery_digest(native_run, monkeypatch):
+def test_archive_audit_rejects_unrelated_delivery_digest(native_run):
     system, run_id = native_run
+    assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "verified"
     projection = system.project(run_id)
     delivery = replace(projection.delivery_spec, code_tree_digest=canonical_hash("unrelated tree"))
-    monkeypatch.setattr(system, "project", lambda _run_id: replace(projection, delivery_spec=delivery))
+    rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
     assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "unverified"
 
 
@@ -195,22 +200,26 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_ru
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED,
                                       EventType.MODEL_MESSAGE, EventType.TOOL_CALLED])
-def test_model_input_audit_rejects_forged_adopted_versions(native_run, monkeypatch, field, event_type):
+def test_model_input_audit_rejects_forged_adopted_versions(native_run, field, event_type):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == event_type and item.payload.get("activation_id"))
     event.payload[field] = "forged-prompt" if field == "prompt_hash" else 999
+    rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified", audit
     assert any(field in note for note in audit["notes"])
 
 
 @pytest.mark.parametrize("field", ["text", "byte_start", "byte_end"])
-def test_model_input_audit_rejects_changed_received_original(collaboration_run, monkeypatch, field):
+def test_model_input_audit_rejects_changed_received_original(collaboration_run, field):
     system, run_id = collaboration_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.USER_INPUT_RECEIVED)
     event.payload[field] = "rewritten original" if field == "text" else 999
+    rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified", audit
     assert any("input bytes or range" in note for note in audit["notes"])
@@ -240,14 +249,14 @@ def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
     assert audit["status"] == "verified", audit
 
 
-def test_collaboration_audit_rejects_results_from_another_request(collaboration_run, monkeypatch):
+def test_collaboration_audit_rejects_results_from_another_request(collaboration_run):
     system, run_id = collaboration_run
+    assert summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]["status"] == "verified"
     projection = system.project(run_id)
     result_id = projection.responses[1].result_event_ids[0]
-    events = copy.deepcopy(system.store.list_events(run_id))
-    next(event for event in events if event.event_id == result_id).payload["request_id"] = "unrelated-request"
-    monkeypatch.setattr(system, "project", lambda _run_id: projection)
-    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
+    result = next(item for item in _saved_events(system, run_id) if item.event_id == result_id)
+    result.payload["request_id"] = "unrelated-request"
+    rewrite_saved_event(system.store, result)
     audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
     assert audit["status"] == "unverified"
     assert audit["requirements_action"] is False
@@ -256,21 +265,24 @@ def test_collaboration_audit_rejects_results_from_another_request(collaboration_
 
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED])
 @pytest.mark.parametrize("field", ["request_id", "effective_contract_hash", "engineering_plan_hash", "all"])
-def test_model_input_audit_rejects_changed_work_basis(collaboration_run, monkeypatch, event_type, field):
+def test_model_input_audit_rejects_changed_work_basis(collaboration_run, event_type, field):
     system, run_id = collaboration_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == event_type and item.payload.get("request_id"))
     fields = ["request_id", "effective_contract_hash", "engineering_plan_hash"] if field == "all" else [field]
     for name in fields:
         event.payload[name] = "wrong-" + name
+    rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any(any(name in note for name in fields) for note in audit["notes"])
 
 
-def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(collaboration_run, monkeypatch):
+def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(collaboration_run):
     system, run_id = collaboration_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = [item for item in events if item.type == EventType.CONTEXT_ASSEMBLED and item.role == "quality"][-1]
     request = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
     request["input"][0]["content"] += "\n\n[private_engineering_transcript]\nUNRELATED_PRIVATE_HISTORY_CANARY"
@@ -282,16 +294,19 @@ def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(coll
                      and item.payload["activation_id"] == event.payload["activation_id"]
                      and item.payload["step_id"] == event.payload["step_id"])
     attempted.context_digest = event.context_digest
+    rewrite_saved_events(system.store, [event, attempted])
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any("pinned developer input differs" in note for note in audit["notes"])
 
 
-def test_model_input_audit_rejects_forged_injected_source_metadata(native_run, monkeypatch):
+def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
     event.payload["injected"][0]["digest"] = canonical_hash("different source")
+    rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any("injected source metadata" in note for note in audit["notes"])
@@ -321,10 +336,9 @@ def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
     assert fields["context_isolated"] is False
 
 
-def _events_for_mutation(system, run_id, monkeypatch):
-    events = copy.deepcopy(system.store.list_events(run_id))
-    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
-    return events
+def _saved_events(system, run_id):
+    # 审计读到的必须是事件库中保存的事件；测试改动以后写回事件行，再经公开接口运行审计
+    return system.store.list_events(run_id)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -332,11 +346,13 @@ def _events_for_mutation(system, run_id, monkeypatch):
     ("session_id", "foreign-session"), ("department", "quality"),
     ("step_id", 100), ("digest", "sha256:wrong"),
 ])
-def test_unbound_or_missing_request_cannot_certify_run(native_run, monkeypatch, field, value):
+def test_unbound_or_missing_request_cannot_certify_run(native_run, field, value):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
     event.payload[field] = value
+    rewrite_saved_event(system.store, event)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert fields["model_input_audit"]["status"] == "unverified"
@@ -346,9 +362,10 @@ def test_unbound_or_missing_request_cannot_certify_run(native_run, monkeypatch, 
     ("foreign_history", "department's recorded outputs"), ("extra_tool", "actual tool schemas"),
     ("hidden_instructions", "unexpected model input fields"), ("changed_intend", "verbatim task"),
 ])
-def test_actual_inputs_are_checked_even_when_artifact_hash_is_valid(native_run, monkeypatch, mutation, expected):
+def test_actual_inputs_are_checked_even_when_artifact_hash_is_valid(native_run, mutation, expected):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.CONTEXT_ASSEMBLED)
     request = json.loads(system.artifacts.get_text(event.payload["request_ref"]["content_hash"]))
     if mutation == "foreign_history":
@@ -366,29 +383,36 @@ def test_actual_inputs_are_checked_even_when_artifact_hash_is_valid(native_run, 
     event.artifact_hashes = [ref.content_hash]
     attempted = next(item for item in events if item.type == EventType.MODEL_REQUESTED)
     attempted.context_digest = canonical_hash(request)
+    rewrite_saved_events(system.store, [event, attempted])
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any(expected in note for note in fields["model_input_audit"]["notes"])
 
 
-def test_tool_history_must_match_recorded_result(native_run, monkeypatch):
+def test_tool_history_must_match_recorded_result(native_run):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.TOOL_CALLED and item.payload.get("input_item"))
     event.payload["input_item"]["output"] = json_dumps({"ok": True, "output": "unrecorded", "error": None})
+    rewrite_saved_event(system.store, event)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any("recorded result" in note for note in fields["model_input_audit"]["notes"])
 
 
-def test_consistently_relabelled_steps_must_still_match_activation_event(native_run, monkeypatch):
+def test_consistently_relabelled_steps_must_still_match_activation_event(native_run):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED)
     identity = activated.payload["activation_id"]
+    relabelled = []
     for event in events:
         if event.type != EventType.DEPARTMENT_ACTIVATED and event.payload.get("activation_id") == identity:
             event.payload["activation_id"] = "unrelated-activation"
+            relabelled.append(event)
+    rewrite_saved_events(system.store, relabelled)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any("department activation" in note for note in fields["model_input_audit"]["notes"])
@@ -416,12 +440,13 @@ def test_audit_preserves_department_history_when_request_returns_to_product(data
     assert fields["model_input_audit"]["activation_count"] == 6
 
 
-def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir, monkeypatch):
+def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir):
     system, projection = run_scripted(data_dir, [
         product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
         plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
     ])
-    events = _events_for_mutation(system, projection.run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, projection.run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, projection.run_id)
     assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.role == "product"][1]
     request = json.loads(system.artifacts.get_text(assembled.payload["request_ref"]["content_hash"]))
     assert request["input"][-1]["role"] == "user"
@@ -435,6 +460,7 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_
                      and event.payload["activation_id"] == assembled.payload["activation_id"]
                      and event.payload["step_id"] == assembled.payload["step_id"])
     attempted.context_digest = canonical_hash(request)
+    rewrite_saved_events(system.store, [assembled, attempted])
     fields = isolation_fields(system.store, system.artifacts, projection.run_id)
     assert fields["context_isolated"] is False
     assert any("department's recorded outputs" in note for note in fields["model_input_audit"]["notes"])
@@ -462,10 +488,12 @@ def test_compaction_audit_checks_partial_sources_and_resumed_input(compacted_run
     ("source_ref", "recorded compaction plan"), ("coverage", "checkpoint coverage"),
     ("summary", "bounded model output"), ("work_input", "department's recorded outputs"),
 ])
-def test_compaction_audit_rejects_invented_sources_summary_or_visible_history(compacted_run, monkeypatch, mutation, expected):
+def test_compaction_audit_rejects_invented_sources_summary_or_visible_history(compacted_run, mutation, expected):
     system, run_id = compacted_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     compacted = next(event for event in events if event.type == EventType.COMPACTION_RECORDED)
+    mutated = [compacted]
     if mutation == "source_ref":
         compacted.payload["source_refs"][0]["event_id"] = "another-department-event"
     elif mutation == "coverage":
@@ -488,16 +516,19 @@ def test_compaction_audit_rejects_invented_sources_summary_or_visible_history(co
                          and event.payload["activation_id"] == assembled.payload["activation_id"]
                          and event.payload["step_id"] == assembled.payload["step_id"])
         attempted.context_digest = canonical_hash(request)
+        mutated.extend([assembled, attempted])
+    rewrite_saved_events(system.store, mutated)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any(expected in note for note in fields["model_input_audit"]["notes"])
 
 
-def test_unmatched_host_receipt_does_not_pass(native_run, monkeypatch):
+def test_unmatched_host_receipt_does_not_pass(native_run):
     system, run_id = native_run
-    events = _events_for_mutation(system, run_id, monkeypatch)
-    events[:] = [event for event in events
-                 if not (event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_check")]
+    assert summarize_run(system, run_id, scenario="happy")["check_receipts_verified"] is True
+    events = _saved_events(system, run_id)
+    delete_saved_events(system.store, [event.event_id for event in events
+                                       if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_check"])
     summary = summarize_run(system, run_id, scenario="happy")
     assert summary["check_receipts_verified"] is False
     assert any("no matching host execution" in note for note in summary["check_receipt_notes"])
