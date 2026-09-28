@@ -70,14 +70,15 @@ def _answer(client, command_id: str, **body):
     return client.post("/api/commands/decision.answer", json={"command_id": command_id, **body})
 
 
-def _wait_for_termination(system: LoopSystem, run_id: str, timeout_sec: float = 30.0):
+def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = 30.0):
+    # 回答以后 run 由服务的事件循环中的任务继续运行：等到任务结束并且 run 到了终态，再核对它的投影
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
         projection = system.project(run_id)
-        if projection.phase in TERMINAL_PHASES:
+        if projection.phase in TERMINAL_PHASES and system.orchestrator.execution(run_id) is None:
             return projection
         time.sleep(0.02)
-    raise AssertionError(f"run {run_id} did not reach a terminal phase within {timeout_sec}s")
+    raise AssertionError(f"run {run_id} was not finished by its task within {timeout_sec}s")
 
 
 def _delete_saved_projections(data_dir):
@@ -140,7 +141,7 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
             "command_id": command_id, "position": accepted.json()["position"], "duplicate": False,
             "refs": {"decision_id": decision["decision_id"], "run_id": run_id}}
 
-        finished = _wait_for_termination(system, run_id)
+        finished = _wait_for_completion(system, run_id)
         assert finished.phase == "DONE"
         assert [call.department for call in service.adapters[0].invocations] == [
             "product", "engineering", "engineering", "engineering", "quality"]
@@ -232,9 +233,11 @@ def test_a_repeated_command_identity_applies_once_and_every_rejection_explains_i
         assert len(answers) == 1 and answers[0].command_id == command_id
         assert system.project(run_id).stop_reason == "cancelled"
 
-        # 同一身份、内容不同：拒绝命令身份重复使用
+        # 同一身份、内容不同：拒绝命令身份重复使用；内容指向不存在的请求时同样如此，与请求是否存在无关
         reused = _answer(client, command_id, decision_id=decision_id, option="continue", base_version=1)
         assert reused.status_code == 409 and reused.json()["reason"] == "command_id_reused"
+        reused_missing = _answer(client, command_id, decision_id="evt_missing", option="continue", base_version=1)
+        assert reused_missing.status_code == 409 and reused_missing.json()["reason"] == "command_id_reused"
 
         # 请求已回答：再次回答被拒绝，什么也不写
         end = system.store.end_position()
@@ -246,6 +249,30 @@ def test_a_repeated_command_identity_applies_once_and_every_rejection_explains_i
                     if event.type == EventType.DECISION_ANSWERED]) == 1
 
 
+def test_a_withdrawn_request_is_still_unanswered_and_cannot_be_answered(data_dir):
+    # 运行结束时撤销的请求没有回答：是否已回答为 false 时列出、为 true 时不列出，再次回答被拒绝
+    service = _Service(data_dir, [_unavailable_script()])
+    with running_api(service) as client:
+        project_id, _work_item_id, run_id, _blocked = _blocked_run(client, service)
+        system = service.system
+        [decision] = _list(client, project_id=project_id)["data"]["decisions"]
+
+        cancelled = system.cancel(run_id)
+        assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
+        [withdrawn] = _list(client, project_id=project_id, answered=False)["data"]["decisions"]
+        assert (withdrawn["decision_id"], withdrawn["status"], withdrawn["answer"]) == (
+            decision["decision_id"], "withdrawn", None)
+        assert _list(client, project_id=project_id, answered=True)["data"] == {"decisions": []}
+        assert [item["status"] for item in _list(client, project_id=project_id)["data"]["decisions"]] == ["withdrawn"]
+
+        end = system.store.end_position()
+        closed = _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
+                         base_version=1)
+        assert closed.status_code == 409 and closed.json()["reason"] == "decision_closed"
+        assert "已经撤销" in closed.json()["message"]
+        assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
+
+
 def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection(data_dir):
     service = _Service(data_dir, [_unavailable_script(), []])
     with running_api(service) as client:
@@ -253,7 +280,7 @@ def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection
         [decision] = _list(client, project_id=project_id)["data"]["decisions"]
         assert _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
                        base_version=1, note="凭据已经补上").status_code == 200
-        assert _wait_for_termination(service.system, run_id).phase == "DONE"
+        assert _wait_for_completion(service.system, run_id).phase == "DONE"
         before = _list(client, project_id=project_id, work_item_id=work_item_id)
         before_all = _list(client)
 

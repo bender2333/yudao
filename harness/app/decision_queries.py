@@ -18,8 +18,7 @@ if TYPE_CHECKING:
 
 
 class DecisionsList(Contract):
-    # 筛选条件：省略的条件不限制；是否已回答里 false 取仍未回答的请求（open），true 取已经回答的请求；
-    # 已撤销的请求由结果的状态看出，不加这个条件时列出
+    # 筛选条件：省略的条件不限制；是否已回答里 false 取还没有回答的请求（open 与已撤销），true 取已经回答的请求
     project_id: str | None = None
     work_item_id: str | None = None
     kind: str | None = None
@@ -63,7 +62,7 @@ def _view(decision: DecisionRequest) -> DecisionView:
 
 
 def _decisions_list(application: Application, request: DecisionsList) -> Snapshot[DecisionList]:
-    statuses = () if request.answered is None else (("answered",) if request.answered else ("open",))
+    statuses = () if request.answered is None else (("answered",) if request.answered else ("open", "withdrawn"))
     position, decisions = saved_decisions(
         application.system.store,
         projects=() if request.project_id is None else (request.project_id,),

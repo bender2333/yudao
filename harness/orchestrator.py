@@ -1213,6 +1213,8 @@ class Orchestrator:
         # 请求给出的选项，追加回答，并按回答解除阻塞（待恢复选择停止事项时在同一事务中结束运行）。
         # 核对不通过时抛出 DecisionClosed、StaleDecision 或 InvalidOption，什么也不写，命令不登记。
         # 返回回答以后需要继续执行的 run，由调用方开始（start）；没有时为空
+        # 命令身份先于决定请求核对：同一身份、内容不同时按 command_id_reused 拒绝，与请求是否存在无关
+        self.store.check_command(command)
         saved = saved_decision(self.store, decision_id)
         if saved is None:
             raise DecisionNotFound(decision_id)
