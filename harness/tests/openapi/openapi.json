@@ -817,6 +817,14 @@
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "local",
+              "lan"
+            ],
+            "title": "Access"
           }
         },
         "additionalProperties": false,
@@ -825,7 +833,8 @@
           "log_id",
           "boot_id",
           "version",
-          "contract_digest"
+          "contract_digest",
+          "access"
         ],
         "title": "Deployment"
       },
