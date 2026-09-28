@@ -12,15 +12,19 @@
   - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）、[ADR-0018](../adr/0018-single-control-host-remote-execution.md)。需求：[D29](../requirements/remote-execution.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
-  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。工单：#45（调用目标每次请求解析，3.1 之前），父工单 #83（子工单 #84 至 #96）。
+  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前），Stage 3 的工作包父工单 #83（子工单 #84 至 #96）。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002 至 0006、[0017](../adr/0017-role-settings-override-department.md)。
+- [本地通用工具](local-tools.md)
+  - 内容：代码快照接入的使用过程；公开树、搜索、区间阅读与编辑、本地命令、动作回执、独立质检的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
+  - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守。
+  - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节。
 - [Provider 层](provider-layer.md)
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
   - 状态：Stage 2.7 已实现。「冻结目标」「协议归于模型访问定义」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效。
   - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0004。
 - [应用层与接口层](app-and-interface.md)
   - 内容：应用层（合同、注册表、命令处理、查询处理、读取模型、事件流订阅、输出片段转发）与接口层（FastAPI 路由、OpenAPI、认证）；命令合同（身份、基准版本、结果）与命令清单；查询与读取模型；事件流（范围筛选、按位置补齐、缺口检测与重新同步、模型输出片段）；能力清单与接口版本核对；本机与局域网两种访问方式（令牌与 TLS 保留位置并标为 TODO）；系统首页（待你决定、离开期间的报告）、机器查询与托盘提醒；与现有 Web 的对照与迁移。
-  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，3.1、3.2C、3.8 与 Stage 4 运维各自连同界面一起验收。骨架 #72 已完成，其余未实施。工单：父工单 #70（子工单 #72 至 #78），桌面客户端 #71（子工单 #79 至 #82，以及 3.2C 的机器页面）。
+  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。骨架 #72 已完成，其余未实施。工单：父工单 #70（子工单 #73 至 #78），桌面客户端 #71（#79、#80、#82 与原型 v8 #125）；机器页面 #117 属于 3.2C（#120），模型管理页 #93 至 #95 属于 D24（#83）。
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0013](../adr/0013-event-log-and-single-write-path.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。

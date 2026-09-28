@@ -1,6 +1,6 @@
 # 当前验收基线
 
-更新：2026-09-28。用途：区分已验收的历史版本、当前代码及尚待执行的验收。本页统一报告口径，不代替真实运行报告。路线以 [总体路线图](program-roadmap.md) 为准。
+更新：2026-09-29。用途：区分已验收的历史版本、当前代码及尚待执行的验收。本页统一报告口径，不代替真实运行报告。路线以 [总体路线图](program-roadmap.md) 为准。
 
 最新补充：用户新增 [Stage 2.7](archive/stage-2-provider-plan.md)，先做 D22 启动/重载与 D23 独立 Provider / Go 接入。该阶段代码与应用侧验收已完成，结果见 [执行报告](archive/stage-2-7-provider-report.md)；真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制。本页 3.0B 在 2.7 后的新冻结版本上完成；同版本已覆盖证据可直接引用。
 
@@ -23,7 +23,7 @@
 | 三部门合同循环、QA、压缩、重试、Git 与完整封存 | 已实现；原生验收及 F 收口有通过记录 | 任意复杂任务都可靠 |
 | Stage 2 日常路径 | 历史十场 9 DONE、1 计划取消，约定合同已关闭 | 通用 90% 成功率；完整 OMP 工具与恢复能力 |
 | 项目、事项、采纳与继承 | B4 三次真实变更报告均 DONE/adopted | 已有项目接入与建档（3.8）、项目级自由对话、同事项多 run 或并行已经完成 |
-| Provider、Context/Trace 与 Web | 已实现；配置页面后续有真实页面走查；Stage 2.7 的真实 Go 覆盖 Responses 与 Chat Completions | Anthropic Messages 的真实覆盖、跨两套真实服务完整验收、所有原型细节均已覆盖 |
+| Provider、Context/Trace 与 Web | 已实现；配置页面后续有真实页面走查；Stage 2.7 的真实 Go 覆盖 Responses 与 Chat Completions | Anthropic Messages 的真实覆盖（由 #96 验收）、跨两套真实服务完整验收、所有原型细节均已覆盖 |
 | P1 五项与 README 修复 | 5e46b6c / d941e67 / 90c3fc0 / c01c470 / ca72de0 / 3c73f9c；已提交 | 当前应用已有一次完整的新冻结版本验收 |
 | Provider 中文消息与移动端 | b6aeb58 / affdf1d，记录在 319d586 | 所有浏览器和使用场景均已验证 |
 | 学习基础 | LessonCandidate 待验证记录、harness.analysis L1–L3 | 跨任务经验采用、失效或学习收益 |
@@ -89,7 +89,7 @@
 | 无 run 部门模型对话 | 首批明确排除 | 不阻塞；不得把材料登记称为对话 |
 | 接入已有项目：初始 PRD 与现有结构说明 | Stage 3 后续独立包（3.8，[D33](requirements/existing-project-onboarding.md)） | 不阻塞 3.1；依赖 3.1，3.9 依赖它 |
 | 项目流跨版本保存与升级排空 | 3.1 的版本规则（[ADR-0019](adr/0019-project-stream-across-versions.md)） | 3.1 按 run 事件版本核对 |
-| Go 所需三协议与统一 Provider | 2.7，已于 2026-09-20 关闭（[执行报告](archive/stage-2-7-provider-report.md)） | 不阻塞；2026-09-26 核对后 #2 至 #5 关闭（预置表的 Go 请求基址已改正，`import harness.providers` 不再加载内核模块）；Anthropic Messages 的真实工具往返受区域与端点限制，#7 等待可用的 Messages 模型与凭据（needs-info），D24 的真实 Provider 验收（#96）同样覆盖三种协议；其他订阅与推理设置在 3.3 |
+| Go 所需三协议与统一 Provider | 2.7，已于 2026-09-20 关闭（[执行报告](archive/stage-2-7-provider-report.md)） | 不阻塞；2026-09-26 核对后 #2 至 #5 关闭（预置表的 Go 请求基址已改正，`import harness.providers` 不再加载内核模块）；#7 已关闭，Anthropic Messages 的真实工具往返由 Stage 3 D24 工作包的真实 Provider 验收（#96）检验，#96 覆盖三种协议；推理设置属于 Stage 3 的 D24 工作包（#83） |
 | 执行环境服务（本机容器与远程执行代理） | Stage 3 后续独立包（3.2C，[ADR-0018](adr/0018-single-control-host-remote-execution.md)） | 不阻塞 3.1；依赖 3.1 的动作核实与 #110，3.2B 依赖它 |
 | 网络/MCP | Stage 3 后续独立包（3.2B） | 按对应能力依赖推进 |
 | 运维、长时间运行 | Stage 4 运维部门与长时间运行 | 不阻塞通用工具与单机恢复 |

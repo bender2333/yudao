@@ -98,7 +98,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 你是计划执行者，负责依据已确认的架构设计、任务规格与工单要求，执行具体的任务拆解、代码实现、构建与自动化测试验证。
 
 ## 普通流程
-1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
+1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取当前阶段父工单（`docs/program-roadmap.md` 中进行中的阶段，Stage 3 为 #9）下面的子工单，包括挂在其工作包父工单下面的子工单；只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
 2. 阅读：`gh issue view <编号> --comments`，以及工单链接的 `docs/design/` 设计文档、`CONTEXT.md` 与相关 ADR。
 3. 实现：按 `/implement` 的流程，测试先行（`/tdd`），完成后用 `/code-review` 审查，然后提交并推送。
 4. 自测：运行「常用命令」中的测试命令，逐项核对工单的验收标准。

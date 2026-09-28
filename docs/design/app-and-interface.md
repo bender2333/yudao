@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-更新：2026-09-28。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。
+更新：2026-09-29。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）。
 
 依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据将改为原型 v8（尚未制作，完成后替换链接），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
@@ -134,8 +134,8 @@ flowchart TB
 | 类别 | 命令 | 基准版本指向 | 核对 |
 | --- | --- | --- | --- |
 | 新建 | 新建项目、记录原文、新建事项 | 没有已存在的对象，为空 | 不核对 |
-| 修改 | 项目的重命名、置顶、归档与恢复，项目部门设置，登记命令，工具授权，机器登记与项目的机器授权，同一项目的排队顺序，角色设置，执行槽位数，模型目录与部门默认，凭据，语义记录的纠正 | 被修改对象的版本：项目基本信息版本、该部门设置的版本、该登记命令的版本、该机器登记的版本、该项目机器授权的版本、该项目排队顺序的版本、目录修订号、凭据版本、该条记录的版本 | 必须等于当前版本，否则拒绝，返回当前版本 |
-| 追加与控制 | 追加需求、部门指导、取消事项、取消排队、目录的重新读取、获取模型列表、连接测试与模型测试 | 用户提交时看到的对象版本：事项的输入版本、该部门的指导版本、事项版本、目录修订号 | 写入事件作为依据，不要求相等；对象的状态不允许时拒绝 |
+| 修改 | 项目的重命名、置顶、归档与恢复，项目部门设置，源目录登记，登记命令，工具授权，机器登记与项目的机器授权，同一项目的排队顺序，角色设置，执行槽位数，模型目录与部门默认，凭据，语义记录的纠正 | 被修改对象的版本：项目基本信息版本、该部门设置的版本、该项目源目录登记的版本、该登记命令的版本、该机器登记的版本、该项目机器授权的版本、该项目排队顺序的版本、目录修订号、凭据版本、该条记录的版本 | 必须等于当前版本，否则拒绝，返回当前版本 |
+| 追加与控制 | 追加需求、部门指导、取消事项、取消排队、开始排空、强制升级、目录的重新读取、获取模型列表、连接测试与模型测试 | 用户提交时看到的对象版本：事项的输入版本、该部门的指导版本、事项版本、排空状态的版本、目录修订号 | 写入事件作为依据，不要求相等；对象的状态不允许时拒绝 |
 | 回答 | 回答决定请求 | 决定请求的版本 | 请求仍未回答且版本相等 |
 
 修改类命令要求相等，因为基于旧内容的保存会覆盖别人或系统的修改（原型第 4.6 节「版本冲突时提示重新读取」）。追加类命令本身不覆盖任何内容，重新读取不会改变用户的意图，所以只记录依据。
@@ -172,7 +172,7 @@ sequenceDiagram
 
 | 结果 | HTTP | 内容 |
 | --- | --- | --- |
-| 接受 | 200 | `command_id`、`position`（本命令最后一条事件的位置）、`refs`（新建对象的标识，例如 `project_id`、`work_item_id`、`run_id`）、`duplicate` |
+| 接受 | 200 | `command_id`、`position`（本命令最后一条事件的位置）、`refs`（新建对象的标识，例如 `project_id`、`work_item_id`、`run_id`）、`duplicate`、`reminders`（照常保存时附带的提醒；所选模型不具备部门的建议能力时写明部门、角色（按角色的设置才有）、模型、缺少的能力与影响，模型管理设计说明第 5.6 节；没有时为空） |
 | 拒绝 | 409 | `command_id`、`reason`（封闭清单中的原因代码）、`message`（中文说明）、`current_version`（修改类命令版本不符时） |
 | 请求体不符合合同 | 422 | pydantic 的字段错误 |
 | 未认证 | 401 | 无内容 |
@@ -201,10 +201,10 @@ sequenceDiagram
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
 | `material.record` | 记录原文 | 项目、原文、部门（可选） | `material_recorded` | 空 | 已有 `POST /api/projects/{id}/materials` |
-| `work_item.create` | 新建事项并开始执行 | 项目、事项原文、标题（可选）、代码快照来源（可选，3.2A） | `work_item_created`、`run_created`、`user_input_received` | 空 | 已有 `POST /api/projects/{id}/work-items`；删除 `max_cycles`、`run_time_limit_sec`、`context_window` 三个参数（D24 第 10 节，限额属于 ADR-0014 的定义） |
+| `work_item.create` | 新建事项并开始执行 | 项目、事项原文、标题（可选）、代码快照来源（可选，3.2A；局域网访问方式下只能选择 `source_directory.save` 登记过的源目录，第 10 节第 6 项） | `work_item_created`、`run_created`、`user_input_received` | 空 | 已有 `POST /api/projects/{id}/work-items`；删除 `max_cycles`、`run_time_limit_sec`、`context_window` 三个参数（D24 第 10 节，限额属于 ADR-0014 的定义） |
 | `work_item.append_input` | 追加需求 | 事项、原文 | `user_input_received` | 事项的输入版本（记录依据） | 已有 `POST /api/runs/{id}/inputs`，作用对象改为事项 |
 | `work_item.cancel` | 取消事项 | 事项 | `run_failed`（停止原因 `cancelled`） | 事项版本（记录依据） | 已有 `POST /api/runs/{id}/cancel` |
-| `work_item.reorder` | 调整同一项目排队中用户新要求的顺序；修复事项始终排在前面，不参与调整 | 项目、排队中用户新要求的新顺序 | 由 #19 确定 | 该项目排队顺序的版本 | 新增（#19） |
+| `work_item.reorder` | 调整同一项目排队中用户新要求的顺序；因升级重新开始的事项最前，其次是修复事项（Stage 4），这两类不参与调整 | 项目、排队中用户新要求的新顺序 | 由 #19 确定 | 该项目排队顺序的版本 | 新增（#19） |
 | `guidance.send` | 发送部门指导 | 事项、部门、原文 | `department_guidance_received` | 该部门的指导版本（记录依据） | 已有 `POST /api/runs/{id}/departments/{dept}/guidance` |
 
 `work_item.cancel` 由流程编排写入取消事实并取消该事项的任务；任务在取消以后交回的结果按执行权拒收（恢复契约第 45 行、第 80 行）。
@@ -213,11 +213,12 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `department_settings.save` | 保存项目部门设置 | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 | 部门 Prompt 已有 `PUT /api/projects/{id}/prompts/{dept}`；模型与档位新增（D24 第 5.2 节） |
+| `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 | 部门 Prompt 已有 `PUT /api/projects/{id}/prompts/{dept}`；模型与档位、提醒新增（D24 第 5.2、5.6 节） |
+| `source_directory.save` | 登记与修改本项目的源目录 | 项目、名称、路径 | 由界面工作线的工单确定 | 该项目源目录登记的版本 | 新增（界面工作线，#74，随 `work_item.create` 的代码快照来源一起） |
 | `command_registration.save` | 登记与修改命令 | 项目、登记名、固定参数、允许的额外参数、时限、输出上限 | `command_configured` | 该登记命令的版本 | 已有 `PUT /api/projects/{id}/commands/{name}`；界面入口新增 |
 | `tool_authorization.save` | 保存网络取回与 MCP 工具在本项目的授权范围 | 项目、授权范围 | 由 3.2B 确定 | 工具授权版本 | 新增（3.2B） |
-| `machine_authorization.save` | 保存本项目可以使用的机器与授权 | 项目；每台机器的登记目录、可以执行的操作、是否作为本项目的运行环境（Stage 4 的常设授权随运行环境一起保存） | 由 3.2C 确定 | 该项目机器授权的版本 | 新增（3.2C） |
-| `role_settings.save` | 保存本项目的角色设置 | 项目、部门、角色、模型、档位、角色 Prompt | 由 D26 确定 | 该角色设置的版本 | 新增（Stage 5，多角色设计第 14 节） |
+| `machine_authorization.save` | 保存本项目可以使用的机器与授权 | 项目；每台机器的登记目录与可以执行的操作（3.2C）；是否作为本项目的运行环境与常设授权（Stage 4） | 由 3.2C 确定；运行环境与常设授权的事件由 Stage 4 确定 | 该项目机器授权的版本 | 新增（3.2C）；运行环境与常设授权在 Stage 4 加入 |
+| `role_settings.save` | 保存本项目的角色设置；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 项目、部门、角色、模型、档位、角色 Prompt | 由 D26 确定 | 该角色设置的版本 | 新增（Stage 5，多角色设计第 14 节） |
 
 **用户决定（通知、恢复页、部门工作间、元观察页）**
 
@@ -241,6 +242,15 @@ sequenceDiagram
 
 机器由系统登记一次，同一台机器可以被多个项目使用；每个项目用 `machine_authorization.save` 选择可以使用的机器，授权范围按项目分开（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)）。
 
+**升级（3.1）**
+
+| 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
+| --- | --- | --- | --- | --- | --- |
+| `runtime.start_drain` | 开始排空：Yudao 停止开始新事项，等正在进行的 run 结束 | 无 | 由 3.1 确定 | 排空状态的版本（记录依据） | 新增（3.1） |
+| `runtime.force_upgrade` | 强制升级：正在进行的 run 记为因升级停止，对应的事项用已采纳成果重新开始，并记下「因升级重新开始」的优先级；只在排空期间可用，其他时候以 `not_allowed` 拒绝 | 无（作用于全部进行中的 run） | 由 3.1 确定 | 排空状态的版本（记录依据） | 新增（3.1） |
+
+升级的规则见 [ADR-0019](../adr/0019-project-stream-across-versions.md)：run 事件版本不同的升级先排空，排空状态由 `system.status` 返回。因升级重新开始的事项排在队列最前面，由 3.4A（#19）按 3.1 记下的优先级实现。
+
 **运行与执行槽位（3.4A）**
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
@@ -252,20 +262,20 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `catalog.connection.save` | 新增或修改 Provider 配置及其模型访问定义（含容量确认） | Provider 配置字段、模型访问定义列表 | `catalog_revised`（第 10 节第 1 项） | 目录修订号 | 已有 `POST /api/providers`、`PUT /api/providers/{id}` |
+| `catalog.connection.save` | 新增或修改 Provider 配置及其模型访问定义（含容量确认与输入方式） | Provider 配置字段、模型访问定义列表（每个定义含输入方式：文本、图像） | `catalog_revised`（第 10 节第 1 项） | 目录修订号 | 已有 `POST /api/providers`、`PUT /api/providers/{id}` |
 | `catalog.connection.delete` | 删除 Provider 配置 | Provider 配置 | `catalog_revised` | 目录修订号 | 已有 `DELETE /api/providers/{id}` |
 | `catalog.document.save` | 保存目录文档（编辑 JSON、导入） | 目录文档 | `catalog_revised` | 目录修订号 | 已有 `POST /api/providers`（带 `providers` 字段） |
 | `catalog.reload` | 重新读取目录文件 | 无 | `catalog_revised`（修订号变化时） | 目录修订号（记录依据） | 已有 `POST /api/providers/reload` |
-| `catalog.candidates.collect` | 获取模型列表 | Provider 配置、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/candidates` |
+| `catalog.candidates.collect` | 获取模型列表；每个候选带预填的窗口、输出上限与输入方式，每个预填值带来源（上游模型列表，或模型能力表及其 revision） | Provider 配置、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/candidates` |
 | `catalog.connection.test` | 连接测试 | Provider 配置 | `catalog_test_finished` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=connection`） |
-| `catalog.model.test` | 模型测试，通过时写入准入 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`） |
-| `catalog.department_defaults.save` | 保存部门默认 | 各部门的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 已有 `PUT /api/department-bindings` |
-| `catalog.role_defaults.save` | 保存角色默认 | 各角色的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 新增（Stage 5） |
+| `catalog.model.test` | 模型测试，通过时写入准入；输入方式包含图像时另发一次带图片的请求，结果区分图像输入测试失败并带上游返回的原因 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`） |
+| `catalog.department_defaults.save` | 保存部门默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各部门的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 已有 `PUT /api/department-bindings`；提醒新增（D24 第 5.6 节） |
+| `catalog.role_defaults.save` | 保存角色默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各角色的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 新增（Stage 5） |
 | `credential.set` | 保存 API Key，只在本进程有效或写入 `.env` | 凭据引用、API Key、写入方式 | `credential_changed`（只含引用、来源与版本） | 凭据版本 | 已有 `POST /api/provider-credentials`（`action=set`） |
 | `credential.clear_override` | 清除内存覆盖 | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=clear_override`） |
 | `credential.remove_persisted` | 删除持久凭据 | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=remove_persisted`） |
 
-容量「接受」是模型访问定义表中逐行的确认，随 `catalog.connection.save` 一起提交（模型管理设计说明第 4.3 节），不单独成为命令。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现，界面在事件到达前显示「测试中」。
+模型管理属于 Stage 3 的 D24 工作包（#83）。容量「接受」是模型访问定义表中逐行的确认，随 `catalog.connection.save` 一起提交（模型管理设计说明第 4.3 节），不单独成为命令。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现，界面在事件到达前显示「测试中」。
 
 **运维（Stage 4）**
 
@@ -280,7 +290,7 @@ sequenceDiagram
 | `semantic.mark_invalid` | 把一条内容标记失效 | 内容、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 | `semantic.correct` | 写入更正 | 内容、更正文字、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 
-命令共 35 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 12 个。原型构建约定第 3.5 节的命令标识由本清单代替。
+命令共 38 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 15 个。原型构建约定第 3.5 节的命令标识由本清单代替。
 
 ### 3.3 用户决定的回答
 
@@ -372,7 +382,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `department.workspace` | 部门状态、部门消息、指导记录与处理状态、Context 快照（上下文清单与压缩记录）、部门 Prompt（项目配置版本与所选请求实际使用的版本）、当前生效的模型及来源、最近一次调用目标（D24）；角色名单与部门账本（Stage 5） | | 已有 `GET /api/projects/{id}/departments/{dept}`、`GET /api/runs/{id}/departments/{dept}`；生效模型及来源新增（D24）；角色与账本新增（Stage 5） |
+| `department.workspace` | 部门状态、部门消息、指导记录与处理状态、Context 快照（上下文清单与压缩记录）、部门 Prompt（项目配置版本与所选请求实际使用的版本）、当前生效的模型及来源、最近一次调用目标、当前生效模型不具备部门建议能力的角色及提醒（D24）；角色名单与部门账本（Stage 5） | | 已有 `GET /api/projects/{id}/departments/{dept}`、`GET /api/runs/{id}/departments/{dept}`；生效模型及来源、建议能力的提醒新增（D24）；角色与账本新增（Stage 5） |
 | `run.actions` | 动作列表：身份、部门或角色、工具、输入依据、回执（登记名、参数、退出状态、输出、截断、超时、耗时）；状态与前后快照（3.1） | | 新增；回执已在 `tool_started`、`tool_called` 事件中（3.2A），状态与核实为 3.1 新增 |
 | `attempt.live` | 一个进行中调用尝试已收到的输出文字与字数；尝试已结束时返回结束状态 | 该尝试最后一条事件的位置，另带文字偏移 | 新增（第 5.6 节） |
 | `role.detail` | 角色的历史，每一步的模型请求、工具调用与工具许可的结果，当前的焦点、目录与已附加的实体；预测性任务单独标示 | | 新增（Stage 5，多角色设计第 15 节、语义系统第 14 节） |
@@ -398,23 +408,24 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | `project.attempts` | 请求记录，按事项、部门、角色（Stage 5）、状态、Provider、请求与实际模型、文字筛选，游标分页 | 调用尝试表的位置 | 已有 `GET /api/projects/{id}/model-attempts` 与 `GET /api/runs/{id}/model-attempts`，合并 |
 | `project.usage` | 用量汇总，按事项与筛选条件分组，未上报的项为空 | 调用尝试表的位置 | 已有 `GET /api/projects/{id}/model-usage` 与 `GET /api/runs/{id}/model-usage`，合并 |
-| `run.attempt` | 请求详情：输入、输出、SDK 流事件、用量、错误；调用目标（D24 第 6 节）；按栏目的来源、用量与上限及放入原因（#24）；语义视图（Stage 5） | | 已有 `GET /api/runs/{id}/model-attempts/{aid}`；调用目标新增（D24）；栏目与语义视图新增（#24、Stage 5） |
+| `run.attempt` | 请求详情：输入、输出、SDK 流事件、用量、错误；调用目标的公开部分，含输入方式（D24 第 6 节，取自请求事件）；按栏目的来源、用量与上限及放入原因（#24）；语义视图（Stage 5） | | 已有 `GET /api/runs/{id}/model-attempts/{aid}`；调用目标新增（D24）；栏目与语义视图新增（#24、Stage 5） |
 
 **设置**
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `project.settings` | 基本信息与版本、各部门的项目部门设置与版本（Prompt，模型与档位为 D24）、登记命令与版本、工具授权（3.2B）、机器授权与版本（3.2C）、观察窗口与修复失败次数上限（Stage 4）、角色设置（Stage 5） | | 部分已有：`GET /api/projects/{id}/prompts/{dept}`、`/commands`、`/commands/{name}` |
+| `project.settings` | 基本信息与版本、各部门的项目部门设置与版本（Prompt；模型与档位为 D24）、部门建议能力的提醒（D24，按模型管理设计说明第 5.3 节解析出的本项目各部门及各角色的生效模型判断，包括跟随部门默认或角色默认）、登记的源目录与版本（界面工作线）、登记命令与版本、工具授权（3.2B）、机器授权与版本（登记目录与可以执行的操作为 3.2C，是否作为运行环境与常设授权为 Stage 4）、观察窗口与修复失败次数上限（Stage 4）、角色设置（Stage 5） | | 部分已有：`GET /api/projects/{id}/prompts/{dept}`、`/commands`、`/commands/{name}` |
 
 **系统页**
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `catalog` | 服务方案预置表与修订号、Provider 配置、模型访问定义、准入记录、凭据状态（不含 Key）、候选与采集时间、部门默认、角色默认（Stage 5）、目录修订号 | | 已有 `GET /api/providers`、`/api/provider-presets`、`/api/department-bindings`，合并；按 D24 修改 |
+| `catalog` | 服务方案预置表与修订号、模型能力表的 revision、快照日期与来源链接，以及预置服务方案在能力表中的条目（手动添加模型访问定义时客户端据此预填）、Provider 配置、模型访问定义（含输入方式：文本、图像）、准入记录、凭据状态（不含 Key）、候选与采集时间（候选的预填值带来源）、部门默认与角色默认（角色默认为 Stage 5），各带当前的建议能力提醒；目录修订号 | | 已有 `GET /api/providers`、`/api/provider-presets`、`/api/department-bindings`，合并；按 D24（#83）修改 |
 | `catalog.document` | 目录文档（编辑 JSON 与导出使用），不含 Key、准入记录与项目部门设置 | | 数据已有（`to_document`），查询新增 |
+| `catalog.change_impact` | 按拟议的修改计算会作废准入的定义、引用方（部门默认的哪个部门、哪个项目的哪个部门）与正在使用它们的进行中事项，不写入任何内容（模型管理设计说明第 4.4 节） | | 新增（#90） |
 | `runtime.slots` | 槽位数、占用、跨项目队列、重启后的队列状态 | | 新增（#19） |
-| `tools.registry` | 网络授权与最近的取回、MCP 服务与工具及恢复约定、准入钩子与观察者 | | 新增（3.2B、3.7） |
-| `machines.list` | 登记的机器：名称、地址、用途、在线状态（执行代理的心跳）、正在执行的动作；授权使用它的项目，以及它是哪些项目的运行环境 | | 新增（3.2C） |
+| `tools.registry` | 网络授权与最近的取回、MCP 服务与工具及恢复约定（3.2B）；只读观察者（Stage 5，#98）；准入钩子（Stage 6） | | 新增（3.2B）；观察者与准入钩子随所属阶段加入 |
+| `machines.list` | 登记的机器：名称、地址、用途、在线状态（执行代理的心跳）、正在执行的动作、授权使用它的项目（3.2C）；它是哪些项目的运行环境（Stage 4） | | 新增（3.2C）；运行环境在 Stage 4 加入 |
 | `ops.status` | 运行责任、发布记录、故障链路、故障记录与修复失败次数、备份、运行指标、待授权的外部动作 | | 新增（Stage 4） |
 | `meta.observations` | 流转统计、不符合项、判定点与判定记录 | | 新增（Stage 6） |
 
@@ -425,7 +436,7 @@ sequenceDiagram
 | `run.export` | 一个 run 的全部事件、投影与观测记录 | | 已有 `GET /api/runs/{id}/export` |
 | `replay.check` | 删除保存的投影后在内存中重放一个 run 或项目，与保存的投影比较，返回是否一致与差异 | | 已有 `POST /api/runs/{id}/replay` 与命令行 `replay`，改为查询 |
 
-查询共 31 个：由已有路由改成或合并的 14 个，新增 17 个。
+查询共 32 个：由已有路由改成或合并的 14 个，新增 18 个。
 
 ### 4.4 删除的读取路由
 
@@ -519,7 +530,7 @@ sequenceDiagram
 
 ### 5.6 模型输出片段
 
-- 持久事实保持现有事件：`model_requested`、`model_stream_progress`（阶段）、`model_attempt_finished` 或 `model_attempt_failed`（输出与 SDK 流事件以工件引用保存）。
+- 持久事实保持现有事件：`model_requested`（带调用目标的公开部分，含输入方式）、`model_stream_progress`（阶段）、`model_attempt_finished` 或 `model_attempt_failed`（输出与 SDK 流事件以工件引用保存）。
 - 步骤驱动从模型调用合同的流式输出中取得片段，发布到控制核心的输出片段通道。通道在进程内，片段不写入事件日志。
 - 输出片段转发订阅这个通道：每个调用尝试每 100 毫秒合并一次片段，发送给带 `live=1`、范围匹配的连接；同时保存每个进行中调用尝试已收到的文字，供 `attempt.live` 查询；调用尝试结束或失败以后释放。
 - SSE 中片段的事件名为 `delta`，没有 `id`，不改变续传位置。内容：`attempt_id`、`logical_call_id`、`project_id`、`work_item_id`、`run_id`、`department`、`role`、`channel`（`output` 输出文字、`reasoning` 推理内容、`tool_arguments` 工具参数）、`offset`（本片段在该通道中的起始字数）、`text`。
@@ -661,11 +672,13 @@ sequenceDiagram
 
 ### 7.5 对其他工单与文档的影响
 
-- 界面工作线（2026-09-28 用户决定）：应用层、接口层与桌面客户端提前到 Stage 3，与 #49、#45、3.1 同时进行；#70 的子工单排在 3.1 之前，其后是客户端外壳 #79 与当前档页面。3.1、3.2C、3.8 与 Stage 4 运维各自连同界面一起验收：工作包的后端工单与对应的 D30 子工单同属这个工作包的验收，界面没有通过验收时工作包不关闭。系统首页、托盘提醒与接口版本核对属于 #71 的范围；机器页面与机房画面是 3.2C 的 D30 子工单。
+- 界面工作线（2026-09-28 用户决定）：应用层、接口层与桌面客户端提前到 Stage 3，与 #49、#45、3.1 同时进行；#70 的子工单排在 3.1 之前，其后是客户端外壳 #79 与当前档页面。3.1、3.2C、3.4A、3.2B、3.2D、3.8、D24 与 Stage 4 运维各自连同界面一起验收：工作包的后端工单与对应的 D30 子工单同属这个工作包的验收，界面工单挂在所属工作包的父工单下，界面没有通过验收时工作包不关闭。系统首页、托盘提醒与接口版本核对属于 #71 的范围；机器页面与机房画面是 3.2C 的 D30 子工单；模型管理页与部门设置弹窗的模型部分是 D24（#83）下的 #93 至 #95。
 - #44：事件日志为每条事件保存项目、事项、run、部门与种类并建立索引，供范围筛选；写入口提供「在同一事务中读取保存的投影、判断并追加」的接口，并在同一事务中登记命令身份（唯一约束）；#44 提供事件日志的订阅接口，统一事件流由本设计的事件流工单完成（第 10 节第 3 项）。
 - #49：回答命令与决定请求的查询通过本设计的骨架工单登记，#49 排在骨架工单之后（第 10 节第 2 项）。
-- #16：「继续命令经 Web、命令行与接口共用同一入口」由 `decision.answer` 实现。
-- #19：`busy` 拒绝由排队代替；新增 `runtime.slots`、`runtime.set_slots`、`queue.cancel`。
+- #17、#49：核实结果未知的动作（#17）与模型引用无法使用时的待恢复（#49）都由 `decision.answer` 回答，命令行与接口共用这一个入口；中断的 run 在启动时自动继续，不发出决定请求（第 3.3 节）。
+- 3.1（#119）：新增 `runtime.start_drain`、`runtime.force_upgrade`；强制升级只记下「因升级重新开始」的优先级。
+- #19：`busy` 拒绝由排队代替；新增 `runtime.slots`、`runtime.set_slots`、`queue.cancel`；按 3.1 记下的优先级把因升级重新开始的事项排在队列最前面。
+- #74：新增 `source_directory.save`，与 `work_item.create` 的代码快照来源一起实现。
 - #24：「按栏目读取上下文清单的查询接口」登记为应用层查询（`run.attempt` 的栏目部分）。
 - #37：`semantic.mark_invalid`、`semantic.correct` 登记为应用层命令。
 - 原型构建约定第 3.5 节的命令标识、第 6.1 节的事件对象由本设计代替；设计文档索引加入本文件；[部门定向指导](department-guidance.md)状态行「指导接口已在 `harness/web/server.py` 实现」在删除工单中修改；前端技术调研第 6 节的现状在删除工单以后更新；总体架构第 10 节加入本设计的工单。
@@ -712,10 +725,10 @@ sequenceDiagram
 3. **#44 与统一事件流。** #44 提供事件日志的订阅接口；统一事件流由本设计的事件流工单完成。冻结的旧控制台的两个事件流在删除之前改为按全局位置读取，保持现有的定时查询。
 4. **#44 的日志列与写入口接口。** 事件日志保存每条事件的项目、事项、run、部门与种类并建立索引；写入口提供同一事务内的「读取保存的投影、判断、追加」接口与命令身份的唯一约束。两项写进 #44。
 5. **流式进度事件的数量。** 输出片段加入以后，`model_stream_progress` 只在阶段变化时写入；这会改变 #43 的事件序列基准，在事件流工单中实施并有意识地更新基准。
-6. **代码快照来源的路径。** 本机访问方式下，新建事项可以直接填写服务所在机器上的源目录；局域网访问方式下只能选择项目设置中登记过的源目录。
+6. **代码快照来源的路径。** 本机访问方式下，新建事项可以直接填写服务所在机器上的源目录；局域网访问方式下只能选择项目设置中登记过的源目录（`source_directory.save`）。
 7. **Web 控制台的去留。** 按第 7.3 节：冻结，D30 当前档的项目页面与模型管理页通过验收以后删除。
 8. **桌面客户端启动本机后端。** 连接「本机」时，桌面客户端的主进程在后端没有运行时启动它（`python -m harness api`），作为附属进程管理；也可以按地址连接已经运行的本机或远端部署（与 OpenCode 桌面版相同）。
 9. **执行槽位数。** 执行槽位数是部署设置，经命令修改并写成事件；它取决于运行机器的能力，不属于随系统发布的定义。
 10. **取消排队的结果。** 由 3.4A（#19）的设计确定。
-11. **D24 的实施工单。** D26 的后端工单是 #50 下的子工单；D24 中部门默认、项目部门设置与推理档位另建工单，客户端的模型页与部门设置依赖它们。
+11. **D24 的实施工单。** D24 模型管理属于 Stage 3，父工单 #83，子工单 #84 至 #96；其中 #93、#94 建立模型管理页，#95 建立部门设置弹窗与部门工作间的模型显示，它们依赖 D24 的后端工单。D26 的后端工单是 #50 下的子工单。
 12. **长期目标的修改。** 属于产品规则，待用户确认；在此之前命令清单不含修改长期目标。
