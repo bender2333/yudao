@@ -619,6 +619,7 @@ def request_time_unavailable_stop(data_dir):
     assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
     return system, run_id, {}
 
+
 def request_time_unavailable_cancel(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
