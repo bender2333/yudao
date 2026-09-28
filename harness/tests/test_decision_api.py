@@ -14,7 +14,7 @@ from harness.tests.api_helpers import running_api
 # 用户决定在应用层与接口层的行为（设计说明第 3.3、4.3 节）：未回答的请求由查询 decisions.list 读取，回答经命令
 # decision.answer 提交；回答「继续执行」时流程编排在服务的事件循环中把这个 run 继续运行到结束，「停止事项」时
 # 事项以 cancelled 结束。服务是真实启动的 FastAPI 应用（uvicorn），事件日志是真实的 SQLite 文件，模型回答由
-# FakeAdapter 脚本给出；新建事项与运行到阻塞经控制的公开接口，核对经 HTTP 与应用层。
+# FakeAdapter 脚本给出；新建事项与运行到阻塞经控制核心的公开接口，核对经 HTTP 与应用层。
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
