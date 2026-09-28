@@ -139,11 +139,20 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     with running_api(opened) as client:
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
-    assert capabilities["commands"] == [{"name": "project.create", "reasons": ["command_id_reused"]}]
-    assert capabilities["queries"] == [{"name": "system.status", "changed_by": []}]
-    assert _registered_paths(document, "/api/commands/") == {"project.create"} == set(DEFAULT_REGISTRY.commands)
-    assert _registered_paths(document, "/api/queries/") == {"system.status"} == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == []
+    assert capabilities["commands"] == [
+        {"name": "project.create", "reasons": ["command_id_reused"]},
+        {"name": "decision.answer", "reasons": ["not_found", "decision_closed", "stale_base", "option_invalid",
+                                               "command_id_reused"]},
+    ]
+    assert capabilities["queries"] == [
+        {"name": "system.status", "changed_by": []},
+        {"name": "decisions.list", "changed_by": ["decision_requested", "decision_answered", "decision_withdrawn"]},
+    ]
+    assert _registered_paths(document, "/api/commands/") == {"project.create", "decision.answer"} == set(
+        DEFAULT_REGISTRY.commands)
+    assert _registered_paths(document, "/api/queries/") == {"system.status", "decisions.list"} == set(
+        DEFAULT_REGISTRY.queries)
+    assert capabilities["decisions"] == ["model_unavailable"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id

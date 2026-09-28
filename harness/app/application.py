@@ -9,15 +9,20 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from ..decisions import DECISION_KINDS
 from ..models import new_id, utc_now
 from ..runtime import LoopSystem
 from .commands import execute
 from .contracts import Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
+from .decision_commands import DECISION_ANSWER
+from .decision_queries import DECISIONS_LIST
 from .project_commands import PROJECT_CREATE
 from .registry import Registry
 from .system_queries import SYSTEM_STATUS
 
-DEFAULT_REGISTRY = Registry(commands=[PROJECT_CREATE], queries=[SYSTEM_STATUS])
+# 能力清单的 decisions 取自决定合同中的种类：当前部署会发出的决定请求
+DEFAULT_REGISTRY = Registry(commands=[PROJECT_CREATE, DECISION_ANSWER], queries=[SYSTEM_STATUS, DECISIONS_LIST],
+                            decisions=tuple(DECISION_KINDS))
 
 
 class Application:

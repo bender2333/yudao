@@ -56,6 +56,57 @@
         }
       }
     },
+    "/api/commands/decision.answer": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "decision.answer",
+        "operationId": "command_decision_answer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_DecisionRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, decision_closed, stale_base, option_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -70,6 +121,103 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot_SystemStatus_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queries/decisions.list": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "decisions.list",
+        "operationId": "query_decisions_list",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "work_item_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Item Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "answered",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Answered"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_DecisionList_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -101,6 +249,35 @@
   },
   "components": {
     "schemas": {
+      "Accepted_DecisionRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/DecisionRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[DecisionRefs]"
+      },
       "Accepted_ProjectRefs_": {
         "properties": {
           "command_id": {
@@ -129,6 +306,136 @@
           "duplicate"
         ],
         "title": "Accepted[ProjectRefs]"
+      },
+      "CallTarget": {
+        "properties": {
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "requested_provider": {
+            "type": "string",
+            "title": "Requested Provider"
+          },
+          "requested_protocol": {
+            "type": "string",
+            "title": "Requested Protocol"
+          },
+          "requested_model": {
+            "type": "string",
+            "title": "Requested Model"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Version"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "configured_max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Max Output Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "provider_config_id",
+          "model_id",
+          "provider_name",
+          "protocol",
+          "base_url",
+          "requested_provider",
+          "requested_protocol",
+          "requested_model",
+          "credential_ref",
+          "credential_version",
+          "context_window",
+          "configured_max_output_tokens"
+        ],
+        "title": "CallTarget"
       },
       "Capabilities": {
         "properties": {
@@ -239,6 +546,223 @@
         ],
         "title": "CommandCapability"
       },
+      "DecisionAnswer": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "option": {
+            "type": "string",
+            "title": "Option"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "decision_id",
+          "option"
+        ],
+        "title": "DecisionAnswer"
+      },
+      "DecisionAnswerRecord": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "option": {
+            "type": "string",
+            "title": "Option"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "answered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Answered At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "option",
+          "note",
+          "base_version",
+          "actor",
+          "command_id",
+          "answered_at"
+        ],
+        "title": "DecisionAnswerRecord"
+      },
+      "DecisionList": {
+        "properties": {
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionView"
+            },
+            "type": "array",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decisions"
+        ],
+        "title": "DecisionList"
+      },
+      "DecisionOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "DecisionOption"
+      },
+      "DecisionRefs": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision_id",
+          "run_id"
+        ],
+        "title": "DecisionRefs"
+      },
+      "DecisionView": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "title": "Blocks"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "answered",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ModelUnavailableRequested"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionAnswerRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision_id",
+          "kind",
+          "blocks",
+          "version",
+          "status",
+          "requested_at",
+          "request",
+          "answer"
+        ],
+        "title": "DecisionView"
+      },
       "Deployment": {
         "properties": {
           "log_id": {
@@ -280,6 +804,79 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ModelUnavailableRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "model_unavailable",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "target",
+          "reason",
+          "message"
+        ],
+        "title": "ModelUnavailableRequested"
       },
       "ProjectCreate": {
         "properties": {
@@ -423,6 +1020,24 @@
           "message"
         ],
         "title": "Rejected"
+      },
+      "Snapshot_DecisionList_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DecisionList"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[DecisionList]"
       },
       "Snapshot_SystemStatus_": {
         "properties": {
@@ -983,136 +1598,6 @@
           "code_tree_digest"
         ],
         "title": "Baseline",
-        "type": "object"
-      },
-      "CallTarget": {
-        "additionalProperties": false,
-        "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
-          "provider_config_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider Config Id"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
-          },
-          "provider_name": {
-            "title": "Provider Name",
-            "type": "string"
-          },
-          "protocol": {
-            "title": "Protocol",
-            "type": "string"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          },
-          "requested_provider": {
-            "title": "Requested Provider",
-            "type": "string"
-          },
-          "requested_protocol": {
-            "title": "Requested Protocol",
-            "type": "string"
-          },
-          "requested_model": {
-            "title": "Requested Model",
-            "type": "string"
-          },
-          "credential_ref": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Ref"
-          },
-          "credential_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Version"
-          },
-          "context_window": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context Window"
-          },
-          "configured_max_output_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configured Max Output Tokens"
-          }
-        },
-        "required": [
-          "snapshot_id",
-          "provider_config_id",
-          "model_id",
-          "provider_name",
-          "protocol",
-          "base_url",
-          "requested_provider",
-          "requested_protocol",
-          "requested_model",
-          "credential_ref",
-          "credential_version",
-          "context_window",
-          "configured_max_output_tokens"
-        ],
-        "title": "CallTarget",
         "type": "object"
       },
       "ChangeRecord": {
@@ -3735,25 +4220,6 @@
           "rationale"
         ],
         "title": "DecisionChange",
-        "type": "object"
-      },
-      "DecisionOption": {
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "label"
-        ],
-        "title": "DecisionOption",
         "type": "object"
       },
       "DecisionRequestedEvent": {
@@ -9896,79 +10362,6 @@
           "summary"
         ],
         "title": "ModelStreamProgressPayload",
-        "type": "object"
-      },
-      "ModelUnavailableRequested": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "model_unavailable",
-            "title": "Kind",
-            "type": "string"
-          },
-          "blocks": {
-            "const": "run",
-            "title": "Blocks",
-            "type": "string"
-          },
-          "options": {
-            "items": {
-              "$ref": "#/components/schemas/DecisionOption"
-            },
-            "title": "Options",
-            "type": "array"
-          },
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "facts": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Facts",
-            "type": "array"
-          },
-          "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Department",
-            "type": "string"
-          },
-          "target": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CallTarget"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind",
-          "blocks",
-          "options",
-          "description",
-          "facts",
-          "department",
-          "target",
-          "reason",
-          "message"
-        ],
-        "title": "ModelUnavailableRequested",
         "type": "object"
       },
       "PlanAcceptedEvent": {
