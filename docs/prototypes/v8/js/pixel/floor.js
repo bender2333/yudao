@@ -397,9 +397,12 @@
           return;
         }
         case 'x_decision_issued':
-        case 'x_decision_answered': {
+        case 'x_decision_answered':
+        case 'project_decision_requested':
+        case 'project_decision_answered': {
           const d = ev.department || (it && it.department);
-          if (d && roomOf(lay, d)) st.decisions[d] = { until: scene.realT + 5000, text: ev.type === 'x_decision_issued' ? '待你决定' : '已回答', itemId: wid, answered: ev.type === 'x_decision_answered' };
+          const answered = ev.type === 'x_decision_answered' || ev.type === 'project_decision_answered';
+          if (d && roomOf(lay, d)) st.decisions[d] = { until: scene.realT + 5000, text: answered ? '已回答' : '待你决定', itemId: wid, answered };
           return;
         }
         case 'x_provider_wait_entered':

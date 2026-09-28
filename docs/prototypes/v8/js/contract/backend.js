@@ -411,10 +411,10 @@
       const found = history.some((ev) => types.includes(ev.type) && keyOf(ev) === item.id && ev.at === item.born_at);
       need(found, list + ' 中的 ' + item.id + ' 带 born_at，但没有同一时间的出现事件（' + types.join('、') + '）');
     });
-    appear('projects', ['project_registered', 'x_onboarding_started'], (ev) => ev.project_id);
-    appear('work_items', ['work_item_created', 'x_repair_created', 'x_onboarding_started'], (ev) => ev.work_item_id);
-    appear('runs', ['run_created', 'work_item_created', 'x_repair_created', 'x_onboarding_started'], (ev) => ev.run_id);
-    appear('decisions', ['x_decision_issued'], (ev) => ev.payload && ev.payload.decision_id);
+    appear('projects', ['project_registered'], (ev) => ev.project_id);
+    appear('work_items', ['work_item_created', 'x_repair_created'], (ev) => ev.work_item_id);
+    appear('runs', ['run_created', 'work_item_created', 'x_repair_created', 'onboarding_revision_started'], (ev) => ev.run_id);
+    appear('decisions', ['x_decision_issued', 'project_decision_requested'], (ev) => ev.payload && ev.payload.decision_id);
     // 场景
     const nos = new Set();
     scenarioList.forEach((sc) => {

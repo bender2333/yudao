@@ -186,7 +186,7 @@ Y8.registry.tagOf(kind, name)    // 界面上的档位标签：ui 为 null，其
 
 可回放的查询：`system.status`、`projects.list`、`decisions.list`、`project.loop`、`machines.list`。
 
-应用层设计说明中尚未列出、原型先用临时名称的命令标有 `pending: true`，标注模式显示「合同待补」：`project.onboard`（3.8 接入已有项目：名称、长期目标、登记的源目录）。查询的 `at` 参数同样属于合同待补。`source_directory.save`（登记源目录，`project.settings` 返回登记的源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）已在应用层设计说明中。
+设计说明中尚未列出的名称标有 `pending: true`，标注模式显示「合同待补」；现在只有查询的 `at` 参数属于这一类。其余命令都有设计依据：`source_directory.save`（登记源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）见应用层设计说明；`machine.save`、`machine_authorization.save`、`execution_placement.save`（3.2C）见[执行环境服务设计说明](../../design/execution-environment.md)；`project.onboard`（名称、长期目标、源目录名称、源目录路径）与 `onboarding.restart`（3.8）见[接入已有项目设计说明](../../design/existing-project-onboarding.md)第 3 节。
 
 决定种类的标识：
 
@@ -240,7 +240,8 @@ Y8.backend.command('work_item.reorder', (params, db) => ({ reject: { reason, mes
 | 3.1 | `x_run_interrupted`、`x_run_auto_resumed`、`x_action_unknown`、`x_drain_started`、`x_upgrade_forced`、`x_run_stopped_for_upgrade` |
 | 3.2C | `x_machine_saved`、`x_machine_offline`、`x_machine_online`、`x_remote_action_started`、`x_remote_action_finished`、`x_late_receipt`、`x_machine_authorization_saved` |
 | 3.4A | `x_queued`、`x_slot_acquired`、`x_queue_cancelled`、`x_queue_reordered`、`x_slots_set` |
-| 3.8 | `x_onboarding_started`、`x_existing_read`、`x_initial_prd_confirmed` |
+| 3.2C（正式名称） | `execution_placement_configured` |
+| 3.8（正式名称，接入已有项目设计说明第 3.3 节） | `initial_prd_proposed`、`project_decision_requested`、`project_decision_answered`、`project_decision_withdrawn`、`onboarding_revision_started`、`baseline_adopted`、`structure_accepted`、`baseline_review_accepted`；接入时的 `project_registered` 带 `source: 'existing'`，`work_item_created` 与 `run_created` 带 `kind: 'onboarding'`；「阅读已有项目」由建档事项中读取与搜索工具的 `tool_started` 驱动 |
 | 3.2B | `x_network_fetch`、`x_mcp_called`、`x_tool_authorization_saved` |
 | 3.2D | `x_trial_step` |
 | S4 | `x_provider_wait_entered`、`x_provider_wait_left`、`x_backup_taken`、`x_deployed`、`x_rolled_back`、`x_fault_recorded`、`x_repair_created`、`x_repair_failed`、`x_auto_repair_stopped`、`x_check_in` |
@@ -425,7 +426,7 @@ m.setModel(machineRoomModel); m.playEvent(event); m.resize(); m.destroy();
 | `x_fault_recorded` | `fault_id`、`machine_id` |
 | `x_repair_created` | `fault_id` |
 | `x_trial_step` | `screenshot`（`assets/` 中的文件名）、`text`、`step` |
-| `x_decision_issued`、`x_decision_answered` | `decision_id`、`kind` |
+| `x_decision_issued`、`x_decision_answered`、`project_decision_requested`、`project_decision_answered` | `decision_id`、`kind`（`initial_prd` 是项目流中的决定，发出与回答使用 `project_decision_*`，其余种类使用 `x_decision_*`） |
 | `x_role_task_assigned`、`x_role_result_returned` | `to` |
 
 ## 8. 示例数据

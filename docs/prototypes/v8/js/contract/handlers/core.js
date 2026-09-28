@@ -382,8 +382,9 @@
     }
     const note = (params.note || '').trim();
     const path = 'decisions[id=' + raw.id + ']';
+    const projectStream = Y8.registry.entry('decision', raw.kind).stream === 'project';
     const answered = {
-      type: 'x_decision_answered', project_id: raw.project_id, work_item_id: raw.work_item_id, run_id: raw.run_id,
+      type: projectStream ? 'project_decision_answered' : 'x_decision_answered', project_id: raw.project_id, work_item_id: raw.work_item_id, run_id: raw.run_id,
       label: '用户回答「' + Y8.registry.entry('decision', raw.kind).label + '」：' + option.label,
       payload: { decision_id: raw.id, kind: raw.kind, option: option.id },
       patch: [
