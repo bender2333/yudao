@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import AsyncIterator, Container
 from contextlib import aclosing
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
@@ -26,7 +27,13 @@ from .invoke import (
     to_provider_input,
 )
 from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
-from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
+from .resolve import (
+    CallTargetResolution,
+    FrozenTarget,
+    ResolveSnapshot,
+    resolve_call_target as _resolve_call_target,
+    resolve_snapshot,
+)
 from .responses import ProviderConnections, check_availability
 from .store import ProviderStore
 
@@ -54,6 +61,8 @@ class ProviderFacade:
         self._cancels = CancelRegistry()
         # 部门绑定：department -> {"provider_id": ..., "model_id": ...}，与目录一起发布
         self._bindings: dict[str, dict[str, str]] = {}
+        # 按句柄持有的调用目标：句柄 -> (内部目标, 公开部分)。凭据材料只在这里，控制核心不持有
+        self._call_targets: dict[str, tuple[FrozenTarget, dict[str, Any]]] = {}
         # 实际生效修订：目录与绑定任一发布即单调递增，包含 store.revision 的推进
         self._revision = 0
         self._lock = threading.RLock()
@@ -382,6 +391,24 @@ class ProviderFacade:
             if admission_issues:
                 raise CatalogValidationError(admission_issues)
             return snapshot
+
+    def resolve_call_target(self, model_id: str, requested_tier: str | None = None) -> CallTargetResolution:
+        # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不认识部门。
+        # 检查定义存在、所属连接存在、准入有效、窗口已知、凭据可用；凭据材料留在 Provider 模块内，
+        # 交回的公开部分不含密钥，执行调用时按句柄取出材料
+        with self._lock:
+            resolution, target = _resolve_call_target(self._store, self._credentials, model_id, requested_tier)
+            if target is None:
+                return resolution
+            handle_id = f"target_{uuid4().hex[:16]}"
+            self._call_targets[handle_id] = (target, dict(resolution.public))
+            return replace(resolution, handle_id=handle_id)
+
+    def release_call_handle(self, handle_id: str) -> dict[str, Any]:
+        # 一次逻辑调用结束（成功，或不再重试）时丢弃它保留的凭据材料，交回这次解析的公开部分
+        with self._lock:
+            _, public = self._call_targets.pop(str(handle_id))
+            return dict(public)
 
     def presets_public_view(self) -> dict[str, Any]:
         # 预置表数据与版本由模块提供，Web 只读取，不做远端热更
