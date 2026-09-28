@@ -123,7 +123,7 @@ Yudao 的模型能力表按以下规则维护：
 - **范围**：只收录预置表中服务方案的模型。每个服务方案记录它在 models.dev 中对应的 provider ID（OpenCode Go 对应 `opencode-go`）。自定义服务方案在表中没有条目。
 - **字段**：每个模型只保留上游模型 ID、输入方式、输出方式、上下文窗口、输出上限、是否支持工具调用与是否支持推理，分别取自 `modalities.input`、`modalities.output`、`limit.context`、`limit.output`、`tool_call` 与 `reasoning`。models.dev 中 `modalities` 是可以缺少的字段，缺少时表中不记录该模型的输入方式与输出方式。
 - **版本与来源**：整张表带 revision、快照日期与来源链接；界面显示 revision、快照日期与来源。
-- **更新**：随 Yudao 新版本更新快照，运行时不从远端刷新，与预置表的方式相同（[ADR-0003](../adr/0003-versioned-preset-table-no-remote-refresh.md)）。
+- **更新**：发布前由代码仓库中的提取脚本从 models.dev 取出上面的字段生成快照，随 Yudao 新版本更新，运行时不从远端刷新，与预置表的方式相同（[ADR-0003](../adr/0003-versioned-preset-table-no-remote-refresh.md)）。
 - **用途**：只用于新建模型访问定义（从模型列表加入候选或手动添加）时预填（第 4.3 节）。运行、准入与建议能力的提醒只使用模型访问定义中的值，不读取能力表。
 
 预置表与模型能力表是两份文件，各带 revision：预置表只含接入规则，能力表只含模型能力。
