@@ -8,8 +8,9 @@
 
   const DEPT = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
   const ROOM_STATUS = ['running', 'asking', 'pending_verification'];
-  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'stopped_for_upgrade'];
+  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
   const STATUS_TEXT = {
+    waiting_decision: '等待你的决定',
     queued: '排队中', waiting_slot: '等待执行槽位', running: '运行中', asking: '询问中', waiting_provider: '等待模型服务', paused: '已暂停',
     failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复',
     stopped_for_upgrade: '因升级停止', adopted: '已采纳'
@@ -69,6 +70,7 @@
   }
 
   const STATUS_LABEL = {
+    waiting_decision: '等待你的决定',
     running: '运行中', queued: '排队中', waiting_slot: '等待执行槽位', waiting_provider: '等待模型服务', pending_verification: '待核实',
     waiting_resume: '待恢复', interrupted: '中断', idle: '空闲'
   };

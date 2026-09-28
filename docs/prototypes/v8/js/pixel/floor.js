@@ -23,14 +23,15 @@
   const UNDER_Y = 276;     // 地板下的管道（运维故障信件回到大厅）
   const DEPTS = ['product', 'engineering', 'quality'];
   const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release', letter: 'letter' };
-  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'stopped_for_upgrade'];
+  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
   const ACTIVE = ['running', 'asking', 'pending_verification'];
   const STATUS_TEXT = {
     queued: '排队中', waiting_slot: '等待执行槽位', running: '运行中', asking: '询问中', waiting_provider: '等待模型服务', paused: '已暂停',
     failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复',
-    stopped_for_upgrade: '因升级停止', adopted: '已采纳'
+    stopped_for_upgrade: '因升级停止', adopted: '已采纳', waiting_decision: '等待你的决定'
   };
   const STATUS_CHIP = {
+    waiting_decision: PAL.yellow2,
     running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
     failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2,
     waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3
@@ -206,6 +207,7 @@
         case 'cancelled': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
         case 'pending_verification': return seat('sit_scratch', { kind: 'question' });
         case 'waiting_resume': return seat('sit_wait', { kind: 'text', text: '待恢复' });
+        case 'waiting_decision': return seat('sit_wait', { kind: 'text', text: '待你决定' });
         case 'stopped_for_upgrade': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
         default: return seat('sit');
       }
