@@ -8,7 +8,7 @@
 - 隐藏检查对被测方不可见，检查运行结果，不只看退出码；可以按条统计完成度。
 - 至少一个带界面、需要操作的任务，能评价完成的丰富程度。
 - 成本可控：每个版本每个场景运行 3 次。
-- 模型 DeepSeek V4.1 Flash 能力较强（2026-09-10 发布，模型卡修订 `dba1be0`：配 OpenCode 的 Terminal-Bench 2.1 为 85.0，DeepSWE v1.1 为 65.5，NL2Repo-Bench 为 64.0），接近满分的评测区分不出差别。
+- 模型 DeepSeek V4.1 Flash 能力较强（2026-09-10 发布，模型卡修订 `dba1be0`：配 OpenCode 的 Terminal-Bench 2.1 为 85.0，DeepSWE v1.1 为 65.5，NL2Repo-Bench 为 64.0），接近满分的评测区分不出差别。选题时按这个模型判断难度；2026-09-28 用户决定评测使用的模型由用户另行提供，有视觉能力（[D32](../requirements/comparison-experiment.md)），难度是否仍然合适在第一次运行 OpenCode 基础分时核对。
 
 ## 2. 选用的三个任务
 

@@ -1,6 +1,6 @@
 # Yudao 总体路线图
 
-更新：2026-09-28。本文是当前阶段定义与依赖的唯一入口。最新调整（2026-09-28）：用户确认 Yudao 在可以预见的时间内只有一个人使用，会部署到多台电脑与树莓派一类的板子上；成功标准是能独立高质量交付，以及能长时间自我运行并自我修复（修复 Yudao 交付的软件）。据此阶段按执行顺序重新编号：Stage 3 增加 3.2C 执行环境服务（本机容器与远程执行代理，[ADR-0018](adr/0018-single-control-host-remote-execution.md)），删除 3.4B；运维部门与长时间运行提前为 Stage 4；原 Stage 4 改为 Stage 5；元观察、系统演化与跨任务经验合为最后的 Stage 6，暂时不做；原分布式部署阶段中实际需要的远程执行并入 3.2C，控制核心主备与服务端数据库删除，多个控制核心实例作为扩展途径写在 ADR-0018。与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）与版本回归共用三个评测场景（[评测场景设计](design/evaluation-scenarios.md)），OpenCode 的基础分现在运行，3.9 与之后每个阶段结束时重复。同日第二次讨论确定：项目流跨 Yudao 版本保存，run 流跟随应用版本（[ADR-0019](adr/0019-project-stream-across-versions.md)）；接入已有项目作为 3.8 放入 Stage 3（[D33](requirements/existing-project-onboarding.md)）；Stage 4 的修复循环与长时间运行的规则。同日第三次讨论确定：应用层、接口层与桌面客户端作为界面工作线提前到 Stage 3，此后每个工作包连同界面一起验收（[D30](requirements/web-game-frontend.md)）。本次更新是设计，不表示新增运行能力已实现。
+更新：2026-09-28。本文是当前阶段定义与依赖的唯一入口。最新调整（2026-09-28）：用户确认 Yudao 在可以预见的时间内只有一个人使用，会部署到多台电脑与树莓派一类的板子上；成功标准是能独立高质量交付，以及能长时间自我运行并自我修复（修复 Yudao 交付的软件）。据此阶段按执行顺序重新编号：Stage 3 增加 3.2C 执行环境服务（本机容器与远程执行代理，[ADR-0018](adr/0018-single-control-host-remote-execution.md)），删除 3.4B；运维部门与长时间运行提前为 Stage 4；原 Stage 4 改为 Stage 5；元观察、系统演化与跨任务经验合为最后的 Stage 6，暂时不做；原分布式部署阶段中实际需要的远程执行并入 3.2C，控制核心主备与服务端数据库删除，多个控制核心实例作为扩展途径写在 ADR-0018。与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）与版本回归共用三个评测场景（[评测场景设计](design/evaluation-scenarios.md)），OpenCode 的基础分现在运行，3.9 与之后每个阶段结束时重复。同日第二次讨论确定：项目流跨 Yudao 版本保存，run 流跟随应用版本（[ADR-0019](adr/0019-project-stream-across-versions.md)）；接入已有项目作为 3.8 放入 Stage 3（[D33](requirements/existing-project-onboarding.md)）；Stage 4 的修复循环与长时间运行的规则。同日第三次讨论确定：应用层、接口层与桌面客户端作为界面工作线提前到 Stage 3，此后每个工作包连同界面一起验收（[D30](requirements/web-game-frontend.md)）；评测工作线与界面并行，Stage 3 结束之前完成；新增 3.2D 浏览器与 computer use（[D34](requirements/browser-and-computer-use.md)），质检部门必须有视觉能力。本次更新是设计，不表示新增运行能力已实现。
 
 长期架构按[总体架构](design/architecture/overall-architecture.md)与 ADR-0010 至 ADR-0018 确定。能力和证据状态见 [当前验收基线](current-baseline.md)；进行中的工作见 [Stage 3 计划](stage-3-plan.md) 与 GitHub Issues；模型管理的已确认设计见 [模型管理设计说明](design/model-management.md)。历史报告保留原编号、版本和结果，不再作为新的执行入口。
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | Stage 1：可信交付 | 产品、工程、质检围绕有效要求完成可核验交付；失败与取消可追溯 | 按原生循环验收记录完成 | [MVP 验收](archive/mvp-acceptance.md)，以及 Stage 2 的 F 收口记录 |
 | Stage 2：三部门 Harness 基线及 Provider 补充 | 原日常路径基础上，补无配置启动、统一 Provider 模块和 Go 订阅接入 | 2.1–2.6 按原合同关闭；2.7 于 2026-09-20 关闭 | [历史进度](archive/stage-2-progress.md)、[2.7 计划](archive/stage-2-provider-plan.md)、[2.7 执行报告](archive/stage-2-7-provider-report.md) |
-| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；任意代码在容器或登记的远程机器上执行；网络与 MCP 工具、扩展接口；不同项目并行；桌面客户端与系统首页；与单个 agent 对照 | 3.0B 于 2026-09-21 完成；3.2A 于 2026-09-26 验收；控制核心重构、一份事件日志、带版本的定义、应用层骨架已完成；恢复、执行环境服务与并行未实现 | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
+| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；任意代码在容器或登记的远程机器上执行；网络与 MCP 工具、浏览器与 computer use、扩展接口；不同项目并行；桌面客户端与系统首页；与单个 agent 对照 | 3.0B 于 2026-09-21 完成；3.2A 于 2026-09-26 验收；控制核心重构、一份事件日志、带版本的定义、应用层骨架已完成；恢复、执行环境服务与并行未实现 | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
 | Stage 4：运维部门与长时间运行 | 运维部门在登记的运行环境中部署并观察交付的软件，发现的问题自动进入修复；Yudao 在进程重启、模型服务中断后自动继续 | 后续规划；需求已确认 | 本文第 5.1 节 |
 | Stage 5：部门内协作、上下文与界面 | 部门在连续多个事项中只使用当前有效的信息，部门内部按固定角色分工，用户能看清部门内外的运行过程 | 后续规划；语义系统、部门内多角色、模型管理有设计与工单 | 本文第 5.2 节 |
 | Stage 6：受治理的系统演化 | 根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；部门之间的流转有独立的流程审查 | 暂时不做 | 本文第 5.3 节 |
@@ -35,7 +35,8 @@ flowchart LR
     ENV --> X["3.2B 网络与 MCP"]
     R --> E["3.7 扩展与完整接口"]
     R --> ONB["3.8 接入已有项目"]
-    X --> C["3.9 组合验收与对照实验"]
+    X --> BCU["3.2D 浏览器与 computer use"]
+    BCU --> C["3.9 组合验收与对照实验"]
     P --> C
     E --> C
     ONB --> C
@@ -51,8 +52,9 @@ flowchart LR
 7. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供本机容器与远程执行代理两种新实现；用户在项目中登记机器。依赖 3.1 的动作核实与 #110。排在 3.2B 之前，外部内容进入模型输入之前，任意代码已经可以隔离运行。
 8. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
 9. **3.2B 网络与 MCP、3.7 扩展接口**：每个新工具单独验收。
-10. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
-11. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
+10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)）：依赖 3.2B 与 3.2C。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 在容器的虚拟屏幕中通过截图、点击与输入操作桌面程序。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门必须有视觉能力：所选模型不支持图像时拒绝保存设置，请求时进入待恢复。安全按普通浏览器 MCP 的默认做法，暂不另加限制。评测场景 1 的 Yudao 一侧依赖本项。
+11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
+12. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
 
 已有 Provider 配置页复用；其他 Provider/订阅和推理设置留在 3.3，按用户明确的服务推进。
 

@@ -2,6 +2,8 @@
 
 > 2026-09-28 新资料：[评测场景选题调研](evaluation-benchmarks.md)。支持 [D32](../requirements/comparison-experiment.md) 与 [评测场景设计](../design/evaluation-scenarios.md)，记录 WebGen-Bench、ArtifactsBench、FeatBench、PRDBench 中选用任务的来源、版本、需求、检查与公开成绩，同档的其他候选，以及 Terminal-Bench 2.0、Harbor 与其他没有选用的评测和原因。
 
+> 2026-09-28 新资料：[浏览器与 computer use 调研](browser-and-computer-use.md)。支持 [D34](../requirements/browser-and-computer-use.md)，记录 Codex（`69f7140`）、OMP 与 OpenCode 的做法，以及 Playwright MCP、Chrome DevTools MCP、OpenAI 与 Anthropic computer use、browser-use 的比较。
+
 > 2026-09-26 新资料：[Anthropic 费马大定理形式化与 Prove2Me：一手来源调研](fermat-formalization-prove2me.md)。核对 Anthropic 博客《Formalizing Fermat's Last Theorem》、Prove2Me 论文（arXiv:2608.28433）与证明仓库：早期多 agent 因丢失项目状态失败，改用陈述与证明分离且不可修改、proof-sketch 边证边拆、人审核有边界的 mission 与回读、milestone 之后成功；记录「去中心化」的准确含义与前提，与 Yudao 的对照、冲突，以及「在循环中嵌入确定性 DAG 节点」的待讨论材料（未形成决定）。
 
 > 2026-09-26 新资料：[提示词审计（2026-09-26）](prompt-audit-2026-09-26.md)。按 `/claude-api prompt-audit` 检查规则文件、部门指令、上下文固定规则、压缩提示词与工具描述，列出 21 项结果与 5 项只登记的条目，附可以逐段采用的补丁；规则文件的补丁与 `harness/` 的补丁、工具合并都已于 2026-09-26 采用（`harness/` 部分见 #46）。

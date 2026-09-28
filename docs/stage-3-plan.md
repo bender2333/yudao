@@ -2,7 +2,7 @@
 
 更新：2026-09-28。状态：3.0B 于 2026-09-21 完成；3.2A 于 2026-09-26 验收（#12–#15 关闭，[3.2A 验收报告](stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md)）；3.1、3.2C 与 3.4A 未实施。顺序：[Stage 2.7 Provider 与 Go](archive/stage-2-provider-plan.md)（2026-09-20 关闭）→ 3.0B → 通用工具 → 恢复 → 执行环境服务 → 网络与 MCP；恢复可靠后不同项目并行；3.2A 与 3.1 之间的前置工作见[总体路线图](program-roadmap.md)第 2 节。
 
-2026-09-24 调整：3.5 技能、3.6 部门内多角色、3.10 语义系统移到 Stage 5（部门内协作、上下文与界面）；3.8 运维并入 Stage 4（运维部门与长时间运行）的运维部门。2026-09-28 调整：新增 3.2C 执行环境服务（本机容器与远程执行代理，[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)），排在 3.1 之后、3.2B 之前；同一项目的事项按优先级排队，3.4B 同项目并行采纳取消；3.1 的恢复在 Yudao 启动时自动进行；与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）与版本回归共用三个评测场景（[评测场景设计](design/evaluation-scenarios.md)），OpenCode 基础分现在运行，3.9 重复。同日新增 3.8 接入已有项目（[D33](requirements/existing-project-onboarding.md)），排在 3.1 之后、3.9 之前；版本规则按 [ADR-0019](adr/0019-project-stream-across-versions.md) 区分项目流与 run 流。同日应用层、接口层与桌面客户端作为界面工作线提前到本阶段（[D30](requirements/web-game-frontend.md)），此后每个工作包连同界面一起验收。各阶段定义见[总体路线图](program-roadmap.md)。
+2026-09-24 调整：3.5 技能、3.6 部门内多角色、3.10 语义系统移到 Stage 5（部门内协作、上下文与界面）；3.8 运维并入 Stage 4（运维部门与长时间运行）的运维部门。2026-09-28 调整：新增 3.2C 执行环境服务（本机容器与远程执行代理，[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)），排在 3.1 之后、3.2B 之前；同一项目的事项按优先级排队，3.4B 同项目并行采纳取消；3.1 的恢复在 Yudao 启动时自动进行；与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）与版本回归共用三个评测场景（[评测场景设计](design/evaluation-scenarios.md)），OpenCode 基础分现在运行，3.9 重复。同日新增 3.8 接入已有项目（[D33](requirements/existing-project-onboarding.md)），排在 3.1 之后、3.9 之前；版本规则按 [ADR-0019](adr/0019-project-stream-across-versions.md) 区分项目流与 run 流。同日应用层、接口层与桌面客户端作为界面工作线提前到本阶段（[D30](requirements/web-game-frontend.md)），此后每个工作包连同界面一起验收；评测工作线与界面并行，本阶段结束之前完成；新增 3.2D 浏览器与 computer use（[D34](requirements/browser-and-computer-use.md)）。各阶段定义见[总体路线图](program-roadmap.md)。
 
 上位入口：[总体路线图](program-roadmap.md)。代码与证据起点：[当前验收基线](current-baseline.md)。本版替换 2026-09-09 的旧依赖，不再要求学习闭环先完成，也不把已完成的 Provider UI 再列为待建。
 
@@ -35,10 +35,11 @@
 | 3.2C 执行环境服务 | 执行环境的合同经过 HTTP 加 JSON，新增本机容器与远程执行代理两种实现；用户在项目中登记机器（地址、用途、授权范围）；连接的认证与加密保留位置并标为 TODO（只在局域网内使用）；远程动作按心跳判断存活（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)） | 同一事项的工程构建与质检检查分别在本机容器与一台登记的树莓派上完成；执行代理断开时动作结果记为未知并按 3.1 核实，迟到的回执只记录 | 3.1 的动作核实；#110 |
 | 3.4A 独立事项并行 | 不同项目、隔离目录、有限执行槽位、独立取消与恢复；同一项目的事项按优先级排队 | 两个项目真实重叠执行；其中一个故障不会重做或污染另一个 | 3.1 验收通过 |
 | 3.2B 网络与 MCP | 有授权的取回、官方 MCP SDK 接入及每类动作恢复契约 | 真实外部工具调用有证据；未明确副作用恢复的工具不能默认重试 | 3.2C；每个新工具单独验收 |
+| 3.2D 浏览器与 computer use | 浏览器工具使用 Playwright MCP（每个动作一个工具，每一步给可访问性结构，模型能看图时附截图，截图保存为证据）；computer use 在容器的虚拟屏幕中通过截图、点击与输入操作桌面程序；质检两个工具都可以使用，工程可以使用浏览器做研发自测；部门定义写明必需能力，质检为图像输入，不满足时拒绝保存设置、请求时进入待恢复；安全按普通浏览器 MCP 的默认做法（[D34](requirements/browser-and-computer-use.md)） | 质检从 PRD 生成测试，在浏览器中逐项操作一个交付的网页应用并核验，截图绑定交付快照；在虚拟屏幕中操作一个交付的桌面程序完成同样的核验；给质检设置不支持图像的模型时被拒绝 | 3.2B、3.2C |
 | 3.3 其他 Provider 与推理设置 | 更多服务/订阅、推理配置及比较 | 在统一 Provider 模块中接入并真实验收；Go 三协议和混合绑定已归 2.7，不重复立项 | 2.7；按后续明确服务推进 |
 | 3.7 扩展与完整接口 | 准入钩子、只读观察者、完整 CLI/NDJSON/嵌入 | 不改内核增加一项检查和观察；CI 完成事项并导出 | 工具/恢复接口稳定 |
 | 3.8 接入已有项目 | 产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；初始 PRD 经用户确认后成为当前有效的要求（[D33](requirements/existing-project-onboarding.md)） | 一个没有经过 Yudao 的真实代码项目完成建档，用户确认初始 PRD，随后一个事项在它的基础上完成修改并采纳 | 3.1 |
-| 3.9 组合验收与对照实验 | 真实外部项目（经 3.8 接入）多次变更、工具、恢复、执行环境服务、并行、网络与 MCP、扩展接口；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)） | 源码冻结，逐能力有结论，并报告质量、上下文、调用、用量和耗时；对照实验在三个评测场景上两边各运行 3 次，报告完成度、正确性、丰富程度、模型请求数、用量与耗时，失败与缺失的结果如实列出 | 相关工作包通过，包括 3.8；评测工作线完成 |
+| 3.9 组合验收与对照实验 | 真实外部项目（经 3.8 接入）多次变更、工具、恢复、执行环境服务、并行、网络与 MCP、扩展接口；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)） | 源码冻结，逐能力有结论，并报告质量、上下文、调用、用量和耗时；对照实验在三个评测场景上两边各运行 3 次，报告完成度、正确性、丰富程度、模型请求数、用量与耗时，失败与缺失的结果如实列出 | 相关工作包通过，包括 3.2D 与 3.8；评测工作线完成 |
 
 3.2A 和 3.1 内部都保持单任务运行。3.1 的双进程争抢测试是恢复正确性测试，不表示已经开放多任务调度。3.0B 未通过前，可以准备工具/故障样例，不能把后续代码当已验证基线。
 
