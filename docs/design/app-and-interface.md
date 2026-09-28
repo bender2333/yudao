@@ -262,13 +262,13 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `catalog.connection.save` | 新增或修改 Provider 配置及其模型访问定义（含容量确认与输入方式） | Provider 配置字段、模型访问定义列表（每个定义含输入方式：文本、图像） | `catalog_revised`（第 10 节第 1 项） | 目录修订号 | 已有 `POST /api/providers`、`PUT /api/providers/{id}` |
+| `catalog.connection.save` | 新增或修改 Provider 配置及其模型访问定义（含容量确认与输入方式） | Provider 配置字段、模型访问定义列表（每个定义含输入方式：文本、图像，以及是否接受要求调用工具） | `catalog_revised`（第 10 节第 1 项） | 目录修订号 | 已有 `POST /api/providers`、`PUT /api/providers/{id}` |
 | `catalog.connection.delete` | 删除 Provider 配置 | Provider 配置 | `catalog_revised` | 目录修订号 | 已有 `DELETE /api/providers/{id}` |
 | `catalog.document.save` | 保存目录文档（编辑 JSON、导入） | 目录文档 | `catalog_revised` | 目录修订号 | 已有 `POST /api/providers`（带 `providers` 字段） |
 | `catalog.reload` | 重新读取目录文件 | 无 | `catalog_revised`（修订号变化时） | 目录修订号（记录依据） | 已有 `POST /api/providers/reload` |
 | `catalog.candidates.collect` | 获取模型列表；每个候选带预填的窗口、输出上限与输入方式，每个预填值带来源（上游模型列表，或模型能力表及其 revision） | Provider 配置、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/candidates` |
 | `catalog.connection.test` | 连接测试 | Provider 配置 | `catalog_test_finished` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=connection`） |
-| `catalog.model.test` | 模型测试，通过时写入准入；输入方式包含图像时另发一次带图片的请求，结果区分图像输入测试失败并带上游返回的原因 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`） |
+| `catalog.model.test` | 模型测试，通过时写入准入 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`） |
 | `catalog.department_defaults.save` | 保存部门默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各部门的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 已有 `PUT /api/department-bindings`；提醒新增（D24 第 5.6 节） |
 | `catalog.role_defaults.save` | 保存角色默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各角色的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 新增（Stage 5） |
 | `credential.set` | 保存 API Key，只在本进程有效或写入 `.env` | 凭据引用、API Key、写入方式 | `credential_changed`（只含引用、来源与版本） | 凭据版本 | 已有 `POST /api/provider-credentials`（`action=set`） |
