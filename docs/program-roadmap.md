@@ -1,6 +1,6 @@
 # Yudao 总体路线图
 
-更新：2026-09-28。本文是当前阶段定义与依赖的唯一入口。最新调整（2026-09-28）：用户确认 Yudao 在可以预见的时间内只有一个人使用，会部署到多台电脑与树莓派一类的板子上；成功标准是能独立高质量交付，以及能长时间自我运行并自我修复（修复 Yudao 交付的软件）。据此阶段按执行顺序重新编号：Stage 3 增加 3.2C 执行环境服务（本机容器与远程执行代理，[ADR-0018](adr/0018-single-control-host-remote-execution.md)），删除 3.4B；运维部门与长时间运行提前为 Stage 4；原 Stage 4 改为 Stage 5；元观察、系统演化与跨任务经验合为最后的 Stage 6，暂时不做；原分布式部署阶段中实际需要的远程执行并入 3.2C，控制核心主备与服务端数据库删除，多个控制核心实例作为扩展途径写在 ADR-0018。与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）在 3.9 第一次执行。同日第二次讨论确定：项目流跨 Yudao 版本保存，run 流跟随应用版本（[ADR-0019](adr/0019-project-stream-across-versions.md)）；接入已有项目作为 3.8 放入 Stage 3（[D33](requirements/existing-project-onboarding.md)）；Stage 4 的修复循环与长时间运行的规则。本次更新是设计，不表示新增运行能力已实现。
+更新：2026-09-28。本文是当前阶段定义与依赖的唯一入口。最新调整（2026-09-28）：用户确认 Yudao 在可以预见的时间内只有一个人使用，会部署到多台电脑与树莓派一类的板子上；成功标准是能独立高质量交付，以及能长时间自我运行并自我修复（修复 Yudao 交付的软件）。据此阶段按执行顺序重新编号：Stage 3 增加 3.2C 执行环境服务（本机容器与远程执行代理，[ADR-0018](adr/0018-single-control-host-remote-execution.md)），删除 3.4B；运维部门与长时间运行提前为 Stage 4；原 Stage 4 改为 Stage 5；元观察、系统演化与跨任务经验合为最后的 Stage 6，暂时不做；原分布式部署阶段中实际需要的远程执行并入 3.2C，控制核心主备与服务端数据库删除，多个控制核心实例作为扩展途径写在 ADR-0018。与单个 agent 的对照实验（[D32](requirements/comparison-experiment.md)）与版本回归共用三个评测场景（[评测场景设计](design/evaluation-scenarios.md)），OpenCode 的基础分现在运行，3.9 与之后每个阶段结束时重复。同日第二次讨论确定：项目流跨 Yudao 版本保存，run 流跟随应用版本（[ADR-0019](adr/0019-project-stream-across-versions.md)）；接入已有项目作为 3.8 放入 Stage 3（[D33](requirements/existing-project-onboarding.md)）；Stage 4 的修复循环与长时间运行的规则。本次更新是设计，不表示新增运行能力已实现。
 
 长期架构按[总体架构](design/architecture/overall-architecture.md)与 ADR-0010 至 ADR-0018 确定。能力和证据状态见 [当前验收基线](current-baseline.md)；进行中的工作见 [Stage 3 计划](stage-3-plan.md) 与 GitHub Issues；模型管理的已确认设计见 [模型管理设计说明](design/model-management.md)。历史报告保留原编号、版本和结果，不再作为新的执行入口。
 
@@ -45,7 +45,7 @@ flowchart LR
 6. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
 7. **3.2B 网络与 MCP、3.7 扩展接口**：每个新工具单独验收。
 8. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
-9. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；第一次执行与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
+9. **3.9 组合验收与对照实验**：在真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。
 
 已有 Provider 配置页复用；其他 Provider/订阅和推理设置留在 3.3，按用户明确的服务推进。
 
@@ -69,7 +69,7 @@ flowchart LR
 | 单项局部改进 | 固定重试等执行规则；尚无证据驱动的比较结论 | 针对已观察问题比较固定策略与一项有界调整，质量不降并报告额外成本 |
 | 项目记忆 | 项目上下文文本随采纳增长，只携带最近一次采纳成果的产品合同 | 由 Stage 5 语义系统承担：项目内的轨迹与图谱跨事项延续，替代长期记忆 |
 | 跨任务经验 | 候选仅保存，不自动注入 | 随 Stage 6 进行：候选、独立验证、适用检索、限定采用、冲突处理、反例与停用贯通 |
-| 综合比较 | D32 与单个 agent 的对照实验在 3.9 第一次执行 | 在未见任务上比较固定基线、仅控制、仅经验、组合方案 |
+| 综合比较 | D32 与单个 agent 的对照实验：OpenCode 基础分现在运行，3.9 与之后每个阶段结束时重复 | 在未见任务上比较固定基线、仅控制、仅经验、组合方案 |
 
 语义与关系查询服务于具体问题：“这条经验由哪些经历支持”“要求变化后哪些经验需要重验”。已有存储能满足时不新增图数据库或向量库。相似文本不能直接证明同一问题或同一根因。项目内的轨迹与图谱由 Stage 5 语义系统维护，作为事件的投影存放在现有 SQLite 中，查询只用结构条件与全文检索，不使用向量检索（[D25](requirements/semantic-system.md)）。
 

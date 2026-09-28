@@ -39,7 +39,7 @@
 | D29 | [远程执行环境](remote-execution.md) | 需求已确认；部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，执行环境服务的合同沿用 [ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 的边界，未实施；路线位置 Stage 3 的 3.2C 执行环境服务 |
 | D30 | [游戏化的桌面客户端界面与界面实现](web-game-frontend.md) | 需求已记录；客户端为 Electron 桌面程序（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）；[原型 v7](../prototypes/v7/design.md) 已完成，技术设计进行中，未实施 |
 | D31 | [部门内的外包角色](outsourced-agent-roles.md) | 需求已记录，未实施；路线位置待定 |
-| D32 | [与单个 agent 的对照实验](comparison-experiment.md) | 需求已确认，任务集未设计，未实施；路线位置 Stage 3 的 3.9 组合验收第一次执行，之后每个阶段结束时重复；任务可以使用经 3.8 接入的已有项目 |
+| D32 | [与单个 agent 的对照实验](comparison-experiment.md) | 需求、三个场景与评分方法已确认，未实施；版本回归与 OpenCode 对照共用三个场景（[评测场景设计](../design/evaluation-scenarios.md)）；OpenCode 基础分现在运行，3.9 组合验收与之后每个阶段结束时重复 |
 | D33 | [接入已有项目](existing-project-onboarding.md) | 需求已确认，未实施；路线位置 Stage 3 的 3.8 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
