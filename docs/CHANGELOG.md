@@ -194,3 +194,5 @@ claude-opus-5-5 / 2026-09-27 21:25 / docs/architecture-issues.md 登记两条：
 claude-opus-5-5 / 2026-09-27 21:49 / docs/requirements/provider-retries.md（D17）写明证书校验失败不重试、三种协议共用信任操作系统证书库的 TLS 上下文；docs/architecture-issues.md 为 #113、#109 登记的四条问题追加处理结论（#114、#115） / #113 与 #109 登记的问题
 
 claude-opus-5-5 / 2026-09-27 22:54 / docs/stage-3/organization-comparison-samples.md 第 29、348、444 行去掉估计用量（estimated）的来源与 estimated_totals / #109 按规则 1 删除了没有写入方的估计用量读取
+
+claude-opus-5-5 / 2026-09-28 16:40 / docs/design/app-and-interface.md 第 4.3 节 decisions.list：返回内容加入所属的项目、事项与 run，筛选条件由「是否已回答」改为可多选的状态（等待回答、已回答、已撤销），写明等待用户的列表只取等待回答 / #49 核对：已撤销的请求混在「未回答」中，界面按项目列出时需要知道所属事项；参照 OpenCode 与 OMP 的等待请求做法，用户确认
