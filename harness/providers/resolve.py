@@ -204,6 +204,24 @@ def call_target_public(
     }
 
 
+_DECISION_TARGET_STRINGS = (
+    "provider_name", "protocol", "requested_provider", "requested_protocol", "requested_model",
+)
+
+
+def event_call_target(public: Mapping[str, Any], *, selection_source: str | None) -> dict[str, Any]:
+    # 写入请求、尝试与压缩事件的调用目标：解析的公开部分加选择来源，不含密钥
+    return {**public, "selection_source": selection_source}
+
+
+def decision_call_target(public: Mapping[str, Any]) -> dict[str, Any] | None:
+    # 待恢复决定请求里的调用目标：身份还没有解析出来时不填，原因与说明写在请求文本里
+    payload = event_call_target(public, selection_source=None)
+    if any(not isinstance(payload.get(key), str) for key in _DECISION_TARGET_STRINGS):
+        return None
+    return payload
+
+
 @dataclass(frozen=True)
 class CallTargetResolution:
     # 一次模型调用的调用目标解析结果：public 是进入事件与界面的公开部分，不含密钥；

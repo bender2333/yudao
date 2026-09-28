@@ -35,10 +35,6 @@
     "outcome": "failed",
     "human_action": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。"
   },
-  "provider_credentials_lost": {
-    "outcome": "failed",
-    "human_action": "任务创建时冻结的 provider 凭据已不在当前进程中。请新建 run，不能用新凭据续跑旧任务。"
-  },
   "provider_protocol": {
     "outcome": "failed",
     "human_action": null

@@ -104,7 +104,11 @@ def test_baseline_requests_unaffected_after_candidate_v1(comparison):
 def test_comparison_writes_report_without_network(comparison):
     system, report, out = comparison
     assert system.test_adapter.name == "fake"
-    assert system.facade.describe_readiness()["available"] is False
+    # 测试系统在每次激活时按 fake 协议登记调用目标（#45），就绪检查看到的就是这份确定性定义；
+    # 对照运行仍然只使用 FakeAdapter，不访问网络
+    readiness = system.facade.describe_readiness()
+    assert readiness["available"] is True
+    assert {item["protocol"] for item in readiness["departments"].values()} == {"fake"}
     assert report["conclusion"] == "undecided"
     markdown = (out / "a4-compare.md").read_text(encoding="utf-8")
     assert "结论：`undecided`" in markdown

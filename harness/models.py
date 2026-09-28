@@ -577,8 +577,9 @@ class RunProjection:
     provider: str = "fake"
     adapter: str = "fake"
     model: str | None = None
-    provider_snapshot: dict[str, Any] = field(default_factory=dict)
     model_requests: list[dict[str, Any]] = field(default_factory=list)
+    # 每个部门最近一次请求解析出的调用目标公开部分（含选择来源），界面与审计读取这里
+    department_call_targets: dict[str, dict[str, Any]] = field(default_factory=dict)
     requested_provider: str | None = None
     requested_model: str | None = None
     actual_provider: str | None = None
@@ -635,10 +636,8 @@ class RunProjection:
 
     @property
     def provider_bindings(self) -> dict[str, dict[str, Any]]:
-        departments = self.provider_snapshot.get("departments")
-        if not isinstance(departments, dict):
-            return {}
-        return departments
+        # 每个部门最近一次请求解析出的调用目标；还没有请求时为空
+        return self.department_call_targets
 
 
 # ---------------------------------------------------------------------------

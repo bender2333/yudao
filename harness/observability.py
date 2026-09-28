@@ -873,17 +873,18 @@ def _public_status(record: dict[str, Any]) -> str:
 
 
 def _department_provider(binding: dict[str, Any] | None) -> dict[str, Any] | None:
+    # 部门最近一次请求解析出的调用目标：字段取自请求事件的载荷
     if not isinstance(binding, dict):
         return None
     return {
-        "provider": binding.get("provider_name") or binding.get("provider_id"),
-        "model": binding.get("model"),
+        "provider": binding.get("provider_name") or binding.get("provider_config_id"),
+        "model": binding.get("requested_model"),
         "protocol": binding.get("protocol"),
         "base_url": binding.get("base_url"),
         "context_window": binding.get("context_window"),
-        "max_output_tokens": binding.get("max_output_tokens"),
+        "max_output_tokens": binding.get("configured_max_output_tokens"),
         "temperature": None,
-        "snapshot_id": binding.get("snapshot_id"),
+        "selection_source": binding.get("selection_source"),
     }
 
 

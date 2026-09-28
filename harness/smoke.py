@@ -568,20 +568,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 for field, value in {**basis, **expected_guidance}.items():
                     if field not in payload or payload[field] != value:
                         notes.append(f"event {event.stream_version}: activation {field} does not match current work")
-                frozen_binding = current_work.provider_bindings.get(event.role or "")
-                if frozen_binding:
-                    expected_binding = {
-                        "provider_config_id": frozen_binding.get("provider_id"),
-                        "model_id": frozen_binding.get("model_id"),
-                        "protocol": frozen_binding.get("protocol"),
-                        "base_url": frozen_binding.get("base_url"),
-                        "requested_model": frozen_binding.get("model"),
-                        "context_window": frozen_binding.get("context_window"),
-                        "configured_max_output_tokens": frozen_binding.get("max_output_tokens"),
-                    }
-                    for field, value in expected_binding.items():
-                        if payload.get(field) != value:
-                            notes.append(f"event {event.stream_version}: provider binding {field} differs from the frozen task snapshot")
             continue
         if event.type not in {EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED,
                               EventType.COMPACTION_RECORDED, EventType.MODEL_MESSAGE,
@@ -669,12 +655,25 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError(f"{field} does not match the activation and current work")
             checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"],
                               basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
-            # 按记录下来的事件由 P 重新装配：调用目标按冻结的部门模型，部门身份、提示词与只能回应指导按激活时的记录，
-            # guidance_results 使用装配时已有的事件与记录下来的工作区快照
-            frozen_binding = current_work.provider_bindings.get(event.role or "")
-            target_window = frozen_binding.get("context_window") if frozen_binding else None
-            configured_output_limit = frozen_binding.get("max_output_tokens") if frozen_binding else None
-            limits = model_limits(current_work.context_window, target_window, configured_output_limit)
+            # 按记录下来的事件由 P 重新装配：调用目标取这次请求事件记录的解析结果，
+            # 部门身份、提示词与只能回应指导按激活时的记录，guidance_results 使用装配时已有的事件与记录下来的工作区快照。
+            # 工具与部门工作消息本身没有调用目标，用这次激活里同一步请求记录下来的窗口
+            if "context_window" in payload:
+                target_window = payload["context_window"]
+                configured_output_limit = payload.get("configured_max_output_tokens")
+            else:
+                recorded = next(
+                    (item for item in events
+                     if item.type == EventType.CONTEXT_ASSEMBLED
+                     and item.payload.get("activation_id") == activation
+                     and item.payload.get("step_id") == payload.get("step_id")),
+                    None,
+                )
+                if recorded is None:
+                    raise ValueError("event has no recorded model request to take the call target from")
+                target_window = recorded.payload["context_window"]
+                configured_output_limit = recorded.payload.get("configured_max_output_tokens")
+            limits = model_limits(target_window, configured_output_limit)
             frame = StepFrame(
                 department=event.role, session_id=event.session_id, activation_id=activation,
                 prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
@@ -762,9 +761,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if payload.get("compaction_event_id") != manifest.compaction_event_id:
                     raise ValueError("model request uses an unrelated compaction checkpoint")
                 if payload.get("effective_context_window") != limits.context_window:
-                    raise ValueError("effective context window does not match the frozen department model")
-                if payload.get("configured_max_output_tokens") != configured_output_limit:
-                    raise ValueError("configured output limit does not match the frozen department model")
+                    raise ValueError("effective context window does not match the resolved call target")
                 if purpose == "compaction":
                     if schemas or limit is None:
                         raise ValueError("compaction must have no tools and an explicit output limit")
@@ -789,7 +786,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if schemas != expected.context.tools:
                         raise ValueError("actual tool schemas differ from the allowed definitions")
                     if limit != manifest.max_output_tokens:
-                        raise ValueError("effective output limit does not match the frozen department model")
+                        raise ValueError("effective output limit does not match the resolved call target")
                 if request != expected.payload:
                     raise ValueError("model request differs from the request rebuilt from the recorded events")
                 if (payload.get("input_token_estimate") != expected.input_token_estimate
