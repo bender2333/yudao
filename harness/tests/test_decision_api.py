@@ -99,10 +99,13 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         assert (blocked.phase, blocked.stop_reason, blocked.outcome) == ("ENGINEERING", None, "running")
         assert blocked.cycle_count == 2 and blocked.token_used == 120 and blocked.product_spec is not None
 
-        # 未回答的请求按项目与事项列出，内容完整：身份、种类、阻塞范围、选项与说明、涉及的事实引用、状态与回答
-        listed = _list(client, project_id=project_id, work_item_id=work_item_id)
+        # 未回答的请求按项目与事项列出，内容完整：身份、所属的项目、事项与 run、种类、阻塞范围、选项与说明、
+        # 涉及的事实引用、状态与回答
+        listed = _list(client, project_id=project_id, work_item_id=work_item_id, status=["open"])
         assert listed["position"] == system.store.end_position()
         [decision] = listed["data"]["decisions"]
+        assert (decision["project_id"], decision["work_item_id"], decision["run_id"]) == (
+            project_id, work_item_id, run_id)
         assert (decision["kind"], decision["blocks"], decision["status"], decision["version"]) == (
             "model_unavailable", "run", "open", 1)
         assert decision["answer"] is None and decision["requested_at"]
@@ -115,13 +118,13 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
                     if event.type == EventType.MODEL_ATTEMPT_FAILED]
         assert request["facts"] == [failed.event_id]
 
-        # 筛选：同一个项目的另一个事项与另外的种类、已回答的请求都不被列出
+        # 筛选：同一个项目的另一个事项与另外的种类、其他状态的请求都不被列出
         other_item, other_run = service.system.projects.start_work_item(project_id, "另一个事项")
         assert _list(client, project_id=project_id, work_item_id=work_item_id)["data"] == listed["data"]
         assert _list(client, work_item_id=other_item)["data"] == {"decisions": []}
         assert _list(client, kind="model_unavailable")["data"] == listed["data"]
-        assert _list(client, answered=False)["data"] == listed["data"]
-        assert _list(client, answered=True)["data"] == {"decisions": []}
+        assert _list(client, status=["open"])["data"] == listed["data"]
+        assert _list(client, status=["answered", "withdrawn"])["data"] == {"decisions": []}
         assert _list(client, kind="other")["data"] == {"decisions": []}
         assert _list(client, project_id="proj_missing")["data"] == {"decisions": []}
 
@@ -152,7 +155,7 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
 
         # 回答后的请求按状态列出，回答的内容与事件一致
-        answered = _list(client, project_id=project_id, work_item_id=work_item_id, answered=True)
+        answered = _list(client, project_id=project_id, work_item_id=work_item_id, status=["answered"])
         assert answered["position"] == system.store.end_position()
         [answered_decision] = answered["data"]["decisions"]
         [answer_event] = [event for event in system.store.list_events(run_id)
@@ -186,7 +189,7 @@ def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
         [item] = system.projects.projection(project_id).work_items
         assert (item.work_item_id, item.status, item.stop_reason) == (work_item_id, "stopped", "cancelled")
         assert len(service.adapters[0].invocations) == 2
-        [answered_decision] = _list(client, project_id=project_id, answered=True)["data"]["decisions"]
+        [answered_decision] = _list(client, project_id=project_id, status=["answered"])["data"]["decisions"]
         assert (answered_decision["status"], answered_decision["answer"]["option"],
                 answered_decision["answer"]["note"]) == ("answered", "stop", None)
 
@@ -249,21 +252,22 @@ def test_a_repeated_command_identity_applies_once_and_every_rejection_explains_i
                     if event.type == EventType.DECISION_ANSWERED]) == 1
 
 
-def test_a_withdrawn_request_is_still_unanswered_and_cannot_be_answered(data_dir):
-    # 运行结束时撤销的请求没有回答：是否已回答为 false 时列出、为 true 时不列出，再次回答被拒绝
+def test_a_withdrawn_request_is_not_in_the_waiting_list_and_cannot_be_answered(data_dir):
+    # 运行结束时撤销的请求不在等待回答的列表里（状态为 withdrawn）；按已撤销或省略状态时列出，再次回答被拒绝
     service = _Service(data_dir, [_unavailable_script()])
     with running_api(service) as client:
-        project_id, _work_item_id, run_id, _blocked = _blocked_run(client, service)
+        project_id, work_item_id, run_id, _blocked = _blocked_run(client, service)
         system = service.system
-        [decision] = _list(client, project_id=project_id)["data"]["decisions"]
+        [decision] = _list(client, project_id=project_id, status=["open"])["data"]["decisions"]
 
         cancelled = system.cancel(run_id)
         assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
-        [withdrawn] = _list(client, project_id=project_id, answered=False)["data"]["decisions"]
+        assert _list(client, project_id=project_id, status=["open"])["data"] == {"decisions": []}
+        [withdrawn] = _list(client, project_id=project_id, status=["withdrawn"])["data"]["decisions"]
         assert (withdrawn["decision_id"], withdrawn["status"], withdrawn["answer"]) == (
             decision["decision_id"], "withdrawn", None)
-        assert _list(client, project_id=project_id, answered=True)["data"] == {"decisions": []}
-        assert [item["status"] for item in _list(client, project_id=project_id)["data"]["decisions"]] == ["withdrawn"]
+        assert [item["status"] for item in
+                _list(client, project_id=project_id, work_item_id=work_item_id)["data"]["decisions"]] == ["withdrawn"]
 
         end = system.store.end_position()
         closed = _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
@@ -271,6 +275,60 @@ def test_a_withdrawn_request_is_still_unanswered_and_cannot_be_answered(data_dir
         assert closed.status_code == 409 and closed.json()["reason"] == "decision_closed"
         assert "已经撤销" in closed.json()["message"]
         assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
+
+
+def test_the_listing_filters_by_several_states_and_reports_the_owning_identities(data_dir):
+    # 状态筛选可以重复给出多个状态（?status=open&status=answered），也可以一次给出多个；省略状态时不限制。
+    # 每一项都带所属的项目、事项与 run；不在清单里的状态被拒绝（422），查询不写入
+    service = _Service(data_dir, [_unavailable_script() + [
+        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+    ]])
+    with running_api(service) as client:
+        project_id, work_item_id, run_id, _blocked = _blocked_run(client, service)
+        system = service.system
+        [first] = _list(client, project_id=project_id, status=["open"])["data"]["decisions"]
+        assert (first["project_id"], first["work_item_id"], first["run_id"]) == (project_id, work_item_id, run_id)
+        # 单值筛选：等待回答的列表只取 open，其他状态各自为空
+        assert _list(client, project_id=project_id, status=["answered"])["data"] == {"decisions": []}
+        assert _list(client, project_id=project_id, status=["withdrawn"])["data"] == {"decisions": []}
+
+        # 回答以后它只在 answered 下出现
+        assert _answer(client, str(uuid.uuid4()), decision_id=first["decision_id"], option="continue",
+                       base_version=1).status_code == 200
+        assert _wait_for_completion(system, run_id).phase == "DONE"
+        assert _list(client, project_id=project_id, status=["open"])["data"] == {"decisions": []}
+        assert [(item["decision_id"], item["status"]) for item in
+                _list(client, project_id=project_id, status=["open", "answered"])["data"]["decisions"]] == [
+            (first["decision_id"], "answered")]
+
+        # 第二个事项的请求在运行取消时撤销
+        second_item, second_run = system.projects.start_work_item(project_id, "另一个事项")
+        blocked_again = system.run_until_stop(second_run)
+        assert (blocked_again.phase, blocked_again.stop_reason, blocked_again.outcome) == ("ENGINEERING", None,
+                                                                                          "running")
+        [second] = _list(client, work_item_id=second_item)["data"]["decisions"]
+        assert (second["project_id"], second["work_item_id"], second["run_id"]) == (project_id, second_item,
+                                                                                    second_run)
+        assert system.cancel(second_run).stop_reason == "cancelled"
+
+        # 多选：两个状态一起筛选，按请求的先后排列；省略状态时不限制
+        assert [(item["decision_id"], item["status"]) for item in
+                _list(client, project_id=project_id, status=["answered", "withdrawn"])["data"]["decisions"]] == [
+            (first["decision_id"], "answered"), (second["decision_id"], "withdrawn")]
+        assert [item["decision_id"] for item in
+                _list(client, project_id=project_id)["data"]["decisions"]] == [
+            first["decision_id"], second["decision_id"]]
+        # 事项范围与状态一起使用
+        assert [item["decision_id"] for item in
+                _list(client, work_item_id=second_item, status=["withdrawn"])["data"]["decisions"]] == [
+            second["decision_id"]]
+
+        # 不在清单里的状态被拒绝，查询不写入
+        end = system.store.end_position()
+        invalid = client.get("/api/queries/decisions.list", params=[("status", "open"), ("status", "bogus")])
+        assert invalid.status_code == 422
+        assert system.store.end_position() == end
 
 
 def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection(data_dir):

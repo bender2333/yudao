@@ -185,19 +185,20 @@
             }
           },
           {
-            "name": "answered",
+            "name": "status",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Answered"
+              "type": "array",
+              "items": {
+                "enum": [
+                  "open",
+                  "answered",
+                  "withdrawn"
+                ],
+                "type": "string"
+              },
+              "title": "Status"
             }
           }
         ],
@@ -709,6 +710,39 @@
             "type": "string",
             "title": "Decision Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "kind": {
             "type": "string",
             "title": "Kind"
@@ -753,6 +787,9 @@
         "type": "object",
         "required": [
           "decision_id",
+          "project_id",
+          "work_item_id",
+          "run_id",
           "kind",
           "blocks",
           "version",
