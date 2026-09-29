@@ -450,6 +450,8 @@ class _ResponsesInvoker:
                 model=invocation.config.model,
                 input=_responses_input_items(provider_input),
                 tools=_responses_tools(provider_input),
+                # 要求调用工具时发送 tool_choice: required；自动时不发送（#102）
+                **({"tool_choice": "required"} if provider_input.tool_choice == "required" else {}),
                 store=False,
                 stream=True,
                 **output_limit,

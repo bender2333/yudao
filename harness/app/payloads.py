@@ -178,6 +178,8 @@ class CallTarget(Payload):
     credential_version: str | None
     context_window: int | None
     configured_max_output_tokens: int | None
+    # 模型访问定义声明的是否接受要求调用工具；模型尚未解析时为空
+    accepts_required_tool_call: bool | None
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
@@ -411,6 +413,8 @@ class ModelRequestedPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     purpose: Purpose
     effective_context_window: int
     max_output_tokens: int | None
+    # 是否要求调用工具：最后一次主机提示之后的工作请求为 required；声明不接受时为 auto（#102）
+    tool_choice: Literal["auto", "required"]
     definitions_version: str
 
 

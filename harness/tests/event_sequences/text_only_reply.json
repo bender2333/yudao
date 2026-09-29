@@ -179,6 +179,7 @@
     "<sha256#6>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
@@ -350,6 +351,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
@@ -388,7 +390,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -406,6 +409,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "base_url": "",
@@ -458,6 +462,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#1>",
     "base_url": "",
@@ -514,6 +519,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -621,6 +627,7 @@
     "<sha256#23>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
@@ -792,6 +799,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-2:work:attempt-1",
@@ -830,7 +838,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 2
+    "step_id": 2,
+    "tool_choice": "auto"
    }
   },
   {
@@ -848,6 +857,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-2:work:attempt-1",
     "base_url": "",
@@ -900,6 +910,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -1026,6 +1037,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "args": {
      "acceptance_criteria": [
@@ -1271,6 +1283,7 @@
   "delivery_specs": [],
   "department_call_targets": {
    "product": {
+    "accepts_required_tool_call": true,
     "base_url": "",
     "configured_max_output_tokens": 4800,
     "context_window": 32000,
@@ -1649,6 +1662,7 @@
   "model": "fake-script",
   "model_requests": [
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -1701,6 +1715,7 @@
     "usage": null
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
