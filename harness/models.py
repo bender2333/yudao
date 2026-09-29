@@ -107,6 +107,9 @@ class CatalogEventType:
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
     CREDENTIAL_CHANGED = "credential_changed"
+    # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
+    RUNTIME_DRAIN_STARTED = "runtime_drain_started"
+    RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
 
 
 GIT_VERSION_EVENTS = frozenset({

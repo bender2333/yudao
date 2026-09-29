@@ -1,4 +1,4 @@
-# 流的分类与 run 事件版本（ADR-0019，工单 #126）。
+# 流的分类、run 事件版本与排空状态（ADR-0019，工单 #126）。
 # 事件日志只有一份；按流的种类分为项目流与 run 流。项目流（与机器流）记录项目的长期事实，跨 Yudao 版本保存，
 # 新版本只能增加种类或字段、已有字段的含义不变；run 流跟随应用版本，每个 Yudao 版本声明自己的 run 事件版本，
 # 版本不同时先排空再升级。
@@ -79,12 +79,14 @@ PROJECT_EVENT_TYPES = frozenset({
     "source_directory_configured",
 })
 
-# 目录流：模型目录与凭据的修订记录。与项目流一样是跨版本保存的长期事实
+# 目录流：模型目录与凭据的修订记录，以及排空与强制升级。与项目流一样是跨版本保存的长期事实
 CATALOG_EVENT_TYPES = frozenset({
     "catalog_revised",
     "catalog_candidates_collected",
     "catalog_test_finished",
     "credential_changed",
+    "runtime_drain_started",
+    "runtime_force_upgrade_requested",
 })
 
 # 全部声明过分类的事件种类
@@ -97,9 +99,19 @@ STOP_REASON_UPGRADE = "run_event_version_changed"
 # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
 PRIORITY_UPGRADE_RESTART = "upgrade_restart"
 PRIORITY_USER = "user"
+
+# 排空状态的三种取值：未排空、排空中（还有 run 在进行）、已排空可以升级
+DRAIN_IDLE = "idle"
+DRAIN_DRAINING = "draining"
+DRAIN_READY = "ready"
+
+# 排空与强制升级的事件种类：记在目录流中，是控制主机这一份部署的长期事实（ADR-0019）
+DRAIN_STARTED = "runtime_drain_started"
+FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
+
 @dataclass(frozen=True)
 class StartupRuns:
-    # 启动时按 run 事件版本分类的 run（ADR-0019，工单 #126）：
+    # 启动时按 run 事件版本分类的 run：
     # same_version 是版本与当前相同且未结束的 run，交给 #16 自动继续，本工单不动它们；
     # other_version 是未结束且版本不同（含旧事件没有记录版本）的 run，按强制升级处理；finished 是已结束的 run
     same_version: tuple[str, ...]
@@ -124,3 +136,12 @@ def classify_startup_runs(store: EventStore) -> StartupRuns:
         else:
             other.append(run_id)
     return StartupRuns(tuple(same), tuple(other), tuple(finished))
+
+@dataclass(frozen=True)
+class DrainState:
+    # 排空状态：state 是未排空、排空中或已排空可以升级；version 是状态的版本，命令的基准版本与它记录在一起；
+    # running_runs 是还没有结束的 run 数，queued_work_items 是排空期间新建、还没有开始的事项数
+    state: str = DRAIN_IDLE
+    version: int = 0
+    running_runs: int = 0
+    queued_work_items: int = 0

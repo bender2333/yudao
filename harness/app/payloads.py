@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
 from ..models import DEPARTMENTS, PHASES, CatalogEventType, EventType, ProjectEventType
+from ..streams import PRIORITY_USER
 
 Department = Literal[DEPARTMENTS]
 Phase = Literal[PHASES]
@@ -903,7 +904,7 @@ class WorkItemCreatedPayload(Payload):
     context_window: int
     definitions_version: str
     # 事项在队列中的优先级：因升级重新开始的事项排在最前面；旧事件没有这个字段时按用户新要求处理（ADR-0019）
-    priority: str
+    priority: str = PRIORITY_USER
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -1013,6 +1014,17 @@ class CredentialChangedPayload(Payload):
     version: int
     persisted: bool
 
+class RuntimeDrainStartedPayload(Payload):
+    # 开始排空：排空状态的版本与开始排空时还没有结束的 run
+    version: int
+    running_runs: int
+
+class RuntimeForceUpgradeRequestedPayload(Payload):
+    # 强制升级：排空状态的版本、因升级停止的 run 与用采纳成果重新开始的事项
+    version: int
+    stopped_runs: list[str]
+    restarted_work_items: list[str]
+
 
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
@@ -1076,4 +1088,6 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
+    CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
+    CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
 }

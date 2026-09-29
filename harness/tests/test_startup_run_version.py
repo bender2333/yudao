@@ -54,6 +54,8 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     assert adopted is not None and adopted.type == ProjectEventType.DELIVERABLE_ADOPTED
     second_run = _second_unfinished_run(system, project_id)
     before = saved_project(system.store, project_id).to_dict()
+    # 项目的长期事实：当前 PRD 与采纳成果、项目部门设置、登记命令
+    facts_before = {key: before[key] for key in ("name", "goal", "current_adoption", "adoptions", "prompt_configs", "commands")}
     adoption_before = system.projects.projection(project_id).current_adoption
     assert adoption_before is not None
     end = system.store.end_position()
@@ -64,7 +66,9 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     # 重启：项目流在任何版本下都完整读取与重建
     adapter = FakeAdapter([])
     restarted = LoopSystem.for_testing(data_dir, adapter)
-    assert saved_project(restarted.store, project_id).to_dict() == before
+    # 项目流的长期事实完整重建（重新开始的新事项不改动这些事实）
+    after = saved_project(restarted.store, project_id).to_dict()
+    assert {key: after[key] for key in facts_before} == facts_before
     project = restarted.projects.projection(project_id)
     assert project.current_adoption is not None
     assert project.current_adoption.adoption_id == adoption_before.adoption_id

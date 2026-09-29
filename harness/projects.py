@@ -559,6 +559,37 @@ class ProjectService:
             raise
         return created.work_item_id, created.run_id
 
+    def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
+                        command: Command | None = None) -> str:
+        # 排空期间新建的事项（3.1，ADR-0019）：在项目流按通常方式登记事项，但不创建它的 run，也不开始执行。
+        # run 流为空，事项的状态因此是「还没有开始」；它排在队列里等升级完成以后开始（调度由 3.4A 的 #19 实现）
+        _require_text("text", text)
+        _require_title(title)
+        self._writable(project_id)
+        work_item_id, run_id = new_id("wi"), new_id("run")
+
+        def queue(transaction: Transaction) -> str:
+            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            source_run = None
+            baseline, initial_tree = None, None
+            adoption = project.current_adoption
+            if adoption is not None:
+                source_run = project_run(self.store, adoption.run_id)
+                baseline = {
+                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
+                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
+                    "code_tree_digest": adoption.code_tree_digest,
+                }
+            self._work_item_created(
+                transaction, project, text, title=title, max_cycles=DEFINITIONS.limits.max_cycles,
+                run_time_limit_sec=DEFINITIONS.limits.run_time_limit_sec, context_window=32_000,
+                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+                work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
+            )
+            return work_item_id
+
+        return self.writes.transact(project_stream(project_id), queue, command=command)
+
     # 结算
 
     def settle(self, run_id: str) -> ProjectEvent | None:
