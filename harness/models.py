@@ -667,6 +667,8 @@ class RunProjection:
     last_event_id: str | None = None
     # 投影所反映的 run 流版本
     stream_version: int = 0
+    # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
+    run_event_version: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))

@@ -17,6 +17,7 @@ from .projection import RunProjection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .replay_check import verify_replay
+from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs
 from .workspace import Workspace
 
 __all__ = [
@@ -81,8 +82,22 @@ class LoopSystem:
         self.orchestrator.projects = self.projects
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
+        # 启动时核对 run 事件版本（ADR-0019，工单 #126）：版本相同的未结束 run 交给 #16 自动继续，这里不动它们；
+        # 版本不同（含旧事件没有记录版本）的未结束 run 记为因升级停止，对应的事项用采纳成果重新开始
+        self.startup_runs = classify_startup_runs(self.store)
+        for run_id in self.startup_runs.other_version:
+            self.upgrade_run(run_id)
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
+
+    def upgrade_run(self, run_id: str) -> tuple[str, str] | None:
+        # 按强制升级处理一个未结束的 run：记为因升级停止，再用项目当前的采纳成果为它所属的事项开始新的 run。
+        # 已经结束的 run 不停止；没有对应事项的 run 只停止，不重新开始
+        projection = self.orchestrator.stop_for_upgrade(
+            run_id, reason=f"recorded version differs from {RUN_EVENT_VERSION}")
+        if projection.phase == "FAILED" and projection.stop_reason == STOP_REASON_UPGRADE:
+            return self.projects.restart_work_item_for_upgrade(run_id)
+        return None
 
     def sync_catalog_revision(self, *, operation: str = "reload") -> int | None:
         # 目录修订号与最后一条 catalog_revised 不同就补写一条；相同或已补写过时什么也不写

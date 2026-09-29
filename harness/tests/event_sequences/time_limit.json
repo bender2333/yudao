@@ -70,6 +70,7 @@
     "prompt_config_versions": {},
     "provider": "fake",
     "registered_commands": {},
+    "run_event_version": 1,
     "run_time_limit_sec": 3,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -1054,6 +1055,7 @@
   "responses": [],
   "reviews": [],
   "rework_count": 0,
+  "run_event_version": 1,
   "run_id": "<run#1>",
   "run_time_limit_sec": 3,
   "sessions": {

@@ -32,6 +32,7 @@ from .environment import LocalEnvironment
 from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
+from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
@@ -295,6 +296,7 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
+                "run_event_version": RUN_EVENT_VERSION,
             },
         )
         transition = NewEvent(
@@ -585,6 +587,12 @@ class Orchestrator:
                     self._cancel_driver(activation)
         if cancel_error is not None:
             raise cancel_error
+        return self.project(run_id)
+    def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
+        # 因升级停止（ADR-0019，工单 #126）：run 事件版本与当前版本不同的未结束 run 记为因升级停止，
+        # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
+        message = f"run event version differs from the current version: {reason}"
+        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
         return self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:

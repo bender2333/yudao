@@ -255,6 +255,8 @@ class RunCreatedPayload(Payload):
     command_versions: dict[str, int]
     # 事项所用定义的版本（全部定义文件内容的摘要）
     definitions_version: str
+    # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
+    run_event_version: int
 
 
 class UserInputReceivedPayload(InputRecord):
@@ -900,6 +902,8 @@ class WorkItemCreatedPayload(Payload):
     run_time_limit_sec: int
     context_window: int
     definitions_version: str
+    # 事项在队列中的优先级：因升级重新开始的事项排在最前面；旧事件没有这个字段时按用户新要求处理（ADR-0019）
+    priority: str
 
 
 class WorkItemStartFailedPayload(Payload):
