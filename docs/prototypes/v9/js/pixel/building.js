@@ -3,8 +3,8 @@
 // 楼里的小人、通往机房的管线、机房里的设备与管线、沿管线移动的包裹都是 P.ecs 的实体
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('building.js 需要先加载 js/pixel/engine.js');
   if (!P.ecs) throw new Error('building.js 需要先加载 js/pixel/ecs.js');
   const ECS = P.ecs;
@@ -269,7 +269,7 @@
       },
       playEvent(ev) {
         if (!ev || !ev.project_id) return;
-        const key = Y8.registry.keyOf(ev);
+        const key = Y9.registry.keyOf(ev);
         const color = key === 'rework' || key === 'fault' ? PAL.red2 : key === 'decision' ? PAL.yellow2 : key === 'adopt' || key === 'release' ? PAL.green2 : PAL.white;
         if (key || ev.type === 'department_activated') flashes[ev.project_id] = { color, until: scene.realT + 1200 };
         if (ev.type === 'deliverable_adopted') {

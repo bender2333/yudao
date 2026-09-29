@@ -2,6 +2,8 @@
 
 本文件只写跟 [v8 BUILD.md](../v8/BUILD.md) 不一样的地方。第 1 节（基本要求）、第 4 节（档位）、第 5 节（接口层／示例后端）、第 6 节（界面层：路由、`kit.js`、决定卡片）、第 8 节（示例数据的登记方式与形状、世界设定、跨文件标识、截图）、第 9 节（场景）、第 10 节（测试）、第 11 节（交付）跟 v8 完全相同，直接照抄 v8 对应文件，不重新写一遍；`js/contract/`、`js/ui/`（像素画面以外）、`styles/` 原样搬过来，只有下面列出的界面层文件有改动。变的是第 2、3、7 节：像素引擎内部从"一个部门一个角色、按状态切姿势"改成实体—组件—系统。
 
+命名随版本改名（v7 到 v8 也是这样做的）：v9 的全局对象是 `window.Y9`，CSS 类名以 `y9-` 开头，存储键以 `y9.` 开头，脚本是 `js/y9.js`，页面标题与顶栏的标签写「v9 原型」。v8 BUILD.md 里出现的 `Y8`、`y8-`、`js/y8.js` 在 v9 读作 `Y9`、`y9-`、`js/y9.js`。验收脚本同时打开 v8 与 v9 的页面时，按页面所属的版本取对应的命名空间与存储键（`checks/env.js` 的 `spaceOf`）。
+
 ## 1. 分层（对照 v8 BUILD.md 第 2 节）
 
 ```mermaid
@@ -39,6 +41,7 @@ flowchart TB
 ```
 docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
   js/pixel/ecs.js               新增：世界、房间与管道与节点的声明、任务派发、角色与包裹的推进、管道的流动、信号、待机活动、对话框的数据
+  js/y9.js                      改名：由 js/y8.js 改名，命名空间 Y9、存储键前缀 y9.，内容与 v8 相同
   js/pixel/say.js               新增：小人头顶说的话——事件到一句话的目录（P.say），气泡的折行、避让、淡出与绘制（P.drawSpeeches）
   js/pixel/floor-decl.js        新增：项目楼层的声明——房间、管道、任务目录、待机活动、事件到任务的解析、持续状态、陈设
   js/pixel/decision-card.js     新增：世界里的决定卡片（板上的决定单点开以后的那张纸）
@@ -48,7 +51,7 @@ docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
   js/pixel/floor.js             改写：读声明，房间、管道、小人、包裹按实体画，头顶有对话框，大厅有决定板
   js/pixel/building.js          改写：楼里的小人、通往机房的管线、机房里的设备与管线都是实体
   js/ui/scenes.js               改动：项目楼层的面板多读部门的角色列表与等待回答的决定请求，回答走 decision.answer
-  js/ui/cards.js                改动：材料的整理拆成纯文字的版本，新增 Y8.cards.face 给画面用
+  js/ui/cards.js                改动：材料的整理拆成纯文字的版本，新增 Y9.cards.face 给画面用
   js/ui/views/overview.js       改动：页面上方的决定区块去掉（内容在大厅的板与文字列表里）
   checks/                       新增：验收脚本（第 4 节）
   其余文件                      原样保留
@@ -163,7 +166,7 @@ P.ecs.config.autonomy                   // 自主行为（待机活动、管道�
 
 ```js
 const card = P.createDecisionCard(scene, canvas, { onDecide, onGo });
-card.setDecisions(faces)   // faces 是 Y8.cards.face(决定请求) 的列表；不在列表里的提交记录与草稿清掉
+card.setDecisions(faces)   // faces 是 Y9.cards.face(决定请求) 的列表；不在列表里的提交记录与草稿清掉
 card.open(id) / close() / isOpen() / openId()
 card.draw(c)               // 每帧在最上层画：遮罩、纸、抬头、材料、说明栏、选项的章、回答的章；同时收集这一帧的可点击区域
 card.click(x, y)           // 世界坐标；卡片打开时处理点击并返回 true（点在纸的外面是关上）
@@ -171,7 +174,7 @@ card.cursor(x, y)          // 鼠标在可点击区域上返回 'pointer'
 card.stamp(id, 文字)       // 回答事件到达时在纸上盖章
 ```
 
-`Y8.cards.face(决定请求)` 返回 `{ id, kind, version, title, work_item_id, where, waited, blocks, rows, links, options, view }`：`rows` 是 `[标题, 内容]` 的列表（内容是纯文字，指向别的页面的是 `{ text, go }`），`options` 是 `{ id, label, kind, requires, note_required }`。说明栏叠一个 `<textarea>`（加在 canvas 的父元素里，位置随画布缩放），草稿按决定请求 id 保存在卡片里。回答调用 `onDecide({ decision_id, option, note, base_version })`，返回命令的结果；`floor.js` 负责板上的便条、决定单的飞行与经理的送单、收单。
+`Y9.cards.face(决定请求)` 返回 `{ id, kind, version, title, work_item_id, where, waited, blocks, rows, links, options, view }`：`rows` 是 `[标题, 内容]` 的列表（内容是纯文字，指向别的页面的是 `{ text, go }`），`options` 是 `{ id, label, kind, requires, note_required }`。说明栏叠一个 `<textarea>`（加在 canvas 的父元素里，位置随画布缩放），草稿按决定请求 id 保存在卡片里。回答调用 `onDecide({ decision_id, option, note, base_version })`，返回命令的结果；`floor.js` 负责板上的便条、决定单的飞行与经理的送单、收单。
 
 ## 4. 验收
 

@@ -117,6 +117,16 @@ def test_opencode_go_three_protocols_paths_and_identity_headers():
                 self.wfile.write(chunk)
             self.wfile.flush()
 
+        def do_GET(self) -> None:
+            # 连接测试读取模型列表地址：三种协议都在本机上游取得，不访问真实的 opencode.ai
+            body = json.dumps({"data": [{"id": "model-x"}]}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
@@ -130,7 +140,8 @@ def test_opencode_go_three_protocols_paths_and_identity_headers():
             "providers": [
                 {"id": provider_id, "name": provider_id, "protocol": protocol,
                  "base_url": shared_base, "credential_ref": "SHARED_KEY",
-                 "preset_id": "opencode-go", "timeout_sec": 30.0}
+                 "preset_id": "opencode-go", "timeout_sec": 30.0,
+                 "models_url": shared_base + "/v1/models"}
                 for provider_id, _model_id, protocol, _upstream, _path in connections
             ],
             "models": [

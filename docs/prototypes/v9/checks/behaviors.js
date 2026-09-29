@@ -26,7 +26,7 @@ function staticChecks() {
 // ---------------------------------------------------------------------------
 // 在页面里运行的检查
 const DRIVER = async () => {
-  const P = window.Y8.pixel;
+  const P = window.Y9.pixel;
   const E = P.ecs;
   const results = [];
   const check = (name, ok, detail) => results.push({ name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail) });
@@ -549,7 +549,7 @@ const DRIVER = async () => {
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+  await page.addInitScript((lv) => sessionStorage.setItem('y9.level', JSON.stringify(lv)), 'S5');
   await page.goto(v9Url + '#/sys/machines');
   await page.waitForTimeout(700);
   const inPage = await page.evaluate(DRIVER);
@@ -562,20 +562,20 @@ const DRIVER = async () => {
     const errs = [];
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
     p.on('pageerror', (e) => errs.push(String(e)));
-    await p.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+    await p.addInitScript((lv) => sessionStorage.setItem('y9.level', JSON.stringify(lv)), 'S5');
     await p.goto(v9Url + hash);
     await p.waitForTimeout(1500);
     const info = await act(p);
-    const canvas = await p.locator('.y8-floor-wrap canvas').count();
+    const canvas = await p.locator('.y9-floor-wrap canvas').count();
     const hashAfter = new URL(p.url()).hash;
     await p.close();
     return { errs, canvas, info, hashAfter };
   };
   const seek = await replayPage('#/p/p-todo/overview', async (p) => {
-    const ticks = p.locator('.y8-floor-timeline [data-act="replay.seek"]');
+    const ticks = p.locator('.y9-floor-timeline [data-act="replay.seek"]');
     const n = await ticks.count();
     if (n) { await ticks.nth(Math.min(3, n - 1)).click(); await p.waitForTimeout(600); }
-    await p.locator('.y8-floor-timeline [data-act="replay.step"]').first().click();
+    await p.locator('.y9-floor-timeline [data-act="replay.step"]').first().click();
     await p.waitForTimeout(600);
     return n;
   });

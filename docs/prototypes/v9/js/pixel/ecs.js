@@ -3,8 +3,8 @@
 // 声明（floor-decl.js），floor.js、building.js 在这之上改写。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('ecs.js 需要先加载 js/pixel/engine.js');
 
   const ECS = {};

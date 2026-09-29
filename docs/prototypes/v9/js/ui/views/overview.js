@@ -1,8 +1,8 @@
 // 概览（设计说明第 5.1 节）：项目摘要、待你决定、循环画面、当前事项、事项看板、流转记录
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const esc = Y8.esc;
+  const Y9 = window.Y9;
+  const esc = Y9.esc;
 
   let panel = null;
   let flowAll = false;
@@ -19,17 +19,17 @@
   const ACTIVE_STATUS = ['not_started', 'queued', 'in_progress'];
 
   function overview(pid) {
-    return Y8.api.query('project.overview', { project: pid }).data;
+    return Y9.api.query('project.overview', { project: pid }).data;
   }
 
   function colorOf(index) {
-    const colors = Y8.pixel.ITEM_COLORS;
+    const colors = Y9.pixel.ITEM_COLORS;
     if (!(index >= 0 && index < colors.length)) throw new Error('事项颜色序号无效：' + index);
     return colors[index];
   }
 
   function swatch(index) {
-    return '<span class="y8-pp-swatch" style="--item:' + colorOf(index) + '" aria-hidden="true"></span>';
+    return '<span class="y9-pp-swatch" style="--item:' + colorOf(index) + '" aria-hidden="true"></span>';
   }
 
   function directionText(from, to) {
@@ -38,17 +38,17 @@
       if (!(id in PLACE)) throw new Error('未知的流转位置：' + id);
       return PLACE[id];
     };
-    return '<span class="y8-pp-dir">' + esc(name(from)) + '<span class="y8-pp-arrow" aria-hidden="true">→</span>' + esc(name(to)) + '</span>';
+    return '<span class="y9-pp-dir">' + esc(name(from)) + '<span class="y9-pp-arrow" aria-hidden="true">→</span>' + esc(name(to)) + '</span>';
   }
 
   function kindChip(kind) {
     if (!KIND_LABEL[kind]) throw new Error('未知的流转类型：' + kind);
-    return '<span class="y8-pp-flowkind is-' + esc(kind) + '"><span>' + esc(KIND_LABEL[kind]) + '</span></span>';
+    return '<span class="y9-pp-flowkind is-' + esc(kind) + '"><span>' + esc(KIND_LABEL[kind]) + '</span></span>';
   }
 
   function stat(label, value, cls) {
-    return '<div class="y8-pp-stat' + (cls ? ' is-' + cls : '') + '"><span class="y8-pp-stat-num">' + esc(value) + '</span>' +
-      '<span class="y8-pp-stat-label">' + esc(label) + '</span></div>';
+    return '<div class="y9-pp-stat' + (cls ? ' is-' + cls : '') + '"><span class="y9-pp-stat-num">' + esc(value) + '</span>' +
+      '<span class="y9-pp-stat-label">' + esc(label) + '</span></div>';
   }
 
   // ---------------------------------------------------------------------------
@@ -58,18 +58,18 @@
     const p = ov.project;
     const adoption = ov.adoption;
     const adopt = adoption
-      ? '<div class="y8-ov-adopt"><div class="y8-ov-adopt-top"><span class="y8-ov-adopt-ver">' + esc(adoption.version) + '</span>' + Y8.ui.status('adopted', '当前成果') + '</div>' +
+      ? '<div class="y9-ov-adopt"><div class="y9-ov-adopt-top"><span class="y9-ov-adopt-ver">' + esc(adoption.version) + '</span>' + Y9.ui.status('adopted', '当前成果') + '</div>' +
         '<p>' + esc(adoption.summary || '（没有摘要）') + '</p>' +
-        '<p class="y8-muted y8-small">' + esc(Y8.ui.time(adoption.adopted_at)) + ' 采纳</p></div>'
-      : '<div class="y8-ov-adopt is-empty"><span class="y8-muted">当前成果</span><strong>尚未采纳</strong></div>';
-    const archived = p.archived ? Y8.ui.note('归档项目只读：查询仍可用，写命令会被拒绝。', 'warn') : '';
-    return Y8.ui.block({
-      id: 'ov-summary', query: 'project.overview', className: 'y8-ov-summary',
-      body: '<div class="y8-ov-hero"><div class="y8-ov-hero-main"><h1 class="y8-ov-title">' + esc(p.name) + '</h1>' +
-        '<div class="y8-ov-goal"><span class="y8-muted">长期目标</span><span>' + esc(p.goal || '—') + '</span></div>' +
-        (p.source === 'existing' ? '<p class="y8-ov-source">' + Y8.ui.tag('已有项目') + '<span class="y8-muted">从已有代码接入，初始 PRD 由你确认</span></p>' : '') +
+        '<p class="y9-muted y9-small">' + esc(Y9.ui.time(adoption.adopted_at)) + ' 采纳</p></div>'
+      : '<div class="y9-ov-adopt is-empty"><span class="y9-muted">当前成果</span><strong>尚未采纳</strong></div>';
+    const archived = p.archived ? Y9.ui.note('归档项目只读：查询仍可用，写命令会被拒绝。', 'warn') : '';
+    return Y9.ui.block({
+      id: 'ov-summary', query: 'project.overview', className: 'y9-ov-summary',
+      body: '<div class="y9-ov-hero"><div class="y9-ov-hero-main"><h1 class="y9-ov-title">' + esc(p.name) + '</h1>' +
+        '<div class="y9-ov-goal"><span class="y9-muted">长期目标</span><span>' + esc(p.goal || '—') + '</span></div>' +
+        (p.source === 'existing' ? '<p class="y9-ov-source">' + Y9.ui.tag('已有项目') + '<span class="y9-muted">从已有代码接入，初始 PRD 由你确认</span></p>' : '') +
         archived + '</div>' + adopt + '</div>' +
-        '<div class="y8-ov-stats">' +
+        '<div class="y9-ov-stats">' +
           stat('进行中', ov.stats.in_progress, 'running') +
           stat('排队中', ov.stats.queued, 'queued') +
           stat('已采纳', ov.stats.adopted, 'adopted') +
@@ -78,7 +78,7 @@
   }
 
   function loopBlock(pid, workItemId) {
-    return Y8.ui.block({
+    return Y9.ui.block({
       id: 'ov-loop', title: '循环画面', query: ['project.loop', 'project.flow'],
       subtitle: '三部门循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实',
       body: '<div id="ov-floor"></div>'
@@ -95,22 +95,22 @@
   }
 
   function inputList(item) {
-    const info = Y8.api.query('work_item.inputs', { work_item: item.id }).data;
-    if (!info.inputs.length) return Y8.ui.empty('这个事项还没有输入记录');
+    const info = Y9.api.query('work_item.inputs', { work_item: item.id }).data;
+    if (!info.inputs.length) return Y9.ui.empty('这个事项还没有输入记录');
     const steps = ['received', 'assigned', 'accepted'];
     const labels = { received: '已接收', assigned: '已交给产品处理', accepted: '已由有效需求接纳' };
-    return '<ol class="y8-ov-inputs">' + info.inputs.slice().reverse().map((input) => {
+    return '<ol class="y9-ov-inputs">' + info.inputs.slice().reverse().map((input) => {
       const at = steps.indexOf(input.progress);
       if (at < 0) throw new Error('未知的处理进度：' + input.progress);
       const bytes = Array.isArray(input.bytes)
         ? '字节 ' + input.bytes[0] + '–' + input.bytes[1]
-        : (typeof input.bytes === 'number' ? Y8.ui.num(input.bytes) + ' 字节' : '');
-      return '<li class="y8-ov-input' + (input.kind === 'command' ? ' is-command' : '') + '">' +
-        '<div class="y8-ov-input-head"><strong>v' + esc(input.version) + '</strong>' +
-          (input.kind === 'command' ? Y8.ui.tag('文本命令') : Y8.ui.tag('用户输入')) +
-          '<span class="y8-muted">' + esc(Y8.ui.time(input.at)) + (bytes ? ' · ' + esc(bytes) : '') + '</span></div>' +
-        '<p class="y8-ov-input-text">' + esc(input.text) + '</p>' +
-        '<ul class="y8-ov-steps">' + steps.map((step, index) =>
+        : (typeof input.bytes === 'number' ? Y9.ui.num(input.bytes) + ' 字节' : '');
+      return '<li class="y9-ov-input' + (input.kind === 'command' ? ' is-command' : '') + '">' +
+        '<div class="y9-ov-input-head"><strong>v' + esc(input.version) + '</strong>' +
+          (input.kind === 'command' ? Y9.ui.tag('文本命令') : Y9.ui.tag('用户输入')) +
+          '<span class="y9-muted">' + esc(Y9.ui.time(input.at)) + (bytes ? ' · ' + esc(bytes) : '') + '</span></div>' +
+        '<p class="y9-ov-input-text">' + esc(input.text) + '</p>' +
+        '<ul class="y9-ov-steps">' + steps.map((step, index) =>
           '<li class="' + (index < at ? 'is-done' : index === at ? 'is-current' : '') + '">' + esc(labels[step]) + '</li>').join('') + '</ul>' +
       '</li>';
     }).join('') + '</ol>';
@@ -121,68 +121,68 @@
     parts.push('<span>所在部门：' + esc(item.department ? DEPT_LABEL[item.department] : '大厅') + '</span>');
     if (item.cycle) parts.push('<span>第 ' + esc(item.cycle) + ' 轮</span>');
     if (item.started_at) {
-      parts.push('<span class="y8-ov-time">已用 ' + esc(Y8.ui.duration(item.elapsed_sec)) + ' / ' + esc(Y8.ui.duration(item.limit_sec)) +
-        Y8.ui.meter(item.elapsed_sec, item.limit_sec, { warnAt: 0.8 }) + '</span>');
+      parts.push('<span class="y9-ov-time">已用 ' + esc(Y9.ui.duration(item.elapsed_sec)) + ' / ' + esc(Y9.ui.duration(item.limit_sec)) +
+        Y9.ui.meter(item.elapsed_sec, item.limit_sec, { warnAt: 0.8 }) + '</span>');
     }
-    return '<div class="y8-ov-item-meta">' + parts.join('') + '</div>';
+    return '<div class="y9-ov-item-meta">' + parts.join('') + '</div>';
   }
 
   function currentBody(ov, target, ctx) {
     const pid = ov.project.id;
     if (!target) {
-      if (!ov.work_items.length) return Y8.ui.empty('这个项目还没有事项') + composerHtml(ov, null);
-      const switchRow = '<div class="y8-ov-switch"><span class="y8-muted y8-small">这个项目没有进行中的事项；选择一个事项查看它的输入记录：</span>' + ov.work_items.map((item) =>
-        '<button type="button" class="y8-pp-chip" data-go="' + esc(Y8.paths.overview(pid, item.id)) + '">' + swatch(item.color_index) + esc(item.title) + '</button>').join('') + '</div>';
+      if (!ov.work_items.length) return Y9.ui.empty('这个项目还没有事项') + composerHtml(ov, null);
+      const switchRow = '<div class="y9-ov-switch"><span class="y9-muted y9-small">这个项目没有进行中的事项；选择一个事项查看它的输入记录：</span>' + ov.work_items.map((item) =>
+        '<button type="button" class="y9-pp-chip" data-go="' + esc(Y9.paths.overview(pid, item.id)) + '">' + swatch(item.color_index) + esc(item.title) + '</button>').join('') + '</div>';
       return switchRow + composerHtml(ov, null);
     }
-    const head = '<div class="y8-ov-item-head">' + swatch(target.color_index) + '<h3>' + esc(target.title) + '</h3>' +
-      Y8.ui.status(target.display.kind, target.display.text) + '</div>' + itemMeta(target);
+    const head = '<div class="y9-ov-item-head">' + swatch(target.color_index) + '<h3>' + esc(target.title) + '</h3>' +
+      Y9.ui.status(target.display.kind, target.display.text) + '</div>' + itemMeta(target);
     const recovering = RECOVERING.includes(target.recovery_state);
     const note = recovering
-      ? Y8.ui.note(Y8.ui.status(target.display.kind, target.display.text) + ' ' + esc(target.display.text) +
-        '<span class="y8-note-actions">' + Y8.ui.button({ label: '查看恢复与动作核实', kind: 'small primary', go: Y8.paths.recovery(pid, target.id) }) + '</span>', 'warn')
-      : (target.pending_question ? Y8.ui.note('待决问题：' + esc(target.pending_question), 'warn') : '');
+      ? Y9.ui.note(Y9.ui.status(target.display.kind, target.display.text) + ' ' + esc(target.display.text) +
+        '<span class="y9-note-actions">' + Y9.ui.button({ label: '查看恢复与动作核实', kind: 'small primary', go: Y9.paths.recovery(pid, target.id) }) + '</span>', 'warn')
+      : (target.pending_question ? Y9.ui.note('待决问题：' + esc(target.pending_question), 'warn') : '');
     const switcher = !ctx.workItemId && ov.work_items.length > 1
-      ? '<div class="y8-ov-switch"><span class="y8-muted y8-small">全部事项：</span>' + ov.work_items.map((item) =>
-        '<button type="button" class="y8-pp-chip" data-go="' + esc(Y8.paths.overview(pid, item.id)) + '">' + swatch(item.color_index) + esc(item.title) + '</button>').join('') + '</div>'
+      ? '<div class="y9-ov-switch"><span class="y9-muted y9-small">全部事项：</span>' + ov.work_items.map((item) =>
+        '<button type="button" class="y9-pp-chip" data-go="' + esc(Y9.paths.overview(pid, item.id)) + '">' + swatch(item.color_index) + esc(item.title) + '</button>').join('') + '</div>'
       : '';
     return switcher + head + note + inputList(target) + composerHtml(ov, target);
   }
 
   function composerHtml(ov, target) {
     const pid = ov.project.id;
-    if (ov.project.archived) return Y8.ui.note('归档项目只读：不能追加需求、记录原文或新建事项。', 'warn');
+    if (ov.project.archived) return Y9.ui.note('归档项目只读：不能追加需求、记录原文或新建事项。', 'warn');
     if (target && ACTIVE_STATUS.includes(target.status)) {
-      return '<div class="y8-ov-composer">' +
-        '<label class="y8-field"><span>追加需求 · 「' + esc(target.title) + '」</span>' +
-          '<textarea class="y8-textarea" rows="3" id="ov-append-text" data-draft="ov.append.' + esc(target.id) + '" placeholder="补充或修改这个事项的要求；输入 /stop 或 /cancel 立即停止"></textarea></label>' +
-        '<div class="y8-ov-composer-foot"><small class="y8-muted">提交后进入当前事项的产品入口，由产品部门处理</small>' +
-          '<div class="y8-row">' +
-            Y8.ui.button({ label: '取消事项', kind: 'small', act: 'ov.cancel', data: { workItem: target.id } }) +
-            Y8.ui.button({ label: '追加需求', kind: 'small primary', act: 'ov.append', data: { workItem: target.id } }) +
+      return '<div class="y9-ov-composer">' +
+        '<label class="y9-field"><span>追加需求 · 「' + esc(target.title) + '」</span>' +
+          '<textarea class="y9-textarea" rows="3" id="ov-append-text" data-draft="ov.append.' + esc(target.id) + '" placeholder="补充或修改这个事项的要求；输入 /stop 或 /cancel 立即停止"></textarea></label>' +
+        '<div class="y9-ov-composer-foot"><small class="y9-muted">提交后进入当前事项的产品入口，由产品部门处理</small>' +
+          '<div class="y9-row">' +
+            Y9.ui.button({ label: '取消事项', kind: 'small', act: 'ov.cancel', data: { workItem: target.id } }) +
+            Y9.ui.button({ label: '追加需求', kind: 'small primary', act: 'ov.append', data: { workItem: target.id } }) +
           '</div></div></div>';
     }
     const dirs = ov.source_directories || [];
     const source = dirs.length
-      ? '<label class="y8-field"><span>可信源目录（可选，作为新事项的代码快照来源）</span>' +
-        '<select class="y8-input" id="ov-new-src"><option value="">不使用源目录</option>' +
+      ? '<label class="y9-field"><span>可信源目录（可选，作为新事项的代码快照来源）</span>' +
+        '<select class="y9-input" id="ov-new-src"><option value="">不使用源目录</option>' +
         dirs.map((dir) => '<option value="' + esc(dir.path) + '">' + esc(dir.name) + ' · ' + esc(dir.path) + '</option>').join('') + '</select></label>'
       : '';
-    return '<div class="y8-ov-composer">' +
-      '<label class="y8-field"><span>新的想法或材料</span>' +
-        '<textarea class="y8-textarea" rows="3" id="ov-new-text" data-draft="ov.new.' + esc(pid) + '" placeholder="描述这次要改变什么，或先记下原文"></textarea></label>' +
-      '<label class="y8-field"><span>事项标题（可选）</span>' +
-        '<input type="text" class="y8-input" id="ov-new-title" data-draft="ov.title.' + esc(pid) + '" placeholder="留空时取原文第一行"></label>' +
+    return '<div class="y9-ov-composer">' +
+      '<label class="y9-field"><span>新的想法或材料</span>' +
+        '<textarea class="y9-textarea" rows="3" id="ov-new-text" data-draft="ov.new.' + esc(pid) + '" placeholder="描述这次要改变什么，或先记下原文"></textarea></label>' +
+      '<label class="y9-field"><span>事项标题（可选）</span>' +
+        '<input type="text" class="y9-input" id="ov-new-title" data-draft="ov.title.' + esc(pid) + '" placeholder="留空时取原文第一行"></label>' +
       source +
-      '<div class="y8-ov-composer-foot"><small class="y8-muted">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门</small>' +
-        '<div class="y8-row">' +
-          Y8.ui.button({ label: '记录原文', kind: 'small', act: 'ov.record', data: { project: pid } }) +
-          Y8.ui.button({ label: '作为新事项开始', kind: 'small primary', act: 'ov.create', data: { project: pid } }) +
+      '<div class="y9-ov-composer-foot"><small class="y9-muted">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门</small>' +
+        '<div class="y9-row">' +
+          Y9.ui.button({ label: '记录原文', kind: 'small', act: 'ov.record', data: { project: pid } }) +
+          Y9.ui.button({ label: '作为新事项开始', kind: 'small primary', act: 'ov.create', data: { project: pid } }) +
         '</div></div></div>';
   }
 
   function currentBlock(ov, target, ctx) {
-    return Y8.ui.block({
+    return Y9.ui.block({
       id: 'ov-current', title: '当前事项',
       query: ['work_item.inputs'], command: ['material.record', 'work_item.create', 'work_item.append_input', 'work_item.cancel'],
       body: currentBody(ov, target, ctx)
@@ -207,19 +207,19 @@
   }
 
   function boardCard(pid, item) {
-    const movable = item.status === 'queued' && item.kind !== 'repair' && item.queue_reason !== 'decision' && Y8.cap.command('work_item.reorder');
+    const movable = item.status === 'queued' && item.kind !== 'repair' && item.queue_reason !== 'decision' && Y9.cap.command('work_item.reorder');
     const detail = cardDetail(item);
     const actions = RECOVERING.includes(item.recovery_state)
-      ? '<div class="y8-ov-card-actions">' + Y8.ui.button({ label: '查看恢复与动作核实', kind: 'small primary', go: Y8.paths.recovery(pid, item.id) }) + '</div>'
+      ? '<div class="y9-ov-card-actions">' + Y9.ui.button({ label: '查看恢复与动作核实', kind: 'small primary', go: Y9.paths.recovery(pid, item.id) }) + '</div>'
       : '';
-    return '<article class="y8-ov-card' + (item.kind === 'repair' ? ' is-repair' : '') + '" style="--item:' + colorOf(item.color_index) + '"' +
+    return '<article class="y9-ov-card' + (item.kind === 'repair' ? ' is-repair' : '') + '" style="--item:' + colorOf(item.color_index) + '"' +
       ' data-card-work-item="' + esc(item.id) + '"' + (movable ? ' draggable="true"' : '') + '>' +
-      '<header class="y8-ov-card-head">' + swatch(item.color_index) + '<strong class="y8-ov-card-title"><button type="button" class="y8-pp-title" data-go="' + esc(Y8.paths.overview(pid, item.id)) + '">' + esc(item.title) + '</button></strong>' +
-        (item.kind === 'repair' ? Y8.ui.tag('修复') : '') + '</header>' +
-      '<div class="y8-ov-card-status">' + Y8.ui.status(item.display.kind, item.display.text) + '</div>' +
-      '<div class="y8-ov-card-meta">' + esc(item.department ? DEPT_LABEL[item.department] : '大厅') + (item.cycle ? ' · 第 ' + esc(item.cycle) + ' 轮' : '') +
+      '<header class="y9-ov-card-head">' + swatch(item.color_index) + '<strong class="y9-ov-card-title"><button type="button" class="y9-pp-title" data-go="' + esc(Y9.paths.overview(pid, item.id)) + '">' + esc(item.title) + '</button></strong>' +
+        (item.kind === 'repair' ? Y9.ui.tag('修复') : '') + '</header>' +
+      '<div class="y9-ov-card-status">' + Y9.ui.status(item.display.kind, item.display.text) + '</div>' +
+      '<div class="y9-ov-card-meta">' + esc(item.department ? DEPT_LABEL[item.department] : '大厅') + (item.cycle ? ' · 第 ' + esc(item.cycle) + ' 轮' : '') +
         (item.status === 'queued' && item.queue_pos != null ? ' · 第 ' + esc(item.queue_pos) + ' 位' : '') + '</div>' +
-      (detail ? '<p class="y8-ov-card-detail">' + esc(detail) + '</p>' : '') + actions +
+      (detail ? '<p class="y9-ov-card-detail">' + esc(detail) + '</p>' : '') + actions +
     '</article>';
   }
 
@@ -242,18 +242,18 @@
     if (groups.queued) {
       groups.queued.sort((a, b) => (a.kind === 'repair' ? 0 : 1) - (b.kind === 'repair' ? 0 : 1) || ((a.queue_pos || 0) - (b.queue_pos || 0)));
     }
-    const body = '<div class="y8-ov-board">' + columns.map((col) => {
+    const body = '<div class="y9-ov-board">' + columns.map((col) => {
       const items = groups[col.id] || [];
       const cards = items.map((item) => boardCard(pid, item)).join('');
-      const dropHint = col.id === 'queued' && Y8.cap.command('work_item.reorder')
-        ? '<p class="y8-ov-board-hint">拖动调整顺序；修复事项固定在最前面</p>' : '';
-      return '<section class="y8-ov-board-col is-' + col.id + '" data-col="' + col.id + '">' +
-        '<header class="y8-ov-board-head"><h3>' + esc(col.label) + '</h3><span class="y8-count">' + items.length + '</span></header>' +
-        (cards || '<p class="y8-ov-board-empty">没有事项</p>') + dropHint + '</section>';
+      const dropHint = col.id === 'queued' && Y9.cap.command('work_item.reorder')
+        ? '<p class="y9-ov-board-hint">拖动调整顺序；修复事项固定在最前面</p>' : '';
+      return '<section class="y9-ov-board-col is-' + col.id + '" data-col="' + col.id + '">' +
+        '<header class="y9-ov-board-head"><h3>' + esc(col.label) + '</h3><span class="y9-count">' + items.length + '</span></header>' +
+        (cards || '<p class="y9-ov-board-empty">没有事项</p>') + dropHint + '</section>';
     }).join('') + '</div>';
-    return Y8.ui.block({
+    return Y9.ui.block({
       id: 'ov-board', title: '事项看板', query: 'project.overview',
-      command: Y8.cap.command('work_item.reorder') ? 'work_item.reorder' : null,
+      command: Y9.cap.command('work_item.reorder') ? 'work_item.reorder' : null,
       subtitle: '卡片显示标题、状态、所在部门与轮次；排队中的顺序就是执行顺序', body
     });
   }
@@ -261,29 +261,29 @@
   function flowBlock(pid, workItemId) {
     const params = { project: pid };
     if (workItemId) params.work_item = workItemId;
-    const rows = Y8.api.query('project.flow', params).data.rows;
+    const rows = Y9.api.query('project.flow', params).data.rows;
     const shown = flowAll ? rows : rows.slice(0, 12);
     const showItem = !workItemId;
     let body;
     if (!shown.length) {
-      body = Y8.ui.empty('这个范围内还没有流转记录');
+      body = Y9.ui.empty('这个范围内还没有流转记录');
     } else {
-      const head = '<li class="y8-ov-flow-row is-head"><span>时间</span>' + (showItem ? '<span>事项</span>' : '') +
+      const head = '<li class="y9-ov-flow-row is-head"><span>时间</span>' + (showItem ? '<span>事项</span>' : '') +
         '<span>方向</span><span>类型</span><span>内容</span><span>状态</span><span>原始事件</span></li>';
-      const list = shown.map((row) => '<li class="y8-ov-flow-row' + (row.kind === 'rework' ? ' is-rework' : '') + '">' +
-        '<span class="y8-ov-flow-time">' + esc(Y8.ui.time(row.at)) + '</span>' +
-        (showItem ? '<span class="y8-ov-flow-item">' + esc(itemTitle(pid, row.work_item_id)) + '</span>' : '') +
-        '<span class="y8-ov-flow-dir">' + directionText(row.from, row.to) + '</span>' +
-        '<span class="y8-ov-flow-kind">' + kindChip(row.kind) + '</span>' +
-        '<span class="y8-ov-flow-content">' + esc(row.content) + '</span>' +
-        '<span class="y8-ov-flow-status">' + esc(row.status) + '</span>' +
-        '<span class="y8-ov-flow-event">' + (row.event_position
-          ? '<button type="button" class="y8-link" data-act="ov.event" data-position="' + esc(row.event_position) + '">打开事件</button>'
-          : '<span class="y8-muted">—</span>') + '</span></li>').join('');
-      body = '<ul class="y8-ov-flow' + (showItem ? ' has-item' : '') + '">' + head + list + '</ul>' +
-        (rows.length > 12 ? '<div class="y8-ov-flow-more">' + Y8.ui.button({ label: flowAll ? '只看最近 12 条' : '显示全部 ' + rows.length + ' 条', kind: 'small', act: 'ov.flowAll' }) + '</div>' : '');
+      const list = shown.map((row) => '<li class="y9-ov-flow-row' + (row.kind === 'rework' ? ' is-rework' : '') + '">' +
+        '<span class="y9-ov-flow-time">' + esc(Y9.ui.time(row.at)) + '</span>' +
+        (showItem ? '<span class="y9-ov-flow-item">' + esc(itemTitle(pid, row.work_item_id)) + '</span>' : '') +
+        '<span class="y9-ov-flow-dir">' + directionText(row.from, row.to) + '</span>' +
+        '<span class="y9-ov-flow-kind">' + kindChip(row.kind) + '</span>' +
+        '<span class="y9-ov-flow-content">' + esc(row.content) + '</span>' +
+        '<span class="y9-ov-flow-status">' + esc(row.status) + '</span>' +
+        '<span class="y9-ov-flow-event">' + (row.event_position
+          ? '<button type="button" class="y9-link" data-act="ov.event" data-position="' + esc(row.event_position) + '">打开事件</button>'
+          : '<span class="y9-muted">—</span>') + '</span></li>').join('');
+      body = '<ul class="y9-ov-flow' + (showItem ? ' has-item' : '') + '">' + head + list + '</ul>' +
+        (rows.length > 12 ? '<div class="y9-ov-flow-more">' + Y9.ui.button({ label: flowAll ? '只看最近 12 条' : '显示全部 ' + rows.length + ' 条', kind: 'small', act: 'ov.flowAll' }) + '</div>' : '');
     }
-    return Y8.ui.block({
+    return Y9.ui.block({
       id: 'ov-flow', title: '流转记录', query: 'project.flow',
       subtitle: workItemId ? '所选事项的流转' : '整个项目；返工行用醒目的颜色标出', body
     });
@@ -301,7 +301,7 @@
     const pid = ctx.projectId;
     const ov = overview(pid);
     const target = activeOf(ov, ctx);
-    return '<div class="y8-pp y8-ov">' +
+    return '<div class="y9-pp y9-ov">' +
       summaryBlock(ov) +
       loopBlock(pid, ctx.workItemId) +
       currentBlock(ov, target, ctx) +
@@ -337,19 +337,19 @@
         ev.preventDefault();
         queueCol.classList.remove('is-drop');
         if (!draggedId || draggedId === card.dataset.cardWorkItem) return;
-        const pid = Y8.route().params.projectId;
+        const pid = Y9.route().params.projectId;
         const ov = overview(pid);
         const movable = ov.work_items.filter((item) => item.status === 'queued' && item.kind !== 'repair' && item.queue_reason !== 'decision').map((item) => item.id);
         const order = movable.filter((id) => id !== draggedId);
         const at = order.indexOf(card.dataset.cardWorkItem);
         order.splice(at < 0 ? order.length : at, 0, draggedId);
-        Y8.run('work_item.reorder', { project: pid, order: order.join(','), base_version: ov.project.version });
+        Y9.run('work_item.reorder', { project: pid, order: order.join(','), base_version: ov.project.version });
       });
     });
   }
 
   function mount(ctx, root) {
-    panel = Y8.scenes.mountFloor(root.querySelector('#ov-floor'), { projectId: ctx.projectId, workItemId: ctx.workItemId });
+    panel = Y9.scenes.mountFloor(root.querySelector('#ov-floor'), { projectId: ctx.projectId, workItemId: ctx.workItemId });
     bindBoard(root);
   }
 
@@ -374,7 +374,7 @@
     if (panel) panel.update();
   }
 
-  Y8.views.register('overview', {
+  Y9.views.register('overview', {
     title: () => '概览',
     needs: { queries: ['project.overview', 'project.loop', 'project.flow', 'work_item.inputs'] },
     render,
@@ -388,19 +388,19 @@
   // ---------------------------------------------------------------------------
   // 界面动作
 
-  Y8.actions.register('ov.append', (el) => {
+  Y9.actions.register('ov.append', (el) => {
     const box = document.getElementById('ov-append-text');
-    const result = Y8.run('work_item.append_input', { work_item: el.dataset.workItem, text: box.value });
+    const result = Y9.run('work_item.append_input', { work_item: el.dataset.workItem, text: box.value });
     if (!result.accepted) return;
     box.value = '';
-    Y8.app.clearDraft('ov.append.' + el.dataset.workItem);
+    Y9.app.clearDraft('ov.append.' + el.dataset.workItem);
   });
 
-  Y8.actions.register('ov.cancel', (el) => {
-    const pid = Y8.route().params.projectId;
+  Y9.actions.register('ov.cancel', (el) => {
+    const pid = Y9.route().params.projectId;
     const item = overview(pid).work_items.find((entry) => entry.id === el.dataset.workItem);
     if (!item) throw new Error('事项不存在：' + el.dataset.workItem);
-    Y8.ui.modal({
+    Y9.ui.modal({
       title: '取消事项',
       body: '<p>取消「' + esc(item.title) + '」：run 记为失败（原因为用户取消），执行槽位释放，队首事项取得槽位。取消以后不能恢复。</p>',
       actions: [
@@ -410,25 +410,25 @@
     });
   });
 
-  Y8.actions.register('ov.cancelConfirm', (el) => {
-    const result = Y8.run('work_item.cancel', { work_item: el.dataset.workItem });
-    if (result.accepted) Y8.ui.closeModal();
+  Y9.actions.register('ov.cancelConfirm', (el) => {
+    const result = Y9.run('work_item.cancel', { work_item: el.dataset.workItem });
+    if (result.accepted) Y9.ui.closeModal();
   });
 
-  Y8.actions.register('ov.record', (el) => {
+  Y9.actions.register('ov.record', (el) => {
     const box = document.getElementById('ov-new-text');
-    const result = Y8.run('material.record', { project: el.dataset.project, text: box.value });
+    const result = Y9.run('material.record', { project: el.dataset.project, text: box.value });
     if (!result.accepted) return;
     box.value = '';
-    Y8.app.clearDraft('ov.new.' + el.dataset.project);
+    Y9.app.clearDraft('ov.new.' + el.dataset.project);
   });
 
-  Y8.actions.register('ov.create', (el) => {
+  Y9.actions.register('ov.create', (el) => {
     const pid = el.dataset.project;
     const box = document.getElementById('ov-new-text');
     const titleEl = document.getElementById('ov-new-title');
     const srcEl = document.getElementById('ov-new-src');
-    const result = Y8.run('work_item.create', {
+    const result = Y9.run('work_item.create', {
       project: pid, text: box.value,
       title: titleEl ? titleEl.value : null,
       source_dir: srcEl && srcEl.value ? srcEl.value : null
@@ -436,24 +436,24 @@
     if (!result.accepted) return;
     box.value = '';
     if (titleEl) titleEl.value = '';
-    Y8.app.clearDraft('ov.new.' + pid);
-    Y8.app.clearDraft('ov.title.' + pid);
-    Y8.go(Y8.paths.overview(pid, result.refs.work_item_id));
+    Y9.app.clearDraft('ov.new.' + pid);
+    Y9.app.clearDraft('ov.title.' + pid);
+    Y9.go(Y9.paths.overview(pid, result.refs.work_item_id));
   });
 
-  Y8.actions.register('ov.flowAll', () => {
+  Y9.actions.register('ov.flowAll', () => {
     flowAll = !flowAll;
-    const pid = Y8.route().params.projectId;
-    const route = Y8.route();
-    refresh(Y8.app.dom.content, '#ov-flow', flowBlock(pid, route.query.w || null));
+    const pid = Y9.route().params.projectId;
+    const route = Y9.route();
+    refresh(Y9.app.dom.content, '#ov-flow', flowBlock(pid, route.query.w || null));
   });
 
-  Y8.actions.register('ov.event', (el) => {
-    const data = Y8.api.query('event.detail', { position: Number(el.dataset.position) }).data;
+  Y9.actions.register('ov.event', (el) => {
+    const data = Y9.api.query('event.detail', { position: Number(el.dataset.position) }).data;
     const ev = data.event;
     const rows = [
-      ['时间', esc(Y8.ui.time(ev.at))],
-      ['类型', Y8.ui.code(ev.type)],
+      ['时间', esc(Y9.ui.time(ev.at))],
+      ['类型', Y9.ui.code(ev.type)],
       ['说明', esc(ev.label)],
       ['项目', esc(ev.project_id || '—')],
       ['事项', esc(ev.work_item_id || '—')],
@@ -463,13 +463,13 @@
       ['发起者', esc(ev.actor || '—')]
     ];
     const artifacts = data.artifacts.length
-      ? '<h3 class="y8-h3">引用的工件</h3><ul class="y8-source-list">' + data.artifacts.map((a) =>
-        '<li><strong>' + esc(a.title) + '</strong> <span class="y8-muted">' + esc(a.kind) + '</span>' + Y8.ui.pre(a.text) + '</li>').join('') + '</ul>'
+      ? '<h3 class="y9-h3">引用的工件</h3><ul class="y9-source-list">' + data.artifacts.map((a) =>
+        '<li><strong>' + esc(a.title) + '</strong> <span class="y9-muted">' + esc(a.kind) + '</span>' + Y9.ui.pre(a.text) + '</li>').join('') + '</ul>'
       : '';
-    Y8.ui.modal({
+    Y9.ui.modal({
       title: '事件 ' + ev.position, wide: true,
-      body: Y8.ui.kv(rows, 'is-rows') +
-        '<h3 class="y8-h3">载荷</h3>' + Y8.ui.pre(JSON.stringify(ev.payload || {}, null, 2)) + artifacts,
+      body: Y9.ui.kv(rows, 'is-rows') +
+        '<h3 class="y9-h3">载荷</h3>' + Y9.ui.pre(JSON.stringify(ev.payload || {}, null, 2)) + artifacts,
       actions: [{ label: '关闭', close: true }]
     });
   });

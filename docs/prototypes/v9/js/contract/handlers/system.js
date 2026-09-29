@@ -3,8 +3,8 @@
 // 项目角色设置读取 settings.roles[部门] 中 role_id、model、request_level
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const B = Y8.backend;
+  const Y9 = window.Y9;
+  const B = Y9.backend;
   if (!B || !B.helpers) throw new Error('handlers/system.js 需要先加载 handlers/core.js');
 
   const reject = B.helpers.reject;
@@ -299,10 +299,10 @@
       image_input: Boolean(def.image_input),
       image_input_source: def.image_input_source || null,
       accepts_required_tool_call: Boolean(def.accepts_required_tool_call),
-      reasoning: def.reasoning ? Y8.clone(def.reasoning) : null,
+      reasoning: def.reasoning ? Y9.clone(def.reasoning) : null,
       capacity_accepted: Boolean(def.capacity_accepted),
-      admission: def.admission ? Y8.clone(def.admission) : null,
-      admission_revoked: def.admission_revoked ? Y8.clone(def.admission_revoked) : null,
+      admission: def.admission ? Y9.clone(def.admission) : null,
+      admission_revoked: def.admission_revoked ? Y9.clone(def.admission_revoked) : null,
       prefill: def.prefill || null,
       referrers: refs
     };
@@ -353,7 +353,7 @@
       return {
         id: conn.id, name: conn.name, scheme: conn.scheme, protocol: conn.protocol, base_url: conn.base_url,
         credential_ref: conn.credential_ref, timeout_sec: conn.timeout_sec, models_url: conn.models_url || '',
-        credential: cred ? { ref: cred.ref, state: cred.state, sources: Y8.clone(cred.sources), version: cred.version, rejected: cred.rejected, note: cred.note } : null,
+        credential: cred ? { ref: cred.ref, state: cred.state, sources: Y9.clone(cred.sources), version: cred.version, rejected: cred.rejected, note: cred.note } : null,
         admitted_count: defs.filter((def) => def.admission).length,
         candidate_count: defs.filter((def) => !def.admission).length,
         definitions: defs,
@@ -372,19 +372,19 @@
     const out = {
       revision: catalog.file.revision,
       system_revision: db.data.system.catalog_revision,
-      file: Y8.clone(catalog.file),
+      file: Y9.clone(catalog.file),
       capability_table: {
         source: catalog.capability_table.source,
         revision: catalog.capability_table.revision,
-        models: Y8.clone(catalog.capability_table.models)
+        models: Y9.clone(catalog.capability_table.models)
       },
-      presets: Y8.clone(catalog.presets),
+      presets: Y9.clone(catalog.presets),
       connections,
       credentials: (catalog.credentials || []).map((cred) => ({
-        ref: cred.ref, state: cred.state, sources: Y8.clone(cred.sources), version: cred.version,
+        ref: cred.ref, state: cred.state, sources: Y9.clone(cred.sources), version: cred.version,
         rejected: Boolean(cred.rejected), rejected_source: cred.rejected_source || null, note: cred.note
       })),
-      model_tests: Y8.clone(catalog.model_tests || {}),
+      model_tests: Y9.clone(catalog.model_tests || {}),
       department_defaults: defaults,
       admitted: (catalog.definitions || []).filter((def) => def.admission).map((def) => ({
         id: def.id, label: label(def.id), connection_id: def.connection_id,
@@ -419,7 +419,7 @@
       out.role_defaults = roleDefaults;
       out.role_catalog = {};
       Object.keys(catalog.role_catalog || {}).forEach((dept) => {
-        if (Array.isArray(catalog.role_catalog[dept])) out.role_catalog[dept] = Y8.clone(catalog.role_catalog[dept]);
+        if (Array.isArray(catalog.role_catalog[dept])) out.role_catalog[dept] = Y9.clone(catalog.role_catalog[dept]);
       });
     }
     return out;
@@ -434,7 +434,7 @@
         definitions: (catalog.definitions || []).filter((def) => def.connection_id === conn.id).map((def) => ({
           id: def.id, upstream_model: def.upstream_model, window: def.window, max_output: def.max_output,
           image_input: Boolean(def.image_input), accepts_required_tool_call: Boolean(def.accepts_required_tool_call),
-          reasoning: def.reasoning ? Y8.clone(def.reasoning) : null,
+          reasoning: def.reasoning ? Y9.clone(def.reasoning) : null,
           capacity_accepted: Boolean(def.capacity_accepted)
         }))
       })),
@@ -522,8 +522,8 @@
         note: queue.some((row) => row.upgrade_restart) ? '队列中有因升级重新开始的事项，排在最前面' : '重启后队列保持，没有因升级重新开始的事项'
       }
     };
-    if (db.atLeast('3.1')) out.drain = Y8.clone(db.data.system.drain);
-    if (db.atLeast('S4')) out.disk = Y8.clone(db.data.system.disk);
+    if (db.atLeast('3.1')) out.drain = Y9.clone(db.data.system.drain);
+    if (db.atLeast('S4')) out.disk = Y9.clone(db.data.system.disk);
     if (db.atLeast('S5')) out.unit = 'role';
     return out;
   });
@@ -533,13 +533,13 @@
     if (!tools) throw new Error('当前档位没有工具登记');
     const out = {
       design_note: '设计待定',
-      network: Y8.clone(tools.network),
-      mcp: Y8.clone(tools.mcp),
+      network: Y9.clone(tools.network),
+      mcp: Y9.clone(tools.mcp),
       hooks: { note: 'Stage 6 设计' }
     };
-    if (db.atLeast('3.2D') && tools.browser) out.browser = Y8.clone(tools.browser);
-    if (db.atLeast('3.2D') && tools.computer_use) out.computer_use = Y8.clone(tools.computer_use);
-    if (db.atLeast('S5') && tools.observers) out.observers = Y8.clone(tools.observers);
+    if (db.atLeast('3.2D') && tools.browser) out.browser = Y9.clone(tools.browser);
+    if (db.atLeast('3.2D') && tools.computer_use) out.computer_use = Y9.clone(tools.computer_use);
+    if (db.atLeast('S5') && tools.observers) out.observers = Y9.clone(tools.observers);
     return out;
   });
 
@@ -567,7 +567,7 @@
 
   function normalizeReasoning(value, path, errors) {
     if (value === null || value === undefined) return null;
-    if (!Y8.isPlainObject(value)) {
+    if (!Y9.isPlainObject(value)) {
       errors.push({ path, message: '推理档位声明必须是对象或 null' });
       return null;
     }
@@ -610,7 +610,7 @@
     const nextIds = new Set();
     incoming.forEach((raw, index) => {
       const path = 'definitions[' + index + ']';
-      if (!Y8.isPlainObject(raw)) {
+      if (!Y9.isPlainObject(raw)) {
         errors.push({ path, message: '模型访问定义必须是对象' });
         return;
       }
@@ -715,10 +715,10 @@
       }
       patches.push({ path: 'catalog.definitions', value: nextDefinitions });
     }
-    const nextCatalog = Y8.clone(db.raw.catalog);
+    const nextCatalog = Y9.clone(db.raw.catalog);
     patches.forEach((patch) => {
       if (patch.path.indexOf('system.') === 0) return;
-      Y8.applyPatch(nextCatalog, Object.assign({}, patch, { path: patch.path.replace(/^catalog\./, '') }));
+      Y9.applyPatch(nextCatalog, Object.assign({}, patch, { path: patch.path.replace(/^catalog\./, '') }));
     });
     const events = [{
       type: 'catalog_revised',
@@ -760,14 +760,14 @@
 
   function validateDocument(db, doc) {
     const errors = [];
-    if (!Y8.isPlainObject(doc)) return [{ path: '(文档)', message: '目录文档必须是对象' }];
+    if (!Y9.isPlainObject(doc)) return [{ path: '(文档)', message: '目录文档必须是对象' }];
     unknownKeys(doc, db.atLeast('S5') ? ['connections', 'department_defaults', 'role_defaults'] : ['connections', 'department_defaults'], '', errors);
     if (!Array.isArray(doc.connections)) errors.push({ path: 'connections', message: '缺少连接列表' });
     const connIds = new Set();
     const defById = {};
     (doc.connections || []).forEach((conn, index) => {
       const path = 'connections[' + index + ']';
-      if (!Y8.isPlainObject(conn)) {
+      if (!Y9.isPlainObject(conn)) {
         errors.push({ path, message: '连接必须是对象' });
         return;
       }
@@ -778,7 +778,7 @@
       if (!Array.isArray(conn.definitions)) errors.push({ path: path + '.definitions', message: '缺少模型访问定义列表' });
       (conn.definitions || []).forEach((def, defIndex) => {
         const defPath = path + '.definitions[' + defIndex + ']';
-        if (!Y8.isPlainObject(def)) {
+        if (!Y9.isPlainObject(def)) {
           errors.push({ path: defPath, message: '模型访问定义必须是对象' });
           return;
         }
@@ -790,7 +790,7 @@
       });
     });
     const checkRefs = (bucket, path) => {
-      if (!Y8.isPlainObject(doc[bucket])) {
+      if (!Y9.isPlainObject(doc[bucket])) {
         errors.push({ path, message: '必须是对象' });
         return;
       }
@@ -798,7 +798,7 @@
         const entry = doc[bucket][key];
         const at = path + '.' + key;
         if (entry === null) return;
-        if (!Y8.isPlainObject(entry)) {
+        if (!Y9.isPlainObject(entry)) {
           errors.push({ path: at, message: '必须是对象或 null' });
           return;
         }
@@ -877,7 +877,7 @@
       });
       patches.push({ path: 'catalog.role_defaults', value: roles });
     }
-    const nextCatalog = Y8.clone(db.raw.catalog);
+    const nextCatalog = Y9.clone(db.raw.catalog);
     nextCatalog.connections = nextConnections;
     nextCatalog.definitions = nextDefinitions;
     nextCatalog.department_defaults = defaults;
@@ -923,13 +923,13 @@
 
   function schedule(db, build) {
     const snap = {
-      catalog: Y8.clone(db.data.catalog),
-      runs: Y8.clone(db.raw.runs || []),
-      work_items: Y8.clone(db.raw.work_items || []),
-      project_settings: Y8.clone(db.raw.project_settings || {}),
+      catalog: Y9.clone(db.data.catalog),
+      runs: Y9.clone(db.raw.runs || []),
+      work_items: Y9.clone(db.raw.work_items || []),
+      project_settings: Y9.clone(db.raw.project_settings || {}),
       now: db.now
     };
-    setTimeout(() => Y8.backend.emit(build(snap)), 1000);
+    setTimeout(() => Y9.backend.emit(build(snap)), 1000);
   }
 
   function testKeyPatch(db, bucket, id, value) {
@@ -1025,7 +1025,7 @@
       const patch = [{ path: 'catalog.model_tests', value: Object.assign({}, snap.catalog.model_tests, { [def.id]: { phase: 'finished', at: snap.now, ok: result.ok, text: result.text } }) }];
       if (result.admission) {
         patch.push({ path: 'catalog.definitions', value: (snap.catalog.definitions || []).map((item) => (item.id === def.id ? Object.assign({}, item, { admission: result.admission, admission_revoked: null }) : item)) });
-        const next = Y8.clone(snap.catalog);
+        const next = Y9.clone(snap.catalog);
         const target = next.definitions.find((item) => item.id === def.id);
         target.admission = result.admission;
         target.admission_revoked = null;
@@ -1054,12 +1054,12 @@
     const stale = needRevision(db, params);
     if (stale) return stale;
     const incoming = params.defaults;
-    if (!Y8.isPlainObject(incoming)) throw new Error(labelText + '缺少 defaults');
+    if (!Y9.isPlainObject(incoming)) throw new Error(labelText + '缺少 defaults');
     const pairs = [];
     Object.keys(incoming).forEach((key) => {
       const entry = incoming[key];
       if (entry === null) return;
-      if (!Y8.isPlainObject(entry)) throw new Error(labelText + '的一项必须是对象或 null：' + key);
+      if (!Y9.isPlainObject(entry)) throw new Error(labelText + '的一项必须是对象或 null：' + key);
       if (!entry.definition) return;
       pairs.push({ key, definition: entry.definition, request_level: entry.request_level || null });
     });
@@ -1077,7 +1077,7 @@
       patches.push({ path: 'catalog.' + bucket + '.' + key + '.definition', value: entry.definition || null });
       patches.push({ path: 'catalog.' + bucket + '.' + key + '.request_level', value: entry.request_level || null });
     });
-    const next = Y8.clone(db.raw.catalog);
+    const next = Y9.clone(db.raw.catalog);
     Object.keys(incoming).forEach((key) => {
       const entry = incoming[key] || { definition: null, request_level: null };
       if (!next[bucket][key]) next[bucket][key] = {};
@@ -1141,14 +1141,14 @@
   }
 
   function writeCred(db, cred, sourceKey, on) {
-    const next = Y8.clone(cred);
+    const next = Y9.clone(cred);
     next.sources[sourceKey] = on;
     next.state = credState(next);
     next.rejected = next.state !== 'missing' && next.rejected_source === next.state;
     next.version = bumpCred(cred.version);
     next.note = credNote(next);
     const patches = ['state', 'sources', 'rejected', 'version', 'note'].map((key) => ({ path: 'catalog.credentials[ref=' + cred.ref + '].' + key, value: next[key] }));
-    const catalog = Y8.clone(db.raw.catalog);
+    const catalog = Y9.clone(db.raw.catalog);
     const row = catalog.credentials.find((item) => item.ref === cred.ref);
     Object.assign(row, { state: next.state, sources: next.sources, rejected: next.rejected, version: next.version, note: next.note });
     return { next, patches: patches.concat(effectivePatches(db, catalog)), catalog };

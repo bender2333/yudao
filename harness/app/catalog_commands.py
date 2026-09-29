@@ -283,13 +283,13 @@ async def _collect_candidates(application: Application, command: Command, reques
             _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
                 "base_revision": request.base_version,
                 "provider_id": request.provider_id, "status": "unknown", "source_url": request.models_url or "",
-                "fetched_at": "", "candidate_ids": [], "error": str(exc),
+                "fetched_at": "", "candidates": [], "candidate_ids": [], "error": str(exc),
             })
             return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
             "base_revision": request.base_version,
             "provider_id": request.provider_id, "status": result["status"], "source_url": result["source_url"],
-            "fetched_at": result["fetched_at"],
+            "fetched_at": result["fetched_at"], "candidates": result["candidates"],
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
         })
 

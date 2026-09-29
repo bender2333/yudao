@@ -3,8 +3,8 @@
 // execution_placement.save、machine_authorization.save 需要 not_allowed，登记表的拒绝原因里没有，这里补上。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const B = Y8.backend;
+  const Y9 = window.Y9;
+  const B = Y9.backend;
   if (!B || !B.helpers) throw new Error('handlers/department.js 需要先加载 handlers/core.js');
 
   const reject = B.helpers.reject;
@@ -180,7 +180,7 @@
     const items = db.workItemsOf(projectId);
     const active = items.find((item) => item.status === 'in_progress');
     if (active) return active;
-    return items.slice().sort((a, b) => Y8.time.ms(b.created_at) - Y8.time.ms(a.created_at))[0] || null;
+    return items.slice().sort((a, b) => Y9.time.ms(b.created_at) - Y9.time.ms(a.created_at))[0] || null;
   }
 
   function roomStatus(db, run, department) {
@@ -312,9 +312,9 @@
     const attempt = pair.attempt;
     if (attempt.text) return String(attempt.text);
     if (attempt.received) return String(attempt.received);
-    const started = attempt.started_at ? Y8.time.ms(attempt.started_at) : 0;
+    const started = attempt.started_at ? Y9.time.ms(attempt.started_at) : 0;
     return db.log({ run: pair.run.id, department: attempt.department, types: 'model_stream_progress' })
-      .filter((ev) => !started || Y8.time.ms(ev.at) >= started)
+      .filter((ev) => !started || Y9.time.ms(ev.at) >= started)
       .map((ev) => (ev.payload && ev.payload.text) || '')
       .join('');
   }
@@ -367,9 +367,9 @@
     const project = db.project(d.project_id);
     const item = d.work_item_id ? db.workItem(d.work_item_id) : null;
     const blocked = d.blocks && d.blocks.work_item_id ? db.workItem(d.blocks.work_item_id) : null;
-    const out = Y8.clone(d);
+    const out = Y9.clone(d);
     out.options = (d.options || []).map((option) => ({ id: option.id, label: option.label, kind: option.kind || null, requires: option.requires || null }));
-    out.kind_label = Y8.registry.entry('decision', d.kind).label;
+    out.kind_label = Y9.registry.entry('decision', d.kind).label;
     out.project_name = project ? project.name : d.project_id;
     out.work_item_title = item ? item.title : null;
     out.waited_sec = B.helpers.since(db, d.issued_at);
@@ -390,7 +390,7 @@
     const status = roomStatus(db, run, department);
     const resolved = models().resolve(db, project.id, department);
     const deptAttempts = run ? (run.attempts || []).filter((attempt) => attempt.department === department) : [];
-    const last = deptAttempts.slice().sort((a, b) => Y8.time.ms(b.started_at) - Y8.time.ms(a.started_at))[0] || null;
+    const last = deptAttempts.slice().sort((a, b) => Y9.time.ms(b.started_at) - Y9.time.ms(a.started_at))[0] || null;
     const guidance = run ? (run.guidance || []).filter((entry) => entry.department === department) : [];
     const messages = run && run.messages && run.messages[department] ? run.messages[department] : [];
     const contexts = run && run.contexts && run.contexts[department] ? run.contexts[department] : [];
@@ -419,7 +419,7 @@
     const prdCount = item ? (db.data.materials || []).filter((material) => material.work_item_id === item.id && material.kind === 'prd').length : 0;
     const room = {
       department: department,
-      level: Y8.level.current(),
+      level: Y9.level.current(),
       status: status,
       crt: {
         target: targetTitle,
@@ -486,7 +486,7 @@
       last_target: last ? Object.assign({ attempt_id: last.id, at: last.started_at, status: last.status, status_text: ATTEMPT_TEXT[last.status] || last.status }, publicTarget(db, last)) : null,
       prompt: promptOf(db, settings, run, department),
       messages: messages.slice().sort((a, b) => (b.seq || 0) - (a.seq || 0)),
-      guidance: guidance.slice().sort((a, b) => Y8.time.ms(b.at) - Y8.time.ms(a.at)).map((entryItem) => Object.assign({}, entryItem, {
+      guidance: guidance.slice().sort((a, b) => Y9.time.ms(b.at) - Y9.time.ms(a.at)).map((entryItem) => Object.assign({}, entryItem, {
         status_text: GUIDANCE_LABELS[entryItem.status] || entryItem.status
       })),
       context: { snapshots: contexts, compactions: compactions },
@@ -618,7 +618,7 @@
     pairs.forEach((pair) => {
       const key = pair.attempt.department + ':' + (pair.attempt.role || '');
       const prev = latest[key];
-      if (!prev || Y8.time.ms(pair.attempt.started_at) > Y8.time.ms(prev.attempt.started_at)) latest[key] = pair;
+      if (!prev || Y9.time.ms(pair.attempt.started_at) > Y9.time.ms(prev.attempt.started_at)) latest[key] = pair;
     });
     Object.keys(latest).forEach((key) => {
       const pair = latest[key];
@@ -666,9 +666,9 @@
       }),
       failures: fault.failures || 0,
       observe_until: fault.observe_until || null,
-      observe_remaining_sec: fault.observe_until ? Math.max(0, Y8.time.between(db.now, fault.observe_until)) : null
+      observe_remaining_sec: fault.observe_until ? Math.max(0, Y9.time.between(db.now, fault.observe_until)) : null
     }));
-    const backups = (ops.backups || []).slice().sort((a, b) => Y8.time.ms(b.at) - Y8.time.ms(a.at)).slice(0, 3);
+    const backups = (ops.backups || []).slice().sort((a, b) => Y9.time.ms(b.at) - Y9.time.ms(a.at)).slice(0, 3);
     const decisions = (db.data.decisions || []).filter((d) => d.project_id === project.id && d.status === 'waiting' && (
       OPS_KINDS.includes(d.kind) || (d.materials && d.materials.department === 'operations')
     )).map((d) => decisionCard(db, d));
@@ -702,7 +702,7 @@
       const text = String(params.text);
       rows = rows.filter((pair) => JSON.stringify(pair.attempt).indexOf(text) >= 0);
     }
-    rows.sort((a, b) => Y8.time.ms(b.attempt.started_at) - Y8.time.ms(a.attempt.started_at));
+    rows.sort((a, b) => Y9.time.ms(b.attempt.started_at) - Y9.time.ms(a.attempt.started_at));
     const offset = params.cursor ? Number(params.cursor) : 0;
     if (!Number.isFinite(offset) || offset < 0) throw new Error('cursor 无效');
     const pageSize = params.limit ? Math.min(200, Math.max(1, Number(params.limit))) : PAGE;
@@ -902,7 +902,7 @@
     if (TERMINAL.includes(run.phase)) return reject('run_terminal', '事项已结束，不能再发送指导');
     const text = requireText(params.text, '指导原文').trim();
     const version = (run.guidance || []).filter((entry) => entry.department === department).length + 1;
-    const id = Y8.uid('g');
+    const id = Y9.uid('g');
     const record = { id: id, department: department, version: version, text: text, status: 'received', response: null, at: db.now };
     const message = {
       seq: ((run.messages && run.messages[department]) || []).reduce((max, entry) => Math.max(max, entry.seq || 0), 0) + 1,
@@ -1230,9 +1230,9 @@
 
   function loadSemantic(db, projectId) {
     const top = db.raw.semantic && db.raw.semantic[projectId];
-    if (top) return Y8.clone(top);
+    if (top) return Y9.clone(top);
     const raw = settingsRaw(db, projectId);
-    if (raw.semantic) return Y8.clone(raw.semantic);
+    if (raw.semantic) return Y9.clone(raw.semantic);
     return null;
   }
 
@@ -1271,7 +1271,7 @@
     const current = typeof store.version === 'number' ? store.version : 0;
     if (versionParam(params) !== current) return stale(current);
     const unitId = params.unit || params.unit_id || null;
-    const id = Y8.uid('su');
+    const id = Y9.uid('su');
     if (unitId) {
       const prev = (store.units || []).find((item) => item.id === unitId);
       if (!prev) return reject('not_found', '语义单元不存在：' + unitId);

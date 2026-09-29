@@ -2,8 +2,8 @@
 // 内容只来自事件已经带着的事实（事件类型、载荷里的字段、事件说明），项目楼层与部门房间两个画面共用这一份目录。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.bubble) throw new Error('say.js 需要先加载 js/pixel/engine.js');
   const PAL = P.PAL;
 

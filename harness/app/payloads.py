@@ -986,6 +986,8 @@ class CatalogCandidatesCollectedPayload(Payload):
     status: Literal["ok", "unknown"]
     source_url: str
     fetched_at: str
+    # 候选逐条带上游模型 ID；上游列表返回窗口与输出上限时带这两项，其余候选只有上游模型 ID
+    candidates: list[dict[str, Any]]
     candidate_ids: list[str]
     error: str | None
 

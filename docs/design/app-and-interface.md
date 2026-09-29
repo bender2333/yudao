@@ -1,8 +1,8 @@
 # 应用层与接口层设计说明
 
-更新：2026-09-29。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。
+更新：2026-09-30。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。
 
-依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据将改为原型 v8（尚未制作，完成后替换链接），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
+依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../prototypes/v9/design.md)与[构建约定](../prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../prototypes/v8/design.md)与[构建约定](../prototypes/v8/BUILD.md)），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
 ## 1. 要解决的问题
 
@@ -339,7 +339,7 @@ sequenceDiagram
 - 项目内的查询都接受事项范围参数 `work_item`（原型第 3.3 节的 `?w=`）。
 - 查询不写入任何内容，也不触发结算、重读或模型调用。
 - 分页查询的游标带第一页的位置；后续页只返回该位置以前的记录，翻页期间新出现的记录由事件流带来（可观测性设计第 5 节「历史回看固定读取所选时点」）。
-- **按位置读取（回放）。** 第 4.3 节「位置」一列写明「可回放」的查询另接受参数 `at`（全局位置），返回处理到这个位置时的快照，供首页与概览的时间轴回放离开期间的画面（[原型 v8](../prototypes/v8/design.md)第 5.5 节）：
+- **按位置读取（回放）。** 第 4.3 节「位置」一列写明「可回放」的查询另接受参数 `at`（全局位置），返回处理到这个位置时的快照，供首页与概览的时间轴回放离开期间的画面（[原型 v9](../prototypes/v9/design.md) 沿用 [v8 设计说明](../prototypes/v8/design.md)第 5.5 节）：
   - 投影在内存中从事件重放到 `at` 为止，与 `replay.check` 的重放相同，不写入，不调用模型与工具；同一位置的结果可以缓存。
   - 结果的 `position` 等于 `at`；已经等待的时长等与时间有关的字段按位置 `at` 那条事件的写入时间计算；这个位置以后才出现的对象不在结果中。
   - `at` 大于日志末尾时返回 422；不是「可回放」的查询带 `at` 时返回 422。
@@ -373,7 +373,7 @@ sequenceDiagram
 
 **系统首页（界面工作线）**
 
-首页路径为 `#/home`，机器页为 `#/sys/machines`（[原型 v8](../prototypes/v8/design.md)第 3 节）。首页顶部是一排状态项（`system.status` 的首页状态项与 `decisions.list` 的等待数量，托盘图标使用同一份数据），下面是一栋楼的像素画面（每个项目一层，地下室是机房），再往下依次是「待你决定」（`decisions.list` 中等待回答的请求，跨项目，按发出时间排列）、离开期间的报告、项目列表（`projects.list`）。
+首页路径为 `#/home`，机器页为 `#/sys/machines`（[原型 v9](../prototypes/v9/design.md) 沿用 [v8 设计说明](../prototypes/v8/design.md)第 3 节）。首页顶部是一排状态项（`system.status` 的首页状态项与 `decisions.list` 的等待数量，托盘图标使用同一份数据），下面是一栋楼的像素画面（每个项目一层，地下室是机房），再往下依次是「待你决定」（`decisions.list` 中等待回答的请求，跨项目，按发出时间排列）、离开期间的报告、项目列表（`projects.list`）。
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
