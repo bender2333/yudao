@@ -8,6 +8,7 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
 from .engine import StepLimits
+from .environment import LocalEnvironment
 from .event_store import EventStore, catalog_stream
 from .models import CatalogEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
@@ -16,6 +17,7 @@ from .projection import RunProjection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .replay_check import verify_replay
+from .workspace import Workspace
 
 __all__ = [
     "LoopSystem",
@@ -26,6 +28,8 @@ __all__ = [
 
 class LoopSystem:
     # 系统装配：持久化、独立 Provider 模块与原生编排器，空态可启动
+    read_only = False
+
     def __init__(
         self,
         data_dir: str | Path,
@@ -58,11 +62,12 @@ class LoopSystem:
             self.facade.configure_paths(config, dotenv)
             # 启动读取一致版本：缺文件空态，有效修订与重载错误由模块记录，不抛错
             self.facade.reload()
+        self.workspace_root = self.data_dir / "workspaces"
         self.orchestrator = Orchestrator(
             self.store,
             self.writes,
             self.artifacts,
-            self.data_dir / "workspaces",
+            self.workspace_root,
             facade=self.facade,
             test_adapter_factory=test_adapter_factory,
             test_provider=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
@@ -158,8 +163,11 @@ class LoopSystem:
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
 
-    def workspace(self, run_id: str):
-        return self.orchestrator.workspace(run_id)
+    def workspace(self, run_id: str) -> Workspace:
+        return Workspace(self.workspace_root / run_id)
+
+    def environment(self, run_id: str) -> LocalEnvironment:
+        return LocalEnvironment.open(self.workspace_root / run_id)
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

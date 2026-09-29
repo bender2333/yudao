@@ -273,7 +273,7 @@
         api_version: apiVersionOverride === null ? dep.api_version : apiVersionOverride, access: dep.access
       },
       queries: queries.map((name) => ({ name, replay: Boolean(r.queries[name].replay) })),
-      commands: commands.map((name) => ({ name, reasons: r.commands[name].reasons.slice(), pending: Boolean(r.commands[name].pending) })),
+      commands: commands.map((name) => ({ name, reasons: r.commands[name].reasons.slice() })),
       decisions: Object.keys(r.decisions).filter((kind) => level(r.decisions[kind])),
       event_types: Object.keys(r.events).filter((type) => level(r.events[type])),
       overlays,

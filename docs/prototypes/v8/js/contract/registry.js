@@ -1,5 +1,5 @@
-// 能力登记表：查询、命令、决定种类、覆盖层与事件种类所属的档位。名称以应用层与接口层设计说明第 3 至 6 节为准，
-// pending 表示应用层设计说明尚未列出、原型先用的临时名称（标注模式显示「合同待补」）
+// 能力登记表：查询、命令、决定种类、覆盖层与事件种类所属的档位。名称以应用层与接口层设计说明第 3 至 6 节为准；
+// replay 表示查询可回放（接受 at 参数，应用层设计说明第 4.1 节）
 (function () {
   'use strict';
   const Y8 = window.Y8;
@@ -23,6 +23,8 @@
     'semantic.records': q('S5', '语义记录'),
     'overlay.context_usage': q('S5', '上下文用量'),
     'run.recovery': q('3.1', '恢复与动作核实'),
+    'run.trials': q('3.2D', '试用记录'),
+    'evidence.screenshot': q('3.2D', '截图证据'),
     'work_item.materials': q('ui', '资料'),
     'delivery.file': q('ui', '交付文件'),
     'project.attempts': q('ui', '请求记录'),
@@ -91,6 +93,7 @@
     // 初始 PRD 的确认是项目流中的决定（接入已有项目设计说明第 3.3 节），回答写入 project_decision_answered
     initial_prd: Object.assign(d('3.8', '确认接入已有项目的初始 PRD', 'work_item'), { stream: 'project' }),
     tool_once: d('3.2B', '授权网络取回与 MCP 工具', 'action'),
+    cannot_verify: d('3.2D', '质检无法核验', 'run'),
     provider_wait: d('S4', '进入等待模型服务的通知', null),
     external_action: d('S4', '授权常设授权清单以外的外部动作', 'action'),
     rollback_restore: d('S4', '需要恢复备份的回滚', 'fault'),

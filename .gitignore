@@ -19,6 +19,7 @@ test-results/
 .tmp/
 .tmp-codex-test/
 .tmp-omp-profile/
+.tmp-omp-*.log
 .playwright-mcp/
 .mission-workspaces/
 .remember/

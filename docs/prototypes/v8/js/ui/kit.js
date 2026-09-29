@@ -121,10 +121,7 @@
 
   function annotationHtml(opts, names, tag) {
     const list = (kind) => {
-      const items = names.filter((pair) => pair[0] === kind).map(([k, name]) => {
-        const pending = k === 'command' && Y8.registry.entry('command', name).pending;
-        return Y8.esc(name) + (pending ? '<em class="y8-annot-pending">合同待补</em>' : '');
-      });
+      const items = names.filter((pair) => pair[0] === kind).map(([, name]) => Y8.esc(name));
       return items.length ? items.join('、') : '无';
     };
     return '<div class="y8-annot" role="note"><span><b>查询</b>' + list('query') + '</span><span><b>命令</b>' + list('command') +

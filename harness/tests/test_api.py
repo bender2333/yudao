@@ -164,6 +164,18 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog", "changed_by": catalog_changed_by},
         {"name": "catalog.document", "changed_by": catalog_changed_by},
     ]
+    queries = capabilities["queries"]
+    assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
+        "system.status", "decisions.list", "projects.list", "project.overview", "project.loop", "project.flow",
+        "work_item.inputs", "event.detail", "department.workspace", "run.actions", "work_item.materials",
+        "delivery.file", "project.attempts", "project.usage", "run.attempt", "project.settings", "run.export",
+        "replay.check", "catalog", "catalog.document",
+    }
+    # 覆盖层只列出依赖的查询都已登记的：flow 与 waiting 的依赖已登记，其余依赖的查询尚未加入
+    assert capabilities["overlays"] == [
+        {"name": "flow", "queries": ["project.flow"]},
+        {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
+    ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
     assert capabilities["decisions"] == ["model_unavailable"]
@@ -279,3 +291,37 @@ def test_requests_outside_the_contract_are_refused_and_documentation_pages_are_c
         for path in ("/docs", "/redoc", "/docs/oauth2-redirect"):
             assert client.get(path).status_code == 404
         assert client.get("/openapi.json").status_code == 200
+
+
+def test_queries_for_a_missing_target_answer_404_like_the_old_read_routes(data_dir):
+    # 旧路由对不存在的运行、事件与交付文件返回 404；已登记的查询在目标不存在时同样给出 404
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        for name, params in (("project.overview", {"project_id": "missing"}),
+                             ("project.flow", {"project_id": "missing"}),
+                             ("work_item.inputs", {"project_id": "missing", "work_item": "missing"}),
+                             ("event.detail", {"event_id": "missing"}),
+                             ("run.actions", {"run_id": "missing"}),
+                             ("run.attempt", {"run_id": "missing", "attempt_id": "missing"}),
+                             ("run.export", {"run_id": "missing"}),
+                             ("delivery.file", {"event_id": "missing", "path": "missing.py"})):
+            response = client.get(f"/api/queries/{name}", params=params)
+            assert response.status_code == 404, (name, response.text)
+            assert response.json()["error"]
+        assert opened.store.end_position() == 0
+
+
+def test_query_filters_outside_the_contract_are_refused_by_the_contract(data_dir):
+    # 状态与部门的取值由合同限定，游标与分页大小的格式同样如此：不符合时按合同拒绝，不落到 500
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        for name, params in (("project.attempts", {"project_id": "p", "status": "bogus"}),
+                             ("project.usage", {"project_id": "p", "status": "bogus"}),
+                             ("project.attempts", {"project_id": "p", "department": "bogus"}),
+                             ("project.usage", {"project_id": "p", "department": "bogus"}),
+                             ("project.attempts", {"project_id": "p", "cursor": "not-a-cursor"}),
+                             ("project.attempts", {"project_id": "p", "cursor": "1:x:2"}),
+                             ("project.attempts", {"project_id": "p", "limit": 0}),
+                             ("project.attempts", {"project_id": "p", "limit": 500})):
+            response = client.get(f"/api/queries/{name}", params=params)
+            assert response.status_code == 422, (name, params, response.text)

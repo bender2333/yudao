@@ -166,7 +166,7 @@ flowchart LR
 
 ## 9. 前提与未决事项
 
-- 场景 1 的 Yudao 一侧需要质检部门具备浏览器与 computer use 工具，按 PRD 自行生成测试并操作页面。两个工具由 Stage 3 的 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力，质检两个工具都可以使用。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
+- 场景 1 的 Yudao 一侧需要质检部门具备浏览器与 computer use 工具，按 PRD 自行生成测试并操作页面。两个工具由 Stage 3 的 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力，质检两个工具都可以使用。工程按接口约定中的启动方式与端口在交付说明中写启动方式，质检按交付说明启动交付的网页（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 3.3 节）。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
 - 场景 2 的 Yudao 一侧依赖 3.8 接入已有项目：运行器用 `project.onboard` 接入仓库在基准提交的代码，建档完成以后由运行器回答初始 PRD 的确认，再新建事项提交需求；测试命令登记为在场景镜像中执行。建档的用量与耗时在报告中单独列出，与事项的指标分开（第 5.2 节；[接入已有项目设计说明](existing-project-onboarding.md)第 12 节第 1 项，2026-09-29 用户决定）。
 - 界面智能体与裁判使用的模型由用户提供：要能看图、版本固定、与被测模型不同。
 

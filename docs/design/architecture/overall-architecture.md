@@ -120,7 +120,7 @@ flowchart TB
 | 裁决规则（U） | 提案校验、记录与尝试按本体校验、工具许可；许可规则可以增加，只能收紧 | `adjudication.py`（工具许可、提案校验与提交判断的入口）；`validation.py` |
 | 写入口与事件日志 | 执行权与流版本的核对、追加事件、更新保存的投影、通知订阅方 | `write_path.py`（写入口 `WritePath`：同一事务中读取保存的投影、判断并追加，期望版本、命令身份与执行权编号的核对）、`event_store.py`（一份事件日志、按全局位置与范围读取、订阅）、`projection.py`（保存的投影、重放核对） |
 
-执行层中，执行环境在 `environment.py`（本机实现 `LocalEnvironment` 与只读查询 `FactsQuery`），动作合同在 `actions.py`，模型调用合同在 `providers/call.py`。定义层在 `harness/definitions/`：限额、停止原因、组织、角色、工具、提案合同与服务方案预置表七个 JSON 文件，加载与 pydantic 校验在 `__init__.py`，版本由全部文件的内容摘要确定。应用层与接口层在 `harness/app/` 与 `harness/api/`。
+执行层中，执行环境在 `environment.py`（本机实现 `LocalEnvironment`：从封存快照建立工作区、只读查询 `FactsQuery`、执行动作并交回回执、交付封存所需的 `snapshot()`），动作合同在 `actions.py`，模型调用合同在 `providers/call.py`。定义层在 `harness/definitions/`：限额、停止原因、组织、角色、工具、提案合同与服务方案预置表七个 JSON 文件，加载与 pydantic 校验在 `__init__.py`，版本由全部文件的内容摘要确定。应用层与接口层在 `harness/app/` 与 `harness/api/`。
 
 - 流程编排只调用步骤驱动的开始、取消与取得结果，不接触步骤内部。
 - 步骤驱动只通过 P 与 U 的接口取得请求与裁决结果。
@@ -210,7 +210,7 @@ sequenceDiagram
 | 登记的本地命令 | 本机、容器或执行代理 | 登记表 | 3.2A |
 | 检查 | 检查副本 | 质检角色 | 已有 |
 | 网络取回、MCP 工具 | 本机、容器或执行代理 | 用户决定 | 3.2B |
-| 浏览器（Playwright MCP）与 computer use（容器中的虚拟屏幕） | 容器 | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门（[D34](../../requirements/browser-and-computer-use.md)） | 3.2D |
+| 浏览器（Playwright MCP）与 computer use（容器中的虚拟屏幕） | run 的本机容器（镜像带试用层） | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门；质检只按交付说明中的启动方式启动交付的软件（[D34](../../requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](../browser-and-computer-use.md)） | 3.2D |
 | 外部动作（部署、回滚、重启、读取运行数据） | 登记的运行环境上的执行代理 | 常设授权清单以内由运维直接执行；清单以外由用户决定 | Stage 4 |
 | 外包 agent 的文件与命令请求 | 外包 agent 的容器 | 与自有角色相同 | D31 |
 
@@ -232,6 +232,7 @@ sequenceDiagram
 | 授权网络取回、MCP 工具，以及常设授权清单以外的外部动作，一次性批准 | 3.2B、D27、原型 v7 |
 | 核实结果未知的动作：重新执行（只对契约声明可以重复的动作）、按当前实际状态继续、停止事项 | 恢复契约第 4 节 |
 | 模型引用无法使用、机器离线或需要升级时的待恢复 | 模型管理设计说明第 5.5 节、执行环境服务设计说明第 6.5 节 |
+| 质检无法核验：重新核验、停止事项 | 3.2D，浏览器与 computer use 设计说明第 8.4 节 |
 | 确认接入已有项目的初始 PRD：确认、提出修改 | 接入已有项目设计说明、D33 |
 | 进入等待模型服务的通知（只通知一次，用户可以取消 run） | Stage 4、D17 |
 | 判定点置信不足时的裁定 | D28 |
