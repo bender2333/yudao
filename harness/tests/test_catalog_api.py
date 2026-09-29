@@ -349,6 +349,60 @@ def test_reload_command_appends_only_when_the_file_changed(tmp_path):
         assert second.payload["revision"] == _catalog(client)["revision"] > latest
 
 
+def test_duplicate_command_identity_does_not_apply_the_change_again(tmp_path):
+    # 同一命令身份再次提交只返回原来的结果，不再执行；内容不同时拒绝，也不执行
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        current = _catalog(client)["revision"]
+
+        def post(name, body):
+            return client.post(f"/api/commands/{name}", json=body)
+
+        command_id = str(uuid.uuid4())
+        body = {"command_id": command_id, "base_version": current,
+                "provider": _provider("p2"), "models": [_model("m2")]}
+        first = post("catalog.connection.save", body)
+        assert first.status_code == 200, first.text
+        assert first.json()["duplicate"] is False
+        after_first = _catalog(client)
+        file_after_first = opened.config.read_text(encoding="utf-8")
+
+        again = post("catalog.connection.save", body)
+        assert again.status_code == 200, again.text
+        assert again.json()["duplicate"] is True and again.json()["position"] == first.json()["position"]
+        assert _catalog(client)["revision"] == after_first["revision"]
+        assert opened.config.read_text(encoding="utf-8") == file_after_first
+
+        reused = post("catalog.connection.save", {**body, "provider": _provider("p3"), "models": [_model("m3")]})
+        assert reused.status_code == 409 and reused.json()["reason"] == "command_id_reused"
+        assert _catalog(client)["revision"] == after_first["revision"]
+        assert opened.config.read_text(encoding="utf-8") == file_after_first
+
+        delete_body = {"command_id": str(uuid.uuid4()), "base_version": after_first["revision"], "provider_id": "p2"}
+        removed = post("catalog.connection.delete", delete_body)
+        assert removed.status_code == 200, removed.text
+        after_delete = _catalog(client)
+        assert [item["id"] for item in after_delete["providers"]] == ["p1"]
+        repeated_delete = post("catalog.connection.delete", delete_body)
+        assert repeated_delete.status_code == 200, repeated_delete.text
+        assert repeated_delete.json()["duplicate"] is True
+        assert _catalog(client)["revision"] == after_delete["revision"]
+
+        # 凭据命令同样不重复执行：版本不再推进，.env 不重写
+        credential = _catalog(client)["providers"][0]["credential"]
+        credential_body = {"command_id": str(uuid.uuid4()), "base_version": credential["version"], "ref": REF,
+                           "secret": "catalog-secret-key-9", "persist": True}
+        set_once = post("credential.set", credential_body)
+        assert set_once.status_code == 200, set_once.text
+        version = _catalog(client)["providers"][0]["credential"]["version"]
+        dotenv_text = opened.dotenv.read_text(encoding="utf-8")
+        set_again = post("credential.set", credential_body)
+        assert set_again.status_code == 200, set_again.text
+        assert set_again.json()["duplicate"] is True
+        assert _catalog(client)["providers"][0]["credential"]["version"] == version
+        assert opened.dotenv.read_text(encoding="utf-8") == dotenv_text
+
+
 # ---------------------------------------------------------------------------
 # 测试内的真实上游
 

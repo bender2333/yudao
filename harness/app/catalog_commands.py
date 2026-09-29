@@ -159,12 +159,19 @@ def _provider_view(facade, provider_id: str) -> dict[str, Any] | None:
     return next((item for item in facade.providers_view()["providers"] if item["id"] == provider_id), None)
 
 
+def _check_not_registered(application: Application, command: Command) -> None:
+    # 已经登记过的命令身份不再执行（内容相同 → DuplicateCommand，不同 → CommandIdReused）：
+    # 修改 Provider 目录或凭据之前先核对，重复提交不会把目录、目录文件与 .env 再改一遍
+    application.system.store.check_command(command)
+
+
 # ---------------------------------------------------------------------------
 # 目录内容
 
 
 async def _save_connection(application: Application, command: Command, request: CatalogConnectionSave) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
@@ -183,6 +190,7 @@ async def _save_connection(application: Application, command: Command, request: 
 
 async def _delete_connection(application: Application, command: Command, request: CatalogConnectionDelete) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
@@ -202,6 +210,7 @@ async def _delete_connection(application: Application, command: Command, request
 
 async def _save_document(application: Application, command: Command, request: CatalogDocumentSave) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
@@ -224,6 +233,7 @@ async def _save_document(application: Application, command: Command, request: Ca
 async def _save_department_defaults(application: Application, command: Command,
                                     request: CatalogDepartmentDefaultsSave) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
@@ -368,6 +378,7 @@ def _credential_event(action: str, status: dict[str, Any], version: int, persist
 
 async def _set_credential(application: Application, command: Command, request: CredentialSet) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     current = facade.credential_version(request.ref)
     if request.base_version != current:
         raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
@@ -381,6 +392,7 @@ async def _set_credential(application: Application, command: Command, request: C
 
 async def _clear_credential_override(application: Application, command: Command, request: CredentialClearOverride) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     current = facade.credential_version(request.ref)
     if request.base_version != current:
         raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
@@ -391,6 +403,7 @@ async def _clear_credential_override(application: Application, command: Command,
 async def _remove_persisted_credential(application: Application, command: Command,
                                        request: CredentialRemovePersisted) -> None:
     facade = application.system.facade
+    _check_not_registered(application, command)
     current = facade.credential_version(request.ref)
     if request.base_version != current:
         raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
