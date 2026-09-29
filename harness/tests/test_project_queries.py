@@ -69,7 +69,8 @@ def _projection_rows(store) -> list[tuple]:
 
 def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     application = _application(_system(data_dir, []))
-    overlays = {item.name: item.queries for item in application.capabilities("sha256:test").overlays}
+    capabilities = application.capabilities("sha256:test", access="local")
+    overlays = {item.name: item.queries for item in capabilities.overlays}
     assert overlays["flow"] == ["project.flow"]
     assert overlays["waiting"] == ["project.loop", "decisions.list"]
     assert "recovery" not in overlays
@@ -77,7 +78,7 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     assert "semantic_records" not in overlays
 
     partial = Registry(commands=[], queries=[SYSTEM_STATUS], decisions=())
-    listed = {item.name for item in partial.capabilities(application.capabilities("sha256:test").deployment).overlays}
+    listed = {item.name for item in partial.capabilities(capabilities.deployment).overlays}
     assert listed == set()
 
 
