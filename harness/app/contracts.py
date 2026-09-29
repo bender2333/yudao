@@ -159,11 +159,18 @@ class CommandCapability(Contract):
     reasons: list[RejectionReason]
 
 
+class OverlayCapability(Contract):
+    # 一个覆盖层：名称与它依赖的查询（设计说明第 6.1 节）；依赖的查询都已登记时才列出
+    name: str
+    queries: list[str]
+
+
 class Capabilities(Contract):
     # 能力清单（第 6.1 节），由注册表生成：查询与改变它结果的事件种类、命令与可能的拒绝原因、
-    # 当前部署会发出的决定种类与会写入的事件种类
+    # 当前部署会发出的决定种类、会写入的事件种类与可用的覆盖层
     deployment: Deployment
     queries: list[QueryCapability]
     commands: list[CommandCapability]
     decisions: list[str]
     event_types: list[str]
+    overlays: list[OverlayCapability]

@@ -1,5 +1,6 @@
 # 应用层的入口：在控制核心之上执行已登记的命令与查询，生成能力清单。接口层与命令行都经过它（设计说明第 2 节）。
-# 修改只经过控制核心的写入口与流程编排；查询只读取。
+# 修改只经过控制核心的写入口与流程编排；查询只读取。只读的打开供命令行使用：以只读方式打开数据目录，
+# 不写保存的投影，不需要进程锁。
 
 from __future__ import annotations
 
@@ -9,7 +10,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from ..artifacts import ArtifactStore
 from ..decisions import DECISION_KINDS
+from ..event_store import EventStore
+from ..git_versions import GitVersionStore
 from ..models import new_id, utc_now
 from ..runtime import LoopSystem
 from .commands import execute
@@ -17,22 +21,57 @@ from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deplo
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .project_commands import PROJECT_CREATE
+from .project_queries import PROJECT_QUERIES
+from .read_models import ReadModels
 from .registry import Registry
 from .system_queries import SYSTEM_STATUS
 
+
+class ReadOnlyError(RuntimeError):
+    # 只读的打开不支持的操作：命令、模型目录与就绪状态
+    pass
+
+
+class ReadOnlyCore:
+    # 只读打开的控制核心：事件日志、工件与 Git 版本都以只读方式打开，不建立目录，也不写保存的投影
+    read_only = True
+
+    def __init__(self, data_dir: str | Path) -> None:
+        self.data_dir = Path(data_dir)
+        self.store = EventStore(self.data_dir / "events.sqlite", read_only=True)
+        self.artifacts = ArtifactStore(self.data_dir / "artifacts", read_only=True)
+        self.git_versions = GitVersionStore(self.data_dir / "git", read_only=True)
+
+    def close(self) -> None:
+        self.store.close()
+
+    def provider_status(self) -> dict[str, Any]:
+        raise ReadOnlyError("provider status is not available in a read-only open")
+
+    @property
+    def facade(self) -> Any:
+        raise ReadOnlyError("the provider catalog is not available in a read-only open")
+
+
 # 能力清单的 decisions 取自决定合同中的种类：当前部署会发出的决定请求
-DEFAULT_REGISTRY = Registry(commands=[PROJECT_CREATE, DECISION_ANSWER], queries=[SYSTEM_STATUS, DECISIONS_LIST],
-                            decisions=tuple(DECISION_KINDS))
+DEFAULT_REGISTRY = Registry(
+    commands=[PROJECT_CREATE, DECISION_ANSWER],
+    queries=[SYSTEM_STATUS, DECISIONS_LIST, *PROJECT_QUERIES],
+    decisions=tuple(DECISION_KINDS),
+)
 
 
 class Application:
-    def __init__(self, system: LoopSystem, *, registry: Registry = DEFAULT_REGISTRY) -> None:
+    def __init__(self, system: LoopSystem | ReadOnlyCore, *, registry: Registry = DEFAULT_REGISTRY) -> None:
         self.system = system
         self.registry = registry
         # 本次启动的身份与时间：服务重启以后改变，客户端据此重新读取能力清单并重新同步
         self.boot_id = new_id("boot")
         self.started_at = utc_now()
         self.version = version("yudao-harness")
+        # 应用层保存的读取模型：调用尝试表与流转记录。可写打开时保存在数据目录里，只读打开时在内存中重建
+        path = None if system.read_only else Path(system.data_dir) / "read-models.sqlite"
+        self.read_models = ReadModels(system.store, system.artifacts, path)
 
     @classmethod
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
@@ -41,10 +80,22 @@ class Application:
         system.start_provider_watching()
         return cls(system)
 
+    @classmethod
+    def open_readonly(cls, data_dir: str | Path) -> Application:
+        # 命令行使用的只读打开：不建立目录、不写保存的投影、不取进程锁；读取模型从事件重放重建
+        return cls(ReadOnlyCore(data_dir))
+
     def close(self) -> None:
+        self.read_models.close()
         self.system.close()
 
+    def rebuild_read_models(self) -> None:
+        # 删除调用尝试表与流转记录以后从事件重放重建；不调用模型与工具
+        self.read_models.rebuild()
+
     async def command(self, name: str, request: CommandRequest, *, actor: str) -> Accepted | Rejected:
+        if self.system.read_only:
+            raise ReadOnlyError("commands are not available in a read-only open")
         return await execute(self, self.registry.commands[name], request, actor=actor)
 
     def query(self, name: str, request: BaseModel | None) -> Snapshot[Any]:

@@ -112,3 +112,6 @@ opencode-go/deepseek-v4.1-flash / 2026-09-29 03:45 / #76 桌面客户端页面�
 
 opencode-go/deepseek-v4.1-flash / 2026-09-29 03:45 / #76 事件流订阅的验收 / 验收标准包含「局域网访问方式下……订阅事件流」，而 `GET /api/events` 属于 #75（尚未实施），#76 的阻塞项只有 #72。访问检查在路由处理之前执行，对 `/api/events` 同样生效：本次以「来源不同时在路由之前被拒绝，来源正确时访问层不拦截」核对这一点，订阅本身要等 #75 登记路由。 / 建议架构师确认 #75 与 #76 的先后，或者把订阅这一项的验收放在 #75 完成之后。
 
+opencode-go/deepseek-v4.1-flash / 2026-09-29 03:06 / #73 应用层保存的读取模型与「只有事件日志打开数据库」的检查 / 设计说明第 4.2 节要求应用层保存调用尝试表与流转记录（各自记录已处理到的位置，可以删除后重建，重建不调用模型与工具），保存意味着服务重启以后不必重放整份日志；`harness/tests/test_single_write_path.py` 的 `test_only_the_event_log_opens_the_database_and_writes_its_tables` 规定除 `event_store.py` 以外没有任何模块导入 `sqlite3` 或写日志的 `events`、`projections`、`commands` 三张表。两者的对象不同：检查针对事件日志（唯一的事实来源，写入只经过写入口），读取模型是可删除、可重建的派生数据，按设计在写入口的事务之外更新，出错只影响对应的查询。 / 建议：检查保留原有意图（只有 `write_path.py` 调用 `commit` 与 `replace_projection`，三张日志表只由 `event_store.py` 写），为应用层自己的读取模型数据库加一个具名例外（`harness/app/read_models.py`）。#73 按此实施：读取模型保存在数据目录的 `read-models.sqlite`，只读的打开在内存中重建；若架构师决定读取模型不落盘，只需替换 `read_models.py` 的存储层，查询合同与测试不变。
+处理：采纳具名例外。读取模型是可以删除后从事件重建的派生数据，保存在数据目录中自己的 `read-models.sqlite`，不打开事件日志的数据库文件，不写 `events`、`projections`、`commands` 三张表，也不作为事件的读取来源；这三条之外的例外不增加。已随 #73（PR #162）合并。
+

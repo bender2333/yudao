@@ -16,10 +16,10 @@ from .artifacts import ArtifactStore
 from .contracts import contract_payload, render_plan, render_prd
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
+from .environment import LocalEnvironment
 from .git_versions import GitVersionStore
 from .models import Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
-from .public_tree import verify_public_tree
 from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
@@ -44,7 +44,7 @@ class SubmissionWriter:
         self.git_versions = git_versions
 
     def prepare(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
-                workspace_root: Path, artifact: dict[str, Any], department: str, parent_event_id: str,
+                environment: LocalEnvironment, artifact: dict[str, Any], department: str, parent_event_id: str,
                 session_id: str, provider: str | None, model: str | None) -> Acceptance:
         # 接纳之前的全部准备：工件、Git 版本、交付封存与材料。projection 是接纳所依据的运行状态，
         # 流程编排给出事务中的运行状态。出错时事务中没有追加任何事件，已经写出的材料恢复原样
@@ -103,7 +103,7 @@ class SubmissionWriter:
         elif kind == "collaboration_response":
             artifact["id"] = new_id("response")
             metadata["state_after"] = artifact["return_phase"]
-            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            environment.verify_tree(snapshot)
             event = append(EventType.COLLABORATION_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "department_guidance_response":
             event = append(EventType.DEPARTMENT_GUIDANCE_RESPONDED, artifact, [artifact["content_hash"]])
@@ -112,7 +112,7 @@ class SubmissionWriter:
                 raise ValueError("Delivery does not match the validated workspace snapshot")
             artifact["id"] = new_id("del")
             ref = store_tree(self.artifacts, run_id, snapshot.tree)
-            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            environment.verify_tree(snapshot)
             artifact["tree_ref"] = asdict(ref)
             event = append(EventType.DELIVERY_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/delivery.json"] = _json_bytes(prepared[event][1])
@@ -132,7 +132,7 @@ class SubmissionWriter:
                     raise ValueError("QA release delivery archive does not match the validated workspace snapshot")
             artifact["id"] = new_id("qa")
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
-            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            environment.verify_tree(snapshot)
             artifact["evidence_refs"] = [asdict(ref)]
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/qa.json"] = _json_bytes(prepared[event][1])
@@ -161,7 +161,7 @@ class SubmissionWriter:
                 if event_type != EventType.SPEC_SUPERSEDED:
                     payload["git_version"] = revision
         if kind in {"delivery_spec", "qa_review"}:
-            verify_public_tree(workspace_root, snapshot.tree.manifest)
+            environment.verify_tree(snapshot)
         previous_materials: dict[str, bytes | None] = {}
 
         def restore_materials() -> None:

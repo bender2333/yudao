@@ -101,10 +101,6 @@ class ObservabilityQuery:
                  and _attempt_id_for(event.payload, event.role) == attempt_id),
                 None,
             )
-        context = self._context_detail(run_id, context_event, attempt)
-        sdk_request = self._artifact_json(run_id, attempt.get("sdk_request_ref"))
-        sdk_response = self._artifact_json(run_id, attempt.get("response_ref"))
-        sdk_events = self._stream_events(run_id, attempt.get("stream_events_ref"))
         lifecycle_events = [
             event_card(event) for event in events
             if _same_attempt(event, attempt)
@@ -129,16 +125,27 @@ class ObservabilityQuery:
             }
             and event.payload.get("name") != "provider_usage"
         ]
+        return self.attempt_detail(run_id, attempt, records, context_event=context_event,
+                                   lifecycle_events=lifecycle_events, tool_events=tool_events)
+
+    def attempt_detail(self, run_id: str, attempt: dict[str, Any], records: dict[str, dict[str, Any]], *,
+                       context_event: Event | None = None, lifecycle_events: list[dict[str, Any]] | None = None,
+                       tool_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        # 一次尝试的详情；记录可以由调用方给出（读取模型的调用尝试表按运行给出这个 run 的记录），
+        # 事件列表与工具回执只在给出时出现（旧控制台给出，读取模型按引用读取工件）
+        context = self._context_detail(run_id, context_event, attempt)
+        sdk_request = self._artifact_json(run_id, attempt.get("sdk_request_ref"))
+        sdk_response = self._artifact_json(run_id, attempt.get("response_ref"))
+        sdk_events = self._stream_events(run_id, attempt.get("stream_events_ref"))
         sibling_records = [
             item for item in records.values()
             if item.get("logical_call_id") == attempt.get("logical_call_id")
-            and item.get("id") != attempt_id
+            and item.get("id") != attempt.get("id")
         ]
         sibling_records.sort(key=lambda item: (item.get("seq", 0), item.get("attempt", 0)))
         siblings = [_public_attempt(item) for item in sibling_records]
         scope = attempt.get("collection_scope") or _collection_scope()
-        detail_events = _detail_events(lifecycle_events, sdk_events)
-        return {
+        detail = {
             "run_id": run_id,
             "version": SCHEMA_VERSION,
             "attempt": _public_attempt(attempt),
@@ -146,9 +153,9 @@ class ObservabilityQuery:
             "context": context,
             "request": sdk_request,
             "response": sdk_response,
-            "events": detail_events,
+            "events": _detail_events(lifecycle_events or [], sdk_events),
             "event_order": "source_grouped",
-            "tools": tool_events,
+            "tools": tool_events or [],
             "observed_scope": scope,
             "artifact_refs": {
                 "request": attempt.get("sdk_request_ref"),
@@ -157,6 +164,7 @@ class ObservabilityQuery:
                 "usage": attempt.get("raw_usage_ref"),
             },
         }
+        return detail
 
     def export_run(self, run_id: str) -> dict[str, Any]:
         """Return the complete read-only observation bundle for one run."""
@@ -568,7 +576,7 @@ class ObservabilityQuery:
                 effective_actual = record.get("actual_model") or record.get("requested_model")
                 if effective_actual != actual_needle:
                     continue
-            if needle is not None and needle not in _search_text(record):
+            if needle is not None and needle not in search_text(record):
                 continue
             result.append(record)
         result.sort(key=lambda item: (item.get("seq", 0), item.get("attempt", 0)))
@@ -578,133 +586,10 @@ class ObservabilityQuery:
         events = self.store.list_events(run_id)
         if not events:
             raise RunNotFoundError(run_id)
-        records: dict[str, dict[str, Any]] = {}
-        contexts: dict[str, Event] = {}
-        activation_rounds: dict[str, Any] = {}
-        output_item_counts: dict[str, int] = defaultdict(int)
-        progress_attempts: set[str] = set()
-        progress_facts: dict[str, dict[str, Any]] = {}
+        fold = AttemptFold(self.artifacts, run_id)
         for event in events:
-            payload = event.payload or {}
-            if event.type == EventType.DEPARTMENT_ACTIVATED and payload.get("activation_id"):
-                activation_rounds[str(payload["activation_id"])] = payload.get("cycle")
-            elif event.type == EventType.CONTEXT_ASSEMBLED and payload.get("purpose") in {"work", "compaction"}:
-                attempt_id = _attempt_id_for(payload, event.role)
-                contexts[attempt_id] = event
-                record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
-                _merge_context(record, event, payload)
-            elif event.type == EventType.MODEL_REQUESTED:
-                attempt_id = _attempt_id_for(payload, event.role)
-                record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
-                _merge_started(record, event, payload)
-            elif event.type == EventType.MODEL_REQUEST_SERIALIZED:
-                attempt_id = _attempt_id_for(payload, event.role)
-                record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
-                record["sdk_request_ref"] = payload.get("request_ref")
-                record["request_serialized_event_id"] = event.event_id
-                record["request_digest"] = payload.get("request_digest")
-            elif event.type in {EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED}:
-                attempt_id = _attempt_id_for(payload, event.role)
-                record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
-                _merge_finished(record, event, payload)
-            elif event.type == EventType.MODEL_RETRY_SCHEDULED:
-                attempt_id = _attempt_id_for(payload, event.role)
-                record = records.setdefault(attempt_id, _new_attempt(attempt_id, event, payload))
-                record["retry_scheduled_event_id"] = event.event_id
-                record["retry_delay_sec"] = payload.get("delay_sec")
-            elif event.type == EventType.MODEL_MESSAGE:
-                output_item_counts[_attempt_id_for(payload, event.role)] += 1
-            elif event.type == STREAM_PROGRESS_EVENT:
-                attempt_id = _attempt_id_for(payload, event.role)
-                stage = payload.get("stage")
-                if stage in {"output", "output_item_done"} or payload.get("first_output_at"):
-                    progress_attempts.add(attempt_id)
-                progress_facts[attempt_id] = {
-                    "stream_first_observed_at": payload.get("first_observed_at"),
-                    "stream_first_output_at": payload.get("first_output_at"),
-                    "stream_last_stage": stage,
-                }
-
-        for record in records.values():
-            context = contexts.get(record["id"])
-            if context is not None:
-                record["context_event_id"] = context.event_id
-                record["context"] = context.payload
-            record["usage"] = self._attempt_usage(run_id, record)
-            record["work_round"] = activation_rounds.get(str(record.get("activation_id")))
-            output_count = output_item_counts.get(record["id"], 0)
-            record.update(progress_facts.get(record["id"], {}))
-            record["output_item_count"] = output_count
-            record["partial_output"] = bool(
-                record.get("status") in {"requesting", "failed", "cancelled"}
-                and (output_count or record["id"] in progress_attempts)
-            )
-            record["stage"] = (
-                "partial" if record.get("status") == "requesting" and record["partial_output"]
-                else record.get("status")
-            )
-            record.pop("context", None)
-        counts: dict[str, int] = defaultdict(int)
-        for record in records.values():
-            if record.get("sent"):
-                counts[str(record.get("logical_call_id"))] += 1
-        for record in records.values():
-            record["attempt_count"] = counts[str(record.get("logical_call_id"))]
-        return records
-
-    def _attempt_usage(self, run_id: str, record: dict[str, Any]) -> dict[str, Any]:
-        raw = self._artifact_json(run_id, record.get("raw_usage_ref"))
-        if isinstance(raw, dict) and isinstance(raw.get("usage"), dict):
-            raw = raw["usage"]
-        summary = record.get("usage_summary")
-        values: dict[str, Any] = {field: None for field in USAGE_FIELDS}
-        currency = None
-        cost_source = None
-        source = "missing"
-        if isinstance(raw, dict):
-            values["input_tokens"] = _count_value(raw.get("input_tokens"))
-            details = raw.get("input_tokens_details")
-            if isinstance(details, dict):
-                values["cache_read_tokens"] = _count_value(details.get("cached_tokens"))
-                values["cache_write_tokens"] = _count_value(
-                    details.get("cache_write_tokens")
-                    if "cache_write_tokens" in details else details.get("cache_write")
-                )
-            values["cache_write_tokens"] = values["cache_write_tokens"] if values["cache_write_tokens"] is not None else _count_value(raw.get("cache_write_tokens"))
-            values["output_tokens"] = _count_value(raw.get("output_tokens"))
-            values["total_tokens"] = _count_value(raw.get("total_tokens"))
-            values["cost"] = _cost_value(raw.get("cost"))
-            currency = raw.get("currency") or raw.get("cost_currency")
-            cost_source = raw.get("cost_source") or ("provider" if values["cost"] is not None else None)
-            if values["cost"] is not None and not isinstance(currency, str):
-                values["cost"] = None
-            source = "reported" if _has_usage_values(values) else "missing"
-        if raw is None and isinstance(summary, dict):
-            # Persisted normalized summaries are used only for fields absent
-            # from the raw provider usage object.
-            for field in USAGE_FIELDS:
-                if values[field] is None and summary.get(field) is not None:
-                    values[field] = _cost_value(summary[field]) if field == "cost" else (
-                        _count_value(summary[field]) if field != "latency_ms" else _count_value(summary[field])
-                    )
-            currency = summary.get("currency")
-            cost_source = summary.get("cost_source")
-            if values["cost"] is not None and not isinstance(currency, str):
-                values["cost"] = None
-            if _has_usage_values(values):
-                source = "reported" if summary["reported"] else "unknown"
-        values["latency_ms"] = record.get("duration_ms")
-        return {
-            **values,
-            "currency": currency if isinstance(currency, str) and currency else None,
-            "cost_source": cost_source if isinstance(cost_source, str) and cost_source else None,
-            "source": source,
-            "reported": source == "reported",
-            "coverage": {
-                field: _usage_field_state(field, values[field], source)
-                for field in USAGE_FIELDS
-            },
-        }
+            fold.merge(event)
+        return fold.records()
 
     def _context_detail(self, run_id: str, event: Event | None,
                         attempt: dict[str, Any]) -> dict[str, Any] | None:
@@ -743,13 +628,7 @@ class ObservabilityQuery:
         }
 
     def _artifact_json(self, run_id: str, ref: Any) -> Any:
-        if not isinstance(ref, dict):
-            return None
-        try:
-            raw = self.artifacts.get_for_run(run_id, ArtifactRef(**ref))
-            return json.loads(raw)
-        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
-            return None
+        return artifact_json(self.artifacts, run_id, ref)
 
     def _stream_events(self, run_id: str, ref: Any) -> list[dict[str, Any]]:
         if not isinstance(ref, dict):
@@ -814,6 +693,189 @@ def export_observability(store: EventStore, artifacts: ArtifactStore, run_id: st
 
 def department_view(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> dict[str, Any]:
     return ObservabilityQuery(store, artifacts).department(run_id, department)
+
+
+def artifact_json(artifacts: ArtifactStore, run_id: str, ref: Any) -> Any:
+    if not isinstance(ref, dict):
+        return None
+    try:
+        raw = artifacts.get_for_run(run_id, ArtifactRef(**ref))
+        return json.loads(raw)
+    except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def attempt_usage(artifacts: ArtifactStore, run_id: str, record: dict[str, Any]) -> dict[str, Any]:
+    # 一次尝试的用量：上游原文按引用读取，标准化的汇总只补齐原文里没有的字段
+    raw = artifact_json(artifacts, run_id, record.get("raw_usage_ref"))
+    if isinstance(raw, dict) and isinstance(raw.get("usage"), dict):
+        raw = raw["usage"]
+    summary = record.get("usage_summary")
+    values: dict[str, Any] = {field: None for field in USAGE_FIELDS}
+    currency = None
+    cost_source = None
+    source = "missing"
+    if isinstance(raw, dict):
+        values["input_tokens"] = _count_value(raw.get("input_tokens"))
+        details = raw.get("input_tokens_details")
+        if isinstance(details, dict):
+            values["cache_read_tokens"] = _count_value(details.get("cached_tokens"))
+            values["cache_write_tokens"] = _count_value(
+                details.get("cache_write_tokens")
+                if "cache_write_tokens" in details else details.get("cache_write")
+            )
+        values["cache_write_tokens"] = values["cache_write_tokens"] if values["cache_write_tokens"] is not None else _count_value(raw.get("cache_write_tokens"))
+        values["output_tokens"] = _count_value(raw.get("output_tokens"))
+        values["total_tokens"] = _count_value(raw.get("total_tokens"))
+        values["cost"] = _cost_value(raw.get("cost"))
+        currency = raw.get("currency") or raw.get("cost_currency")
+        cost_source = raw.get("cost_source") or ("provider" if values["cost"] is not None else None)
+        if values["cost"] is not None and not isinstance(currency, str):
+            values["cost"] = None
+        source = "reported" if _has_usage_values(values) else "missing"
+    if raw is None and isinstance(summary, dict):
+        # Persisted normalized summaries are used only for fields absent
+        # from the raw provider usage object.
+        for field in USAGE_FIELDS:
+            if values[field] is None and summary.get(field) is not None:
+                values[field] = _cost_value(summary[field]) if field == "cost" else (
+                    _count_value(summary[field]) if field != "latency_ms" else _count_value(summary[field])
+                )
+        currency = summary.get("currency")
+        cost_source = summary.get("cost_source")
+        if values["cost"] is not None and not isinstance(currency, str):
+            values["cost"] = None
+        if _has_usage_values(values):
+            source = "reported" if summary["reported"] else "unknown"
+    values["latency_ms"] = record.get("duration_ms")
+    return {
+        **values,
+        "currency": currency if isinstance(currency, str) and currency else None,
+        "cost_source": cost_source if isinstance(cost_source, str) and cost_source else None,
+        "source": source,
+        "reported": source == "reported",
+        "coverage": {
+            field: _usage_field_state(field, values[field], source)
+            for field in USAGE_FIELDS
+        },
+    }
+
+
+class AttemptFold:
+    """把 run 事件逐步并入调用尝试记录（应用层的调用尝试表使用）。
+
+    与整段扫描使用同一套合并规则：merge 一次事件，records() 得到与 ObservabilityQuery._attempt_records 相同的记录。
+    state() 与 load_state() 用于把折叠状态保存在读取模型里，按订阅逐步更新；用量只在它依据的字段变化时重新计算。
+    """
+
+    def __init__(self, artifacts: ArtifactStore, run_id: str) -> None:
+        self.artifacts = artifacts
+        self.run_id = run_id
+        self._records: dict[str, dict[str, Any]] = {}
+        self.positions: dict[str, int] = {}
+        self.activation_rounds: dict[str, Any] = {}
+        self.output_item_counts: dict[str, int] = defaultdict(int)
+        self.progress_attempts: set[str] = set()
+        self.progress_facts: dict[str, dict[str, Any]] = {}
+        self.usage_signatures: dict[str, Any] = {}
+
+    @classmethod
+    def load_state(cls, artifacts: ArtifactStore, run_id: str, state: str) -> "AttemptFold":
+        fold = cls(artifacts, run_id)
+        saved = json.loads(state)
+        fold._records = saved["records"]
+        fold.positions = {key: int(value) for key, value in saved["positions"].items()}
+        fold.activation_rounds = saved["activation_rounds"]
+        fold.output_item_counts = defaultdict(int, {key: int(value) for key, value in saved["output_item_counts"].items()})
+        fold.progress_attempts = set(saved["progress_attempts"])
+        fold.progress_facts = saved["progress_facts"]
+        fold.usage_signatures = saved["usage_signatures"]
+        return fold
+
+    def state(self) -> str:
+        return json_dumps({
+            "records": self._records,
+            "positions": self.positions,
+            "activation_rounds": self.activation_rounds,
+            "output_item_counts": dict(self.output_item_counts),
+            "progress_attempts": sorted(self.progress_attempts),
+            "progress_facts": self.progress_facts,
+            "usage_signatures": self.usage_signatures,
+        })
+
+    def merge(self, event: Event) -> None:
+        payload = event.payload or {}
+        record: dict[str, Any] | None = None
+        if event.type == EventType.DEPARTMENT_ACTIVATED and payload.get("activation_id"):
+            self.activation_rounds[str(payload["activation_id"])] = payload.get("cycle")
+        elif event.type == EventType.CONTEXT_ASSEMBLED and payload.get("purpose") in {"work", "compaction"}:
+            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            _merge_context(record, event, payload)
+        elif event.type == EventType.MODEL_REQUESTED:
+            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            _merge_started(record, event, payload)
+        elif event.type == EventType.MODEL_REQUEST_SERIALIZED:
+            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record["sdk_request_ref"] = payload.get("request_ref")
+            record["request_serialized_event_id"] = event.event_id
+            record["request_digest"] = payload.get("request_digest")
+        elif event.type in {EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED}:
+            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            _merge_finished(record, event, payload)
+        elif event.type == EventType.MODEL_RETRY_SCHEDULED:
+            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record["retry_scheduled_event_id"] = event.event_id
+            record["retry_delay_sec"] = payload.get("delay_sec")
+        elif event.type == EventType.MODEL_MESSAGE:
+            self.output_item_counts[_attempt_id_for(payload, event.role)] += 1
+        elif event.type == STREAM_PROGRESS_EVENT:
+            attempt_id = _attempt_id_for(payload, event.role)
+            stage = payload.get("stage")
+            if stage in {"output", "output_item_done"} or payload.get("first_output_at"):
+                self.progress_attempts.add(attempt_id)
+            self.progress_facts[attempt_id] = {
+                "stream_first_observed_at": payload.get("first_observed_at"),
+                "stream_first_output_at": payload.get("first_output_at"),
+                "stream_last_stage": stage,
+            }
+        if record is not None:
+            self._refresh_usage(record)
+
+    def records(self) -> dict[str, dict[str, Any]]:
+        for record in self._records.values():
+            record["work_round"] = self.activation_rounds.get(str(record.get("activation_id")))
+            output_count = self.output_item_counts.get(record["id"], 0)
+            record.update(self.progress_facts.get(record["id"], {}))
+            record["output_item_count"] = output_count
+            record["partial_output"] = bool(
+                record.get("status") in {"requesting", "failed", "cancelled"}
+                and (output_count or record["id"] in self.progress_attempts)
+            )
+            record["stage"] = (
+                "partial" if record.get("status") == "requesting" and record["partial_output"]
+                else record.get("status")
+            )
+        counts: dict[str, int] = defaultdict(int)
+        for record in self._records.values():
+            if record.get("sent"):
+                counts[str(record.get("logical_call_id"))] += 1
+        for record in self._records.values():
+            record["attempt_count"] = counts[str(record.get("logical_call_id"))]
+        return self._records
+
+    def _record(self, attempt_id: str, event: Event, payload: dict[str, Any]) -> dict[str, Any]:
+        record = self._records.get(attempt_id)
+        if record is None:
+            record = _new_attempt(attempt_id, event, payload)
+            self._records[attempt_id] = record
+            self.positions[attempt_id] = event.position
+        return record
+
+    def _refresh_usage(self, record: dict[str, Any]) -> None:
+        signature = json_dumps([record.get("raw_usage_ref"), record.get("usage_summary")])
+        if self.usage_signatures.get(record["id"]) != signature:
+            record["usage"] = attempt_usage(self.artifacts, self.run_id, record)
+            self.usage_signatures[record["id"]] = signature
 
 
 def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
@@ -1218,7 +1280,7 @@ def _handover_detail(event: Event) -> str:
     return str(payload.get("reason") or "")
 
 
-def _search_text(record: dict[str, Any]) -> str:
+def search_text(record: dict[str, Any]) -> str:
     return " ".join(str(record.get(key) or "") for key in (
         "id", "logical_call_id", "collaboration_request_id", "context_event_id",
         "department", "purpose", "requested_provider", "requested_model",

@@ -12,8 +12,8 @@ from pydantic import BaseModel
 from ..event_store import Command
 from ..models import Event, ProjectEvent
 from .contracts import (
-    EVENT_TYPES, REJECTION_REASONS, Capabilities, CommandCapability, CommandRequest, Deployment, QueryCapability,
-    RejectionReason, Snapshot,
+    EVENT_TYPES, REJECTION_REASONS, Capabilities, CommandCapability, CommandRequest, Deployment,
+    OverlayCapability, QueryCapability, RejectionReason, Snapshot,
 )
 
 if TYPE_CHECKING:
@@ -43,9 +43,27 @@ class QueryDefinition:
     changed_by: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class OverlayDefinition:
+    # 一个覆盖层：名称与它依赖的查询（设计说明第 6.1 节）。定义登记在注册表中，
+    # 能力清单按依赖的查询是否都已登记自动列出
+    name: str
+    queries: tuple[str, ...]
+
+
+# 覆盖层的清单（标识：名称，依赖的查询）
+OVERLAYS: tuple[OverlayDefinition, ...] = (
+    OverlayDefinition(name="flow", queries=("project.flow",)),
+    OverlayDefinition(name="waiting", queries=("project.loop", "decisions.list")),
+    OverlayDefinition(name="recovery", queries=("run.recovery",)),
+    OverlayDefinition(name="context_usage", queries=("overlay.context_usage",)),
+    OverlayDefinition(name="semantic_records", queries=("semantic.records",)),
+)
+
+
 class Registry:
     def __init__(self, commands: Sequence[CommandDefinition], queries: Sequence[QueryDefinition], *,
-                 decisions: Sequence[str] = ()) -> None:
+                 decisions: Sequence[str] = (), overlays: Sequence[OverlayDefinition] = OVERLAYS) -> None:
         names = [item.name for item in commands] + [item.name for item in queries]
         if len(set(names)) != len(names):
             raise ValueError(f"duplicate registered names: {sorted(name for name in names if names.count(name) > 1)}")
@@ -60,6 +78,7 @@ class Registry:
         self.commands = {item.name: item for item in commands}
         self.queries = {item.name: item for item in queries}
         self.decisions = tuple(decisions)
+        self.overlays = tuple(overlays)
 
     def reasons(self, name: str) -> tuple[RejectionReason, ...]:
         # 命令可能返回的全部拒绝原因：自己声明的原因，加上每个命令都可能返回的命令身份重复使用
@@ -72,4 +91,9 @@ class Registry:
             commands=[CommandCapability(name=name, reasons=list(self.reasons(name))) for name in self.commands],
             decisions=list(self.decisions),
             event_types=list(EVENT_TYPES),
+            overlays=[
+                OverlayCapability(name=item.name, queries=list(item.queries))
+                for item in self.overlays
+                if set(item.queries) <= set(self.queries)
+            ],
         )
