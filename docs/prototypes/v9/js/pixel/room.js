@@ -3,6 +3,8 @@
   const Y8 = window.Y8;
   const P = Y8.pixel;
   if (!P || !P.createScene) throw new Error('room.js 需要先加载 js/pixel/engine.js');
+  if (!P.ecs) throw new Error('room.js 需要先加载 js/pixel/ecs.js');
+  const ECS = P.ecs;
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;
 
