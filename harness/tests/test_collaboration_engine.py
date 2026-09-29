@@ -334,7 +334,7 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
     assert decision.accepted
     # 运行之外接纳新的产品规格（经写入口的事务），协作请求的依据随之改变
     system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
-        transaction, projection=external, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
+        transaction, projection=external, snapshot=snapshot, environment=system.environment(run_id),
         artifact=decision.artifact, department="product", parent_event_id=before.last_event_id,
         session_id=before.sessions["product"].session_id, provider="fake", model="fake-script",
     ).append(transaction))

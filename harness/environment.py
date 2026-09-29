@@ -1,6 +1,7 @@
 # 本机执行环境：run 的工作区所在的环境。控制核心经合同与它往来（actions.py），不直接读写工作区文件：
-# perform 执行环境工具的动作并交回回执，cancel 按动作身份取消，query 提供工作区事实的只读查询，
-# snapshot 交回交付封存所需的带文件内容的公开树。
+# establish 从封存快照建立工作区，open 打开已经建立的工作区，perform 执行环境工具的动作并交回回执，
+# cancel 按动作身份取消，query 提供工作区事实的只读查询，snapshot 交回交付封存所需的带文件内容的公开树，
+# verify_tree 核对当前公开树仍与判断所依据的快照一致。
 # 进程类动作（检查、登记的本地命令）以异步方式启动与等待；超时或取消时结束整个进程树，回执带截至结束时的输出；
 # 取消在动作开始之前到达时不启动进程。
 
@@ -24,7 +25,7 @@ from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
-from .public_tree import capture_public_tree, is_private_path
+from .public_tree import CapturedTree, TreeError, capture_public_tree, is_private_path, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .redact import redact_text, sanitized_env
 from .tools import normalize_registered_commands
@@ -86,6 +87,37 @@ class LocalEnvironment:
             name: getattr(self, method) for name, method in _HANDLERS.items()}
         self._processes: dict[str, Callable[[Action, asyncio.Event], Awaitable[tuple[Any, str]]]] = {
             name: getattr(self, method) for name, method in _PROCESSES.items()}
+
+    @classmethod
+    def establish(cls, root: str | Path, tree: CapturedTree | None, *,
+                  registered_commands: dict[str, Any] | None = None,
+                  check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> LocalEnvironment:
+        # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
+        if tree is not None:
+            Path(root).parent.mkdir(parents=True, exist_ok=True)
+            materialize_tree(tree, root)
+        return cls(Workspace(root), registered_commands=registered_commands, check_timeout_sec=check_timeout_sec)
+
+    @classmethod
+    def open(cls, root: str | Path, *, registered_commands: dict[str, Any] | None = None,
+             check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> LocalEnvironment:
+        # 打开已经建立的工作区
+        return cls(Workspace(root), registered_commands=registered_commands, check_timeout_sec=check_timeout_sec)
+
+    def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
+                   delivery_spec_hash: str | None, effective_contract_hash: str | None = None,
+                   engineering_plan_hash: str | None = None) -> None:
+        # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与计划
+        self.workspace.bind_check(
+            activation_id=activation_id, product_spec_hash=product_spec_hash,
+            delivery_spec_hash=delivery_spec_hash, effective_contract_hash=effective_contract_hash,
+            engineering_plan_hash=engineering_plan_hash,
+        )
+
+    def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
+        # 交付核对：当前公开树仍与判断所依据的快照一致
+        if self.workspace.snapshot().tree.manifest != snapshot.tree.manifest:
+            raise TreeError("Public tree does not match the complete recorded manifest")
 
     async def perform(self, action: Action) -> ActionReceipt:
         # 工具的执行出错时回执为 failed，错误说明交回模型

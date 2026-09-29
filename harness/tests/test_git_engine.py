@@ -40,7 +40,7 @@ def _commit_spec(system, run_id, proposal):
                                  facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
     assert decision.accepted, decision.error_dicts
     return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
-        transaction, projection=projection, snapshot=snapshot, workspace_root=system.workspace(run_id).root,
+        transaction, projection=projection, snapshot=snapshot, environment=system.environment(run_id),
         artifact=decision.artifact, department="product", parent_event_id=projection.last_event_id,
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake",
     ).append(transaction))
