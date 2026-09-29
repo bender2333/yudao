@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,15 +16,20 @@ def refresh_candidates(
     provider: ProviderDefinition,
     *,
     models_url_override: str | None = None,
+    api_key: str = "",
     timeout_sec: float = 30.0,
 ) -> dict[str, Any]:
     source_url = _effective_models_url(provider, models_url_override)
     fetched_at = datetime.now(timezone.utc).isoformat()
     if not source_url:
         return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案")
+    if provider.protocol != "fake" and not api_key.strip():
+        return _unknown(provider, source_url, fetched_at,
+                        f"凭据引用 {provider.credential_ref or '（未填写）'} 无法解析，请在模型管理中配置凭据")
     try:
+        headers = {**_auth_headers(provider.protocol, api_key), "User-Agent": USER_AGENT}
         with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
-            response = client.get(source_url, headers={"User-Agent": USER_AGENT})
+            response = client.get(source_url, headers=headers)
         response.raise_for_status()
         payload = response.json()
     except httpx.HTTPStatusError as exc:
@@ -51,7 +57,48 @@ def refresh_candidates(
     }
 
 
-def _effective_models_url(provider: ProviderDefinition, override: str | None) -> str:
+# 连接测试只读取模型列表地址，证明地址与凭据可用，不改变任何准入
+def probe_connection(
+    provider: ProviderDefinition,
+    *,
+    api_key: str = "",
+    timeout_sec: float = 30.0,
+) -> dict[str, Any]:
+    source_url = _effective_models_url(provider)
+    if not source_url:
+        return {"ok": False, "source_url": "", "protocol": provider.protocol,
+                "reason": "no_models_url", "message": "连接与服务方案都没有模型列表地址，不提供连接测试"}
+    headers = {**_auth_headers(provider.protocol, api_key), "User-Agent": USER_AGENT}
+    try:
+        with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
+            response = client.get(source_url, headers=headers)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        reason = "credential_rejected" if status in (401, 403) else "upstream_error"
+        return {"ok": False, "source_url": source_url, "protocol": provider.protocol, "reason": reason,
+                "message": f"模型列表返回 HTTP {status}"}
+    except httpx.HTTPError as exc:
+        if certificate_verification_failed(exc):
+            return {"ok": False, "source_url": source_url, "protocol": provider.protocol,
+                    "reason": "upstream_error",
+                    "message": f"模型列表请求失败：证书校验失败（{service_address(source_url)}）"}
+        return {"ok": False, "source_url": source_url, "protocol": provider.protocol,
+                "reason": "upstream_error", "message": f"模型列表请求失败：{type(exc).__name__}"}
+    return {"ok": True, "source_url": source_url, "protocol": provider.protocol, "reason": "",
+            "message": ""}
+
+
+def _auth_headers(protocol: str, api_key: str) -> dict[str, str]:
+    # 模型列表地址要求认证时按该连接的协议带上凭据：Responses 与 Chat Completions 用 Bearer，
+    # Anthropic Messages 用 x-api-key；fake 不需要凭据。没有凭据时不带认证头，由上游决定拒绝
+    if not api_key:
+        return {}
+    if protocol == "messages":
+        return {"x-api-key": api_key}
+    return {"Authorization": f"Bearer {api_key}"}
+
+def _effective_models_url(provider: ProviderDefinition, override: str | None = None) -> str:
     if isinstance(override, str) and override.strip():
         return override.strip()
     if provider.models_url:
@@ -73,8 +120,17 @@ def _parse_candidates(payload: Any) -> list[dict[str, Any]]:
         if model_id in seen:
             continue
         seen.add(model_id)
-        # 候选只有上游模型 ID；协议与容量由访问定义与模型测试决定
-        candidates.append({"id": model_id})
+        # 候选默认只有上游模型 ID；上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项
+        candidate: dict[str, Any] = {"id": model_id}
+        limits = item.get("limit") if isinstance(item, dict) else None
+        if isinstance(limits, Mapping):
+            window = limits.get("context")
+            output = limits.get("output")
+            if isinstance(window, int) and not isinstance(window, bool) and window > 0:
+                candidate["context_window"] = window
+            if isinstance(output, int) and not isinstance(output, bool) and output > 0:
+                candidate["max_output_tokens"] = output
+        candidates.append(candidate)
     candidates.sort(key=lambda entry: entry["id"])
     return candidates
 
@@ -91,4 +147,4 @@ def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, err
     }
 
 
-__all__ = ["refresh_candidates"]
+__all__ = ["probe_connection", "refresh_candidates"]
