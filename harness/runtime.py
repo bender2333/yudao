@@ -77,6 +77,10 @@ class LoopSystem:
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
+        # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层设计说明第 7.2 节）
+        self.orchestrator.projects = self.projects
+        # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
+        self.projects.settle_pending_on_startup()
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
