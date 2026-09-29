@@ -12,9 +12,10 @@ flowchart TB
     subgraph Pixel["像素画面 js/pixel"]
         Ecs["ecs.js：实体、组件、系统（引擎，没有具体的部门名）"]
         Decl["floor-decl.js：项目楼层的声明（房间、管道、任务、待机活动、持续状态、陈设）"]
+        Say["say.js：小人头顶说的话（事件到一句话的目录）与气泡的排版绘制"]
         Floor["floor.js：项目楼层（读声明，按实体画）"]
         Card["decision-card.js：世界里的决定卡片"]
-        Room["room.js：部门房间（跟 v8 完全相同，不改）"]
+        Room["room.js：部门房间（画法与动作跟 v8 相同，增加头顶的气泡与收信方向）"]
         Building["building.js：楼与机房（改写为实体）"]
         Engine["engine.js：画布、动画循环、缓动、粒子、共用画法（跟 v8 完全相同，不改）"]
     end
@@ -24,6 +25,8 @@ flowchart TB
     App -->|"onDecide(决定请求的回答)"| Card
     Floor -->|"声明世界 · 派发事件"| Ecs
     Floor -->|"读取"| Decl
+    Floor -->|"P.say · P.drawSpeeches"| Say
+    Room -->|"P.say · P.drawSpeeches"| Say
     Floor --> Card
     Building -->|"同上"| Ecs
     Ecs -->|"actor、画布原语"| Engine
@@ -36,11 +39,12 @@ flowchart TB
 ```
 docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
   js/pixel/ecs.js               新增：世界、房间与管道与节点的声明、任务派发、角色与包裹的推进、管道的流动、信号、待机活动、对话框的数据
+  js/pixel/say.js               新增：小人头顶说的话——事件到一句话的目录（P.say），气泡的折行、避让、淡出与绘制（P.drawSpeeches）
   js/pixel/floor-decl.js        新增：项目楼层的声明——房间、管道、任务目录、待机活动、事件到任务的解析、持续状态、陈设
   js/pixel/decision-card.js     新增：世界里的决定卡片（板上的决定单点开以后的那张纸）
   js/pixel/engine.js            原样保留
   js/pixel/sprites.js           原样保留
-  js/pixel/room.js              原样保留
+  js/pixel/room.js              改动：动作开始时小人头顶说话（交接、分派、传信的两端各说一句），收到询问的一方走到传信管口取信；其余原样保留
   js/pixel/floor.js             改写：读声明，房间、管道、小人、包裹按实体画，头顶有对话框，大厅有决定板
   js/pixel/building.js          改写：楼里的小人、通往机房的管线、机房里的设备与管线都是实体
   js/ui/scenes.js               改动：项目楼层的面板多读部门的角色列表与等待回答的决定请求，回答走 decision.answer
@@ -50,13 +54,13 @@ docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
   其余文件                      原样保留
 ```
 
-`index.html` 的脚本加载顺序：`pixel/sprites.js`、`pixel/engine.js`、`pixel/ecs.js`、`pixel/floor-decl.js`、`pixel/decision-card.js`、`pixel/room.js`、`pixel/floor.js`、`pixel/building.js`。
+`index.html` 的脚本加载顺序：`pixel/sprites.js`、`pixel/engine.js`、`pixel/ecs.js`、`pixel/say.js`、`pixel/floor-decl.js`、`pixel/decision-card.js`、`pixel/room.js`、`pixel/floor.js`、`pixel/building.js`。
 
 负责者：
 
 | 负责者 | 文件 |
 | --- | --- |
-| 架构师 | `BUILD.md`、`js/pixel/ecs.js`、`floor-decl.js`、`floor.js`、`decision-card.js`、`building.js` 里楼的管线与机房的部分、`js/ui/` 里上表列出的改动、`checks/` |
+| 架构师 | `BUILD.md`、`js/pixel/ecs.js`、`say.js`、`floor-decl.js`、`floor.js`、`decision-card.js`、`room.js` 里的气泡、`building.js` 里楼的管线与机房的部分、`js/ui/` 里上表列出的改动、`checks/` |
 | 任务 B 楼里的小人 | `js/pixel/building.js` 里楼层小人：小人是 `ecs.js` 的角色实体（`department: null`），走位目标写进 `ch.spot`，走位与待机动画由 `ECS.stepCharacters` 推进（工作时走到对应部门门口，空闲时随机走动） |
 | 任务 A1／A2／A3／C／D／E | 跟 v8 完全相同的负责范围，不需要重新做（v8 的交付原样保留） |
 
@@ -104,8 +108,8 @@ P.ecs.route(world, from, to)             // 两个房间之间交接走过的管
 {
   model_requested: { label: '打字', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
   tool_started_search: { label: '翻找资料', spot: 'cabinet', pose: 'magnify', bubble: 'say', ms: 1200 },
-  package_handoff_out: { label: '放进管道口', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: null, ms: 520, facing: 1 },
-  x_role_task_assigned: { label: '分派任务', actor: 'manager', spot: 'peer', toward: 'role', pose: 'give', bubble: 'say', ms: 700 },
+  package_handoff_out: { label: '放进管道口', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
+  x_role_task_assigned: { label: '分派任务', actor: 'manager', spot: 'peer', toward: 'role', pose: 'give', bubble: 'say', ms: 700, then: 'role_task_received' },
   x_deployed: { dept: 'operations', label: '发布', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 700, facing: 1,
     fx: [{ when: 'done', send: { link: 'operations>machine_room', bmp: 'box_sealed', then: [{ signal: 'door', ms: 1800 }] } }] },
   // …覆盖 v8 design.md 第 8.3 节里所有"小人动作"的行，加上部门内角色之间的动作、运维、决定请求、待机活动
@@ -114,21 +118,21 @@ P.ecs.route(world, from, to)             // 两个房间之间交接走过的管
 
 - `spot` 是房间里的一个命名位置：`desk` 工位、`stand` 工位旁站着、`cabinet` 文件柜、`terminal` 终端、`monitor` 监控屏、`inspect` 检验台、`port_in`/`port_out` 左右墙的管道口、`door` 房间的门口、`peer` 另一个角色的工位旁（`toward` 指定是谁）、`at` 任务自带的坐标（`extra.at`）。具体坐标由 `declareRooms` 生成房间时算出，房间声明的 `spots` 可以把文件柜、终端的位置对到房间里已有的陈设上。
 - `pose` 是 engine.js 已注册的动作名（`P.ANIMS` 的键）；`ms` 是到达 `spot` 以后做这么久；`icon` 是做这个任务时头顶的状态图标；`facing` 是到达以后的朝向。
-- `bubble` 为 `'say'` 时头顶显示说话气泡，内容为 `label`（模型请求在流式输出到达时用事件的 `payload.text` 取代默认的标签并逐字追加）；为 `null` 时不显示；队列里的下一项带有 `label` 的说话任务时，头顶显示思考气泡（见 `bubbleFor`）。
+- `bubble` 为 `'say'` 时头顶显示说话气泡，内容为 `label`（模型请求在流式输出到达时用事件的 `payload.text` 取代默认的标签并逐字追加）；为 `null` 时不显示（待机活动）；队列里的下一项带有 `label` 的说话任务时，头顶显示思考气泡（见 `bubbleFor`）。声明里的 `label` 是备用的内容：事件类型登记在 `P.say` 的目录里时，任务的 `label` 由 `floor.js` 按事件换成第一人称的一句话（`extrasOf`），交接与传信的两端各换一句（`sayOf`）。
 - `dept`、`by`、`actor`、`toward`、`then`：事件落在哪个角色上的规则（design.md 第 4.2 节）；`fx`：任务开始（`when: 'start'`）与做完（`when: 'done'`）时的效果——`signal`（命名信号亮一段时间）、`flash`（房间闪光，`room` 为 `'self'` 是做这件事的角色所在的房间）、`send`（包裹沿声明的管道走，到达以后执行 `then`）；`idle` 标出待机活动。
 - 不出现在这张表里的事件类型是信号，不生成任务，由画面直接改灯、牌子、计数（见 `floor.js` 的 `playEvent`）。
-- 交接与传信的任务（`package_handoff_out`、`package_handoff_in`、`package_return_out`、`package_return_in`、`letter_out`、`letter_in`）不由事件类型触发，由 `floor.js` 直接放进队列；待机活动由 `ecs.js` 按目录的 `idle` 列表挑选。
+- 交接与传信的任务（`package_handoff_out`、`package_handoff_in`、`package_return_out`、`package_return_in`、`letter_out`、`letter_in`、`letter_arrive_in`、`letter_arrive_out`）不由事件类型触发，由 `floor.js` 直接放进队列；待机活动由 `ecs.js` 按目录的 `idle` 列表挑选。
 
 ### 3.4 系统
 
 ```js
 P.ecs.enqueue(world, who, key, extra)   // 把目录里的一项放进角色的队列；who 是角色 id 或者部门 id（部门按 extra.role 与任务的 by、actor 找角色）；extra 覆盖字段；extra.front 插到队首并放弃正在做的非 must 任务，extra.must 不会被队列上限挤掉；不是待机活动的任务进来时，正在做与排着的待机活动放弃
-P.ecs.dispatch(world, ev, make)         // 事件到达：查目录，命中就 enqueue 并返回 true；没有命中返回 false，由调用方按信号处理；make(任务定义, 事件, 角色) 可以返回要合并进任务的字段（效果回调）
+P.ecs.dispatch(world, ev, make)         // 事件到达：查目录，命中就 enqueue 并返回 true；没有命中返回 false，由调用方按信号处理；make(任务定义, 事件, 角色, 一方) 可以返回要合并进任务的字段（效果回调、气泡里的话），一方为 'to' 时是任务 then 后续任务里收东西的一方
 P.ecs.stepCharacters(world, scene)      // 每帧调用，规则见下
 P.ecs.stepPackages(world, scene)        // 每帧调用：transit 不为空的包裹沿 pts 移动，到达终点时 atRest、transit 置空并执行 onDone
 P.ecs.stepPipes(world, scene, stateOf)  // 每帧调用：stateOf(管道) 给出 'flowing'｜'idle'｜'stopped'，流速与光点带着惯性跟随
 P.ecs.signal / signalOn / signalValue   // 命名信号：signal(world, scene, 名字, 毫秒, 值)
-P.ecs.bubbleFor(character)              // 当前应显示的气泡 {text, kind}，只读
+P.ecs.bubbleFor(character)              // 当前应显示的气泡 {text, kind, tail}，只读；tail 为真表示是流式输出的文字，只留结尾
 P.ecs.syncCharacters(world, scene, specs, spriteOf)  // specs 是 [{ id, department, roleKind, name }]：每个角色有一个实体与对应的 actor，去掉不再需要的，给每个房间排好工位
 P.ecs.charFor / charsOf / primaryOf / actorOf         // 找角色：按 id 或种类、部门里的全部角色、中心角色、角色的 actor
 P.ecs.spawnPackage / sendPackage / removePackage / packagePosition / linkActive  // 包裹的生成、沿管道发出、销毁、当前坐标，以及一条管道上有没有包裹在移动
@@ -153,7 +157,7 @@ P.ecs.config.autonomy                   // 自主行为（待机活动、管道�
 
 `ecs.js` 不新增画布画法。`floor.js`、`building.js` 在各自的 `draw()` 里按实体当前的状态调用 `engine.js` 已有的画法（`P.drawActor`、`paint.chair`、`paint.desk`、`P.drawBitmap`……）：房间取自 `world.rooms`，管道取自 `world.links`，包裹取自 `world.packages`（正在移动的用 `packagePosition`）；角色的 actor 由 `syncCharacters` 建立，走位与姿势交给 `stepCharacters`，画面只读。部门房间的墙、屏幕、灯、门、工位由 `floor.js` 通用地画，房间自己的陈设由声明的 `props` 画。一个房间里有几个角色就画几个工位，每个工位依次画椅子、坐着的角色、桌子、显示器、角色前面的部分，站着的角色最后按纵坐标画。
 
-管道流动的光点（沿折线按间隔画点）位置取自 `flow.phase`，数量取自 `flow.load`（`autonomy` 关闭时取 v8 的时间算式）。头顶对话框由 `floor.js` 的 `drawBubbles` 按 `bubbleFor` 画：说话气泡（实心尾巴）是当前任务，思考气泡（圆点尾巴）是队列里的下一项；头顶已有状态图标时画在图标上方，开了减少动画时不画。
+管道流动的光点（沿折线按间隔画点）位置取自 `flow.phase`，数量取自 `flow.load`（`autonomy` 关闭时取 v8 的时间算式）。头顶对话框由 `floor.js` 的 `drawBubbles` 按 `bubbleFor` 收集，交给 `say.js` 的 `P.drawSpeeches` 排版绘制：说话气泡（实心尾巴）是当前任务，思考气泡（圆点尾巴）是队列里的下一项；任务做完以后这句话再留 `P.sayMs(文字)` 毫秒（`st.said`）；头顶已有状态图标时画在图标上方，开了减少动画时也画。部门房间（`room.js`）在动作开始时按事件调用 `P.say` 写进小人的 `data.say`，在 `draw()` 的最后用同一个 `P.drawSpeeches` 画。
 
 ### 3.6 世界里的决定卡片（`decision-card.js`）
 
@@ -181,7 +185,7 @@ card.stamp(id, 文字)       // 回答事件到达时在纸上盖章
 | `walkers.js` | 楼里的小人由 `stepCharacters` 推进：走位、速度、朝向、门口停靠位置 |
 | `identity-building.js` | 楼与机房在同一数据、同一时间基准下与 v8 逐像素相同（关闭自主行为） |
 | `record.js`、`replay.js` | 楼层画面：`record.js` 在 v8 页面（`--root` 可以指定别的页面，`--out` 指定文件名）播放全部场景，录下楼层画面收到的 `setModel`、`playEvent`、`focus`、`setOverlay` 调用；`replay.js` 用固定的时钟与随机数把同一串调用回放给 v8 与 v9，事件播完静置 14 秒后比较整张画面的像素与小人的位置、姿势、图标，全部相同才通过。`--mode burst` 是事件连续播放、只在最后比较；`--reduced` 是系统设置为减少动画。整层中断时小人停在中断前正在做的动作的位置，只比较小人以外的画面；自主行为关闭；有差异的录制重跑一次，重跑相同不算差异；有差异的检查点把 v8、v9 与差异图存进 `.tmp/v9-checks/replay/`，小人的差异列到字段 |
-| `behaviors.js` | 行为检查（确定的时钟，手写的数据）：多角色（13 个角色实体、工位、同一部门至少 4 个角色同时做不同的任务、事件按角色找到人、交接由经理做、没有角色设置时一个部门一个小人）、自主行为（待机活动出现、成对说话、真正的任务立刻打断待机、关闭以后没有）、管道流动（满速、停下光点留下、空闲光点淡出）、机房与楼（包裹沿管线走、回滚往上）、决定卡片（点板子打开、点章调用回答命令、需要说明的选项不带说明不提交、盖章期间纸与说明栏留着、翻页与关闭按钮、别处文本框里的方向键不翻页、经理送单与决定单飞行）、运维数据出现时世界重新声明而在途的包裹与角色保留、回答询问的方向、回放（Stage 5 档位点时间轴的刻度与单步没有错误，带回放位置的地址能装载）、声明（引擎与画面代码里没有具体的部门名；去掉运维的房间声明照常运转；只写声明加一个新房间与一种任务） |
+| `behaviors.js` | 行为检查（确定的时钟，手写的数据）：多角色（13 个角色实体、工位、同一部门至少 4 个角色同时做不同的任务、事件按角色找到人、交接由经理做、没有角色设置时一个部门一个小人）、自主行为（待机活动出现、成对说话、真正的任务立刻打断待机、关闭以后没有）、管道流动（满速、停下光点留下、空闲光点淡出）、机房与楼（包裹沿管线走、回滚往上）、决定卡片（点板子打开、点章调用回答命令、需要说明的选项不带说明不提交、盖章期间纸与说明栏留着、翻页与关闭按钮、别处文本框里的方向键不翻页、经理送单与决定单飞行）、运维数据出现时世界重新声明而在途的包裹与角色保留、回答询问的方向、说话气泡（每个会引起动作的事件类型都在目录里；工程经理提交交付说明时头顶说「现在提交交付说明」并且画在画面上，减少动画时也画，几秒后消失；部门房间与项目楼层里分派与交回、交接、询问与回答的两端各说各的话；收到询问的房间走到传信管口取信；模型请求时只有思考气泡）、回放（Stage 5 档位点时间轴的刻度与单步没有错误，带回放位置的地址能装载）、声明（引擎与画面代码里没有具体的部门名；去掉运维的房间声明照常运转；只写声明加一个新房间与一种任务） |
 | `life.js` | 事件过程截图：回放录制的调用（`--recs` 指定录制文件，在 v9 页面录的带着角色），在指定事件之后每隔一段时间截一帧拼成联系表，人工查看小人走到具体位置、包裹沿管道移动、头顶对话框与待机活动 |
 
 事件进行中的画面（小人走向具体位置、包裹沿管道移动、头顶对话框、待机活动、管道的惯性）与 v8 不同，逐像素比较只覆盖静止以后的画面，这些过程由 `behaviors.js` 与 `life.js` 检查。多角色的房间、大厅的决定板、世界里的决定卡片在快照带着这些数据的时候出现，静止画面由 `behaviors.js` 与人工截图查看。

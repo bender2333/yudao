@@ -104,7 +104,7 @@
     let focusId = null;
     let overlay = { id: null, data: null };
     const st = {
-      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], hidden: {}, remoteDots: [], queueX: {}, n: 0
+      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], hidden: {}, remoteDots: [], queueX: {}, n: 0, said: {}
     };
     const scene = P.createScene(canvas, { W, H, draw, update });
     // 世界里的决定卡片：决定单贴在大厅的板上，点开在画面里回答（decision-card.js）
@@ -156,9 +156,28 @@
 
     function workerOf(ch) { return ECS.actorOf(world, scene, ch.id); }
 
-    // 小人走到管道口放下或取出包裹：任务放到队首（交接不排队），做完以后执行 after；没有角色或减少动画时直接执行
+    // 小人头顶说的内容：来自事件（P.say，js/pixel/say.js）；目录里没有这类事件时，任务用自己声明的标签。
+    // side 为 'to' 表示说话的小人是事件里收东西的一方
+    function sayOf(ev, dept, side) {
+      const text = P.say(ev, { dept, side, roleName: (id) => (world.characters[id] || {}).name || null });
+      return text ? { label: text } : {};
+    }
+
+    function said(ch, text) {
+      st.said[ch.id] = { text, kind: 'say', until: scene.realT + P.sayMs(text) };
+    }
+
+    // 小人走到管道口放下或取出包裹：任务放到队首（交接不排队），做完以后执行 after；没有角色时直接执行。
+    // 减少动画时小人不走动，只在原处说话
     function trip(d, key, after, extra) {
-      if (scene.reduced || !ECS.enqueue(world, d, key, Object.assign({ front: true, must: true, onDone: after }, extra))) { if (after) after(); }
+      if (scene.reduced) {
+        const def = world.catalog.tasks[key];
+        const ch = def && ECS.charFor(world, d, null, def.actor || def.by);
+        if (ch && extra && extra.label) said(ch, extra.label);
+        if (after) after();
+        return;
+      }
+      if (!ECS.enqueue(world, d, key, Object.assign({ front: true, must: true, onDone: after }, extra))) { if (after) after(); }
     }
 
     // -------------------------------------------------------------------------
@@ -235,13 +254,18 @@
       }
     }
 
-    function fxOf(def, ev, ch) {
-      if (!def.fx) return null;
-      const run = (when) => () => def.fx.filter((f) => f.when === when).forEach((f) => applyFx(f, ev, ch));
-      return { start: run('start'), done: run('done') };
+    // 交给 ECS.dispatch 的 make：任务头顶说的内容与声明里的效果
+    function extrasOf(def, ev, ch, side) {
+      const out = sayOf(ev, ch.department, side);
+      if (def.fx) {
+        const run = (when) => () => def.fx.filter((f) => f.when === when).forEach((f) => applyFx(f, ev, ch));
+        out.start = run('start');
+        out.done = run('done');
+      }
+      return out;
     }
 
-    function dispatchTask(ev) { return ECS.dispatch(world, ev, fxOf); }
+    function dispatchTask(ev) { return ECS.dispatch(world, ev, extrasOf); }
 
     function playEvent(ev) {
       if (!ev || !ev.type) throw new Error('playEvent 需要事件对象');
@@ -271,19 +295,23 @@
           if (rework) hops.forEach((h) => { st.pipeFlash[h.key] = scene.realT + 2600; });
           const bmp = ART_BMP[pl.artifact] || 'box_sealed';
           // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一个任务
-          const arrive = () => { flash(to, PAL.white, 500); trip(to, rework ? 'package_return_in' : 'package_handoff_in'); };
+          const arrive = () => { flash(to, PAL.white, 500); trip(to, rework ? 'package_return_in' : 'package_handoff_in', null, sayOf(ev, to, 'to')); };
           const leg = (i) => send(hops[i].pts, bmp, { itemId: wid, color, linkKey: hops[i].key, onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()) });
-          trip(from, rework ? 'package_return_out' : 'package_handoff_out', () => leg(0));
+          trip(from, rework ? 'package_return_out' : 'package_handoff_out', () => leg(0), sayOf(ev, from, 'from'));
           return;
         }
         case 'qa_submitted':
           if (ev.department) flash(ev.department, pl.verdict === 'release' ? PAL.green2 : PAL.red2, 1200);
           dispatchTask(ev);
           return;
+        // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信
         case 'collaboration_requested': {
           const pts = tubeFor(pl.from, pl.to);
-          const key = order.indexOf(pl.to) > order.indexOf(pl.from) ? 'letter_out' : 'letter_in';
-          trip(pl.from, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to) }), { label: '发出询问' });
+          const forward = order.indexOf(pl.to) > order.indexOf(pl.from);
+          trip(pl.from, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
+            small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to),
+            onDone: () => trip(pl.to, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, pl.to, 'to'))
+          }), sayOf(ev, pl.from, 'from'));
           return;
         }
         case 'collaboration_responded': {
@@ -291,8 +319,11 @@
           const answerer = ev.department || pl.to;
           const asker = pl.from === answerer ? pl.to : pl.from;
           const pts = tubeFor(answerer, asker);
-          const key = order.indexOf(asker) > order.indexOf(answerer) ? 'letter_out' : 'letter_in';
-          trip(answerer, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker) }), { label: '回答询问' });
+          const forward = order.indexOf(asker) > order.indexOf(answerer);
+          trip(answerer, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
+            small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker),
+            onDone: () => trip(asker, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, asker, 'to'))
+          }), sayOf(ev, answerer, 'from'));
           return;
         }
         case 'deliverable_adopted':
@@ -811,24 +842,19 @@
 
     // -------------------------------------------------------------------------
 
-    // 头顶对话框：说话气泡是正在做的任务，思考气泡是队列里的下一项；内容只来自任务自己的字段
+    // 头顶对话框：说话气泡是正在做的任务，思考气泡是队列里的下一项；内容只来自任务自己的字段。
+    // 任务做完以后这句话再留一会儿，够读完；减少动画时小人不走动，气泡照样显示
     function drawBubbles(c) {
-      if (scene.reduced) return;
+      const list = [];
       Object.values(world.characters).forEach((ch) => {
         const a = workerOf(ch);
         const b = ch.bubble;
-        if (!a || !a.visible || !b) return;
-        const [hx, hy] = P.headTop(scene, a);
-        const text = b.text.length > 14 ? '…' + b.text.slice(-13) : b.text;
-        const tw = Math.min(90, Math.max(14, P.measure(c, text, 6, 500)));
-        const w = Math.round(tw + 8), h = 11;
-        const x = Math.max(2, Math.min(W - w - 2, Math.round(hx - w / 2 + 3)));
-        const y = hy - (a.icon ? 34 : 20);
-        c.globalAlpha = a.dim;
-        P.bubble(c, x, y, w, h, { kind: b.kind, tx: hx + 3 });
-        P.text(c, text, x + 4, y + h / 2 + 0.5, { size: 6, max: tw, color: PAL.ink2 });
-        c.globalAlpha = 1;
+        let s = st.said[ch.id];
+        if (b && (!s || s.text !== b.text || s.kind !== b.kind)) s = st.said[ch.id] = { text: b.text, kind: b.kind, until: scene.realT + P.sayMs(b.text) };
+        if (!a || !a.visible || !s || (!b && s.until <= scene.realT)) return;
+        list.push({ a, text: s.text, kind: s.kind, tail: Boolean(b && b.tail), until: b ? 0 : s.until });
       });
+      P.drawSpeeches(c, scene, list, { W, size: 6, maxW: 84 });
     }
 
     function draw(sc, c) {
