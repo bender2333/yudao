@@ -183,13 +183,22 @@ class SavedProjection:
 
 
 class EventStore:
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
+        # read_only 用于只读的子命令：不建立目录、不写库结构，连接以只读方式打开；
+        # 写入方法在使用时直接拒绝，读取期间不会改动事件日志与保存的投影
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
         self._idle: queue.SimpleQueue[sqlite3.Connection] = queue.SimpleQueue()
         self._opened: list[sqlite3.Connection] = []
         self._listeners: list[Callable[[list[Event | ProjectEvent]], None]] = []
         self._closed = False
+        if read_only:
+            if not self.path.is_file():
+                raise FileNotFoundError(f"event log does not exist: {self.path}")
+            with self._connection() as connection:
+                self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(SCHEMA)
@@ -203,6 +212,7 @@ class EventStore:
         # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号一起写回事件）、
         # 保存这个流的投影与这次改变的决定请求、登记命令。任何一项核对不通过都拒绝，什么也不写。
         # 订阅方由写入口在提交成功以后经 notify 通知
+        self._refuse_write()
         if decisions and not events:
             raise ValueError("decision requests change only together with the events that change them")
         with self._transaction() as connection:
@@ -248,6 +258,7 @@ class EventStore:
     def replace_projection(self, stream: str, version: int, state: str,
                            decisions: Sequence[SavedDecision] = ()) -> None:
         # 用重放得到的投影与决定请求替换这个流保存的投影；version 是重放到的流版本，流在重放以后又有写入时拒绝
+        self._refuse_write()
         with self._transaction() as connection:
             row = connection.execute(
                 "SELECT COALESCE(MAX(stream_version), 0) AS version, COALESCE(MAX(position), 0) AS position, "
@@ -382,6 +393,19 @@ class EventStore:
         with self._connection() as connection:
             return _end_position(connection)
 
+    def run_time_bounds(self, run_id: str) -> tuple[str, str] | None:
+        # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取
+        with self._connection() as connection:
+            first = connection.execute(
+                "SELECT created_at FROM events WHERE run_id = ? ORDER BY position ASC LIMIT 1", (run_id,),
+            ).fetchone()
+            if first is None:
+                return None
+            last = connection.execute(
+                "SELECT created_at FROM events WHERE run_id = ? ORDER BY position DESC LIMIT 1", (run_id,),
+            ).fetchone()
+        return first["created_at"], last["created_at"]
+
     def get_event(self, event_id: str) -> Event | None:
         event = self._get(event_id)
         return event if isinstance(event, Event) else None
@@ -416,6 +440,11 @@ class EventStore:
             row = connection.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
         return None if row is None else _from_row(row)
 
+    def _refuse_write(self) -> None:
+        # 只读打开的事件日志不接受任何写入
+        if self.read_only:
+            raise RuntimeError("the event store is open read-only")
+
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
         # 从连接池取一个连接，用完放回；没有空闲的连接时新开一个。连接不属于任何线程
@@ -424,7 +453,9 @@ class EventStore:
         try:
             connection = self._idle.get_nowait()
         except queue.Empty:
-            connection = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None, timeout=30)
+            source = f"file:{self.path.as_posix()}?mode=ro" if self.read_only else str(self.path)
+            connection = sqlite3.connect(source, uri=self.read_only, check_same_thread=False, isolation_level=None,
+                                         timeout=30)
             connection.row_factory = sqlite3.Row
             self._opened.append(connection)
         try:

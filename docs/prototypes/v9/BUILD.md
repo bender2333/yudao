@@ -12,7 +12,7 @@ flowchart TB
     subgraph Pixel["像素画面 js/pixel"]
         Ecs["ecs.js：实体、组件、系统（新增）"]
         Floor["floor.js：项目楼层（改写为调用 ecs.js）"]
-        Room["room.js：部门房间（改写为调用 ecs.js）"]
+        Room["room.js：部门房间（跟 v8 完全相同，不改）"]
         Building["building.js：楼与机房（改写为调用 ecs.js）"]
         Engine["engine.js：画布、动画循环、缓动、粒子、共用画法（跟 v8 完全相同，不改）"]
     end
@@ -20,12 +20,11 @@ flowchart TB
     App -->|"同上"| Room
     App -->|"同上"| Building
     Floor -->|"声明房间与管道 · 派发事件"| Ecs
-    Room -->|"同上"| Ecs
     Building -->|"同上"| Ecs
     Ecs -->|"actor、画布原语"| Engine
 ```
 
-`floor.js`、`room.js`、`building.js` 对外的 `setModel`/`playEvent`/`resize`/`destroy` 接口跟 v8 完全一样（第 7.2 至 7.4 节的函数签名不变），界面层不知道下面换了引擎，这是这次改造唯一要守住的边界。
+`floor.js`、`building.js` 对外的 `setModel`/`playEvent`/`resize`/`destroy` 接口跟 v8 完全一样（第 7.3、7.4 节的函数签名不变），界面层不知道下面换了引擎，这是这次改造唯一要守住的边界。
 
 ## 2. 文件结构与负责者（对照 v8 BUILD.md 第 3 节）
 
@@ -34,7 +33,7 @@ docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
   js/pixel/ecs.js               新增：实体、组件、系统、房间与管道的图结构声明、任务派发、对话框
   js/pixel/engine.js            原样保留
   js/pixel/sprites.js           原样保留
-  js/pixel/room.js              改写：调用 ecs.js，不再是原地叠临时姿势
+  js/pixel/room.js              原样保留
   js/pixel/floor.js             改写：调用 ecs.js，不再是 layoutFor/pipesFor 写死坐标
   js/pixel/building.js          改写：楼层小人的待机行为改用 ecs.js 的待机系统，机房不变（机房本来就没有"一部门一角色"的问题，见第 7.4 节）
   其余文件                      原样保留
@@ -48,11 +47,10 @@ docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
 | --- | --- |
 | 架构师 | `BUILD.md`、`js/pixel/ecs.js`（已完成：世界、房间与管道的声明加排布、任务派发、角色与包裹的推进、对话框，`declareRooms`/`declareLinks` 已经用 v8 `layoutFor(false)`、`layoutFor(true)` 与 `pipesFor` 的已知输出核对过，坐标一致） |
 | 任务 F 项目楼层 | `js/pixel/floor.js` 改写（第 7.3 节）：接上 `ecs.js`，补全 `P.ecs.TASKS` 里第 3.3 节示例之外、v8 design.md 第 8.3 节其余各行；交接的包裹动画用 `ECS.spawnPackage`/`ECS.sendPackage`/`ECS.stepPackages` 重写，两端角色的放下/取出动作各自是一个任务（`spot: 'port_out'`/`'port_in'`）；大厅、成果库、覆盖层、背景绘制不动 |
-| 任务 R 部门房间 | `js/pixel/room.js` 改写（第 7.2 节），调用同一份 `ecs.js` |
 | 任务 B 楼与机房 | `js/pixel/building.js` 改写：楼层小人的待机行为改用 `ECS.stepCharacters` 同一套待机逻辑（工作时走到对应部门门口，空闲时随机走动），机房场景不动（机房本来没有"一部门一角色"问题） |
 | 任务 A1／A2／A3／C／D（除像素房间外）／E | 跟 v8 完全相同的负责范围，不需要重新做（v8 的交付原样保留） |
 
-v8 的 `docs/prototypes/v8/` 整份复制到 `docs/prototypes/v9/` 作为起点，任务 F、R、B 与架构师只改上表列出的文件。三个任务都以「跟 v8 截图逐页对比，肉眼看不出差异」为验收标准（第 4 节），发现 `ecs.js` 本身的问题（坐标、接口形状）记入交付说明，不要绕开它自己改一份平行逻辑。
+v8 的 `docs/prototypes/v8/` 整份复制到 `docs/prototypes/v9/` 作为起点，任务 F、B 与架构师只改上表列出的文件。两个任务都以「跟 v8 截图逐页对比，肉眼看不出差异」为验收标准（第 4 节），发现 `ecs.js` 本身的问题（坐标、接口形状）记入交付说明，不要绕开它自己改一份平行逻辑。
 
 ## 3. 像素引擎（`ecs.js`）
 
@@ -116,7 +114,7 @@ P.ecs.TASKS = {
   tool_started_search: { label: '翻找资料', spot: 'cabinet', pose: 'read_sit', bubble: 'say' },
   tool_started_run_command: { label: '执行登记命令', spot: 'terminal', pose: 'pull', bubble: 'say' },
   qa_submitted_release: { label: '放行', spot: 'inspect', pose: 'stamp_green', bubble: 'say' },
-  // …按 v8 design.md 第 8.3 节逐行补全，任务 T 的工作范围
+  // …按 v8 design.md 第 8.3 节逐行补全，任务 F 的工作范围
 };
 ```
 
@@ -135,7 +133,7 @@ P.ecs.bubbleFor(character)      // 返回当前应显示的气泡（第 3.3 节�
 
 ### 3.5 渲染
 
-`ecs.js` 不新增画布原语，画一个实体时按它当前的组件值调用 `engine.js` 已有的函数（`P.drawActor`、`paint.chair`、`paint.desk`、`P.drawBitmap`、`drawPipe` 的画法不变，只是把"这条管道通不通"的判断从"两端有没有活跃事项"改成"这条管道上有没有 `transit` 不为空的包裹"）。`floor.js`、`room.js`、`building.js` 在各自的 `draw()` 里遍历 `world.rooms`/`world.pipes`/`world.characters`/`world.packages`，调用画法，不直接操作 `scene.actors`（角色对应的 `scene.actor` 由 `ecs.js` 内部维护，跟 v7/v8 的做法一样复用 `scene.addActor`/`scene.run`）。
+`ecs.js` 不新增画布原语，画一个实体时按它当前的组件值调用 `engine.js` 已有的函数（`P.drawActor`、`paint.chair`、`paint.desk`、`P.drawBitmap`、`drawPipe` 的画法不变，只是把"这条管道通不通"的判断从"两端有没有活跃事项"改成"这条管道上有没有 `transit` 不为空的包裹"）。`floor.js`、`building.js` 在各自的 `draw()` 里遍历 `world.rooms`/`world.pipes`/`world.characters`/`world.packages`，调用画法，不直接操作 `scene.actors`（角色对应的 `scene.actor` 由 `ecs.js` 内部维护，跟 v7/v8 的做法一样复用 `scene.addActor`/`scene.run`）。
 
 ## 4. 验收
 
