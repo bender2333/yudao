@@ -20,11 +20,12 @@ SUPPORTED_PROTOCOLS = frozenset({"responses", "chat_completions", "messages", "f
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
 
-# Provider 配置：一份服务连接，不携带协议，协议在模型访问定义声明
+# Provider 配置：一份服务连接，声明一种协议（ADR-0004）；地址保存该协议的请求基址
 @dataclass(frozen=True)
 class ProviderDefinition:
     id: str
     name: str
+    protocol: str = ""
     base_url: str = ""
     credential_ref: str = ""
     timeout_sec: float = 600.0
@@ -35,12 +36,17 @@ class ProviderDefinition:
         for name in ("id", "name", "base_url", "credential_ref", "preset_id", "models_url"):
             value = getattr(self, name)
             object.__setattr__(self, name, value.strip() if isinstance(value, str) else value)
+        object.__setattr__(
+            self, "protocol",
+            self.protocol.strip().casefold() if isinstance(self.protocol, str) else self.protocol,
+        )
 
     def public_dict(self) -> dict[str, Any]:
         # 非敏感字段，可落盘与导出
         return {
             "id": self.id,
             "name": self.name,
+            "protocol": self.protocol,
             "base_url": self.base_url,
             "credential_ref": self.credential_ref,
             "timeout_sec": self.timeout_sec,
@@ -49,34 +55,27 @@ class ProviderDefinition:
         }
 
 
-# 模型访问定义：某份 Provider 配置下的一个模型，一条调用协议
+# 模型访问定义：某份 Provider 配置下的一个模型访问定义，不声明协议（协议取自所属连接，ADR-0004）
 @dataclass(frozen=True)
 class ModelDefinition:
     id: str
     provider_id: str
     model: str
-    protocol: str
     context_window: int | None
     max_output_tokens: int
     capability_source: str = ""
     admitted_at: str | None = None
     admitted_revision: int | None = None
     admitted_model: str | None = None
-    admitted_protocol: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("id", "provider_id", "model", "capability_source"):
             value = getattr(self, name)
             object.__setattr__(self, name, value.strip() if isinstance(value, str) else value)
-        object.__setattr__(
-            self, "protocol",
-            self.protocol.strip().casefold() if isinstance(self.protocol, str) else self.protocol,
-        )
-        for name in ("admitted_at", "admitted_model", "admitted_protocol"):
-            value = getattr(self, name)
-            if isinstance(value, str):
-                normalized = value.strip()
-                object.__setattr__(self, name, normalized or None)
+        value = self.admitted_model
+        if isinstance(value, str):
+            normalized = value.strip()
+            object.__setattr__(self, "admitted_model", normalized or None)
 
     @property
     def admitted(self) -> bool:
@@ -88,14 +87,12 @@ class ModelDefinition:
             "id": self.id,
             "provider_id": self.provider_id,
             "model": self.model,
-            "protocol": self.protocol,
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
             "admitted_at": self.admitted_at,
             "admitted_revision": self.admitted_revision,
             "admitted_model": self.admitted_model,
-            "admitted_protocol": self.admitted_protocol,
         }
 
 
@@ -229,10 +226,10 @@ class ProviderStore:
         self.revision += 1
         admitted = ModelDefinition(
             id=current.id, provider_id=current.provider_id, model=current.model,
-            protocol=current.protocol, context_window=current.context_window,
+            context_window=current.context_window,
             max_output_tokens=current.max_output_tokens, capability_source=current.capability_source,
             admitted_at=_utc_now(), admitted_revision=self.revision,
-            admitted_model=(admitted_model or current.model), admitted_protocol=current.protocol,
+            admitted_model=(admitted_model or current.model),
         )
         items = [item for item in self._model_items if item.id != current.id] + [admitted]
         candidate_items = tuple(items)
@@ -287,6 +284,8 @@ class ProviderStore:
                 provider_ids.add(provider.id)
             if not isinstance(provider.name, str) or not provider.name:
                 issues.append(ValidationIssue(f"{location}.name", "必须是非空字符串"))
+            if not isinstance(provider.protocol, str) or provider.protocol not in SUPPORTED_PROTOCOLS:
+                issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             if not isinstance(provider.timeout_sec, (int, float)) or isinstance(provider.timeout_sec, bool) \
                     or not math.isfinite(float(provider.timeout_sec)) or provider.timeout_sec <= 0:
                 issues.append(ValidationIssue(f"{location}.timeout_sec", "必须是正的有限数值"))
@@ -316,8 +315,6 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.provider_id", "Provider 配置不存在"))
             if not isinstance(model.model, str) or not model.model.strip():
                 issues.append(ValidationIssue(f"{location}.model", "必须是非空字符串"))
-            if not isinstance(model.protocol, str) or model.protocol not in SUPPORTED_PROTOCOLS:
-                issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             _validate_positive_int(model.context_window, f"{location}.context_window", issues, allow_none=True)
             _validate_positive_int(model.max_output_tokens, f"{location}.max_output_tokens", issues, allow_none=False)
             if model.context_window is not None and model.max_output_tokens is not None \
@@ -336,7 +333,7 @@ def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], li
     allowed = {"providers", "models", "revision"}
     unknown = sorted(set(raw) - allowed, key=str)
     issues: list[ValidationIssue] = [ValidationIssue(f"catalog.{key}", "未知字段") for key in unknown]
-    # 旧 Provider 级 protocol 不做兼容读取，直接报可定位问题
+    # 一份连接声明一种协议；模型访问定义声明协议时直接报可定位问题（ADR-0004）
     providers: list[ProviderDefinition] = []
     models: list[ModelDefinition] = []
     provider_items = raw.get("providers", [])
@@ -365,18 +362,15 @@ def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], li
 def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
         return None, [ValidationIssue(location, "应为对象")]
-    allowed = {"id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url"}
+    allowed = {"id", "name", "protocol", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url"}
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
-    if "protocol" in raw:
-        # 旧结构明确拒绝，不做默认继承
-        issues.append(ValidationIssue(f"{location}.protocol", "Provider 级 protocol 已移除，请在模型访问定义声明"))
-    required = {"id", "name"}
+    required = {"id", "name", "protocol"}
     missing = required - set(raw)
     issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
     return ProviderDefinition(
-        id=raw["id"], name=raw["name"],
+        id=raw["id"], name=raw["name"], protocol=raw["protocol"],
         base_url=raw.get("base_url", ""), credential_ref=raw.get("credential_ref", ""),
         timeout_sec=raw.get("timeout_sec", 600.0),
         preset_id=raw.get("preset_id", ""), models_url=raw.get("models_url", ""),
@@ -387,21 +381,25 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     if not isinstance(raw, Mapping):
         return None, [ValidationIssue(location, "应为对象")]
     allowed = {
-        "id", "provider_id", "model", "protocol", "context_window", "max_output_tokens",
-        "capability_source", "admitted_at", "admitted_revision", "admitted_model", "admitted_protocol",
+        "id", "provider_id", "model", "context_window", "max_output_tokens",
+        "capability_source", "admitted_at", "admitted_revision", "admitted_model",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
-    required = {"id", "provider_id", "model", "protocol", "max_output_tokens"}
+    if "protocol" in raw:
+        # 模型访问定义不再声明协议（ADR-0004）：指出字段位置，不迁移
+        issues.append(ValidationIssue(
+            f"{location}.protocol", "模型访问定义不再声明协议，请在 Provider 配置上声明"))
+    required = {"id", "provider_id", "model", "max_output_tokens"}
     missing = required - set(raw)
     issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
     return ModelDefinition(
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
-        protocol=raw["protocol"], context_window=raw.get("context_window"),
+        context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
         admitted_at=raw.get("admitted_at"), admitted_revision=raw.get("admitted_revision"),
-        admitted_model=raw.get("admitted_model"), admitted_protocol=raw.get("admitted_protocol"),
+        admitted_model=raw.get("admitted_model"),
     ), issues
 
 

@@ -22,6 +22,7 @@ from .invoke import (
     CancelRegistry,
     InvokeResult,
     ProviderInput,
+    check_target_availability,
     provider_input_for,
     stream_invocation,
     to_provider_input,
@@ -35,8 +36,8 @@ from .resolve import (
     resolve_call_target as _resolve_call_target,
     resolve_snapshot,
 )
-from .responses import ProviderConnections, check_availability
-from .store import ProviderStore
+from .responses import ProviderConnections
+from .store import SUPPORTED_PROTOCOLS, ProviderStore
 
 
 # 三部门默认绑定键，模块自身不硬编码部门语义，只提供默认选择
@@ -190,7 +191,7 @@ class ProviderFacade:
             entry = dict(item)
             existing = self._store.models.get(str(entry.get("id")))
             if existing is not None:
-                for key in ("admitted_at", "admitted_revision", "admitted_model", "admitted_protocol"):
+                for key in ("admitted_at", "admitted_revision", "admitted_model"):
                     if getattr(existing, key) is not None:
                         entry[key] = getattr(existing, key)
             merged.append(entry)
@@ -483,7 +484,9 @@ class ProviderFacade:
             for key in sorted(snapshot.targets):
                 binding = self._bindings.get(key, {})
                 model = self._store.models.get(binding.get("model_id", ""))
-                if model is not None and model.protocol != "fake" and not model.admitted:
+                provider = self._store.providers.get(binding.get("provider_id", ""))
+                if model is not None and provider is not None \
+                        and provider.protocol != "fake" and not model.admitted:
                     admission_issues.append(ValidationIssue(
                         f"bindings.{key}.model_id",
                         f"模型 {model.id} 尚未通过模型测试准入，请先执行模型测试",
@@ -542,7 +545,7 @@ class ProviderFacade:
     def presets_public_view(self) -> dict[str, Any]:
         # 预置表数据与版本由模块提供，Web 只读取，不做远端热更
         return {
-            "table_version": PRESET_TABLE_VERSION,
+            "revision": PRESET_TABLE_VERSION,
             "source": PRESET_TABLE_SOURCE,
             "presets": list_presets(),
         }
@@ -574,7 +577,7 @@ class ProviderFacade:
                 "revision": revision,
                 "admitted_at": stored.admitted_at,
                 "admitted_model": stored.admitted_model,
-                "admitted_protocol": stored.admitted_protocol,
+                "admitted_protocol": provider.protocol,
             }
 
     def model_test(self, provider_id: str, model_id: str) -> dict[str, Any]:
@@ -602,7 +605,7 @@ class ProviderFacade:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             return {
                 "ok": False, "error": str(exc), "model": None, "admitted": False,
-                "protocol": model.protocol, "revision": self.revision,
+                "protocol": provider.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
             }
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
@@ -611,7 +614,7 @@ class ProviderFacade:
         persisted, persist_error = self._persist_admission()
         payload = {
             "ok": True, "error": None, "model": actual, "admitted": True,
-            "protocol": model.protocol, "revision": admission["revision"],
+            "protocol": provider.protocol, "revision": admission["revision"],
             "elapsed_ms": elapsed_ms,
             "usage_reported": bool(result.usage.get("reported", False)),
             "persisted": persisted,
@@ -695,10 +698,11 @@ class ProviderFacade:
         admissions = []
         for model_id in sorted(self._store.models):
             model = self._store.models[model_id]
+            provider = self._store.providers.get(model.provider_id)
             admissions.append({
                 "model_id": model.id,
                 "provider_id": model.provider_id,
-                "protocol": model.protocol,
+                "protocol": None if provider is None else provider.protocol,
                 "admitted": model.admitted,
                 "admitted_at": model.admitted_at,
                 "admitted_revision": model.admitted_revision,
@@ -779,28 +783,21 @@ class ProviderFacade:
         return self._cancels.cancel(attempt_id)
 
     def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
-        # 连接测试只证明地址与凭据可用，不证明具体模型可调
+        # 连接测试只证明地址与凭据可用，不证明具体模型可调；三种协议同一套缺失项检查
         snapshot = resolve_snapshot(self._store, [selection], self._credentials)
         key = str(selection.get("key", selection.get("target_key", selection.get("department", "target"))))
         frozen_target = snapshot.target(key)
-        if frozen_target.protocol == "fake":
-            return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": "fake"}
-        if frozen_target.protocol == "responses":
-            from .responses import ResponsesConfig
-            availability = check_availability(ResponsesConfig(
-                model=frozen_target.model, api_key=frozen_target.api_key,
-                provider=frozen_target.provider_id, base_url=frozen_target.base_url,
-                timeout_sec=frozen_target.timeout_sec,
-            ))
-            if not availability["available"]:
-                return {"ok": False, "kind": "connection", "target_key": key,
-                        "revision": snapshot.revision, "reason": availability["reason"],
-                        "message": availability["message"]}
-            return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": "responses"}
-        raise ProviderError(f"unsupported provider protocol: {frozen_target.protocol}",
-                            reason="unsupported_protocol")
+        protocol = frozen_target.protocol
+        if protocol not in SUPPORTED_PROTOCOLS:
+            raise ProviderError(f"unsupported provider protocol: {protocol}",
+                                reason="unsupported_protocol")
+        availability = check_target_availability(frozen_target)
+        if not availability["available"]:
+            return {"ok": False, "kind": "connection", "target_key": key,
+                    "revision": snapshot.revision, "protocol": protocol,
+                    "reason": availability["reason"], "message": availability["message"]}
+        return {"ok": True, "kind": "connection", "target_key": key,
+                "revision": snapshot.revision, "protocol": protocol}
 
     def configure_paths(self, config_path: str | Path | None,
                         dotenv_path: str | Path | None = None) -> None:

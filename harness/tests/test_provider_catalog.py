@@ -15,16 +15,16 @@ from harness.providers import (
 def _document(**overrides):
     document = {
         "providers": [
-            {"id": "provider-a", "name": "Provider A",
+            {"id": "provider-a", "name": "Provider A", "protocol": "responses",
              "base_url": "https://a.example/v1", "credential_ref": "credential-a"},
-            {"id": "provider-b", "name": "Provider B",
+            {"id": "provider-b", "name": "Provider B", "protocol": "responses",
              "base_url": "https://b.example/v1", "credential_ref": "credential-b"},
         ],
         "models": [
             {"id": "model-a", "provider_id": "provider-a", "model": "model-a",
-             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+             "context_window": 32000, "max_output_tokens": 4096},
             {"id": "model-b", "provider_id": "provider-b", "model": "model-b",
-             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+             "context_window": 32000, "max_output_tokens": 4096},
         ],
         "bindings": {
             "product": {"provider_id": "provider-a", "model_id": "model-a"},
@@ -48,7 +48,9 @@ def _facade(**credential_overrides):
 def admit_bound_models(facade, document=None):
     # 真实协议模型须先经模型测试准入才能用于任务；测试通过模块接口记录该事实
     bindings = (document or facade.to_document())["bindings"]
-    models = {item["id"]: item for item in facade.providers_view()["models"]}
+    view = facade.providers_view()
+    models = {item["id"]: item for item in view["models"]}
+    protocols = {item["id"]: item["protocol"] for item in view["providers"]}
     admitted: set[tuple[str, str]] = set()
     for item in bindings.values():
         provider_id, model_id = item.get("provider_id"), item.get("model_id")
@@ -56,7 +58,7 @@ def admit_bound_models(facade, document=None):
             continue
         admitted.add((provider_id, model_id))
         model = models.get(model_id)
-        if model is None or model["protocol"] == "fake":
+        if model is None or protocols.get(provider_id) == "fake":
             continue
         facade.record_admission(provider_id, model_id, admitted_model=model["model"])
 
@@ -78,22 +80,33 @@ def test_new_document_round_trip_contains_only_non_sensitive_fields(tmp_path):
     assert "api_key" not in json.dumps(reloaded.to_document())
 
 
-def test_old_provider_level_protocol_is_rejected_without_migration():
+def test_provider_config_requires_a_protocol():
+    # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
     document = _document()
-    document["providers"][0]["protocol"] = "responses"
+    del document["providers"][0]["protocol"]
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "providers[0].protocol" for issue in caught.value.issues)
 
 
-def test_model_protocol_is_required_per_model_definition():
+def test_model_definition_declaring_protocol_is_rejected_without_migration():
+    # 模型访问定义不再声明协议（ADR-0004）：指出字段位置，不迁移
     document = _document()
-    del document["models"][0]["protocol"]
+    document["models"][0]["protocol"] = "responses"
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "models[0].protocol" for issue in caught.value.issues)
+
+
+def test_model_without_protocol_is_accepted():
+    facade = ProviderFacade()
+    assertion = facade.store_document(_document())
+    assert assertion >= 1
+    view = facade.providers_view()
+    assert "protocol" not in view["models"][0]
+    assert view["providers"][0]["protocol"] == "responses"
 
 
 def test_snapshot_freezes_three_targets_without_persisting_secrets():
@@ -115,7 +128,7 @@ def test_each_target_is_independent_and_frozen_after_publish():
     revision_before = facade.revision
     facade.save_model({
         "id": "model-c", "provider_id": "provider-a", "model": "model-c",
-        "protocol": "responses", "context_window": 8000, "max_output_tokens": 512,
+        "context_window": 8000, "max_output_tokens": 512,
     })
     assert facade.revision > revision_before
     assert snapshot.target("product").model == "model-a"

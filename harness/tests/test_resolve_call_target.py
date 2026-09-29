@@ -41,6 +41,7 @@ def _responses_document():
             {
                 "id": "provider-a",
                 "name": "Provider A",
+                "protocol": "responses",
                 "base_url": "https://a.example/v1",
                 "credential_ref": "credential-a",
             },
@@ -50,7 +51,6 @@ def _responses_document():
                 "id": "model-a",
                 "provider_id": "provider-a",
                 "model": "upstream-a",
-                "protocol": "responses",
                 "context_window": 32000,
                 "max_output_tokens": 4096,
             },
@@ -160,7 +160,8 @@ def test_missing_credential_material_is_unavailable():
 
 def test_fake_protocol_needs_neither_admission_nor_credential():
     document = _responses_document()
-    document["models"][0].update({"protocol": "fake", "model": "fake-script"})
+    document["providers"][0]["protocol"] = "fake"
+    document["models"][0]["model"] = "fake-script"
     facade = _facade(document)
 
     resolved = facade.resolve_call_target("model-a")

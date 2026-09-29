@@ -12,13 +12,12 @@ from harness.runtime import LoopSystem
 from harness.web.server import serve
 
 
-def _model_document(model_id, provider_id, *, protocol="fake", model="fake-script",
+def _model_document(model_id, provider_id, *, model="fake-script",
                     context_window=32000, max_output_tokens=4096):
     return {
         "id": model_id,
         "provider_id": provider_id,
         "model": model,
-        "protocol": protocol,
         "context_window": context_window,
         "max_output_tokens": max_output_tokens,
     }
@@ -28,6 +27,7 @@ def _catalog_document(provider_id="fake-a", model_id="model-a", *, protocol="fak
     provider = {
         "id": provider_id,
         "name": provider_fields.get("name", provider_id),
+        "protocol": protocol,
         "base_url": provider_fields.get("base_url", ""),
         "credential_ref": provider_fields.get("credential_ref", ""),
         "timeout_sec": provider_fields.get("timeout_sec", 600),
@@ -35,7 +35,7 @@ def _catalog_document(provider_id="fake-a", model_id="model-a", *, protocol="fak
     return {
         "providers": [provider],
         "models": [_model_document(
-            model_id, provider_id, protocol=protocol,
+            model_id, provider_id,
             model=provider_fields.get("model", "fake-script"))],
         "bindings": {
             department: {"provider_id": provider_id, "model_id": model_id}
@@ -105,9 +105,10 @@ def _admit_bound_models(facade):
     # 真实协议模型须先经模型测试准入；测试通过模块接口记录该事实
     view = facade.providers_view()
     models = {item["id"]: item for item in view["models"]}
+    protocols = {item["id"]: item["protocol"] for item in view["providers"]}
     for binding in view["bindings"].values():
         model = models.get(binding.get("model_id"))
-        if model is not None and model["protocol"] != "fake":
+        if model is not None and protocols.get(binding.get("provider_id")) != "fake":
             facade.record_admission(binding["provider_id"], model["id"],
                                     admitted_model=model["model"])
 
@@ -143,10 +144,10 @@ def test_list_create_update_and_bindings_round_trip(tmp_path):
         created = {
             "id": "fake-b",
             "name": "Second",
+            "protocol": "fake",
             "models": [{
                 "id": "model-b",
                 "model": "other-script",
-                "protocol": "fake",
                 "context_window": 16000,
                 "max_output_tokens": 2048,
             }],
@@ -158,6 +159,7 @@ def test_list_create_update_and_bindings_round_trip(tmp_path):
 
         status, body = request(host, port, "PUT", "/api/providers/fake-b", {
             "name": "Second renamed",
+            "protocol": "fake",
             "timeout_sec": 30,
             "models": created["models"],
         })
@@ -197,15 +199,26 @@ def test_validation_and_delete_dependents(tmp_path):
         assert status == 400, body
 
         status, body = request(host, port, "POST", "/api/providers", {
-            "id": "ok", "name": "BadProto", "protocol": "responses",
+            "id": "ok", "name": "BadProto", "protocol": "grpc",
         })
         assert status == 400, body
         assert "protocol" in body
 
+        # 模型访问定义不再声明协议（ADR-0004）：拒绝并指出字段位置
+        status, body = request(host, port, "POST", "/api/providers", {
+            "id": "ok2", "name": "ModelProto", "protocol": "responses",
+            "models": [{
+                "id": "model-x", "model": "m", "protocol": "responses",
+                "context_window": 8000, "max_output_tokens": 4096,
+            }],
+        })
+        assert status == 400, body
+        assert "models[1].protocol" in body
+
         status, body = request(host, port, "PUT", "/api/providers/fake-a", {
             "name": "Still fake",
             "models": [{
-                "id": "model-a", "model": "fake-script", "protocol": "fake",
+                "id": "model-a", "model": "fake-script",
                 "context_window": 0, "max_output_tokens": 4096,
             }],
         })
@@ -220,6 +233,7 @@ def test_validation_and_delete_dependents(tmp_path):
         extra = {
             "id": "spare",
             "name": "Spare",
+            "protocol": "fake",
         }
         status, body = request(host, port, "POST", "/api/providers", extra)
         assert status == 201, body
@@ -260,7 +274,8 @@ def test_import_keeps_old_catalog_on_invalid_document(tmp_path):
 
 def test_moving_a_model_to_another_connection_keeps_one_owner_and_moves_bindings(tmp_path):
     def provider(provider_id):
-        return {"id": provider_id, "name": provider_id, "base_url": "", "credential_ref": "", "timeout_sec": 600}
+        return {"id": provider_id, "name": provider_id, "protocol": "fake",
+                "base_url": "", "credential_ref": "", "timeout_sec": 600}
 
     def bindings(provider_id):
         return {department: {"provider_id": provider_id, "model_id": "model-a"} for department in DEPARTMENTS}
@@ -392,7 +407,7 @@ def test_unwritable_catalog_keeps_old_directory(tmp_path, monkeypatch):
     monkeypatch.setattr("harness.providers.facade.os.replace", boom)
     with running_server(system) as (_server, host, port):
         status, body = request(host, port, "POST", "/api/providers", {
-            "id": "spare", "name": "Spare",
+            "id": "spare", "name": "Spare", "protocol": "fake",
         })
         assert status == 503, body
         assert all(item["id"] != "spare"
@@ -456,7 +471,7 @@ def test_manual_reload_picks_up_disk_changes_and_reports_corruption(tmp_path):
     with running_server(system) as (_server, host, port):
         document = json.loads(config.read_text(encoding="utf-8"))
         document["models"].append(_model_document(
-            "model-extra", "fake-a", protocol="fake", model="extra-script"))
+            "model-extra", "fake-a", model="extra-script"))
         config.write_text(json.dumps(document), encoding="utf-8")
         status, body = request(host, port, "POST", "/api/providers/reload")
         assert status == 200, body
@@ -540,24 +555,25 @@ def models_server(payload, *, status=200):
 def _go_document(models_url: str) -> dict:
     return {
         "providers": [{
-            "id": "go", "name": "OpenCode Go", "base_url": "https://opencode.ai/zen/go/v1",
+            "id": "go", "name": "OpenCode Go", "protocol": "responses",
+            "base_url": "https://opencode.ai/zen/go/v1",
             "credential_ref": "GO_KEY", "timeout_sec": 60, "preset_id": "opencode-go",
             "models_url": models_url,
         }],
         "models": [{
             "id": "go-luna", "provider_id": "go", "model": "gpt-5.6-luna",
-            "protocol": "responses", "context_window": 32000, "max_output_tokens": 2048,
+            "context_window": 32000, "max_output_tokens": 2048,
             "capability_source": "preset-v1",
         }],
         "bindings": {},
     }
 
 
-def test_provider_presets_endpoint_exposes_version_and_go_endpoints(tmp_path):
+def test_provider_presets_endpoint_exposes_revision_and_go_endpoints(tmp_path):
     system, _config = catalog_system(tmp_path)
     with running_server(system) as (_server, host, port):
         payload = get_json(host, port, "/api/provider-presets")
-    assert payload["table_version"]
+    assert payload["revision"]
     assert payload["source"]
     preset = payload["presets"][0]
     assert preset["id"] == "opencode-go"
@@ -568,8 +584,9 @@ def test_provider_presets_endpoint_exposes_version_and_go_endpoints(tmp_path):
     }
     assert preset["models_url"].endswith("/zen/go/v1/models")
     assert preset["auth"] == "api_key"
-    assert {hint["protocol"] for hint in preset["known_models"]} == {
-        "responses", "chat_completions", "messages"}
+    # 预置表只含接入规则，不带模型（#84）
+    assert "known_models" not in preset
+    assert "models" not in preset
 
 
 def test_candidates_refresh_reads_models_url_without_persisting(tmp_path):
@@ -585,10 +602,10 @@ def test_candidates_refresh_reads_models_url_without_persisting(tmp_path):
     assert payload["status"] == "ok"
     assert payload["source_url"] == models_url
     assert [item["id"] for item in payload["candidates"]] == ["gpt-5.6-luna", "never-heard-of-it"]
+    # 候选只有上游模型 ID；协议与容量由访问定义与模型测试决定（#84）
     hint = next(item for item in payload["candidates"] if item["id"] == "gpt-5.6-luna")
-    assert hint["protocol"] == "responses"
-    unknown = next(item for item in payload["candidates"] if item["id"] == "never-heard-of-it")
-    assert unknown["protocol"] is None
+    assert "protocol" not in hint
+    assert "capability_source" not in hint
     # 候选不落盘、不自动成为可用模型
     assert config.read_text(encoding="utf-8") == before
     assert [item["id"] for item in listed["models"]] == ["go-luna"]

@@ -3763,10 +3763,6 @@
             "type": "string",
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -3819,17 +3815,6 @@
             ],
             "title": "Admitted Model"
           },
-          "admitted_protocol": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Protocol"
-          },
           "stale": {
             "type": "boolean",
             "title": "Stale"
@@ -3841,14 +3826,12 @@
           "id",
           "provider_id",
           "model",
-          "protocol",
           "context_window",
           "max_output_tokens",
           "capability_source",
           "admitted_at",
           "admitted_revision",
           "admitted_model",
-          "admitted_protocol",
           "stale"
         ],
         "title": "CatalogModel"
@@ -3887,9 +3870,9 @@
       },
       "CatalogPresets": {
         "properties": {
-          "table_version": {
+          "revision": {
             "type": "string",
-            "title": "Table Version"
+            "title": "Revision"
           },
           "source": {
             "type": "string",
@@ -3907,7 +3890,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "table_version",
+          "revision",
           "source",
           "presets"
         ],
@@ -3922,6 +3905,10 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
           },
           "base_url": {
             "type": "string",
@@ -3963,6 +3950,7 @@
         "required": [
           "id",
           "name",
+          "protocol",
           "base_url",
           "credential_ref",
           "timeout_sec",
@@ -4852,16 +4840,6 @@
             "minLength": 1,
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "chat_completions",
-              "fake",
-              "messages",
-              "responses"
-            ],
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -4894,7 +4872,6 @@
         "required": [
           "id",
           "model",
-          "protocol",
           "max_output_tokens",
           "provider_id"
         ],
@@ -5252,16 +5229,6 @@
             "minLength": 1,
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "chat_completions",
-              "fake",
-              "messages",
-              "responses"
-            ],
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -5289,7 +5256,6 @@
         "required": [
           "id",
           "model",
-          "protocol",
           "max_output_tokens"
         ],
         "title": "ModelInput"
@@ -5900,6 +5866,16 @@
             "minLength": 1,
             "title": "Name"
           },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "fake",
+              "messages",
+              "responses"
+            ],
+            "title": "Protocol"
+          },
           "base_url": {
             "type": "string",
             "title": "Base Url",
@@ -5930,7 +5906,8 @@
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "protocol"
         ],
         "title": "ProviderInput"
       },
