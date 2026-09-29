@@ -249,3 +249,10 @@
   - 真正的"无法容纳"场景（固定原文与当前工作超出窗口）仍然明确停止。
 - 变更文件：`harness/compaction.py`（新增常量、截断、预检、非致命空/超限）、`harness/orchestrator.py`（`_finish_compaction` 处理 None 返回值）。
 - 现有 `test_three_undeclared_tool_calls_fail_compaction` 测试不变：适配器级的协议畸形（未声明工具却返回 function_call）仍走引擎重试→耗尽→FAILED 路径，与 `finish_compaction` 的非致命处理是不同的错误路径。
+
+## 2026-09-29 - 权威拓扑与目标层的治理形状，用下游核验的有无判断要不要阻塞
+
+- 用户指出「权威拓扑是设计时的常量」这条写法容易把事情说死，要求按第一性原理、奥卡姆剃刀重新审查这条边界是否真的需要。
+- 用户随后指出「目标层只由用户修改」本身也有讨好用户、免责声明的嫌疑；架构师提出的第一版修法（原始意图生效前必须经过挑战和澄清）又被用户指出仍是变相的追责机制，会让 Yudao 做不到长期运行。
+- 决定见 [ADR-0020](adr/0020-block-only-when-no-downstream-check.md)：权威拓扑属于 [ADR-0014](adr/0014-versioned-definitions.md) 的组织定义，只随用户批准的新版本改变，不是独立于组织定义之外的常量；目标、约束、验收标准的来源只能是用户的意图，产品部门的解释立即生效，不必逐项等待批准；要不要阻塞等待用户，看下游有没有独立的核验能够挡住错误的判断——有核验兜底的不阻塞，继续做、留痕、事后可改；没有核验能挡住的地方（读法互相矛盾、或者变更会影响谁在信任链末端），才真正走用户决定这条合同。
+- 修改文件：`docs/design/architecture/core-and-materials.md`（第 2、3 节）、`docs/adr/0014-versioned-definitions.md`（理由部分的措辞）、新增 `docs/adr/0020-block-only-when-no-downstream-check.md`。
