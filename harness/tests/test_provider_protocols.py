@@ -234,15 +234,15 @@ def test_one_preset_supports_independent_connections_with_own_address_and_key():
             overrides={"GO_KEY_A": "key-a", "GO_KEY_B": "key-b"}, use_env=False))
         facade.store_document({
             "providers": [
-                {"id": "go-a", "name": "Go 个人", "base_url": base_a + "/v1", "credential_ref": "GO_KEY_A",
-                 "timeout_sec": 20.0, "preset_id": "opencode-go"},
-                {"id": "go-b", "name": "Go 团队", "base_url": base_b + "/v1", "credential_ref": "GO_KEY_B",
-                 "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                {"id": "go-a", "name": "Go 个人", "protocol": "responses", "base_url": base_a + "/v1",
+                 "credential_ref": "GO_KEY_A", "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                {"id": "go-b", "name": "Go 团队", "protocol": "responses", "base_url": base_b + "/v1",
+                 "credential_ref": "GO_KEY_B", "timeout_sec": 20.0, "preset_id": "opencode-go"},
             ],
             "models": [
-                {"id": "m-a", "provider_id": "go-a", "model": "model-x", "protocol": "responses",
+                {"id": "m-a", "provider_id": "go-a", "model": "model-x",
                  "context_window": 32000, "max_output_tokens": 2048},
-                {"id": "m-b", "provider_id": "go-b", "model": "model-x", "protocol": "responses",
+                {"id": "m-b", "provider_id": "go-b", "model": "model-x",
                  "context_window": 32000, "max_output_tokens": 2048},
             ],
             "bindings": {},

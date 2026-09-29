@@ -320,10 +320,10 @@ class Orchestrator:
         provider_id = self.test_provider
         model_id = f"{provider_id}-model"
         self.facade.store_document({
-            "providers": [{"id": provider_id, "name": provider_id, "base_url": ""}],
+            "providers": [{"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""}],
             "models": [{
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
-                "protocol": "fake", "context_window": context_window,
+                "context_window": context_window,
                 "max_output_tokens": response_reserve(context_window, None),
             }],
             "bindings": {department: {"provider_id": provider_id, "model_id": model_id}

@@ -167,13 +167,6 @@ class ProposalContracts(_Definition):
 Protocol = Literal["responses", "chat_completions", "messages"]
 
 
-class KnownModel(_Definition):
-    # 预置提示：来源写明是否验证过，不当成已验证的能力
-    model_id: str = Field(min_length=1)
-    protocol: Protocol
-    capability_source: str = Field(min_length=1)
-
-
 class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
@@ -185,7 +178,6 @@ class ServicePreset(_Definition):
     header_profile: str
     source: str
     notes: str
-    known_models: tuple[KnownModel, ...]
 
     freeze_base_urls = _frozen("base_urls")
 

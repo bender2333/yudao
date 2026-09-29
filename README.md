@@ -50,6 +50,7 @@ uv sync --frozen
     {
       "id": "opencode-go",
       "name": "OpenCode Go",
+      "protocol": "chat_completions",
       "base_url": "https://opencode.ai/zen/go/v1",
       "credential_ref": "YUDAO_OPENCODE_GO_KEY",
       "timeout_sec": 600,
@@ -62,7 +63,6 @@ uv sync --frozen
       "id": "go-glm-chat",
       "provider_id": "opencode-go",
       "model": "glm-5.1",
-      "protocol": "chat_completions",
       "context_window": 128000,
       "max_output_tokens": 8192,
       "capability_source": "预置提示：官方端点示例"
@@ -76,7 +76,9 @@ uv sync --frozen
 }
 ```
 
-协议在模型访问定义上声明，一条定义只走一条协议（`responses` / `chat_completions` / `messages`），需要多协议时在同一模型上建多条定义。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
+一份 Provider 配置只声明一种协议（`responses` / `chat_completions` / `messages`），地址是该协议的请求基址；请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。同一服务方案要用另一种协议时另建一份 Provider 配置，默认沿用同一凭据引用；模型访问定义不再声明协议，在模型上声明协议会在读取目录时报错并指出字段位置。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
+
+Provider 连接只信任操作系统的证书库：私有 CA 与企业代理的证书装在系统证书库中即可；`SSL_CERT_FILE`、`SSL_CERT_DIR` 这两个环境变量对 Provider 连接不起作用。
 
 凭据来源优先级为进程内存覆盖 > 进程环境变量 > `.yudao/.env`。页面填写 Key 默认只对本进程有效，勾选持久化才写入 `.env`；已保存的 Key 不回填，也不进入日志、事件与导出。
 

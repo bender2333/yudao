@@ -213,14 +213,16 @@ def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
 
     directory = _copy(tmp_path)
     table = _read(directory, "service_presets.json")
-    original = table["presets"][0]["known_models"][0]["protocol"]
-    table["presets"][0]["known_models"][0]["protocol"] = "grpc"
+    # 预置表只含接入规则，不带模型（#84）
+    assert "known_models" not in table["presets"][0]
+    table["presets"][0]["base_urls"]["responses"] = 7
     _write(directory, "service_presets.json", table)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[:2] == ("service_presets.json", "presets[0].known_models[0].protocol")
-    table["presets"][0]["known_models"][0]["protocol"] = original
+    assert issue[:2] == ("service_presets.json", "presets[0].base_urls.responses")
+    table = _read(directory, "service_presets.json")
+    table["presets"][0]["base_urls"]["responses"] = "https://opencode.ai/zen/go/v1"
     table["presets"].append(table["presets"][0])
     _write(directory, "service_presets.json", table)
     with pytest.raises(DefinitionError) as raised:

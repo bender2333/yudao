@@ -78,10 +78,9 @@ def start_work_item(host, port, project_id, text, **options):
 def provider_config(tmp_path, *, credential_ref="MISSING_PROVIDER_KEY"):
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "provider", "name": "Provider",
+        "providers": [{"id": "provider", "name": "Provider", "protocol": "responses",
                        "base_url": "https://provider.example/v1", "credential_ref": credential_ref}],
         "models": [{"id": "model", "provider_id": "provider", "model": "model",
-                     "protocol": "responses",
                      "context_window": 32000, "max_output_tokens": 4096}],
         "bindings": {department: {"provider_id": "provider", "model_id": "model"}
                      for department in ("product", "engineering", "quality")},

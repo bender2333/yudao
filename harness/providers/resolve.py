@@ -102,14 +102,14 @@ def resolve_snapshot(
         if model.provider_id != provider.id:
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
-        if model.protocol not in SUPPORTED_PROTOCOLS:
+        if provider.protocol not in SUPPORTED_PROTOCOLS:
             issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             continue
         if model.context_window is None:
             issues.append(ValidationIssue(f"{location}.model_id", "模型缺少 context_window，无法用于任务"))
             continue
         material = None
-        if model.protocol != "fake":
+        if provider.protocol != "fake":
             if not provider.credential_ref:
                 issues.append(ValidationIssue(f"{location}.credential", "凭据引用无法解析"))
                 continue
@@ -122,7 +122,7 @@ def resolve_snapshot(
             provider_id=provider.id,
             provider_name=provider.name,
             model_id=model.id,
-            protocol=model.protocol,
+            protocol=provider.protocol,
             base_url=provider.base_url,
             model=model.model,
             context_window=model.context_window,
@@ -190,10 +190,10 @@ def call_target_public(
         "provider_config_id": None if provider is None else provider.id,
         "model_id": model.id if model is not None else (model_id if isinstance(model_id, str) else None),
         "provider_name": None if provider is None else provider.name,
-        "protocol": None if model is None else model.protocol,
+        "protocol": None if provider is None else provider.protocol,
         "base_url": None if provider is None else provider.base_url,
         "requested_provider": None if provider is None else provider.id,
-        "requested_protocol": None if model is None else model.protocol,
+        "requested_protocol": None if provider is None else provider.protocol,
         "requested_model": None if model is None else model.model,
         "credential_ref": None if provider is None else (provider.credential_ref or None),
         "credential_version": None if material is None else material.version,
@@ -254,12 +254,12 @@ def resolve_call_target(
     public = call_target_public(model_id, requested_tier, model=model, provider=provider)
     if provider is None:
         return unavailable("Provider 配置不存在", public)
-    if model.protocol not in SUPPORTED_PROTOCOLS:
+    if provider.protocol not in SUPPORTED_PROTOCOLS:
         return unavailable("协议不受支持", public)
     if model.context_window is None:
         return unavailable("模型缺少 context_window，无法用于任务", public)
     material = None
-    if model.protocol != "fake":
+    if provider.protocol != "fake":
         if not model.admitted:
             return unavailable(f"模型 {model.id} 尚未通过模型测试准入，请先执行模型测试", public)
         if not provider.credential_ref:
@@ -272,7 +272,7 @@ def resolve_call_target(
         provider_id=provider.id,
         provider_name=provider.name,
         model_id=model.id,
-        protocol=model.protocol,
+        protocol=provider.protocol,
         base_url=provider.base_url,
         model=model.model,
         context_window=model.context_window,
