@@ -337,11 +337,17 @@
           const room = d && world.rooms[d] && world.rooms[d].roomKind === 'dept' ? world.rooms[d] : null;
           const b = boardRect();
           if (pl.decision_id) st.hidden[pl.decision_id] = true;
-          const post = () => scene.fly({
-            bmp: 'decision', from: room ? [room.door, ROOM_B + 4] : [b.x + b.w / 2, TOP - 6], to: [b.x + b.w / 2, b.y + b.h / 2], ms: 1000, arc: 26,
-            onDone: () => { delete st.hidden[pl.decision_id]; ECS.signal(world, scene, 'board', 1600); }
-          });
-          if (!(room && !scene.reduced && ECS.dispatch(world, Object.assign({}, ev, { department: d }), () => ({ done: post })))) post();
+          let posted = false;
+          const post = () => {
+            if (posted) return;
+            posted = true;
+            scene.fly({
+              bmp: 'decision', from: room ? [room.door, ROOM_B + 4] : [b.x + b.w / 2, TOP - 6], to: [b.x + b.w / 2, b.y + b.h / 2], ms: 1000, arc: 26,
+              onDone: () => { delete st.hidden[pl.decision_id]; ECS.signal(world, scene, 'board', 1600); }
+            });
+          };
+          if (room && !scene.reduced && ECS.dispatch(world, Object.assign({}, ev, { department: d }), () => ({ done: post }))) scene.after(8000, post);
+          else post();
           return;
         }
         case 'x_decision_answered':

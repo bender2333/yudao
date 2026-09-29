@@ -207,10 +207,10 @@
     letter_out: { label: '发出询问', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
     letter_in: { label: '回答询问', by: 'manager', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 },
     // 决定请求：提出决定的部门的小人走到门口送出决定单，回答以后在门口收下（决定单在大厅的板上，由 floor.js 处理）
-    x_decision_issued: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600 },
-    project_decision_requested: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600 },
-    x_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600 },
-    project_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600 },
+    x_decision_issued: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
+    project_decision_requested: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
+    x_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
+    project_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
     // 部门内的角色之间（Stage 5）：经理把任务卡递到工具角色的工位，工具角色把结果卡交回经理，审查者盖章，探索者查资料
     x_role_task_assigned: { label: '分派任务', actor: 'manager', spot: 'peer', toward: 'role', pose: 'give', bubble: 'say', ms: 700 },
     x_role_result_returned: { label: '交回结果', by: 'manager', spot: 'peer', toward: 'manager', pose: 'give', bubble: 'say', ms: 600, then: 'role_result_received' },
@@ -218,17 +218,18 @@
     x_review_recorded_passed: { label: '审查通过', spot: 'desk', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'check' },
     x_review_recorded_returned: { label: '审查退回', spot: 'desk', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'exclaim' },
     x_explorer_fetch: { label: '查资料', spot: 'cabinet', pose: 'rummage', bubble: 'say', ms: 1400 },
-    // 运维（Stage 4）：发布与回滚是把包裹放进通往机房的管道口，故障是盯着监控屏并把故障信件送回大厅
+    // 运维（Stage 4）：发布与回滚是把包裹放进通往机房的管道口，故障是盯着监控屏并把故障信件送回大厅；
+    // 做完以后才有包裹与信号，所以是 must（不会被别的任务插队放弃，也不会被队列上限挤掉）
     x_deployed: {
-      dept: 'operations', label: '发布', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 700, facing: 1,
+      dept: 'operations', must: true, label: '发布', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 700, facing: 1,
       fx: [{ when: 'done', send: { link: 'operations>machine_room', bmp: 'box_sealed', then: [{ signal: 'door', ms: 1800 }] } }]
     },
     x_rolled_back: {
-      dept: 'operations', label: '回滚', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 700, facing: 1,
+      dept: 'operations', must: true, label: '回滚', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 700, facing: 1,
       fx: [{ when: 'done', send: { link: 'operations>machine_room', reverse: true, bmp: 'box', then: [{ flash: { room: 'self', color: 'orange1', ms: 800 } }] } }]
     },
     x_fault_recorded: {
-      dept: 'operations', label: '发现故障', spot: 'monitor', pose: 'watch_r', bubble: 'say', ms: 1200, icon: 'exclaim', facing: 1,
+      dept: 'operations', must: true, label: '发现故障', spot: 'monitor', pose: 'watch_r', bubble: 'say', ms: 1200, icon: 'exclaim', facing: 1,
       fx: [
         { when: 'start', signal: 'monitor', ms: 4000 },
         { when: 'done', send: { link: 'operations>hall', bmp: 'letter', color: 'red2', then: [{ signal: 'mail', ms: 1800 }] } }

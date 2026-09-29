@@ -285,7 +285,8 @@
       setDecisions, open, close, draw, click, cursor, destroy,
       isOpen: () => Boolean(openId),
       openId: () => openId,
-      stamp: (id, text) => { stamp = { id, text, t0: scene.realT }; }
+      // 回答事件到达时盖章；自己刚回答过的已经盖着章，不重盖
+      stamp: (id, text) => { if (!stamp || stamp.id !== id) stamp = { id, text, t0: scene.realT }; }
     };
   };
 })();
