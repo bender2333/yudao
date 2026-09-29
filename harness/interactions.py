@@ -51,7 +51,8 @@ class InteractionWriter:
         return {"initial_input": received, "department_prompts": prompts,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
-    def receive(self, transaction: Transaction, text: str, *, command: bool) -> Event:
+    def receive(self, transaction: Transaction, text: str, *, command: bool,
+                base_version: int | None = None) -> Event:
         # 保存输入的原文：更新并发布原始意图，在事务中追加 user_input_received。
         # 事务提交或没有提交以后，都按已经提交的运行状态重新发布原始意图：同时到达的几次输入各自发布了
         # 没有提交的内容，最后一次发布总是已经提交的内容
@@ -60,7 +61,7 @@ class InteractionWriter:
         payload = self._input(run_id, text, version=projection.input_version + 1,
                               kind="command" if command else "text",
                               previous_ref=ArtifactRef(**projection.intend_ref),
-                              parent_commit=projection.git_version["commit"])
+                              parent_commit=projection.git_version["commit"], base_version=base_version)
         transaction.on_abort(lambda: self._publish_committed(run_id))
         transaction.on_commit(lambda: self._publish_committed(run_id))
         return transaction.append(NewEvent(
@@ -79,7 +80,8 @@ class InteractionWriter:
             artifact_hashes=[payload["prompt_ref"]["content_hash"]],
         ))[0]
 
-    def receive_guidance(self, transaction: Transaction, department: str, text: str) -> Event:
+    def receive_guidance(self, transaction: Transaction, department: str, text: str, *,
+                         base_version: int | None = None) -> Event:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
@@ -96,6 +98,8 @@ class InteractionWriter:
             "guidance_ref": asdict(ref),
             "status": "received",
         }
+        if base_version is not None:
+            payload["base_version"] = base_version
         return transaction.append(NewEvent(
             EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             role="user",
@@ -106,7 +110,8 @@ class InteractionWriter:
         ))[0]
 
     def _input(self, run_id: str, text: str, *, version: int, kind: str,
-               previous_ref: ArtifactRef | None, parent_commit: str | None) -> dict[str, Any]:
+               previous_ref: ArtifactRef | None, parent_commit: str | None,
+               base_version: int | None = None) -> dict[str, Any]:
         material = append_intend(self.artifacts, run_id, text, previous_ref=previous_ref)
         original = self.artifacts.get_for_run(run_id, material.intend_ref)
         revision = self.git_versions.prepare(
@@ -114,9 +119,12 @@ class InteractionWriter:
             message=f"Receive user input v{version}",
         )
         self._publish(run_id, original)
-        return {"id": new_id("input"), "version": version, "text": text, "kind": kind,
-                "input_ref": asdict(material.input_ref), "intend_ref": asdict(material.intend_ref),
-                "byte_start": material.byte_start, "byte_end": material.byte_end, "git_version": revision}
+        payload = {"id": new_id("input"), "version": version, "text": text, "kind": kind,
+                   "input_ref": asdict(material.input_ref), "intend_ref": asdict(material.intend_ref),
+                   "byte_start": material.byte_start, "byte_end": material.byte_end, "git_version": revision}
+        if base_version is not None:
+            payload["base_version"] = base_version
+        return payload
 
     def _publish(self, run_id: str, original: bytes) -> None:
         with self._publication:

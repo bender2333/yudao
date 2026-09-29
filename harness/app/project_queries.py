@@ -1093,6 +1093,12 @@ class CommandSetting(Contract):
     output_limit: int
 
 
+class SourceDirectorySetting(Contract):
+    name: str
+    path: str
+    version: int
+
+
 class ProjectSettingsResult(Contract):
     project_id: str
     name: str
@@ -1102,6 +1108,7 @@ class ProjectSettingsResult(Contract):
     archived: bool
     departments: dict[str, DepartmentSetting]
     commands: dict[str, CommandSetting]
+    source_directories: dict[str, SourceDirectorySetting]
 
 
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
@@ -1123,6 +1130,10 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                                      args=list(value.args), timeout_sec=value.timeout_sec,
                                      output_limit=value.output_limit)
                 for name, value in state.commands.items()
+            },
+            source_directories={
+                name: SourceDirectorySetting(name=value.name, path=value.path, version=value.version)
+                for name, value in state.source_directories.items()
             },
         ),
     )
@@ -1356,7 +1367,8 @@ RUN_ATTEMPT = QueryDefinition(
 PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-                ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED),
+                ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
+                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
 )
 
 RUN_EXPORT = QueryDefinition(

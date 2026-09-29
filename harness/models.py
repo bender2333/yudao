@@ -97,6 +97,7 @@ class ProjectEventType:
     DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
+    SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
 
 
 class CatalogEventType:
@@ -754,6 +755,21 @@ class Material:
 
 
 @dataclass
+class SourceDirectory:
+    # 项目登记的源目录：名称是登记名，路径是控制主机上的路径；
+    # 版本是该条登记的版本，作为 source_directory.save 的基准版本
+    name: str
+    path: str
+    version: int
+    base_version: int | None = None
+    updated_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
 class RegisteredCommand:
     name: str
     version: int
@@ -827,6 +843,8 @@ class ProjectProjection:
     commands: dict[str, RegisteredCommand] = field(default_factory=dict)
     command_history: list[RegisteredCommand] = field(default_factory=list)
     materials: list[Material] = field(default_factory=list)
+    source_directories: dict[str, SourceDirectory] = field(default_factory=dict)
+    source_directory_history: list[SourceDirectory] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
     # 投影所反映的项目流版本
