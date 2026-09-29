@@ -1301,6 +1301,48 @@
         }
       }
     },
+    "/api/queries/attempt.live": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "attempt.live",
+        "operationId": "query_attempt_live",
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attempt Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_LiveAttempt_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/decisions.list": {
       "get": {
         "tags": [
@@ -2546,6 +2588,218 @@
           }
         }
       }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "events",
+        "operationId": "events",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          },
+          {
+            "name": "work_item",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Item"
+            }
+          },
+          {
+            "name": "run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "live",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Live"
+            }
+          },
+          {
+            "name": "last-event-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "contentMediaType": "application/json",
+                      "contentSchema": {
+                        "title": "Streamitem Events"
+                      }
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3350,6 +3604,9 @@
             },
             "type": "array",
             "title": "Overlays"
+          },
+          "stream": {
+            "$ref": "#/components/schemas/StreamCapability"
           }
         },
         "additionalProperties": false,
@@ -3360,7 +3617,8 @@
           "commands",
           "decisions",
           "event_types",
-          "overlays"
+          "overlays",
+          "stream"
         ],
         "title": "Capabilities"
       },
@@ -5199,6 +5457,33 @@
         ],
         "title": "InputView"
       },
+      "LiveAttempt": {
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "title": "Attempt Id"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          },
+          "channels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Channels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "live",
+          "channels"
+        ],
+        "title": "LiveAttempt"
+      },
       "MaterialRecord": {
         "properties": {
           "command_id": {
@@ -6347,6 +6632,24 @@
         ],
         "title": "Snapshot[EventDetailResult]"
       },
+      "Snapshot_LiveAttempt_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LiveAttempt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[LiveAttempt]"
+      },
       "Snapshot_ProjectAttemptsResult_": {
         "properties": {
           "position": {
@@ -6659,6 +6962,28 @@
           "version"
         ],
         "title": "SourceDirectorySetting"
+      },
+      "StreamCapability": {
+        "properties": {
+          "deltas": {
+            "type": "boolean",
+            "title": "Deltas"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deltas",
+          "scopes"
+        ],
+        "title": "StreamCapability"
       },
       "SystemStatus": {
         "properties": {

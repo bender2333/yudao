@@ -165,12 +165,19 @@ class OverlayCapability(Contract):
     queries: list[str]
 
 
+class StreamCapability(Contract):
+    # 事件流的片段能力（第 6.1 节）：是否提供模型输出片段、连接可以使用的范围参数
+    deltas: bool
+    scopes: list[str]
+
+
 class Capabilities(Contract):
     # 能力清单（第 6.1 节），由注册表生成：查询与改变它结果的事件种类、命令与可能的拒绝原因、
-    # 当前部署会发出的决定种类、会写入的事件种类与可用的覆盖层
+    # 当前部署会发出的决定种类、会写入的事件种类、可用的覆盖层与事件流的片段能力
     deployment: Deployment
     queries: list[QueryCapability]
     commands: list[CommandCapability]
     decisions: list[str]
     event_types: list[str]
     overlays: list[OverlayCapability]
+    stream: StreamCapability
