@@ -157,13 +157,66 @@ flowchart LR
     XD[pytest-xdist] --> I
 ```
 
-依赖方向：各层测试只依赖 `support/` 与 `harness` 包；`support/` 不依赖任何测试文件；层与层之间不互相导入。
+依赖方向：各层测试只依赖 `support/` 与 `harness` 包；`support/` 不依赖任何测试文件；层与层之间不互相导入。三个层目录与 `support/` 都是 Python 包，这些规则写成 `pyproject.toml` 中 import-linter 的契约（三层互相独立、`support` 不导入三层），由已有的 `test_layers.py` 检查。
 
 ## 9. 实施顺序
 
 1. 建立 `support/` 与三个层目录；根与各层的 `conftest.py`（边界检查、时间上限、多进程检查）；`addopts` 输出参数；pytest-timeout 加入 dev 依赖组。
 2. 搬迁与拆分：移动辅助函数，按第 2 节把每个文件放进对应层，拆开混合文件；只移动与拆分，不改测试内容；删除两个浏览器脚本与重复运行前端测试的测试项。
-3. 往下层移：按第 5 节修改测试，包括只需要运行记录的测试改为每个文件一次循环、局部结论改用 `activate_once`、OpenAPI 快照不启动服务、去掉等待用的固定时长、`_free_port`。
-4. 规则文件：AGENTS.md「常用命令」「执行者」「审查者」与 CLAUDE.md「自主推进模式」按第 4、6 节修改，在第 2 步合并以后生效。
+3. 规则文件：第 2 步合并以后，架构师按第 10 节修改 AGENTS.md 与 CLAUDE.md。
+4. 往下层移，分成互不重叠的两部分，可以同时进行：
+   - 第 5 节第 1、4、6 项：只需要运行记录的测试改为每个文件一次循环，OpenAPI 快照不启动服务，`_free_port`。
+   - 第 5 节第 2、3、5 项：局部结论改用 `activate_once` 或直接调用函数，去掉等待用的固定时长。
 
-每一步完成后，三层合计的测试项数与移动前相同（第 3 步中合并或删除的重复项在工单中逐项列出）。
+第 2 步移动大量文件。它合并以后，仍在进行的工单分支先合并 main，再把自己新增或修改的测试放进对应的层，审查者按第 2 节核对。
+
+每一步完成后，三层合计的测试项数与移动前相同；删除或合并的测试项在交付评论中逐项列出。
+
+## 10. 规则文件的修改
+
+用户 2026-09-29 已确认，第 2 步合并以后写入，写入后删除本节。
+
+AGENTS.md「常用命令」整节替换为：
+
+```markdown
+## 常用命令
+- 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
+- 启动控制台：`uv run python -m harness`（默认端口 8765）；无需凭据的演示：`uv run python -m harness demo --serve --port 8765`
+- 测试分为单元、功能与模块、集成三层，分别在 `harness/tests/unit/`、`harness/tests/module/`、`harness/tests/integration/`，每层的定义与边界见 `docs/design/test-pyramid.md`：
+  - 单元层与模块层：`uv run python -m pytest harness/tests/unit harness/tests/module`
+  - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/integration/<文件>`
+  - 前端测试：`node --test --test-reporter=dot harness/tests/unit/test_web_ui.js`
+  - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行。
+  - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
+  - 新增的测试放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。
+- 真实模型 smoke：`uv run python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
+```
+
+AGENTS.md「执行者」普通流程第 4 步：
+
+```markdown
+4. 自测：开发中运行与改动相关的测试文件；交付前运行「常用命令」中的单元层与模块层、本次改动或新增的集成层测试文件与前端测试，逐项核对工单的验收标准。
+```
+
+AGENTS.md「执行者」自主推进模式第 4 步：
+
+```markdown
+4. 交付：在工单下评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与每层结尾的计数行、逐条的验收核对，不粘贴测试输出；然后把标签从 `in-progress` 改为 `needs-review`。
+```
+
+AGENTS.md「审查者」审查流程第 3 步：
+
+```markdown
+3. 测试：运行「常用命令」中的单元层与模块层、本次改动或新增的集成层测试文件与前端测试，单进程；核对新增或移动的测试放在 `docs/design/test-pyramid.md` 第 2 节规定的层中。
+```
+
+AGENTS.md「审查者」审查结论：`REVIEW: PASS` 与 `REVIEW: FAIL` 两处的「附上测试结果」改为「附上每层结尾的计数行与失败项名称，不粘贴测试输出」。
+
+CLAUDE.md「自主推进模式」流程：第 3 步「收尾」之后插入下面的第 4 步，原第 4 步「搁置」改为第 5 步；第 3 步的「不重复运行测试」保留。
+
+```markdown
+4. 集成层：上次 `INTEGRATION: PASS` 以后合并满 5 个 PR，或者关闭工作包父工单之前，Claude 在 `C:\project\yudao-worktrees\integration` 检出 main 的当前提交，在后台运行
+   `uv run python -m pytest harness/tests/integration -n 4 --junitxml=.tmp/test-results/integration.xml`
+   - 通过：在阶段父工单下评论，第一行写 `INTEGRATION: PASS <提交号>`，附每层计数，作为下一批的起点。
+   - 失败：暂停合并。先用单进程重新运行失败的测试：通过时建工单修正这个不稳定的测试，恢复合并；仍然失败时用 `git bisect run` 只运行失败的测试，找到出问题的提交，建修复工单并关联那个 PR 的工单，排在最前；修复合并后再运行集成层全部，通过后恢复合并。步骤见 `docs/design/test-pyramid.md` 第 4.2 节。
+```
