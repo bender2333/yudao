@@ -5,6 +5,8 @@
   const Y8 = window.Y8;
   const P = Y8.pixel;
   if (!P || !P.createScene) throw new Error('building.js 需要先加载 js/pixel/engine.js');
+  if (!P.ecs) throw new Error('building.js 需要先加载 js/pixel/ecs.js');
+  const ECS = P.ecs;
   const PAL = P.PAL;
   const R = P.R, RB = P.RB;
 
@@ -39,39 +41,73 @@
     const floorY = (i) => ROOF + i * FH;
     const roomX = (k) => 150 + k * 96;
 
+    // 楼层小人的待机行为接上 ecs.js（BUILD.md 第 2 节任务 B）：每层一个角色实体，id 用 project_id。
+    // 楼里的世界不画房间图，ECS.roomOf 返回 null，P.ecs.stepCharacters 的待机行为因此走
+    // 「留在 ch.spot、到达后播 idle」这一分支：走动目标由下面的 update 写进 ch.spot——有部门亮灯
+    // 时是本层那个部门门口（坐标跟 v8 相同），空闲时是本层的随机位置——走位与 idle 动画
+    // 统一交给 ECS.stepCharacters 推进，本文件不再自己叠 go+idle。
+    const world = ECS.world();
+    // 速度沿用 v8：走到门口 40 像素/秒、随机走动 22 像素/秒（stepCharacters 的 go 步骤不写 speed，
+    // engine.js 取 actor.speed，因此每次设目标时先写 a.speed）；随机走动的间隔沿用 v8
+    const SPEED_WORK = 40, SPEED_ROAM = 22, ROAM_MIN = 3000, ROAM_SPAN = 5000;
+
+    function walkerActor(pid) { return scene.actors.find((x) => x.id === 'ch-' + pid); }
+
+    function addWalker(f, i) {
+      const x = 130 + (i * 97) % 360;
+      const y = floorY(i) + FH - 6;
+      // department 置 null：楼里的小人不属于任何房间，走上面说的待机留在 spot 的分支
+      world.characters[f.project_id] = { kind: 'character', id: f.project_id, department: null,
+        spot: { x, y }, queue: [], current: null, rest: null, bubble: null };
+      // ECS 用 'ch-' + 角色 id 找 actor，所以 actor id 必须是 'ch-' + project_id
+      scene.addActor({ id: 'ch-' + f.project_id, sprite: ROOMS[i % 3] + '.agent', x, y, anim: 'idle',
+        speed: SPEED_ROAM, data: { walker: true, next: 0 } });
+    }
+
     function syncWalkers() {
-      const keep = new Set(model.floors.map((f) => 'walker-' + f.project_id));
-      scene.actors.filter((a) => a.data.walker && !keep.has(a.id)).forEach((a) => scene.removeActor(a));
-      model.floors.forEach((f, i) => {
-        let a = scene.actors.find((x) => x.id === 'walker-' + f.project_id);
-        const y = floorY(i) + FH - 6;
-        if (!a) {
-          const dept = ROOMS[i % 3];
-          a = scene.addActor({ id: 'walker-' + f.project_id, sprite: dept + '.agent', x: 130 + (i * 97) % 360, y, anim: 'idle', data: { walker: true, next: 0 } });
+      scene.actors.filter((a) => a.data.walker).forEach((a) => {
+        const pid = a.id.slice(3);
+        if (!model.floors.some((f) => f.project_id === pid)) {
+          delete world.characters[pid];
+          scene.removeActor(a);
         }
+      });
+      model.floors.forEach((f, i) => {
+        const a = walkerActor(f.project_id);
+        if (!a || !world.characters[f.project_id]) { addWalker(f, i); return; }
+        const y = floorY(i) + FH - 6;
         a.y = y;
-        a.data.floor = f;
+        world.characters[f.project_id].spot.y = y;
       });
     }
 
     function update() {
-      scene.actors.forEach((a) => {
-        if (!a.data.walker || a.script) return;
-        const f = a.data.floor;
-        // 空闲的小人在本层走动；有部门工作时站在工作的房间门口
+      model.floors.forEach((f) => {
+        const ch = world.characters[f.project_id];
+        if (!ch) return;
+        const a = walkerActor(f.project_id);
+        // 走位脚本跑完之前不换目标（跟 v8 相同：v8 的 update 对 a.script 直接 return）
+        if (!a || a.script) return;
         const working = ROOMS.findIndex((d) => f.lit && f.lit[d]);
         if (working >= 0) {
+          // 有部门工作时站到本层那个部门门口，门口坐标跟 v8 相同
           const tx = roomX(working) + 40;
-          if (Math.abs(a.x - tx) > 2) scene.run(a, [{ t: 'go', x: tx, y: a.y, speed: 40 }, { t: 'turn', facing: -1 }], {});
-          else scene.play(a, 'idle');
-          return;
-        }
-        scene.play(a, 'idle');
-        if (scene.realT > a.data.next) {
-          a.data.next = scene.realT + 3000 + Math.random() * 5000;
-          scene.run(a, [{ t: 'go', x: 130 + Math.random() * 400, y: a.y, speed: 22 }], {});
+          a.speed = SPEED_WORK;
+          ch.spot.y = a.y;
+          if (Math.abs(a.x - tx) > 2) ch.spot.x = tx;
+          else if (a.facing !== -1) a.facing = -1; // v8 到达门口后的 turn facing:-1
+        } else {
+          // 空闲时随机走动：到了下一趟的时间点就把待机的 spot 换成本层随机位置
+          a.speed = SPEED_ROAM;
+          ch.spot.y = a.y;
+          if (scene.realT > a.data.next) {
+            a.data.next = scene.realT + ROAM_MIN + Math.random() * ROAM_SPAN;
+            ch.spot.x = 130 + Math.random() * 400;
+          }
         }
       });
+      // 待机的走位与 idle 动画交给 ecs.js 的待机系统推进（首页的楼不进任务队列，queue 恒为空）
+      ECS.stepCharacters(world, scene);
     }
 
     function drawFloor(c, f, i, t) {
