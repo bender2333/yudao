@@ -87,7 +87,8 @@ class CodeSnapshot(Payload):
 
 
 class InputRecord(Payload):
-    # 一次用户输入：原文、它在原始意图中的字节范围与 Git 版本
+    # 一次用户输入：原文、它在原始意图中的字节范围与 Git 版本；
+    # base_version 是用户提交时看到的事项输入版本，作为这次追加的依据（追加类命令不要求相等）
     id: str
     version: int
     text: str
@@ -97,6 +98,7 @@ class InputRecord(Payload):
     byte_start: int
     byte_end: int
     git_version: GitVersion
+    base_version: int | None = None
 
 
 class PromptRecord(Payload):
@@ -274,6 +276,8 @@ class DepartmentGuidanceReceivedPayload(Payload):
     text: str
     guidance_ref: ArtifactRef
     status: Literal["received"]
+    # base_version 是用户提交时看到的该部门的指导版本，作为这次指导的依据（追加类命令不要求相等）
+    base_version: int | None = None
 
 
 class DepartmentGuidanceAppliedPayload(Payload):
@@ -950,6 +954,15 @@ class MaterialRecordedPayload(Payload):
     department: Department | None
 
 
+class SourceDirectoryConfiguredPayload(Payload):
+    # 项目登记的源目录：名称是登记名，路径是控制主机上的路径；
+    # version 是该条登记的版本，base_version 是这次登记依据的版本
+    name: str
+    path: str
+    version: int
+    base_version: int
+
+
 # 模型目录与凭据（应用层与接口层设计说明第 10 节第 1 项）：只含修订号、变化与结果，不含 Key
 
 class CatalogRevisedPayload(Payload):
@@ -1054,6 +1067,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED: DepartmentPromptConfiguredPayload,
     ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
+    ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
