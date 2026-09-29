@@ -1,5 +1,9 @@
 {
-  "added_defaults": {},
+  "added_defaults": {
+    "work_item_created": {
+      "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
+    }
+  },
   "baseline": {
     "adoption_held": {
       "code_tree_digest": "string",
@@ -159,6 +163,7 @@
       "context_window": "integer",
       "definitions_version": "string",
       "max_cycles": "integer",
+      "priority": "string",
       "project_context_ref": "object",
       "prompt_config_versions": "object",
       "run_id": "string",
