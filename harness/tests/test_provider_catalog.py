@@ -109,6 +109,27 @@ def test_model_definition_declares_whether_it_accepts_a_required_tool_call():
     assert any(issue.location == "models[0].accepts_required_tool_call" for issue in caught.value.issues)
 
 
+def test_providers_view_model_dict_carries_capability_source_and_tool_call_declaration():
+    # 对外目录的模型字典同时给出能力来源与是否接受要求调用工具（#102）；
+    # 模型测试记录准入以后两项都保持，前端模型列表才能继续显示能力来源
+    document = _document()
+    document["models"][0]["capability_source"] = "preset-v1"
+    document["models"][0]["accepts_required_tool_call"] = False
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    model = facade.providers_view()["models"][0]
+    assert model["capability_source"] == "preset-v1"
+    assert model["accepts_required_tool_call"] is False
+
+    admit_bound_models(facade, document)
+    admitted = facade.providers_view()["models"][0]
+    assert admitted["admitted_at"] is not None
+    assert admitted["capability_source"] == "preset-v1"
+    assert admitted["accepts_required_tool_call"] is False
+    assert admitted["admitted_model"] == "model-a"
+
+
 def test_provider_config_requires_a_protocol():
     # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
     document = _document()

@@ -91,6 +91,7 @@ class ModelDefinition:
             "model": self.model,
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
+            "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
             "admitted_at": self.admitted_at,
             "admitted_revision": self.admitted_revision,
