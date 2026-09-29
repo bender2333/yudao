@@ -402,6 +402,21 @@ def test_duplicate_command_identity_does_not_apply_the_change_again(tmp_path):
         assert _catalog(client)["providers"][0]["credential"]["version"] == version
         assert opened.dotenv.read_text(encoding="utf-8") == dotenv_text
 
+        # 重读命令同样不重复执行：第一次重读之后文件被外部修改，重复提交不再发布这次修改
+        opened.application.system.facade.stop_watching()
+        reload_body = {"command_id": str(uuid.uuid4()), "base_version": _catalog(client)["revision"]}
+        first_reload = post("catalog.reload", reload_body)
+        assert first_reload.status_code == 200, first_reload.text
+        before_file_change = _catalog(client)
+        _write_document(opened.config, {"providers": [_provider("p8")], "models": [_document_model("p8", "m8")],
+                                        "bindings": {}})
+        repeated_reload = post("catalog.reload", reload_body)
+        assert repeated_reload.status_code == 200, repeated_reload.text
+        assert repeated_reload.json()["duplicate"] is True
+        unchanged = _catalog(client)
+        assert unchanged["revision"] == before_file_change["revision"]
+        assert [item["id"] for item in unchanged["providers"]] == ["p1"]
+
 
 # ---------------------------------------------------------------------------
 # 测试内的真实上游

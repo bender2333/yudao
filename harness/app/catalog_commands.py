@@ -254,6 +254,7 @@ async def _save_department_defaults(application: Application, command: Command,
 async def _reload(application: Application, command: Command, request: CatalogReload) -> None:
     # 重新读取目录文件：修订号变化时才追加事件；事件记录提交时依据的修订号（追加类命令，不要求相等）
     facade = application.system.facade
+    _check_not_registered(application, command)
     before = facade.catalog_revision()
     await asyncio.to_thread(facade.reload)
     after = facade.catalog_revision()
