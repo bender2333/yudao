@@ -92,7 +92,8 @@
 - 项目依赖按被检查提交中的 `uv.lock` 安装（`uv sync --frozen`），按锁文件的摘要缓存。
 - 控制主机（Windows）上用 Docker Desktop 的 WSL2 后端运行，常驻模式的容器随 Docker Desktop 启动；Linux 主机上用 Docker Engine 运行，也可以不经容器直接运行可执行工具。容器引擎与 3.2C 选定的相同（[执行环境服务](execution-environment.md)第 5.2.1 节）。
 - Windows 上的命令行经 `docker exec` 进入同一个容器运行；仓库提供一个 PowerShell 脚本包装这条命令，用法与 Linux 上直接运行相同。
-- 常驻模式只在本机端口监听。
+- 常驻模式只供本机使用：容器把端口映射到主机的 `127.0.0.1`；MCP SDK 在容器内监听全部地址时不会自动校验请求的 Host，需要显式只接受 `127.0.0.1` 与 `localhost`。
+- 镜像在 git 的系统配置中允许读取挂载进来的仓库（`safe.directory`），否则 git 会拒绝读取属于其他用户的仓库。
 
 ### 5.3 代码的来源
 
@@ -139,7 +140,7 @@
 2. 需要处理的发现项，每项两三行：位置、改了什么、建议的处理方式；超过一定条数时只列出前面若干条，并给出总数；
 3. 下一步应该做什么，例如「逐条处理以上存活的变异，写进交付评论」或「提交不存在，先在本地提交」。
 
-等待上限按各个 agent 的 MCP 调用超时确定（第 7.4 节）。
+等待上限是 9 分钟，按各个 agent 的 MCP 调用超时确定（第 7.4 节）。
 
 ### 7.2 命令行
 
@@ -160,7 +161,20 @@ AGENTS.md 只写「交付前按检查工具的 skill 运行检查」与交付评
 
 ### 7.4 各 agent 的配置
 
-MCP 与 skill 的配置写进仓库，每个 worktree 检出以后自动可用，不需要在每台机器上逐个配置。各 agent 的配置文件位置、MCP 调用超时、skill 的读取位置，以及在无界面运行时是否加载 MCP 与 skill，待调研结果补充。
+MCP 与 skill 的配置提交进仓库，主仓库与各个 worktree 检出以后都有，不需要在每台机器上逐个配置。三个 agent 的做法（2026-09-30 核对：omp 18.4.3、OpenCode 1.18.33、Claude Code 2.1.284）：
+
+| agent | MCP 配置 | 调用超时 | skill 的读取位置 | 无界面运行 |
+| --- | --- | --- | --- | --- |
+| omp | `.omp/mcp.json`，只从启动目录读取：`type` 为 `http`，`url` 指向本机端口，`timeout` 为 600000 毫秒 | 默认 30 秒，进度通知不会延长，必须在 `timeout` 中设置 | `.claude/skills/`，从启动目录向上查找到仓库根 | `-p` 时加载 MCP 与 skill；开始前最多等 MCP 服务 30 秒 |
+| OpenCode | 仓库根的 `opencode.json`：`mcp.yudao-check`，`type` 为 `remote`，`timeout` 为 600000 毫秒。`.opencode/` 下的配置文件被本仓库的 `.gitignore` 忽略，不能使用 | 收到进度通知时重新计时 | `.claude/skills/` | `opencode run` 同样启动 MCP；skill 经内置的 `skill` 工具加载 |
+| Claude Code | 仓库根的 `.mcp.json`：`type` 为 `http`，`timeout` 为 600000 毫秒 | 工具超时很长；HTTP 空闲时有上限，`timeout` 不小于 1000 时空闲上限不低于它 | `.claude/skills/` | `-p` 与云端会话不经询问直接加载项目的 MCP |
+
+由此确定：
+
+- **skill 只写一份**：`.claude/skills/yudao-check/SKILL.md`，三个 agent 都读取这个位置。格式遵守 Agent Skills 开放格式：`name` 与目录名相同，只用小写字母、数字与连字符；`description` 必填。
+- **MCP 配置三份**，地址相同：`.omp/mcp.json`、`.mcp.json`、`opencode.json`。端口固定，避开 Yudao 控制台默认的 8765。
+- **等待上限 9 分钟**：一次调用最多等 9 分钟，小于三份配置中的 10 分钟；等待期间发送进度通知；到时还没完成就返回任务编号，由 `result` 继续等待。MCP 2026-07-28 版规范建议跨调用的状态用服务生成的编号作为普通参数传递，与此一致。复杂度差异只要几秒，测试分层与大多数变异检查在一次调用内完成。
+- **omp 的启动目录**要有 `.omp/mcp.json`：从主仓库或任何一个 worktree 启动都满足。
 
 ## 8. 在现有开发流程中的用法
 
