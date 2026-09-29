@@ -110,8 +110,11 @@ class Application:
         path = None if system.read_only else Path(system.data_dir) / "read-models.sqlite"
         self.read_models = ReadModels(system.store, system.artifacts, path)
         # 输出片段通道的订阅方（第 5.6 节）：按 100 毫秒合并一次片段，转发给带 live=1 的连接，
-        # 并保存每个进行中调用尝试已收到的文字供 attempt.live 查询。只读打开没有通道，也没有片段
+        # 并保存每个进行中调用尝试已收到的文字供 attempt.live 查询。只读打开没有通道，也没有片段。
+        # 订阅在应用层建立时登记：片段在调用进行中持续到达，客户端可能在调用开始以后才连上连接
         self.deltas: DeltaPump | None = None if system.read_only else DeltaPump(channel=system.deltas)
+        if self.deltas is not None:
+            self.deltas.start()
         # 需要以后以事件出现结果的命令（获取模型列表与两种测试）作为任务运行
         self._tasks: set[asyncio.Task[Any]] = set()
 
@@ -168,10 +171,8 @@ class Application:
         ))
 
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
-        # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段。
+        # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
         # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
-        if live and self.deltas is not None:
-            self.deltas.start()
         return EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
                            pump=self.deltas, **options)
 

@@ -20,8 +20,6 @@ from harness.runtime import LoopSystem
 @contextmanager
 def _chunked_stream(frames: list[bytes]):
     # 本机提供方：用分块传输逐帧发送流事件，帧之间停顿 0.4 秒，用来核对按时间的补充记录已经去掉
-    counts: list[int] = []
-
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -30,7 +28,6 @@ def _chunked_stream(frames: list[bytes]):
 
         def do_POST(self):
             self.rfile.read(int(self.headers["Content-Length"]))
-            counts.append(1)
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Transfer-Encoding", "chunked")

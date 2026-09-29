@@ -51,6 +51,9 @@ class _BlockingDeltas:
                                    deltas=(ModelDelta(channel="output", offset=index * 3, text=text),))
         self.streamed.set()
         await asyncio.wait_for(self.release.wait(), 15)
+        yield ModelStreamEvent(kind="response", id="response", payload={
+            "id": "resp-stub", "object": "response", "status": "completed",
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "第一段第二段第三段"}]}]})
         yield ModelResponse(output=[{"type": "message", "content": [
             {"type": "output_text", "text": "第一段第二段第三段"}]}],
             usage=_USAGE, provider=self.name, model=self.model)
@@ -72,6 +75,18 @@ def _wait_for_live_release(application: Application, attempt_id: str, timeout: f
             return True
         time.sleep(0.02)
     return application.live_attempt(attempt_id) == {}
+
+def _wait_for_attempt_response(client: httpx.Client, run_id: str, attempt_id: str, timeout: float = 20.0):
+    # 等调用尝试的结果写进读取模型：模型输出与用量在调用结束以后记录
+    deadline = time.monotonic() + timeout
+    attempt = None
+    while time.monotonic() < deadline:
+        attempt = client.get("/api/queries/run.attempt",
+                             params={"run_id": run_id, "attempt_id": attempt_id}).json()
+        if attempt["data"]["response"] is not None:
+            return attempt
+        time.sleep(0.05)
+    return attempt
 
 def _read_deltas(client: httpx.Client, url: str, *, count: int, headers=None):
     # 一直读到拿到 count 条 delta 帧为止：片段在调用进行中到达，可能排在若干日志事件之后
@@ -253,8 +268,7 @@ def test_live_connection_receives_deltas_and_attempt_live_matches_them(data_dir)
         # 等待这次调用尝试结束：结束以后 attempt.live 释放，最终输出以 run.attempt 为准
         assert _wait_for_live_release(opened.applications[0], attempt_id)
         assert opened.applications[0].live_attempt(attempt_id) == {}
-        attempt = client.get("/api/queries/run.attempt",
-                             params={"run_id": system.list_run_ids()[0], "attempt_id": attempt_id}).json()
+        attempt = _wait_for_attempt_response(client, system.list_run_ids()[0], attempt_id)
         assert "第一段第二段第三段" in json.dumps(attempt["data"]["response"], ensure_ascii=False)
 
 def test_plain_connection_does_not_receive_deltas(data_dir):

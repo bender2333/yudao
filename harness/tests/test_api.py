@@ -186,10 +186,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
-        "system.status", "decisions.list", "projects.list", "project.overview", "project.loop", "project.flow",
-        "work_item.inputs", "event.detail", "department.workspace", "run.actions", "work_item.materials",
-        "delivery.file", "project.attempts", "project.usage", "run.attempt", "project.settings", "run.export",
-        "replay.check", "catalog", "catalog.document",
+        "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
+        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
+        "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
+        "project.settings", "run.export", "replay.check", "catalog", "catalog.document",
     }
     # 覆盖层只列出依赖的查询都已登记的：flow 与 waiting 的依赖已登记，其余依赖的查询尚未加入
     assert capabilities["overlays"] == [
