@@ -196,8 +196,13 @@
     package_return_in: { label: '从回流口取出', spot: 'port_out', pose: 'crouch', bubble: null, ms: 520, facing: 1 },
     // 传信：信件塞进传信管口（方向由 spot 与 facing 决定）
     letter_out: { label: '发出询问', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
-    letter_in: { label: '回答询问', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 }
+    letter_in: { label: '回答询问', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 },
+    // 待机时偶尔起身：走到房间里的一个位置伸个懒腰（位置在 ch.wanderTo）
+    idle_wander: { label: '', spot: 'wander', pose: 'stretch', bubble: null, ms: 1500 }
   };
+
+  // 行为开关：验收脚本把随机走动关掉，让静止画面可以逐像素比较
+  ECS.config = { idleWander: true };
 
   // 事件类型到任务键的解析：大多数事件类型本身就是任务键；少数按 payload 再分支
   function taskKeyFor(ev) {
@@ -277,6 +282,7 @@
     if (spotKind === 'cabinet') return { x: r.cabinet.x, y: GEO.DESK_Y, seat: null };
     if (spotKind === 'terminal') return { x: r.terminal.x, y: r.terminal.y, seat: null };
     if (spotKind === 'monitor') return { x: r.monitor.x, y: r.monitor.y, seat: null };
+    if (spotKind === 'wander') return { x: ch.wanderTo, y: GEO.PORT_STAND, seat: null };
     if (spotKind === 'port_out') return { x: r.outPort - 6, y: GEO.PORT_STAND, seat: null };
     if (spotKind === 'port_in') return { x: r.inPort + 6, y: GEO.PORT_STAND, seat: null };
     throw new Error('未知的 spot：' + spotKind);
@@ -297,6 +303,7 @@
     Object.values(world.characters).forEach((ch) => {
       const a = scene.actors.find((x) => x.id === 'ch-' + ch.id);
       if (!a) return;
+      if (ch.current || ch.queue.length) ch.wanderAt = null;
       // 走路的脚本还没结束不换任务；整层静止（中断）时小人不出发，队列等着
       if (!ch.current && ch.queue.length && !a.script && !scene.frozen) {
         ch.current = ch.queue.shift();
@@ -335,6 +342,17 @@
         if (scene.realT - task._t0 >= task.ms) {
           ch.current = null;
           if (task.onDone) task.onDone(task);
+        }
+      }
+      // 待机（快照的持续状态是喝茶）时偶尔起身：隔几秒走到房间里的一个位置伸个懒腰，再回到工位
+      if (!task && !ch.queue.length && goal && goal.pose === 'tea' && spot.seat && ECS.config.idleWander && !scene.frozen && !scene.reduced) {
+        if (ch.wanderAt == null) {
+          ch.wanderAt = scene.realT + 5000 + Math.random() * 7000;
+        } else if (scene.realT >= ch.wanderAt) {
+          const r = ECS.roomOf(world, ch.department);
+          ch.wanderTo = Math.round(r.x + 18 + Math.random() * (r.w - 36));
+          ch.wanderAt = null;
+          ECS.enqueue(world, ch.id, 'idle_wander');
         }
       }
       ch.bubble = ECS.bubbleFor(ch);

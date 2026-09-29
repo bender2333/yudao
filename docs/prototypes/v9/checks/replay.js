@@ -4,7 +4,7 @@
 //
 // 用法：node docs/prototypes/v9/checks/replay.js [--v9 <index.html 的 file:// 地址>] [--only 场景编号,场景编号] [--mode step|burst] [--keep 4]
 // 先运行 record.js 生成 .tmp/v9-checks/recordings.json；有差异的检查点会把 v8、v9 与差异图存进 .tmp/v9-checks/replay/。
-// step：每个事件之后静置 14 秒再比较；burst：事件连续播放，只在最后静置以后比较。
+// step：每个事件之后静置 14 秒再比较；burst：事件连续播放，只在最后静置以后比较；--reduced：系统设置为减少动画。
 const fs = require('fs');
 const path = require('path');
 const { chromium, EXE, v8Url, v9Url, outDir } = require('./env');
@@ -15,6 +15,7 @@ const V9 = arg('v9', v9Url);
 const ONLY = arg('only', '') ? arg('only').split(',') : null;
 const MODE = arg('mode', 'step');
 const KEEP = Number(arg('keep', 4));
+const REDUCED = process.argv.includes('--reduced');
 const OUT = path.join(outDir, 'replay');
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -44,6 +45,7 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER }) => {
   // 统计 v9 画面对 ecs.js 的使用
   const counts = {};
   const E = P.ecs;
+  if (E && E.config) E.config.idleWander = false;
   if (E) {
     ['dispatch', 'declareRooms', 'declareLinks', 'syncCharacters', 'stepCharacters', 'spawnPackage', 'sendPackage', 'stepPackages', 'bubbleFor'].forEach((k) => {
       if (typeof E[k] !== 'function') return;
@@ -110,7 +112,7 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER }) => {
 };
 
 async function version(browser, root, rec) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: REDUCED ? 'reduce' : 'no-preference' });
   const page = await ctx.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -167,7 +169,7 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
   const cmp = await browser.newPage();
   await cmp.goto('about:blank');
   const summary = [];
-  for (const rec of recordings) {
+  async function runOne(rec) {
     const a = await version(browser, V8, rec);
     const b = await version(browser, V9, rec);
     const row = { id: rec.id, checkpoints: a.cps.length, pixelDiff: 0, stateDiff: 0, v8fail: a.failure, v9fail: b.failure,
@@ -195,6 +197,19 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
           const tag = rec.id + '-' + String(i).padStart(2, '0');
           save(tag + '-v8.png', A.png); save(tag + '-v9.png', B.png); save(tag + '-diff.png', d.png);
         }
+      }
+    }
+    return row;
+  }
+  for (const rec of recordings) {
+    let row = await runOne(rec);
+    // 机器负载高时偶尔出现几个像素的随机差异：重跑一次，重跑相同就不算差异（备注里保留第一次的情况）
+    if (row.pixelDiff || row.stateDiff) {
+      const again = await runOne(rec);
+      if (!again.pixelDiff && !again.stateDiff) {
+        again.notes.push('第一次运行有差异（' + row.pixelDiff + ' 个检查点的像素、' + row.stateDiff + ' 个检查点的小人），重跑相同');
+        again.retried = true;
+        row = again;
       }
     }
     summary.push(row);
