@@ -25,6 +25,8 @@ __all__ = [
 
 class LoopSystem:
     # 系统装配：持久化、独立 Provider 模块与原生编排器，空态可启动
+    read_only = False
+
     def __init__(
         self,
         data_dir: str | Path,

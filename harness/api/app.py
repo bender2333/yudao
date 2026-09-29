@@ -18,6 +18,7 @@ from pydantic import TypeAdapter
 
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.contracts import Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
+from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 
 # 本机访问方式的提出者（第 6.2 节）
@@ -89,7 +90,10 @@ def _add_command(api: FastAPI, registry: Registry, definition: CommandDefinition
 
 def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
     async def endpoint(request: Request, params: Any = None) -> Any:
-        return _application(request).query(definition.name, params)
+        try:
+            return _application(request).query(definition.name, params)
+        except NotFound as exc:
+            return JSONResponse(status_code=404, content={"error": str(exc)})
 
     parameters = () if definition.request is None else (("params", Annotated[definition.request, Query()]),)
     endpoint.__signature__ = _signature(*parameters)

@@ -258,7 +258,9 @@ def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, ca
     fresh.store.close()
     assert main(["replay", "--project", project_id, "--data-dir", str(data_dir)]) == 0
     printed = json.loads(capsys.readouterr().out)
-    assert printed == online.canonical_state()
+    assert printed["data"]["target"] == "project"
+    assert printed["data"]["consistent"] is True
+    assert printed["data"]["differences"] == []
     with pytest.raises(SystemExit):
         main(["replay", "--data-dir", str(data_dir)])
 
@@ -791,13 +793,17 @@ def test_cli_project_list_and_show(data_dir, capsys):
     project_id = system.projects.register("CLI", GOAL)
     archived_id = system.projects.register("Archived", GOAL)
     system.projects.archive(archived_id)
+    version = system.projects.projection(project_id).stream_version
     assert main(["project", "list", "--data-dir", str(data_dir)]) == 0
-    rows = json.loads(capsys.readouterr().out)
+    listed = json.loads(capsys.readouterr().out)
+    rows = listed["data"]["projects"]
     assert [row["project_id"] for row in rows] == [project_id]
     assert rows[0]["work_item_count"] == 0 and rows[0]["current_adoption"] is None
+    assert listed["position"] >= 1
     assert main(["project", "list", "--archived", "--data-dir", str(data_dir)]) == 0
-    assert {row["project_id"] for row in json.loads(capsys.readouterr().out)} == {project_id, archived_id}
+    archived_rows = json.loads(capsys.readouterr().out)["data"]["projects"]
+    assert {row["project_id"] for row in archived_rows} == {project_id, archived_id}
     assert main(["project", "show", project_id, "--data-dir", str(data_dir)]) == 0
     shown = json.loads(capsys.readouterr().out)
-    assert shown == system.projects.projection(project_id).to_dict()
-    assert shown["name"] == "CLI" and shown["prompt_configs"]["product"]["source"] == "default"
+    assert shown["data"]["name"] == "CLI" and shown["data"]["goal"] == GOAL
+    assert shown["data"]["version"] == version

@@ -70,22 +70,24 @@ class CommandConfigConflict(Exception):
         self.current = current
 
 
-def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str) -> ProjectProjection:
-    # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态
+def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
+                       include_history: bool = True) -> ProjectProjection:
+    # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
+    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们
     state = saved_project(store, project_id)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state)
+    return _compose(store, state, include_history=include_history)
 
 
-def _compose(store: EventStore, state: ProjectProjection) -> ProjectProjection:
+def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
     _default_prompts(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
-        _derive_work_item(store, item, adopted, held, project_id)
+        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
 
@@ -100,7 +102,7 @@ def _default_prompts(state: ProjectProjection) -> ProjectProjection:
 
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
-                      held: dict[str, HeldCandidate], project_id: str) -> None:
+                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True) -> None:
     try:
         run = project_run(store, item.run_id)
     except RunNotFoundError:
@@ -109,7 +111,6 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     if run.project_id != project_id or run.work_item_id != item.work_item_id:
         item.status = "not_started"
         return
-    events = store.list_events(item.run_id)
     item.phase = run.phase
     item.stop_reason = run.stop_reason
     item.human_action = run.human_action
@@ -126,14 +127,16 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.status = "stopped"
     else:
         item.status = "in_progress"
-    handoffs = work_item_handoffs(events)
-    item.last_handoff = handoffs[-1] if handoffs else None
-    item.rework = [
-        {"verdict": event.payload["verdict"], "seq": event.stream_version, "at": event.created_at,
-         "summary": event.payload.get("rationale", "")}
-        for event in events
-        if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") in REWORK_VERDICTS
-    ]
+    if include_history:
+        events = store.list_events(item.run_id)
+        handoffs = work_item_handoffs(events)
+        item.last_handoff = handoffs[-1] if handoffs else None
+        item.rework = [
+            {"verdict": event.payload["verdict"], "seq": event.stream_version, "at": event.created_at,
+             "summary": event.payload.get("rationale", "")}
+            for event in events
+            if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") in REWORK_VERDICTS
+        ]
     if run.pending_request is not None:
         item.pending_question = run.pending_request.question
     elif run.phase in TERMINAL_PHASES:

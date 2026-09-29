@@ -27,13 +27,17 @@ class GitVersionError(ValueError):
 
 
 class GitVersionStore:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, read_only: bool = False) -> None:
         self.root = Path(root).absolute()
+        self.read_only = read_only
         self._git_path = shutil.which("git")
         if self._git_path is None:
             raise GitVersionError("Git executable is unavailable")
-        self._directory(self.root, create=True)
         self._hooks = self.root / "empty-hooks"
+        if read_only:
+            # 只读使用不建立目录：需要 Git 历史的操作在目录缺失时给出同样的错误
+            return
+        self._directory(self.root, create=True)
         self._directory(self._hooks, create=True)
 
     def prepare(
