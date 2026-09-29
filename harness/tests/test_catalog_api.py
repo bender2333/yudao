@@ -19,13 +19,13 @@ UPSTREAM_BASE = "http://127.0.0.1:9/v1"
 
 
 def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
-    return {"id": provider_id, "name": provider_id, "base_url": base_url, "credential_ref": REF,
-            "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
+    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+            "credential_ref": REF, "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
 
 
 def _model(model_id="m1", *, model="model-x"):
-    # 连接保存用的模型访问定义：所属连接由命令参数给出
-    return {"id": model_id, "model": model, "protocol": "responses",
+    # 连接保存用的模型访问定义：所属连接由命令参数给出，协议取自连接
+    return {"id": model_id, "model": model,
             "context_window": 32000, "max_output_tokens": 2048}
 
 
