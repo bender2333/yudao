@@ -88,7 +88,7 @@
     return Y8.ui.block({
       id: 'ov-loop', title: '循环画面', query: ['project.loop', 'project.flow'],
       subtitle: '三部门循环、包裹与管道；右上角切换覆盖层，下方时间轴回放本项目的关键事实',
-      className: 'y8-pp-loop-stage', body: '<div id="ov-floor"></div>'
+      body: '<div id="ov-floor"></div>'
     });
   }
 
