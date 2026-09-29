@@ -91,7 +91,7 @@
       label: op.label, kind: 'small' + (op.kind === 'primary' ? ' primary' : op.kind === 'danger' ? ' danger' : ''),
       act: 'cards.answer', disabled: isSubmitted || answered,
       data: { decisionId: d.id, option: op.id, version: d.version },
-      title: op.requires === 'model_ok' ? '修复模型配置以后才能继续' : null
+      title: op.requires === 'model_ok' ? '修复模型配置以后才能继续' : op.note_required ? '需要在说明中写明修改意见' : null
     })).join('');
     const answerHtml = answered
       ? '<p class="y8-card-result">' + (d.status === 'answered' ? '已回答：' + esc(d.answer ? d.answer.label || d.answer.option : '') : '已撤销') + '</p>'

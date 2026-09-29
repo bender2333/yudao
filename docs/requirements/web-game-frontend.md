@@ -1,6 +1,6 @@
 # D30 游戏化的 Web 界面与界面实现
 
-确认时间：2026-09-25，2026-09-28 补充长时间运行以后的界面，2026-09-29 确定原型 v8 的方向。状态：需求已记录，技术设计见应用层与接口层设计说明，未实施；路线位置 Stage 3 的界面工作线。原型：[界面原型 v8 设计说明](../prototypes/v8/design.md)（设计中，原型文件尚未制作），完成后取代 [v7](../prototypes/v7/design.md)。
+确认时间：2026-09-25，2026-09-28 补充长时间运行以后的界面，2026-09-29 确定原型 v8 的方向。状态：需求已记录，技术设计见应用层与接口层设计说明，未实施；路线位置 Stage 3 的界面工作线。原型：[界面原型 v8](../prototypes/v8/index.html)（[设计说明](../prototypes/v8/design.md)、[构建约定](../prototypes/v8/BUILD.md)；原型文件已制作，待用户审阅），审阅通过后取代 [v7](../prototypes/v7/design.md)。
 
 ## 用户原话
 
@@ -74,4 +74,4 @@
 
 ## 实现状态
 
-未实施。原型 v7 已完成（`docs/prototypes/v7/`）；v8 设计说明在 `docs/prototypes/v8/design.md`，原型文件尚未制作；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)。路线位置：Stage 3 的界面工作线。
+未实施。原型 v7 已完成（`docs/prototypes/v7/`）；原型 v8 已制作（`docs/prototypes/v8/`），待用户审阅；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)。路线位置：Stage 3 的界面工作线。

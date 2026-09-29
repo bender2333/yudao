@@ -29,7 +29,10 @@
     if (rec === 'interrupted' || rec === 'pending_verification' || rec === 'waiting_resume') return rec;
     if (run && run.waiting_provider) return 'waiting_provider';
     switch (item.status) {
-      case 'queued': return item.queue_reason === 'slot' ? 'waiting_slot' : 'queued';
+      case 'queued':
+        // 已经有 run、停下来等用户决定的事项在最后所在的房间等待；还没开始的事项在大厅排队
+        if (item.queue_reason === 'decision' && run) return 'waiting_decision';
+        return item.queue_reason === 'slot' ? 'waiting_slot' : 'queued';
       case 'in_progress': {
         const asking = (run.requests || []).some((r) => r.status === 'open' && r.from === run.department);
         return asking ? 'asking' : 'running';
@@ -54,7 +57,11 @@
     done: '已完成', cancelled: '已取消', stopped_for_upgrade: '因升级停止'
   };
 
-  function signOf(status, run) {
+  function signOf(status, run, db, item) {
+    if (status === 'waiting_decision') {
+      const d = db && item ? (db.data.decisions || []).find((x) => x.status === 'waiting' && x.blocks && x.blocks.work_item_id === item.id) : null;
+      return '待你决定' + (d ? '：' + Y8.registry.entry('decision', d.kind).label : '');
+    }
     if (status === 'waiting_resume') {
       const u = run.recovery && run.recovery.unusable;
       return '待恢复' + (u && u.problem ? '：' + u.problem : '');
@@ -79,10 +86,10 @@
         cycle: run ? run.cycle : 0,
         elapsed_sec: run ? run.elapsed_sec : 0,
         limit_sec: run ? run.limit_sec : 7200,
-        sign: run ? signOf(status, run) : null,
+        sign: run ? signOf(status, run, db, item) : null,
         recovery_state: run && run.recovery ? run.recovery.state : null
       };
-      if (db.atLeast('3.4A')) out.queue_pos = item.queue_pos || null;
+      if (db.atLeast('3.4A')) out.queue_pos = status === 'waiting_decision' ? null : item.queue_pos || null;
       if (db.atLeast('S4')) out.waiting_provider_sec = run ? run.waiting_provider_sec || 0 : 0;
       return out;
     }).filter(Boolean);
@@ -133,6 +140,7 @@
   // 项目的状态标记（左侧栏、楼层的状态灯）
   const MARKER_ORDER = [
     ['waiting_resume', 'waiting', '待恢复'], ['pending_verification', 'pending', '待核实'], ['interrupted', 'interrupted', '中断'],
+    ['waiting_decision', 'waiting', '等待你的决定'],
     ['waiting_provider', 'waiting_provider', '等待模型服务'], ['waiting_slot', 'waiting_slot', '等待执行槽位'],
     ['running', 'running', '运行中'], ['asking', 'running', '运行中'], ['queued', 'queued', '排队中']
   ];
@@ -223,7 +231,7 @@
     const item = d.work_item_id ? db.workItem(d.work_item_id) : null;
     const blocked = d.blocks && d.blocks.work_item_id ? db.workItem(d.blocks.work_item_id) : null;
     const out = Y8.clone(d);
-    out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null }));
+    out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null, note_required: Boolean(o.note_required) }));
     out.kind_label = Y8.registry.entry('decision', d.kind).label;
     out.project_name = project ? project.name : d.project_id;
     out.work_item_title = item ? item.title : null;
@@ -381,6 +389,7 @@
       if (problem) return reject('option_invalid', problem);
     }
     const note = (params.note || '').trim();
+    if (option.note_required && !note) return reject('not_allowed', '「' + option.label + '」需要写明说明');
     const path = 'decisions[id=' + raw.id + ']';
     const projectStream = Y8.registry.entry('decision', raw.kind).stream === 'project';
     const answered = {

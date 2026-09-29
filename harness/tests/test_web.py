@@ -2,7 +2,7 @@ import json
 import subprocess
 import threading
 import time
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from pathlib import Path
@@ -20,6 +20,7 @@ from harness.git_versions import GitVersionError
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
+from harness.tests.saved_rewrite import rewrite_saved_event
 from harness.web.server import serve
 from harness.views import retry_view
 from harness.models import EventType
@@ -739,35 +740,39 @@ def test_effective_prd_and_plan_are_visible_from_their_accepted_materials(data_d
 
 
 @pytest.mark.parametrize("kind,event_type", [("prd", "contract_accepted"), ("plan", "plan_accepted")])
-def test_document_detail_rejects_cross_run_material(data_dir, monkeypatch, kind, event_type):
+def test_document_detail_rejects_cross_run_material(data_dir, kind, event_type):
     system, projection = run_scripted(data_dir, happy_script())
     event = next(item for item in system.store.list_events(projection.run_id) if item.type == event_type)
     ref = event.payload[f"{kind}_ref"]
     original = (system.artifacts.root / ref["path"]).read_bytes()
     foreign = system.artifacts.put("another-run", kind, original, media_type="text/markdown")
-    event.payload[f"{kind}_ref"] = asdict(foreign)
-    monkeypatch.setattr(system.store, "get_event", lambda _event_id: event)
     with running_server(system) as (_server, host, port):
+        detail = get_json(host, port, f"/api/runs/{projection.run_id}/events/{event.event_id}")
+        assert detail[f"{kind}_markdown"]
+        event.payload[f"{kind}_ref"] = asdict(foreign)
+        rewrite_saved_event(system.store, event)
         status, body, _ = request(host, port, "GET", f"/api/runs/{projection.run_id}/events/{event.event_id}")
         assert status in {400, 500}, body
         assert f"{kind}_markdown" not in json.loads(body)
 
 
 @pytest.mark.parametrize("failure", ["missing_with_other_run_copy", "modified_bytes", "foreign_reference"])
-def test_model_input_detail_rejects_invalid_or_cross_run_artifact(data_dir, monkeypatch, failure):
+def test_model_input_detail_rejects_invalid_or_cross_run_artifact(data_dir, failure):
     system, projection = run_scripted(data_dir, happy_script())
     event = next(item for item in system.store.list_events(projection.run_id) if item.type == "context_assembled")
     ref = event.payload["request_ref"]
     original = system.artifacts.root / ref["path"]
     foreign = system.artifacts.put("another-run", "model_request", original.read_bytes(), media_type="application/json")
-    if failure == "missing_with_other_run_copy":
-        original.unlink()
-    elif failure == "modified_bytes":
-        original.write_text('{"input": "modified"}', encoding="utf-8")
-    else:
-        event.payload["request_ref"] = asdict(foreign)
-        monkeypatch.setattr(system.store, "get_event", lambda _event_id: event)
     with running_server(system) as (_server, host, port):
+        clean = get_json(host, port, f"/api/runs/{projection.run_id}/events/{event.event_id}")
+        assert clean["model_input"]["input"]
+        if failure == "missing_with_other_run_copy":
+            original.unlink()
+        elif failure == "modified_bytes":
+            original.write_text('{"input": "modified"}', encoding="utf-8")
+        else:
+            event.payload["request_ref"] = asdict(foreign)
+            rewrite_saved_event(system.store, event)
         status, body, _ = request(host, port, "GET", f"/api/runs/{projection.run_id}/events/{event.event_id}")
         assert status in {400, 500}, body
         assert "model_input" not in json.loads(body)
@@ -1072,22 +1077,23 @@ def test_delivery_web_rejects_incomplete_or_corrupted_archive(archived_run, dama
 
 
 @pytest.mark.parametrize("mismatch", ["run", "tree_digest"])
-def test_delivery_web_rejects_archive_not_bound_to_its_acceptance(archived_run, monkeypatch, mismatch):
+def test_delivery_web_rejects_archive_not_bound_to_its_acceptance(archived_run, mismatch):
     system, projection = archived_run
     delivery = projection.delivery_spec
     event = system.store.get_event(delivery.created_event_id)
-    payload = dict(event.payload)
-    if mismatch == "run":
-        other_run = system.create_run("unrelated task")
-        data = system.artifacts.get_for_run(projection.run_id, delivery.tree_ref)
-        payload["tree_ref"] = asdict(system.artifacts.put(other_run, "tree_manifest", data, media_type="application/json"))
-    else:
-        payload["code_tree_digest"] = "sha256:" + "0" * 64
-    changed = replace(event, payload=payload)
-    get_event = system.store.get_event
-    monkeypatch.setattr(system.store, "get_event", lambda event_id: changed if event_id == event.event_id else get_event(event_id))
     endpoint = f"/api/runs/{projection.run_id}/events/{delivery.created_event_id}"
     with running_server(system) as (_server, host, port):
+        for url in (endpoint, endpoint + "/files?path=src%2Fecho.py"):
+            assert request(host, port, "GET", url)[0] == 200
+        payload = dict(event.payload)
+        if mismatch == "run":
+            other_run = system.create_run("unrelated task")
+            data = system.artifacts.get_for_run(projection.run_id, delivery.tree_ref)
+            payload["tree_ref"] = asdict(system.artifacts.put(other_run, "tree_manifest", data, media_type="application/json"))
+        else:
+            payload["code_tree_digest"] = "sha256:" + "0" * 64
+        event.payload = payload
+        rewrite_saved_event(system.store, event)
         for url in (endpoint, endpoint + "/files?path=src%2Fecho.py"):
             status, body, _ = request(host, port, "GET", url)
             assert status == 400
@@ -1150,25 +1156,23 @@ def test_web_git_versions_include_plan_binary_delivery_and_no_current_tree_fallb
 
 
 @pytest.mark.parametrize("mismatch", ["same_run_commit", "tree", "material"])
-def test_web_git_versions_reject_refs_or_materials_not_bound_to_the_event(revised_git_run, monkeypatch, mismatch):
+def test_web_git_versions_reject_refs_or_materials_not_bound_to_the_event(revised_git_run, mismatch):
     system, projection = revised_git_run
     run_id = projection.run_id
     event = system.store.get_event(projection.effective_contract.created_event_id)
-    payload = dict(event.payload)
-    if mismatch == "same_run_commit":
-        payload["git_version"] = system.store.get_event(projection.inputs[-1].created_event_id).payload["git_version"]
-    elif mismatch == "tree":
-        payload["git_version"] = {**payload["git_version"], "tree": "0" * 40}
-    else:
-        payload["prd_ref"] = asdict(system.artifacts.put(run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
-    changed = replace(event, payload=payload)
-    original_get, original_list = system.store.get_event, system.store.list_events
-    monkeypatch.setattr(system.store, "get_event", lambda event_id: changed if event_id == event.event_id else original_get(event_id))
-    monkeypatch.setattr(system.store, "list_events", lambda *args, **kwargs: [
-        changed if item.event_id == event.event_id else item for item in original_list(*args, **kwargs)
-    ])
+    endpoint = f"/api/runs/{run_id}/events/{event.event_id}"
     with running_server(system) as (_server, host, port):
-        status, body, _ = request(host, port, "GET", f"/api/runs/{run_id}/events/{event.event_id}")
+        assert request(host, port, "GET", endpoint)[0] == 200
+        payload = dict(event.payload)
+        if mismatch == "same_run_commit":
+            payload["git_version"] = system.store.get_event(projection.inputs[-1].created_event_id).payload["git_version"]
+        elif mismatch == "tree":
+            payload["git_version"] = {**payload["git_version"], "tree": "0" * 40}
+        else:
+            payload["prd_ref"] = asdict(system.artifacts.put(run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
+        event.payload = payload
+        rewrite_saved_event(system.store, event)
+        status, body, _ = request(host, port, "GET", endpoint)
         assert status == 400, body
         assert "Git" in json.loads(body)["error"]
         assert str(system.data_dir) not in body
