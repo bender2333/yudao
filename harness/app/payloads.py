@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
-from ..models import DEPARTMENTS, PHASES, EventType, ProjectEventType
+from ..models import DEPARTMENTS, PHASES, CatalogEventType, EventType, ProjectEventType
 
 Department = Literal[DEPARTMENTS]
 Phase = Literal[PHASES]
@@ -950,6 +950,48 @@ class MaterialRecordedPayload(Payload):
     department: Department | None
 
 
+# 模型目录与凭据（应用层与接口层设计说明第 10 节第 1 项）：只含修订号、变化与结果，不含 Key
+
+class CatalogRevisedPayload(Payload):
+    # 目录内容（连接、访问定义、部门默认）或文件被外部修改与重读以后的修订号
+    revision: int
+    base_revision: int | None
+    operation: Literal["save_connection", "delete_connection", "save_document", "department_defaults",
+                       "reload", "startup"]
+    provider_id: str | None
+
+
+class CatalogCandidatesCollectedPayload(Payload):
+    provider_id: str
+    status: Literal["ok", "unknown"]
+    source_url: str
+    fetched_at: str
+    candidate_ids: list[str]
+    error: str | None
+
+
+class CatalogTestFinishedPayload(Payload):
+    # 连接测试不写准入（admitted 为空）；模型测试通过时带准入结果
+    kind: Literal["connection", "model"]
+    provider_id: str
+    model_id: str | None
+    ok: bool
+    protocol: str | None
+    error: str | None
+    actual_model: str | None
+    elapsed_ms: int
+    admitted: bool | None
+
+
+class CredentialChangedPayload(Payload):
+    # 只含引用、动作、来源与版本，不含 Key
+    ref: str
+    action: Literal["set", "clear_override", "remove_persisted"]
+    source: str
+    version: int
+    persisted: bool
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1007,4 +1049,8 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED: DepartmentPromptConfiguredPayload,
     ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
+    CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
+    CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
+    CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
+    CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
 }

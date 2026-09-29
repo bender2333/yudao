@@ -11,7 +11,7 @@ from harness.app.project_commands import PROJECT_CREATE
 from harness.app.registry import CommandDefinition, QueryDefinition, Registry
 from harness.app.system_queries import SYSTEM_STATUS
 from harness.event_store import project_stream
-from harness.models import EventType, ProjectEventType
+from harness.models import CatalogEventType, EventType, ProjectEventType
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.write_path import NewProjectEvent
@@ -143,23 +143,37 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "project.create", "reasons": ["command_id_reused"]},
         {"name": "decision.answer", "reasons": ["not_found", "decision_closed", "stale_base", "option_invalid",
                                                "command_id_reused"]},
+        {"name": "catalog.connection.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.connection.delete", "reasons": ["stale_base", "not_found", "in_use", "command_id_reused"]},
+        {"name": "catalog.document.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.reload", "reasons": ["command_id_reused"]},
+        {"name": "catalog.candidates.collect", "reasons": ["not_found", "command_id_reused"]},
+        {"name": "catalog.connection.test", "reasons": ["not_found", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.model.test", "reasons": ["not_found", "command_id_reused"]},
+        {"name": "catalog.department_defaults.save",
+         "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "credential.set", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "credential.clear_override", "reasons": ["stale_base", "command_id_reused"]},
+        {"name": "credential.remove_persisted", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
     ]
+    catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
+                          "credential_changed"]
     assert capabilities["queries"] == [
         {"name": "system.status", "changed_by": []},
         {"name": "decisions.list", "changed_by": ["decision_requested", "decision_answered", "decision_withdrawn"]},
+        {"name": "catalog", "changed_by": catalog_changed_by},
+        {"name": "catalog.document", "changed_by": catalog_changed_by},
     ]
-    assert _registered_paths(document, "/api/commands/") == {"project.create", "decision.answer"} == set(
-        DEFAULT_REGISTRY.commands)
-    assert _registered_paths(document, "/api/queries/") == {"system.status", "decisions.list"} == set(
-        DEFAULT_REGISTRY.queries)
+    assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
+    assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
     assert capabilities["decisions"] == ["model_unavailable"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
     assert deployment["version"] == document["info"]["version"]
-    # 事件种类：现有全部 run 事件与项目事件，与 OpenAPI 中事件对象的联合一致
-    known = {value for owner in (EventType, ProjectEventType) for key, value in vars(owner).items()
-             if not key.startswith("_")}
+    # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
+    known = {value for owner in (EventType, ProjectEventType, CatalogEventType)
+             for key, value in vars(owner).items() if not key.startswith("_")}
     assert set(capabilities["event_types"]) == known == set(EVENT_TYPES)
     mapping = document["components"]["schemas"]["EventObject"]["discriminator"]["mapping"]
     assert set(mapping) == known
