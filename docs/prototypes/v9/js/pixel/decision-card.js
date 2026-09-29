@@ -24,9 +24,11 @@
     let hits = [];
     let msg = null;
     let stamp = null;
+    // 回答以后事件流带来的新列表里已经没有这个决定：纸留着这份内容，盖章结束再收起
+    let ghost = null;
     const submitted = {};
     const notes = {};
-    const wrapCache = {};
+    let wrapCache = {};
     let noteEl = null;
 
     // ---------------------------------------------------------------------------
@@ -44,15 +46,19 @@
     }
 
     const rowLines = (c, face, i, valueW) => {
-      const key = face.id + '|' + face.version + '|' + i + '|' + valueW;
+      const v = face.rows[i][1];
+      const text = typeof v === 'object' && v ? v.text : v;
+      const key = face.id + '|' + i + '|' + valueW + '|' + text;
       if (!wrapCache[key]) {
-        const v = face.rows[i][1];
-        wrapCache[key] = wrap(c, typeof v === 'object' && v ? v.text : v, valueW, 6.5, 500);
+        if (Object.keys(wrapCache).length > 400) wrapCache = {};
+        wrapCache[key] = wrap(c, text, valueW, 6.5, 500);
       }
       return wrapCache[key];
     };
 
     const faceOf = (id) => faces.find((f) => f.id === id) || null;
+    // 打开着的那张卡片的内容：列表里已经没有它时用留下的那一份
+    const shown = () => (openId ? faceOf(openId) || (ghost && ghost.id === openId ? ghost : null) : null);
 
     // ---------------------------------------------------------------------------
     // 说明的输入框：画面里的横线纸上叠一个透明的输入框，中文输入法需要它
@@ -93,6 +99,9 @@
 
     function onKey(e) {
       if (!openId) return;
+      // 别处的文本框里打字（方向键移动光标）不算对卡片的操作
+      const t = e.target;
+      if (t && t !== noteEl && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
       if (e.key === 'Escape') close();
       else if (e.key === 'ArrowLeft') flip(-1);
       else if (e.key === 'ArrowRight') flip(1);
@@ -107,8 +116,14 @@
     }
 
     function close() {
-      if (openId) document.removeEventListener('keydown', onKey);
+      if (openId) {
+        document.removeEventListener('keydown', onKey);
+        // 提交过的说明随卡片收起；列表里已经没有的决定，提交记录也一起清掉
+        if (submitted[openId]) delete notes[openId];
+        if (!faceOf(openId)) { delete submitted[openId]; delete notes[openId]; }
+      }
       openId = null;
+      ghost = null;
       msg = null;
       hideNote();
     }
@@ -133,7 +148,6 @@
         return;
       }
       submitted[face.id] = true;
-      delete notes[face.id];
       stamp = { id: face.id, text: '已回答：' + op.label, t0: scene.realT };
       scene.after(1200, () => { stamp = null; if (openId === face.id) close(); });
     }
@@ -152,7 +166,7 @@
 
     function draw(c) {
       hits = [];
-      const face = openId ? faceOf(openId) : null;
+      const face = shown();
       if (!face) { hideNote(); return; }
       const px = PAPER.x, py = PAPER.y, pw = PAPER.w, ph = PAPER.h;
       c.fillStyle = 'rgba(12,14,30,0.58)';
@@ -166,8 +180,9 @@
       P.drawBitmap(c, 'decision', px + 12, py + 8);
       P.text(c, face.title, px + 28, py + 14, { size: 8.5, weight: 800, color: PAL.ink, max: pw - 132 });
       const idx = faces.findIndex((f) => f.id === face.id);
-      const bx = px + pw - 60;
-      if (faces.length > 1) {
+      // 翻页在左，关闭在右，两组按钮之间留出间隔
+      const bx = px + pw - 88;
+      if (faces.length > 1 && idx >= 0) {
         button(c, bx, py + 6, 12, 12, '‹', null, 'prev');
         P.text(c, (idx + 1) + '/' + faces.length, bx + 26, py + 12.5, { size: 6.5, weight: 700, align: 'center', color: PAL.ink2 });
         button(c, bx + 40, py + 6, 12, 12, '›', null, 'next');
@@ -176,41 +191,51 @@
       P.text(c, face.where, px + 14, py + 30, { size: 6.5, weight: 600, color: PAL.ink2, max: pw - 28 });
       P.text(c, face.waited + ' · ' + face.blocks, px + 14, py + 40, { size: 6, color: PAL.grey3, max: pw - 28 });
       R(c, px + 10, py + 46, pw - 20, 1, PAL.wood2);
-      // 材料：标题在左，内容在右，按宽度折行；放不下的行截断
+      // 材料：标题在左，内容在右，按宽度折行；放不下的行截断，链接固定在说明栏上方的一行
       const valueX = px + 14 + LABEL_W, valueW = pw - 28 - LABEL_W;
-      const noteY = py + ph - 74, limit = noteY - 24;
+      const noteY = py + ph - 74;
+      const linksY = noteY - 34;
+      const limit = (face.links.length ? linksY : noteY - 22) - 6;
       let y = py + 54;
       let cut = false;
       face.rows.forEach((row, i) => {
         if (cut) return;
         const lines = rowLines(c, face, i, valueW);
-        if (y + lines.length * 8 > limit) { cut = true; P.text(c, '……材料较长，其余内容在页面下方的文字列表里', px + 14, y + 4, { size: 6, color: PAL.grey3 }); return; }
-        P.text(c, row[0], px + 14, y + 4, { size: 6, weight: 600, color: PAL.grey3, max: LABEL_W - 4 });
         const v = row[1];
-        lines.forEach((line, k) => P.text(c, line, valueX, y + 4 + k * 8, { size: 6.5, weight: v && typeof v === 'object' ? 700 : 500, color: v && typeof v === 'object' ? PAL.blue3 : PAL.ink, max: valueW }));
-        if (v && typeof v === 'object') hits.push({ x: valueX, y: y - 1, w: valueW, h: lines.length * 8 + 2, act: 'go', arg: v.go });
-        y += lines.length * 8 + 3;
+        const isLink = Boolean(v && typeof v === 'object');
+        // 这一行放不下：能放下几行画几行，最后一行以省略号结尾，后面的行不画
+        const fit = Math.min(lines.length, Math.floor((limit - y) / 8));
+        if (fit < lines.length) cut = true;
+        if (fit < 1) return;
+        P.text(c, row[0], px + 14, y + 4, { size: 6, weight: 600, color: PAL.grey3, max: LABEL_W - 4 });
+        lines.slice(0, fit).forEach((line, k) => P.text(c, cut && k === fit - 1 ? line + '…' : line, valueX, y + 4 + k * 8, { size: 6.5, weight: isLink ? 700 : 500, color: isLink ? PAL.blue3 : PAL.ink, max: valueW }));
+        if (isLink) hits.push({ x: valueX, y: y - 1, w: valueW, h: fit * 8 + 2, act: 'go', arg: v.go });
+        y += fit * 8 + 3;
       });
+      if (cut) P.text(c, '材料较长，其余内容在页面下方的文字列表里', px + pw - 14, noteY - 5, { size: 6, align: 'right', color: PAL.grey3 });
       // 材料里的链接（去别的页面）
       let lx = px + 14;
-      if (!cut) {
-        face.links.forEach((l) => {
-          const w = Math.min(150, Math.ceil(P.measure(c, l.text, 6.5, 700)) + 14);
-          button(c, lx, Math.min(y + 1, limit - 10), w, 12, l.text, null, 'go', l.go);
-          lx += w + 6;
-        });
-      }
+      face.links.forEach((l) => {
+        const w = Math.min(150, Math.ceil(P.measure(c, l.text, 6.5, 700)) + 14);
+        button(c, lx, linksY, w, 12, l.text, null, 'go', l.go);
+        lx += w + 6;
+      });
       // 说明
       const done = Boolean(submitted[face.id]);
       P.text(c, '说明（可选）', px + 14, noteY - 5, { size: 6, weight: 600, color: PAL.grey3 });
       placeNote(px + 10, noteY, pw - 20, 30, done);
-      // 选项：盖在纸上的章
+      // 选项：盖在纸上的章；选项太多放不下时按比例收窄
       const oy = py + ph - 34;
       let ox = px + 12;
-      face.options.forEach((op) => {
-        const w = Math.max(58, Math.ceil(P.measure(c, op.label, 6.5, 700)) + 18);
+      const natural = face.options.map((op) => Math.max(58, Math.ceil(P.measure(c, op.label, 6.5, 700)) + 18));
+      const gap = 8;
+      const room = pw - 24 - gap * Math.max(0, natural.length - 1);
+      const sum = natural.reduce((s, w) => s + w, 0);
+      const k = sum > room ? room / sum : 1;
+      face.options.forEach((op, i) => {
+        const w = Math.max(30, Math.floor(natural[i] * k));
         button(c, ox, oy, w, 18, op.label, op.kind, 'option', op.id, done);
-        ox += w + 8;
+        ox += w + gap;
       });
       if (done) P.text(c, '已提交，等待控制主机确认', ox + 4, oy + 9, { size: 6.5, weight: 600, color: PAL.green3 });
       if (msg && msg.until > scene.realT) P.text(c, msg.text, px + 14, oy - 8, { size: 6.5, weight: 700, color: PAL.red3, max: pw - 28 });
@@ -247,7 +272,7 @@
     // 返回 true 表示卡片打开着，点击已经被它处理（点在纸外面是关上）
     function click(x, y) {
       if (!openId) return false;
-      const face = faceOf(openId);
+      const face = shown();
       const h = hitAt(x, y);
       if (h && face) {
         if (h.act === 'close') close();
@@ -270,10 +295,14 @@
     // 数据
 
     function setDecisions(list) {
-      faces = list || [];
-      Object.keys(submitted).forEach((id) => { if (!faceOf(id)) delete submitted[id]; });
-      Object.keys(notes).forEach((id) => { if (!faceOf(id)) delete notes[id]; });
-      if (openId && !faceOf(openId) && !(stamp && stamp.id === openId)) close();
+      const next = list || [];
+      // 正在盖章的决定被回答事件带来的新列表拿掉了：留下这份内容，盖章结束（1.2 秒）再收起
+      if (openId && stamp && stamp.id === openId && !next.some((f) => f.id === openId)) ghost = faceOf(openId) || ghost;
+      faces = next;
+      const alive = (id) => Boolean(faceOf(id)) || Boolean(ghost && ghost.id === id);
+      Object.keys(submitted).forEach((id) => { if (!alive(id)) delete submitted[id]; });
+      Object.keys(notes).forEach((id) => { if (!alive(id)) delete notes[id]; });
+      if (openId && !alive(openId)) close();
     }
 
     function destroy() {

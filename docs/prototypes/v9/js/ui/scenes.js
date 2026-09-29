@@ -170,9 +170,10 @@
     throw new Error('未知的覆盖层：' + id);
   }
 
-  // Stage 5：部门里有几个角色，各自的状态（空闲、被分派、工作、交回、外出）；低档位没有角色，画面按一个部门一个小人画
+  // Stage 5：部门里有几个角色，各自的状态（空闲、被分派、工作、交回、外出）；低档位没有角色，画面按一个部门一个小人画。
+  // 回放到过去的时间点时也没有角色（部门工作间的查询不能回放），画面同样按一个部门一个小人画
   function rolesFor(loop, projectId, workItemId, at) {
-    if (!Y8.cap.query('role.detail')) return null;
+    if (at !== null || !Y8.cap.query('role.detail')) return null;
     const out = {};
     Object.keys(DEPT).filter((d) => d !== 'operations' || loop.ops).forEach((d) => {
       out[d] = q('department.workspace', { project: projectId, department: d, work_item: workItemId || undefined }, at).roles;
