@@ -179,14 +179,20 @@
     }).join('') + '</div>';
   }
 
+  // 试用记录（3.2D，查询 run.trials）：每一步的操作、截图缩略图与对应的需求条目；每张截图标明模型是否看到它，
+  // 点击截图查看原尺寸（evidence.screenshot），旁边列出同一步的可访问性结构摘录
   function trialsPanel(v) {
-    if (!v.trials) return ui.empty('本页没有试用记录');
-    if (!v.trials.length) return ui.empty('还没有试用记录');
-    return '<ol class="y8-ws-summaries">' + v.trials.map((trial) =>
+    const data = Y8.api.query('run.trials', { work_item: v.work_item.id }).data;
+    if (!data.trials.length) return ui.empty('还没有试用记录');
+    const head = '<p class="y8-muted y8-small">质检模型：' + esc(data.model) + (data.image_input ? '（支持图像输入）' : '（只有文本输入：显示器照常显示截图，模型只读取可访问性结构的文字）') + '</p>';
+    return head + '<ol class="y8-ws-summaries y8-trials">' + data.trials.map((trial) =>
       '<li><strong>第 ' + esc(trial.step) + ' 步</strong><span>' + esc(trial.action) + '</span>' +
-      ui.tag('对应需求：' + esc(trial.requirement)) + '<span class="y8-muted">' + esc(Y8.ui.time(trial.at)) + '</span>' +
-      (trial.screenshot ? '<a href="assets/' + esc(trial.screenshot) + '" target="_blank" rel="noopener">查看截图</a>' : '') +
-      (trial.text_lines ? ui.pre(trial.text_lines.join('\n')) : '') + '</li>'
+      (trial.requirement ? ui.tag('对应需求：' + trial.requirement) : '') + '<span class="y8-muted">' + esc(Y8.ui.time(trial.at)) + '</span>' +
+      (trial.screenshot
+        ? '<button type="button" class="y8-trial-shot" data-act="dept.shot" data-work-item="' + esc(v.work_item.id) + '" data-step="' + esc(trial.step) + '" title="查看原尺寸">' +
+          '<img src="assets/' + esc(trial.screenshot) + '" alt="第 ' + esc(trial.step) + ' 步的截图" loading="lazy"></button>'
+        : '') +
+      '<span class="y8-trial-saw' + (trial.model_saw ? '' : ' is-text') + '">' + (trial.model_saw ? '模型看到了这张截图' : '模型只读取文字') + '</span></li>'
     ).join('') + '</ol>';
   }
 
@@ -354,7 +360,7 @@
   function checksInner(ctx, v) {
     const items = [
       { id: 'actions', label: '动作与回执' },
-      { id: 'trials', label: '试用记录', tag: v.trials ? '3.2D' : null, show: Boolean(v.trials) },
+      { id: 'trials', label: '试用记录', tag: '3.2D', show: Boolean(v.trials && v.work_item && Y8.cap.query('run.trials')) },
       { id: 'context', label: 'Context' },
       { id: 'prompt', label: '部门 Prompt' },
       { id: 'roles', label: '角色名单', tag: v.roles ? 'Stage 5' : null, show: Boolean(v.roles) },
@@ -643,6 +649,18 @@
       body: modalBody()
     });
   }
+
+  Y8.actions.register('dept.shot', (el) => {
+    const s = Y8.api.query('evidence.screenshot', { work_item: el.dataset.workItem, step: Number(el.dataset.step) }).data;
+    const lines = s.text_lines.length ? ui.pre(s.text_lines.join('\n')) : ui.empty('这一步没有记录可访问性结构摘录');
+    ui.modal({
+      title: '第 ' + s.step + ' 步的截图', wide: true,
+      body: '<div class="y8-shot-view"><figure><img src="assets/' + esc(s.screenshot) + '" alt="第 ' + esc(s.step) + ' 步的截图">' +
+        '<figcaption>' + esc(s.action || '') + ' · 虚拟屏幕 ' + s.width + '×' + s.height + ' · ' + (s.model_saw ? '模型看到了这张截图' : '模型只读取文字') + '</figcaption></figure>' +
+        '<div><h3 class="y8-h3">同一步的可访问性结构摘录</h3>' + lines + '</div></div>',
+      actions: [{ label: '关闭', close: true }]
+    });
+  });
 
   Y8.actions.register('dept.openSettings', (el) => {
     const ctx = Y8.app.ctx();

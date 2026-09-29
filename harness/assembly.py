@@ -32,16 +32,12 @@ class ModelLimits:
     reserve: int
 
 
-def model_limits(context_window: int, target_window: int | None = None,
-                 output_limit: int | None = None) -> ModelLimits:
-    # 没有调用目标（测试适配器）时只按 run 的窗口计算；每次请求实际的输出上限在装配时按输入估算确定
-    if target_window is None:
-        return ModelLimits(context_window, None, response_reserve(context_window, None))
-    window = min(context_window, target_window)
-    reserve = response_reserve(window, output_limit)
+def model_limits(target_window: int, output_limit: int | None = None) -> ModelLimits:
+    # 阈值只用本次调用目标的窗口。事项级 context_window 不再参与，字段的删除由 #74 完成
+    reserve = response_reserve(target_window, output_limit)
     if reserve < 1:
         raise ValueError("the effective context window leaves no room for model output")
-    return ModelLimits(window, output_limit, reserve)
+    return ModelLimits(target_window, output_limit, reserve)
 
 
 @dataclass(frozen=True)

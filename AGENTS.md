@@ -1,5 +1,5 @@
 # 适用范围
-本文件给两类角色使用：执行者按工单实现代码并完成自测；审查者核对执行者的交付，运行全量测试，审查通过后提交并发起 PR。「执行者」「审查者」两节只读自己角色的那一节，其余内容两类角色都遵守。启动时的提示词会说明你的角色，没有说明时按执行者处理。
+本文件给两类角色使用：执行者按工单实现代码并完成自测；审查者核对执行者的交付，运行单元层、模块层与改动相关的测试，审查通过后提交并发起 PR。「执行者」「审查者」两节只读自己角色的那一节，其余内容两类角色都遵守。启动时的提示词会说明你的角色，没有说明时按执行者处理。
 
 架构师的规则在 `CLAUDE.md`。Cursor、Grok 等同时读取 `CLAUDE.md` 与 `AGENTS.md` 的工具，以本文件为准，忽略 `CLAUDE.md`。
 
@@ -27,11 +27,17 @@ Python 包 `harness/`，分三层：
 - 测试：`harness/tests/`。
 
 ## 常用命令
-- 安装依赖（Python 3.11 或更新版本）：`python -m pip install -e ".[dev]"`
-- 启动控制台：`python -m harness`（默认端口 8765）；无需凭据的演示：`python -m harness demo --serve --port 8765`
-- Python 测试：`python -m pytest harness/tests -q`。全量测试耗时较长，开发中先运行相关测试文件，关闭工单前运行全量测试。
-- 前端测试：`node --test harness/tests/test_web_ui.js`
-- 真实模型 smoke：`python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
+- 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
+- 启动控制台：`uv run python -m harness`（默认端口 8765）；无需凭据的演示：`uv run python -m harness demo --serve --port 8765`
+- 测试分为单元、功能与模块、集成三层，每个测试文件属于哪一层写在登记表 `harness/tests/layers.toml` 中，每层的定义与边界见 `docs/design/test-pyramid.md`：
+  - 单元层与模块层：`uv run python -m pytest -m "unit or module"`
+  - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/<文件>`
+  - 前端测试：`node --test --test-reporter=dot harness/tests/test_web_ui.js`
+  - 登记表建立之前（#158 合并之前）：运行与本次改动相关的测试文件与前端测试。
+  - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试。
+  - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
+  - 新增测试文件时在登记表中加一行，放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。
+- 真实模型 smoke：`uv run python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
 
 # 参考实现
 - OMP（oh-my-pi）：`C:\project\codes\oh-my-pi`。协议处理、工具循环、上下文压缩与模型管理的主要参考实现。
@@ -101,7 +107,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取当前阶段父工单（`docs/program-roadmap.md` 中进行中的阶段，Stage 3 为 #9）下面的子工单，包括挂在其工作包父工单下面的子工单；只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
 2. 阅读：`gh issue view <编号> --comments`，以及工单链接的 `docs/design/` 设计文档、`CONTEXT.md` 与相关 ADR。
 3. 实现：按 `/implement` 的流程，测试先行（`/tdd`），完成后用 `/code-review` 审查，然后提交并推送。
-4. 自测：运行「常用命令」中的测试命令，逐项核对工单的验收标准。
+4. 自测：开发中运行与改动相关的测试文件；交付前运行「常用命令」中的单元层与模块层、本次改动或新增的集成层测试文件与前端测试，逐项核对工单的验收标准。
 5. 关闭（强制要求）：全部代码编写、命令执行与测试验证均已完成并通过后：
    1. 提交包含可验证交付证据、修改文件清单及验收标准的评论：
       ```bash
@@ -118,7 +124,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 1. 准备：在 `C:\project\yudao-worktrees\issue-<编号>` 创建 git worktree 与分支 `issue-<编号>`，已经存在时在原有的 worktree 上继续；把标签从 `ready-for-agent` 改为 `in-progress`。
 2. 任务：以工单正文与最新一条任务评论为准，阅读工单链接的设计文档、`CONTEXT.md` 与相关 ADR。
 3. 实现与自测：同普通流程第 3、4 步。只在本地分支提交，不推送，不创建 PR，推送与 PR 由审查者完成。
-4. 交付：在工单下评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结果、逐条的验收核对；然后把标签从 `in-progress` 改为 `needs-review`。
+4. 交付：在工单下评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与每层结尾的计数行、逐条的验收核对，不粘贴测试输出；然后把标签从 `in-progress` 改为 `needs-review`。
 5. 不关闭工单，工单由架构师关闭。
 
 ## 架构问题登记
@@ -139,18 +145,18 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 工作目录是 `C:\project\yudao-worktrees\issue-<编号>`，工单标签为 `needs-review`。
 1. 规范检查：worktree 路径与分支名是否为 `issue-<编号>`，标签状态是否正确，最新一条 `DELIVERY:` 评论是否齐全。
 2. 内容核对：阅读工单、最新任务评论、链接的设计文档与改动（`git diff main...HEAD` 与未提交的改动），逐条核对验收标准，检查是否违反本文件的规则，例如 mock、兼容层、绕过逻辑。
-3. 全量测试：`python -m pytest harness/tests -q` 与 `node --test harness/tests/test_web_ui.js`。
+3. 测试：运行「常用命令」中的单元层与模块层、本次改动或新增的集成层测试文件与前端测试，单进程；核对新增的测试文件已在登记表中，并登记在 `docs/design/test-pyramid.md` 第 2 节规定的层。
 
 ## 审查结论
 - 通过：
   1. 提交还没有提交的改动；
   2. 推送分支，用 `gh pr create` 创建 PR，正文写 `Closes #<编号>`；
   3. 删除 worktree（`git worktree remove`）；
-  4. 在工单下评论，第一行写 `REVIEW: PASS`，附上 PR 链接与测试结果；
+  4. 在工单下评论，第一行写 `REVIEW: PASS`，附上 PR 链接、每层结尾的计数行与失败项名称，不粘贴测试输出；
   5. 把标签从 `needs-review` 改为 `review-passed`。
 - 未通过：
   1. 保留 worktree；
-  2. 在工单下评论，第一行写 `REVIEW: FAIL`，逐条写明问题所在的文件、行号与原因，并附上测试结果；
+  2. 在工单下评论，第一行写 `REVIEW: FAIL`，逐条写明问题所在的文件、行号与原因，并附上每层结尾的计数行与失败项名称，不粘贴测试输出；
   3. 把标签从 `needs-review` 改为 `review-failed`。
 
 ## 行为禁止

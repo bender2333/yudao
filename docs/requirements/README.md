@@ -41,6 +41,6 @@
 | D31 | [部门内的外包角色](outsourced-agent-roles.md) | 需求已记录，未实施；路线位置待定 |
 | D32 | [与单个 agent 的对照实验](comparison-experiment.md) | 需求、三个场景与评分方法已确认，未实施；版本回归与 OpenCode 对照共用三个场景（[评测场景设计](../design/evaluation-scenarios.md)）；作为 Stage 3 的评测工作线与界面工作线并行，Stage 3 结束之前必须完成，之后每个阶段结束时重复；两边使用用户提供的、有视觉能力的同一个模型；场景 1 的 Yudao 一侧依赖 3.2D |
 | D33 | [接入已有项目](existing-project-onboarding.md) | 需求已确认，未实施；路线位置 Stage 3 的 3.8 |
-| D34 | [浏览器与 computer use](browser-and-computer-use.md) | 需求已确认，未实施；路线位置 Stage 3 的 3.2D；质检部门的建议能力是图像输入，不满足时只提醒 |
+| D34 | [浏览器与 computer use](browser-and-computer-use.md) | 需求与设计已确认（[设计说明](../design/browser-and-computer-use.md)），未实施；路线位置 Stage 3 的 3.2D，工单 #123（#147 至 #155）；质检部门的建议能力是图像输入，不满足时只提醒 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

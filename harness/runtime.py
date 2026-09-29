@@ -69,6 +69,7 @@ class LoopSystem:
             test_adapter_factory=test_adapter_factory,
             test_provider=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
+            test_model=(getattr(test_adapter, "model", "fake-script") if test_adapter is not None else "fake-script"),
             step_limits=step_limits,
         )
         self.git_versions = self.orchestrator.git_versions

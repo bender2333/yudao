@@ -276,3 +276,14 @@
   .y8-obs-title h1 { font-size: 18px; }
   .y8-set-dept .y8-kv.is-rows > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
+
+/* 试用记录的截图（3.2D）：缩略图按虚拟屏幕 1280×800 等比缩放 */
+.y8-trial-shot { border: 1px solid var(--line); padding: 2px; background: #0e1420; border-radius: 4px; display: block; width: 160px; max-width: 100%; }
+.y8-trial-shot img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: contain; image-rendering: pixelated; }
+.y8-trial-saw { font-size: 12px; color: var(--green); }
+.y8-trial-saw.is-text { color: var(--amber); }
+.y8-shot-view { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; }
+.y8-shot-view figure { margin: 0; }
+.y8-shot-view img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: contain; background: #0e1420; border-radius: 6px; }
+.y8-shot-view figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+@media (max-width: 720px) { .y8-shot-view { grid-template-columns: minmax(0, 1fr); } }

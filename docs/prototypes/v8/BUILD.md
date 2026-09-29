@@ -186,7 +186,7 @@ Y8.registry.tagOf(kind, name)    // 界面上的档位标签：ui 为 null，其
 
 可回放的查询：`system.status`、`projects.list`、`decisions.list`、`project.loop`、`machines.list`。
 
-设计说明中尚未列出的名称标有 `pending: true`，标注模式显示「合同待补」；现在只有查询的 `at` 参数属于这一类。其余命令都有设计依据：`source_directory.save`（登记源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）见应用层设计说明；`machine.save`、`machine_authorization.save`、`execution_placement.save`（3.2C）见[执行环境服务设计说明](../../design/execution-environment.md)；`project.onboard`（名称、长期目标、源目录名称、源目录路径）与 `onboarding.restart`（3.8）见[接入已有项目设计说明](../../design/existing-project-onboarding.md)第 3 节。
+查询的 `at` 参数见应用层设计说明第 4.1 节（按位置读取），可回放的查询在第 4.3 节「位置」一列标明。命令的设计依据：`source_directory.save`（登记源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）见应用层设计说明；`machine.save`、`machine_authorization.save`、`execution_placement.save`（3.2C）见[执行环境服务设计说明](../../design/execution-environment.md)；`project.onboard`（名称、长期目标、源目录名称、源目录路径）与 `onboarding.restart`（3.8）见[接入已有项目设计说明](../../design/existing-project-onboarding.md)第 3 节。
 
 决定种类的标识：
 
@@ -201,6 +201,7 @@ Y8.registry.tagOf(kind, name)    // 界面上的档位标签：ui 为 null，其
 | `rollback_restore` | 需要恢复备份的回滚 | S4 |
 | `repair_stopped` | 同一故障连续修复失败后停止自动修复 | S4 |
 | `rework_reminder` | 反复退回的提醒 | S5 |
+| `cannot_verify` | 质检无法核验 | 3.2D |
 
 关键事实的种类（`Y8.registry.events[type].key`，时间轴刻度按种类着色）：`handoff` 交接、`ask` 询问、`answer` 回答、`rework` 返工、`release` 放行、`adopt` 采纳、`fault` 故障、`repair` 修复、`deploy` 部署与回滚、`wait` 进入与离开等待、`decision` 决定请求的发出与回答。`qa_submitted` 按 `payload.verdict` 分为放行或返工。
 
@@ -307,7 +308,7 @@ Y8.views.register('overview', {
 ```js
 Y8.ui.block({ title, query, command, body, actions, className, id, subtitle })
 // 区块的档位标签由 query 或 command 的第一个名称在登记表中的档位决定；能力清单没有列出其中任一名称时返回空字符串；
-// 标注模式打开时，右上角显示「查询：… · 命令：… · 档位：…」，合同待补的名称标出「合同待补」
+// 标注模式打开时，右上角显示「查询：… · 命令：… · 档位：…」
 Y8.ui.status(kind, text)   // kind 增加 waiting_slot（等待执行槽位）、waiting_provider（等待模型服务）、offline（离线）、repair（修复中）
 ```
 
@@ -508,6 +509,7 @@ Y8.data.define({
 | `rollback_restore` | `fault_id`、`to_version`、`backup: { id, at }`、`incompatible` |
 | `repair_stopped` | `fault_id`、`repairs: [{ work_item_id, evidence }]`、`running_version` |
 | `rework_reminder` | `plan_item`、`returns`、`last_review` |
+| `cannot_verify` | `model`、`input`、`items: [{ criterion, reason }]` |
 
 ### 8.3 世界设定
 

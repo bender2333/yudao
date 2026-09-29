@@ -1,6 +1,6 @@
 # 系统架构原理：控制核心与可替换的材料
 
-更新：2026-09-28，第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
+更新：2026-09-29，第 2、3 节按 [ADR-0020](../../adr/0020-block-only-when-no-downstream-check.md)（权威拓扑与目标层的治理形状、阻塞与否的判据）修改；第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
 
 依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
@@ -30,7 +30,7 @@
 3. 上下文装配规则：每次给它装配什么。
 4. 外置的私有历史。
 
-提供模型调用的服务、执行工具的机器与容器、外包 agent 的会话是可以替换的材料。原理第 9 节：身份由组织闭包决定，材料的替换不改变身份，前提是四条不变量保持不变（目标层只由用户修改、权威拓扑是设计时的常量、U ≠ f、失败即失败）。f 从一开始就运行在模型厂商的机器上。部门内多角色（D26）按同一方式实现：每个角色是一套上下文装配规则与工具许可，它的每一步由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），记忆只存在于外置的历史、轨迹与图谱中。
+提供模型调用的服务、执行工具的机器与容器、外包 agent 的会话是可以替换的材料。原理第 9 节：身份由组织闭包决定，材料的替换不改变身份，前提是四条不变量保持不变（目标层只由用户修改；权威拓扑属于组织这项定义，只随发布的新版本或者 Stage 6 经用户批准的候选改变，材料替换不能绕开这条路径改动它，见 [ADR-0014](../../adr/0014-versioned-definitions.md)；U ≠ f；失败即失败）。组织的新版本在采纳前，裁决规则 U 额外校验权威关系的结构：信任链不能出现循环，至少留一个角色的放行依据来自独立产生的证据而不是另一个模型的意见（第 8 节「可以外包的判据」用的是同一条标准），目标、约束与验收标准无论经过多少层部门，最终都能追溯到用户；三条有一条不满足，这份提案被拒绝。f 从一开始就运行在模型厂商的机器上。部门内多角色（D26）按同一方式实现：每个角色是一套上下文装配规则与工具许可，它的每一步由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），记忆只存在于外置的历史、轨迹与图谱中。
 
 ```mermaid
 flowchart LR
@@ -74,7 +74,9 @@ f 的输出始终是概率性的。确定性流程把概率限制在提案里，
 
 - 把 PRD 条目写成可以执行的检查。Anthropic 的 harness 设计实验在动手之前协商 sprint contract，为每条标准设硬阈值，任何一条低于阈值即判定失败。
 - 质检使用与工程不同的模型与不同的证据来源。
-- 人留在意图这一层（不变量：目标、约束与验收标准只由用户明确批准修改）。
+- 人留在意图这一层：目标、约束与验收标准的来源只能是用户的意图，不能由部门或者模型自行发明。
+
+用户的意图不需要在生效前逐项等待批准。产品部门把意图解释成当前生效的规范，解释立即驱动工作；含糊之处要不要停下，看下游有没有独立的核验能够挡住错误的判断——有核验兜底的（例如某种读法是否选错，质检的测试能够验出来），继续做、留痕、事后可以修正；没有核验能够挡住的地方（读法之间互相矛盾，没有测试能说明该信哪一条；或者变更会影响权威关系里谁在信任链末端，见第 2 节），才经[总体架构](overall-architecture.md)第 7.4 节的用户决定这条合同，向用户提出请求，并按合同的阻塞范围尽量不阻塞。
 
 ## 4. 循环系统
 
@@ -130,7 +132,7 @@ Astra 把循环放进模型内部，代价是过程不可见。Yudao 的控制�
 三条动向都在向 Yudao 的原理靠近：
 
 - 手册：「A skill is a control, though an advisory one … the hook makes them close to impossible」，对应规则由代码执行、不靠提示词。
-- 手册总结的一次内部事故：事故响应 agent 通过 Slack 请另一个能写代码的 Claude 推送修复；教训是「draw the boundary around access and actions, not around a model's instructions」，对应权威拓扑是设计时的常量、执行者之间没有直接通道。
+- 手册总结的一次内部事故：事故响应 agent 通过 Slack 请另一个能写代码的 Claude 推送修复；教训是「draw the boundary around access and actions, not around a model's instructions」，对应权威拓扑不能被参与者协商改变、执行者之间没有直接通道。
 - 手册的交接文件链 intent → spec → plan，对应 Yudao 的 intend → PRD → PLAN（2026-09-06 的比较见 [AI 原生 SDLC 对 Yudao 的启示](../../research/ai-native-sdlc-insights.md)）。
 - loop 工程中 Ralph 与 routines 每轮全新会话、从文件装配，以及 maker 与 checker 分开，对应会话可以丢弃与独立核验。
 - graph 工程中由脚本决定下一步，对应编排器不调用 LLM。
@@ -177,7 +179,7 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 | 原理 | 分布式部署 | 外包角色 |
 | --- | --- | --- |
 | U ≠ f | 提交只在控制核心进行，执行节点只交回动作回执 | agent 宣布完成只算交回提案 |
-| 权威拓扑是设计时的常量 | 执行节点之间没有直接通道，询问与交接都经过编排器 | agent 提出询问只能调用 Yudao 提供的请求工具，由编排器派发 |
+| 权威拓扑不能被参与者协商改变 | 执行节点之间没有直接通道，询问与交接都经过编排器 | agent 提出询问只能调用 Yudao 提供的请求工具，由编排器派发 |
 | 会话一次性，每次调用重新装配上下文 | 执行节点不保存状态，工作区每次从封存快照建立；动作与角色任务的状态在事件中 | 每次激活开新会话，使用全新的 agent 状态目录，不续接旧会话 |
 | 独立性靠结构成立 | 执行节点只收到本次调用需要的内容，机器上没有别的资料 | 容器里只放这个角色的资料，工作区从不带历史的快照重建 |
 | 单一会话内部的累加也是污染 | 与单机部署相同 | agent 自己压缩上下文，Yudao 用预算限制单个会话 |
