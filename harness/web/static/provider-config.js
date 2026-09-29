@@ -24,6 +24,7 @@
   const emptyModel = () => ({
     id: "", provider_id: "", model: "",
     context_window: "", max_output_tokens: "", capability_source: "",
+    accepts_required_tool_call: true,
   });
 
   let root = null;
@@ -139,6 +140,7 @@
       id: item.id, provider_id: item.provider_id, model: item.model,
       context_window: item.context_window ?? "", max_output_tokens: item.max_output_tokens ?? "",
       capability_source: item.capability_source || "",
+      accepts_required_tool_call: item.accepts_required_tool_call !== false,
     } : { ...emptyModel(), provider_id: providerId || "" };
   }
 
@@ -373,6 +375,7 @@
       id: candidate.id, provider_id: selectedProviderId, model: candidate.id,
       context_window: "", max_output_tokens: "",
       capability_source: candidate.capability_source || "",
+      accepts_required_tool_call: candidate.accepts_required_tool_call !== false,
     };
     setMessage(`已填入候选 ${candidate.id}：按需填写容量后保存，再执行模型测试`, "");
     render();
@@ -536,6 +539,8 @@
       <label>context_window<input name="context_window" type="number" min="1" value="${escapeHtml(modelForm.context_window)}" required></label>
       <label>max_output_tokens<input name="max_output_tokens" type="number" min="1" value="${escapeHtml(modelForm.max_output_tokens)}" required></label>
       <label>能力来源<input name="capability_source" value="${escapeHtml(modelForm.capability_source)}" readonly placeholder="预置提示或手动填写来源"></label>
+      <label><input name="accepts_required_tool_call" type="checkbox"${modelForm.accepts_required_tool_call ? " checked" : ""}> 是否接受要求调用工具</label>
+      <p class="yp-small">默认为接受。不接受时，最后一次主机提示之后的请求不要求调用工具。</p>
       ${admissionInfo}
       <div class="yp-heading-actions">
         <button class="yp-btn" type="button" data-pc-action="new-model">新建模型</button>
@@ -797,6 +802,7 @@
       id: model.id, provider_id: model.provider_id, model: model.model,
       context_window: model.context_window,
       max_output_tokens: model.max_output_tokens, capability_source: model.capability_source || "",
+      accepts_required_tool_call: model.accepts_required_tool_call !== false,
     };
   }
 
@@ -826,6 +832,7 @@
         context_window: String(fields.context_window ?? ""),
         max_output_tokens: String(fields.max_output_tokens ?? ""),
         capability_source: String(fields.capability_source ?? ""),
+        accepts_required_tool_call: fields.accepts_required_tool_call === "on",
       };
     }
     const credentialNode = root?.querySelector("[data-pc-form='credential']");
@@ -919,6 +926,7 @@
       context_window: Number(fields.context_window),
       max_output_tokens: Number(fields.max_output_tokens),
       capability_source: String(fields.capability_source || "").trim(),
+      accepts_required_tool_call: fields.accepts_required_tool_call === "on",
     };
     const provider = (data.providers || []).find(item => item.id === providerId);
     if (!provider) {
@@ -1082,6 +1090,7 @@
         id: item.id, provider_id: item.provider_id, model: item.model,
         context_window: item.context_window,
         max_output_tokens: item.max_output_tokens, capability_source: item.capability_source || "",
+        accepts_required_tool_call: item.accepts_required_tool_call !== false,
       })),
       bindings: data.bindings || {},
     };

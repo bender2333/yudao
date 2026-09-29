@@ -44,6 +44,7 @@ class ModelInput(Contract):
     context_window: int | None = None
     max_output_tokens: PositiveInt
     capability_source: str = ""
+    accepts_required_tool_call: bool = True
 
 
 class DocumentModelInput(ModelInput):

@@ -25,6 +25,8 @@ class FrozenTarget:
     timeout_sec: float
     credential_ref: str | None = None
     capability_source: str = ""
+    # 模型访问定义声明的是否接受要求调用工具（#102）
+    accepts_required_tool_call: bool = True
     header_profile: str = ""
     preset_id: str = ""
     revision: int = 0
@@ -46,6 +48,7 @@ class FrozenTarget:
             "timeout_sec": self.timeout_sec,
             "credential_ref": self.credential_ref,
             "capability_source": self.capability_source,
+            "accepts_required_tool_call": self.accepts_required_tool_call,
             "header_profile": self.header_profile,
             "preset_id": self.preset_id,
             "revision": self.revision,
@@ -130,6 +133,7 @@ def resolve_snapshot(
             timeout_sec=provider.timeout_sec,
             credential_ref=provider.credential_ref or None,
             capability_source=model.capability_source,
+            accepts_required_tool_call=model.accepts_required_tool_call,
             header_profile=preset_header_profile(provider.preset_id),
             preset_id=provider.preset_id,
             revision=store.revision,
@@ -199,6 +203,7 @@ def call_target_public(
         "credential_version": None if material is None else material.version,
         "context_window": None if model is None else model.context_window,
         "configured_max_output_tokens": None if model is None else model.max_output_tokens,
+        "accepts_required_tool_call": None if model is None else model.accepts_required_tool_call,
         "requested_tier": requested_tier,
         "sent_tier": None,
     }
@@ -280,6 +285,7 @@ def resolve_call_target(
         timeout_sec=provider.timeout_sec,
         credential_ref=provider.credential_ref or None,
         capability_source=model.capability_source,
+        accepts_required_tool_call=model.accepts_required_tool_call,
         header_profile=preset_header_profile(provider.preset_id),
         preset_id=provider.preset_id,
         revision=store.revision,

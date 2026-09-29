@@ -411,7 +411,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 for key in ("provider_config_id", "model_id", "provider_name", "protocol", "base_url",
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
-                            "configured_max_output_tokens", "selection_source", "requested_tier", "sent_tier")
+                            "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "requested_tier", "sent_tier")
             }
         state.model_requests.append({
             "event_id": event.event_id,
@@ -445,6 +446,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "effective_context_window": payload.get("effective_context_window"),
             "max_output_tokens": payload.get("max_output_tokens"),
             "configured_max_output_tokens": payload.get("configured_max_output_tokens"),
+            "accepts_required_tool_call": payload.get("accepts_required_tool_call"),
             "actual_provider": None,
             "actual_model": None,
             "context_digest": event.context_digest,
