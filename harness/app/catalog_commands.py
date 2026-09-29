@@ -242,7 +242,7 @@ async def _save_department_defaults(application: Application, command: Command,
 
 
 async def _reload(application: Application, command: Command, request: CatalogReload) -> None:
-    # 重新读取目录文件：修订号变化时才追加事件
+    # 重新读取目录文件：修订号变化时才追加事件；事件记录提交时依据的修订号（追加类命令，不要求相等）
     facade = application.system.facade
     before = facade.catalog_revision()
     await asyncio.to_thread(facade.reload)
@@ -250,7 +250,7 @@ async def _reload(application: Application, command: Command, request: CatalogRe
     if after == before:
         _register(application, command)
         return
-    _revised(application, command, "reload", before, after, provider_id=None)
+    _revised(application, command, "reload", request.base_version, after, provider_id=None)
 
 
 # ---------------------------------------------------------------------------
@@ -269,11 +269,13 @@ async def _collect_candidates(application: Application, command: Command, reques
                                              models_url_override=request.models_url)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
+                "base_revision": request.base_version,
                 "provider_id": request.provider_id, "status": "unknown", "source_url": request.models_url or "",
                 "fetched_at": "", "candidate_ids": [], "error": str(exc),
             })
             return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
+            "base_revision": request.base_version,
             "provider_id": request.provider_id, "status": result["status"], "source_url": result["source_url"],
             "fetched_at": result["fetched_at"],
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
@@ -282,9 +284,10 @@ async def _collect_candidates(application: Application, command: Command, reques
     application.schedule(run())
 
 
-def _test_payload(kind: str, provider_id: str, model_id: str, started: float, result: dict[str, Any],
-                  error: str | None) -> dict[str, Any]:
+def _test_payload(base_revision: int, kind: str, provider_id: str, model_id: str, started: float,
+                  result: dict[str, Any], error: str | None) -> dict[str, Any]:
     return {
+        "base_revision": base_revision,
         "kind": kind, "provider_id": provider_id, "model_id": model_id, "ok": bool(result.get("ok")),
         "protocol": result.get("protocol"), "error": error,
         "actual_model": result.get("model") if kind == "model" else None,
@@ -315,14 +318,15 @@ async def _test_connection(application: Application, command: Command, request: 
             result = await asyncio.to_thread(facade.test_connection, selection)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                    _test_payload("connection", request.provider_id, model_id, started,
+                    _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
                                   {"ok": False, "admitted": None}, str(exc)))
             return
         error = None
         if not result.get("ok"):
             error = str(result.get("message") or result.get("reason") or "连接失败")
         _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                _test_payload("connection", request.provider_id, model_id, started, result, error))
+                _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
+                              result, error))
 
     application.schedule(run())
 
@@ -343,12 +347,12 @@ async def _test_model(application: Application, command: Command, request: Catal
             result = await asyncio.to_thread(facade.model_test, request.provider_id, request.model_id)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                    _test_payload("model", request.provider_id, request.model_id, started,
+                    _test_payload(request.base_version, "model", request.provider_id, request.model_id, started,
                                   {"ok": False, "admitted": None}, str(exc)))
             return
         _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                _test_payload("model", request.provider_id, request.model_id, started, result,
-                              result.get("error")))
+                _test_payload(request.base_version, "model", request.provider_id, request.model_id, started,
+                              result, result.get("error")))
 
     application.schedule(run())
 

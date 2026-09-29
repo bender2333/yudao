@@ -953,7 +953,8 @@ class MaterialRecordedPayload(Payload):
 # 模型目录与凭据（应用层与接口层设计说明第 10 节第 1 项）：只含修订号、变化与结果，不含 Key
 
 class CatalogRevisedPayload(Payload):
-    # 目录内容（连接、访问定义、部门默认）或文件被外部修改与重读以后的修订号
+    # 目录内容（连接、访问定义、部门默认）或文件被外部修改与重读以后的修订号；
+    # base_revision 是这次变化依据的修订号：命令写提交时用户看到的修订号，外部修改与启动补写取变化前的修订号
     revision: int
     base_revision: int | None
     operation: Literal["save_connection", "delete_connection", "save_document", "department_defaults",
@@ -962,6 +963,8 @@ class CatalogRevisedPayload(Payload):
 
 
 class CatalogCandidatesCollectedPayload(Payload):
+    # base_revision 是提交命令时依据的目录修订号（追加类命令记录依据，不要求等于当时的最新修订号）
+    base_revision: int
     provider_id: str
     status: Literal["ok", "unknown"]
     source_url: str
@@ -971,7 +974,9 @@ class CatalogCandidatesCollectedPayload(Payload):
 
 
 class CatalogTestFinishedPayload(Payload):
-    # 连接测试不写准入（admitted 为空）；模型测试通过时带准入结果
+    # 连接测试不写准入（admitted 为空）；模型测试通过时带准入结果。
+    # base_revision 是提交命令时依据的目录修订号
+    base_revision: int
     kind: Literal["connection", "model"]
     provider_id: str
     model_id: str | None

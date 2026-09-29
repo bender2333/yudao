@@ -218,6 +218,7 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                                    description="catalog_test_finished (model)")
             assert finished.payload["ok"] is True and finished.payload["admitted"] is True
             assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
+            assert finished.payload["base_revision"] == current
             admitted = _catalog(client)["models"][0]
             assert admitted["admitted_at"] is not None
 
@@ -230,6 +231,7 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                                      lambda item: item.payload.get("kind") == "connection", timeout=15.0,
                                      description="catalog_test_finished (connection)")
             assert connection.payload["ok"] is True and connection.payload["admitted"] is None
+            assert connection.payload["base_revision"] == before_connection["revision"]
             assert _catalog(client)["models"][0]["admitted_at"] == admitted["admitted_at"]
             _assert_no_secret(client, opened)
     finally:
@@ -249,6 +251,7 @@ def test_candidates_collect_reads_the_models_url_and_writes_an_event(tmp_path):
             assert event.payload["status"] == "ok" and event.payload["provider_id"] == "p1"
             assert set(event.payload["candidate_ids"]) == {"m1", "m9"}
             assert event.payload["source_url"] == models_url
+            assert event.payload["base_revision"] == current
             assert _catalog(client)["revision"] == current
             _assert_no_secret(client, opened)
 
@@ -326,7 +329,24 @@ def test_reload_command_appends_only_when_the_file_changed(tmp_path):
                             timeout=5.0, description="reload catalog_revised")
         after = _catalog(client)
         assert event.payload["revision"] == after["revision"] > current
+        assert event.payload["base_revision"] == current
         assert [item["id"] for item in after["providers"]] == ["p4"]
+
+        # 追加类命令：提交时依据的修订号已经不是最新时仍被接受，事件记录依据的版本
+        saved = _command(client, "catalog.connection.save", base_version=after["revision"],
+                         provider=_provider("p5"), models=[_model("m5")])
+        assert saved.status_code == 200, saved.text
+        latest = _catalog(client)["revision"]
+        assert latest > after["revision"]
+        _write_document(opened.config, {"providers": [_provider("p6")], "models": [_document_model("p6", "m6")],
+                                        "bindings": {}})
+        stale = _command(client, "catalog.reload", base_version=after["revision"])
+        assert stale.status_code == 200, stale.text
+        [second] = _wait_for(opened.store,
+                             lambda item: item.payload.get("operation") == "reload"
+                             and item.payload["base_revision"] == after["revision"],
+                             timeout=5.0, description="按旧修订号提交的 reload")
+        assert second.payload["revision"] == _catalog(client)["revision"] > latest
 
 
 # ---------------------------------------------------------------------------

@@ -3405,6 +3405,10 @@
       "CatalogCandidatesCollectedPayload": {
         "additionalProperties": false,
         "properties": {
+          "base_revision": {
+            "title": "Base Revision",
+            "type": "integer"
+          },
           "provider_id": {
             "title": "Provider Id",
             "type": "string"
@@ -3445,6 +3449,7 @@
           }
         },
         "required": [
+          "base_revision",
           "provider_id",
           "status",
           "source_url",
@@ -3785,6 +3790,10 @@
       "CatalogTestFinishedPayload": {
         "additionalProperties": false,
         "properties": {
+          "base_revision": {
+            "title": "Base Revision",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "connection",
@@ -3862,6 +3871,7 @@
           }
         },
         "required": [
+          "base_revision",
           "kind",
           "provider_id",
           "model_id",
