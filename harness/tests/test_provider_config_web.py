@@ -11,6 +11,9 @@ from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
 from harness.web.server import serve
 
+# OpenCode Go 连接的凭据：获取模型列表与连接测试都按协议带上它（#85）
+GO_SECRET = "go-catalog-secret"
+
 
 def _model_document(model_id, provider_id, *, model="fake-script",
                     context_window=32000, max_output_tokens=4096):
@@ -31,6 +34,7 @@ def _catalog_document(provider_id="fake-a", model_id="model-a", *, protocol="fak
         "base_url": provider_fields.get("base_url", ""),
         "credential_ref": provider_fields.get("credential_ref", ""),
         "timeout_sec": provider_fields.get("timeout_sec", 600),
+        "models_url": provider_fields.get("models_url", ""),
     }
     return {
         "providers": [provider],
@@ -325,36 +329,39 @@ def test_fake_test_connection_skips_network(tmp_path):
 
 def test_test_connection_reports_missing_credential_without_secrets(tmp_path):
     secret = "super-secret-test-key"
-    document = _catalog_document(
-        "resp-a", "model-a", protocol="responses",
-        base_url="https://provider.example/v1", credential_ref="YUDAO_TEST_KEY",
-        model="listed-model",
-    )
-    system, _config = catalog_system(tmp_path, document)
-    with running_server(system) as (_server, host, port):
-        listed = get_json(host, port, "/api/providers")
-        assert secret not in json.dumps(listed)
-        assert listed["providers"][0]["credential_configured"] is False
-        status, body = request(host, port, "POST", "/api/providers/resp-a/test")
-        assert status == 200, body
-        payload = json.loads(body)
-        assert payload["ok"] is False
-        assert "YUDAO_TEST_KEY" in payload["error"]
-        assert secret not in body
+    # 连接测试读取模型列表地址：给出一份真实的上游，凭据缺失与凭据可用都能真实到达上游（#85）
+    with models_server({"data": [{"id": "listed-model"}]}) as models_url:
+        document = _catalog_document(
+            "resp-a", "model-a", protocol="responses",
+            base_url="https://provider.example/v1", credential_ref="YUDAO_TEST_KEY",
+            model="listed-model", models_url=models_url,
+        )
+        system, _config = catalog_system(tmp_path, document)
+        with running_server(system) as (_server, host, port):
+            listed = get_json(host, port, "/api/providers")
+            assert secret not in json.dumps(listed)
+            assert listed["providers"][0]["credential_configured"] is False
+            status, body = request(host, port, "POST", "/api/providers/resp-a/test")
+            assert status == 200, body
+            payload = json.loads(body)
+            assert payload["ok"] is False
+            assert "YUDAO_TEST_KEY" in payload["error"]
+            assert secret not in body
 
-        status, body = request(host, port, "POST", "/api/provider-credentials", {
-            "ref": "YUDAO_TEST_KEY", "action": "set", "secret": secret,
-        })
-        assert status == 200, body
-        assert secret not in body
-        listed = get_json(host, port, "/api/providers")
-        assert listed["providers"][0]["credential_configured"] is True
-        status, body = request(host, port, "POST", "/api/providers/resp-a/test")
-        assert status == 200, body
-        payload = json.loads(body)
-        assert payload["ok"] is True
-        assert payload["actual_model"] == "listed-model"
-        assert secret not in body
+            status, body = request(host, port, "POST", "/api/provider-credentials", {
+                "ref": "YUDAO_TEST_KEY", "action": "set", "secret": secret,
+            })
+            assert status == 200, body
+            assert secret not in body
+            listed = get_json(host, port, "/api/providers")
+            assert listed["providers"][0]["credential_configured"] is True
+            status, body = request(host, port, "POST", "/api/providers/resp-a/test")
+            assert status == 200, body
+            payload = json.loads(body)
+            # 该上游不校验凭据，配置凭据以后请求到达上游即通过
+            assert payload["ok"] is True
+            assert payload["actual_model"] == "listed-model"
+            assert secret not in body
 
 
 def test_replacing_catalog_only_affects_the_next_request(tmp_path):
@@ -592,7 +599,9 @@ def test_provider_presets_endpoint_exposes_revision_and_go_endpoints(tmp_path):
 def test_candidates_refresh_reads_models_url_without_persisting(tmp_path):
     upstream = models_server({"data": [{"id": "gpt-5.6-luna"}, {"id": "never-heard-of-it"}]})
     with upstream as models_url:
-        system, config = catalog_system(tmp_path, _go_document(models_url))
+        # 获取模型列表按连接协议的认证方式带上凭据（#85）
+        system, config = catalog_system(tmp_path, _go_document(models_url),
+                                        credentials={"GO_KEY": GO_SECRET})
         before = config.read_text(encoding="utf-8")
         with running_server(system) as (_server, host, port):
             status, body = request(host, port, "POST", "/api/providers/go/candidates", {})

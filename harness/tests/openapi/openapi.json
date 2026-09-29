@@ -8175,6 +8175,14 @@
             "title": "Fetched At",
             "type": "string"
           },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
           "candidate_ids": {
             "items": {
               "type": "string"
@@ -8200,6 +8208,7 @@
           "status",
           "source_url",
           "fetched_at",
+          "candidates",
           "candidate_ids",
           "error"
         ],
