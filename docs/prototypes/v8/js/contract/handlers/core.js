@@ -231,7 +231,7 @@
     const item = d.work_item_id ? db.workItem(d.work_item_id) : null;
     const blocked = d.blocks && d.blocks.work_item_id ? db.workItem(d.blocks.work_item_id) : null;
     const out = Y8.clone(d);
-    out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null }));
+    out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null, note_required: Boolean(o.note_required) }));
     out.kind_label = Y8.registry.entry('decision', d.kind).label;
     out.project_name = project ? project.name : d.project_id;
     out.work_item_title = item ? item.title : null;
@@ -389,6 +389,7 @@
       if (problem) return reject('option_invalid', problem);
     }
     const note = (params.note || '').trim();
+    if (option.note_required && !note) return reject('not_allowed', '「' + option.label + '」需要写明说明');
     const path = 'decisions[id=' + raw.id + ']';
     const projectStream = Y8.registry.entry('decision', raw.kind).stream === 'project';
     const answered = {

@@ -302,7 +302,7 @@
               ]
             },
             {
-              id: 'revise', label: '提出修改', kind: null, events: [
+              id: 'revise', label: '提出修改', kind: null, note_required: true, events: [
                 {
                   type: 'onboarding_revision_started', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard',
                   label: '用户提出修改，建档进入新一轮', payload: { base_event: 'initial_prd_proposed' },
@@ -682,7 +682,7 @@
                   answer: null,
                   options: [
                     { id: 'confirm', label: '确认初始 PRD', kind: 'primary', events: [] },
-                    { id: 'revise', label: '提出修改', kind: null, events: [] }
+                    { id: 'revise', label: '提出修改', kind: null, note_required: true, events: [] }
                   ]
                 }
               },

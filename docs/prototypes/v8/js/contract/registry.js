@@ -60,7 +60,7 @@
     'tool_authorization.save': c('3.2B', EDIT),
     'machine_authorization.save': c('3.2C', EDIT.concat(['not_allowed'])),
     'role_settings.save': c('S5', EDIT),
-    'decision.answer': c('ui', ['stale_base', 'not_found', 'decision_closed', 'option_invalid']),
+    'decision.answer': c('ui', ['stale_base', 'not_found', 'decision_closed', 'option_invalid', 'not_allowed']),
     'home.mark_seen': c('ui', []),
     'machine.save': c('3.2C', ['stale_base', 'already_exists']),
     'runtime.set_slots': c('3.4A', ['stale_base', 'not_allowed']),

@@ -374,7 +374,8 @@ floor.setModel(floorModel); floor.playEvent(event); floor.focus(workItemId); flo
 {
   items: [{ id, title, color_index, status, department, cycle, elapsed_sec, limit_sec, waiting_provider_sec, queue_pos, kind, sign }],
   // status：'queued'|'waiting_slot'|'running'|'asking'|'waiting_provider'|'paused'|'failed'|'done'|'cancelled'|
-  //         'interrupted'|'pending_verification'|'waiting_resume'|'stopped_for_upgrade'|'adopted'
+  //         'interrupted'|'pending_verification'|'waiting_resume'|'waiting_decision'|'stopped_for_upgrade'|'adopted'
+  // waiting_decision：事项已有 run、停下来等用户的决定（事项 queued、queue_reason 为 decision），在最后所在的房间等待
   // kind：'request' 用户的新要求 | 'repair' 修复事项（S4）
   focus_id,
   slots: { total, used } | null,                 // 3.4A
