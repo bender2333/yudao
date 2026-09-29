@@ -147,8 +147,9 @@
     return '<span class="y8-service" title="与控制主机的连接"><span class="y8-dot"></span>已连接 · 接口版本 ' + esc(cap.deployment.api_version) + '</span>';
   }
 
-  function scopeSelect(ctx) {
-    if (!ctx.projectId || isSystemRoute(ctx.route.name)) return '';
+  // project 为 projects.list 中的该项目；项目不在当前能力范围内时为 null，不查询项目内容
+  function scopeSelect(ctx, project) {
+    if (!project || isSystemRoute(ctx.route.name)) return '';
     const items = Y8.api.query('project.overview', { project: ctx.projectId }).data.work_items;
     const current = ctx.workItemId || '';
     const options = '<option value="">整个项目</option>' + items.map((item) =>
@@ -193,7 +194,7 @@
     if (name !== 'home') crumbs.push('<strong>' + esc(pageTitle(ctx)) + '</strong>');
     return drawerButton +
       '<nav class="y8-crumbs" aria-label="路径">' + crumbs.join('<span class="y8-crumb-sep">/</span>') + '</nav>' +
-      '<div class="y8-top-actions">' + scopeSelect(ctx) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
+      '<div class="y8-top-actions">' + scopeSelect(ctx, project) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
   }
 
   // ---------------------------------------------------------------------------
@@ -265,7 +266,7 @@
   // ---------------------------------------------------------------------------
   // 托盘与系统通知（设计说明第 10 节）：窗口关闭后仍保持一条不按项目筛选的事件流
 
-  const NOTIFY_TYPES = ['x_decision_issued', 'x_provider_wait_entered'];
+  const NOTIFY_TYPES = ['x_decision_issued', 'project_decision_requested', 'x_provider_wait_entered'];
 
   function trayHtml() {
     const count = Y8.api.connected() ? Y8.api.query('decisions.list', {}).data.length : null;
@@ -308,7 +309,7 @@
     const tray = document.getElementById('y8-tray-host');
     if (tray) tray.innerHTML = trayHtml();
     if (!NOTIFY_TYPES.includes(event.type)) return;
-    if (event.type === 'x_decision_issued') {
+    if (event.type === 'x_decision_issued' || event.type === 'project_decision_requested') {
       const d = Y8.api.query('decisions.list', {}).data.find((item) => item.id === event.payload.decision_id);
       if (d) notify('新的决定请求：' + d.kind_label, d.project_name + (d.work_item_title ? ' · ' + d.work_item_title : ''), '#/home', 'decision-' + d.id);
     } else if (event.type === 'x_provider_wait_entered') {
@@ -430,7 +431,8 @@
       body: '<div class="y8-form">' +
         '<label class="y8-field"><span>项目名称</span><input type="text" class="y8-input" id="y8-onboard-name" data-draft="shell.onboard.name" placeholder="例如：openai-agents 增加功能"></label>' +
         '<label class="y8-field"><span>长期目标</span><textarea class="y8-textarea" id="y8-onboard-goal" rows="3" data-draft="shell.onboard.goal"></textarea></label>' +
-        '<label class="y8-field"><span>登记的源目录</span><input type="text" class="y8-input" id="y8-onboard-dir" data-draft="shell.onboard.dir" placeholder="例如：D:\\code\\openai-agents-python"></label>' +
+        '<label class="y8-field"><span>源目录名称</span><input type="text" class="y8-input" id="y8-onboard-source" data-draft="shell.onboard.source" placeholder="例如：openai-agents"></label>' +
+        '<label class="y8-field"><span>源目录路径（控制主机上的路径）</span><input type="text" class="y8-input" id="y8-onboard-dir" data-draft="shell.onboard.dir" placeholder="例如：D:\\code\\openai-agents-python"></label>' +
         '<p class="y8-muted y8-small">产品阅读已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构说明。初始 PRD 由你确认以后成为当前有效的要求。</p></div>',
       actions: [{ label: '取消', close: true }, { label: '开始接入', kind: 'primary', act: 'shell.startOnboard' }]
     });
@@ -440,10 +442,11 @@
     const result = Y8.run('project.onboard', {
       name: document.getElementById('y8-onboard-name').value,
       goal: document.getElementById('y8-onboard-goal').value,
-      source_dir: document.getElementById('y8-onboard-dir').value
+      source_name: document.getElementById('y8-onboard-source').value,
+      source_path: document.getElementById('y8-onboard-dir').value
     });
     if (!result.accepted) return;
-    ['name', 'goal', 'dir'].forEach((k) => Y8.app.clearDraft('shell.onboard.' + k));
+    ['name', 'goal', 'source', 'dir'].forEach((k) => Y8.app.clearDraft('shell.onboard.' + k));
     Y8.ui.closeModal();
     setTimeout(() => Y8.go(Y8.paths.overview(result.refs.project_id, null)), Y8.backend.latency + 50);
   });

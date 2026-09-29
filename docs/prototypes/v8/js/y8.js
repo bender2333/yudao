@@ -168,6 +168,14 @@
   Y8.applyPatch = function applyPatch(root, patch) {
     if (!patch || typeof patch.path !== 'string') throw new Error('补丁缺少 path');
     if ('push' in patch) return Y8.path.push(root, patch.path, Y8.clone(patch.push));
+    if ('put' in patch) {
+      // 向对象增加一个键：{ path, put: { key, value } }；键已存在时抛出错误
+      const target = Y8.path.get(root, patch.path);
+      if (!Y8.isPlainObject(target)) throw new Error('「' + patch.path + '」不是对象，不能增加键');
+      if (patch.put.key in target) throw new Error('「' + patch.path + '」中已有键：' + patch.put.key);
+      target[patch.put.key] = Y8.clone(patch.put.value);
+      return target;
+    }
     if ('remove' in patch) return Y8.path.remove(root, patch.path, patch.remove.key, patch.remove.value);
     if (!('value' in patch)) throw new Error('补丁缺少 value、push 或 remove：' + patch.path);
     return Y8.path.set(root, patch.path, Y8.clone(patch.value));

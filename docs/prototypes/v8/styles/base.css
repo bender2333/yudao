@@ -1,4 +1,4 @@
-/* 原型 v7 基础样式：变量、布局、通用组件、外壳、浮动工具条与窄屏规则。色板沿用 v6。 */
+/* 原型 v8 基础样式：变量、布局、通用组件、外壳、状态项、托盘与通知、决定卡片、时间轴、画面面板、浮动工具条与窄屏规则。色板沿用 v6。 */
 
 :root {
   color-scheme: light dark;
@@ -454,6 +454,127 @@ html.is-annotate .y8-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
   .y8-tb-sep { display: none; }
   .y8-tb-event { flex-wrap: wrap; }
   .y8-note-actions { display: flex; margin: 8px 0 0; }
+}
+
+/* ---------------------------------------------------------------- v8：通用小部件 */
+
+.y8-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--soft); flex-wrap: wrap; }
+.y8-seg-btn { border: 0; background: transparent; color: var(--muted); border-radius: 7px; padding: 3px 10px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.y8-seg-btn:hover { background: var(--soft-2); color: var(--text); }
+.y8-seg-btn.is-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--shadow-color); font-weight: 600; }
+.y8-count.is-decide { background: var(--amber-bg); color: var(--amber); margin-left: 6px; }
+.y8-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.y8-tag.is-pending { background: var(--red-bg); color: var(--red); }
+.y8-annot-pending { font-style: normal; margin-left: 4px; padding: 0 4px; border-radius: 4px; background: var(--red-bg); color: var(--red); font-size: 10.5px; }
+.y8-btn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.y8-side-actions { display: grid; gap: 6px; margin: 8px 0 10px; }
+.y8-onboard { justify-content: flex-start; }
+.y8-home-link { margin-top: 10px; width: 100%; }
+.y8-connect-link { margin-top: 10px; width: 100%; }
+.y8-status.is-waiting_slot { background: var(--orange-bg); color: var(--orange); }
+.y8-status.is-waiting_provider { background: var(--soft-2); color: var(--muted); border: 1px dashed var(--line-strong); }
+.y8-status.is-offline { background: var(--soft-2); color: var(--muted); }
+.y8-status.is-repair { background: var(--red-bg); color: var(--red); }
+
+/* ---------------------------------------------------------------- 状态项 */
+
+.y8-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.y8-stat {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left;
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--faint);
+}
+.y8-stat:disabled { opacity: 1; cursor: default; }
+.y8-stat .y8-stat-icon { grid-row: 1 / 3; width: 18px; height: 18px; }
+.y8-stat-label { font-size: 12px; }
+.y8-stat-value { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.y8-stat.is-lit { color: var(--amber); background: var(--amber-bg); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
+.y8-stat.is-lit.is-decisions { color: var(--blue); background: var(--blue-bg); border-color: color-mix(in srgb, var(--blue) 45%, transparent); }
+.y8-stat.is-lit.is-offline_machines, .y8-stat.is-lit.is-repairing_faults, .y8-stat.is-lit.is-disk { color: var(--red); background: var(--red-bg); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.y8-stat.is-lit:hover { filter: brightness(.97); }
+.y8-stat.is-compact { display: inline-flex; padding: 2px 8px; gap: 5px; border-radius: 999px; }
+.y8-stat.is-compact .y8-stat-icon { width: 14px; height: 14px; }
+.y8-stat.is-compact .y8-stat-value { font-size: 12px; }
+.y8-top-stats { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- 决定卡片 */
+
+.y8-cards { display: grid; gap: 12px; }
+.y8-card { border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.y8-card.is-waiting_resume, .y8-card.is-unknown_action { border-left-color: var(--orange); }
+.y8-card.is-rollback_restore, .y8-card.is-repair_stopped { border-left-color: var(--red); }
+.y8-card.is-provider_wait, .y8-card.is-rework_reminder { border-left-color: var(--blue); }
+.y8-card.is-submitted { opacity: .75; }
+.y8-card-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.y8-card-meta { display: flex; gap: 6px 14px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; }
+.y8-card-body summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.y8-card-kv { margin-top: 6px; }
+.y8-card-links { margin-top: 6px; }
+.y8-card-answer { display: grid; gap: 8px; }
+.y8-card-submitted { color: var(--blue); font-size: 12.5px; }
+.y8-card-result { color: var(--green); font-weight: 600; }
+.y8-card-foot { display: flex; justify-content: flex-end; }
+
+/* ---------------------------------------------------------------- 时间轴与回放 */
+
+.y8-replay { display: grid; gap: 8px; margin-top: 12px; }
+.y8-replay-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.y8-replay-on { font-weight: 600; color: var(--violet); background: var(--violet-bg); padding: 1px 8px; border-radius: 6px; }
+.y8-replay-fact { color: var(--text); font-size: 12.5px; overflow-wrap: anywhere; }
+.y8-ticks { display: flex; align-items: center; gap: 3px; overflow-x: auto; padding: 8px 4px; border-radius: 8px; background: var(--soft); min-height: 40px; }
+.y8-tick { flex: none; width: 12px; height: 24px; border: 0; padding: 0; background: transparent; display: grid; place-items: center; }
+.y8-tick span { width: 6px; height: 18px; border-radius: 3px; background: var(--tick); opacity: .85; }
+.y8-tick.is-past span { opacity: .45; }
+.y8-tick.is-current span { width: 8px; height: 24px; opacity: 1; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tick); }
+.y8-tick.is-highlight span { outline: 2px solid var(--text); outline-offset: 1px; opacity: 1; }
+.y8-tick-break { flex: none; display: inline-flex; flex-direction: column; align-items: center; color: var(--faint); font-size: 13px; line-height: 1; padding: 0 4px; }
+.y8-tick-break small { font-size: 10px; white-space: nowrap; }
+.y8-legends { display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
+.y8-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--tick); margin-right: 4px; }
+
+/* ---------------------------------------------------------------- 画面面板 */
+
+.y8-scene { position: relative; border-radius: 10px; overflow: hidden; background: #1f2230; }
+.y8-scene canvas { display: block; width: 100%; }
+.is-replay > .y8-scene { box-shadow: 0 0 0 3px var(--violet); }
+.y8-floor-wrap { display: flex; flex-direction: column; }
+.y8-overlay-bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 6px 8px; background: #1f2230; }
+.y8-overlay-bar::before { content: "覆盖层"; color: #9ea3bd; font-size: 12px; margin-right: auto; }
+.y8-overlay-bar .y8-seg-btn { background: rgba(255, 255, 255, .08); color: #dfe3f2; }
+.y8-overlay-bar .y8-seg-btn.is-on { background: #9c86ff; color: #16122c; }
+.y8-scene-list { margin-top: 8px; font-size: 12.5px; }
+.y8-scene-list summary { cursor: pointer; color: var(--muted); }
+.y8-scene-list ul { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 4px; }
+.y8-scene-list li { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.y8-scene-list h4 { margin: 8px 0 2px; font-size: 12.5px; }
+.y8-dot-color { width: 9px; height: 9px; border-radius: 2px; background: var(--c); display: inline-block; }
+
+/* ---------------------------------------------------------------- 托盘、系统通知、整窗提示 */
+
+.y8-tray-host { position: fixed; right: 14px; bottom: calc(var(--tb-space, 100px) + 10px); z-index: 90; }
+.y8-tray { position: relative; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px 3px 6px; box-shadow: 0 2px 8px var(--shadow-color); font-size: 12px; color: var(--muted); }
+.y8-tray-icon { width: 18px; height: 18px; color: var(--green); }
+.y8-tray-badge { position: absolute; left: 16px; top: -4px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+.y8-notify-root { position: fixed; right: 14px; top: calc(var(--banner-h) + 48px); z-index: 130; display: grid; gap: 8px; width: min(340px, calc(100vw - 28px)); }
+.y8-notify { display: grid; gap: 3px; text-align: left; border: 1px solid #3a3f52; background: #1f2230; color: #eceefa; border-radius: 10px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); font-size: 12.5px; }
+.y8-notify-app { display: flex; align-items: center; gap: 6px; color: #9ea3bd; font-size: 11px; }
+.y8-notify strong { font-size: 13px; }
+.y8-window-note.is-offline { position: fixed; top: var(--banner-h); left: 0; right: 0; z-index: 95; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; background: #3d4250; color: #fff; font-size: 13px; }
+body.is-disconnected .y8-app { filter: grayscale(1) opacity(.6); pointer-events: none; }
+.y8-window-note.is-version { position: fixed; inset: var(--banner-h) 0 0 0; z-index: 95; display: grid; place-items: center; background: var(--bg); padding: 16px; }
+body.is-version-mismatch .y8-app { display: none; }
+.y8-update-card { max-width: 520px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 24px; display: grid; gap: 10px; }
+
+/* ---------------------------------------------------------------- 工具条的档位与模拟 */
+
+.y8-toolbar .y8-tb-level { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: transparent; color: #c4c6dd; }
+.y8-toolbar .y8-tb-level:hover { background: transparent; }
+.y8-tb-select.is-scenario { max-width: 260px; }
+.y8-tb-btn.is-on { background: #9c86ff; color: #16122c; }
+.y8-tb-sim { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 4px 14px 6px; color: #c9cbe2; font-size: 12px; }
+.y8-tb-sim label { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (max-width: 720px) {
+  .y8-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

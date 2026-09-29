@@ -1,4 +1,3 @@
-import copy
 import json
 
 import pytest
@@ -11,6 +10,7 @@ from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
 from harness.tests.helpers import FAST_RETRIES, after_event
+from harness.tests.saved_rewrite import insert_saved_event_after, rewrite_saved_event
 
 
 def _retry_run(tmp_path):
@@ -22,10 +22,9 @@ def _retry_run(tmp_path):
     return system, run_id
 
 
-def _mutated_events(system, run_id, monkeypatch):
-    events = copy.deepcopy(system.store.list_events(run_id))
-    monkeypatch.setattr(system.store, "list_events", lambda *_args, **_kwargs: events)
-    return events
+def _saved_events(system, run_id):
+    # 审计读到的必须是事件库中保存的事件；测试改动以后写回事件行，再经公开接口运行审计
+    return system.store.list_events(run_id)
 
 
 def test_native_retry_events_are_verified_by_model_input_audit(tmp_path, monkeypatch):
@@ -45,11 +44,13 @@ def test_native_retry_events_are_verified_by_model_input_audit(tmp_path, monkeyp
     assert sum(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events) == 1
 
 
-def test_model_input_audit_rejects_retry_event_without_max_attempts(tmp_path, monkeypatch):
+def test_model_input_audit_rejects_retry_event_without_max_attempts(tmp_path):
     system, run_id = _retry_run(tmp_path)
-    events = _mutated_events(system, run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     schedule = next(event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED)
     schedule.payload.pop("max_attempts")
+    rewrite_saved_event(system.store, schedule)
 
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
 
@@ -57,11 +58,13 @@ def test_model_input_audit_rejects_retry_event_without_max_attempts(tmp_path, mo
     assert any("max_attempts" in note for note in audit["notes"])
 
 
-def test_model_input_audit_rejects_retry_event_with_wrong_next_attempt(tmp_path, monkeypatch):
+def test_model_input_audit_rejects_retry_event_with_wrong_next_attempt(tmp_path):
     system, run_id = _retry_run(tmp_path)
-    events = _mutated_events(system, run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     schedule = next(event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED)
     schedule.payload["next_attempt"] = schedule.payload["attempt"] + 2
+    rewrite_saved_event(system.store, schedule)
 
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
 
@@ -77,11 +80,13 @@ def test_model_input_audit_rejects_retry_event_with_wrong_next_attempt(tmp_path,
     (EventType.MODEL_REQUESTED, "root_step_id"),
     (EventType.MODEL_REQUESTED, "retry_of_step_id"),
 ])
-def test_model_input_audit_rejects_missing_retry_metadata(tmp_path, monkeypatch, event_type, field):
+def test_model_input_audit_rejects_missing_retry_metadata(tmp_path, event_type, field):
     system, run_id = _retry_run(tmp_path)
-    events = _mutated_events(system, run_id, monkeypatch)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     event = next(item for item in events if item.type == event_type)
     event.payload.pop(field)
+    rewrite_saved_event(system.store, event)
 
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
 
@@ -89,7 +94,7 @@ def test_model_input_audit_rejects_missing_retry_metadata(tmp_path, monkeypatch,
     assert any(field in note for note in audit["notes"])
 
 
-def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fails_audit(tmp_path, monkeypatch):
+def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fails_audit(tmp_path):
     partial = {
         "id": "failed-partial",
         "type": "message",
@@ -111,13 +116,13 @@ def test_failed_partial_output_is_removed_from_retry_history_and_late_residue_fa
     clean = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert clean["status"] == "verified", clean
 
-    events = _mutated_events(system, run_id, monkeypatch)
+    events = _saved_events(system, run_id)
     partial_event = next(event for event in events
                          if event.type == EventType.MODEL_MESSAGE
                          and event.payload.get("response_id") == "failed-partial")
-    failure_index = next(index for index, event in enumerate(events)
-                         if event.type == EventType.MODEL_ATTEMPT_FAILED)
-    events.insert(failure_index + 1, copy.deepcopy(partial_event))
+    failure = next(event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED)
+    # 失败之后又保存了一条这个步骤的输出：插入一条真实的事件行，审计必须发现
+    insert_saved_event_after(system.store, partial_event.event_id, failure.event_id)
     residue = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
 
     assert residue["status"] == "unverified"

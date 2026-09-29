@@ -41,7 +41,7 @@
 以下在 3.2D 设计时确定：
 
 - Playwright MCP 在执行环境中的运行方式（容器镜像、浏览器版本）与启用的能力（可访问性快照、截图、断言）。
-- computer use 的虚拟屏幕、截图尺寸与动作集合，参照 Anthropic 的参考实现（Docker 容器加虚拟显示）。
+- computer use 的虚拟屏幕、截图尺寸与动作集合，参照 Anthropic 的参考实现（Docker 容器加虚拟显示）。实现核对见 [computer use 实现调研](../research/computer-use-implementations.md)。
 - 截图作为证据的保存位置与在界面上的显示。
 - 质检从 PRD 生成测试的方式，以及测试记录怎样绑定交付快照。
 
