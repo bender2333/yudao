@@ -5,6 +5,8 @@
   const Y8 = window.Y8;
   const P = Y8.pixel;
   if (!P || !P.createScene) throw new Error('floor.js 需要先加载 js/pixel/engine.js');
+  if (!P.ecs) throw new Error('floor.js 需要先加载 js/pixel/ecs.js');
+  const ECS = P.ecs;
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;
 
@@ -14,13 +16,9 @@
   const FLOOR_LINE = 150;  // 房间内墙与地面的分界
   const ROOM_B = 214;      // 房间下沿（门所在的墙）
   const DESK_Y = 196;      // 工位的桌面前沿
-  const PORT_STAND = 176;  // 小人站在管道口前的位置
   const PIPE_Y = 138;      // 交接管道的高度
   const TUBE_Y = 104;      // 相邻房间之间传信管的高度
-  const DUCT_Y = 30;       // 天花板上的回流管道
-  const DUCT_TUBE_Y = 42;  // 天花板上的长传信管（产品与质检之间）
   const CORR_Y = 238;      // 走廊
-  const UNDER_Y = 276;     // 地板下的管道（运维故障信件回到大厅）
   const DEPTS = ['product', 'engineering', 'quality'];
   const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release', letter: 'letter' };
   const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
@@ -63,25 +61,43 @@
   ];
 
   // ---------------------------------------------------------------------------
-  // 布局：有运维房间（Stage 4）时成果库变窄
+  // 房间与管道的声明：P.ecs 按声明排布；有运维房间（Stage 4）时成果库变窄
 
-  function layoutFor(hasOps) {
-    const hall = { id: 'hall', x: 4, w: 100 };
-    const rooms = {};
-    let x = 110;
-    DEPTS.forEach((d) => { rooms[d] = { id: d, x, w: 110 }; x += 116; });
-    const lib = { id: 'library', x, w: hasOps ? 82 : 136 };
-    x += lib.w + 6;
-    const ops = hasOps ? { id: 'operations', x, w: 88 } : null;
-    const door = { x: 606, y: 218, w: 28, h: 40 };   // 通往机房的门，在走廊尽头
-    [hall, lib, ops].concat(DEPTS.map((d) => rooms[d])).forEach((r) => {
-      if (!r) return;
-      r.door = r.x + Math.round(r.w / 2);
-      r.inPort = r.x + 12;              // 左墙的管道口
-      r.outPort = r.x + r.w - 12;       // 右墙的管道口
-      r.desk = { x: r.x + Math.round(r.w / 2) - 17, w: 34, seatX: r.x + Math.round(r.w / 2) - 5, seatY: DESK_Y };
-    });
-    return { hall, rooms, lib, ops, door };
+  const ROOM_DEFS = [
+    { id: 'hall', label: '大厅', roomKind: 'hall' },
+    { id: 'product', label: '产品', roomKind: 'dept' },
+    { id: 'engineering', label: '工程', roomKind: 'dept' },
+    { id: 'quality', label: '质检', roomKind: 'dept' },
+    { id: 'library', label: '成果库', roomKind: 'shelf' },
+    { id: 'operations', label: '运维', roomKind: 'dept', optional: true }
+  ];
+
+  // 管道：交接管道 handoff（粗的玻璃管）、传信管 tube（细的蓝色管）、回流管道 return
+  const LINK_DEFS = [
+    { from: 'hall', to: 'product', kind: 'handoff' },
+    { from: 'product', to: 'engineering', kind: 'handoff' },
+    { from: 'engineering', to: 'quality', kind: 'handoff' },
+    { from: 'quality', to: 'library', kind: 'handoff' },
+    { from: 'quality', to: 'product', kind: 'return' },
+    { from: 'product', to: 'engineering', kind: 'tube' },
+    { from: 'engineering', to: 'quality', kind: 'tube' },
+    { from: 'product', to: 'quality', kind: 'tube' },
+    { from: 'library', to: 'operations', kind: 'handoff', optional: true },
+    { from: 'operations', to: 'machine_room', kind: 'handoff', optional: true },
+    { from: 'operations', to: 'hall', kind: 'return', via: 'under', optional: true }
+  ];
+
+  function declareWorld(hasOps) {
+    const world = ECS.world();
+    ECS.declareRooms(world, ROOM_DEFS, { hasOps });
+    ECS.declareLinks(world, LINK_DEFS);
+    return world;
+  }
+
+  // 画面按房间名取用的排布（同一批房间实体）
+  function layOf(world) {
+    const r = world.rooms;
+    return { hall: r.hall, rooms: { product: r.product, engineering: r.engineering, quality: r.quality }, lib: r.library, ops: r.operations || null, door: world.machineDoor };
   }
 
   function roomOf(lay, id) {
@@ -91,58 +107,17 @@
     return lay.rooms[id] || null;
   }
 
-  // 管道：交接管道 handoff（粗的玻璃管）与传信管 tube（细的蓝色管）；pts 为画面坐标的折线
-  function pipesFor(lay) {
-    const r = lay.rooms;
-    const pipes = {};
-    const add = (key, kind, pts) => { pipes[key] = { key, kind, pts }; };
-    add('hall>product', 'handoff', [[lay.hall.x + 22, PIPE_Y], [r.product.inPort, PIPE_Y]]);
-    add('product>engineering', 'handoff', [[r.product.outPort, PIPE_Y], [r.engineering.inPort, PIPE_Y]]);
-    add('engineering>quality', 'handoff', [[r.engineering.outPort, PIPE_Y], [r.quality.inPort, PIPE_Y]]);
-    add('quality>library', 'handoff', [[r.quality.outPort, PIPE_Y], [lay.lib.inPort, PIPE_Y]]);
-    // 回流管道：质检经天花板回到产品
-    add('quality>product', 'return', [[r.quality.outPort - 8, PIPE_Y - 8], [r.quality.outPort - 8, DUCT_Y], [r.product.inPort + 8, DUCT_Y], [r.product.inPort + 8, PIPE_Y - 8]]);
-    add('product~engineering', 'tube', [[r.product.outPort, TUBE_Y], [r.engineering.inPort, TUBE_Y]]);
-    add('engineering~quality', 'tube', [[r.engineering.outPort, TUBE_Y], [r.quality.inPort, TUBE_Y]]);
-    add('product~quality', 'tube', [[r.product.x + 22, TUBE_Y - 12], [r.product.x + 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, TUBE_Y - 12]]);
-    if (lay.ops) {
-      add('library>operations', 'handoff', [[lay.lib.outPort, PIPE_Y], [lay.ops.inPort, PIPE_Y]]);
-      add('operations>machine_room', 'handoff', [[lay.ops.outPort, PIPE_Y], [lay.ops.outPort, ROOM_B + 10], [lay.door.x + 14, ROOM_B + 10], [lay.door.x + 14, lay.door.y + 12]]);
-      add('operations>hall', 'return', [[lay.ops.x + 20, ROOM_B - 4], [lay.ops.x + 20, UNDER_Y], [lay.hall.x + 12, UNDER_Y], [lay.hall.x + 12, ROOM_B + 26]]);
-    }
-    return pipes;
-  }
-
-  function polyLength(pts) {
-    let len = 0;
-    for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    return len;
-  }
-
-  function pointAt(pts, d) {
-    let left = d;
-    for (let i = 1; i < pts.length; i++) {
-      const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-      if (left <= seg || i === pts.length - 1) {
-        const k = seg ? Math.min(1, left / seg) : 1;
-        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k];
-      }
-      left -= seg;
-    }
-    return pts[pts.length - 1];
-  }
-
   // ---------------------------------------------------------------------------
 
   P.createFloorScene = function createFloorScene(canvas, opts) {
     const o = opts || {};
     let model = { items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false };
-    let lay = layoutFor(false);
-    let pipes = pipesFor(lay);
+    let world = declareWorld(false);
+    let lay = layOf(world);
     let focusId = null;
     let overlay = { id: null, data: null };
     const st = {
-      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, movers: [], arrows: [], mailFlash: 0, shelfFlash: 0,
+      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], mailFlash: 0, shelfFlash: 0,
       doorFlash: 0, monitorFlash: 0, decisions: {}, remoteDots: [], queueX: {}, n: 0
     };
     const scene = P.createScene(canvas, { W, H, draw, update });
@@ -163,120 +138,76 @@
       return here.find((it) => ACTIVE.includes(it.status)) || here.find((it) => it.status === 'waiting_provider') || here[0] || null;
     }
 
+    // 每个房间一个角色实体（P.ecs）：快照决定小人现在该干什么（ch.rest），事件变成任务放进队列
     function syncWorkers() {
       const want = DEPTS.concat(lay.ops ? ['operations'] : []);
-      scene.actors.filter((a) => a.data.worker && !want.includes(a.data.dept)).forEach((a) => scene.removeActor(a));
+      ECS.syncCharacters(world, scene, want, spriteOf);
       want.forEach((d) => {
-        const r = roomOf(lay, d);
-        let a = scene.actors.find((x) => x.data.worker && x.data.dept === d);
-        if (!a) {
-          a = scene.addActor({ id: 'w-' + d, sprite: spriteOf(d), x: r.desk.seatX, y: r.desk.seatY, anim: 'sit', data: { worker: true, dept: d } });
-          a.seat = r.desk;
-        }
-        a.data.room = r;
-        a.data.item = primaryItem(d);
+        const ch = world.characters[d];
+        ch.item = primaryItem(d);
+        ch.rest = restFor(d, ch.item);
       });
     }
 
-    function restFor(a) {
-      const d = a.data.dept;
-      const r = a.data.room;
-      const it = a.data.item;
-      const seat = (anim, icon) => ({ x: r.desk.seatX, y: r.desk.seatY, seat: r.desk, anim, icon: icon || null });
+    // 快照对应的持续状态：spot 与 pose 的含义见 ecs.js 的任务目录
+    function restFor(d, it) {
+      const seat = (pose, icon, iconText) => ({ spot: 'desk', pose, icon: icon || null, iconText: iconText || null });
       if (d === 'operations') {
-        if (model.ops && model.ops.fault) return { x: r.x + r.w - 26, y: PORT_STAND, seat: null, anim: 'watch_r', icon: { kind: 'exclaim' } };
+        if (model.ops && model.ops.fault) return { spot: 'monitor', pose: 'watch_r', icon: 'exclaim' };
         return seat(model.ops ? 'type' : 'tea');
       }
       if (!it) return seat('tea');
-      if (a.data.tempUntil > scene.realT) return seat(a.data.tempAnim, a.data.tempIcon);
       const openFrom = (model.open_requests || []).find((q) => q.from === d && q.work_item_id === it.id);
       switch (it.status) {
         case 'running': return seat('type');
         case 'asking': {
           const target = openFrom ? openFrom.to : null;
           const right = target && DEPTS.indexOf(target) > DEPTS.indexOf(d);
-          return { x: right ? r.outPort - 6 : r.inPort + 6, y: PORT_STAND, seat: null, anim: 'wait', facing: right ? 1 : -1, icon: null };
+          return { spot: right ? 'port_out' : 'port_in', pose: 'wait', facing: right ? 1 : -1 };
         }
         case 'waiting_provider': {
           const w = waitingDept(d);
-          return seat('sit_wait', { kind: 'hourglass', text: w && w.next_retry_at ? Y8.time.clock(w.next_retry_at) + ' 重试' : '等待' });
+          return seat('sit_wait', 'hourglass', w && w.next_retry_at ? Y8.time.clock(w.next_retry_at) + ' 重试' : '等待');
         }
-        case 'paused': return seat('sit_relax', { kind: 'zzz' });
+        case 'paused': return seat('sit_relax', 'zzz');
         case 'failed': return seat('slump');
-        case 'done': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'cheer' };
-        case 'cancelled': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
-        case 'pending_verification': return seat('sit_scratch', { kind: 'question' });
-        case 'waiting_resume': return seat('sit_wait', { kind: 'text', text: '待恢复' });
-        case 'waiting_decision': return seat('sit_wait', { kind: 'text', text: '待你决定' });
-        case 'stopped_for_upgrade': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
+        case 'done': return { spot: 'stand', pose: 'cheer' };
+        case 'cancelled': return { spot: 'stand', pose: 'idle' };
+        case 'pending_verification': return seat('sit_scratch', 'question');
+        case 'waiting_resume': return seat('sit_wait', 'text', '待恢复');
+        case 'waiting_decision': return seat('sit_wait', 'text', '待你决定');
+        case 'stopped_for_upgrade': return { spot: 'stand', pose: 'idle' };
         default: return seat('sit');
       }
     }
 
-    function applyWorker(a) {
-      const rest = restFor(a);
-      a.dim = dimFor(a.data.item && a.data.item.id);
-      const atSpot = Math.hypot(a.x - rest.x, a.y - rest.y) < 1.5 && (rest.seat ? a.seat === rest.seat : !a.seat);
-      if (!atSpot) {
-        const steps = [];
-        if (a.seat) steps.push({ t: 'seat', seat: null }, { t: 'anim', name: 'idle', ms: 120 });
-        steps.push({ t: 'go', x: rest.x, y: rest.y });
-        if (rest.seat) steps.push({ t: 'seat', seat: rest.seat }, { t: 'turn', facing: 1 });
-        if (rest.facing) steps.push({ t: 'turn', facing: rest.facing });
-        scene.run(a, steps, {});
-        return;
-      }
-      if (rest.facing) a.facing = rest.facing;
-      if (rest.icon) {
-        if (!a.icon || a.icon.kind !== rest.icon.kind || a.icon.text !== rest.icon.text) a.icon = Object.assign({ t0: scene.realT }, rest.icon);
-      } else a.icon = null;
-      scene.play(a, rest.anim);
-    }
+    function workerOf(d) { return ECS.actorOf(world, scene, d); }
 
-    function workerOf(d) { return scene.actors.find((a) => a.data.worker && a.data.dept === d) || null; }
-
-    // 小人走到管道口放下或取出包裹
-    function portTrip(d, side, anim, after) {
-      const a = workerOf(d);
-      if (!a || scene.reduced) { if (after) after(); return; }
-      const r = roomOf(lay, d);
-      const x = side === 'out' ? r.outPort - 6 : r.inPort + 6;
-      scene.run(a, [
-        { t: 'seat', seat: null }, { t: 'go', x, y: PORT_STAND }, { t: 'turn', facing: side === 'out' ? 1 : -1 },
-        { t: 'anim', name: anim, ms: 520, key: true }, { t: 'call', fn: () => { if (after) after(); } }
-      ], {});
-    }
-
-    function tempWorker(d, anim, icon, ms) {
-      const a = workerOf(d);
-      if (!a) return;
-      a.data.tempAnim = anim; a.data.tempIcon = icon; a.data.tempUntil = scene.realT + (ms || 2200);
+    // 小人走到管道口放下或取出包裹：任务放到队首（交接不排队），做完以后执行 after；没有角色或减少动画时直接执行
+    function trip(d, key, after, extra) {
+      if (scene.reduced || !ECS.enqueue(world, d, key, Object.assign({ front: true, must: true, onDone: after }, extra))) { if (after) after(); }
     }
 
     // -------------------------------------------------------------------------
     // 管道中的包裹
 
-    function pathFor(from, to, artifact) {
-      const direct = pipes[from + '>' + to];
-      if (direct) return { pts: direct.pts, key: direct.key };
-      if (artifact === 'defect' || (DEPTS.indexOf(from) > DEPTS.indexOf(to) && DEPTS.includes(to))) {
-        if (from === 'quality' && to === 'product') return { pts: pipes['quality>product'].pts, key: 'quality>product' };
-        const back = pipes[to + '>' + from];
-        if (back) return { pts: back.pts.slice().reverse(), key: back.key };
-      }
-      const back = pipes[to + '>' + from];
-      if (back) return { pts: back.pts.slice().reverse(), key: back.key };
-      return null;
+    function pathFor(from, to) {
+      const l = ECS.linkBetween(world, from, to, 'handoff');
+      return l ? { pts: l.pts, key: l.key } : null;
     }
 
     function tubeFor(from, to) {
-      const a = pipes[from + '~' + to];
-      if (a) return a.pts;
-      const b = pipes[to + '~' + from];
-      if (b) return b.pts.slice().reverse();
-      return null;
+      const l = ECS.linkBetween(world, from, to, 'tube');
+      return l ? l.pts : null;
     }
 
+    function tubeKeyOf(from, to) {
+      const l = ECS.linkBetween(world, from, to, 'tube');
+      return l ? l.key : null;
+    }
+
+    // 包裹是 world.packages 里的实体：沿管道移动，到达终点后销毁并执行 onDone；linkKey 标出它经过的管道
+    let packageSeq = 0;
     function send(pts, bmp, opt) {
       const option = opt || {};
       if (!pts) { if (option.onDone) option.onDone(); return; }
@@ -285,31 +216,31 @@
         if (option.onDone) option.onDone();
         return;
       }
-      const len = polyLength(pts);
-      st.movers.push({ pts, len, bmp, t0: scene.realT, ms: option.ms || Math.max(700, len * 9), itemId: option.itemId, small: option.small, color: option.color, onDone: option.onDone, cross: option.cross });
-    }
-
-    function drawMovers(c) {
-      st.movers.forEach((m) => {
-        const k = Math.min(1, (scene.realT - m.t0) / m.ms);
-        const [x, y] = pointAt(m.pts, P.ease.inOut(k) * m.len);
-        c.globalAlpha = dimFor(m.itemId);
-        if (m.small) {
-          RB(c, Math.round(x) - 2, Math.round(y) - 1, 5, 3, PAL.white);
-          R(c, Math.round(x) - 1, Math.round(y), 3, 1, m.color || PAL.blue2);
-        } else {
-          const b = P.bitmap(m.bmp);
-          P.drawBitmap(c, m.bmp, Math.round(x - b.w / 2), Math.round(y - b.h / 2));
-          if (m.color) R(c, Math.round(x - b.w / 2), Math.round(y + b.h / 2), b.w, 2, m.color);
-        }
-        c.globalAlpha = 1;
+      const id = 'pk-' + (++packageSeq);
+      const pk = ECS.spawnPackage(world, id, option.itemId || null, null, option.artifact || null, null);
+      Object.assign(pk, { bmp, color: option.color, small: option.small });
+      ECS.sendPackage(world, id, option.linkKey || null, pts, option.ms, () => {
+        ECS.removePackage(world, id);
+        if (option.onDone) option.onDone();
       });
     }
 
-    function updateMovers() {
-      const done = st.movers.filter((m) => scene.realT - m.t0 >= m.ms);
-      st.movers = st.movers.filter((m) => scene.realT - m.t0 < m.ms);
-      done.forEach((m) => { if (m.onDone) m.onDone(); });
+    function drawPackages(c) {
+      Object.values(world.packages).forEach((pk) => {
+        const pos = ECS.packagePosition(pk);
+        if (!pos) return;
+        const [x, y] = pos;
+        c.globalAlpha = dimFor(pk.workItemId);
+        if (pk.small) {
+          RB(c, Math.round(x) - 2, Math.round(y) - 1, 5, 3, PAL.white);
+          R(c, Math.round(x) - 1, Math.round(y), 3, 1, pk.color || PAL.blue2);
+        } else {
+          const b = P.bitmap(pk.bmp);
+          P.drawBitmap(c, pk.bmp, Math.round(x - b.w / 2), Math.round(y - b.h / 2));
+          if (pk.color) R(c, Math.round(x - b.w / 2), Math.round(y + b.h / 2), b.w, 2, pk.color);
+        }
+        c.globalAlpha = 1;
+      });
     }
 
     // -------------------------------------------------------------------------
@@ -336,28 +267,32 @@
           let to = pl.to;
           if (to === 'adopted' || to === 'adoption') to = 'library';
           const from = pl.from;
-          const path = pathFor(from, to, pl.artifact);
+          const path = pathFor(from, to);
           if (!path) return;
           const rework = pl.artifact === 'defect' || path.key === 'quality>product' || (DEPTS.includes(from) && DEPTS.includes(to) && DEPTS.indexOf(from) > DEPTS.indexOf(to));
           if (rework) st.pipeFlash[path.key] = scene.realT + 2600;
           const bmp = ART_BMP[pl.artifact] || 'box_sealed';
-          const go = () => send(path.pts, bmp, { itemId: wid, color, onDone: () => { flash(to, PAL.white, 500); if (DEPTS.includes(to)) portTrip(to, rework ? 'out' : 'in', 'crouch'); } });
-          if (DEPTS.includes(from) || from === 'operations') portTrip(from, rework ? 'in' : 'out', 'side_place', go);
+          // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一个任务
+          const arrive = () => { flash(to, PAL.white, 500); if (DEPTS.includes(to)) trip(to, rework ? 'package_return_in' : 'package_handoff_in'); };
+          const go = () => send(path.pts, bmp, { itemId: wid, color, linkKey: path.key, onDone: arrive });
+          if (DEPTS.includes(from) || from === 'operations') trip(from, rework ? 'package_return_out' : 'package_handoff_out', go);
           else go();
           return;
         }
         case 'qa_submitted':
           flash('quality', pl.verdict === 'release' ? PAL.green2 : PAL.red2, 1200);
-          tempWorker('quality', pl.verdict === 'release' ? 'sit_happy' : 'sit_scratch', { kind: pl.verdict === 'release' ? 'check' : 'exclaim' }, 1800);
+          ECS.dispatch(world, Object.assign({}, ev, { department: 'quality' }));
           return;
         case 'collaboration_requested': {
           const pts = tubeFor(pl.from, pl.to);
-          portTrip(pl.from, DEPTS.indexOf(pl.to) > DEPTS.indexOf(pl.from) ? 'out' : 'in', 'side_place', () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.blue2 }));
+          const key = DEPTS.indexOf(pl.to) > DEPTS.indexOf(pl.from) ? 'letter_out' : 'letter_in';
+          trip(pl.from, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to) }), { label: '发出询问' });
           return;
         }
         case 'collaboration_responded': {
           const pts = tubeFor(pl.to, pl.from);
-          portTrip(pl.to, DEPTS.indexOf(pl.from) > DEPTS.indexOf(pl.to) ? 'out' : 'in', 'side_place', () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.green2 }));
+          const key = DEPTS.indexOf(pl.from) > DEPTS.indexOf(pl.to) ? 'letter_out' : 'letter_in';
+          trip(pl.to, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(pl.to, pl.from) }), { label: '回答询问' });
           return;
         }
         case 'deliverable_adopted':
@@ -371,7 +306,7 @@
           return;
         case 'x_slot_acquired': {
           st.flash.hall = { color: PAL.green2, until: scene.realT + 900 };
-          send(pipes['hall>product'].pts, 'box', { itemId: wid, color, onDone: () => portTrip('product', 'in', 'crouch') });
+          send(world.links['hall>product'].pts, 'box', { itemId: wid, color, linkKey: 'hall>product', onDone: () => trip('product', 'package_handoff_in') });
           return;
         }
         case 'x_queue_reordered':
@@ -380,7 +315,7 @@
         case 'x_run_interrupted':
           return;
         case 'x_run_auto_resumed':
-          scene.actors.filter((a) => a.data.worker).forEach((a) => scene.run(a, [{ t: 'anim', name: a.seat ? 'stretch_sit' : 'stretch' }], {}));
+          Object.keys(world.characters).forEach((d) => ECS.enqueue(world, d, 'x_run_auto_resumed'));
           DEPTS.forEach((d) => flash(d, PAL.yellow1, 700));
           return;
         case 'x_action_unknown':
@@ -412,31 +347,23 @@
           if (ev.department) flash(ev.department, ev.type === 'x_provider_wait_entered' ? PAL.grey3 : PAL.yellow1, 900);
           return;
         case 'x_deployed':
-          if (lay.ops) send(pipes['operations>machine_room'].pts, 'box_sealed', { onDone: () => { st.doorFlash = scene.realT + 1800; } });
+          if (lay.ops) send(world.links['operations>machine_room'].pts, 'box_sealed', { linkKey: 'operations>machine_room', onDone: () => { st.doorFlash = scene.realT + 1800; } });
           return;
         case 'x_rolled_back':
-          if (lay.ops) send(pipes['operations>machine_room'].pts.slice().reverse(), 'box', { onDone: () => flash('operations', PAL.orange1, 800) });
+          if (lay.ops) send(world.links['operations>machine_room'].pts.slice().reverse(), 'box', { linkKey: 'operations>machine_room', onDone: () => flash('operations', PAL.orange1, 800) });
           return;
         case 'x_fault_recorded':
           if (!lay.ops) return;
           st.monitorFlash = scene.realT + 4000;
-          scene.after(scene.reduced ? 0 : 900, () => send(pipes['operations>hall'].pts, 'letter', { color: PAL.red2, onDone: () => { st.mailFlash = scene.realT + 1800; } }));
+          scene.after(scene.reduced ? 0 : 900, () => send(world.links['operations>hall'].pts, 'letter', { color: PAL.red2, linkKey: 'operations>hall', onDone: () => { st.mailFlash = scene.realT + 1800; } }));
           return;
         case 'run_done':
           scene.emit('confetti', W / 2, 60, 40, { spread: 560 });
           return;
-        default: {
+        default:
+          // 其余事件由任务目录决定：命中的事件变成部门角色的任务，没有命中的事件在画面上没有小人的动作
           if (!ev.department || !roomOf(lay, ev.department) || ev.department === 'operations') return;
-          const map = {
-            model_requested: ['type', { kind: 'think' }], model_stream_progress: ['type', { kind: 'think' }], model_attempt_finished: ['sit_happy', { kind: 'bulb' }],
-            model_retry_scheduled: ['sit_wait', { kind: 'hourglass', text: pl.n ? pl.n + '/' + pl.of : null }], model_attempt_failed: ['slump', { kind: 'cross' }],
-            tool_started: ['read_sit', null], tool_skipped: ['sit_scratch', { kind: 'cross' }], proposal_rejected: ['sit_scratch', { kind: 'question' }],
-            spec_accepted: ['sit_happy', { kind: 'check' }], plan_accepted: ['sit_happy', { kind: 'check' }], delivery_accepted: ['sit_happy', { kind: 'check' }],
-            compaction_recorded: ['sit_up', null], department_guidance_received: ['sit_up', { kind: 'exclaim' }]
-          };
-          const entry = map[ev.type];
-          if (entry) tempWorker(ev.department, entry[0], entry[1], 2400);
-        }
+          ECS.dispatch(world, ev);
       }
     }
 
@@ -445,8 +372,12 @@
 
     function update() {
       if (!model.interrupted) st.clock += scene.reduced ? 0 : 16.7;
-      updateMovers();
-      scene.actors.forEach((a) => { if (a.data.worker && !a.script) applyWorker(a); });
+      ECS.stepPackages(world, scene);
+      ECS.stepCharacters(world, scene);
+      Object.values(world.characters).forEach((ch) => {
+        const a = workerOf(ch.id);
+        if (a) a.dim = dimFor(ch.item && ch.item.id);
+      });
       st.arrows = st.arrows.filter((ar) => ar.until > scene.realT);
       st.remoteDots = st.remoteDots.filter((d) => scene.realT - d.t0 < d.ms);
       // 队列中的包裹滑到自己的位置
@@ -505,22 +436,25 @@
     // -------------------------------------------------------------------------
     // 绘制：管道
 
+    // 管道通不通：快照里两端有活跃事项，或者管道上有包裹在移动
     function pipeState(p) {
       if (model.interrupted) return 'stopped';
-      const [a, b] = p.key.split(/[>~]/);
+      const [a, b] = p.id.split(/[>~]/);
       if (waitingDept(a) || waitingDept(b)) return 'stopped';
       const active = (d) => itemsIn(d).some((it) => ACTIVE.includes(it.status));
-      if (p.kind === 'tube') return (model.open_requests || []).length ? 'flowing' : 'idle';
+      if (ECS.linkActive(world, p.id)) return 'flowing';
+      if (p.linkKind === 'tube') return (model.open_requests || []).length ? 'flowing' : 'idle';
       return active(a) || active(b) ? 'flowing' : 'idle';
     }
 
     function drawPipe(c, p, t) {
       const state = pipeState(p);
-      const thick = p.kind === 'tube' ? 3 : 8;
-      const flashing = (st.pipeFlash[p.key] || 0) > scene.realT && Math.floor(t / 180) % 2 === 0;
+      const tube = p.linkKind === 'tube';
+      const thick = tube ? 3 : 8;
+      const flashing = (st.pipeFlash[p.id] || 0) > scene.realT && Math.floor(t / 180) % 2 === 0;
       const outline = PAL.ink;
-      const body = flashing ? PAL.red2 : p.kind === 'tube' ? TUBE : state === 'stopped' ? '#9aa0aa' : p.kind === 'return' ? '#c9b48a' : PAL.glass;
-      const hi = p.kind === 'tube' ? PAL.white : PAL.white;
+      const body = flashing ? PAL.red2 : tube ? TUBE : state === 'stopped' ? '#9aa0aa' : p.linkKind === 'return' ? '#c9b48a' : PAL.glass;
+      const hi = PAL.white;
       for (let i = 1; i < p.pts.length; i++) {
         const [x0, y0] = p.pts[i - 1], [x1, y1] = p.pts[i];
         const x = Math.min(x0, x1) - thick / 2, y = Math.min(y0, y1) - thick / 2;
@@ -530,16 +464,16 @@
         else R(c, x + 1, y + 1, 1, h - 2, hi);
       }
       // 金属接头
-      if (p.kind !== 'tube') p.pts.forEach(([x, y]) => RB(c, x - thick / 2 - 1, y - thick / 2 - 1, thick + 2, thick + 2, PAL.metal3));
+      if (!tube) p.pts.forEach(([x, y]) => RB(c, x - thick / 2 - 1, y - thick / 2 - 1, thick + 2, thick + 2, PAL.metal3));
       // 流动：沿管道移动的亮点
       if (state === 'flowing' && !scene.reduced && !scene.frozen) {
-        const len = polyLength(p.pts);
-        const gap = p.kind === 'tube' ? 14 : 22;
-        const off = (t / (p.kind === 'tube' ? 30 : 45)) % gap;
-        c.fillStyle = p.kind === 'tube' ? TUBE_D : P.rgba(PAL.blue2, 0.55);
+        const len = ECS.polyLength(p.pts);
+        const gap = tube ? 14 : 22;
+        const off = (t / (tube ? 30 : 45)) % gap;
+        c.fillStyle = tube ? TUBE_D : P.rgba(PAL.blue2, 0.55);
         for (let d = off; d < len; d += gap) {
-          const [x, y] = pointAt(p.pts, d);
-          c.fillRect(Math.round(x) - 1, Math.round(y) - (p.kind === 'tube' ? 0 : 1), 2, p.kind === 'tube' ? 1 : 2);
+          const [x, y] = ECS.pointAt(p.pts, d);
+          c.fillRect(Math.round(x) - 1, Math.round(y) - (tube ? 0 : 1), 2, tube ? 1 : 2);
         }
       }
     }
@@ -552,7 +486,7 @@
     }
 
     function drawPipes(c, t) {
-      Object.values(pipes).forEach((p) => drawPipe(c, p, t));
+      Object.values(world.links).forEach((p) => drawPipe(c, p, t));
       DEPTS.forEach((d) => {
         const r = lay.rooms[d];
         drawPort(c, r.inPort, PIPE_Y, 'handoff');
@@ -564,7 +498,7 @@
       if (lay.ops) { drawPort(c, lay.ops.inPort, PIPE_Y, 'handoff'); drawPort(c, lay.ops.outPort, PIPE_Y, 'handoff'); }
       // Stage 6 的判定阀门位置：交接管道上的空卡座
       ['product>engineering', 'engineering>quality', 'quality>library'].forEach((key) => {
-        const p = pipes[key];
+        const p = world.links[key];
         const mx = Math.round((p.pts[0][0] + p.pts[1][0]) / 2);
         R(c, mx - 3, PIPE_Y - 9, 6, 2, PAL.metal4);
       });
@@ -668,7 +602,7 @@
         if (a.seat === desk) P.drawActor(c, scene, a, 'base');
         paint.desk(c, desk.x, desk.seatY, { w: desk.w });
         R(c, desk.x + desk.w - 11, desk.seatY - 9, 9, 6, PAL.ink);
-        const it = a.data.item;
+        const it = world.characters[d].item;
         const mode = model.interrupted ? 'off' : it && it.status === 'running' ? 'code' : it && it.status === 'failed' ? 'error' : it && it.status === 'pending_verification' ? 'alert' : 'idle';
         paint.screen(c, desk.x + desk.w - 10, desk.seatY - 8, 7, 4, mode, t, { seed: desk.x });
         if (it) {
@@ -779,7 +713,7 @@
         (data.segments || []).forEach((s) => {
           const path = pathFor(s.from, s.to, s.kind === 'rework' ? 'defect' : null) || { pts: tubeFor(s.from, s.to) };
           if (!path || !path.pts) return;
-          const [x, y] = pointAt(path.pts, polyLength(path.pts) / 2);
+          const [x, y] = ECS.pointAt(path.pts, ECS.polyLength(path.pts) / 2);
           label(x, y - 6, s.count + ' 次 · ' + Y8.time.clock(s.last_at), s.kind === 'rework' ? PAL.red1 : PAL.white);
         });
       } else if (overlay.id === 'waiting') {
@@ -811,6 +745,26 @@
 
     // -------------------------------------------------------------------------
 
+    // 头顶对话框：说话气泡是正在做的任务，思考气泡是队列里的下一项；内容只来自任务自己的字段
+    function drawBubbles(c) {
+      if (scene.reduced) return;
+      Object.values(world.characters).forEach((ch) => {
+        const a = workerOf(ch.id);
+        const b = ch.bubble;
+        if (!a || !a.visible || !b) return;
+        const [hx, hy] = P.headTop(scene, a);
+        const text = b.text.length > 14 ? '…' + b.text.slice(-13) : b.text;
+        const tw = Math.min(90, Math.max(14, P.measure(c, text, 6, 500)));
+        const w = Math.round(tw + 8), h = 11;
+        const x = Math.max(2, Math.min(W - w - 2, Math.round(hx - w / 2 + 3)));
+        const y = hy - (a.icon ? 34 : 20);
+        c.globalAlpha = a.dim;
+        P.bubble(c, x, y, w, h, { kind: b.kind, tx: hx + 3 });
+        P.text(c, text, x + 4, y + h / 2 + 0.5, { size: 6, max: tw, color: PAL.ink2 });
+        c.globalAlpha = 1;
+      });
+    }
+
     function draw(sc, c) {
       const t = sc.animT;
       c.drawImage(buildBackground(), 0, 0);
@@ -819,7 +773,7 @@
       drawLibrary(c, t);
       if (lay.ops) drawDeptRoom(c, 'operations', t);
       drawPipes(c, t);
-      drawMovers(c);
+      drawPackages(c);
       drawMachineDoor(c, t);
       sc.drawFlyers(c);
       sc.drawParticles(c);
@@ -885,12 +839,13 @@
       });
 
       sc.actors.forEach((a) => { if (a.icon) { c.globalAlpha = a.dim; P.drawIcon(c, sc, a); c.globalAlpha = 1; } });
+      drawBubbles(c);
 
       // 减少动画时的交接箭头
       st.arrows.forEach((ar) => {
         c.globalAlpha = dimFor(ar.itemId);
         P.arrow(c, ar.pts, ar.color, { dash: ar.dash });
-        const mid = pointAt(ar.pts, polyLength(ar.pts) / 2);
+        const mid = ECS.pointAt(ar.pts, ECS.polyLength(ar.pts) / 2);
         const b = P.bitmap(ar.bmp);
         P.drawBitmap(c, ar.bmp, mid[0] - b.w / 2, mid[1] - b.h - 3);
         c.globalAlpha = 1;
@@ -958,10 +913,10 @@
       model = Object.assign({ open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false }, m);
       const hasOps = Boolean(m.ops);
       if (hasOps !== Boolean(lay.ops)) {
-        lay = layoutFor(hasOps);
-        pipes = pipesFor(lay);
+        world = declareWorld(hasOps);
+        lay = layOf(world);
         bg = null;
-        scene.actors.filter((a) => a.data.worker).forEach((a) => scene.removeActor(a));
+        scene.actors.filter((a) => a.data.ecsChar).forEach((a) => scene.removeActor(a));
       }
       if (m.focus_id !== undefined && focusId === null) focusId = m.focus_id;
       syncWorkers();

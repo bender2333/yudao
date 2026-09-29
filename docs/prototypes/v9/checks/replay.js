@@ -76,7 +76,7 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER }) => {
     workers.forEach((a, i) => { a.clock = 5000; a.animStart = 0; a.seed = 100 + i; });
     sc.animT = 20000;
     sc.drawNow();
-    cps.push({ label, state, png: canvas.toDataURL('image/png'), t });
+    cps.push({ label, state, png: canvas.toDataURL('image/png'), t, frozen: Boolean(sc.frozen) });
   }
 
   try {
@@ -125,9 +125,10 @@ async function version(browser, root, rec) {
   return Object.assign(res, { errors });
 }
 
-async function diff(cmp, a, b) {
+// rects：不参与比较的矩形 [x0, y0, x1, y1]（整层中断时小人停在哪里取决于中断之前的动作，只比较小人以外的画面）
+async function diff(cmp, a, b, rects) {
   if (a === b) return { count: 0 };
-  return cmp.evaluate(async ([x, y]) => {
+  return cmp.evaluate(async ([x, y, masks]) => {
     const load = (src) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.src = src; });
     const [ia, ib] = await Promise.all([load(x), load(y)]);
     if (ia.width !== ib.width || ia.height !== ib.height) return { count: -1, size: [ia.width, ia.height, ib.width, ib.height] };
@@ -143,8 +144,9 @@ async function diff(cmp, a, b) {
     let count = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
     const out = cx.createImageData(cv.width, cv.height);
     for (let i = 0; i < da.length; i += 4) {
-      const same = da[i] === db[i] && da[i + 1] === db[i + 1] && da[i + 2] === db[i + 2];
       const p = i / 4, px = p % cv.width, py = (p - px) / cv.width;
+      const masked = masks && masks.some((m) => px >= m[0] && px <= m[2] && py >= m[1] && py <= m[3]);
+      const same = masked || (da[i] === db[i] && da[i + 1] === db[i + 1] && da[i + 2] === db[i + 2]);
       if (same) {
         out.data[i] = db[i] * 0.35; out.data[i + 1] = db[i + 1] * 0.35; out.data[i + 2] = db[i + 2] * 0.35; out.data[i + 3] = 255;
       } else {
@@ -155,7 +157,7 @@ async function diff(cmp, a, b) {
     }
     cx.putImageData(out, 0, 0);
     return { count, bbox: [x0, y0, x1, y1], png: cv.toDataURL('image/png') };
-  }, [a, b]);
+  }, [a, b, rects || null]);
 }
 
 const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.from(dataUrl.split(',')[1], 'base64'));
@@ -175,8 +177,12 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
     let kept = 0;
     for (let i = 0; i < n; i++) {
       const A = a.cps[i], B = b.cps[i];
-      const d = await diff(cmp, A.png, B.png);
-      const stateSame = JSON.stringify(A.state) === JSON.stringify(B.state);
+      // 整层中断（画面静止）时，小人停在中断前正在做的动作的位置：不比较小人的状态，像素只比较小人以外的部分
+      const frozen = A.frozen || B.frozen;
+      const boxes = frozen ? A.state.concat(B.state).map((s) => [Math.round(s.x) - 40, Math.round(s.y) - 72, Math.round(s.x) + 40, Math.round(s.y) + 8]) : null;
+      if (frozen) row.frozenCheckpoints = (row.frozenCheckpoints || 0) + 1;
+      const d = await diff(cmp, A.png, B.png, boxes);
+      const stateSame = frozen || JSON.stringify(A.state) === JSON.stringify(B.state);
       if (!stateSame) {
         row.stateDiff++;
         if (row.notes.length < 6) row.notes.push('[小人] ' + A.label + ' v8=' + JSON.stringify(A.state.map((s) => [s.sprite.split('.')[0], s.x, s.y, s.seat, s.anim, s.icon && s.icon.kind])) + ' v9=' + JSON.stringify(B.state.map((s) => [s.sprite.split('.')[0], s.x, s.y, s.seat, s.anim, s.icon && s.icon.kind])));
