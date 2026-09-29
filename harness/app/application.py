@@ -48,6 +48,7 @@ from .project_and_work_item_commands import (
     SOURCE_DIRECTORY_SAVE,
     WORK_ITEM_APPEND_INPUT,
     WORK_ITEM_CANCEL,
+    WORK_ITEM_CREATE,
 )
 from .runtime_commands import RUNTIME_FORCE_UPGRADE, RUNTIME_START_DRAIN
 from .system_queries import SYSTEM_STATUS

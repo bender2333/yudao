@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
-
+from pydantic import AwareDatetime
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition
 
@@ -41,6 +41,9 @@ class SystemStatus(Contract):
     catalog: CatalogState
     # 排空状态（ADR-0019，3.1）：未排空、排空中与剩余的 run 数、已排空可以升级
     drain: DrainStatus
+
+# 这个文件用了 from __future__ import annotations，SystemStatus 引用 DrainStatus 时需要重建模型
+SystemStatus.model_rebuild()
 
 def _system_status(application: Application, _request: None) -> Snapshot[SystemStatus]:
     system = application.system
