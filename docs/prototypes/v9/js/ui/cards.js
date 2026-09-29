@@ -23,12 +23,15 @@
     return '打开';
   }
 
-  // 每种决定请求需要的材料（BUILD.md 第 8.2 节）
-  function materialsHtml(d) {
+  // 每种决定请求需要的材料（BUILD.md 第 8.2 节）：[标题, 内容] 的列表。
+  // html 为真时内容是可以直接放进页面的 HTML；否则是纯文字（像素画面用），能点开别的页面的内容是 { text, go }
+  function materialRows(d, html) {
     const m = d.materials || {};
     const kv = [];
-    const code = (v) => (v === undefined || v === null || v === '' ? '' : Y8.ui.code(v));
-    const text = (v) => (v === undefined || v === null ? '' : esc(v));
+    const code = (v) => (v === undefined || v === null || v === '' ? '' : html ? Y8.ui.code(v) : String(v));
+    const text = (v) => (v === undefined || v === null ? '' : html ? esc(v) : String(v));
+    const when = (v) => (html ? esc(Y8.ui.time(v)) : Y8.ui.time(v));
+    const go = (label, href) => (html ? '<button type="button" class="y8-link" data-go="' + esc(href) + '">' + esc(label) + '</button>' : { text: label, go: href });
     switch (d.kind) {
       case 'waiting_resume':
         kv.push(['部门', text(dept(m.department))], ['模型', code(m.model)], ['具体问题', text(m.problem)]);
@@ -48,18 +51,18 @@
         break;
       case 'initial_prd':
         kv.push(['初始 PRD 摘要', text(m.prd_summary)]);
-        if (m.prd_material_id) kv.push(['原文', '<button type="button" class="y8-link" data-go="' + esc(Y8.paths.materials(d.project_id, d.work_item_id)) + '">在资料中查看初始 PRD</button>']);
-        if (m.structure_material_id) kv.push(['现有结构说明', '<button type="button" class="y8-link" data-go="' + esc(Y8.paths.materials(d.project_id, d.work_item_id)) + '">工程写出的现有结构说明</button>']);
+        if (m.prd_material_id) kv.push(['原文', go('在资料中查看初始 PRD', Y8.paths.materials(d.project_id, d.work_item_id))]);
+        if (m.structure_material_id) kv.push(['现有结构说明', go('工程写出的现有结构说明', Y8.paths.materials(d.project_id, d.work_item_id))]);
         break;
       case 'provider_wait':
-        kv.push(['部门', text(dept(m.department))], ['模型服务', text(m.provider)], ['失败的分类', text(m.category)], ['下一次重试', m.next_retry_at ? esc(Y8.ui.time(m.next_retry_at)) : '']);
+        kv.push(['部门', text(dept(m.department))], ['模型服务', text(m.provider)], ['失败的分类', text(m.category)], ['下一次重试', m.next_retry_at ? when(m.next_retry_at) : '']);
         break;
       case 'external_action':
         kv.push(['动作', text(m.action)], ['运行环境', text(machineName(m.machine_id))], ['运维给出的理由', text(m.reason)], ['证据', text(m.evidence)]);
         break;
       case 'rollback_restore':
         kv.push(['故障记录', code(m.fault_id)], ['回滚的目标版本', code(m.to_version)],
-          ['将要恢复的备份', m.backup ? esc(m.backup.id) + ' · ' + esc(Y8.ui.time(m.backup.at)) : ''], ['交付说明中不兼容的说明', text(m.incompatible)]);
+          ['将要恢复的备份', m.backup ? text(m.backup.id) + ' · ' + when(m.backup.at) : ''], ['交付说明中不兼容的说明', text(m.incompatible)]);
         break;
       case 'repair_stopped':
         kv.push(['故障记录', code(m.fault_id)], ['当前运行的版本', code(m.running_version)]);
@@ -71,18 +74,42 @@
       default:
         throw new Error('未知的决定种类：' + d.kind);
     }
-    const links = (m.links || []).map((href) => '<button type="button" class="y8-btn small" data-go="' + esc(href) + '">' + esc(linkLabel(href)) + '</button>').join('');
-    return Y8.ui.kv(kv, 'y8-card-kv') + (links ? '<div class="y8-row y8-card-links">' + links + '</div>' : '');
+    return kv;
+  }
+
+  function materialsHtml(d) {
+    const links = ((d.materials || {}).links || []).map((href) => '<button type="button" class="y8-btn small" data-go="' + esc(href) + '">' + esc(linkLabel(href)) + '</button>').join('');
+    return Y8.ui.kv(materialRows(d, true), 'y8-card-kv') + (links ? '<div class="y8-row y8-card-links">' + links + '</div>' : '');
+  }
+
+  // 挡住了什么：纯文字（muted 为真表示不挡住事项）
+  function blocksText(d) {
+    const b = d.blocks;
+    if (!b || !b.scope) return { text: '不挡住事项', muted: true };
+    const parts = [];
+    if (b.work_item_title) parts.push('挡住「' + b.work_item_title + '」');
+    else if (d.work_item_title) parts.push('挡住「' + d.work_item_title + '」');
+    if (b.queued_behind) parts.push('同一项目中排在它后面的事项 ' + b.queued_behind + ' 个');
+    return { text: parts.join('，') || '挡住本事项', muted: false };
   }
 
   function blocksHtml(d) {
-    const b = d.blocks;
-    if (!b || !b.scope) return '<span class="y8-muted">不挡住事项</span>';
-    const parts = [];
-    if (b.work_item_title) parts.push('挡住「' + esc(b.work_item_title) + '」');
-    else if (d.work_item_title) parts.push('挡住「' + esc(d.work_item_title) + '」');
-    if (b.queued_behind) parts.push('同一项目中排在它后面的事项 ' + b.queued_behind + ' 个');
-    return parts.join('，') || '挡住本事项';
+    const b = blocksText(d);
+    return b.muted ? '<span class="y8-muted">' + esc(b.text) + '</span>' : esc(b.text);
+  }
+
+  // 像素画面里的决定卡片用的内容：跟 DOM 卡片同一份材料，纯文字
+  function face(d) {
+    return {
+      id: d.id, kind: d.kind, version: d.version, title: d.kind_label, work_item_id: d.work_item_id,
+      where: d.project_name + (d.work_item_title ? ' · ' + d.work_item_title : ''),
+      waited: '已等待 ' + Y8.ui.duration(d.waited_sec),
+      blocks: blocksText(d).text,
+      rows: materialRows(d, false),
+      links: ((d.materials || {}).links || []).map((href) => ({ text: linkLabel(href), go: href })),
+      options: d.options.map((op) => ({ id: op.id, label: op.label, kind: op.kind, requires: op.requires, note_required: op.note_required })),
+      view: d.view
+    };
   }
 
   function render(d, opts) {
@@ -138,5 +165,5 @@
     }
   });
 
-  Y8.cards = { render, list };
+  Y8.cards = { render, list, face };
 })();

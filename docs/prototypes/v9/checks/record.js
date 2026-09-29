@@ -1,12 +1,14 @@
 // 录制：在 v8 页面里播放全部场景，记录项目楼层画面（createFloorScene）收到的每一次调用，
 // 之后由 replay.js 把同一串调用按确定的时钟回放给 v8 与 v9 的楼层画面，比较结果。
-// 用法：node docs/prototypes/v9/checks/record.js（写出 .tmp/v9-checks/recordings.json）
+// 用法：node docs/prototypes/v9/checks/record.js [--root <index.html 的 file:// 地址，默认是 v8>] [--out 文件名，默认 recordings.json]
+// 写出 .tmp/v9-checks/<文件名>。在 v8 页面上录的调用给 replay.js 与 v8 逐像素比较；在 v9 页面上录的调用带着部门角色，给 life.js 看多角色。
 const fs = require('fs');
 const path = require('path');
 const { chromium, EXE, v8Url, outDir } = require('./env');
 
-const ROOT = v8Url;
-const OUT = path.join(outDir, 'recordings.json');
+const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; };
+const ROOT = arg('root', v8Url);
+const OUT = path.join(outDir, arg('out', 'recordings.json'));
 
 (async () => {
   const browser = await chromium.launch({ executablePath: EXE });

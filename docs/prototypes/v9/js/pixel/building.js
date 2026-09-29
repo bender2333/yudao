@@ -1,5 +1,6 @@
 // 楼与机房（设计说明第 4.2 节）：首页画一栋楼，每个项目一层（部门房间的灯、事项小旗、入口阀门、状态灯、空闲时走动的小人）；
-// 地下室是所有项目共用的机房（3.2C），每台机器是一台设备，项目楼层有管线通到它正在使用的设备。机器页上方复用机房画面
+// 地下室是所有项目共用的机房（3.2C），每台机器是一台设备，项目楼层有管线通到它正在使用的设备。机器页上方复用机房画面。
+// 楼里的小人、通往机房的管线、机房里的设备与管线、沿管线移动的包裹都是 P.ecs 的实体
 (function () {
   'use strict';
   const Y8 = window.Y8;
@@ -28,6 +29,9 @@
   const LINK_COLORS = ['#e8505b', '#3fc1e8', '#8fd14f', '#f7c948', '#f27ec2', '#b98558'];
   P.LINK_COLORS = LINK_COLORS;
 
+  // 包裹沿管线走的时间：管线长度乘一个系数，最短 700 毫秒
+  const travelMs = (pts) => Math.max(700, ECS.polyLength(pts) * 9);
+
   // ---------------------------------------------------------------------------
   // 楼
 
@@ -41,11 +45,8 @@
     const floorY = (i) => ROOF + i * FH;
     const roomX = (k) => 150 + k * 96;
 
-    // 楼层小人的待机行为接上 ecs.js（BUILD.md 第 2 节任务 B）：每层一个角色实体，id 用 project_id。
-    // 楼里的世界不画房间图，ECS.roomOf 返回 null，P.ecs.stepCharacters 的待机行为因此走
-    // 「留在 ch.spot、到达后播 idle」这一分支：走动目标由下面的 update 写进 ch.spot——有部门亮灯
-    // 时是本层那个部门门口（坐标跟 v8 相同），空闲时是本层的随机位置——走位与 idle 动画
-    // 统一交给 ECS.stepCharacters 推进，本文件不再自己叠 go+idle。
+    // 楼里的世界：每层一个小人（角色实体，没有房间，走位由 ECS.stepCharacters 推进），
+    // 每个用着机器的项目一根通往机房的管线（管道实体，沿右侧竖井下到地下室），远程动作的包裹沿着它走。
     const world = ECS.world();
     // 速度沿用 v8：走到门口 40 像素/秒、随机走动 22 像素/秒（stepCharacters 的 go 步骤不写 speed，
     // engine.js 取 actor.speed，因此每次设目标时先写 a.speed）；随机走动的间隔沿用 v8
@@ -81,6 +82,25 @@
       });
     }
 
+    // 通往机房的管线的几何：从这一层的出口横着走到右侧竖井，再沿竖井下到地下室
+    function shaftOf(f, i) {
+      const y = floorY(i);
+      const x0 = roomX(3) + (f.has_ops ? 82 : 0);
+      const sx = W - 22 - (i % 6) * 3;
+      const drop = (model.floors.length - i) * FH - 30;
+      return { col: LINK_COLORS[i % LINK_COLORS.length], y, x0, sx, drop, pts: [[x0, y + 31], [sx + 1, y + 31], [sx + 1, y + 30 + drop + BASE]] };
+    }
+
+    function declareShafts() {
+      const defs = [];
+      model.floors.forEach((f, i) => {
+        if (f.machine_ids && f.machine_ids.length) defs.push({ from: 'floor:' + f.project_id, to: 'basement', kind: 'shaft', pts: shaftOf(f, i).pts, index: i, active: Boolean(f.link_active) });
+      });
+      ECS.declareLinks(world, defs);
+    }
+
+    const shaftKey = (pid) => 'floor:' + pid + '>basement';
+
     function update() {
       model.floors.forEach((f) => {
         const ch = world.characters[f.project_id];
@@ -106,8 +126,10 @@
           }
         }
       });
-      // 待机的走位与 idle 动画交给 ecs.js 的待机系统推进（首页的楼不进任务队列，queue 恒为空）
+      // 待机的走位与 idle 动画交给 ecs.js 推进（首页的楼不进任务队列，queue 恒为空）；管线与包裹同样由 ecs.js 推进
       ECS.stepCharacters(world, scene);
+      ECS.stepPipes(world, scene, (p) => (p.def.active ? 'flowing' : 'idle'));
+      ECS.stepPackages(world, scene);
     }
 
     function drawFloor(c, f, i, t) {
@@ -150,15 +172,25 @@
         });
         if (k < 3 && (!f.has_ops ? k < 2 : true)) R(c, x + 80, y + 26, 16, 3, PAL.glass2);
       });
-      // 管线出口：通往机房的管线沿右侧竖井下到地下室
-      if (f.machine_ids && f.machine_ids.length) {
-        const col = LINK_COLORS[i % LINK_COLORS.length];
-        const sx = W - 22 - (i % 6) * 3;
-        R(c, roomX(3) + (f.has_ops ? 82 : 0), y + 30, sx - roomX(3) - (f.has_ops ? 82 : 0), 2, col);
-        R(c, sx, y + 30, 2, (model.floors.length - i) * FH - 30 + BASE, col);
-        if (f.link_active && !scene.reduced) {
-          const k = (t / 900 + i * 0.3) % 1;
-          R(c, sx - 1, y + 30 + k * ((model.floors.length - i) * FH - 30), 4, 3, PAL.yellow2);
+      // 管线出口：通往机房的管线沿右侧竖井下到地下室，管线里有光点在流动
+      const link = world.links[shaftKey(f.project_id)];
+      if (link) {
+        const s = shaftOf(f, i);
+        R(c, s.x0, y + 30, s.sx - s.x0, 2, s.col);
+        R(c, s.sx, y + 30, 2, s.drop + BASE, s.col);
+        if (!scene.reduced) {
+          const fl = link.flow;
+          if (ECS.config.autonomy) {
+            if (fl && fl.load > 0.02) {
+              const k = (fl.phase / 900 + i * 0.3) % 1;
+              c.globalAlpha = fl.load;
+              R(c, s.sx - 1, y + 30 + k * s.drop, 4, 3, PAL.yellow2);
+              c.globalAlpha = 1;
+            }
+          } else if (f.link_active) {
+            const k = (t / 900 + i * 0.3) % 1;
+            R(c, s.sx - 1, y + 30 + k * s.drop, 4, 3, PAL.yellow2);
+          }
         }
       }
       const fl = flashes[f.project_id];
@@ -166,6 +198,15 @@
         c.fillStyle = P.rgba(fl.color, Math.min(0.3, ((fl.until - scene.realT) / 1200) * 0.3));
         c.fillRect(12, y + 2, W - 24, FH - 2);
       }
+    }
+
+    function drawPackages(c) {
+      Object.values(world.packages).forEach((pk) => {
+        const pos = ECS.packagePosition(pk);
+        if (!pos) return;
+        const b = P.bitmap(pk.bmp);
+        P.drawBitmap(c, pk.bmp, Math.round(pos[0] - b.w / 2), Math.round(pos[1] - b.h / 2));
+      });
     }
 
     function draw(sc, c) {
@@ -180,6 +221,7 @@
       model.floors.forEach((f, i) => drawFloor(c, f, i, t));
       const walkers = sc.actors.filter((a) => a.data.walker).sort((p, q) => p.y - q.y);
       walkers.forEach((a) => P.drawActor(c, sc, a));
+      drawPackages(c);
       R(c, 0, sc.H - BASE, W, BASE, '#5a6070');
       P.text(c, model.show_basement ? '▼ 地下室：机房' : '', W / 2, sc.H - BASE / 2, { size: 6, weight: 700, align: 'center', color: PAL.white });
       sc.drawParticles(c);
@@ -203,12 +245,26 @@
     });
     canvas.addEventListener('mouseleave', () => { hover = null; });
 
+    let packageSeq = 0;
+    // 远程动作与部署、回滚的包裹沿这一层通往机房的管线走：出去是往下，回滚与回执是往上
+    function sendOnShaft(pid, bmp, up) {
+      const link = world.links[shaftKey(pid)];
+      if (!link || scene.reduced) return;
+      const id = 'pk-' + (++packageSeq);
+      ECS.spawnPackage(world, id, null, null, null, null);
+      world.packages[id].bmp = bmp;
+      const pts = up ? link.pts.slice().reverse() : link.pts;
+      ECS.sendPackage(world, id, link.id, pts, travelMs(pts), () => ECS.removePackage(world, id));
+    }
+
     return {
       scene,
+      inspect: () => ({ world, model }),
       setModel(m) {
         if (!m || !Array.isArray(m.floors)) throw new Error('setModel 需要 buildingModel');
         model = m;
         scene.setSize(W, ROOF + Math.max(1, m.floors.length) * FH + BASE);
+        declareShafts();
         syncWalkers();
       },
       playEvent(ev) {
@@ -220,6 +276,10 @@
           const i = model.floors.findIndex((f) => f.project_id === ev.project_id);
           if (i >= 0) scene.emit('confetti', W / 2, floorY(i), 24, { spread: 400 });
         }
+        if (ev.type === 'x_remote_action_started') sendOnShaft(ev.project_id, 'folder', false);
+        else if (ev.type === 'x_remote_action_finished') sendOnShaft(ev.project_id, 'letter', true);
+        else if (ev.type === 'x_deployed') sendOnShaft(ev.project_id, 'box_sealed', false);
+        else if (ev.type === 'x_rolled_back') sendOnShaft(ev.project_id, 'box_sealed', true);
       },
       resize: () => scene.resize(),
       destroy: () => scene.destroy()
@@ -275,18 +335,36 @@
   P.createMachineRoomScene = function createMachineRoomScene(canvas, opts) {
     const o = opts || {};
     let model = { machines: [], links: [] };
-    const flashes = {};
-    const drops = [];
     const scene = P.createScene(canvas, { W, H: MH, draw, update });
 
+    // 机房的世界：每台机器是一个设备节点，每个项目通往它正在使用的设备的管线是一根管道实体，
+    // 部署、远程动作与回执的包裹沿着这根管道走；设备的闪光是带颜色的信号
+    const world = ECS.world();
+
     const machineX = (i, n) => Math.round(W / (n + 1) * (i + 1));
-    const xOf = (id) => {
-      const i = model.machines.findIndex((m) => m.id === id);
-      return i < 0 ? null : machineX(i, model.machines.length);
-    };
+    const xOf = (id) => (world.rooms[id] ? world.rooms[id].x : null);
+
+    // 设备节点与管线：管线从天花板按项目颜色通到设备
+    function declareWorld() {
+      const n = model.machines.length;
+      ECS.declareNodes(world, model.machines.map((m, i) => ({ id: m.id, roomKind: 'device', x: machineX(i, n), y: 118, w: 60, h: 90, def: m })));
+      const defs = [];
+      model.links.forEach((l, i) => {
+        const x = xOf(l.machine_id);
+        if (x === null) return;
+        const ci = l.color_index % 6;
+        const lx = x - 10 + (i % 5) * 5;
+        const sx = W - 22 - ci * 3;
+        const yh = CEIL + 2 + ci * 2;
+        defs.push({ from: 'shaft:' + l.project_id, to: l.machine_id, kind: 'shaft', index: i, colorIndex: l.color_index, active: Boolean(l.active), lx, sx, yh,
+          pts: [[sx + 1, 0], [sx + 1, yh + 1], [lx + 1, yh + 1], [lx + 1, CEIL + 28]] });
+      });
+      ECS.declareLinks(world, defs);
+    }
 
     function update() {
-      for (let i = drops.length - 1; i >= 0; i--) if (scene.realT - drops[i].t0 > drops[i].ms) drops.splice(i, 1);
+      ECS.stepPipes(world, scene, (p) => (p.def.active ? 'flowing' : 'idle'));
+      ECS.stepPackages(world, scene);
     }
 
     function draw(sc, c) {
@@ -297,26 +375,33 @@
       R(c, 0, 118, W, MH - 118, '#454a56');
       for (let x = 0; x < W; x += 16) R(c, x, 118, 1, MH - 118, '#3d424d');
       P.sign(c, 44, 16, '机房', { size: 7, bg: PAL.grey1, stripe: PAL.grey3 });
-      // 管线：从天花板按项目颜色通到设备
-      model.links.forEach((l, i) => {
-        const x = xOf(l.machine_id);
-        if (x === null) return;
-        const col = LINK_COLORS[l.color_index % LINK_COLORS.length];
-        const lx = x - 10 + (i % 5) * 5;
-        const sx = W - 22 - (l.color_index % 6) * 3;
-        R(c, lx, CEIL + 2 + (l.color_index % 6) * 2, sx - lx + 2, 2, col);
-        R(c, sx, 0, 2, CEIL + 4 + (l.color_index % 6) * 2, col);
-        R(c, lx, CEIL + 2 + (l.color_index % 6) * 2, 2, 118 - 70 - CEIL - (l.color_index % 6) * 2, col);
-        if (l.active && !sc.reduced) {
-          const k = (t / 800 + i * 0.37) % 1;
-          R(c, lx - 1, CEIL + 2 + k * 40, 4, 3, PAL.yellow2);
+      // 管线：从天花板按项目颜色通到设备，管线里有光点在流动
+      Object.values(world.links).forEach((p) => {
+        const l = p.def;
+        const col = LINK_COLORS[l.colorIndex % LINK_COLORS.length];
+        const ci = l.colorIndex % 6;
+        R(c, l.lx, l.yh, l.sx - l.lx + 2, 2, col);
+        R(c, l.sx, 0, 2, l.yh + 2, col);
+        R(c, l.lx, l.yh, 2, 118 - 70 - CEIL - ci * 2, col);
+        if (sc.reduced) return;
+        const f = p.flow;
+        if (ECS.config.autonomy) {
+          if (f && f.load > 0.02) {
+            const k = (f.phase / 800 + l.index * 0.37) % 1;
+            c.globalAlpha = f.load;
+            R(c, l.lx - 1, CEIL + 2 + k * 40, 4, 3, PAL.yellow2);
+            c.globalAlpha = 1;
+          }
+        } else if (l.active) {
+          const k = (t / 800 + l.index * 0.37) % 1;
+          R(c, l.lx - 1, CEIL + 2 + k * 40, 4, 3, PAL.yellow2);
         }
       });
       model.machines.forEach((m, i) => {
         const x = machineX(i, model.machines.length);
         drawDevice(c, m, x, t, sc.reduced);
-        const fl = flashes[m.id];
-        if (fl && fl.until > sc.realT) { c.fillStyle = P.rgba(fl.color, 0.3); c.fillRect(x - 40, 30, 80, 90); }
+        const flashColor = ECS.signalValue(world, scene, 'flash:' + m.id);
+        if (flashColor) { c.fillStyle = P.rgba(flashColor, 0.3); c.fillRect(x - 40, 30, 80, 90); }
         P.text(c, m.name, x, 126, { size: 6.5, weight: 700, align: 'center', color: PAL.white, max: W / (model.machines.length + 1) - 6 });
         P.text(c, m.online ? '在线' : '离线', x, 135, { size: 5.5, weight: 600, align: 'center', color: m.online ? PAL.green1 : PAL.grey2 });
         let row = 0;
@@ -329,9 +414,11 @@
         if ((m.late_receipts || []).length) P.sign(c, x + 30, 98, '迟到回执', { size: 5.5, bg: PAL.grey1, stripe: PAL.grey3, maxW: 60 });
         (m.runtime_for || []).forEach((r, k) => P.sign(c, x, 44 + k * 12, r.name + ' · ' + r.version, { size: 5.5, bg: PAL.paper, stripe: PAL.green3, maxW: 120, pole: 2 }));
       });
-      drops.forEach((d) => {
-        const k = Math.min(1, (sc.realT - d.t0) / d.ms);
-        P.drawBitmap(c, d.bmp, d.x - 6, CEIL + (d.up ? 1 - k : k) * 50);
+      Object.values(world.packages).forEach((pk) => {
+        const pos = ECS.packagePosition(pk);
+        if (!pos) return;
+        const b = P.bitmap(pk.bmp);
+        P.drawBitmap(c, pk.bmp, Math.round(pos[0] - b.w / 2), Math.round(pos[1] - b.h / 2));
       });
       sc.drawParticles(c);
     }
@@ -345,27 +432,44 @@
       if (i >= 0) o.onMachineClick(model.machines[i].id);
     });
 
+    let packageSeq = 0;
+    // 包裹沿这个项目通往这台设备的管线走（往下是送到设备，往上是回执与回滚取回）；管线还没有画出来时从天花板直接落到设备上
+    function sendToMachine(ev, machineId, bmp, up) {
+      if (scene.reduced) return;
+      const link = world.links['shaft:' + ev.project_id + '>' + machineId];
+      let pts = link ? link.pts : [[xOf(machineId), CEIL], [xOf(machineId), CEIL + 50]];
+      if (up) pts = pts.slice().reverse();
+      const id = 'pk-' + (++packageSeq);
+      ECS.spawnPackage(world, id, null, null, null, null);
+      world.packages[id].bmp = bmp;
+      ECS.sendPackage(world, id, link ? link.id : null, pts, travelMs(pts), () => ECS.removePackage(world, id));
+    }
+
     return {
       scene,
+      inspect: () => ({ world, model }),
       setModel(m) {
         if (!m || !Array.isArray(m.machines)) throw new Error('setModel 需要 machineRoomModel');
         model = Object.assign({ links: [] }, m);
+        declareWorld();
         scene.setSize(W, MH + (model.machines.some((x) => (x.actions || []).length > 1) ? 12 : 0));
       },
       highlight(ids) {
-        (ids || []).forEach((id) => { flashes[id] = { color: PAL.yellow2, until: scene.realT + 2500 }; });
+        (ids || []).forEach((id) => { ECS.signal(world, scene, 'flash:' + id, 2500, PAL.yellow2); });
       },
       playEvent(ev) {
         const pl = (ev && ev.payload) || {};
         const x = pl.machine_id ? xOf(pl.machine_id) : null;
         if (x === null) return;
-        if (ev.type === 'x_machine_offline') flashes[pl.machine_id] = { color: PAL.grey3, until: scene.realT + 1500 };
-        if (ev.type === 'x_machine_online' || ev.type === 'x_remote_action_finished') flashes[pl.machine_id] = { color: PAL.green2, until: scene.realT + 1200 };
-        if (ev.type === 'x_action_unknown' || ev.type === 'x_late_receipt') flashes[pl.machine_id] = { color: PAL.yellow2, until: scene.realT + 1500 };
-        if (ev.type === 'x_fault_recorded') flashes[pl.machine_id] = { color: PAL.red2, until: scene.realT + 2500 };
-        if (ev.type === 'x_remote_action_started' || ev.type === 'x_deployed' || ev.type === 'x_rolled_back') {
-          if (!scene.reduced) drops.push({ x, t0: scene.realT, ms: 1200, bmp: ev.type === 'x_remote_action_started' ? 'folder' : 'box_sealed', up: ev.type === 'x_rolled_back' });
-        }
+        const flash = (color, ms) => ECS.signal(world, scene, 'flash:' + pl.machine_id, ms, color);
+        if (ev.type === 'x_machine_offline') flash(PAL.grey3, 1500);
+        if (ev.type === 'x_machine_online' || ev.type === 'x_remote_action_finished') flash(PAL.green2, 1200);
+        if (ev.type === 'x_action_unknown' || ev.type === 'x_late_receipt') flash(PAL.yellow2, 1500);
+        if (ev.type === 'x_fault_recorded') flash(PAL.red2, 2500);
+        if (ev.type === 'x_remote_action_started') sendToMachine(ev, pl.machine_id, 'folder', false);
+        else if (ev.type === 'x_remote_action_finished') sendToMachine(ev, pl.machine_id, 'letter', true);
+        else if (ev.type === 'x_deployed') sendToMachine(ev, pl.machine_id, 'box_sealed', false);
+        else if (ev.type === 'x_rolled_back') sendToMachine(ev, pl.machine_id, 'box_sealed', true);
       },
       resize: () => scene.resize(),
       destroy: () => scene.destroy()

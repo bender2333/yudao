@@ -45,9 +45,10 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER }) => {
   // 统计 v9 画面对 ecs.js 的使用
   const counts = {};
   const E = P.ecs;
-  if (E && E.config) E.config.idleWander = false;
+  // 自主行为（待机活动、管道的惯性）关掉：静止的画面只由快照决定，才能与 v8 逐像素比较
+  if (E && E.config) E.config.autonomy = false;
   if (E) {
-    ['dispatch', 'declareRooms', 'declareLinks', 'syncCharacters', 'stepCharacters', 'spawnPackage', 'sendPackage', 'stepPackages', 'bubbleFor'].forEach((k) => {
+    ['dispatch', 'declareRooms', 'declareLinks', 'syncCharacters', 'stepCharacters', 'spawnPackage', 'sendPackage', 'stepPackages', 'stepPipes', 'bubbleFor'].forEach((k) => {
       if (typeof E[k] !== 'function') return;
       const orig = E[k];
       E[k] = function () { counts[k] = (counts[k] || 0) + 1; return orig.apply(this, arguments); };
@@ -187,7 +188,14 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
       const stateSame = frozen || JSON.stringify(A.state) === JSON.stringify(B.state);
       if (!stateSame) {
         row.stateDiff++;
-        if (row.notes.length < 6) row.notes.push('[小人] ' + A.label + ' v8=' + JSON.stringify(A.state.map((s) => [s.sprite.split('.')[0], s.x, s.y, s.seat, s.anim, s.icon && s.icon.kind])) + ' v9=' + JSON.stringify(B.state.map((s) => [s.sprite.split('.')[0], s.x, s.y, s.seat, s.anim, s.icon && s.icon.kind])));
+        // 逐个小人逐个字段列出差异
+        const fields = [];
+        A.state.forEach((s, k) => {
+          const u = B.state[k] || {};
+          Object.keys(s).forEach((key) => { if (JSON.stringify(s[key]) !== JSON.stringify(u[key])) fields.push(s.sprite + '.' + key + ' ' + JSON.stringify(s[key]) + ' → ' + JSON.stringify(u[key])); });
+        });
+        if (A.state.length !== B.state.length) fields.push('小人数量 ' + A.state.length + ' → ' + B.state.length);
+        if (row.notes.length < 6) row.notes.push('[小人] ' + A.label + ' ' + fields.join('；'));
       }
       if (d.count !== 0) {
         row.pixelDiff++;

@@ -1,5 +1,6 @@
-// 实体—组件—系统（v9 构建约定第 3 节）：房间与管道的图结构声明、任务派发、角色与包裹的推进、头顶对话框的数据。
-// 只依赖 engine.js 已有的画布与动画原语，不新增画布画法；floor.js、building.js 在这之上改写。
+// 实体—组件—系统（v9 构建约定第 3 节）：房间与管道的图结构声明、任务派发、角色与包裹的推进、管道的流动、头顶对话框的数据。
+// 只依赖 engine.js 已有的画布与动画原语，不新增画布画法，也不出现任何具体的部门名：房间、管道、任务目录、待机活动都来自
+// 声明（floor-decl.js），floor.js、building.js 在这之上改写。
 (function () {
   'use strict';
   const Y8 = window.Y8;
@@ -12,42 +13,56 @@
   // ---------------------------------------------------------------------------
   // 第 3.1 节：世界
 
-  ECS.world = function world() {
-    return { rooms: {}, roomOrder: [], links: {}, characters: {}, packages: {} };
+  // catalog：{ tasks, idle, keyOf }，见第 3.4 节；每个世界带着自己的目录
+  ECS.world = function world(catalog) {
+    return {
+      rooms: {}, roomOrder: [], links: {}, characters: {}, packages: {}, signals: {},
+      catalog: Object.assign({ tasks: {}, idle: [], keyOf: (ev) => ev.type }, catalog || {})
+    };
   };
+
+  // 行为开关：autonomy 为假时，待机活动与管道的惯性都关闭，静止的画面只由快照决定（验收脚本用它逐像素比较）
+  ECS.config = { autonomy: true };
 
   // ---------------------------------------------------------------------------
   // 第 3.2 节：房间与管道的声明
   //
-  // 沿用 v8 floor.js 的几个常量（像素级一致，不是重新设计画面）：
+  // 沿用 v8 floor.js 的几个常量（像素级一致）：
   const GEO = {
     TOP: 50, ROOM_B: 214, FLOOR_LINE: 150, DESK_Y: 196, PORT_STAND: 176,
     PIPE_Y: 138, TUBE_Y: 104, DUCT_Y: 30, DUCT_TUBE_Y: 42, UNDER_Y: 276, GAP: 6
   };
   ECS.GEO = GEO;
 
-  // defs: [{ id, label, roomKind: 'hall'|'dept'|'shelf', w, optional }]
-  // hasOps 为假时跳过 optional 的房间；宽度沿用 v8：hall 100，部门房间 110，成果库 hasOps 时 82 否则 136，运维 88
-  ECS.declareRooms = function declareRooms(world, defs, opts) {
-    const o = opts || {};
+  // defs: [{ id, label, roomKind, w, when, pipeOutX, spots }]
+  //   w：房间宽度，数字，或者 (flags) => 数字
+  //   when：出现的条件名，flags[when] 为真才生成这个房间
+  //   pipeOutX：交接管道离开房间的位置（房间左边缘起算），省略时是右墙的管道口
+  //   spots：{ cabinet｜terminal｜monitor: (房间) => x }，把任务的位置对到房间里已有的陈设上
+  // 房间实体的 def 字段是它的声明，画面用它取陈设与持续状态的规则
+  ECS.declareRooms = function declareRooms(world, defs, flags) {
+    const fl = flags || {};
     world.rooms = {};
     world.roomOrder = [];
     let x = 4;
     defs.forEach((d) => {
-      if (d.optional && !o.hasOps) return;
-      const w = d.w != null ? d.w : (d.roomKind === 'shelf' ? (o.hasOps ? 82 : 136) : d.roomKind === 'hall' ? 100 : d.id === 'operations' ? 88 : 110);
+      if (d.when && !fl[d.when]) return;
+      const w = typeof d.w === 'function' ? d.w(fl) : d.w;
+      if (!(w > 0)) throw new Error('房间没有声明宽度：' + d.id);
       const r = {
         kind: 'room', id: d.id, label: d.label, roomKind: d.roomKind, x, y: GEO.TOP, w,
         door: x + Math.round(w / 2),
         inPort: x + 12,
         outPort: x + w - 12,
-        // 交接管道离开房间的位置：大厅从信箱那一侧（v8 的 hall.x + 22）出发，其余房间在右墙的管道口
-        pipeOut: d.roomKind === 'hall' ? x + 22 : x + w - 12,
+        pipeOut: d.pipeOutX != null ? x + d.pipeOutX : x + w - 12,
         desk: { x: x + Math.round(w / 2) - 17, w: 34, seatX: x + Math.round(w / 2) - 5, seatY: GEO.DESK_Y },
         cabinet: { x: x + 8, y: GEO.FLOOR_LINE + 6 },
         terminal: { x: x + w - 16, y: GEO.PORT_STAND },
-        monitor: { x: x + w - 26, y: GEO.PORT_STAND }
+        monitor: { x: x + w - 26, y: GEO.PORT_STAND },
+        seats: null,
+        def: d
       };
+      Object.keys(d.spots || {}).forEach((k) => { r[k] = Object.assign({}, r[k], { x: d.spots[k](r) }); });
       world.rooms[d.id] = r;
       world.roomOrder.push(d.id);
       x += w + GEO.GAP;
@@ -65,18 +80,35 @@
     return world.rooms[id] || (id === 'machine_room' ? world.machineDoor : null);
   }
 
-  // links: [{ from, to, kind: 'handoff'|'tube'|'return', via: 'under', optional }]
+  // 不是房间的节点（机房里的设备……）：按明确的几何声明，[{ id, roomKind, x, y, w, h, def }]
+  ECS.declareNodes = function declareNodes(world, defs) {
+    world.rooms = {};
+    world.roomOrder = [];
+    defs.forEach((d) => {
+      world.rooms[d.id] = Object.assign({ kind: 'room', seats: null }, d);
+      world.roomOrder.push(d.id);
+    });
+    return world;
+  };
+
+  // links: [{ from, to, kind: 'handoff'|'tube'|'return'|其他, via: 'under', optional, pts }]
+  // pts 是声明自己给出的折线（非房间的节点之间的管道用它）；重新声明时同一根管道保留原来的流动状态
   ECS.declareLinks = function declareLinks(world, defs) {
+    const old = world.links || {};
     world.links = {};
     defs.forEach((d) => {
-      const a = endpoint(world, d.from);
-      const b = endpoint(world, d.to);
-      if (!a || !b) {
-        if (d.optional) return;
-        throw new Error('管道的端点未声明：' + d.from + ' → ' + d.to);
-      }
       const key = d.from + (d.kind === 'tube' ? '~' : '>') + d.to;
-      world.links[key] = { kind: 'pipe', id: key, from: d.from, to: d.to, linkKind: d.kind, pts: routeLink(world, d, a, b) };
+      let pts = d.pts;
+      if (!pts) {
+        const a = endpoint(world, d.from);
+        const b = endpoint(world, d.to);
+        if (!a || !b) {
+          if (d.optional) return;
+          throw new Error('管道的端点未声明：' + d.from + ' → ' + d.to);
+        }
+        pts = routeLink(world, d, a, b);
+      }
+      world.links[key] = { kind: 'pipe', id: key, from: d.from, to: d.to, linkKind: d.kind, pts, flow: old[key] ? old[key].flow : null, def: d };
     });
     return world;
   };
@@ -95,7 +127,7 @@
       return [[a.x + 22, GEO.TUBE_Y - 12], [a.x + 22, GEO.DUCT_TUBE_Y], [b.x + b.w - 22, GEO.DUCT_TUBE_Y], [b.x + b.w - 22, GEO.TUBE_Y - 12]];
     }
     if (d.kind === 'return') {
-      // via 由声明指定，不猜测：'under' 走地板下（运维回大厅这类隔得远的），省略时走天花板（质检回产品这类）
+      // via 由声明指定，不猜测：'under' 走地板下（隔得远的回流），省略时走天花板
       if (d.via === 'under') {
         return [[a.x + 20, GEO.ROOM_B - 4], [a.x + 20, GEO.UNDER_Y], [b.x + 12, GEO.UNDER_Y], [b.x + 12, GEO.ROOM_B + 26]];
       }
@@ -105,7 +137,6 @@
   }
 
   ECS.roomOf = function roomOf(world, id) {
-    if (id === 'adopted' || id === 'adoption') return world.rooms.library;
     return world.rooms[id] || null;
   };
 
@@ -113,10 +144,29 @@
   ECS.linkBetween = function linkBetween(world, from, to, kind) {
     const sep = kind === 'tube' ? '~' : '>';
     const direct = world.links[from + sep + to];
-    if (direct) return { pts: direct.pts, key: direct.id, reversed: false };
+    if (direct) return { pts: direct.pts, key: direct.id, reversed: false, link: direct };
     const back = world.links[to + sep + from];
-    if (back) return { pts: back.pts.slice().reverse(), key: back.id, reversed: true };
+    if (back) return { pts: back.pts.slice().reverse(), key: back.id, reversed: true, link: back };
     return null;
+  };
+
+  // 一次交接经过的管道：两个房间之间直接有管道就是它（反向也可以），没有就沿声明的交接管道找一条最短的路，
+  // 一段一根管道。找不到返回空数组。
+  ECS.route = function route(world, from, to) {
+    const direct = ECS.linkBetween(world, from, to, 'handoff');
+    if (direct) return [direct];
+    const edges = Object.values(world.links).filter((l) => l.linkKind === 'handoff');
+    const prev = { [from]: null };
+    const queue = [from];
+    while (queue.length) {
+      const at = queue.shift();
+      if (at === to) break;
+      edges.filter((l) => l.from === at && !(l.to in prev)).forEach((l) => { prev[l.to] = l; queue.push(l.to); });
+    }
+    if (!(to in prev)) return [];
+    const hops = [];
+    for (let l = prev[to]; l; l = prev[l.from]) hops.unshift({ pts: l.pts, key: l.id, reversed: false, link: l });
+    return hops;
   };
 
   // ---------------------------------------------------------------------------
@@ -142,101 +192,93 @@
   };
 
   // ---------------------------------------------------------------------------
-  // 第 3.3 节：任务目录
+  // 第 3.3 节：工位与角色
   //
-  // 每一项：{ label, spot, pose, bubble, ms, icon, facing }
-  // spot：'desk'｜'stand'｜'cabinet'｜'terminal'｜'monitor'｜'inspect'｜'port_in'｜'port_out'
-  // pose：engine.js 已注册的动作名（P.ANIMS 的键）
-  // bubble：'say' 做这个任务时头顶显示说话气泡，内容为 label（模型请求在流式输出到达时逐字追加）｜null 不显示；
-  //   队列里的下一项带有 label 时，头顶显示思考气泡（见 bubbleFor）
-  // ms：到达 spot 以后做这么久；streaming 的任务只在正在做的模型请求上追加文字并让它多留一会儿
-  // 键取自驱动它的事件类型，少数事件按 payload 再分支（taskKeyFor）；交接与传信的任务由 floor.js 直接放进队列。
-  ECS.TASKS = {
-    context_assembled: { label: '整理资料', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 900 },
-    model_requested: { label: '打字', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
-    model_stream_progress: { label: '', spot: 'desk', pose: 'type', bubble: 'say', ms: 1, streaming: true },
-    model_attempt_finished: { label: '有想法了', spot: 'desk', pose: 'sit_happy', bubble: null, ms: 600, icon: 'bulb' },
-    model_retry_scheduled: { label: '等待重试', spot: 'desk', pose: 'sit_wait', bubble: 'say', ms: 1400, icon: 'hourglass' },
-    model_attempt_failed: { label: '失败了', spot: 'desk', pose: 'slump', bubble: null, ms: 900, icon: 'cross' },
-    tool_started_search: { label: '翻找资料', spot: 'cabinet', pose: 'magnify', bubble: 'say', ms: 1200 },
-    tool_started_read: { label: '阅读文件', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 1100 },
-    tool_started_write: { label: '编辑', spot: 'desk', pose: 'type', bubble: 'say', ms: 1200 },
-    tool_started_run_command: { label: '执行登记命令', spot: 'terminal', pose: 'lever', bubble: 'say', ms: 1600 },
-    tool_started_fetch: { label: '网络取回', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 1200 },
-    tool_started_mcp: { label: '调用工具', spot: 'terminal', pose: 'lever', bubble: 'say', ms: 1200 },
-    tool_started_browser: { label: '试用网页', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
-    tool_started_test: { label: '自测网页', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
-    tool_started_scan: { label: '阅读旧档案', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 1200 },
-    tool_skipped: { label: '', spot: 'desk', pose: 'sit_scratch', bubble: null, ms: 700, icon: 'cross' },
-    proposal_submitted: { label: '提交提案', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 900 },
-    proposal_rejected: { label: '提案被退回', spot: 'desk', pose: 'sit_scratch', bubble: 'say', ms: 900, icon: 'question' },
-    spec_accepted: { label: '盖上有效章', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 800, icon: 'check' },
-    contract_accepted: { label: '盖上有效章', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 800, icon: 'check' },
-    plan_accepted: { label: '贴上白板', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 800, icon: 'check' },
-    delivery_accepted: { label: '装箱封存', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 900, icon: 'check' },
-    qa_started: { label: '放大镜检查', spot: 'inspect', pose: 'magnify', bubble: 'say', ms: 1200 },
-    qa_submitted_release: { label: '放行', spot: 'inspect', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'check' },
-    qa_submitted_rework: { label: '打回返工', spot: 'inspect', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'exclaim' },
-    department_guidance_received: { label: '门缝塞进纸条', spot: 'port_in', pose: 'crouch', bubble: null, ms: 700, icon: 'exclaim' },
-    department_guidance_applied: { label: '阅读指导', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 900 },
-    department_guidance_responded: { label: '写回复', spot: 'desk', pose: 'type', bubble: 'say', ms: 900 },
-    compaction_recorded: { label: '整理摘要', spot: 'cabinet', pose: 'sit_up', bubble: 'say', ms: 900 },
-    compaction_failed: { label: '重新整理', spot: 'desk', pose: 'sit_scratch', bubble: 'say', ms: 900, icon: 'cross' },
-    run_paused: { label: '事项暂停', spot: 'desk', pose: 'sit_relax', bubble: null, ms: 1200, icon: 'zzz' },
-    run_failed: { label: '事项失败', spot: 'desk', pose: 'slump', bubble: null, ms: 1200, icon: 'cross' },
-    run_done: { label: '举手欢呼', spot: 'stand', pose: 'cheer', bubble: null, ms: 1200 },
-    x_run_stopped_for_upgrade: { label: '收拾桌面', spot: 'stand', pose: 'tidy', bubble: null, ms: 1200 },
-    x_run_auto_resumed: { label: '伸懒腰', spot: 'desk', pose: 'stretch_sit', bubble: null, ms: 800 },
-    x_provider_wait_left: { label: '模型服务恢复', spot: 'desk', pose: 'sit_up', bubble: 'say', ms: 700 },
-    x_auto_repair_stopped: { label: '停止自动修复', spot: 'desk', pose: 'sit_wait', bubble: null, ms: 1200, icon: 'cross' },
-    // 交接：把包裹放进管道口、从管道口取出；返工与回流走另一侧的管道口
-    package_handoff_out: { label: '放进管道口', spot: 'port_out', pose: 'side_place', bubble: null, ms: 520, facing: 1 },
-    package_handoff_in: { label: '从管道口取出', spot: 'port_in', pose: 'crouch', bubble: null, ms: 520, facing: -1 },
-    package_return_out: { label: '放进回流口', spot: 'port_in', pose: 'side_place', bubble: null, ms: 520, facing: -1 },
-    package_return_in: { label: '从回流口取出', spot: 'port_out', pose: 'crouch', bubble: null, ms: 520, facing: 1 },
-    // 传信：信件塞进传信管口（方向由 spot 与 facing 决定）
-    letter_out: { label: '发出询问', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
-    letter_in: { label: '回答询问', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 },
-    // 待机时偶尔起身：走到房间里的一个位置伸个懒腰（位置在 ch.wanderTo）
-    idle_wander: { label: '', spot: 'wander', pose: 'stretch', bubble: null, ms: 1500 }
+  // 一个房间里有 n 个角色时沿房间排开 n 个工位；只有一个角色时就是 declareRooms 算出的 desk（与 v8 一样）
+  ECS.layoutSeats = function layoutSeats(room, n) {
+    if (n <= 1) { room.seats = [room.desk]; return room.seats; }
+    const gap = 2;
+    const w = Math.min(34, Math.floor((room.w - 10) / n) - gap);
+    const total = n * (w + gap) - gap;
+    const x0 = room.x + Math.round((room.w - total) / 2);
+    room.seats = [];
+    for (let i = 0; i < n; i++) {
+      const x = x0 + i * (w + gap);
+      room.seats.push({ x, w, seatX: x + Math.round(w * 12 / 34), seatY: GEO.DESK_Y });
+    }
+    return room.seats;
   };
 
-  // 行为开关：验收脚本把随机走动关掉，让静止画面可以逐像素比较
-  ECS.config = { idleWander: true };
+  // 工具角色在两侧，中心角色居中，经理靠近右墙的管道口（跟 room.js 部门房间的排布规则一致）
+  const SEAT_RANK = { explorer: 0, reviewer: 1, lead: 2, agent: 3, ops: 3, architect: 3, tester: 3, manager: 4 };
+  const CENTER_KINDS = ['architect', 'tester', 'agent', 'ops'];
 
-  // 事件类型到任务键的解析：大多数事件类型本身就是任务键；少数按 payload 再分支
-  function taskKeyFor(ev) {
-    const pl = ev.payload || {};
-    if (ev.type === 'qa_submitted') return pl.verdict === 'release' ? 'qa_submitted_release' : 'qa_submitted_rework';
-    if (ev.type === 'tool_started') {
-      const tool = String(pl.tool || '');
-      if (tool === 'search') return 'tool_started_search';
-      if (tool === 'run_command') return 'tool_started_run_command';
-      if (/write|edit/.test(tool)) return 'tool_started_write';
-      if (/fetch|http|net|url/.test(tool)) return 'tool_started_fetch';
-      if (/mcp/.test(tool)) return 'tool_started_mcp';
-      if (/browser|computer/.test(tool)) return ev.department === 'quality' ? 'tool_started_browser' : 'tool_started_test';
-      if (/scan|legacy|repo/.test(tool)) return 'tool_started_scan';
-      return 'tool_started_read';
-    }
-    if (ev.type === 'model_request_serialized') return 'model_requested';
-    return ev.type;
+  ECS.charsOf = function charsOf(world, dept) {
+    return Object.values(world.characters).filter((c) => c.department === dept);
+  };
+
+  // 部门里的中心角色：没有中心角色时是经理，再没有就是第一个
+  ECS.primaryOf = function primaryOf(world, dept) {
+    const list = ECS.charsOf(world, dept);
+    return list.find((c) => CENTER_KINDS.includes(c.roleKind)) || list.find((c) => c.roleKind === 'manager') || list[0] || null;
+  };
+
+  // 事件或任务落在哪个角色上：指定了角色（id 或种类）就是它，否则按任务声明的 by（角色种类），再没有就是中心角色
+  ECS.charFor = function charFor(world, dept, role, by) {
+    const list = ECS.charsOf(world, dept);
+    if (!list.length) return null;
+    const hit = (k) => list.find((c) => c.id === k || c.roleKind === k);
+    return (role && hit(role)) || (by && hit(by)) || ECS.primaryOf(world, dept);
+  };
+
+  function seatOf(room, ch) {
+    return (room.seats && room.seats[ch.seatIndex]) || room.desk;
   }
 
   // ---------------------------------------------------------------------------
-  // 第 3.4 节：系统
+  // 第 3.4 节：任务目录、待机活动与信号（内容全部来自声明）
+  //
+  // 任务：{ label, spot, pose, bubble, ms, icon, facing, dept, by, actor, toward, then, start, done }
+  //   spot：'desk'｜'stand'｜'cabinet'｜'terminal'｜'monitor'｜'inspect'｜'port_in'｜'port_out'
+  //         ｜'peer'（另一个角色的工位旁，toward 指定是谁）｜'at'（任务自带的坐标 at）
+  //   dept：由哪个部门做（事件没有部门字段时用，例如故障记录由运维做）
+  //   by：事件没有指定角色时由哪种角色做；actor：不管事件指定了谁，都由这种角色做（分派任务是经理做的）
+  //   toward：spot 为 'peer' 时走向谁：'role'（事件指定的角色）或者角色种类；then：做完以后放进走向对象队列的任务
+  //   start／done：任务开始（到达位置）与做完时的回调，由 floor.js 按声明的效果装上
+  // 待机活动：[{ key（任务目录里的键）, weight, kinds（限定角色种类）, needs: 'mate'（需要一个空闲的同伴）, at: 'wander'｜'door' }]
+  // keyOf(事件)：事件落在哪个任务上；没有命中任务目录的事件是信号。
+
+  // 信号：不需要角色去做什么的画面指示（门缝亮灯、信箱闪、监控屏告警、设备闪光……），在 ms 毫秒内为真，可以带一个值（例如颜色）
+  ECS.signal = function signal(world, scene, name, ms, value) {
+    world.signals[name] = { until: scene.realT + ms, value: value === undefined ? true : value };
+  };
+  ECS.signalOn = function signalOn(world, scene, name) {
+    const s = world.signals[name];
+    return Boolean(s) && s.until > scene.realT;
+  };
+  // 信号的值；没有亮着的信号返回 null
+  ECS.signalValue = function signalValue(world, scene, name) {
+    return ECS.signalOn(world, scene, name) ? world.signals[name].value : null;
+  };
 
   // 队列里最多留几个可以被挤掉的任务（must 的任务不受限制）；房间里的动作排队太长时，画面会落后于事实
   const MAX_QUEUE = 3;
 
-  // 把一个任务放进部门角色的队列。key 取自任务目录，extra 覆盖任务的字段（label、facing、onDone……）。
+  // 把一个任务放进角色的队列。who 是角色 id 或部门 id（部门按 extra.role 与任务的 by 找角色），key 取自任务目录，
+  // extra 覆盖任务的字段（label、facing、onDone……）。
   // extra.front 为真：插到队首，并放弃正在做的非 must 任务；extra.must 为真：不会被队列上限挤掉。
-  ECS.enqueue = function enqueue(world, dept, key, extra) {
-    const def = ECS.TASKS[key];
-    const ch = world.characters[dept];
-    if (!def || !ch) return null;
+  ECS.enqueue = function enqueue(world, who, key, extra) {
+    const def = world.catalog.tasks[key];
+    if (!def) return null;
     const e = extra || {};
+    const ch = world.characters[who] || ECS.charFor(world, who, def.actor ? null : e.role, def.actor || def.by);
+    if (!ch) return null;
     const task = Object.assign({ taskKey: key }, def, e);
+    if (!task.idle) {
+      // 真正的事情优先：正在做和排着的待机活动放弃
+      if (ch.current && ch.current.idle) ch.current = null;
+      ch.queue = ch.queue.filter((t) => !t.idle);
+    }
     if (e.front) {
       ch.queue.unshift(task);
       if (ch.current && !ch.current.must) ch.current = null;
@@ -248,14 +290,17 @@
   };
 
   // 事件到达：命中任务目录则入队（角色的动作走队列）；没有任务的事件返回 false，由调用方按信号处理
-  // （房间与管道的灯、牌子、计数不经过队列）
-  ECS.dispatch = function dispatch(world, ev) {
+  // 参数 make(task 定义, 事件, 执行的角色)：调用方为任务装上事件相关的字段（效果回调、气泡文字……），可以省略
+  ECS.dispatch = function dispatch(world, ev, make) {
     if (!ev || !ev.type) throw new Error('dispatch 需要事件对象');
-    if (!ev.department) return false;
-    const key = taskKeyFor(ev);
-    const def = ECS.TASKS[key];
-    const ch = world.characters[ev.department];
-    if (!def || !ch) return false;
+    const key = world.catalog.keyOf(ev);
+    const def = world.catalog.tasks[key];
+    if (!def) return false;
+    // 任务声明了 dept 就由那个部门做（事件本身可以没有部门字段），否则是事件的部门
+    const dept = def.dept || ev.department;
+    if (!dept) return false;
+    const ch = ECS.charFor(world, dept, def.actor ? null : ev.role, def.actor || def.by);
+    if (!ch) return false;
     const pl = ev.payload || {};
     if (def.streaming) {
       // 流式输出：文字接在正在做的模型请求上（第一段文字取代默认的标签），任务从最后一段文字起多留一会儿；
@@ -271,21 +316,39 @@
     }
     const extra = { workItemId: ev.work_item_id };
     if (pl.n !== undefined && pl.of !== undefined) extra.iconText = String(pl.n) + '/' + String(pl.of);
-    return Boolean(ECS.enqueue(world, ev.department, key, extra));
+    // 走向另一个角色的任务：对象是事件指定的角色，或者部门里某种角色
+    if (def.spot === 'peer') {
+      const to = def.toward === 'role' ? ECS.charFor(world, dept, ev.role) : ECS.charFor(world, dept, null, def.toward);
+      if (!to || to === ch) return false;
+      extra.withId = to.id;
+      if (def.then) extra.onDone = () => { ECS.enqueue(world, to.id, def.then); };
+    }
+    if (make) Object.assign(extra, make(def, ev, ch));
+    return Boolean(ECS.enqueue(world, ch.id, key, extra));
   };
 
-  function spotXY(world, ch, spotKind) {
+  function spotXY(world, ch, kind, task) {
     const r = ECS.roomOf(world, ch.department);
-    if (!r || !spotKind) return { x: ch.spot.x, y: ch.spot.y, seat: null };
-    if (spotKind === 'desk' || spotKind === 'inspect') return { x: r.desk.seatX, y: r.desk.seatY, seat: r.desk };
-    if (spotKind === 'stand') return { x: r.desk.seatX, y: r.desk.seatY, seat: null };
-    if (spotKind === 'cabinet') return { x: r.cabinet.x, y: GEO.DESK_Y, seat: null };
-    if (spotKind === 'terminal') return { x: r.terminal.x, y: r.terminal.y, seat: null };
-    if (spotKind === 'monitor') return { x: r.monitor.x, y: r.monitor.y, seat: null };
-    if (spotKind === 'wander') return { x: ch.wanderTo, y: GEO.PORT_STAND, seat: null };
-    if (spotKind === 'port_out') return { x: r.outPort - 6, y: GEO.PORT_STAND, seat: null };
-    if (spotKind === 'port_in') return { x: r.inPort + 6, y: GEO.PORT_STAND, seat: null };
-    throw new Error('未知的 spot：' + spotKind);
+    if (!r || !kind) return { x: ch.spot.x, y: ch.spot.y, seat: null };
+    const seat = seatOf(r, ch);
+    if (kind === 'desk' || kind === 'inspect') return { x: seat.seatX, y: seat.seatY, seat };
+    if (kind === 'stand') return { x: seat.seatX, y: seat.seatY, seat: null };
+    if (kind === 'cabinet') return { x: r.cabinet.x, y: GEO.DESK_Y, seat: null };
+    if (kind === 'terminal') return { x: r.terminal.x, y: r.terminal.y, seat: null };
+    if (kind === 'monitor') return { x: r.monitor.x, y: r.monitor.y, seat: null };
+    if (kind === 'door') return { x: r.door, y: GEO.ROOM_B - 10, seat: null };
+    if (kind === 'port_out') return { x: r.outPort - 6, y: GEO.PORT_STAND, seat: null };
+    if (kind === 'port_in') return { x: r.inPort + 6, y: GEO.PORT_STAND, seat: null };
+    if (kind === 'at') return { x: task.at.x, y: task.at.y, seat: null };
+    if (kind === 'peer') {
+      const peer = world.characters[task.withId];
+      const pr = peer && ECS.roomOf(world, peer.department);
+      if (!pr) return { x: seat.seatX, y: seat.seatY, seat: null };
+      const ps = seatOf(pr, peer);
+      const dir = ps.seatX >= seat.seatX ? 1 : -1;
+      return { x: ps.seatX - dir * 12, y: GEO.PORT_STAND, seat: null, facing: dir };
+    }
+    throw new Error('未知的 spot：' + kind);
   }
   ECS.spotXY = spotXY;
 
@@ -293,71 +356,115 @@
   function idleRestFor(world, ch) {
     const r = ECS.roomOf(world, ch.department);
     if (!r) return { x: ch.spot.x, y: ch.spot.y, seat: null };
-    return { x: r.desk.seatX, y: r.desk.seatY, seat: r.desk };
+    const seat = seatOf(r, ch);
+    return { x: seat.seatX, y: seat.seatY, seat };
   }
 
   // 每帧调用一次。scene 用于驱动 v7/v8 已有的 actor 补间（scene.run/scene.play），不重写走动与缓动逻辑。
-  // ch.rest 是调用方按当前快照写入的"现在该干什么"（形状同任务：spot、pose、icon、iconText、facing），
+  // ch.rest 是调用方按当前快照写入的"现在该干什么"（形状同任务：spot、pose、icon、iconText、facing、hold；away 为真表示不在房间里），
   // 只在没有事件任务在做时生效：画面上的持续状态取自快照，动作的起点取自事件，两者走同一段推进代码。
   ECS.stepCharacters = function stepCharacters(world, scene) {
-    Object.values(world.characters).forEach((ch) => {
-      const a = scene.actors.find((x) => x.id === 'ch-' + ch.id);
-      if (!a) return;
-      if (ch.current || ch.queue.length) ch.wanderAt = null;
-      // 走路的脚本还没结束不换任务；整层静止（中断）时小人不出发，队列等着
-      if (!ch.current && ch.queue.length && !a.script && !scene.frozen) {
-        ch.current = ch.queue.shift();
-        ch.current._t0 = null;
-      }
-      const task = ch.current;
-      const goal = task || ch.rest || null;
-      const spot = goal ? spotXY(world, ch, goal.spot) : idleRestFor(world, ch);
-      const pose = goal ? goal.pose : (spot.seat ? 'tea' : 'idle');
-      const atSpot = Math.hypot(a.x - spot.x, a.y - spot.y) < 1.5 && (spot.seat ? a.seat === spot.seat : !a.seat);
-      if (!atSpot) {
-        if (!a.script && !scene.frozen) {
-          const steps = [];
-          if (a.seat) steps.push({ t: 'seat', seat: null }, { t: 'anim', name: 'idle', ms: 120 });
-          steps.push({ t: 'go', x: spot.x, y: spot.y });
-          if (spot.seat) steps.push({ t: 'seat', seat: spot.seat }, { t: 'turn', facing: 1 });
-          if (goal && goal.facing) steps.push({ t: 'turn', facing: goal.facing });
-          scene.run(a, steps, {});
-        }
-        ch.bubble = ECS.bubbleFor(ch);
-        return;
-      }
-      if (!a.script) {
-        if (goal && goal.facing) a.facing = goal.facing;
-        scene.play(a, pose);
-      }
-      if (goal && goal.icon) {
-        const text = goal.iconText || (goal.icon === 'text' ? goal.label : null);
-        if (!a.icon || a.icon.kind !== goal.icon || a.icon.text !== text) a.icon = { kind: goal.icon, text: text, t0: scene.realT, fromTask: true };
-      } else if (a.icon && a.icon.fromTask) {
-        a.icon = null;
-      }
-      if (task) {
-        // 任务从到达位置开始计时：走路的时间不算在动作里
-        if (task._t0 == null) task._t0 = scene.realT;
-        if (scene.realT - task._t0 >= task.ms) {
-          ch.current = null;
-          if (task.onDone) task.onDone(task);
-        }
-      }
-      // 待机（快照的持续状态是喝茶）时偶尔起身：隔几秒走到房间里的一个位置伸个懒腰，再回到工位
-      if (!task && !ch.queue.length && goal && goal.pose === 'tea' && spot.seat && ECS.config.idleWander && !scene.frozen && !scene.reduced) {
-        if (ch.wanderAt == null) {
-          ch.wanderAt = scene.realT + 5000 + Math.random() * 7000;
-        } else if (scene.realT >= ch.wanderAt) {
-          const r = ECS.roomOf(world, ch.department);
-          ch.wanderTo = Math.round(r.x + 18 + Math.random() * (r.w - 36));
-          ch.wanderAt = null;
-          ECS.enqueue(world, ch.id, 'idle_wander');
-        }
+    Object.values(world.characters).forEach((ch) => stepOne(world, scene, ch));
+  };
+
+  function stepOne(world, scene, ch) {
+    const a = ECS.actorOf(world, scene, ch.id);
+    if (!a) return;
+    if (ch.current || ch.queue.length) ch.idleAt = null;
+    // 待机活动的走路被真正的任务打断：放弃走到一半的路，直接去做真正的任务
+    if (!ch.current && ch.queue.length && a.script && a.data.idleWalk) { scene.cancel(a); a.data.idleWalk = false; }
+    // 走路的脚本还没结束不换任务；整层静止（中断）时小人不出发，队列等着
+    if (!ch.current && ch.queue.length && !a.script && !scene.frozen) {
+      ch.current = ch.queue.shift();
+      ch.current._t0 = null;
+    }
+    const task = ch.current;
+    const goal = task || ch.rest || null;
+    const room = ECS.roomOf(world, ch.department);
+    // 不在房间里（外出）：从画面上消失，回来时从门口走进来
+    if (goal && goal.away) {
+      a.visible = false; a.seat = null; ch.bubble = null;
+      return;
+    }
+    if (!a.visible && room) { a.visible = true; a.seat = null; a.x = room.door; a.y = GEO.ROOM_B - 6; }
+    const spot = goal ? spotXY(world, ch, goal.spot, goal) : idleRestFor(world, ch);
+    const pose = goal ? goal.pose : (spot.seat ? 'tea' : 'idle');
+    const facing = (goal && goal.facing) || spot.facing || 0;
+    const atSpot = Math.hypot(a.x - spot.x, a.y - spot.y) < 1.5 && (spot.seat ? a.seat === spot.seat : !a.seat);
+    if (!atSpot) {
+      if (!a.script && !scene.frozen) {
+        const steps = [];
+        if (a.seat) steps.push({ t: 'seat', seat: null }, { t: 'anim', name: 'idle', ms: 120 });
+        steps.push({ t: 'go', x: spot.x, y: spot.y });
+        if (spot.seat) steps.push({ t: 'seat', seat: spot.seat }, { t: 'turn', facing: 1 });
+        if (facing) steps.push({ t: 'turn', facing });
+        scene.run(a, steps, {});
+        a.data.idleWalk = Boolean(goal && goal.idle);
       }
       ch.bubble = ECS.bubbleFor(ch);
-    });
-  };
+      return;
+    }
+    if (!a.script) {
+      if (facing) a.facing = facing;
+      scene.play(a, pose);
+      a.hold = (goal && goal.hold) || null;
+    }
+    if (goal && goal.icon) {
+      const text = goal.iconText || (goal.icon === 'text' ? goal.label : null);
+      if (!a.icon || a.icon.kind !== goal.icon || a.icon.text !== text) a.icon = { kind: goal.icon, text: text, t0: scene.realT, fromTask: true };
+    } else if (a.icon && a.icon.fromTask) {
+      a.icon = null;
+    }
+    if (task) {
+      // 任务从到达位置开始计时：走路的时间不算在动作里
+      if (task._t0 == null) {
+        task._t0 = scene.realT;
+        if (task.start && !task._started) { task._started = true; task.start(task); }
+      }
+      if (scene.realT - task._t0 >= task.ms) {
+        ch.current = null;
+        if (task.onDone) task.onDone(task);
+        if (task.done) task.done(task);
+      }
+    }
+    // 待机（快照的持续状态是喝茶）时隔几秒自己挑一件事做；同一个房间里的角色越多，每个人挑得越稀
+    if (!task && !ch.queue.length && goal && goal.pose === 'tea' && spot.seat && ECS.config.autonomy && !scene.frozen && !scene.reduced) {
+      if (ch.idleAt == null) ch.idleAt = scene.realT + (5000 + Math.random() * 7000) * (1 + 0.15 * (ECS.charsOf(world, ch.department).length - 1));
+      else if (scene.realT >= ch.idleAt) { ch.idleAt = null; startIdle(world, ch); }
+    }
+    ch.bubble = ECS.bubbleFor(ch);
+  }
+
+  // 空闲的角色自己挑一件事：从目录的待机活动里按权重抽一项（限定角色种类、需要空闲的同伴的都要满足条件）。
+  // 待机活动不产生事实，头顶没有对话框，遇到真正的任务立刻放弃。
+  function startIdle(world, ch) {
+    const room = ECS.roomOf(world, ch.department);
+    if (!room) return;
+    const mates = ECS.charsOf(world, ch.department).filter((c) => c !== ch && free(world, c));
+    const pool = world.catalog.idle.filter((it) => (!it.kinds || it.kinds.includes(ch.roleKind)) && (!it.needs || mates.length));
+    const total = pool.reduce((s, it) => s + it.weight, 0);
+    if (!total) return;
+    let k = Math.random() * total;
+    const pick = pool.find((it) => (k -= it.weight) < 0) || pool[pool.length - 1];
+    const mate = pick.needs ? mates[Math.floor(Math.random() * mates.length)] : null;
+    const pos = (frac) => Math.round(room.x + 18 + frac * (room.w - 36));
+    if (pick.at === 'wander') {
+      ECS.enqueue(world, ch.id, pick.key, { idle: true, at: { x: pos(Math.random()), y: GEO.PORT_STAND } });
+    } else if (pick.at === 'door') {
+      ECS.enqueue(world, ch.id, pick.key, { idle: true, at: { x: room.door, y: GEO.PORT_STAND } });
+    } else if (pick.needs && mate) {
+      // 两个空闲的角色在房间中间碰头说话
+      const mid = pos(Math.random());
+      ECS.enqueue(world, ch.id, pick.key, { idle: true, at: { x: mid - 9, y: GEO.PORT_STAND }, facing: 1 });
+      ECS.enqueue(world, mate.id, pick.key, { idle: true, at: { x: mid + 9, y: GEO.PORT_STAND }, facing: -1 });
+    } else {
+      ECS.enqueue(world, ch.id, pick.key, { idle: true });
+    }
+  }
+
+  function free(world, c) {
+    return !c.current && !c.queue.length && c.rest && c.rest.pose === 'tea' && !c.rest.away;
+  }
 
   // 第 3.4 节：P.ecs.bubbleFor —— 只读取已有的任务数据，不产生新的事实
   ECS.bubbleFor = function bubbleFor(ch) {
@@ -368,31 +475,45 @@
     return null;
   };
 
-  // 让 wantDepts 里的每个部门都有一个角色实体与对应的 actor（id 为 'ch-' + 部门），去掉不再需要的
-  ECS.syncCharacters = function syncCharacters(world, scene, wantDepts, spriteOf) {
-    scene.actors.filter((a) => a.data.ecsChar && !wantDepts.includes(a.data.dept)).forEach((a) => scene.removeActor(a));
-    Object.keys(world.characters).forEach((d) => { if (!wantDepts.includes(d)) delete world.characters[d]; });
-    wantDepts.forEach((d) => {
-      const r = ECS.roomOf(world, d);
-      if (!r) throw new Error('角色所在的房间未声明：' + d);
-      if (!world.characters[d]) {
-        world.characters[d] = { kind: 'character', id: d, department: d, spot: { x: r.desk.seatX, y: r.desk.seatY }, queue: [], current: null, rest: null, bubble: null };
-      }
-      let a = scene.actors.find((x) => x.id === 'ch-' + d);
-      if (!a) {
-        a = scene.addActor({ id: 'ch-' + d, sprite: spriteOf(d), x: r.desk.seatX, y: r.desk.seatY, anim: 'sit', data: { ecsChar: true, dept: d } });
-        a.seat = r.desk;
-      }
+  // 让 specs 里的每个角色都有一个角色实体与对应的 actor（id 为 'ch-' + 角色 id），去掉不再需要的，并给每个房间排好工位。
+  // specs: [{ id, department, roleKind, name }]；spriteOf(spec) 给出精灵名
+  ECS.syncCharacters = function syncCharacters(world, scene, specs, spriteOf) {
+    const want = new Set(specs.map((s) => s.id));
+    scene.actors.filter((a) => a.data.ecsChar && !want.has(a.data.charId)).forEach((a) => scene.removeActor(a));
+    Object.keys(world.characters).forEach((id) => { if (!want.has(id)) delete world.characters[id]; });
+    const byRoom = {};
+    specs.forEach((s) => { (byRoom[s.department] = byRoom[s.department] || []).push(s); });
+    Object.keys(byRoom).forEach((dept) => {
+      const r = ECS.roomOf(world, dept);
+      if (!r) throw new Error('角色所在的房间未声明：' + dept);
+      const list = byRoom[dept].slice().sort((p, q) => ((SEAT_RANK[p.roleKind] || 0) - (SEAT_RANK[q.roleKind] || 0)) || (p.id < q.id ? -1 : 1));
+      const relayout = !r.seats || r.seats.length !== list.length;
+      if (relayout) ECS.layoutSeats(r, list.length);
+      list.forEach((s, i) => {
+        const seat = r.seats[i];
+        let ch = world.characters[s.id];
+        if (!ch) {
+          ch = world.characters[s.id] = { kind: 'character', id: s.id, department: dept, roleKind: s.roleKind, name: s.name, spot: { x: seat.seatX, y: seat.seatY }, seatIndex: i, queue: [], current: null, rest: null, bubble: null };
+        }
+        ch.seatIndex = i; ch.roleKind = s.roleKind; ch.name = s.name;
+        let a = ECS.actorOf(world, scene, s.id);
+        if (!a) {
+          a = scene.addActor({ id: 'ch-' + s.id, sprite: spriteOf(s), x: seat.seatX, y: seat.seatY, anim: 'sit', data: { ecsChar: true, dept, charId: s.id } });
+          a.seat = seat;
+        } else if (relayout && a.seat) {
+          a.seat = seat;
+        }
+      });
     });
   };
 
   // 角色实体对应的 actor
-  ECS.actorOf = function actorOf(world, scene, dept) {
-    return scene.actors.find((x) => x.id === 'ch-' + dept) || null;
+  ECS.actorOf = function actorOf(world, scene, id) {
+    return scene.actors.find((x) => x.id === 'ch-' + id) || null;
   };
 
   // ---------------------------------------------------------------------------
-  // 第 3.4 节：包裹
+  // 第 3.5 节：包裹
 
   ECS.spawnPackage = function spawnPackage(world, id, workItemId, colorIndex, artifact, roomId) {
     world.packages[id] = { kind: 'package', id, workItemId, colorIndex, artifact, atRest: { roomId: roomId || null, spotKind: 'port_in' }, transit: null };
@@ -434,5 +555,28 @@
   // 这条管道上有没有正在移动的包裹
   ECS.linkActive = function linkActive(world, linkKey) {
     return Object.values(world.packages).some((pk) => pk.transit && pk.transit.linkKey === linkKey);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 第 3.6 节：管道的流动
+  //
+  // 管道是持续运转的实体：流速带着惯性跟随状态，光点按累计的相位向前移动，管道里的光点（load）随状态增减。
+  //   flowing：加速到满速，光点逐渐布满；idle：减速，光点淡出；stopped：迅速停下，光点留在原处，等恢复以后继续流动。
+  // stateOf(pipe) 由调用方按快照给出 'flowing'｜'idle'｜'stopped'。autonomy 关闭时状态直接对应 v8 的画法（满速或没有）。
+  ECS.stepPipes = function stepPipes(world, scene, stateOf) {
+    const now = scene.realT;
+    Object.values(world.links).forEach((p) => {
+      const f = p.flow || (p.flow = { state: 'idle', speed: 0, load: 0, phase: 0, t: now });
+      const dt = Math.max(0, Math.min(200, now - f.t));
+      f.t = now;
+      f.state = stateOf(p);
+      if (!ECS.config.autonomy) { f.speed = f.state === 'flowing' ? 1 : 0; f.load = f.speed; return; }
+      const goal = f.state === 'flowing' ? 1 : 0;
+      f.speed += (goal - f.speed) * Math.min(1, dt / (f.state === 'stopped' ? 120 : 350));
+      if (Math.abs(goal - f.speed) < 0.01) f.speed = goal;
+      if (f.state === 'flowing') f.load = Math.min(1, f.load + dt / 500);
+      else if (f.state === 'idle') f.load = Math.max(0, f.load - dt / 1600);
+      f.phase += f.speed * dt;
+    });
   };
 })();
