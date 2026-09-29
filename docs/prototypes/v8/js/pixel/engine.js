@@ -2181,7 +2181,8 @@
   }
   P.shotImage = shotImage;
 
-  // 显示器里的一张截图或文字行：x、y 左上角，像素边框
+  // 显示器里的一张截图或文字行：x、y 左上角，像素边框。浏览器的每一步都有截图，模型不能看图时（text_only）
+  // 显示器同样显示截图，角落标出「只读文字」（3.2D 设计说明第 7.3 节）
   paint.shot = function shot(c, x, y, w, h, o, t) {
     const opt = o || {};
     x = Math.round(x); y = Math.round(y);
@@ -2201,6 +2202,10 @@
       }
     }
     paint.scanlines(c, x + 1, y + 1, w - 2, h - 2, 0.14);
+    if (opt.text_only) {
+      R(c, x + w - 13, y + h - 8, 12, 7, PAL.yellow2);
+      P.text(c, '文字', x + w - 7, y + h - 4.5, { size: 4.5, weight: 700, align: 'center', color: PAL.ink });
+    }
   };
 
   // 交接管道口：地面或墙上的方口，包裹进出；out 为 flowing 时口上有流动的光点
