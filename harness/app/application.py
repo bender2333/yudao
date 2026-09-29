@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,20 @@ from ..event_store import EventStore
 from ..git_versions import GitVersionStore
 from ..models import new_id, utc_now
 from ..runtime import LoopSystem
+from .catalog_commands import (
+    CATALOG_CANDIDATES_COLLECT,
+    CATALOG_CONNECTION_DELETE,
+    CATALOG_CONNECTION_SAVE,
+    CATALOG_CONNECTION_TEST,
+    CATALOG_DEPARTMENT_DEFAULTS_SAVE,
+    CATALOG_DOCUMENT_SAVE,
+    CATALOG_MODEL_TEST,
+    CATALOG_RELOAD,
+    CREDENTIAL_CLEAR_OVERRIDE,
+    CREDENTIAL_REMOVE_PERSISTED,
+    CREDENTIAL_SET,
+)
+from .catalog_queries import CATALOG_DOCUMENT_QUERY, CATALOG_QUERY
 from .commands import execute
 from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
@@ -55,10 +70,12 @@ class ReadOnlyCore:
 
 # 能力清单的 decisions 取自决定合同中的种类：当前部署会发出的决定请求
 DEFAULT_REGISTRY = Registry(
-    commands=[PROJECT_CREATE, DECISION_ANSWER],
-    queries=[SYSTEM_STATUS, DECISIONS_LIST, *PROJECT_QUERIES],
-    decisions=tuple(DECISION_KINDS),
-)
+    commands=[PROJECT_CREATE, DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,
+              CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT, CATALOG_CONNECTION_TEST,
+              CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
+              CREDENTIAL_REMOVE_PERSISTED],
+    queries=[SYSTEM_STATUS, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY, CATALOG_DOCUMENT_QUERY],
+    decisions=tuple(DECISION_KINDS))
 
 
 class Application:
@@ -72,11 +89,15 @@ class Application:
         # 应用层保存的读取模型：调用尝试表与流转记录。可写打开时保存在数据目录里，只读打开时在内存中重建
         path = None if system.read_only else Path(system.data_dir) / "read-models.sqlite"
         self.read_models = ReadModels(system.store, system.artifacts, path)
+        # 需要以后以事件出现结果的命令（获取模型列表与两种测试）作为任务运行
+        self._tasks: set[asyncio.Task[Any]] = set()
 
     @classmethod
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
         # 服务进程使用的控制核心：读取模型目录与凭据文件，并在文件被外部修改时重新读取
         system = LoopSystem(data_dir, provider_config_path=provider_config, dotenv_path=dotenv)
+        # 启动时目录修订号与最后一条 catalog_revised 不同则补写（设计说明第 10 节第 1 项）
+        system.sync_catalog_revision(operation="startup")
         system.start_provider_watching()
         return cls(system)
 
@@ -87,7 +108,17 @@ class Application:
 
     def close(self) -> None:
         self.read_models.close()
+        for task in list(self._tasks):
+            task.cancel()
+        self._tasks.clear()
         self.system.close()
+
+    def schedule(self, coroutine) -> asyncio.Task[Any]:
+        # 结果以后以事件出现的命令：在服务的事件循环中作为任务运行
+        task = asyncio.get_running_loop().create_task(coroutine)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
 
     def rebuild_read_models(self) -> None:
         # 删除调用尝试表与流转记录以后从事件重放重建；不调用模型与工具

@@ -12,8 +12,12 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, TypeVar
 
 from .definitions import DEFINITIONS
-from .event_store import Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, is_run_stream
-from .models import DEPARTMENTS, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now
+from .event_store import (
+    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, is_catalog_stream, is_run_stream,
+)
+from .models import (
+    DEPARTMENTS, CatalogEvent, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now,
+)
 from .projection import (
     Projection, apply_decision_event, dump_decision, dump_projection, empty_projection, fold, load_decisions,
     load_projection, replay, replay_decisions,
@@ -56,6 +60,14 @@ class NewProjectEvent:
     # 一条要追加的项目事件
     type: str
     payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class NewCatalogEvent:
+    # 一条要追加的目录事件；actor 是写入方声明的提出者（补写与外部修改声明系统）
+    type: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    actor: str | None = None
 
 
 class Snapshot:
@@ -203,14 +215,24 @@ class WritePath:
         return streams
 
 
-def _event(stream: str, entry: NewEvent | NewProjectEvent, version: int,
-           command: Command | None) -> Event | ProjectEvent:
+def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, version: int,
+           command: Command | None) -> Event | ProjectEvent | CatalogEvent:
     identity = stream.split(":", 1)[1]
-    if is_run_stream(stream) != isinstance(entry, NewEvent):
-        raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     # 载荷取它在日志中保存的形式（JSON），并入投影的内容与从日志重放时读到的完全相同
     payload = json.loads(json_dumps(entry.payload))
     command_id = None if command is None else command.command_id
+    if isinstance(entry, NewCatalogEvent):
+        if not is_catalog_stream(stream):
+            raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
+        return CatalogEvent(
+            event_id=new_id("cevt"), type=entry.type, payload=payload, created_at=utc_now(), position=0,
+            stream=stream, stream_version=version, command_id=command_id,
+            actor=entry.actor if command is None else command.actor,
+        )
+    if is_catalog_stream(stream):
+        raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
+    if is_run_stream(stream) != isinstance(entry, NewEvent):
+        raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     if isinstance(entry, NewEvent):
         _check_stop_reason(entry)
         return Event(

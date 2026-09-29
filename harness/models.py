@@ -99,6 +99,15 @@ class ProjectEventType:
     MATERIAL_RECORDED = "material_recorded"
 
 
+class CatalogEventType:
+    # 模型目录与凭据的事件（应用层与接口层设计说明第 10 节第 1 项）。
+    # 内容仍由 Provider 模块保存；事件只带修订号、变化与结果，不含 Key
+    CATALOG_REVISED = "catalog_revised"
+    CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
+    CATALOG_TEST_FINISHED = "catalog_test_finished"
+    CREDENTIAL_CHANGED = "credential_changed"
+
+
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
     EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
@@ -484,6 +493,38 @@ class ProjectEvent:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class CatalogEvent:
+    # 目录流中的一条事件。目录不属于项目或 run，范围列为空；日志中的位置与命令列同项目事件
+    event_id: str
+    type: str
+    payload: dict[str, Any]
+    created_at: str
+    position: int
+    stream: str
+    stream_version: int
+    project_id: str | None = None
+    work_item_id: str | None = None
+    run_id: str | None = None
+    department: str | None = None
+    epoch: int | None = None
+    command_id: str | None = None
+    actor: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class CatalogProjection:
+    # 目录流的投影：只记最后一条事件与最后一条 catalog_revised 的修订号。
+    # 目录内容与凭据仍由 Provider 模块保存，这里不复制
+    last_event_id: str | None = None
+    stream_version: int = 0
+    updated_at: str | None = None
+    revision: int = 0
 
 
 @dataclass
