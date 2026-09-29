@@ -22,6 +22,10 @@
   - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程、本机容器、远程执行代理三种实现；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 11 节的决定：机器流、本机容器经本机端口调用执行代理、本阶段先完成本机进程与本机容器，远程机器的真实验收等树莓派）。工单：父工单 #120（#110、#128 至 #131、#117，其余待建）。
   - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
+- [浏览器与 computer use](browser-and-computer-use.md)
+  - 内容：试用会话与试用镜像；Playwright MCP 浏览器工具；容器虚拟屏幕中的 computer use；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
+  - 状态：2026-09-29 设计草稿，第 16 节待用户确认；未实施。工单：父工单 #123（待建）。
+  - 需求：[D34](../requirements/browser-and-computer-use.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（子工单待建）。
