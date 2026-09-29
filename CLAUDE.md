@@ -120,7 +120,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 流程：
 1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，在后台运行
-   `omp -p --prewalk --mode json --auto-approve --max-time 2h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+   `omp -p --prewalk --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
 2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
    `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
 3. 收尾：
@@ -173,7 +173,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - 执行者的日记是 `agents_jour.md`，由执行者维护。2026-09-24 之前的设计日记 `jour.md` 已停止追加，位于 `docs/archive/jour.md`，只在追溯历史时读取。
 
 # 规则
-1. 不保留向后兼容。过时的直接删，别加兼容层、别写migration、别留fallback。事件日志中的项目流是唯一的例外：跨 Yudao 版本保存，只增加字段或事件种类，已有字段的含义不变（[ADR-0019](docs/adr/0019-project-stream-across-versions.md)）。
+1. 不保留向后兼容。过时的直接删，别加兼容层、别写migration、别留fallback。事件日志中的项目流与机器流是唯一的例外：跨 Yudao 版本保存，只增加字段或事件种类，已有字段的含义不变（[ADR-0019](docs/adr/0019-project-stream-across-versions.md)）。
 2. 选能满足当前需求的最简单实现。不要预防性抽象，不要多此一举的配置层。
 3. 系统分层长。先跑通一个最小的端到端版本，再往上加东西。绝不为了未完成的复杂度拆掉能跑的东西。
 4. 组件保持模块化，关注点分离。

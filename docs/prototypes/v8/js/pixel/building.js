@@ -18,6 +18,7 @@
     waiting_provider: { text: '等待模型服务', color: PAL.grey3 },
     pending_verification: { text: '待核实', color: PAL.yellow2 },
     waiting_resume: { text: '待恢复', color: PAL.yellow2 },
+    waiting_decision: { text: '等待你的决定', color: PAL.yellow2 },
     interrupted: { text: '中断', color: PAL.grey4 },
     idle: { text: '空闲', color: PAL.grey2 }
   };

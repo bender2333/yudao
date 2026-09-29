@@ -140,15 +140,12 @@ def test_existing_corrupt_destination_is_not_acknowledged_as_stored(tmp_path):
     assert store.get_for_run("run", first.intend_ref) == b"first"
 
 
-def test_readback_failure_is_not_acknowledged_as_a_successful_append(tmp_path, monkeypatch):
+def test_readback_failure_is_not_acknowledged_as_a_successful_append(tmp_path):
     store = ArtifactStore(tmp_path / "artifacts")
-    original_get = store.get_for_run
-
-    def failed_get(run_id, ref):
-        if ref.kind == "intend":
-            raise OSError("readback failed")
-        return original_get(run_id, ref)
-
-    monkeypatch.setattr(store, "get_for_run", failed_get)
-    with pytest.raises(OSError, match="readback failed"):
-        append_intend(store, "run", "original")
+    first = append_intend(store, "run", "first")
+    # 目标路径已经被一个目录占用：写入跳过，读回失败，这次追加不算成功
+    digest = hash_bytes(b"firstnew").split(":", 1)[1]
+    (store.root / "run" / digest[:2] / digest).mkdir(parents=True)
+    with pytest.raises(OSError):
+        append_intend(store, "run", "new", previous_ref=first.intend_ref)
+    assert store.get_for_run("run", first.intend_ref) == b"first"
