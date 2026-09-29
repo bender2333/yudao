@@ -41,7 +41,7 @@ _COLLECTION_SCOPE = {
 
 @dataclass(frozen=True)
 class ActivationScope:
-    # 记录所属的激活：身份、激活采用的版本与工作依据、配置的提供方与调用目标的公开身份
+    # 记录所属的激活：身份、激活采用的版本与工作依据，以及激活开始时配置的提供方名称（解析发生在每次逻辑调用）
     run_id: str
     department: str
     session_id: str
@@ -53,9 +53,6 @@ class ActivationScope:
     guidance_only: bool
     basis: WorkBasis
     provider: str
-    target: dict[str, Any]
-    # 调用目标的凭据：记录之前从观察中去掉
-    secret: str | None = field(default=None, repr=False)
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.basis.input_version, "prompt_version": self.prompt_version,
@@ -145,19 +142,17 @@ def _stream_progress_summary(payload: dict[str, Any]) -> str:
     return event_type
 
 
-def _redact(value: Any, *, secret: str | None = None, key: str | None = None) -> Any:
+def _redact(value: Any, *, key: str | None = None) -> Any:
     normalized_key = key.casefold().replace("-", "_") if isinstance(key, str) else ""
     if normalized_key in _SENSITIVE_OBSERVATION_KEYS or normalized_key.endswith("_api_key"):
         return "[REDACTED]"
     if isinstance(value, dict):
         return {
-            str(child_key): _redact(child_value, secret=secret, key=str(child_key))
+            str(child_key): _redact(child_value, key=str(child_key))
             for child_key, child_value in value.items()
         }
     if isinstance(value, list):
-        return [_redact(item, secret=secret, key=key) for item in value]
-    if isinstance(value, str) and secret:
-        return value.replace(secret, "[REDACTED]")
+        return [_redact(item, key=key) for item in value]
     return value
 
 
@@ -248,7 +243,7 @@ class StepRecorder:
         payload.update(run_id=scope.run_id, request_ref=asdict(ref), admitted=step.admitted,
                        tokens_charged=0, step_id=request.step_id, attempt=request.attempt,
                        root_step_id=request.root_step_id, retry_of_step_id=request.retry_of_step_id,
-                       **scope.target,
+                       **self._call_target(request),
                        effective_context_window=step.limits.context_window,
                        input_token_estimate=step.input_token_estimate,
                        output_reserve_tokens=step.output_reserve_tokens,
@@ -257,7 +252,7 @@ class StepRecorder:
         payload.update(attempt_id=request.attempt_id, logical_call_id=request.logical_call_id,
                        collaboration_request_id=scope.basis.request_id)
         [event] = self._record_in(transaction, self._draft(
-            EventType.CONTEXT_ASSEMBLED, provider=scope.provider, context_digest=assembled.manifest.digest,
+            EventType.CONTEXT_ASSEMBLED, provider=self._event_provider(request), context_digest=assembled.manifest.digest,
             artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload))
         request.context_event_id = event.event_id
 
@@ -279,7 +274,8 @@ class StepRecorder:
                 }))
         request.attempt_started_at = request.attempt_started_at or utc_now()
         drafts.append(self._draft(
-            EventType.MODEL_REQUESTED, provider=scope.provider, context_digest=request.context.manifest.digest,
+            EventType.MODEL_REQUESTED, provider=self._event_provider(request),
+            context_digest=request.context.manifest.digest,
             payload={"activation_id": scope.activation_id, "step_id": request.step_id,
                      **scope.versions(),
                      "attempt": request.attempt,
@@ -295,7 +291,7 @@ class StepRecorder:
                      "effective_contract_hash": request.effective_contract_hash,
                      "engineering_plan_hash": request.engineering_plan_hash,
                      "request_id": scope.basis.request_id,
-                     **scope.target,
+                     **self._call_target(request),
                      "effective_context_window": request.context.manifest.budget,
                      "max_output_tokens": request.max_output_tokens,
                      "definitions_version": DEFINITIONS.version}))
@@ -354,7 +350,7 @@ class StepRecorder:
         duration_ms = _duration_ms(request)
         capture = self._finalize_capture(request)
         if capture.response_ref is None and isinstance(response.sdk_response, dict):
-            safe_response = _redact(response.sdk_response, secret=scope.secret)
+            safe_response = _redact(response.sdk_response)
             response_ref = self._artifacts.put(
                 scope.run_id,
                 "sdk_response",
@@ -363,7 +359,7 @@ class StepRecorder:
             )
             capture.response_ref = asdict(response_ref)
             capture.provider_response_id = safe_response.get("id") or response.response_id
-        provider = response.provider or scope.provider
+        provider = response.provider or self._event_provider(request)
         model = response.model or self._model
         payload = {
             "attempt_id": request.attempt_id,
@@ -394,7 +390,7 @@ class StepRecorder:
             "usage": _usage_summary(capture.usage or self._step_usage),
             "raw_usage_ref": capture.usage_ref or self._raw_usage_ref,
             **scope.versions(),
-            **scope.target,
+            **self._call_target(request),
         }
         return self._draft(
             EventType.MODEL_ATTEMPT_FINISHED,
@@ -412,11 +408,11 @@ class StepRecorder:
         finished_at = utc_now()
         duration_ms = _duration_ms(request)
         status = "cancelled" if error.reason == "cancelled" else "failed"
-        safe_error = _redact(str(error), secret=scope.secret)
-        safe_diagnostics = _redact(dict(error.diagnostics or {}), secret=scope.secret)
+        safe_error = _redact(str(error))
+        safe_diagnostics = _redact(dict(error.diagnostics or {}))
         return self._draft(
             EventType.MODEL_ATTEMPT_FAILED,
-            provider=self._provider or scope.provider, model=self._model,
+            provider=self._provider or self._event_provider(request), model=self._model,
             context_digest=request.context.manifest.digest, error=safe_error,
             artifact_hashes=[ref["content_hash"] for ref in (capture.response_ref, capture.stream_ref) if ref],
             payload={
@@ -456,7 +452,7 @@ class StepRecorder:
                 "retryable": error.retryable,
                 "will_retry": will_retry,
                 "diagnostics": safe_diagnostics,
-                **scope.target,
+                **self._call_target(request),
             })
 
     def _tool_call_required(self, request: ModelRequest, item: dict[str, Any], count: int, limit: int) -> Draft:
@@ -474,7 +470,8 @@ class StepRecorder:
                         next_step_id: int) -> None:
         scope = self.scope
         self._record_in(transaction, self._draft(
-            EventType.MODEL_RETRY_SCHEDULED, provider=scope.provider, context_digest=request.context.manifest.digest,
+            EventType.MODEL_RETRY_SCHEDULED, provider=self._event_provider(request),
+            context_digest=request.context.manifest.digest,
             payload={
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,
@@ -496,7 +493,7 @@ class StepRecorder:
                 "reason": error.reason,
                 "retryable": True,
                 "delay_sec": delay,
-                **scope.target,
+                **self._call_target(request),
             }))
 
     def compaction(self, transaction: Transaction, request: ModelRequest, result: CompactionResult,
@@ -509,7 +506,8 @@ class StepRecorder:
         plan_ref = self._artifacts.put(scope.run_id, "compaction_plan", json_dumps(asdict(plan)),
                                        media_type="application/json")
         self._record_in(transaction, self._draft(
-            EventType.COMPACTION_RECORDED, provider=response.provider or scope.provider, model=response.model,
+            EventType.COMPACTION_RECORDED, provider=response.provider or self._event_provider(request),
+            model=response.model,
             context_digest=request.context.manifest.digest,
             artifact_hashes=[summary_ref.content_hash, plan_ref.content_hash],
             payload={"run_id": scope.run_id, "department": scope.department,
@@ -520,7 +518,7 @@ class StepRecorder:
                      "plan_ref": asdict(plan_ref), "summary_token_limit": plan.summary_token_limit,
                      "max_output_tokens": plan.max_output_tokens,
                      **scope.work_basis(),
-                     **scope.target,
+                     **self._call_target(request),
                      "previous_compaction_event_id": result.previous_compaction_event_id}))
 
     def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
@@ -544,6 +542,18 @@ class StepRecorder:
         scope = self.scope
         return lambda phase: NewEvent(type, state_before=phase, state_after=phase, role=scope.department,
                                       parent_event_id=scope.parent_event_id, session_id=scope.session_id, **fields)
+
+    def _call_target(self, request: ModelRequest) -> dict[str, Any]:
+        # 这次逻辑调用解析出的调用目标公开部分：写入请求、尝试与压缩事件，不含密钥
+        return dict(request.call_target or {})
+
+    def _event_provider(self, request: ModelRequest | None = None) -> str | None:
+        # 事件上的提供方：解析出的连接标识优先，没有解析结果时用激活开始时的名称
+        if request is not None:
+            config_id = self._call_target(request).get("provider_config_id")
+            if isinstance(config_id, str) and config_id:
+                return config_id
+        return self.scope.provider
 
     def _record(self, *drafts: Draft) -> list[Event]:
         # 在写入口开一个事务追加一次调用的全部记录
@@ -615,23 +625,23 @@ class StepRecorder:
                 "serialization": "sdk_request_json_object",
                 **scope.work_basis(),
                 **scope.versions(),
-                **scope.target,
+                **self._call_target(request),
             }
             return [self._draft(
-                EventType.MODEL_REQUEST_SERIALIZED, provider=scope.provider,
+                EventType.MODEL_REQUEST_SERIALIZED, provider=self._event_provider(request),
                 context_digest=request.context.manifest.digest, artifact_hashes=[ref.content_hash],
                 payload=payload)]
         if observation.provider:
             self._provider = observation.provider
         if observation.model:
             self._model = observation.model
-        provider = self._provider or scope.provider
+        provider = self._provider or self._event_provider(request)
         model = self._model
         if observation.kind == "stream_event":
             if not isinstance(observation.payload, dict):
                 raise ProviderError("Decoded provider stream event is not a JSON object", reason="provider_protocol")
             capture = self._capture(request)
-            observation.payload = _redact(observation.payload, secret=scope.secret)
+            observation.payload = _redact(observation.payload)
             capture.actual_provider = observation.provider or capture.actual_provider
             capture.actual_model = observation.model or capture.actual_model
             capture.provider_response_id = observation.response_id or capture.provider_response_id
@@ -642,7 +652,7 @@ class StepRecorder:
             if not isinstance(observation.payload, dict):
                 raise ProviderError("Provider response is not a JSON object", reason="provider_protocol")
             capture = self._capture(request)
-            observation.payload = _redact(observation.payload, secret=scope.secret)
+            observation.payload = _redact(observation.payload)
             capture.actual_provider = observation.provider or capture.actual_provider
             capture.actual_model = observation.model or capture.actual_model
             ref = self._artifacts.put(
@@ -660,7 +670,7 @@ class StepRecorder:
             if observation.usage is None:
                 return []
             capture = self._capture(request)
-            safe_usage = _redact(observation.payload, secret=scope.secret)
+            safe_usage = _redact(observation.payload)
             ref = self._artifacts.put(scope.run_id, "model_usage", json_dumps(safe_usage),
                                       media_type="application/json")
             self._raw_usage_ref = asdict(ref)
@@ -685,7 +695,7 @@ class StepRecorder:
                 reported=(observation.usage.reported if has_usage else False),
             )
         if observation.kind in {"tool", "skipped_tool"}:
-            payload = _redact(dict(observation.payload), secret=scope.secret)
+            payload = _redact(dict(observation.payload))
             tool_id = f"{request.step_id}:{payload.get('id') or observation.id}"
             if tool_id in self._tool_ids:
                 return []
@@ -697,13 +707,10 @@ class StepRecorder:
                 payload["output_ref"] = asdict(ref)
             event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED
         elif observation.kind == "message":
-            safe_text = _redact(observation.text, secret=scope.secret)
+            safe_text = _redact(observation.text)
             self._messages.append(safe_text)
             self._message_steps.append((request.activation_id, request.step_id))
-            message = _redact(
-                observation.payload or {"role": "assistant", "content": safe_text},
-                secret=scope.secret,
-            )
+            message = _redact(observation.payload or {"role": "assistant", "content": safe_text})
             ref = self._artifacts.put(scope.run_id, "model_message", json_dumps(message),
                                       media_type="application/json")
             payload = {
@@ -725,7 +732,7 @@ class StepRecorder:
         payload["purpose"] = request.purpose
         payload.update(scope.work_basis())
         payload.update(scope.versions())
-        payload.update(scope.target)
+        payload.update(self._call_target(request))
         drafts = [self._draft(event_type, provider=provider, model=model, payload=payload)]
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):
@@ -753,7 +760,7 @@ class StepRecorder:
         capture.progress_last_emitted_monotonic = now
         return [self._draft(
             EventType.MODEL_STREAM_PROGRESS,
-            provider=self._provider or scope.provider, model=observation.model or self._model,
+            provider=self._provider or self._event_provider(request), model=observation.model or self._model,
             context_digest=request.context.manifest.digest,
             payload={
                 "attempt_id": request.attempt_id,
@@ -810,5 +817,5 @@ class StepRecorder:
                 "input_total_tokens": usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens,
                 "output_tokens": usage.output_tokens,
                 "cost": cost_delta, "total_cost": usage.cost,
-                **scope.target,
+                **self._call_target(request),
             })]

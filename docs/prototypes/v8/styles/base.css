@@ -536,8 +536,10 @@ html.is-annotate .y8-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
 .y8-scene { position: relative; border-radius: 10px; overflow: hidden; background: #1f2230; }
 .y8-scene canvas { display: block; width: 100%; }
 .is-replay > .y8-scene { box-shadow: 0 0 0 3px var(--violet); }
-.y8-overlay-bar { position: absolute; top: 26px; right: 8px; z-index: 2; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 70%; }
-.y8-overlay-bar .y8-seg-btn { background: rgba(20, 22, 36, .78); color: #dfe3f2; }
+.y8-floor-wrap { display: flex; flex-direction: column; }
+.y8-overlay-bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 6px 8px; background: #1f2230; }
+.y8-overlay-bar::before { content: "覆盖层"; color: #9ea3bd; font-size: 12px; margin-right: auto; }
+.y8-overlay-bar .y8-seg-btn { background: rgba(255, 255, 255, .08); color: #dfe3f2; }
 .y8-overlay-bar .y8-seg-btn.is-on { background: #9c86ff; color: #16122c; }
 .y8-scene-list { margin-top: 8px; font-size: 12.5px; }
 .y8-scene-list summary { cursor: pointer; color: var(--muted); }
@@ -573,7 +575,6 @@ body.is-version-mismatch .y8-app { display: none; }
 
 @media (max-width: 720px) {
   .y8-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .y8-overlay-bar { position: static; max-width: none; justify-content: flex-start; padding: 6px; background: #1f2230; }
 }
 
 @media (prefers-reduced-motion: reduce) {

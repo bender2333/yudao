@@ -405,9 +405,9 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert {item["client_port"] for item in captures_a}.isdisjoint(
             item["client_port"] for item in captures_b
         )
-        assert result.provider_bindings["product"]["provider_id"] == "provider-a"
-        assert result.provider_bindings["engineering"]["provider_id"] == "provider-b"
-        assert result.provider_bindings["quality"]["provider_id"] == "provider-a"
+        assert result.provider_bindings["product"]["provider_config_id"] == "provider-a"
+        assert result.provider_bindings["engineering"]["provider_config_id"] == "provider-b"
+        assert result.provider_bindings["quality"]["provider_config_id"] == "provider-a"
         requests = result.model_requests
         assert [(item["provider_config_id"], item["requested_model"]) for item in requests] == [
             ("provider-a", "a-product"), ("provider-b", "b-engineering"),
@@ -442,7 +442,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert audit["collaboration_audit"]["status"] == "verified", audit["collaboration_audit"]
 
 
-def test_provider_credentials_are_frozen_per_run_and_rotated_for_new_runs(tmp_path):
+def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
     def product_response(body: dict[str, Any], count: int) -> _Reply:
         assert _department(body) == "product"
         payload = product_spec()
@@ -476,10 +476,10 @@ def test_provider_credentials_are_frozen_per_run_and_rotated_for_new_runs(tmp_pa
         assert [item["authorization"] for item in captures_b] == ["Bearer provider-b-key-v2"]
         assert first.provider_bindings["product"]["credential_version"] == "a-v1"
         assert second.provider_bindings["product"]["credential_version"] == "b-v2"
-        assert first.provider_bindings["product"]["provider_id"] == "provider-a"
-        assert second.provider_bindings["product"]["provider_id"] == "provider-b"
-        assert first.provider_bindings["product"]["model"] == "a-product"
-        assert second.provider_bindings["product"]["model"] == "b-product"
+        assert first.provider_bindings["product"]["provider_config_id"] == "provider-a"
+        assert second.provider_bindings["product"]["provider_config_id"] == "provider-b"
+        assert first.provider_bindings["product"]["requested_model"] == "a-product"
+        assert second.provider_bindings["product"]["requested_model"] == "b-product"
         public = _public_run_data(original, first_run) + _public_run_data(updated, second_run)
         assert "provider-a-key-v1" not in public
         assert "provider-b-key-v2" not in public
@@ -538,19 +538,19 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
         assert system.project(other_run).phase == "ENGINEERING"
 
 
-def test_restart_cannot_rebind_an_existing_run_to_new_credentials(tmp_path):
-    def unexpected(_body: dict[str, Any], _count: int) -> _Reply:
-        return _error()
+def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path):
+    # 上游拒绝凭据（HTTP 401）：请求带着重启后解析出的 Key 发出，运行进入待恢复，不因「凭据已不在本进程」结束
+    def rejecting(_body: dict[str, Any], _count: int) -> _Reply:
+        return _error(401)
 
-    with _provider_server("provider-a", "provider-a-key", unexpected) as (config_a, captures_a, errors_a), \
-            _provider_server("provider-b", "provider-b-key", unexpected) as (config_b, _captures_b, _errors_b):
-        credentials = {
-            "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-            "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-        }
+    with _provider_server("provider-a", "provider-a-key", rejecting) as (config_a, captures_a, errors_a), \
+            _provider_server("provider-b", "provider-b-key", rejecting) as (config_b, _captures_b, _errors_b):
         original = LoopSystem(tmp_path, facade=_facade(
-            config_a.base_url, config_b.base_url, credentials=credentials))
-        run_id = original.create_run("must remain on its frozen target")
+            config_a.base_url, config_b.base_url, credentials={
+                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
+                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
+            }))
+        run_id = original.create_run("resolve the credentials in this process")
         original.store.close()
 
         restarted = LoopSystem(
@@ -563,12 +563,18 @@ def test_restart_cannot_rebind_an_existing_run_to_new_credentials(tmp_path):
         )
         result = restarted.activate_once(run_id)
 
-        assert result.phase == "FAILED" and result.stop_reason == "provider_credentials_lost"
-        assert not errors_a and not captures_a
+        # 重启以后按当前凭据来源解析：这次请求带着新的 Key 发往部门默认绑定的目标
+        assert not errors_a
+        assert [item["authorization"] for item in captures_a] == ["Bearer provider-a-new-key"]
+        assert result.outcome == "running" and result.stop_reason is None
+        requests = [event for event in restarted.store.list_events(run_id)
+                    if event.type == EventType.MODEL_REQUESTED]
+        assert [(item.payload["provider_config_id"], item.payload["credential_version"]) for item in requests] == [
+            ("provider-a", "a-v2")]
+        assert not any(event.type == EventType.RUN_FAILED for event in restarted.store.list_events(run_id))
         public = _public_run_data(restarted, run_id)
-        assert "provider-a-key" not in public
-        assert "provider-a-new-key" not in public
-        assert "provider-b-new-key" not in public
+        for secret in ("provider-a-key", "provider-a-new-key", "provider-b-new-key"):
+            assert secret not in public
 
 
 def test_retry_stays_on_the_bound_provider_and_model(tmp_path):

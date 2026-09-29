@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-09-28 新资料：[computer use 实现调研](computer-use-implementations.md)。支持 [D34](../requirements/browser-and-computer-use.md) 里尚未写进设计的虚拟屏幕、截图尺寸与动作集合，核对 Anthropic 工具合同与 `claude-quickstarts` `dee7116` 的容器参考实现、OpenAI computer 工具与容器配方、Gemini 桌面动作、OMP `fdfeef1f78` 的宿主桌面工具，以及 OSWorld 的客户机环境。
+
 > 2026-09-28 新资料：[评测场景选题调研](evaluation-benchmarks.md)。支持 [D32](../requirements/comparison-experiment.md) 与 [评测场景设计](../design/evaluation-scenarios.md)，记录 WebGen-Bench、ArtifactsBench、FeatBench、PRDBench 中选用任务的来源、版本、需求、检查与公开成绩，同档的其他候选，以及 Terminal-Bench 2.0、Harbor 与其他没有选用的评测和原因。
 
 > 2026-09-28 新资料：[浏览器与 computer use 调研](browser-and-computer-use.md)。支持 [D34](../requirements/browser-and-computer-use.md)，记录 Codex（`69f7140`）、OMP 与 OpenCode 的做法，以及 Playwright MCP、Chrome DevTools MCP、OpenAI 与 Anthropic computer use、browser-use 的比较。

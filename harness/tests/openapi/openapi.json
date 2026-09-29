@@ -1836,17 +1836,6 @@
       },
       "CallTarget": {
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -1943,12 +1932,44 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -1960,7 +1981,10 @@
           "credential_ref",
           "credential_version",
           "context_window",
-          "configured_max_output_tokens"
+          "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier"
         ],
         "title": "CallTarget"
       },
@@ -6553,17 +6577,6 @@
       "CompactionRecordedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -6660,6 +6673,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "effective_contract_hash": {
             "anyOf": [
@@ -6787,7 +6833,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -6800,6 +6845,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -7024,17 +7072,6 @@
       "ContextAssembledPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -7131,6 +7168,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "effective_contract_hash": {
             "anyOf": [
@@ -7361,7 +7431,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -7374,6 +7443,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -8169,7 +8241,6 @@
               "cancelled",
               "provider_error",
               "provider_timeout",
-              "provider_credentials_lost",
               "provider_protocol",
               "unsupported_protocol",
               "retry_after_too_long",
@@ -8844,114 +8915,6 @@
       "DepartmentActivatedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
-          "provider_config_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider Config Id"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
-          },
-          "provider_name": {
-            "title": "Provider Name",
-            "type": "string"
-          },
-          "protocol": {
-            "title": "Protocol",
-            "type": "string"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          },
-          "requested_provider": {
-            "title": "Requested Provider",
-            "type": "string"
-          },
-          "requested_protocol": {
-            "title": "Requested Protocol",
-            "type": "string"
-          },
-          "requested_model": {
-            "title": "Requested Model",
-            "type": "string"
-          },
-          "credential_ref": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Ref"
-          },
-          "credential_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Version"
-          },
-          "context_window": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context Window"
-          },
-          "configured_max_output_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configured Max Output Tokens"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -9039,19 +9002,6 @@
           }
         },
         "required": [
-          "snapshot_id",
-          "provider_config_id",
-          "model_id",
-          "provider_name",
-          "protocol",
-          "base_url",
-          "requested_provider",
-          "requested_protocol",
-          "requested_model",
-          "credential_ref",
-          "credential_version",
-          "context_window",
-          "configured_max_output_tokens",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -11032,17 +10982,6 @@
             ],
             "title": "Request Id"
           },
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -11139,6 +11078,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -11399,7 +11371,6 @@
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -11412,6 +11383,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -11594,17 +11568,6 @@
       "ModelAttemptFinishedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -11701,6 +11664,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -11934,7 +11930,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -11947,6 +11942,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -12124,17 +12122,6 @@
       "ModelMessagePayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -12231,6 +12218,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -12369,7 +12389,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -12382,6 +12401,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -12547,17 +12569,6 @@
       "ModelRequestSerializedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -12654,6 +12665,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -12790,7 +12834,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -12803,6 +12846,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -12969,17 +13015,6 @@
       "ModelRequestedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -13076,6 +13111,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -13231,7 +13299,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -13244,6 +13311,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -13413,17 +13483,6 @@
       "ModelRetryScheduledPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -13520,6 +13579,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -13668,7 +13760,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -13681,6 +13772,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16334,11 +16428,6 @@
             "title": "Adapter",
             "type": "string"
           },
-          "provider_snapshot": {
-            "additionalProperties": true,
-            "title": "Provider Snapshot",
-            "type": "object"
-          },
           "sessions": {
             "additionalProperties": {
               "type": "string"
@@ -16454,7 +16543,6 @@
           "context_window",
           "provider",
           "adapter",
-          "provider_snapshot",
           "sessions",
           "project_id",
           "work_item_id",
@@ -16770,7 +16858,6 @@
               "cancelled",
               "provider_error",
               "provider_timeout",
-              "provider_credentials_lost",
               "provider_protocol",
               "unsupported_protocol",
               "retry_after_too_long",
@@ -17729,17 +17816,6 @@
       "ToolCallResult": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -17836,6 +17912,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -17983,7 +18092,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -17996,6 +18104,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -18308,17 +18419,6 @@
       "ToolSkippedPayload": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -18415,6 +18515,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -18540,7 +18673,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -18553,6 +18685,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -19191,17 +19326,6 @@
       "UsageCharge": {
         "additionalProperties": false,
         "properties": {
-          "snapshot_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -19298,6 +19422,39 @@
               }
             ],
             "title": "Configured Max Output Tokens"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
           },
           "input_version": {
             "title": "Input Version",
@@ -19425,7 +19582,6 @@
           }
         },
         "required": [
-          "snapshot_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -19438,6 +19594,9 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
           "input_version",
           "prompt_version",
           "prompt_hash",

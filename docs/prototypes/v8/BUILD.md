@@ -186,7 +186,7 @@ Y8.registry.tagOf(kind, name)    // 界面上的档位标签：ui 为 null，其
 
 可回放的查询：`system.status`、`projects.list`、`decisions.list`、`project.loop`、`machines.list`。
 
-应用层设计说明中尚未列出、原型先用临时名称的命令标有 `pending: true`，标注模式显示「合同待补」：`project.onboard`（3.8 接入已有项目：名称、长期目标、登记的源目录）。查询的 `at` 参数同样属于合同待补。`source_directory.save`（登记源目录，`project.settings` 返回登记的源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）已在应用层设计说明中。
+设计说明中尚未列出的名称标有 `pending: true`，标注模式显示「合同待补」；现在只有查询的 `at` 参数属于这一类。其余命令都有设计依据：`source_directory.save`（登记源目录）、`runtime.start_drain`、`runtime.force_upgrade`（3.1）见应用层设计说明；`machine.save`、`machine_authorization.save`、`execution_placement.save`（3.2C）见[执行环境服务设计说明](../../design/execution-environment.md)；`project.onboard`（名称、长期目标、源目录名称、源目录路径）与 `onboarding.restart`（3.8）见[接入已有项目设计说明](../../design/existing-project-onboarding.md)第 3 节。
 
 决定种类的标识：
 
@@ -240,7 +240,8 @@ Y8.backend.command('work_item.reorder', (params, db) => ({ reject: { reason, mes
 | 3.1 | `x_run_interrupted`、`x_run_auto_resumed`、`x_action_unknown`、`x_drain_started`、`x_upgrade_forced`、`x_run_stopped_for_upgrade` |
 | 3.2C | `x_machine_saved`、`x_machine_offline`、`x_machine_online`、`x_remote_action_started`、`x_remote_action_finished`、`x_late_receipt`、`x_machine_authorization_saved` |
 | 3.4A | `x_queued`、`x_slot_acquired`、`x_queue_cancelled`、`x_queue_reordered`、`x_slots_set` |
-| 3.8 | `x_onboarding_started`、`x_existing_read`、`x_initial_prd_confirmed` |
+| 3.2C（正式名称） | `execution_placement_configured` |
+| 3.8（正式名称，接入已有项目设计说明第 3.3 节） | `initial_prd_proposed`、`project_decision_requested`、`project_decision_answered`、`project_decision_withdrawn`、`onboarding_revision_started`、`baseline_adopted`、`structure_accepted`、`baseline_review_accepted`；接入时的 `project_registered` 带 `source: 'existing'`，`work_item_created` 与 `run_created` 带 `kind: 'onboarding'`；「阅读已有项目」由建档事项中读取与搜索工具的 `tool_started` 驱动 |
 | 3.2B | `x_network_fetch`、`x_mcp_called`、`x_tool_authorization_saved` |
 | 3.2D | `x_trial_step` |
 | S4 | `x_provider_wait_entered`、`x_provider_wait_left`、`x_backup_taken`、`x_deployed`、`x_rolled_back`、`x_fault_recorded`、`x_repair_created`、`x_repair_failed`、`x_auto_repair_stopped`、`x_check_in` |
@@ -358,7 +359,7 @@ const room = Y8.pixel.createRoomScene(canvas, { department });
 room.setModel(roomModel); room.playEvent(event); room.resize(); room.destroy();
 ```
 
-`roomModel` 沿用 v7 构建约定第 5.2 节，字段改为 snake_case，另有：`machine`（终端屏幕上显示的执行机器名称，3.2C）、`remote_unknown`（远程动作结果未知，终端显示雪花）、`trial`（质检试用台：`{ screenshot, text_lines, step }`，3.2D）、`tool_panel`（MCP 工具按钮与亮灯的按钮，3.2B）、`waiting_provider`（等待模型服务，看着墙上的时钟）、`pipes`（交接管道口与传信管口的状态：`{ out: 'idle'|'flowing'|'stopped', letters_waiting: n }`）。
+`roomModel` 沿用 v7 构建约定第 5.2 节，字段改为 snake_case，另有：`machine`（终端屏幕上显示的执行机器名称，3.2C）、`remote_unknown`（远程动作结果未知，终端显示雪花）、`trial`（质检试用台：`{ screenshot, text_lines, step }`，3.2D）、`tool_panel`（MCP 工具按钮与亮灯的按钮，3.2B）、`waiting_provider`（等待模型服务，看着墙上的时钟）、`pipes`（交接管道口与传信管口的状态：`{ out: 'idle'|'flowing'|'stopped', letters_waiting: n }`）、`existing_read`（阅读已有项目，白板出现「现有行为」清单，3.8）、`self_test`（工程自测网页时显示器上的截图，3.2D）、`ops`（运维房间：`{ version, backup }`，备份柜亮起的格数，S4）、`monitor_alarm`（运维监控屏告警，S4）。完整说明见 `room.js` 的 `setModel` 与任务 D 的交付说明。
 
 ### 7.3 项目楼层（floor.js）
 
@@ -373,7 +374,8 @@ floor.setModel(floorModel); floor.playEvent(event); floor.focus(workItemId); flo
 {
   items: [{ id, title, color_index, status, department, cycle, elapsed_sec, limit_sec, waiting_provider_sec, queue_pos, kind, sign }],
   // status：'queued'|'waiting_slot'|'running'|'asking'|'waiting_provider'|'paused'|'failed'|'done'|'cancelled'|
-  //         'interrupted'|'pending_verification'|'waiting_resume'|'stopped_for_upgrade'|'adopted'
+  //         'interrupted'|'pending_verification'|'waiting_resume'|'waiting_decision'|'stopped_for_upgrade'|'adopted'
+  // waiting_decision：事项已有 run、停下来等用户的决定（事项 queued、queue_reason 为 decision），在最后所在的房间等待
   // kind：'request' 用户的新要求 | 'repair' 修复事项（S4）
   focus_id,
   slots: { total, used } | null,                 // 3.4A
@@ -425,7 +427,7 @@ m.setModel(machineRoomModel); m.playEvent(event); m.resize(); m.destroy();
 | `x_fault_recorded` | `fault_id`、`machine_id` |
 | `x_repair_created` | `fault_id` |
 | `x_trial_step` | `screenshot`（`assets/` 中的文件名）、`text`、`step` |
-| `x_decision_issued`、`x_decision_answered` | `decision_id`、`kind` |
+| `x_decision_issued`、`x_decision_answered`、`project_decision_requested`、`project_decision_answered` | `decision_id`、`kind`（`initial_prd` 是项目流中的决定，发出与回答使用 `project_decision_*`，其余种类使用 `x_decision_*`） |
 | `x_role_task_assigned`、`x_role_result_returned` | `to` |
 
 ## 8. 示例数据
@@ -544,7 +546,7 @@ Y8.data.define({
 
 首页状态项在各档的结果：待你决定按上表累计；结果未知的动作 1（3.1）；离线的机器 1（3.2C）；等待模型服务 1（S4）；磁盘空间 38 GB，高于 10 GB 的提示线，显示「无」（S4）；正在修复的故障 1（S4）。
 
-报告的汇总（自上次查看）：完成与放行的事项 2（`w-todo-base`、`w-metro-fare`）；用量取范围内调用尝试的合计；S4 起另有故障 2、自动修复 1、部署 1、进入等待模型服务 1、报到正常。
+报告的汇总（自上次查看）：完成与放行的事项 2（`w-todo-base`、`w-metro-fare`），S4 起为 3（另有修复事项 `w-sensor-fix1`）；用量取范围内调用尝试的合计；S4 起另有故障 2、自动修复 2（`w-sensor-fix1`、`w-sensor-fix2`）、部署 1、进入等待模型服务 1、报到正常。汇总按事件如实统计，数据不为凑数字改写事件。
 
 离开期间的每一次交接、询问、回答、返工、放行、采纳、故障、修复、部署、进入等待与决定请求的发出都要有对应的事件；每个项目在窗口内至少有 8 条关键事实。
 
@@ -572,7 +574,8 @@ Y8.data.define({
 ```
 
 - 选择场景时，示例后端回到默认数据，再把 `setup` 作为一条不进入报告的事件应用，然后跳到 `go`。档位低于场景要求时切到要求的档位。
-- 每一步：有 `go` 时先跳转；有 `event` 时追加一条事件（带 `patch`），立即推送；有 `act` 时调用界面动作（回放控制）。工具条显示事件种类与 `label`。
+- 每一步：有 `go` 时先跳转；有 `event` 时追加一条事件（带 `patch`），立即推送；有 `act` 时调用界面动作（回放控制）；只有 `go` 与 `label` 的一步只跳转，用于「打开某个页面查看」，不借用其他事件种类。工具条显示事件种类与 `label`。
+- 部门默认、角色默认与项目部门设置中的推理档位字段名为 `request_level`（`level` 只表示档位范围）。
 - 每个场景 8 到 20 步，覆盖设计说明第 5.4 与 8.3 节中对应的事实。
 
 | 编号 | 场景 | 档位 | 所在文件 |

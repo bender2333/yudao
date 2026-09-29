@@ -174,17 +174,19 @@ def test_responses_requests_carry_identity_headers():
 
 
 def test_facade_adapter_accepts_chat_targets():
-    # 桥接层不能只认 Responses：Chat 与 Messages 目标同样可用
-    from harness.adapters.facade_adapter import FacadeAdapter
+    # 桥接层不能只认 Responses：Chat 与 Messages 目标同样可用；目标由公开解析入口登记
+    from harness.tests.protocol_helpers import bound_adapter
 
     server, _capture, base = serve(chat_responder)
     try:
         facade = facade_with(base + "/v1", protocol="chat_completions")
-        adapter = FacadeAdapter(facade, bound_target(facade))
+        adapter = bound_adapter(facade)
         assert adapter.availability().available is True
+        response = complete(adapter, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
     finally:
         server.shutdown()
         server.server_close()
+    assert [item["name"] for item in response.output] == ["write_file"]
 
 
 def test_model_test_admits_a_chat_model():
@@ -364,16 +366,15 @@ def test_cancel_before_start_holds_only_within_the_activation():
     # 取消到达时尝试还没有开始：同一次激活（同一个适配器）内这次尝试一开始就被取消，请求不发出，其他尝试照常；
     # 取消记在随激活创建的适配器上，激活结束时没有开始的尝试不影响之后以同一身份开始的尝试
     from harness.adapters.base import ProviderError as KernelProviderError
-    from harness.adapters.facade_adapter import FacadeAdapter
+    from harness.tests.protocol_helpers import bound_adapter
 
     server, capture, base = serve(responses_responder)
     try:
         facade = facade_with(base + "/v1", protocol="responses")
-        target = bound_target(facade)
         cancelled = model_call(HI, session_id="s", attempt_id="activation:root-1:work:attempt-1")
         never_started = model_call(HI, session_id="s", attempt_id="activation:root-2:work:attempt-1")
         other = model_call(HI, session_id="s", attempt_id="activation:root-3:work:attempt-1")
-        activation = FacadeAdapter(facade, target)
+        activation = bound_adapter(facade)
         activation.cancel(cancelled.attempt_id)
         with pytest.raises(KernelProviderError) as caught:
             complete(activation, cancelled)
@@ -381,7 +382,7 @@ def test_cancel_before_start_holds_only_within_the_activation():
         assert capture.requests == []
         activation.cancel(never_started.attempt_id)
         assert complete(activation, other).output
-        assert complete(FacadeAdapter(facade, target), never_started).output
+        assert complete(bound_adapter(facade), never_started).output
     finally:
         server.shutdown()
         server.server_close()

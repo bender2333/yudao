@@ -9,6 +9,7 @@ import time
 
 import pytest
 
+from harness.models import EventType
 from harness.providers import (
     CredentialChain,
     ProviderFacade,
@@ -160,11 +161,12 @@ def _startup_config(state: str):
 
 
 @pytest.mark.parametrize("state", ["missing", "invalid_json", "empty_catalog", "unbound", "missing_key"])
-def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, monkeypatch, state):
-    # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：命令行装配的系统与控制台照常启动，新建任务被拒绝。
+def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
+    # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：命令行装配的系统与控制台照常启动；
+    # 创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
     # 当前目录是测试目录，默认的凭据文件 .yudao/.env 落在这里
     from harness.__main__ import production_system
-    from harness.providers import CatalogValidationError
+    from harness.projection import saved_decisions
     from harness.tests.test_provider_config_web import get_json, request, running_server
 
     monkeypatch.delenv(_ABSENT_KEY, raising=False)
@@ -194,9 +196,13 @@ def test_console_starts_in_every_unready_state_and_refuses_new_runs(tmp_path, mo
         assert status_view["reload_error"] is None
     if state == "missing_key":
         assert _ABSENT_KEY in status_view["message"]
-    with pytest.raises(CatalogValidationError):
-        system.create_run("must not start without a ready provider")
-    assert system.list_run_ids() == []
+    run_id = system.create_run("create without a ready provider")
+    assert system.list_run_ids() == [run_id]
+    blocked = system.run_until_stop(run_id)
+    assert (blocked.outcome, blocked.stop_reason) == ("running", None)
+    _position, decisions = saved_decisions(system.store, statuses=("open",))
+    assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
+    assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))
     system.close()
 
 

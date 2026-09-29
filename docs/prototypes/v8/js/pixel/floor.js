@@ -23,14 +23,15 @@
   const UNDER_Y = 276;     // 地板下的管道（运维故障信件回到大厅）
   const DEPTS = ['product', 'engineering', 'quality'];
   const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release', letter: 'letter' };
-  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'stopped_for_upgrade'];
+  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
   const ACTIVE = ['running', 'asking', 'pending_verification'];
   const STATUS_TEXT = {
     queued: '排队中', waiting_slot: '等待执行槽位', running: '运行中', asking: '询问中', waiting_provider: '等待模型服务', paused: '已暂停',
     failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复',
-    stopped_for_upgrade: '因升级停止', adopted: '已采纳'
+    stopped_for_upgrade: '因升级停止', adopted: '已采纳', waiting_decision: '等待你的决定'
   };
   const STATUS_CHIP = {
+    waiting_decision: PAL.yellow2,
     running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
     failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2,
     waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3
@@ -103,7 +104,7 @@
     add('quality>product', 'return', [[r.quality.outPort - 8, PIPE_Y - 8], [r.quality.outPort - 8, DUCT_Y], [r.product.inPort + 8, DUCT_Y], [r.product.inPort + 8, PIPE_Y - 8]]);
     add('product~engineering', 'tube', [[r.product.outPort, TUBE_Y], [r.engineering.inPort, TUBE_Y]]);
     add('engineering~quality', 'tube', [[r.engineering.outPort, TUBE_Y], [r.quality.inPort, TUBE_Y]]);
-    add('product~quality', 'tube', [[r.product.x + 30, TUBE_Y - 12], [r.product.x + 30, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 30, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 30, TUBE_Y - 12]]);
+    add('product~quality', 'tube', [[r.product.x + 22, TUBE_Y - 12], [r.product.x + 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, DUCT_TUBE_Y], [r.quality.x + r.quality.w - 22, TUBE_Y - 12]]);
     if (lay.ops) {
       add('library>operations', 'handoff', [[lay.lib.outPort, PIPE_Y], [lay.ops.inPort, PIPE_Y]]);
       add('operations>machine_room', 'handoff', [[lay.ops.outPort, PIPE_Y], [lay.ops.outPort, ROOM_B + 10], [lay.door.x + 14, ROOM_B + 10], [lay.door.x + 14, lay.door.y + 12]]);
@@ -206,6 +207,7 @@
         case 'cancelled': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
         case 'pending_verification': return seat('sit_scratch', { kind: 'question' });
         case 'waiting_resume': return seat('sit_wait', { kind: 'text', text: '待恢复' });
+        case 'waiting_decision': return seat('sit_wait', { kind: 'text', text: '待你决定' });
         case 'stopped_for_upgrade': return { x: r.desk.seatX, y: r.desk.seatY, seat: null, anim: 'idle' };
         default: return seat('sit');
       }
@@ -397,9 +399,12 @@
           return;
         }
         case 'x_decision_issued':
-        case 'x_decision_answered': {
+        case 'x_decision_answered':
+        case 'project_decision_requested':
+        case 'project_decision_answered': {
           const d = ev.department || (it && it.department);
-          if (d && roomOf(lay, d)) st.decisions[d] = { until: scene.realT + 5000, text: ev.type === 'x_decision_issued' ? '待你决定' : '已回答', itemId: wid, answered: ev.type === 'x_decision_answered' };
+          const answered = ev.type === 'x_decision_answered' || ev.type === 'project_decision_answered';
+          if (d && roomOf(lay, d)) st.decisions[d] = { until: scene.realT + 5000, text: answered ? '已回答' : '待你决定', itemId: wid, answered };
           return;
         }
         case 'x_provider_wait_entered':
@@ -647,7 +652,7 @@
       const D = P.DEPTS[d];
       const here = itemsIn(d);
       const working = here.some((it) => ACTIVE.includes(it.status));
-      const sx = r.x + 30, sy = TOP + 18;
+      const sx = r.x + Math.round(r.w / 2) - 22, sy = TOP + 18;
       RB(c, sx - 2, sy - 2, 32, 22, PAL.beige2);
       paint.screen(c, sx, sy, 28, 18, model.interrupted ? 'off' : working ? 'code' : 'idle', t, { seed: r.x });
       paint.scanlines(c, sx, sy, 28, 18, 0.18);
@@ -747,8 +752,10 @@
       if (lines.length) {
         const w = 74;
         const h = lines.length * 8 + 4;
-        RB(c, d.x + d.w - w, d.y - h - 4, w, h, PAL.paper);
-        lines.forEach((line, i) => P.text(c, line, d.x + d.w - w + 3, d.y - h - 4 + 6 + i * 8, { size: 5.5, weight: 600, color: PAL.ink, max: w - 6 }));
+        // 牌子挂在走廊里门的左边，不遮住上面的房间
+        const px = d.x - w - 4, py = d.y + 2;
+        RB(c, px, py, w, h, PAL.paper);
+        lines.forEach((line, i) => P.text(c, line, px + 3, py + 6 + i * 8, { size: 5.5, weight: 600, color: PAL.ink, max: w - 6 }));
       }
       if (unknown) P.drawBitmap(c, 'question', d.x + 10, d.y + 14);
       st.remoteDots.forEach((dot) => {
@@ -938,7 +945,7 @@
       const x = ((ev.clientX - rect.left) / rect.width) * W;
       const y = ((ev.clientY - rect.top) / rect.height) * H;
       const d = lay.door;
-      if (model.machines && x >= d.x - 50 && x <= d.x + d.w && y >= d.y - 40 && y <= d.y + d.h && o.onDoorClick) {
+      if (model.machines && x >= d.x - 80 && x <= d.x + d.w && y >= d.y && y <= d.y + d.h && o.onDoorClick) {
         o.onDoorClick(model.machines.map((m) => m.id));
       }
     });

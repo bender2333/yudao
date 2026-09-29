@@ -65,9 +65,11 @@
         const spec = Object.assign({ project_id: null, work_item_id: null, run_id: null, department: null, role: null, payload: {} }, Y8.clone(st.event));
         spec.patch = Y8.clone(st.patch || []);
         player.last = Y8.backend.emit(spec);
-      } else {
+      } else if (st.act) {
         player.last = { type: st.act, label: st.label || st.act };
         Y8.actions.run(st.act, null, null);
+      } else {
+        player.last = { type: '跳转', label: st.label };
       }
       render();
       return true;

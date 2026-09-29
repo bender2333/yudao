@@ -1,6 +1,6 @@
 # 界面原型 v8 设计说明
 
-日期：2026-09-29。状态：设计说明待用户审阅，原型文件尚未制作。完成后取代 [v7 原型](../v7/design.md)，v7 归档，[#71](https://github.com/bender2333/yudao/issues/71) 的依据改为 v8。
+日期：2026-09-29。状态：原型文件已制作（[index.html](index.html)，构建约定见 [BUILD.md](BUILD.md)），待用户审阅。审阅通过后取代 [v7 原型](../v7/design.md)，v7 归档，[#71](https://github.com/bender2333/yudao/issues/71) 的依据改为 v8。
 
 依据：[D30](../../requirements/web-game-frontend.md)（「长时间运行以后的界面」与「原型 v8 的方向」两节）、[应用层与接口层设计说明](../../design/app-and-interface.md)、[总体路线图](../../program-roadmap.md)、[Stage 3 计划](../../stage-3-plan.md)、[恢复契约](../../design/recovery-contract-and-fault-matrix.md)、[模型管理设计说明](../../design/model-management.md)第 5.6、9 节、[部门内多角色设计说明](../../design/department-roles.md)第 15 节、[D27 运维部门](../../requirements/operations-department.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D33 接入已有项目](../../requirements/existing-project-onboarding.md)、[D34 浏览器与 computer use](../../requirements/browser-and-computer-use.md)、[ADR-0018](../../adr/0018-single-control-host-remote-execution.md)、[ADR-0019](../../adr/0019-project-stream-across-versions.md)。用词以 [CONTEXT.md](../../../CONTEXT.md) 为准。
 

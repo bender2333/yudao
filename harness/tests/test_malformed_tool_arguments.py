@@ -5,9 +5,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from harness.providers.call import ModelResponse
-from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter
-from harness.models import EventType, json_dumps
+from harness.models import DEPARTMENTS, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
@@ -170,9 +169,10 @@ def test_truncated_chat_stream_never_replays_invalid_assistant_arguments(tmp_pat
             }],
             "bindings": {},
         })
-        target = facade.resolve_snapshot(
-            [{"key": "k", "provider_id": "go", "model_id": "m-go"}]).target("k")
-        system = LoopSystem.for_testing(tmp_path, FacadeAdapter(facade, target))
+        facade.record_admission("go", "m-go", admitted_model="target-model")
+        facade.save_bindings({department: {"provider_id": "go", "model_id": "m-go"}
+                              for department in DEPARTMENTS})
+        system = LoopSystem(tmp_path, facade=facade)
         run_id = system.create_run("echo")
 
         result = system.activate_once(run_id)
