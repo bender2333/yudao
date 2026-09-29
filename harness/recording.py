@@ -101,7 +101,6 @@ class _AttemptCapture:
     usage: Usage | None = None
     usage_ref: dict[str, Any] | None = None
     progress_stage: str | None = None
-    progress_last_emitted_monotonic: float | None = None
     first_observed_at: str | None = None
     first_output_at: str | None = None
 
@@ -743,7 +742,8 @@ class StepRecorder:
 
     def _stream_progress(self, request: ModelRequest, capture: _AttemptCapture, observation: _Observation,
                          observed_at: str) -> list[Draft]:
-        # 流式进度：同一次调用尝试中阶段改变或距上一条 0.25 秒以后才记录一条
+        # 流式进度：同一次调用尝试中只在阶段变化时记录一条（设计说明第 10 节第 5 项）。
+        # 阶段之内的文字增量由输出片段通道转发，不写入事件日志
         scope = self.scope
         payload = observation.payload
         stage = observation.stage
@@ -751,13 +751,10 @@ class StepRecorder:
             capture.first_observed_at = observed_at
         if stage in {"output", "output_item_done"} and capture.first_output_at is None:
             capture.first_output_at = observed_at
-        now = time.monotonic()
         changed = stage != capture.progress_stage
-        due = capture.progress_last_emitted_monotonic is None or now - capture.progress_last_emitted_monotonic >= 0.25
         capture.progress_stage = stage
-        if not changed and not due:
+        if not changed:
             return []
-        capture.progress_last_emitted_monotonic = now
         return [self._draft(
             EventType.MODEL_STREAM_PROGRESS,
             provider=self._provider or self._event_provider(request), model=observation.model or self._model,
