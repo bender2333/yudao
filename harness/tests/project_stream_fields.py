@@ -51,6 +51,10 @@ def live_fields() -> dict[str, dict[str, str]]:
     return fields
 
 def load_manifest() -> dict:
+    # 清单还没有建立时给出空清单：fields 与 baseline 为空、没有缺省含义说明。
+    # 这时核对测试指出清单缺少全部内容，用重写选项建立第一份清单
+    if not MANIFEST.is_file():
+        return {"fields": {}, "baseline": {}, "added_defaults": {}}
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 def write_manifest(document: dict) -> None:

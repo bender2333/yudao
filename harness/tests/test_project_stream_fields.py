@@ -56,12 +56,16 @@ def test_a_field_added_after_the_baseline_states_its_meaning_in_older_events():
     assert not missing, f"新增的字段没有写明它在旧事件中的缺省含义：{missing}"
 
 def test_writing_the_manifest_refreshes_fields_and_freezes_the_baseline(request):
-    # 重写选项：只在清单有意改变时使用。fields 随合同类型刷新；baseline 在第一次写入时确定，以后保持不动，
-    # 这样之后新增的字段都要在 added_defaults 中写明缺省含义
+    # 重写选项：只在清单有意改变时使用，清单还没有建立时用它建立第一份清单。
+    # fields 随合同类型刷新；baseline 只在第一次写入时确定，以后保持不动，这样之后新增的字段
+    # 都要在 added_defaults 中写明缺省含义；已经写下的缺省含义一并保留
     if not request.config.getoption("--write-project-stream-fields"):
         pytest.skip("pass --write-project-stream-fields to rewrite the manifest")
     document = load_manifest()
     document["fields"] = live_fields()
-    document.setdefault("baseline", live_fields())
+    # 清单还没有建立时（load_manifest 给出空骨架）baseline 也是空的，这时以当前字段集合作为基线
+    if not document.get("baseline"):
+        document["baseline"] = live_fields()
+    document.setdefault("added_defaults", {})
     write_manifest(document)
     assert live_fields() == load_manifest()["fields"]
