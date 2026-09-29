@@ -13,9 +13,11 @@ from .models import ArtifactRef, hash_bytes
 
 
 class ArtifactStore:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, read_only: bool = False) -> None:
         self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
+        if not read_only:
+            self.root.mkdir(parents=True, exist_ok=True)
 
     def put(self, run_id: str, kind: str, data: str | bytes, *, media_type: str = "text/plain") -> ArtifactRef:
         raw = data.encode("utf-8") if isinstance(data, str) else data

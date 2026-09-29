@@ -144,14 +144,25 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "decision.answer", "reasons": ["not_found", "decision_closed", "stale_base", "option_invalid",
                                                "command_id_reused"]},
     ]
-    assert capabilities["queries"] == [
+    queries = capabilities["queries"]
+    assert queries[:2] == [
         {"name": "system.status", "changed_by": []},
         {"name": "decisions.list", "changed_by": ["decision_requested", "decision_answered", "decision_withdrawn"]},
     ]
+    assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
+        "system.status", "decisions.list", "projects.list", "project.overview", "project.loop", "project.flow",
+        "work_item.inputs", "event.detail", "department.workspace", "run.actions", "work_item.materials",
+        "delivery.file", "project.attempts", "project.usage", "run.attempt", "project.settings", "run.export",
+        "replay.check",
+    }
+    # 覆盖层只列出依赖的查询都已登记的：flow 与 waiting 的依赖已登记，其余依赖的查询尚未加入
+    assert capabilities["overlays"] == [
+        {"name": "flow", "queries": ["project.flow"]},
+        {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
+    ]
     assert _registered_paths(document, "/api/commands/") == {"project.create", "decision.answer"} == set(
         DEFAULT_REGISTRY.commands)
-    assert _registered_paths(document, "/api/queries/") == {"system.status", "decisions.list"} == set(
-        DEFAULT_REGISTRY.queries)
+    assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
     assert capabilities["decisions"] == ["model_unavailable"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
@@ -265,3 +276,21 @@ def test_requests_outside_the_contract_are_refused_and_documentation_pages_are_c
         for path in ("/docs", "/redoc", "/docs/oauth2-redirect"):
             assert client.get(path).status_code == 404
         assert client.get("/openapi.json").status_code == 200
+
+
+def test_queries_for_a_missing_target_answer_404_like_the_old_read_routes(data_dir):
+    # 旧路由对不存在的运行、事件与交付文件返回 404；已登记的查询在目标不存在时同样给出 404
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        for name, params in (("project.overview", {"project_id": "missing"}),
+                             ("project.flow", {"project_id": "missing"}),
+                             ("work_item.inputs", {"project_id": "missing", "work_item": "missing"}),
+                             ("event.detail", {"event_id": "missing"}),
+                             ("run.actions", {"run_id": "missing"}),
+                             ("run.attempt", {"run_id": "missing", "attempt_id": "missing"}),
+                             ("run.export", {"run_id": "missing"}),
+                             ("delivery.file", {"event_id": "missing", "path": "missing.py"})):
+            response = client.get(f"/api/queries/{name}", params=params)
+            assert response.status_code == 404, (name, response.text)
+            assert response.json()["error"]
+        assert opened.store.end_position() == 0
