@@ -15,12 +15,7 @@
       "docs_url": "https://opencode.ai/docs/go/",
       "header_profile": "opencode-go",
       "source": "https://opencode.ai/docs/go/#endpoints（2026-09-19）",
-      "notes": "订阅套餐使用 API Key；请求需带真实客户端 User-Agent 与 x-opencode-session。模型列表只给 ID，协议与容量需按访问定义声明并测试准入。",
-      "known_models": [
-        {"model_id": "gpt-5.6-luna", "protocol": "responses", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"},
-        {"model_id": "glm-5.1", "protocol": "chat_completions", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"},
-        {"model_id": "minimax-m2.7", "protocol": "messages", "capability_source": "预置提示：官方端点示例（2026-09-19），未验证"}
-      ]
+      "notes": "订阅套餐使用 API Key；请求需带真实客户端 User-Agent 与 x-opencode-session。三种协议的请求基址都是同一个。"
     }
   ]
 }

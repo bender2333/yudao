@@ -42,17 +42,6 @@ def preset_header_profile(preset_id: str) -> str:
     return "" if item is None else item.header_profile
 
 
-def preset_known_models(preset_id: str) -> dict[str, dict[str, str]]:
-    # 预置提示只描述来源，不当成已验证能力
-    item = _PRESET_INDEX.get(str(preset_id))
-    if item is None:
-        return {}
-    return {
-        hint.model_id: {"protocol": hint.protocol, "capability_source": hint.capability_source}
-        for hint in item.known_models
-    }
-
-
 def build_identity_headers(header_profile: str, session_id: str) -> dict[str, str]:
     # Go 需要稳定会话标识与真实客户端身份；其他服务方案不带额外头
     if header_profile != "opencode-go":
@@ -64,7 +53,7 @@ def build_identity_headers(header_profile: str, session_id: str) -> dict[str, st
 
 
 def _public_preset(item: ServicePreset) -> dict[str, Any]:
-    # 每次交回新的字典
+    # 每次交回新的字典；预置表只含接入规则，不带模型
     return {
         "id": item.id,
         "name": item.name,
@@ -75,8 +64,6 @@ def _public_preset(item: ServicePreset) -> dict[str, Any]:
         "header_profile": item.header_profile,
         "source": item.source,
         "notes": item.notes,
-        "known_models": [{"model_id": hint.model_id, "protocol": hint.protocol,
-                          "capability_source": hint.capability_source} for hint in item.known_models],
     }
 
 
@@ -89,6 +76,5 @@ __all__ = [
     "list_presets",
     "preset_exists",
     "preset_header_profile",
-    "preset_known_models",
     "preset_models_url",
 ]
