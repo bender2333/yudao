@@ -270,7 +270,7 @@
           recovery: {
             state: 'running', reason: '运行中', unusable: null,
             last_confirmed: { seq: 6, text: '质检已按 PRD 核对写入间隔，开始检查曲线' },
-            owner: { id: 'qa-tester', since: '2026-09-28T09:40:00+08:00' },
+            owner: { id: '质检部门', since: '2026-09-28T09:40:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { elapsed_sec: 2400, limit_sec: 7200, activations: 2, model_steps: 3, retries: 0 },
             auto_resumed_at: null
@@ -423,7 +423,7 @@
           recovery: {
             state: 'running', reason: '运行中', unusable: null,
             last_confirmed: { seq: 5, text: '修复范围已定：夜间并发写入改为单写者队列' },
-            owner: { id: 'eng-lead', since: '2026-09-29T12:50:00+08:00' },
+            owner: { id: '工程部门', since: '2026-09-29T12:50:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { elapsed_sec: 900, limit_sec: 7200, activations: 2, model_steps: 2, retries: 1 },
             auto_resumed_at: null

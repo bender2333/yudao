@@ -130,7 +130,7 @@
 
   function ownerBlock(r) {
     const owner = r.owner
-      ? Y8.ui.kv([['当前执行者', Y8.ui.code(r.owner.id)], ['取得时间', esc(Y8.ui.time(r.owner.since))], ['执行槽位', r.holds_slot ? '占用一个执行槽位' : '<span class="y8-muted">没有占用执行槽位</span>']], 'is-rows')
+      ? Y8.ui.kv([['当前执行者', esc(r.owner.id)], ['取得时间', esc(Y8.ui.time(r.owner.since))], ['执行槽位', r.holds_slot ? '占用一个执行槽位' : '<span class="y8-muted">没有占用执行槽位</span>']], 'is-rows')
       : Y8.ui.kv([['当前执行者', '<span class="y8-muted">没有有效执行者</span>'], ['执行槽位', r.holds_slot ? '保留一个执行槽位' : '<span class="y8-muted">没有占用执行槽位</span>']], 'is-rows');
     const late = r.late_results.length
       ? '<h3 class="y8-h3">迟到结果</h3><p class="y8-small y8-muted">旧执行者的迟到回执作为历史事实列出，不推进状态。</p>' +
@@ -161,7 +161,7 @@
     const up = r.upgrade;
     const newRun = up.new_run_id
       ? Y8.ui.kv([
-        ['新 run', Y8.ui.code(up.new_run_id)],
+        ['新 run', esc(r.work_item.title) + '<small class="y8-muted">' + esc(up.new_run_id) + '</small>'],
         ['新 run 的 Yudao 版本', esc(up.new_yudao_version || '—')],
         ['队列位置', up.queue_pos != null ? '排队中第 ' + esc(up.queue_pos) + ' 位' : '—']
       ], 'is-rows')
@@ -175,7 +175,7 @@
       id: 'rc-upgrade', title: '因升级停止', query: ['run.recovery', 'work_item.materials'],
       subtitle: '停止时的 Yudao 版本与用已采纳成果重新开始的新 run',
       className: 'y8-rc-state-block is-interrupted',
-      body: Y8.ui.kv([['停止时的 Yudao 版本', esc(up.yudao_version || '—')], ['旧 run', Y8.ui.code(up.stopped_run_id)]], 'is-rows') + newRun + events
+      body: Y8.ui.kv([['停止时的 Yudao 版本', esc(up.yudao_version || '—')], ['旧 run', esc(r.work_item.title) + '<small class="y8-muted">' + esc(up.stopped_run_id) + '</small>']], 'is-rows') + newRun + events
     });
   }
 

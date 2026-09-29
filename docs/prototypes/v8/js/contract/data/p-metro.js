@@ -126,7 +126,7 @@
           recovery: {
             state: 'running', reason: '运行中', unusable: null,
             last_confirmed: { seq: 12, text: '质检已放行按里程计算票价' },
-            owner: { id: 'qa-tester', since: '2026-09-28T10:52:00+08:00' },
+            owner: { id: '质检部门', since: '2026-09-28T10:52:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { elapsed_sec: 5400, limit_sec: 7200, activations: 4, model_steps: 9, retries: 0 },
             auto_resumed_at: null
@@ -203,7 +203,7 @@
           recovery: {
             state: 'running', reason: '运行中', unusable: null,
             last_confirmed: { seq: 17, text: '工程已写完换乘站去重与最短路径，登记命令 unit_tests 已开始、尚未收到退出码' },
-            owner: { id: 'eng-lead', since: '2026-09-29T03:02:00+08:00' },
+            owner: { id: '工程部门', since: '2026-09-29T03:02:00+08:00' },
             late_results: [], verifications: [],
             unfinished: [{ id: 'a-metro-unit-17', label: '登记命令 unit_tests' }],
             limits: { elapsed_sec: 4980, limit_sec: 7200, activations: 6, model_steps: 11, retries: 1 },
@@ -334,7 +334,7 @@
             id: 'retry', label: '重新执行', kind: 'primary',
             events: [{
               type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-              label: '用户选择重新执行，主程再次启动登记命令 unit_tests',
+              label: '用户选择重新执行，工程部门再次启动登记命令 unit_tests',
               payload: { tool: 'run_command', action_id: 'a-metro-unit-17' },
               patch: [
                 { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
@@ -694,8 +694,8 @@
         ]
       }),
       ev({
-        at: '2026-09-29T03:02:00+08:00', type: 'tool_started', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', role: 'eng-lead',
-        label: '主程开始执行登记命令 unit_tests',
+        at: '2026-09-29T03:02:00+08:00', type: 'tool_started', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
+        label: '工程部门开始执行登记命令 unit_tests',
         payload: { tool: 'run_command' },
         patch: [
           { path: 'runs[id=r-metro-transfer].elapsed_sec', value: 4980 },
@@ -769,9 +769,9 @@
         no: 3, id: 'sc-metro-ask', name: '询问与回答', level: 'ui', go: '#/p/p-metro/overview',
         setup: [],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程主程站在传信管前，准备询问产品', payload: {} }, patch: [] },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门站在传信管前，准备询问产品', payload: {} }, patch: [] },
           { delay: 1200, event: { type: 'collaboration_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程向产品询问：线路偏好是否改变最短距离', payload: { from: 'engineering', to: 'product', request_id: 'q-sc-prefer' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests', push: { id: 'q-sc-prefer', from: 'engineering', to: 'product', kind: 'consult', question: '线路偏好是否改变最短距离模式的实际距离？', status: 'open', answer: null, born_at: '2026-09-29T15:31:00+08:00' } }] },
-          { delay: 1400, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品架构师展开询问信', payload: {} }, patch: [] },
+          { delay: 1400, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品部门展开询问信', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'collaboration_responded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品回答：最短距离不乘 0.8，只影响综合最优', payload: { from: 'product', to: 'engineering', request_id: 'q-sc-prefer' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests[id=q-sc-prefer].status', value: 'answered' }] },
           { delay: 1000, event: { type: 'collaboration_closed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '线路偏好的询问已关闭，信件离开传信管', payload: { from: 'engineering', to: 'product', request_id: 'q-sc-prefer' } }, patch: [] },
           { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程把当前实现交给质检看一眼边界', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, patch: [{ path: 'runs[id=r-metro-transfer].department', value: 'quality' }] },
@@ -789,7 +789,7 @@
           { delay: 1200, event: { type: 'model_stream_progress', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '模型还在输出路径比较，桌上的纸堆升高', payload: { text: '最短距离与最少换乘的差异集中在西直门、建国门两个换乘站。' } }, patch: [] },
           { delay: 1400, event: { type: 'compaction_recorded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '小人把桌上的纸整理进摘要档案盒，编号变为 1', payload: { n: 1 } }, patch: [{ path: 'runs[id=r-metro-transfer].compactions', push: { department: 'engineering', n: 1, at: '2026-09-29T15:32:00+08:00', coverage: 'seq 1–40', event_id: null } }] },
           { delay: 1200, event: { type: 'context_assembled', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '下一次请求使用摘要 1 与最近的原始记录', payload: {} }, patch: [] },
-          { delay: 1200, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程再次请求模型，上下文已经用上摘要', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门再次请求模型，上下文已经用上摘要', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'compaction_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '第二次整理没有生效，纸堆散落', payload: { reason: '摘要没有覆盖未完成的 unit_tests' } }, patch: [] },
           { delay: 1400, event: { type: 'context_assembled', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '小人重新整理散落的纸，先拣出未完成动作', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'compaction_recorded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '重新整理完成，摘要编号变为 2', payload: { n: 2 } }, patch: [{ path: 'runs[id=r-metro-transfer].compactions', push: { department: 'engineering', n: 2, at: '2026-09-29T15:34:00+08:00', coverage: 'seq 1–52', event_id: null } }] },
@@ -805,13 +805,13 @@
         ],
         steps: [
           { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程正在跑登记命令，管道正常流动', payload: {} }, patch: [] },
-          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程在终端前执行 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门在终端前执行 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
           { delay: 1400, event: { type: 'x_run_interrupted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机断电，整层变暗，时钟停住，管道停止', payload: { reason: '控制主机断电' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '控制主机断电，时钟停住' }] },
           { delay: 1600, go: '#/p/p-metro/overview', event: { type: 'model_stream_progress', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '中断期间没有新的模型输出，小人静止', payload: { text: '' } }, patch: [] },
           { delay: 1400, event: { type: 'x_run_auto_resumed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机重新启动，灯亮起，时钟继续走，管道恢复流动', payload: { boot_id: 'boot-0929-0313' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.auto_resumed_at', value: '2026-09-29T15:33:00+08:00' }] },
-          { delay: 1200, event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程伸懒腰后回到工位', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门伸懒腰后回到工位', payload: {} }, patch: [] },
           { delay: 1200, event: { type: 'context_assembled', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '自动继续后重新装配上下文，恢复不清零已用时间', payload: {} }, patch: [] },
-          { delay: 1200, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程继续核对断电前写到哪一步', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门继续核对断电前写到哪一步', payload: {} }, patch: [] },
           { delay: 1200, event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '核对完成，最后已确认的位置仍是换乘站去重已写入', payload: {} }, patch: [] },
           { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '管道恢复流动，工程继续查看测试输出', payload: { tool: 'read_file' } }, patch: [] }
         ]
@@ -824,14 +824,14 @@
           { path: 'decisions[id=d-metro-unknown].status', value: 'withdrawn' }
         ],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程执行登记命令 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门执行登记命令 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
           { delay: 1400, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: 'unit_tests 没有退出码，未完成动作开始闪烁', payload: { action_id: 'a-metro-unit-17' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'pending_verification' }] },
           { delay: 1200, event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '发出决定请求：核实结果未知的动作', payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action' } }, patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'waiting' }] },
           { delay: 1400, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程房间亮黄灯，小人头顶出现问号', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'x_decision_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '用户选择「重新执行」', payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action', option: 'retry' } }, patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' }] },
-          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程按决定重新执行 unit_tests', payload: { tool: 'run_command', action_id: 'a-metro-unit-17' } }, patch: [] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门按决定重新执行 unit_tests', payload: { tool: 'run_command', action_id: 'a-metro-unit-17' } }, patch: [] },
           { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: 'unit_tests 重新执行完成，退出码 0', payload: { tool: 'run_command', exit_code: 0, timed_out: false } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].after', value: '12 passed' }] },
-          { delay: 1200, event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '主程读完回执，问号消失', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门读完回执，问号消失', payload: {} }, patch: [] },
           { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程回到工位，准备提交交付', payload: {} }, patch: [] },
           { delay: 1000, event: { type: 'proposal_submitted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程提交换乘路径的交付说明', payload: {} }, patch: [] }
         ]

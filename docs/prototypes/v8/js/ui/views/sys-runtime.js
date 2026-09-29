@@ -18,7 +18,7 @@
     const used = Y8.ui.table({
       columns: [
         { key: 'title', label: '正在执行的事项', render: (row) => '<div class="y8-cell-stack"><strong>' + Y8.esc(row.title) + '</strong><small class="y8-muted">' + Y8.esc(row.project_name || row.project_id) + '</small></div>' },
-        { key: 'department', label: '部门', render: (row) => Y8.esc(row.department_label || DEPT_LABELS[row.department] || row.department) + (data.unit === 'role' && row.role ? ' · ' + Y8.esc(row.role) : '') },
+        { key: 'department', label: '部门', render: (row) => Y8.esc(row.department_label || DEPT_LABELS[row.department] || row.department) + (data.unit === 'role' && row.role ? ' · ' + Y8.esc(row.role_label || row.role) : '') },
         { key: 'elapsed', label: '已用时间 / 上限', render: (row) => Y8.esc(Y8.ui.duration(row.elapsed_sec)) + ' / ' + Y8.esc(Y8.ui.duration(row.limit_sec)) }
       ],
       rows: data.used,
@@ -62,11 +62,26 @@
     });
   }
 
+  // 排空区块显示正在进行的 run 对应的事项标题，原始 run 标识放在灰色小字里
+  function runTitles() {
+    const map = {};
+    if (!Y8.cap.query('run.recovery')) return map;
+    Y8.api.query('projects.list', {}).data.forEach((project) => {
+      Y8.api.query('project.overview', { project: project.id }).data.work_items.forEach((item) => {
+        if (item.status !== 'in_progress' || !item.phase) return;
+        const data = Y8.api.query('run.recovery', { work_item: item.id }).data;
+        if (data.run && data.run.id) map[data.run.id] = item.title;
+      });
+    });
+    return map;
+  }
+
   function drainBlock() {
     const drain = status().drain;
     if (!drain) return '';
+    const titles = runTitles();
     const running = drain.running.length
-      ? '<ul class="y8-list">' + drain.running.map((id) => '<li>' + Y8.ui.code(id) + Y8.ui.status('running', '进行中') + '</li>').join('') + '</ul>'
+      ? '<ul class="y8-list">' + drain.running.map((id) => '<li>' + Y8.esc(titles[id] || id) + '<small class="y8-muted">' + Y8.esc(id) + '</small>' + Y8.ui.status('running', '进行中') + '</li>').join('') + '</ul>'
       : '<p class="y8-muted">没有正在进行的 run</p>';
     const actions =
       (drain.state === 'none' ? Y8.ui.button({ label: '开始排空', kind: 'primary', act: 'runtime.startDrain' }) : '') +

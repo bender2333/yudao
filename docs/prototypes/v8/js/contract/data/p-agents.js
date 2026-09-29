@@ -43,7 +43,7 @@
           recovery: {
             state: 'running', reason: null, unusable: null,
             last_confirmed: { seq: 0, text: '建档事项已登记，等待产品开始' },
-            owner: { id: 'exec-5d20', since: '2026-09-27T09:00:00+08:00' },
+            owner: { id: '产品部门', since: '2026-09-27T09:00:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { activations: 3, model_steps: 21, retries: 0 }, auto_resumed_at: null
           },
@@ -316,7 +316,7 @@
                         recovery: {
                           state: 'running', reason: null, unusable: null,
                           last_confirmed: { seq: 0, text: '修改轮已登记，等待产品开始' },
-                          owner: { id: 'exec-5d20', since: '2026-09-29T15:30:00+08:00' },
+                          owner: { id: '产品部门', since: '2026-09-29T15:30:00+08:00' },
                           late_results: [], verifications: [], unfinished: [],
                           limits: { activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null
                         },
@@ -748,7 +748,7 @@
                   recovery: {
                     state: 'running', reason: null, unusable: null,
                     last_confirmed: { seq: 0, text: '事项已登记，等待产品开始' },
-                    owner: { id: 'exec-5d20', since: '2026-09-29T15:30:00+08:00' },
+                    owner: { id: '产品部门', since: '2026-09-29T15:30:00+08:00' },
                     late_results: [], verifications: [], unfinished: [],
                     limits: { activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null
                   },

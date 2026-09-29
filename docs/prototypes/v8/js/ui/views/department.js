@@ -13,8 +13,10 @@
   };
   const DEPTS = ['product', 'engineering', 'quality', 'operations'];
   const ROLE_STATUS = { idle: 'idle', assigned: 'queued', working: 'running', returned: 'succeeded', failed: 'failed', away: 'asking' };
-  const ROLE_STATUS_TEXT = { idle: '空闲', assigned: '已分派', working: '工作中', returned: '已交回', failed: '失败', away: '离开' };
+  const ROLE_STATUS_TEXT = { idle: '空闲', assigned: '已分派', working: '工作中', returned: '已交回', failed: '失败', away: '外出查资料' };
   const ROLE_KIND = { manager: '经理', architect: '连续角色', lead: '连续角色', tester: '连续角色', explorer: '一次性角色', agent: '部门 Agent', ops: '部门 Agent' };
+  const ATTEMPT_KIND = { work: '工作请求', compaction: '压缩请求', collaboration: '协作请求', review: '审查请求' };
+  const ACTION_STATE_TEXT = { not_sent: '未发送', done: '已完成', unknown: '结果未知', running: '进行中' };
   const ITEM_STATUS = { assigned: ['queued', '已分派'], working: ['running', '进行中'], returned: ['succeeded', '已交回'], failed: ['failed', '失败'], cancelled: ['cancelled', '已取消'] };
   const AT_LEAST_S5 = () => Y8.cap.query('role.detail');
 
@@ -79,7 +81,7 @@
         ['最近一次请求', esc(last.model || '—') + ' · ' + esc(last.connection_name || last.connection || '—')],
         ['协议与档位', esc(last.protocol || '—') + ' · ' + esc(last.sent_level || '不带推理参数')],
         ['部门 Prompt 版本', 'v' + esc(last.prompt_version === null || last.prompt_version === undefined ? '—' : last.prompt_version)],
-        ['状态', esc(last.status)]
+        ['状态', esc(last.status_text || last.status)]
       ], 'is-inline y8-ws-model')
       : '';
     const warning = v.image_warning
@@ -130,7 +132,7 @@
       ['待核实动作', room.pending_tool ? ui.code(room.pending_tool) : '<span class="y8-muted">没有</span>']
     ], 'is-inline y8-ws-facts');
     const roles = '<div class="y8-ws-roles"><span class="y8-ws-k">房间里的角色</span><ul>' + room.roles.map((role) =>
-      '<li><strong>' + esc(role.name) + '</strong>' + ui.status(role.kind === 'ops' ? 'running' : 'idle', role.task || role.status) + '</li>'
+      '<li><strong>' + esc(role.name) + '</strong>' + ui.status(role.kind === 'ops' ? 'running' : 'idle', role.task || ROLE_STATUS_TEXT[role.status] || role.status) + '</li>'
     ).join('') + '</ul></div>';
     const door = room.door ? '<p class="y8-ws-event"><code>' + esc(room.door) + '</code><span>' + esc(room.hold_card || '门口立起了牌子') + '</span></p>' : '';
     return facts + roles + door;
@@ -244,7 +246,7 @@
           columns: [
             { key: 'started_at', label: '开始', render: (row) => esc(Y8.ui.time(row.started_at)) },
             { key: 'status', label: '状态', render: (row) => esc(row.status_text) },
-            { key: 'kind', label: '请求类型', render: (row) => esc(row.kind || '') },
+            { key: 'kind', label: '请求类型', render: (row) => esc(ATTEMPT_KIND[row.kind] || row.kind || '') },
             { key: 'requested_model', label: '请求模型', render: (row) => '<span class="y8-obs-model">' + esc(row.requested_model || '—') + '</span>' },
             { key: 'usage', label: '输入 / 输出', render: (row) => row.usage ? '<span class="y8-obs-num">' + esc(row.usage.input) + ' / ' + esc(row.usage.output) + '</span>' : '' },
             { key: 'ops', label: '详情', className: 'y8-col-actions', render: (row) => ui.button({ label: '查看', kind: 'small', go: Y8.paths.observeDetail(ctx.projectId, row.id, row.work_item_id) }) }
@@ -257,7 +259,7 @@
           columns: [
             { key: 'summary', label: '动作' },
             { key: 'tool', label: '工具' },
-            { key: 'state', label: '状态', render: (row) => esc(row.state || '') }
+            { key: 'state', label: '状态', render: (row) => esc(ACTION_STATE_TEXT[row.state] || row.state || '') }
           ],
           rows: step.actions
         })).join('')
@@ -277,7 +279,19 @@
     return table + detail;
   }
 
-  function ledgerPanel(v) {
+  // 账本的分派对象是角色标识；页面上显示角色名，找不到时退回标识
+  function roleNameOf(projectId, roleId) {
+    if (!roleId) return roleId;
+    const data = Y8.api.query('project.settings', { project: projectId }).data;
+    const groups = data && data.roles ? data.roles : {};
+    let name = null;
+    Object.keys(groups).forEach((department) => {
+      (groups[department] || []).forEach((role) => { if (role.role_id === roleId) name = role.name || roleId; });
+    });
+    return name || roleId;
+  }
+
+  function ledgerPanel(ctx, v) {
     const ledger = v.ledger;
     if (!ledger) return ui.empty('本页没有部门账本');
     const items = (ledger.items || []).length
@@ -285,7 +299,7 @@
         columns: [
           { key: 'id', label: '编号', render: (row) => ui.code(row.id) },
           { key: 'text', label: '计划条目' },
-          { key: 'assignee', label: '分派对象', render: (row) => esc(row.assignee || '—') },
+          { key: 'assignee', label: '分派对象', render: (row) => esc(roleNameOf(ctx.projectId, row.assignee) || '—') },
           { key: 'status', label: '状态', render: (row) => { const s = ITEM_STATUS[row.status] || ['idle', row.status]; return ui.status(s[0], s[1]); } },
           { key: 'result', label: '结果摘要', render: (row) => esc(row.result || '') }
         ],
@@ -356,7 +370,7 @@
       else if (item.id === 'context') panels[item.id] = contextPanel(v);
       else if (item.id === 'prompt') panels[item.id] = promptPanel(v);
       else if (item.id === 'roles') panels[item.id] = rolesPanel(ctx, v);
-      else if (item.id === 'ledger') panels[item.id] = ledgerPanel(v);
+      else if (item.id === 'ledger') panels[item.id] = ledgerPanel(ctx, v);
       else if (item.id === 'semantic') panels[item.id] = semanticPanel(ctx, v);
     });
     return ui.tabs({ id: 'dept.checks', items, active }) + ui.tabPanels('dept.checks', active, panels);

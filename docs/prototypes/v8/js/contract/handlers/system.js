@@ -15,7 +15,7 @@
   const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
   const REASONING_METHODS = ['effort', 'adaptive', 'budget'];
   const DOC_CONN_FIELDS = ['id', 'name', 'scheme', 'protocol', 'base_url', 'credential_ref', 'timeout_sec', 'models_url', 'definitions'];
-  const DOC_DEF_FIELDS = ['id', 'upstream_model', 'window', 'max_output', 'image_input', 'reasoning', 'capacity_accepted'];
+  const DOC_DEF_FIELDS = ['id', 'upstream_model', 'window', 'max_output', 'image_input', 'accepts_required_tool_call', 'reasoning', 'capacity_accepted'];
   const TERMINAL = B.helpers.TERMINAL_PHASES;
 
   let bound = null;
@@ -298,6 +298,7 @@
       max_output: def.max_output,
       image_input: Boolean(def.image_input),
       image_input_source: def.image_input_source || null,
+      accepts_required_tool_call: Boolean(def.accepts_required_tool_call),
       reasoning: def.reasoning ? Y8.clone(def.reasoning) : null,
       capacity_accepted: Boolean(def.capacity_accepted),
       admission: def.admission ? Y8.clone(def.admission) : null,
@@ -432,7 +433,8 @@
         credential_ref: conn.credential_ref, timeout_sec: conn.timeout_sec, models_url: conn.models_url || '',
         definitions: (catalog.definitions || []).filter((def) => def.connection_id === conn.id).map((def) => ({
           id: def.id, upstream_model: def.upstream_model, window: def.window, max_output: def.max_output,
-          image_input: Boolean(def.image_input), reasoning: def.reasoning ? Y8.clone(def.reasoning) : null,
+          image_input: Boolean(def.image_input), accepts_required_tool_call: Boolean(def.accepts_required_tool_call),
+          reasoning: def.reasoning ? Y8.clone(def.reasoning) : null,
           capacity_accepted: Boolean(def.capacity_accepted)
         }))
       })),
@@ -474,6 +476,17 @@
     };
   }
 
+  function roleNameOf(db, roleId) {
+    if (!roleId) return null;
+    const groups = catalogOf(db).role_catalog || {};
+    let name = null;
+    Object.keys(groups).forEach((department) => {
+      if (!Array.isArray(groups[department])) return;
+      groups[department].forEach((role) => { if (role.id === roleId) name = role.name; });
+    });
+    return name;
+  }
+
   B.query('runtime.slots', (params, db) => {
     const runtime = db.data.runtime;
     if (!runtime) throw new Error('当前档位没有执行槽位');
@@ -486,7 +499,10 @@
         elapsed_sec: run ? run.elapsed_sec : null,
         limit_sec: run ? run.limit_sec : null
       });
-      if (db.atLeast('S5')) out.role = row.role || null;
+      if (db.atLeast('S5')) {
+        out.role = row.role || null;
+        out.role_label = roleNameOf(db, row.role);
+      }
       return out;
     });
     const queue = (runtime.queue || []).slice().sort((a, b) => a.position - b.position).map((row) => Object.assign({}, workTitle(db, row.work_item_id), {
@@ -575,6 +591,7 @@
     if (!positiveInt(def.max_output)) errors.push({ path: path + '.max_output', message: '输出上限必须是正整数' });
     if (positiveInt(def.window) && positiveInt(def.max_output) && def.max_output > def.window) errors.push({ path: path + '.max_output', message: '输出上限不能大于窗口' });
     if (typeof def.image_input !== 'boolean') errors.push({ path: path + '.image_input', message: '输入方式必须声明是否支持图像' });
+    if (typeof def.accepts_required_tool_call !== 'boolean') errors.push({ path: path + '.accepts_required_tool_call', message: '必须声明是否接受要求调用工具' });
     if (typeof def.capacity_accepted !== 'boolean') errors.push({ path: path + '.capacity_accepted', message: '缺少容量接受标记' });
     else if (requireAccepted && def.capacity_accepted !== true) errors.push({ path: path + '.capacity_accepted', message: '窗口与输出上限在接受之前不能保存' });
     return normalizeReasoning(def.reasoning, path + '.reasoning', errors);
@@ -615,6 +632,7 @@
         max_output: raw.max_output,
         image_input: raw.image_input,
         image_input_source: old ? old.image_input_source : (raw.image_input ? '手动改写' : '手动声明只有文本'),
+        accepts_required_tool_call: raw.accepts_required_tool_call,
         reasoning,
         capacity_accepted: true,
         admission: old && old.admission && !invalidating ? old.admission : null,
@@ -829,6 +847,7 @@
         nextDefinitions.push({
           id, connection_id: conn.id, upstream_model: raw.upstream_model, window: raw.window, max_output: raw.max_output,
           image_input: raw.image_input, image_input_source: old ? old.image_input_source : '目录文档',
+          accepts_required_tool_call: typeof raw.accepts_required_tool_call === 'boolean' ? raw.accepts_required_tool_call : true,
           reasoning, capacity_accepted: old && old.window === raw.window && old.max_output === raw.max_output ? Boolean(old.capacity_accepted) : true,
           admission: old && old.admission && !invalidating ? old.admission : null,
           admission_revoked: invalidating ? { at: db.now, reason: '目录文档修改了受影响字段', previous: old.admission } : (old ? old.admission_revoked : null)
@@ -995,13 +1014,11 @@
         result = { ok: false, text: cred && cred.rejected ? '模型测试失败：凭据被上游拒绝' : '模型测试失败：凭据缺失', admission: null };
       } else if (!def.capacity_accepted) {
         result = { ok: false, text: '模型测试未写入准入：容量尚未接受', admission: null };
-      } else if (def.image_input && params.image_fail) {
-        result = { ok: false, text: '图像输入测试失败：上游拒绝了图片请求', admission: null, image_failed: true };
       } else {
         const sent = def.reasoning ? def.reasoning.default_level : null;
         result = {
           ok: true,
-          text: '模型测试通过' + (sent ? '，默认档位 ' + sent : '') + (def.image_input ? '，图像输入测试通过' : ''),
+          text: '模型测试通过' + (sent ? '，默认档位 ' + sent : ''),
           admission: { tested_at: snap.now, actual_model: def.upstream_model, protocol: PROTOCOL_LABELS[conn.protocol] }
         };
       }

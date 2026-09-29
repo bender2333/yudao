@@ -42,7 +42,7 @@
           recovery: {
             state: 'running', reason: null, unusable: null,
             last_confirmed: { seq: 0, text: '事项已登记，等待产品开始' },
-            owner: { id: 'exec-5d20', since: '2026-09-27T08:00:00+08:00' },
+            owner: { id: '产品部门', since: '2026-09-27T08:00:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { activations: 3, model_steps: 22, retries: 0 }, auto_resumed_at: null
           },
@@ -262,7 +262,7 @@
           recovery: {
             state: 'running', reason: null, unusable: null,
             last_confirmed: { seq: 0, text: '事项已登记，等待产品开始' },
-            owner: { id: 'exec-5d20', since: '2026-09-28T10:00:00+08:00' },
+            owner: { id: '产品部门', since: '2026-09-28T10:00:00+08:00' },
             late_results: [], verifications: [], unfinished: [],
             limits: { activations: 8, model_steps: 64, retries: 1 }, auto_resumed_at: null
           },
@@ -684,7 +684,7 @@
               id: 'deny', label: '不批准', kind: 'danger', events: [
                 {
                   type: 'tool_skipped', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-                  label: '用户不批准取回 MDN 的说明，测试工程师改用页面本身的可访问性结构',
+                  label: '用户不批准取回 MDN 的说明，质检部门改用页面本身的可访问性结构',
                   payload: { tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date' },
                   patch: []
                 }
@@ -1093,8 +1093,8 @@
         ]
       },
       {
-        at: '2026-09-29T13:58:00+08:00', type: 'proposal_submitted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-manager',
-        label: '工程经理代表部门提交交付说明', payload: { material_id: 'm-todo-due-d1' },
+        at: '2026-09-29T13:58:00+08:00', type: 'proposal_submitted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
+        label: '工程部门提交交付说明', payload: { material_id: 'm-todo-due-d1' },
         patch: [{ path: 'runs[id=r-todo-due].roles.engineering[id=eng-manager].status', value: 'working' }]
       },
       {
@@ -1280,7 +1280,7 @@
             delay: 1200,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering', tool: 'edit_range',
-              label: '主程按区间编辑 app.js：导出为 CSV', payload: {}
+              label: '工程部门按区间编辑 app.js：导出为 CSV', payload: {}
             },
             patch: [{
               path: 'runs[id=r-todo-export].actions', push: {
@@ -1294,7 +1294,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering', tool: 'run_command',
-              label: '主程走到终端执行登记命令 npm_test', payload: {}
+              label: '工程部门走到终端执行登记命令 npm_test', payload: {}
             },
             patch: [{
               path: 'runs[id=r-todo-export].actions', push: {
@@ -1328,7 +1328,7 @@
             delay: 1200,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'quality', tool: 'browser',
-              label: '测试工程师在 m-study 上打开页面，检查导出', payload: {}
+              label: '质检部门在 m-study 上打开页面，检查导出', payload: {}
             },
             patch: []
           },
@@ -1378,7 +1378,7 @@
             delay: 1200,
             event: {
               type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-              label: '测试工程师回到试用台前，继续试用剩下的步骤', payload: {}
+              label: '质检部门回到试用台前，继续试用剩下的步骤', payload: {}
             },
             patch: []
           },
@@ -1472,7 +1472,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'edit_range',
-              label: '主程按区间编辑 app.js：逾期改为按本地日历日期比较', payload: {}
+              label: '工程部门按区间编辑 app.js：逾期改为按本地日历日期比较', payload: {}
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
@@ -1486,7 +1486,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'run_command',
-              label: '主程执行登记命令 npm_test，退出 0', payload: {}
+              label: '工程部门执行登记命令 npm_test，退出 0', payload: {}
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
@@ -1598,7 +1598,7 @@
             delay: 1200,
             event: {
               type: 'model_requested', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程架构师按指导更新计划', payload: {}
+              label: '工程部门按指导更新计划', payload: {}
             },
             patch: []
           },
@@ -1606,7 +1606,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'edit_range',
-              label: '主程按指导修改逾期提醒的文案', payload: {}
+              label: '工程部门按指导修改逾期提醒的文案', payload: {}
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
@@ -1661,7 +1661,7 @@
             delay: 1200,
             event: {
               type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-              label: '测试工程师坐到试用台前，继续试用', payload: {}
+              label: '质检部门坐到试用台前，继续试用', payload: {}
             },
             patch: []
           },

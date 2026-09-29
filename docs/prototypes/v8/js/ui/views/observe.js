@@ -350,7 +350,7 @@
       title: '同一次逻辑调用的尝试', query: 'run.attempt',
       body: '<div class="y8-obs-sibs">' + d.siblings.map((sib) =>
         '<button type="button" class="y8-obs-sib' + (sib.id === d.id ? ' is-on' : '') + '" data-go="' + esc(Y8.paths.observeDetail(Y8.app.ctx().projectId, sib.id, d.work_item_id)) + '">' +
-        '<strong>第 ' + esc(sib.n) + '/' + esc(sib.of) + ' 次</strong><small>' + esc(sib.status) + ' · ' + esc(Y8.ui.time(sib.started_at)) + '</small></button>'
+        '<strong>第 ' + esc(sib.n) + '/' + esc(sib.of) + ' 次</strong><small>' + esc(sib.status_text || sib.status) + ' · ' + esc(Y8.ui.time(sib.started_at)) + '</small></button>'
       ).join('') + '</div>'
     });
   }

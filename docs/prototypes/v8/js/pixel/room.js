@@ -1334,7 +1334,9 @@
         if (st.eventStatus === 'asking') st.eventStatus = null;
         return;
       }
-      const action = P.resolveAction(ev);
+      let action = P.resolveAction(ev);
+      // 建档事项（3.8）中读取与搜索工具的 tool_started 播放「阅读已有项目」：接入已有项目设计说明第 3.3 节
+      if (model.existing_read && (action === 'read' || action === 'search')) action = 'read_existing';
       if (!action) {
         if (ev.type === 'tool_started') {
           const a = actorFor(ev);

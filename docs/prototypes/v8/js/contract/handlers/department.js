@@ -423,6 +423,7 @@
         cycle: run ? run.cycle : null
       },
       roles: roles,
+      existing_read: Boolean(item && item.kind === 'onboarding'),
       pose: status === 'working' && primary ? { role_id: primary.id, action: 'typing' } : null,
       door: doorOf(status, run),
       hold_card: status === 'waiting_resume' && run && run.recovery && run.recovery.unusable ? run.recovery.unusable.problem : null,
@@ -476,7 +477,7 @@
         problem: resolved.problem,
         image_input: resolved.image_input
       },
-      last_target: last ? Object.assign({ attempt_id: last.id, at: last.started_at, status: last.status }, publicTarget(db, last)) : null,
+      last_target: last ? Object.assign({ attempt_id: last.id, at: last.started_at, status: last.status, status_text: ATTEMPT_TEXT[last.status] || last.status }, publicTarget(db, last)) : null,
       prompt: promptOf(db, settings, run, department),
       messages: messages.slice().sort((a, b) => (b.seq || 0) - (a.seq || 0)),
       guidance: guidance.slice().sort((a, b) => Y8.time.ms(b.at) - Y8.time.ms(a.at)).map((entryItem) => Object.assign({}, entryItem, {
@@ -777,7 +778,7 @@
     out.output = found.attempt.output || null;
     out.input = found.attempt.input || null;
     const siblings = (found.run.attempts || []).filter((item) => item.department === found.attempt.department).map((item) => ({
-      id: item.id, n: item.n, of: item.of, status: item.status, started_at: item.started_at
+      id: item.id, n: item.n, of: item.of, status: item.status, status_text: ATTEMPT_TEXT[item.status] || item.status, started_at: item.started_at
     }));
     out.siblings = siblings;
     if (db.atLeast('S5')) out.semantic_view = found.attempt.semantic_units || [];

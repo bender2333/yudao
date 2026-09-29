@@ -127,6 +127,7 @@
         (accepted ? '<span>' + Y8.ui.status('admitted', '已接受') + '</span>' : Y8.ui.button({ label: '接受预填', kind: 'small', act: 'sm.defAccept', data: { connectionId: conn.id, index } })) +
         '<small class="y8-muted">接受之前不能保存</small></div></td>' +
       '<td data-label="支持图像输入"><label class="y8-check"><input type="checkbox" data-act="sm.defImage" data-connection-id="' + Y8.esc(conn.id) + '" data-index="' + index + '"' + (def.image_input ? ' checked' : '') + '><span>支持图像输入</span></label>' + source(def.image_input_source) + '</td>' +
+      '<td data-label="是否接受要求调用工具"><label class="y8-check"><input type="checkbox" data-act="sm.defAcceptsTool" data-connection-id="' + Y8.esc(conn.id) + '" data-index="' + index + '"' + (def.accepts_required_tool_call ? ' checked' : '') + '><span>接受要求调用工具</span></label></td>' +
       '<td data-label="推理档位声明">' + reasoning + '</td>' +
       '<td data-label="准入">' + admission + '</td>' +
       '<td data-label="操作" class="y8-col-actions"><div class="y8-row">' +
@@ -152,7 +153,7 @@
     const defs = st.defs[conn.id] || conn.definitions;
     const table = defs.length
       ? '<div class="y8-table-wrap"><table class="y8-table y8-table-defs"><thead><tr>' +
-        ['模型访问定义', '窗口', '输出上限', '容量', '支持图像输入', '推理档位声明', '准入', '操作']
+        ['模型访问定义', '窗口', '输出上限', '容量', '支持图像输入', '是否接受要求调用工具', '推理档位声明', '准入', '操作']
           .map((label) => '<th>' + label + '</th>').join('') +
         '</tr></thead><tbody>' + defs.map((def, index) => definitionRow(conn, def, index)).join('') + '</tbody></table></div>'
       : Y8.ui.empty('没有模型访问定义');
@@ -502,6 +503,7 @@
       window: def.window,
       max_output: def.max_output,
       image_input: Boolean(def.image_input),
+      accepts_required_tool_call: Boolean(def.accepts_required_tool_call),
       reasoning: def.reasoning ? { levels: def.reasoning.levels.slice(), default_level: def.reasoning.default_level, method: def.reasoning.method } : null,
       capacity_accepted: Boolean(def.capacity_accepted)
     };
@@ -559,6 +561,7 @@
       id: conn.id + '/' + prefill.id, connection_id: conn.id, upstream_model: prefill.id,
       window: prefill.window, max_output: prefill.max_output,
       image_input: Boolean(prefill.image_input), image_input_source: prefill.image_source,
+      accepts_required_tool_call: true,
       reasoning: null, capacity_accepted: false, admission: null, admission_revoked: null,
       prefill: '预填自 ' + (prefill.image_source || '候选'), window_source: prefill.window_source, output_source: prefill.output_source
     });
@@ -597,6 +600,12 @@
     const view = defList(connOf(el.dataset.connectionId), Number(el.dataset.index));
     view.def.image_input = el.checked;
     if (el.checked) view.def.image_input_source = '手动改写';
+    redraw();
+  });
+
+  Y8.actions.register('sm.defAcceptsTool', (el) => {
+    const view = defList(connOf(el.dataset.connectionId), Number(el.dataset.index));
+    view.def.accepts_required_tool_call = el.checked;
     redraw();
   });
 
