@@ -58,7 +58,9 @@ def test_a_field_added_after_the_baseline_states_its_meaning_in_older_events():
 def test_writing_the_manifest_refreshes_fields_and_freezes_the_baseline(request):
     # 重写选项：只在清单有意改变时使用，清单还没有建立时用它建立第一份清单。
     # fields 随合同类型刷新；baseline 只在第一次写入时确定，以后保持不动，这样之后新增的字段
-    # 都要在 added_defaults 中写明缺省含义；已经写下的缺省含义一并保留
+    # 都要在 added_defaults 中写明缺省含义；已经写下的缺省含义一并保留。
+    # 不要用这个选项重建丢失的清单：重建会把当时的全部字段洗进 baseline 并清空 added_defaults，
+    # 丢掉缺省含义的记录（实测 priority 会被洗进基线）。清单丢失时从 git 恢复。
     if not request.config.getoption("--write-project-stream-fields"):
         pytest.skip("pass --write-project-stream-fields to rewrite the manifest")
     document = load_manifest()

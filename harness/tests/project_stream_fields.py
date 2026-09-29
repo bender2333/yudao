@@ -3,6 +3,9 @@
 # 类型时测试失败；增加种类或字段时写明旧事件中的缺省含义。清单只覆盖项目流的事件种类，run 流跟随应用版本，
 # 不登记在清单中。清单记三类内容：fields（每个事件种类的字段与类型）、baseline（首次登记时的字段集合）、
 # added_defaults（baseline 之后新增的字段与它在旧事件中的缺省含义）。
+# 清单连同 baseline 与 added_defaults 一起提交在仓库里：baseline 一旦抬高就无法区分哪些字段是新增的，
+# 删除清单再重建会把当时的全部字段洗进 baseline 并清空 added_defaults，丢掉缺省含义的记录。
+# 清单丢失时从 git 恢复，不要用重写选项重建。
 
 import json
 from pathlib import Path
@@ -52,8 +55,11 @@ def live_fields() -> dict[str, dict[str, str]]:
 
 def load_manifest() -> dict:
     # 清单还没有建立时给出空清单：fields 与 baseline 为空、没有缺省含义说明。
-    # 这时核对测试指出清单缺少全部内容，用重写选项建立第一份清单
+    # 这时核对测试指出清单缺少全部内容；用重写选项可以重建，但重建会把当时的全部字段洗进 baseline
+    # 并丢掉缺省含义的记录，清单丢失时应当从 git 恢复
     if not MANIFEST.is_file():
+        print(f"项目流字段清单 {MANIFEST} 不存在：从 git 恢复它，"
+              "不要用重写选项重建（重建会抬高 baseline 并丢掉新增字段的缺省含义）")
         return {"fields": {}, "baseline": {}, "added_defaults": {}}
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
