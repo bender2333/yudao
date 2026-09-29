@@ -69,7 +69,11 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     assert len(contexts) == len(adapter.invocations)
     for event, request in zip(contexts, adapter.invocations):
         saved = json.loads(system.artifacts.get_text(event.payload["request_ref"]["content_hash"]))
-        assert saved == {"input": request.input_items, "tools": request.tools}
+        expected = {"input": request.input_items, "tools": request.tools}
+        if request.max_output_tokens is not None:
+            # 调用目标声明了输出上限时随请求发出，记录下来的工件与发出的请求一致
+            expected["max_output_tokens"] = request.max_output_tokens
+        assert saved == expected
         assert event.context_digest == canonical_hash(saved) == recorded_context(system, request).manifest.digest
         assert event.payload["token_estimate"] == estimate_tokens(json_dumps(saved))
         assert event.payload["admitted"]

@@ -94,7 +94,6 @@ def run_board(projection: RunProjection) -> dict[str, Any]:
         "provider": projection.provider,
         "adapter": projection.adapter,
         "model": projection.model,
-        "provider_snapshot": _plain(projection.provider_snapshot),
         "provider_bindings": _plain(projection.provider_bindings),
         "protocol": None if latest_request is None else latest_request.get("protocol"),
         "model_requests": _plain(projection.model_requests),

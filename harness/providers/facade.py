@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import AsyncIterator, Container
 from contextlib import aclosing
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
@@ -26,7 +27,14 @@ from .invoke import (
     to_provider_input,
 )
 from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
-from .resolve import FrozenTarget, ResolveSnapshot, resolve_snapshot
+from .resolve import (
+    CallTargetResolution,
+    FrozenTarget,
+    ResolveSnapshot,
+    call_target_public,
+    resolve_call_target as _resolve_call_target,
+    resolve_snapshot,
+)
 from .responses import ProviderConnections, check_availability
 from .store import ProviderStore
 
@@ -54,6 +62,8 @@ class ProviderFacade:
         self._cancels = CancelRegistry()
         # 部门绑定：department -> {"provider_id": ..., "model_id": ...}，与目录一起发布
         self._bindings: dict[str, dict[str, str]] = {}
+        # 按句柄持有的调用目标：句柄 -> (内部目标, 公开部分)。凭据材料只在这里，控制核心不持有
+        self._call_targets: dict[str, tuple[FrozenTarget, dict[str, Any]]] = {}
         # 实际生效修订：目录与绑定任一发布即单调递增，包含 store.revision 的推进
         self._revision = 0
         self._lock = threading.RLock()
@@ -383,6 +393,53 @@ class ProviderFacade:
                 raise CatalogValidationError(admission_issues)
             return snapshot
 
+    def resolve_call_target(self, model_id: str, requested_tier: str | None = None) -> CallTargetResolution:
+        # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不认识部门。
+        # 检查定义存在、所属连接存在、准入有效、窗口已知、凭据可用；凭据材料留在 Provider 模块内，
+        # 交回的公开部分不含密钥，执行调用时按句柄取出材料
+        with self._lock:
+            resolution, target = _resolve_call_target(self._store, self._credentials, model_id, requested_tier)
+            if target is None:
+                return resolution
+            handle_id = f"target_{uuid4().hex[:16]}"
+            self._call_targets[handle_id] = (target, dict(resolution.public))
+            return replace(resolution, handle_id=handle_id)
+
+    def release_call_handle(self, handle_id: str) -> dict[str, Any]:
+        # 一次逻辑调用结束（成功，或不再重试）时丢弃它保留的凭据材料，交回这次解析的公开部分
+        with self._lock:
+            _, public = self._call_targets.pop(str(handle_id))
+            return dict(public)
+
+    def resolve_department_default(self, department: str,
+                                   requested_tier: str | None = None) -> CallTargetResolution:
+        # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认并解析。
+        # 对外的解析入口仍只接收模型访问定义引用与请求档位，不接收部门（#45 架构答复第 4 条）
+        with self._lock:
+            binding = self._bindings.get(str(department))
+            if binding is None:
+                return CallTargetResolution(
+                    False, "provider_unavailable", f"部门 {department} 未绑定 Provider 与模型",
+                    call_target_public(None, requested_tier),
+                )
+            resolution, target = _resolve_call_target(
+                self._store, self._credentials, binding.get("model_id"), requested_tier,
+            )
+            if target is None:
+                return resolution
+            handle_id = f"target_{uuid4().hex[:16]}"
+            self._call_targets[handle_id] = (target, dict(resolution.public))
+            return replace(resolution, handle_id=handle_id)
+
+    def bind_call_key(self, handle_id: str, call_key: str) -> None:
+        # 把已解析的目标改挂到这次逻辑调用的身份上；重试沿用同一身份，凭据材料仍留在 Provider 模块
+        with self._lock:
+            current = str(handle_id)
+            key = str(call_key)
+            if current == key:
+                return
+            self._call_targets[key] = self._call_targets.pop(current)
+
     def presets_public_view(self) -> dict[str, Any]:
         # 预置表数据与版本由模块提供，Web 只读取，不做远端热更
         return {
@@ -599,6 +656,24 @@ class ProviderFacade:
                 event = _stream_event(item)
                 if event is not None:
                     yield event
+
+    async def stream_handle(
+        self,
+        handle_id: str,
+        call: ModelCall,
+        *,
+        connections: ProviderConnections | None = None,
+        cancelled: Container[str] = (),
+    ) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
+        # 按这次逻辑调用的身份取出保留的目标再发送。目标在调用开始时取出，进行中的调用不随 reload 更换；
+        # 句柄不存在说明调用开始前目标已经释放，按模型不可用报错
+        with self._lock:
+            try:
+                target, _public = self._call_targets[str(handle_id)]
+            except KeyError as exc:
+                raise ProviderError(f"调用目标句柄不存在：{handle_id}", reason="provider_unavailable") from exc
+        async for item in self.stream(target, call, connections=connections, cancelled=cancelled):
+            yield item
 
     def cancel(self, attempt_id: str) -> bool:
         # 只作用于正在进行的这次调用尝试，返回是否找到；尝试不在进行时不留下记录

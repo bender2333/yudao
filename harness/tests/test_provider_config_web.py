@@ -342,18 +342,26 @@ def test_test_connection_reports_missing_credential_without_secrets(tmp_path):
         assert secret not in body
 
 
-def test_replacing_catalog_does_not_mutate_frozen_run(tmp_path):
+def test_replacing_catalog_only_affects_the_next_request(tmp_path):
     system, _config = catalog_system(tmp_path, provider_id="fake-a", model_id="model-a")
-    run_id = system.create_run("keep frozen snapshot")
+    run_id = system.create_run("resolve the call target per request")
+    # 创建事项不再解析调用目标：还没有发出请求时没有绑定
+    assert system.project(run_id).provider_bindings == {}
+    system.activate_once(run_id)
     before = system.project(run_id).provider_bindings
-    assert before["product"]["provider_id"] == "fake-a"
+    assert before["product"]["provider_config_id"] == "fake-a"
     with running_server(system) as (_server, host, port):
         status, body = request(host, port, "POST", "/api/providers", _catalog_document("fake-z", "model-z"))
         assert status == 200, body
         assert system.facade.providers_view()["providers"][0]["id"] == "fake-z"
-    after = system.project(run_id).provider_bindings
-    assert after == before
-    assert after["product"]["provider_id"] == "fake-a"
+    # 已经发出的请求记录不因目录替换改变；下一次解析按替换以后的目录
+    assert system.project(run_id).provider_bindings == before
+    resolved = system.facade.resolve_department_default("product")
+    try:
+        assert resolved.available is True
+        assert resolved.public["provider_config_id"] == "fake-z"
+    finally:
+        system.facade.release_call_handle(resolved.handle_id)
 
 
 def test_work_item_503_names_missing_credential(tmp_path):

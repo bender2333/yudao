@@ -54,11 +54,12 @@ def _manifest(system, request):
 
 
 @pytest.mark.parametrize("operation", ["input", "stop", "guidance", "prompt"])
-def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_path, operation):
-    # 请求装配完成但超过窗口：请求的记录与运行的结束在同一个事务中提交，紧接着到达的操作得到 RunTerminalError
+def test_operations_arriving_when_the_request_cannot_fit_find_the_run_ended(tmp_path, operation):
+    # 固定部分与部门历史超过窗口、压缩也放不下：运行以 context_overflow 结束，紧接着到达的操作得到 RunTerminalError，
+    # 什么也不写入。调用目标声明了输出上限（#45 起测试也走调用目标），装配在窗口放不下这次请求时交回 context_overflow
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
+    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=8000)
     operations = {
         "input": lambda: system.add_input(run_id, "late input"),
         "stop": lambda: system.add_input(run_id, "/stop"),
@@ -67,11 +68,10 @@ def test_operations_arriving_with_an_unadmitted_request_find_the_run_ended(tmp_p
     }
     waiting = []
 
-    def arrive(event):
-        if not event.payload["admitted"]:
-            waiting.append(from_another_thread(operations[operation]))
+    def arrive(_event):
+        waiting.append(from_another_thread(operations[operation]))
 
-    after_event(system, EventType.CONTEXT_ASSEMBLED, arrive)
+    after_event(system, EventType.RUN_FAILED, arrive)
     result = system.activate_once(run_id)
     [late] = waiting
     assert result.phase == "FAILED" and result.stop_reason == "context_overflow"
