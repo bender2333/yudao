@@ -10,9 +10,14 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from .event_store import EventStore, SavedDecision, SavedProjection, is_run_stream, project_stream, run_stream
+from .event_store import (
+    EventStore, SavedDecision, SavedProjection, is_catalog_stream, is_run_stream, project_stream, run_stream,
+)
 from .models import (
     Adoption,
+    CatalogEvent,
+    CatalogEventType,
+    CatalogProjection,
     CollaborationRequest,
     CollaborationResponse,
     DecisionRequest,
@@ -49,11 +54,12 @@ from .models import (
     waiting_reason_for,
 )
 
-Projection = RunProjection | ProjectProjection
+Projection = RunProjection | ProjectProjection | CatalogProjection
 
 # 保存的投影以 JSON 存放，由 pydantic 按数据类的类型序列化与还原
 _RUN_STATE = TypeAdapter(RunProjection)
 _PROJECT_STATE = TypeAdapter(ProjectProjection)
+_CATALOG_STATE = TypeAdapter(CatalogProjection)
 _DECISION_STATE = TypeAdapter(DecisionRequest)
 
 DECISION_EVENTS = frozenset({EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN})
@@ -92,29 +98,54 @@ def replay_project(store: EventStore, project_id: str) -> ProjectProjection | No
 
 
 def empty_projection(stream: str) -> Projection:
-    return RunProjection() if is_run_stream(stream) else ProjectProjection()
+    if is_run_stream(stream):
+        return RunProjection()
+    if is_catalog_stream(stream):
+        return CatalogProjection()
+    return ProjectProjection()
 
 
 def load_projection(saved: SavedProjection, stream: str) -> Projection:
-    adapter = _RUN_STATE if is_run_stream(stream) else _PROJECT_STATE
+    if is_run_stream(stream):
+        adapter = _RUN_STATE
+    elif is_catalog_stream(stream):
+        adapter = _CATALOG_STATE
+    else:
+        adapter = _PROJECT_STATE
     return adapter.validate_json(saved.state)
 
 
 def dump_projection(state: Projection) -> str:
-    adapter = _RUN_STATE if isinstance(state, RunProjection) else _PROJECT_STATE
+    if isinstance(state, RunProjection):
+        adapter = _RUN_STATE
+    elif isinstance(state, CatalogProjection):
+        adapter = _CATALOG_STATE
+    else:
+        adapter = _PROJECT_STATE
     return adapter.dump_json(state).decode("utf-8")
 
 
-def fold(state: Projection, event: Event | ProjectEvent) -> None:
+def fold(state: Projection, event: Event | ProjectEvent | CatalogEvent) -> None:
     # 把一条事件并入投影；并入以后的投影与从头重放到这条事件的结果相同
     if isinstance(event, Event):
         apply_event(state, event)
         _settle_run_state(state)
+    elif isinstance(event, CatalogEvent):
+        apply_catalog_event(state, event)
     else:
         apply_project_event(state, event)
 
 
-def replay(stream: str, events: list[Event] | list[ProjectEvent]) -> Projection:
+def apply_catalog_event(state: CatalogProjection, event: CatalogEvent) -> None:
+    # 目录投影只记最后一条事件与最后一条 catalog_revised 的修订号；目录内容仍由 Provider 模块保存
+    state.last_event_id = event.event_id
+    state.stream_version = event.stream_version
+    state.updated_at = event.created_at
+    if event.type == CatalogEventType.CATALOG_REVISED:
+        state.revision = int(event.payload["revision"])
+
+
+def replay(stream: str, events: list[Event] | list[ProjectEvent] | list[CatalogEvent]) -> Projection:
     state = empty_projection(stream)
     for event in events:
         fold(state, event)

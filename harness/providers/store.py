@@ -214,6 +214,12 @@ class ProviderStore:
         self.updated_at = _utc_now()
         return self.revision
 
+    def bump_revision(self) -> int:
+        # 不改变定义只推进目录修订号：部门默认等目录内容修改时使用
+        self.revision += 1
+        self.updated_at = _utc_now()
+        return self.revision
+
     def mark_admitted(self, model_id: str, *, admitted_model: str | None) -> int:
         # 记录一次模型测试通过的事实；准入跟随目录修订（Provider/模型定义），
         # 部门绑定变化不使已通过的模型测试失效

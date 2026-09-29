@@ -135,12 +135,18 @@ class OutputDelta(Contract):
 # 能力清单
 
 
+# 访问方式（第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
+AccessMode = Literal["local", "lan"]
+
+
 class Deployment(Contract):
-    # 日志身份在换数据目录时改变，本次启动的身份在服务重启时改变；合同摘要是 OpenAPI 文档的摘要
+    # 日志身份在换数据目录时改变，本次启动的身份在服务重启时改变；合同摘要是 OpenAPI 文档的摘要；
+    # 访问方式由启动设置给出（第 6.2 节）
     log_id: str
     boot_id: str
     version: str
     contract_digest: str
+    access: AccessMode
 
 
 class QueryCapability(Contract):

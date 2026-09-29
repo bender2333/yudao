@@ -12,21 +12,22 @@ from importlib.metadata import version
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from pydantic import TypeAdapter
 
 from ..app.application import DEFAULT_REGISTRY, Application
-from ..app.contracts import Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
+from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
+from .access import CLIENT_ORIGINS, AccessMiddleware
 
-# 本机访问方式的提出者（第 6.2 节）
-LOCAL_ACTOR = "user:local"
 _COMPONENTS = "#/components/schemas/{model}"
 
 
-def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY) -> FastAPI:
+def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY,
+               access: AccessMode = "local") -> FastAPI:
     @asynccontextmanager
     async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         application = open_application()
@@ -48,10 +49,14 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
         _add_query(api, query)
 
     async def capabilities(request: Request) -> Capabilities:
-        return _application(request).capabilities(request.app.state.contract_digest)
+        return _application(request).capabilities(request.app.state.contract_digest, access=access)
 
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
+    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前
+    api.add_middleware(CORSMiddleware, allow_origins=list(CLIENT_ORIGINS), allow_methods=["GET", "POST"],
+                       allow_headers=["Content-Type"])
+    api.add_middleware(AccessMiddleware, access=access)
     api.openapi = lambda: _openapi(api)
     return api
 
@@ -74,7 +79,7 @@ def _add_command(api: FastAPI, registry: Registry, definition: CommandDefinition
     accepted = Accepted[definition.refs]
 
     async def endpoint(request: Request, body: Any) -> Any:
-        result = await _application(request).command(definition.name, body, actor=LOCAL_ACTOR)
+        result = await _application(request).command(definition.name, body, actor=request.state.actor)
         if isinstance(result, Rejected):
             return JSONResponse(status_code=409, content=result.model_dump(mode="json"))
         return result

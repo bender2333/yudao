@@ -4,13 +4,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from filelock import FileLock, Timeout
 
-from .api.server import LOOPBACK_HOSTS
+from .api.server import listen_error
 from .api.server import serve as serve_api
 from .app.application import Application
+from .app.contracts import AccessMode
 from .app.project_queries import NotFound, ProjectOverview, ProjectsList, ReplayCheck
 from .demo import run_demo
 from .providers import ProviderFacade
@@ -32,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-dir", default=str(DEFAULT_DIR))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    # 访问方式（设计说明第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
+    parser.add_argument("--access", choices=get_args(AccessMode), default="local")
     parser.add_argument("--provider-config", default=str(DEFAULT_PROVIDER_CONFIG))
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
@@ -49,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--data-dir", default=argparse.SUPPRESS)
     api.add_argument("--host", default=argparse.SUPPRESS)
     api.add_argument("--port", type=int, default=argparse.SUPPRESS)
+    api.add_argument("--access", choices=get_args(AccessMode), default=argparse.SUPPRESS)
     api.add_argument("--provider-config", default=argparse.SUPPRESS)
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
@@ -96,15 +100,16 @@ def main(argv: list[str] | None = None) -> int:
         system = production_system(args.data_dir, args.provider_config)
         return _serve(system, args.host, args.port)
     if command == "api":
-        if args.host not in LOOPBACK_HOSTS:
-            print(f"the local access mode only listens on a loopback address, not {args.host}", file=sys.stderr)
+        error = listen_error(args.access, args.host)
+        if error is not None:
+            print(error, file=sys.stderr)
             return 1
         lock = _lock_data_dir(args.data_dir)
         if lock is None:
             return 1
         config, dotenv = _provider_paths(args.provider_config)
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
-                  host=args.host, port=args.port)
+                  access=args.access, host=args.host, port=args.port)
         return 0
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):

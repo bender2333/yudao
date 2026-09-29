@@ -26,14 +26,14 @@ def _free_port() -> int:
 
 
 def _start(workdir: Path, command: str, data_dir: Path, port: int, log: Path, *,
-           options_first: bool = False) -> subprocess.Popen:
+           options_first: bool = False, extra: tuple[str, ...] = ()) -> subprocess.Popen:
     # 工作目录放在测试目录中，默认的模型目录与凭据文件路径都落在这里；PYTHONPATH 指向本仓库的 harness。
-    # options_first 时选项写在子命令之前。
+    # options_first 时选项写在子命令之前。extra 是这些公共选项之外的选项。
     # 虚拟环境在 Windows 上的 python.exe 会再启动真正的解释器，所以服务在新的进程组（会话）中启动，按进程树结束
     environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
-    options = ["--data-dir", str(data_dir), "--port", str(port), "--provider-config", ""]
+    options = ["--data-dir", str(data_dir), "--port", str(port), "--provider-config", "", *extra]
     arguments = [*options, command] if options_first else [command, *options]
     with log.open("wb") as output:
         return subprocess.Popen(
@@ -112,3 +112,25 @@ def test_the_api_only_listens_on_a_loopback_address(tmp_path, capsys):
     assert main(["api", "--host", "0.0.0.0", "--data-dir", str(tmp_path / "data")]) == 1
     assert "only listens on a loopback address, not 0.0.0.0" in capsys.readouterr().err
     assert not (tmp_path / "data").exists()
+
+
+def test_the_api_serves_the_local_network_with_the_lan_access_mode(tmp_path):
+    # 局域网访问方式（设计说明第 6.2 节）：监听任意地址，能力清单列出访问方式；
+    # Host 不受本机名称限制，Origin 只接受桌面客户端页面的来源
+    data_dir = tmp_path / "lan"
+    port = _free_port()
+    log = tmp_path / "lan.log"
+    api = _start(tmp_path, "api", data_dir, port, log, options_first=True,
+                 extra=("--access", "lan", "--host", "0.0.0.0"))
+    try:
+        _wait_until_serving(api, f"http://127.0.0.1:{port}/api/capabilities", log)
+        with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC) as client:
+            capabilities = client.get("/api/capabilities")
+            other_host = client.get("/api/capabilities", headers={"Host": "control-host"})
+            rejected = client.get("/api/capabilities", headers={"Origin": "https://evil.example"})
+        assert capabilities.status_code == 200
+        assert capabilities.json()["deployment"]["access"] == "lan"
+        assert other_host.status_code == 200
+        assert rejected.status_code == 403
+    finally:
+        _stop(api)
