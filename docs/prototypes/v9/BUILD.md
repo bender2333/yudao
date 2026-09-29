@@ -46,12 +46,13 @@ docs/prototypes/v9/            由 docs/prototypes/v8/ 整份复制而来
 
 | 负责者 | 文件 |
 | --- | --- |
-| 架构师 | `BUILD.md`、`js/pixel/ecs.js`、`js/pixel/floor.js`、`js/pixel/building.js` |
-| 任务 R 部门房间 | `js/pixel/room.js`（按第 7.2 节改写，调用架构师写好的 `ecs.js`） |
-| 任务 T 任务目录与场景复核 | 第 3.3 节的任务目录表（新文件 `js/pixel/tasks.js`）、十九个场景逐一复核（截图对比 v8，行为不一致时登记，不擅自改画法） |
-| 任务 A1／A2／A3／B／C／D（除像素房间外）／E | 跟 v8 完全相同的负责范围，不需要重新做（v8 的交付原样保留） |
+| 架构师 | `BUILD.md`、`js/pixel/ecs.js`（已完成：世界、房间与管道的声明加排布、任务派发、角色与包裹的推进、对话框，`declareRooms`/`declareLinks` 已经用 v8 `layoutFor(false)`、`layoutFor(true)` 与 `pipesFor` 的已知输出核对过，坐标一致） |
+| 任务 F 项目楼层 | `js/pixel/floor.js` 改写（第 7.3 节）：接上 `ecs.js`，补全 `P.ecs.TASKS` 里第 3.3 节示例之外、v8 design.md 第 8.3 节其余各行；交接的包裹动画用 `ECS.spawnPackage`/`ECS.sendPackage`/`ECS.stepPackages` 重写，两端角色的放下/取出动作各自是一个任务（`spot: 'port_out'`/`'port_in'`）；大厅、成果库、覆盖层、背景绘制不动 |
+| 任务 R 部门房间 | `js/pixel/room.js` 改写（第 7.2 节），调用同一份 `ecs.js` |
+| 任务 B 楼与机房 | `js/pixel/building.js` 改写：楼层小人的待机行为改用 `ECS.stepCharacters` 同一套待机逻辑（工作时走到对应部门门口，空闲时随机走动），机房场景不动（机房本来没有"一部门一角色"问题） |
+| 任务 A1／A2／A3／C／D（除像素房间外）／E | 跟 v8 完全相同的负责范围，不需要重新做（v8 的交付原样保留） |
 
-v8 的 `docs/prototypes/v8/` 整份复制到 `docs/prototypes/v9/` 作为起点，任务 R、T 与架构师只改上表列出的文件。
+v8 的 `docs/prototypes/v8/` 整份复制到 `docs/prototypes/v9/` 作为起点，任务 F、R、B 与架构师只改上表列出的文件。三个任务都以「跟 v8 截图逐页对比，肉眼看不出差异」为验收标准（第 4 节），发现 `ecs.js` 本身的问题（坐标、接口形状）记入交付说明，不要绕开它自己改一份平行逻辑。
 
 ## 3. 像素引擎（`ecs.js`）
 
