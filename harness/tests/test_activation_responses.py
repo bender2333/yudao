@@ -20,6 +20,14 @@ def _artifact(system, ref):
     return json.loads(system.artifacts.get_text(ref["content_hash"]))
 
 
+def _expected_request(captured: dict) -> dict:
+    # 记录下来的请求与发到提供方的请求一致：调用目标声明了输出上限时它随请求发出
+    expected = {"input": captured["input"], "tools": captured["tools"]}
+    if captured.get("max_output_tokens") is not None:
+        expected["max_output_tokens"] = captured["max_output_tokens"]
+    return expected
+
+
 def _assert_request_audit(system, run_id, captures):
     events = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
     attempted = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_REQUESTED]
@@ -27,7 +35,7 @@ def _assert_request_audit(system, run_id, captures):
     assert len(attempted) == len(captures)
     for event, dispatched, captured in zip(events, attempted, captures):
         persisted = _artifact(system, event.payload["request_ref"])
-        assert persisted == {"input": captured["input"], "tools": captured["tools"]}
+        assert persisted == _expected_request(captured)
         assert canonical_hash(persisted) == event.context_digest
         assert event.payload["admitted"] is True
         assert dispatched.payload["attempted"] is True
@@ -44,7 +52,7 @@ def test_native_loop_executes_tool_and_persists_exact_inputs_before_each_request
 
     def second_response(handler, request):
         contexts = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
-        live_audits.append(_artifact(system, contexts[-1].payload["request_ref"]) == {"input": request["input"], "tools": request["tools"]})
+        live_audits.append(_artifact(system, contexts[-1].payload["request_ref"]) == _expected_request(request))
         _send(handler, _stream([SUBMIT], response_id="resp-two"))
 
     with _server([_stream([REASONING, CALL], duplicate=True), second_response]) as (config, captures, *_):

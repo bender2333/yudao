@@ -42,6 +42,10 @@
       case 'tool_once':
         kv.push(['工具', text(m.tool)], ['目标', code(m.target)], ['本项目的授权范围', text(m.scope)], ['超出的部分', text(m.exceeds)]);
         break;
+      case 'cannot_verify':
+        kv.push(['质检模型', code(m.model)], ['输入方式', text(m.input)]);
+        (m.items || []).forEach((it) => kv.push([it.criterion, text(it.reason)]));
+        break;
       case 'initial_prd':
         kv.push(['初始 PRD 摘要', text(m.prd_summary)]);
         if (m.prd_material_id) kv.push(['原文', '<button type="button" class="y8-link" data-go="' + esc(Y8.paths.materials(d.project_id, d.work_item_id)) + '">在资料中查看初始 PRD</button>']);

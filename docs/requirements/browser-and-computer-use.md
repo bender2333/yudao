@@ -1,6 +1,6 @@
 # D34 浏览器与 computer use
 
-确认时间：2026-09-28。状态：需求已确认，设计未开始，未实施。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与 3.2C（执行环境服务），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
+确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单 #147 至 #155。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与 3.2C（执行环境服务），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
 
 ## 用户原话
 
@@ -36,15 +36,23 @@
 - 评测使用的模型由用户单独提供，有视觉能力，Yudao 与 OpenCode 两边相同（[D32](comparison-experiment.md)）。
 - 3.2D 在 Stage 3 中，两个工具在这个工作包里一起验收；评测场景 1 的 Yudao 一侧依赖它。
 
-## 设计中待确定的内容
+## 设计确定的内容
 
-以下在 3.2D 设计时确定：
+设计写在[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)：Playwright MCP 的运行方式与启用的能力（第 3.2、4 节）；虚拟屏幕、截图尺寸 1280×800 与 8 个屏幕工具（第 5 节）；截图作为证据的保存与显示（第 7 节）；质检从 PRD 生成试用用例、逐条结论与放行，试用记录绑定交付快照（第 8 节）。
 
-- Playwright MCP 在执行环境中的运行方式（容器镜像、浏览器版本）与启用的能力（可访问性快照、截图、断言）。
-- computer use 的虚拟屏幕、截图尺寸与动作集合，参照 Anthropic 的参考实现（Docker 容器加虚拟显示）。实现核对见 [computer use 实现调研](../research/computer-use-implementations.md)。
-- 截图作为证据的保存位置与在界面上的显示。
-- 质检从 PRD 生成测试的方式，以及测试记录怎样绑定交付快照。
+2026-09-29 架构师就设计中的六项提出推荐，用户回答：
+
+> 采纳推荐
+
+六项决定（设计说明第 16 节）：
+
+1. 验收条件用「ProductSpec 摘要 + 验收条件序号」引用；3.2D 实施「每条验收条件都有绑定当前交付快照的通过证据才能放行」。
+2. 新增 QAReview 结论 `cannot_verify` 与决定请求「质检无法核验」，选项为重新核验、停止事项。
+3. 所有本机容器都带试用层（镜像约多 1 GB），项目基础镜像为 Debian 或 Ubuntu 系列。
+4. 启动方式由工程写在交付说明中：网页应用写启动命令与就绪条件（一个地址有 HTTP 响应），桌面程序写启动命令与就绪条件（出现可见窗口），就绪时限默认 300 秒、包含安装与构建；质检按交付说明启动，用户不需要另外登记启动命令。交付说明没有写启动方式、而验收条件需要试用时，质检退回工程补写。
+5. 不提供 `browser_evaluate` 与 `browser_run_code_unsafe`。
+6. 屏幕工具使用 Yudao 自己的 8 个函数工具。
 
 ## 实现状态
 
-未实施。前置依赖：3.2B MCP 接入、3.2C 执行环境服务。
+未实施。前置依赖：3.2B MCP 接入（#69）、3.2C 执行环境服务（#142、#143）、D24 的输入方式与建议能力（#146）。工单：#147 至 #155，挂在 #123 下。

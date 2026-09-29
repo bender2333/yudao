@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from harness.adapters.facade_adapter import FacadeAdapter
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS
 from harness.engine import tool_call_required_text
@@ -18,7 +17,7 @@ from harness.tests.helpers import department_history, list_files_turn
 # 连续没有调用工具的回复最多追加说明的次数，取自定义
 LIMIT = DEFINITIONS.limits.tool_call_required_limit
 from harness.tests.protocol_helpers import (
-    bound_target,
+    bound_adapter,
     chat_responder,
     complete,
     facade_with,
@@ -138,7 +137,7 @@ def test_request_after_text_only_reply_ends_with_user_message_on_the_wire(tmp_pa
     server, capture, base = serve(responder)
     try:
         facade = facade_with(base + "/v1", protocol=protocol)
-        complete(FacadeAdapter(facade, bound_target(facade)), call)
+        complete(bound_adapter(facade), call)
     finally:
         server.shutdown()
         server.server_close()

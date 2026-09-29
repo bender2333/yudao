@@ -22,6 +22,7 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
+from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
@@ -41,12 +42,10 @@ from .models import (
     DepartmentPrompt,
     EventType,
     TERMINAL_PHASES,
-    canonical_hash,
     department_for_phase,
     new_id,
 )
 from .providers import ProviderConnections, ProviderFacade
-from .providers.resolve import FrozenTarget, ResolveSnapshot
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .recording import ActivationScope
@@ -59,13 +58,12 @@ from .workspace import Workspace, WorkspaceSnapshot
 
 @dataclass
 class _Activation:
-    # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词、调用目标与适配器，
+    # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词与适配器，
     # 中止信号，激活开始时 run 流的版本，步骤驱动，以及在安全节点等待重试时的唤醒
     scope: ActivationScope
     prompt: DepartmentPrompt
     abort_flag: Event
     adapter: ModelAdapter
-    target: FrozenTarget | None
     yielded_work: dict[str, Any] | None
     version: int
     driver: StepDriver | None = None
@@ -157,18 +155,6 @@ def _validate_run_ownership(
             raise ValueError("baseline code_tree_digest does not match the initial tree digest")
 
 
-def _snapshot_event_dict(snapshot: ResolveSnapshot) -> dict[str, Any]:
-    # 任务快照只存非敏感身份：各部门冻结目标公开身份加凭据版本，不含密钥
-    departments = {}
-    for key in sorted(snapshot.targets):
-        frozen = snapshot.targets[key]
-        payload = frozen.public_dict()
-        payload["department"] = key
-        payload["credential_version"] = frozen.credential_version
-        departments[key] = payload
-    return {"revision": snapshot.revision, "departments": departments}
-
-
 def _validate_frozen_commands(registered_commands: dict[str, Any] | None,
                               command_versions: dict[str, int] | None) -> tuple[dict[str, Any], dict[str, int]]:
     # 登记命令随事项创建冻结：两份必须成对出现，键集合一致，版本号为非负整数
@@ -198,6 +184,7 @@ class Orchestrator:
         test_adapter_factory: Any | None = None,
         test_provider: str = "test",
         test_adapter_name: str = "test",
+        test_model: str = "fake-script",
         sessions: SessionFactory | None = None,
         step_limits: StepLimits = StepLimits(),
     ) -> None:
@@ -214,6 +201,7 @@ class Orchestrator:
         self.test_adapter_factory = test_adapter_factory
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
+        self.test_model = test_model
         self.assembly = ContextAssembly(artifacts)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
@@ -223,7 +211,6 @@ class Orchestrator:
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
-        self._snapshots: dict[str, ResolveSnapshot] = {}
         self._run_start_times: dict[str, float] = {}
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
@@ -264,13 +251,6 @@ class Orchestrator:
             prompt_config_versions=prompt_config_versions,
         )
         frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
-        snapshot = None
-        use_facade = self.facade is not None and (
-            self.test_adapter_factory is None or bool(self.facade.get_bindings()))
-        if use_facade:
-            # 任务创建一次读取一致的目录版本、凭据来源与目标列表并冻结
-            assert self.facade is not None
-            snapshot = self.facade.resolve_departments()
         run_id = run_id or new_id("run")
         material_dir = (self.materials_root / run_id).resolve()
         if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
@@ -285,14 +265,6 @@ class Orchestrator:
         initial = self.interactions.initial(run_id, task, department_prompts=department_prompts)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
-        if snapshot is not None:
-            self._snapshots[run_id] = snapshot
-        provider_snapshot = {} if snapshot is None else _snapshot_event_dict(snapshot)
-        if snapshot is not None:
-            provider_snapshot = {
-                "snapshot_id": canonical_hash(provider_snapshot),
-                **provider_snapshot,
-            }
         project_context_ref = None
         if project_context is not None:
             project_context_ref = asdict(self.artifacts.put(
@@ -310,9 +282,8 @@ class Orchestrator:
                 "max_cycles": max_cycles,
                 "run_time_limit_sec": run_time_limit_sec,
                 "context_window": context_window,
-                "provider": self.test_provider if snapshot is None else "directory",
-                "adapter": self.test_adapter_name if snapshot is None else "directory",
-                "provider_snapshot": provider_snapshot,
+                "provider": self.test_provider if self.test_adapter_factory is not None else "directory",
+                "adapter": self.test_adapter_name if self.test_adapter_factory is not None else "directory",
                 "sessions": {name: session.session_id for name, session in sessions.items()},
                 "project_id": project_id,
                 "work_item_id": work_item_id,
@@ -340,6 +311,24 @@ class Orchestrator:
 
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
+
+    def _install_test_call_target(self, context_window: int) -> None:
+        # 测试系统的确定性适配器：用它的名称与模型名登记一个 fake 协议的模型访问定义。
+        # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致
+        if self.facade is None:
+            raise ValueError("a provider facade is required for runs")
+        provider_id = self.test_provider
+        model_id = f"{provider_id}-model"
+        self.facade.store_document({
+            "providers": [{"id": provider_id, "name": provider_id, "base_url": ""}],
+            "models": [{
+                "id": model_id, "provider_id": provider_id, "model": self.test_model,
+                "protocol": "fake", "context_window": context_window,
+                "max_output_tokens": response_reserve(context_window, None),
+            }],
+            "bindings": {department: {"provider_id": provider_id, "model_id": model_id}
+                         for department in DEPARTMENTS},
+        })
 
     def workspace(self, run_id: str) -> Workspace:
         return Workspace(self.workspace_root / run_id)
@@ -738,45 +727,27 @@ class Orchestrator:
             self._fail(transaction, "provider_error", f"no department for phase {projection.phase}")
             return None
 
-        target: FrozenTarget | None = None
-        snapshot_id: str | None = None
-        run_has_frozen_provider = bool(projection.provider_snapshot.get("snapshot_id"))
-        snapshot = self._snapshots.get(run_id)
-        if run_has_frozen_provider or snapshot is not None:
-            if snapshot is None or self.facade is None:
-                self._fail(
-                    transaction,
-                    "provider_credentials_lost",
-                    "The task's frozen provider credentials are unavailable after restart; create a new run.",
-                )
-                return None
-            try:
-                target = snapshot.target(department)
-                snapshot_id = canonical_hash(_snapshot_event_dict(snapshot))
-                # 旧任务工作、压缩与重试继续使用冻结目标与原认证句柄，不读当前配置
-                adapter = FacadeAdapter(self.facade, target, connections=connections)
-            except (KeyError, ValueError) as exc:
-                self._await_model(transaction, department, None, "provider_unavailable", str(exc))
-                return None
-        else:
-            if self.test_adapter_factory is None:
-                self._fail(
-                    transaction,
-                    "provider_credentials_lost",
-                    "The task's model credentials are unavailable in this process; create a new run.",
-                )
-                return None
+        if self.test_adapter_factory is not None:
+            # 确定性测试适配器没有目录条目：表示成一个 fake 协议的模型访问定义并绑定三个部门，
+            # 声明这个事项的窗口，使步骤驱动的每次解析与真实 Provider 走同一条路径（#45 架构答复第 6 条）
+            self._install_test_call_target(projection.context_window)
             try:
                 adapter = self.test_adapter_factory(department)
             except Exception as exc:
                 self._await_model(transaction, department, None, "provider_unavailable",
                                   f"test adapter creation failed: {exc}")
                 return None
+        else:
+            if self.facade is None:
+                self._fail(transaction, "provider_error", "provider facade is required for runs")
+                return None
+            # 调用目标在每次逻辑调用之前按部门默认解析（#45）：激活只建立桥接，控制核心不持有凭据
+            adapter = FacadeAdapter(self.facade, connections=connections)
 
         availability = adapter.availability()
         if not availability.available:
-            # 这次激活的第一次请求之前模型引用就无法使用：run 停在这次请求之前，等待用户修复配置后回答
-            self._await_model(transaction, department, self._target_metadata(target, adapter, snapshot_id),
+            # 确定性测试适配器在激活开始时不可用：run 停在这次请求之前，等待用户修复配置后回答
+            self._await_model(transaction, department, self._adapter_target_metadata(adapter),
                               availability.reason or "provider_unavailable", availability.message)
             return None
 
@@ -792,14 +763,14 @@ class Orchestrator:
         prompt = projection.department_prompts[department]
         basis = WorkBasis.current(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
-        target_metadata = self._target_metadata(target, adapter, snapshot_id)
+        provider_name = self._activation_provider(adapter)
         parent = transaction.append(NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
             role=department,
             state_before=projection.phase,
             state_after=projection.phase,
             session_id=session.session_id,
-            provider=self._configured_provider(target, adapter),
+            provider=provider_name,
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": basis.effective_contract_hash,
                      "engineering_plan_hash": basis.engineering_plan_hash, "request_id": basis.request_id,
@@ -808,16 +779,14 @@ class Orchestrator:
                      "yielded_work": yielded_work,
                      "guidance_version": basis.guidance_version,
                      "input_version": basis.input_version, "prompt_version": prompt.version,
-                     "prompt_hash": prompt.prompt_ref.content_hash,
-                     **target_metadata},
+                     "prompt_hash": prompt.prompt_ref.content_hash},
         ))[0]
         scope = ActivationScope(
             run_id, department, session.session_id, activation_id, parent.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
-            guidance_only=guidance_only, basis=basis, provider=self._configured_provider(target, adapter),
-            target=target_metadata, secret=getattr(target, "api_key", None),
+            guidance_only=guidance_only, basis=basis, provider=provider_name,
         )
-        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, target, yielded_work,
+        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, yielded_work,
                            transaction.projection.stream_version)
 
     @staticmethod
@@ -829,51 +798,30 @@ class Orchestrator:
             "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
         }
 
-    @staticmethod
-    def _configured_provider(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
-        return target.provider_id if target is not None else getattr(adapter, "name", "test")
+    def _activation_provider(self, adapter: ModelAdapter) -> str:
+        # 激活事件上的提供方名称：确定性测试适配器用它的名称；目录驱动的运行在每次请求解析出连接
+        return getattr(adapter, "name", "test") if self.test_adapter_factory is not None else "directory"
 
     @staticmethod
-    def _configured_model(target: FrozenTarget | None, adapter: ModelAdapter) -> str:
-        return target.model if target is not None else getattr(adapter, "model", "unknown")
-
-    @classmethod
-    def _target_metadata(
-        cls,
-        target: FrozenTarget | None,
-        adapter: ModelAdapter,
-        snapshot_id: str | None = None,
-    ) -> dict[str, Any]:
-        if target is None:
-            return {
-                "snapshot_id": snapshot_id,
-                "provider_config_id": None,
-                "model_id": None,
-                "provider_name": cls._configured_provider(target, adapter),
-                "protocol": "test",
-                "base_url": None,
-                "requested_provider": cls._configured_provider(target, adapter),
-                "requested_protocol": "test",
-                "requested_model": cls._configured_model(target, adapter),
-                "credential_ref": None,
-                "credential_version": None,
-                "context_window": None,
-                "configured_max_output_tokens": None,
-            }
+    def _adapter_target_metadata(adapter: ModelAdapter) -> dict[str, Any]:
+        # 解析之前模型引用就不可用时写进待恢复请求的目标：身份取自确定性适配器，解析相关的项留空
+        provider = getattr(adapter, "name", "test")
         return {
-            "snapshot_id": snapshot_id,
-            "provider_config_id": target.provider_id,
-            "model_id": target.model_id,
-            "provider_name": target.provider_name,
-            "protocol": target.protocol,
-            "base_url": target.base_url,
-            "requested_provider": target.provider_id,
-            "requested_protocol": target.protocol,
-            "requested_model": target.model,
-            "credential_ref": target.credential_ref,
-            "credential_version": target.credential_version,
-            "context_window": target.context_window,
-            "configured_max_output_tokens": target.max_output_tokens,
+            "provider_config_id": None,
+            "model_id": None,
+            "provider_name": provider,
+            "protocol": "test",
+            "base_url": None,
+            "requested_provider": provider,
+            "requested_protocol": "test",
+            "requested_model": getattr(adapter, "model", "unknown"),
+            "credential_ref": None,
+            "credential_version": None,
+            "context_window": None,
+            "configured_max_output_tokens": None,
+            "selection_source": None,
+            "requested_tier": None,
+            "sent_tier": None,
         }
 
     async def _invoke_activation(self, activation: _Activation) -> None:
@@ -891,7 +839,7 @@ class Orchestrator:
             )
             activation.driver = StepDriver.start(
                 scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
-                assembly=self.assembly, adapter=activation.adapter, target=activation.target,
+                assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=LocalEnvironment(workspace, registered_commands=dict(projection.registered_commands)),
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
@@ -901,7 +849,7 @@ class Orchestrator:
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
             return
         if isinstance(result, Stopped) and result.reason is not None:
-            self._end_run(activation, result.reason, result.message, result.version)
+            self._end_run(activation, result.reason, result.message, result.version, target=result.target)
             return
 
         current = self.project(run_id)
@@ -927,7 +875,7 @@ class Orchestrator:
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
                 yielded_work=activation.yielded_work,
-                provider=submission.response.provider or self._configured_provider(activation.target, activation.adapter),
+                provider=submission.response.provider or self._activation_provider(activation.adapter),
                 model=submission.response.model,
             )
         except Exception as exc:
@@ -1158,17 +1106,19 @@ class Orchestrator:
             },
         ))
 
-    def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None) -> None:
+    def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
+                 *, target: dict[str, Any] | None = None) -> None:
         # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）时 run 进入待恢复。
         # version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有用户的命令或输入写入；有写入、并且写入
         # 改变了这次激活的依据（输入或指导）时，停止判断已经过期，按安全节点停止处理，运行继续，由下一次激活处理
-        # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入
+        # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入。
+        # target 是这次失败对应的调用目标公开部分，写进待恢复的请求
         def end(transaction: Transaction) -> None:
             if version is not None and reason != "time_limit" and self._superseded(transaction, activation, version):
                 return
             if reason == "provider_unavailable":
                 scope = activation.scope
-                self._await_model(transaction, scope.department, scope.target, reason, message,
+                self._await_model(transaction, scope.department, target, reason, message,
                                   facts=self._failed_attempts(transaction, scope.activation_id))
                 return
             self._end(transaction, reason, message)

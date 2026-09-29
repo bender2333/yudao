@@ -259,8 +259,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.context_window = int(payload.get("context_window", 32_000))
         state.provider = payload.get("provider", "fake")
         state.adapter = payload["adapter"]
-        snapshot = payload.get("provider_snapshot") or {}
-        state.provider_snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
         state.sessions = {
             department: SessionRecord(session_id=session_id, department=department, status="idle")
             for department, session_id in payload.get("sessions", {}).items()
@@ -375,6 +373,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.actual_provider = None
         state.actual_model = None
         state.model = None
+        if event.role:
+            state.department_call_targets[event.role] = {
+                key: payload.get(key)
+                for key in ("provider_config_id", "model_id", "provider_name", "protocol", "base_url",
+                            "requested_provider", "requested_protocol", "requested_model",
+                            "credential_ref", "credential_version", "context_window",
+                            "configured_max_output_tokens", "selection_source", "requested_tier", "sent_tier")
+            }
         state.model_requests.append({
             "event_id": event.event_id,
             "seq": event.stream_version,
@@ -390,12 +396,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "collaboration_request_id": payload.get("collaboration_request_id", payload.get("request_id")),
             "context_event_id": payload.get("context_event_id"),
             "purpose": payload.get("purpose"),
-            "snapshot_id": payload.get("snapshot_id"),
             "provider_config_id": payload.get("provider_config_id"),
             "model_id": payload.get("model_id"),
             "provider_name": payload.get("provider_name"),
             "credential_ref": payload.get("credential_ref"),
             "credential_version": payload.get("credential_version"),
+            "selection_source": payload.get("selection_source"),
+            "requested_tier": payload.get("requested_tier"),
+            "sent_tier": payload.get("sent_tier"),
             "provider": requested_provider,
             "requested_provider": requested_provider,
             "requested_protocol": payload.get("requested_protocol"),

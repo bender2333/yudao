@@ -28,10 +28,14 @@ from .environment import LocalEnvironment
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
+from .providers import ProviderFacade
 from .providers.call import ModelResponse
-from .providers.resolve import FrozenTarget
+from .providers.resolve import decision_call_target, event_call_target
 from .recording import ActivationScope, StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
+
+# 调用目标的选择来源：本工单只有部门默认这一种；项目部门设置与角色默认由 #89 与 #63 加入（#45）
+DEPARTMENT_DEFAULT_SELECTION = "department_default"
 
 
 @dataclass(frozen=True)
@@ -94,10 +98,12 @@ class Submitted:
 class Stopped:
     # 步骤驱动停止。reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由流程编排按当时的
     # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行。
-    # version 是步骤驱动作出停止判断时（最后一次核对运行状态时）run 流的版本
+    # version 是步骤驱动作出停止判断时（最后一次核对运行状态时）run 流的版本。
+    # target 是这次失败对应的调用目标公开部分（不含密钥）：模型不可用时写进待恢复的决定请求
     version: int
     reason: str | None = None
     message: str = ""
+    target: dict[str, Any] | None = None
 
 
 StepResult = Submitted | Stopped
@@ -115,18 +121,18 @@ class StepDriver:
     @classmethod
     def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-              target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
+              facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
               cancelled: Event, limits: StepLimits) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(scope, prompt, writes=writes, artifacts=artifacts, assembly=assembly,
-                     adapter=adapter, target=target, environment=environment, nodes=nodes,
+                     adapter=adapter, facade=facade, environment=environment, nodes=nodes,
                      cancelled=cancelled, limits=limits)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
-                 target: FrozenTarget | None, environment: LocalEnvironment, nodes: SafeNode,
+                 facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
                  cancelled: Event, limits: StepLimits) -> None:
         self._scope = scope
         basis = scope.basis
@@ -137,7 +143,7 @@ class StepDriver:
         self._assembly = assembly
         self._recorder = StepRecorder(writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
         self._adapter = adapter
-        self._target = target
+        self._facade = facade
         self._environment = environment
         self._nodes = nodes
         self._cancelled = cancelled
@@ -146,6 +152,10 @@ class StepDriver:
         self._action: Action | None = None
         self._step: StepRequest | None = None
         self._task: asyncio.Task[StepResult] | None = None
+        # 这次逻辑调用在 Provider 模块保留的句柄与公开部分；重试沿用，调用结束以后丢弃
+        self._call_handle: str | None = None
+        self._call_key: str | None = None
+        self._call_public: dict[str, Any] | None = None
         # 最后一次核对运行状态时 run 流的版本，随停止结果交回
         self._version = 0
 
@@ -168,12 +178,45 @@ class StepDriver:
         try:
             return await self._steps()
         except ProviderError as exc:
-            return Stopped(self._version, exc.reason, str(exc))
+            return Stopped(self._version, exc.reason, str(exc),
+                           decision_call_target(self._call_public or {}))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
             return Stopped(self._version, "provider_error", f"{type(exc).__name__}: {exc}")
         finally:
+            self._release_call()
             self._recorder.close()
+
+    def _begin_call(self) -> Stopped | None:
+        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标。失败时不发送请求，交回待恢复的停止结果
+        self._release_call()
+        if self._facade is None:
+            raise ProviderError("model calls require the provider facade", reason="provider_error")
+        resolution = self._facade.resolve_department_default(self._scope.department)
+        if not resolution.available:
+            return Stopped(self._version, resolution.reason, resolution.message,
+                           decision_call_target(resolution.public))
+        self._call_handle = resolution.handle_id
+        self._call_public = event_call_target(resolution.public, selection_source=DEPARTMENT_DEFAULT_SELECTION)
+        return None
+
+    def _bind_call(self, logical_call_id: str) -> None:
+        # 把这次解析的目标挂到逻辑调用的身份上；重试与事务重新判断都沿用同一个句柄
+        if self._call_key == logical_call_id:
+            return
+        if self._facade is None or self._call_handle is None:
+            raise ProviderError("model calls require a resolved call target", reason="provider_error")
+        self._facade.bind_call_key(self._call_handle, logical_call_id)
+        self._call_key = logical_call_id
+
+    def _release_call(self) -> None:
+        # 逻辑调用结束（成功，或不再重试）以后丢弃它保留的凭据材料
+        key = self._call_key or self._call_handle
+        self._call_key = None
+        self._call_handle = None
+        self._call_public = None
+        if key is not None and self._facade is not None:
+            self._facade.release_call_handle(key)
 
     def _proceed(self) -> bool:
         judgment = self._nodes.proceed()
@@ -200,7 +243,10 @@ class StepDriver:
         for step_id in range(1, limits.max_model_steps + 1):
             if not self._proceed():
                 return Stopped(self._version)
-            request = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
+            prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
+            if isinstance(prepared, Stopped):
+                return prepared
+            request = prepared
             if request is None or not self._start_request(request):
                 return Stopped(self._version)
             request.attempt_started_monotonic = time.monotonic()
@@ -272,6 +318,8 @@ class StepDriver:
             attempt = 1
             root_step_id = step_id + 1
             retry_of_step_id = None
+            # 这次逻辑调用成功，凭据材料不再保留；下一次逻辑调用重新解析
+            self._release_call()
             if not self._proceed():
                 self._skip(request, response.output,
                            "Not executed because this activation ended or its input changed during the model request.")
@@ -350,10 +398,15 @@ class StepDriver:
                             reason="model_steps_exhausted")
 
     def _prepare(self, step_id: int, attempt: int, root_step_id: int,
-                 retry_of_step_id: int | None) -> ModelRequest | None:
+                 retry_of_step_id: int | None) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
-        # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止
+        # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
+        # 新的逻辑调用先按部门默认解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
         scope = self._scope
+        if retry_of_step_id is None:
+            unavailable = self._begin_call()
+            if unavailable is not None:
+                return unavailable
 
         def prepare(transaction: Transaction) -> tuple[ModelRequest, StepRequest] | _Unassembled | None:
             projection = transaction.projection
@@ -362,11 +415,9 @@ class StepDriver:
             projection = self._settle(transaction)
             if scope.basis.changed(projection, scope.department):
                 return None
-            target = self._target
+            target = self._call_public or {}
             try:
-                limits = model_limits(projection.context_window,
-                                      None if target is None else target.context_window,
-                                      None if target is None else target.max_output_tokens)
+                limits = model_limits(target["context_window"], target["configured_max_output_tokens"])
                 snapshot_hash = self._environment.query(FactsQuery(tree=True)).tree.digest
                 pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
                                             events=transaction.events(), snapshot_hash=snapshot_hash)
@@ -382,6 +433,7 @@ class StepDriver:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
             logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
+            self._bind_call(logical_call_id)
             request = ModelRequest(scope.run_id, scope.department, scope.session_id, scope.activation_id,
                                    step_id, assembled, assembled.tools,
                                    purpose=assembled.manifest.purpose,
@@ -393,6 +445,7 @@ class StepDriver:
                                    retry_of_step_id=retry_of_step_id,
                                    attempt_id=f"{logical_call_id}:attempt-{attempt}",
                                    logical_call_id=logical_call_id,
+                                   call_target=dict(target),
                                    guidance_version=scope.basis.guidance_version, **scope.versions())
             self._recorder.request_assembled(transaction, request, step, snapshot_hash)
             if not step.admitted:

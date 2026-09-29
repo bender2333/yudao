@@ -55,7 +55,7 @@ flowchart LR
 7. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供本机容器与远程执行代理两种新实现；用户在系统中登记机器，在项目中授权使用。依赖 3.1 的动作核实与 #110。排在 3.2B 之前，外部内容进入模型输入之前，任意代码已经可以隔离运行。
 8. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
 9. **3.2B 网络与 MCP**：依赖 3.2C 的后端，每个新工具单独验收。
-10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)）：依赖 3.2B 与 3.2C。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 在容器的虚拟屏幕中通过截图、点击与输入操作桌面程序。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时不提供 computer use，浏览器只给可访问性结构。安全按普通浏览器 MCP 的默认做法，暂不另加限制。评测场景 1 的 Yudao 一侧依赖本项。
+10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 与 3.2C。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 在容器的虚拟屏幕中通过截图、点击与输入操作桌面程序。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时不提供 computer use，浏览器只给可访问性结构。安全按普通浏览器 MCP 的默认做法，暂不另加限制。评测场景 1 的 Yudao 一侧依赖本项。
 11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
 12. **D24 模型管理**（[#83](https://github.com/bender2333/yudao/issues/83)，[模型管理设计说明](design/model-management.md)）：依赖 #45 与应用层的目录命令（#77）。统一的模型目录与准入、模型能力表、推理档位、每个项目单独选择各部门的模型、部门的建议能力提醒；#96 用真实 Provider 验收三种协议。评测时给质检换用视觉模型、3.2D 的建议能力提醒都依赖本项。增加服务方案按预置表与自定义连接进行（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)），不另设工作包。
 13. **3.9 组合验收与对照实验**：在经 3.8 接入的真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。所有工作包父工单关闭以后进行。
