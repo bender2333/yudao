@@ -1648,11 +1648,11 @@
       const pa = primary();
       const d = pa.data.desk;
       const shot = model.trial || model.self_test || {};
-      paint.shot(c, d.x + d.w - 52, d.y - 74, 48, 32, { screenshot: shot.screenshot, text_lines: shot.text_lines || st.eventLines }, t);
+      paint.shot(c, d.x + d.w - 52, d.y - 74, 48, 32, { screenshot: shot.screenshot, text_lines: shot.text_lines || st.eventLines, text_only: shot.model_saw === false }, t);
       P.text(c, '本机浏览器', d.x + d.w - 28, d.y - 78, { size: 5, align: 'center', color: PAL.ink2, max: 60 });
     }
 
-    // 质检试用台：显示器嵌入最近一张截图的缩略图（像素边框）；模型不能看图时显示可访问性结构的文字行（3.2D）
+    // 质检试用台：显示器嵌入最近一张截图的缩略图（像素边框）；模型不能看图时同样显示截图，旁边标明「模型只读取文字」（3.2D）
     function drawTrialTable(c, t) {
       const tb = L.trial;
       const a = scene.actors.find((x) => x.seat === st.trialSeat && x.visible);
@@ -1661,9 +1661,10 @@
       const trial = model.trial || {};
       const step = st.eventStep || trial.step || 0;
       const lines = st.eventLines || trial.text_lines || null;
-      paint.shot(c, tb.x + tb.w - 34, tb.y - 42, 30, 22, { screenshot: trial.screenshot, text_lines: lines }, t);
+      const textOnly = trial.model_saw === false;
+      paint.shot(c, tb.x + tb.w - 34, tb.y - 42, 30, 22, { screenshot: trial.screenshot, text_lines: lines, text_only: textOnly }, t);
       if (step) P.text(c, '第 ' + step + ' 步', tb.x + 8, tb.y + 4, { size: 5, color: PAL.ink2, max: 50 });
-      if (lines && !trial.screenshot) lines.slice(0, 3).forEach((s, i) => P.text(c, s, tb.x + 4, tb.y - 8 - i * 6, { size: 4.5, color: PAL.ink2, max: tb.w - 40 }));
+      if (textOnly) P.sign(c, tb.x + tb.w - 19, tb.y - 44, '模型只读取文字', { size: 4.5, bg: PAL.yellow1, stripe: PAL.orange2, maxW: 70 });
       if (a) {
         c.save();
         c.beginPath(); c.rect(0, 0, W, tb.y); c.clip();

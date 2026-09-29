@@ -165,6 +165,12 @@
     };
   }
 
+  // 试用记录的一步：model_saw 表示模型是否看到这张截图（数据中没有写时按质检解析到的模型是否支持图像输入）
+  function trialOut(trial, target) {
+    const sawDefault = !target || target.image_input !== false;
+    return Object.assign({}, trial, { model_saw: trial.model_saw === undefined ? sawDefault : Boolean(trial.model_saw) });
+  }
+
   function focusItem(db, projectId, workItemId) {
     if (workItemId) {
       const item = db.workItem(workItemId);
@@ -448,8 +454,8 @@
       room.tool_panel = { buttons: buttons.slice(0, 6), lit: -1 };
     }
     if (db.atLeast('3.2D') && department === 'quality' && run && run.trials && run.trials.length) {
-      const trial = run.trials[run.trials.length - 1];
-      room.trial = { screenshot: trial.screenshot || null, text_lines: trial.text_lines || null, step: trial.step };
+      const trial = trialOut(run.trials[run.trials.length - 1], resolved);
+      room.trial = { screenshot: trial.screenshot || null, text_lines: trial.text_lines || null, step: trial.step, model_saw: trial.model_saw };
     }
     if (db.atLeast('S4')) {
       room.waiting_provider = Boolean(run && run.waiting_provider && run.waiting_provider.department === department);
@@ -493,7 +499,7 @@
     }
     if (db.atLeast('3.2D') && department === 'quality') {
       out.image_warning = imageWarning(resolved);
-      out.trials = run && run.trials ? run.trials : [];
+      out.trials = run && run.trials ? run.trials.map((trial) => trialOut(trial, resolved)) : [];
     }
     if (db.atLeast('S5')) {
       out.roles = roles.map((role) => {
@@ -1285,5 +1291,31 @@
       label: '写入语义更正',
       payload: { unit_id: id, replaces: unitId }
     }, semanticPatch(db, project.id, store))], { unit_id: id });
+  });
+
+  // 3.2D：试用记录与截图证据（浏览器与 computer use 设计说明第 7、8 节）
+  B.query('run.trials', (params, db) => {
+    const item = db.workItem(requireText(params.work_item, '事项'));
+    if (!item) throw new Error('事项不存在或不在当前档位：' + params.work_item);
+    const run = db.runOf(item.id);
+    const target = models().resolve(db, item.project_id, 'quality');
+    return {
+      work_item_id: item.id,
+      run_id: run ? run.id : null,
+      model: target.definition ? models().label(target.definition) : '未设置',
+      image_input: target.image_input !== false,
+      trials: run && run.trials ? run.trials.map((trial) => trialOut(trial, target)) : []
+    };
+  });
+
+  B.query('evidence.screenshot', (params, db) => {
+    const item = db.workItem(requireText(params.work_item, '事项'));
+    if (!item) throw new Error('事项不存在或不在当前档位：' + params.work_item);
+    const run = db.runOf(item.id);
+    const step = Number(params.step);
+    const trial = run && run.trials ? run.trials.find((entry) => entry.step === step) : null;
+    if (!trial) throw new Error('试用记录中没有第 ' + params.step + ' 步');
+    const out = trialOut(trial, models().resolve(db, item.project_id, 'quality'));
+    return { step: out.step, at: out.at, action: out.action, screenshot: out.screenshot || null, width: 1280, height: 800, text_lines: out.text_lines || [], model_saw: out.model_saw, requirement: out.requirement || null };
   });
 })();

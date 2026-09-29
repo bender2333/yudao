@@ -217,12 +217,11 @@ Podman 提供兼容 Docker 的接口，官方文档没有说明 docker-py 可以
 
 - **执行代理层**：以 `debian:bookworm-slim` 为基础，用 uv 安装独立的 Python（python-build-standalone）到 `/opt/yudao/python`，在 `/opt/yudao/venv` 中安装执行代理与它的依赖。这一层只作为复制的来源，标签带执行代码摘要。
 - **Yudao 默认基础镜像**：以 `python:3.12-slim-bookworm` 为基础（官方镜像提供 amd64 与 arm64），加入 git、ca-certificates、编译工具（build-essential）、Node.js 当前 LTS 版本。评测场景的三种项目（网页前端、Python 库、Python 命令行程序）都可以在这个镜像中构建与检查。
-- **项目基础镜像**：项目可以在执行位置中登记一个基础镜像（例如 `rust:1-bookworm`）。要求是 glibc 的 Linux 镜像，带有 `/bin/sh` 与 git。
+- **项目基础镜像**：项目可以在执行位置中登记一个基础镜像（例如 `rust:1-bookworm`）。要求是 Debian 或 Ubuntu 系列的 glibc Linux 镜像，带有 `/bin/sh` 与 git；3.2D 的试用层用 apt 安装。
 - **执行环境镜像**：无论使用默认基础镜像还是项目基础镜像，都按同一个 Dockerfile 派生：`FROM <基础镜像>`，从执行代理层复制 `/opt/yudao`，建立 `/yudao`、`/cache` 与用户主目录，设置缓存的环境变量，以 UID 1000 运行，入口为执行代理。独立的 Python 放在 `/opt/yudao`，不依赖基础镜像自己的 Python。标签由基础镜像的摘要与执行代码摘要确定；两者都没有变化时复用已有镜像。
+- **试用层**（3.2D，[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 3.2 节）：执行环境镜像在执行代理层之后加一层试用层（Playwright MCP、Chromium、虚拟屏幕、字体与图形库，约 1 GB），本机容器全部使用带试用层的镜像；标签同时由试用层 Dockerfile 的摘要确定。
 
 镜像在创建 run 时按需构建，构建期间 run 显示为「准备执行环境」。run 冻结的执行位置记录基础镜像的引用与摘要，以及执行环境镜像的身份；回执中的执行位置说明带镜像身份，检查回执因此可以追溯到所用的环境。
-
-3.2D 的虚拟屏幕与浏览器所需的软件作为另一种基础镜像按同一方式派生。
 
 #### 5.2.4 容器的设置
 

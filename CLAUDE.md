@@ -126,7 +126,11 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 3. 收尾：
    - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
-4. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
+4. 集成层：上次 `INTEGRATION: PASS` 以后合并满 5 个 PR，或者关闭工作包父工单之前，Claude 暂停派发，在 `C:\project\yudao-worktrees\integration` 检出 main 的当前提交并执行 `uv sync --frozen`，在后台运行
+   `uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml`（登记表建立之前运行 `uv run python -m pytest harness/tests -n 4 --junitxml=.tmp/test-results/integration.xml`）
+   - 通过：在阶段父工单下评论，第一行写 `INTEGRATION: PASS <提交号>`，附结尾的计数行，作为下一批的起点，恢复派发。
+   - 失败：暂停合并。先用单进程重新运行失败的测试：通过时建工单修正这个不稳定的测试，恢复合并；仍然失败时用 `git bisect run` 只运行失败的测试，找到出问题的提交，建修复工单并关联那个 PR 的工单，排在最前；修复合并后再运行集成层全部，通过后恢复合并。步骤见 `docs/design/test-pyramid.md` 第 4.2 节。
+5. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
 
 命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。omp 使用 prewalk：用默认模型阅读与规划，写下 todo 列表后第一次修改文件时切换到 smol 模型；omp 的错误输出出现 `prewalk disabled` 时，说明 smol 模型无法使用，本轮按异常结束处理。
 
