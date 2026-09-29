@@ -1228,7 +1228,7 @@
         p.stand();
         p.spot('bench');
         p.add(S.hold('pen_red'), S.anim('write', 1200), S.hold(null), S.anim('inspect', 900));
-        p.add(...stampSteps('stamp_once', () => { st.bench.mark = { text: verdict, color }; }));
+        p.add(...stampSteps('stamp', () => { st.bench.mark = { text: verdict, color }; }, 'stamp_once'));
         p.back();
         p.run(() => { st.bench.mark = { text: verdict, color }; });
       },

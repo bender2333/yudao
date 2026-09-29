@@ -147,8 +147,9 @@
     return '<span class="y8-service" title="与控制主机的连接"><span class="y8-dot"></span>已连接 · 接口版本 ' + esc(cap.deployment.api_version) + '</span>';
   }
 
-  function scopeSelect(ctx) {
-    if (!ctx.projectId || isSystemRoute(ctx.route.name)) return '';
+  // project 为 projects.list 中的该项目；项目不在当前能力范围内时为 null，不查询项目内容
+  function scopeSelect(ctx, project) {
+    if (!project || isSystemRoute(ctx.route.name)) return '';
     const items = Y8.api.query('project.overview', { project: ctx.projectId }).data.work_items;
     const current = ctx.workItemId || '';
     const options = '<option value="">整个项目</option>' + items.map((item) =>
@@ -193,7 +194,7 @@
     if (name !== 'home') crumbs.push('<strong>' + esc(pageTitle(ctx)) + '</strong>');
     return drawerButton +
       '<nav class="y8-crumbs" aria-label="路径">' + crumbs.join('<span class="y8-crumb-sep">/</span>') + '</nav>' +
-      '<div class="y8-top-actions">' + scopeSelect(ctx) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
+      '<div class="y8-top-actions">' + scopeSelect(ctx, project) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
   }
 
   // ---------------------------------------------------------------------------
