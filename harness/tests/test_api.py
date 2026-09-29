@@ -294,3 +294,19 @@ def test_queries_for_a_missing_target_answer_404_like_the_old_read_routes(data_d
             assert response.status_code == 404, (name, response.text)
             assert response.json()["error"]
         assert opened.store.end_position() == 0
+
+
+def test_query_filters_outside_the_contract_are_refused_by_the_contract(data_dir):
+    # 状态与部门的取值由合同限定，游标与分页大小的格式同样如此：不符合时按合同拒绝，不落到 500
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        for name, params in (("project.attempts", {"project_id": "p", "status": "bogus"}),
+                             ("project.usage", {"project_id": "p", "status": "bogus"}),
+                             ("project.attempts", {"project_id": "p", "department": "bogus"}),
+                             ("project.usage", {"project_id": "p", "department": "bogus"}),
+                             ("project.attempts", {"project_id": "p", "cursor": "not-a-cursor"}),
+                             ("project.attempts", {"project_id": "p", "cursor": "1:x:2"}),
+                             ("project.attempts", {"project_id": "p", "limit": 0}),
+                             ("project.attempts", {"project_id": "p", "limit": 500})):
+            response = client.get(f"/api/queries/{name}", params=params)
+            assert response.status_code == 422, (name, params, response.text)

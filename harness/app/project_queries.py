@@ -905,7 +905,8 @@ def _project_attempts(application: Application, request: ProjectAttempts) -> Sna
     attempts = [_attempt_view(row) for row in rows]
     cursor = None
     if len(attempts) == request.limit and attempts:
-        cursor = _encode_cursor(page_position or position, attempts[-1].position, attempts[-1].attempt_id)
+        first_page = position if page_position is None else page_position
+        cursor = _encode_cursor(first_page, attempts[-1].position, attempts[-1].attempt_id)
     return Snapshot[ProjectAttemptsResult](
         position=position,
         data=ProjectAttemptsResult(attempts=attempts, cursor=cursor),

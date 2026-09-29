@@ -1,7 +1,8 @@
+import base64
 import json
 import sqlite3
 import time
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -32,12 +33,13 @@ from harness.app.project_queries import (
 )
 from harness.app.registry import Registry
 from harness.app.system_queries import SYSTEM_STATUS
-from harness.event_store import project_stream, run_stream
+from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
-from harness.write_path import NewEvent, WritePath
+from harness.tests.saved_rewrite import rewrite_saved_event
+from harness.write_path import NewEvent
 
 GOAL = "把文本按行处理清楚"
 
@@ -427,6 +429,129 @@ def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
     detail = application.query("event.detail", EventDetail(event_id=event.event_id))
     assert detail.data.artifacts["compaction_summary"]
     assert detail.data.artifacts["compaction_sources"]
+
+
+def test_delivery_detail_and_file_use_the_archived_bytes(data_dir):
+    # 封存的清单与文件原文取自交付封存，不取自当前工作区（旧路由 test_web.py 的对应场景）
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("封存", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    workspace = system.workspace(run_id)
+    workspace.write_file(".settings", "hidden configuration\n")
+    (workspace.root / "assets").mkdir()
+    (workspace.root / "assets" / "data.bin").write_bytes(b"\x00\xff\x01")
+    (workspace.root / "empty").mkdir()
+    projection = system.run_until_stop(run_id)
+    workspace.write_file("src/echo.py", "changed after delivery\n")
+    (workspace.root / "assets" / "data.bin").unlink()
+    application = _application(system)
+    delivery_event = projection.delivery_spec.created_event_id
+
+    detail = application.query("event.detail", EventDetail(event_id=delivery_event))
+    archive = detail.data.artifacts["tree_archive"]
+    assert archive["tree_digest"] == projection.delivery_spec.code_tree_digest
+    assert [item["path"] for item in archive["tree"]["files"]] == [".settings", "assets/data.bin", "src/echo.py"]
+    assert [item["path"] for item in detail.data.artifacts["tree_files"]] == [".settings", "assets/data.bin", "src/echo.py"]
+    for blob in archive["blobs"]:
+        assert (system.artifacts.root / blob["artifact"]["path"]).is_file()
+
+    text = application.query("delivery.file", DeliveryFile(event_id=delivery_event, path="src/echo.py"))
+    assert text.data.content.splitlines() == ["import sys", "print(sys.argv[1])"]
+    assert text.data.base64 is None
+    binary = application.query("delivery.file", DeliveryFile(event_id=delivery_event, path="assets/data.bin"))
+    assert binary.data.content is None
+    assert base64.b64decode(binary.data.base64) == b"\x00\xff\x01"
+
+
+def test_delivery_file_is_limited_to_the_archived_paths_of_a_delivery(data_dir):
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("路径", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    projection = system.run_until_stop(run_id)
+    application = _application(system)
+    delivery_event = projection.delivery_spec.created_event_id
+    for path in (".checks/receipts.jsonl", "../outside", "unarchived.py", "empty"):
+        with pytest.raises(NotFound):
+            application.query("delivery.file", DeliveryFile(event_id=delivery_event, path=path))
+    assembled = next(item for item in system.store.list_events(run_id)
+                     if item.type == EventType.CONTEXT_ASSEMBLED)
+    with pytest.raises(NotFound):
+        application.query("delivery.file", DeliveryFile(event_id=assembled.event_id, path="src/echo.py"))
+    with pytest.raises(NotFound):
+        application.query("delivery.file", DeliveryFile(event_id="event_missing", path="src/echo.py"))
+
+
+@pytest.mark.parametrize("damage", ["missing_blob", "modified_blob"])
+def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("损坏", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    projection = system.run_until_stop(run_id)
+    delivery = projection.delivery_spec
+    archive = json.loads(system.artifacts.get_for_run(run_id, delivery.tree_ref))
+    blob = system.artifacts.root / archive["blobs"][0]["artifact"]["path"]
+    if damage == "missing_blob":
+        blob.unlink()
+        # 事件详情的 Git 版本核对先读到缺失的对象（GitBindingError），交付文件按缺失的工件拒绝
+        detail_error, file_error = ValueError, FileNotFoundError
+    else:
+        blob.write_bytes(b"corrupt archive")
+        detail_error = file_error = ValueError
+    application = _application(system)
+    with pytest.raises(detail_error):
+        application.query("event.detail", EventDetail(event_id=delivery.created_event_id))
+    with pytest.raises(file_error):
+        application.query("delivery.file", DeliveryFile(event_id=delivery.created_event_id, path="src/echo.py"))
+
+
+@pytest.mark.parametrize("mismatch", ["other_commit", "fake_tree", "forged_material"])
+def test_event_detail_rejects_a_git_version_not_bound_to_its_materials(data_dir, mismatch):
+    # 改写保存的事件行以后核对绑定：另一个事件的版本、伪造的树、伪造的正式材料
+    system = _system(data_dir, _release_script())
+    project_id = system.projects.register("绑定", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    events = system.store.list_events(run_id)
+    delivery = next(item for item in events if item.type == EventType.DELIVERY_ACCEPTED)
+    payload = dict(delivery.payload)
+    if mismatch == "other_commit":
+        payload["git_version"] = next(item.payload["git_version"] for item in events
+                                      if item.type == EventType.SPEC_ACCEPTED)
+    elif mismatch == "fake_tree":
+        payload["git_version"] = {**payload["git_version"], "tree": "0" * 40}
+    else:
+        payload["prd_ref"] = asdict(system.artifacts.put(
+            run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
+    rewrite_saved_event(system.store, replace(delivery, payload=payload))
+    application = _application(system)
+    with pytest.raises(ValueError):
+        application.query("event.detail", EventDetail(event_id=delivery.event_id))
+
+
+def test_work_item_scope_is_checked_in_every_project_query(data_dir):
+    # 事项范围参数指向别的事项时，项目内的查询都以目标不存在拒绝（旧路由的跨项目场景）
+    system = _system(data_dir, happy_script())
+    first = system.projects.register("第一个", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(first, "做一件事")
+    system.run_until_stop(run_id)
+    second = system.projects.register("第二个", GOAL)
+    foreign_item, _foreign_run = system.projects.start_work_item(second, "第二件事")
+    application = _application(system)
+    for name, request in (
+        ("project.overview", ProjectOverview(project_id=first, work_item=foreign_item)),
+        ("project.loop", ProjectLoop(project_id=first, work_item=foreign_item)),
+        ("project.flow", ProjectFlow(project_id=first, work_item=foreign_item)),
+        ("work_item.inputs", WorkItemInputs(project_id=first, work_item=foreign_item)),
+        ("work_item.materials", WorkItemMaterials(project_id=first, work_item=foreign_item)),
+        ("department.workspace", DepartmentWorkspace(project_id=first, department="product",
+                                                    work_item=foreign_item)),
+        ("project.attempts", ProjectAttempts(project_id=first, work_item=foreign_item)),
+        ("project.usage", ProjectUsage(project_id=first, work_item=foreign_item)),
+    ):
+        with pytest.raises(NotFound):
+            application.query(name, request)
+        with pytest.raises(NotFound):
+            application.query(name, request.model_copy(update={"work_item": "wi_missing"}))
 
 
 def _rework_script(verdict="rework_engineering"):

@@ -121,13 +121,13 @@ class ReadModels:
             self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.executescript(SCHEMA)
         self._dirty = True
-        self._unsubscribe = store.subscribe(lambda _events: self.mark_dirty())
+        self._unsubscribe = store.subscribe(lambda _events: self._mark_dirty())
 
     def close(self) -> None:
         self._unsubscribe()
         self._connection.close()
 
-    def mark_dirty(self) -> None:
+    def _mark_dirty(self) -> None:
         # 订阅方由事件日志在提交以后调用；这里只置位，查询时再吸收，不把读取模型的错误带给写入方
         self._dirty = True
 
@@ -137,15 +137,15 @@ class ReadModels:
             for table in ("app_attempt_state", "app_attempts", "app_flows", "app_read_positions"):
                 connection.execute(f"DELETE FROM {table}")
         self._dirty = True
-        self.catch_up()
+        self._catch_up()
 
-    def read(self, fetch: Callable[[sqlite3.Connection], list[sqlite3.Row]]) -> tuple[int, list[sqlite3.Row]]:
+    def _read(self, fetch: Callable[[sqlite3.Connection], list[sqlite3.Row]]) -> tuple[int, list[sqlite3.Row]]:
         # 吸收新事件以后在一个读取事务中取得已处理位置与数据：两者来自同一个已提交的状态
-        self.catch_up()
+        self._catch_up()
         with self._reading() as connection:
             return _read_position(connection), fetch(connection)
 
-    def catch_up(self) -> None:
+    def _catch_up(self) -> None:
         if not self._dirty:
             return
         with self._reading() as connection:
@@ -170,7 +170,7 @@ class ReadModels:
                                           department=department, status=status, provider=provider,
                                           requested_model=requested_model, actual_model=actual_model, q=q)
         where = _where(clauses)
-        return self.read(lambda connection: connection.execute(
+        return self._read(lambda connection: connection.execute(
             f"SELECT * FROM app_attempts{where} ORDER BY position ASC, attempt_id ASC", params,
         ).fetchall())
 
@@ -192,7 +192,7 @@ class ReadModels:
                 [*params, first, after, after, after_id, limit],
             ).fetchall()
 
-        return self.read(fetch)
+        return self._read(fetch)
 
     def flows(self, *, project_id: str, work_item_id: str | None = None) -> tuple[int, list[sqlite3.Row]]:
         def fetch(connection: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -205,7 +205,7 @@ class ReadModels:
                 f"SELECT * FROM app_flows WHERE {' AND '.join(clauses)} ORDER BY position ASC", params,
             ).fetchall()
 
-        return self.read(fetch)
+        return self._read(fetch)
 
     def _absorb(self, events: Sequence[Event | ProjectEvent], positions: dict[str, int]) -> None:
         attempt_events = [event for event in events
