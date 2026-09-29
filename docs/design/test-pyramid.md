@@ -1,0 +1,169 @@
+# 测试分层设计说明
+
+状态：2026-09-29 设计，用户已确认分层方式、各角色运行的层与集成层的批量运行（每 5 个 PR 一批、失败时暂停合并）；未实施。本文规定 `harness/tests/` 的三层结构、每层的边界与检查方式、执行者、审查者与架构师各自在什么时候运行哪一层，以及测试输出的读取方式。
+
+## 1. 出发点
+
+2026-09-29 在控制主机（Windows，32 GB 内存）上单进程顺序运行全量测试的实测结果：
+
+| 单项耗时 | 项数 | 合计 |
+| --- | --- | --- |
+| 不到 0.1 秒 | 538 | 9 秒 |
+| 0.1 至 1 秒 | 330 | 177 秒 |
+| 1 至 5 秒 | 386 | 964 秒 |
+| 5 秒以上 | 64 | 539 秒 |
+
+共 1318 项，28 分钟。三个现象决定了本设计：
+
+1. 时间集中在跑完整三部门循环的测试上。一次完整循环（`test_orchestrator.py::test_happy_path_requires_quality_release`）约 3.4 秒，其中 2.3 秒是 75 次 git 子进程（Windows 上每次约 31 毫秒）。约 60 个测试文件使用 `LoopSystem`，许多测试只检查一个局部结论，也先跑完整循环；`test_smoke.py` 的 64 项共 290 秒，每一项都重新跑一次循环取得运行记录。
+2. 单个测试进程的内存不大：顺序运行 `test_smoke.py`、`test_web.py`、`test_projects.py` 时 pytest 进程峰值 212 MB，连同 git 与 node 子进程 360 MB。内存耗尽来自数量叠加：执行者与审查者自行使用 `-n 4`、`-n 6`，每个工作进程两百多 MB，再乘以同时运行的执行者、审查者与 omp 进程本身。
+3. 每个执行者与审查者都运行全量测试，失败时完整的调用堆栈进入模型上下文；`test_web_ui.js` 由规则单独运行一次，又由 `test_web.py` 的一项测试经子进程运行一次。
+
+现有结构：真正的单元测试只有 7 个文件；约 20 个文件混合了不同层级的测试；测试文件之间互相导入辅助函数；没有超时设置，曾有一次全量运行停滞 46 分钟（[3.0B 基线](../stage-3/3.0b-baseline-2026-09-21.md) 第 4.1 节）。
+
+## 2. 三层的定义
+
+层级按测试用到的真实资源划分。每层一个目录，目录是唯一的分类，不另设 marker。
+
+| 层 | 目录 | 允许使用 | 不允许使用 |
+| --- | --- | --- | --- |
+| 单元 | `harness/tests/unit/` | 内存数据、纯函数、单个类，读取仓库内的静态文件与定义 | 临时目录、子进程、网络 |
+| 功能与模块 | `harness/tests/module/` | 一个模块连同它的真实依赖：SQLite 事件库、git 仓库、工件库与工作区文件、线程；`LoopSystem` 上的一次部门激活（`activate_once`） | 网络（包括本机端口）、完整三部门循环 |
+| 集成 | `harness/tests/integration/` | 完整三部门循环、HTTP 服务与本地 Provider 服务、事件序列基准、命令子进程与进程树、控制台入口、服务进程 | 不限 |
+
+判断一项测试属于哪一层时，看它检查的结论需要哪些资源才能到达，用能到达的最低一层。
+
+### 2.1 边界检查
+
+每层的 `conftest.py` 在测试执行期间检查边界，越界的测试直接失败，报告写明使用了哪种资源：
+
+- 单元层：用 Python 的审计钩子（`sys.addaudithook`）拒绝 `subprocess.Popen`、`socket.connect`、`socket.bind` 事件；收集阶段拒绝请求 `tmp_path`、`tmp_path_factory` 或 `data_dir` 夹具的测试。
+- 模块层：用同一个审计钩子拒绝 `socket.connect`、`socket.bind` 事件。
+- 集成层：不检查。
+
+「完整三部门循环」无法由程序可靠识别（`run_until_stop` 在模块层也用于停在第一个阻塞处），由审查者按第 2 节的定义核对。
+
+### 2.2 单项时间上限
+
+使用 pytest-timeout（加入 dev 依赖组）。每层的 `conftest.py` 给本层测试加上上限：单元层 5 秒，模块层 60 秒，集成层 300 秒。Windows 上 pytest-timeout 使用线程方式：超时时打印全部线程的调用堆栈并结束测试进程。这样一次卡住的测试以失败和堆栈结束，不会让运行停滞几十分钟。
+
+### 2.3 多进程运行
+
+只有集成层的批量运行（第 4.2 节）使用 `pytest-xdist`。根 `conftest.py` 在 `-n` 大于 0 且命令中的测试路径不全在 `harness/tests/integration/` 之内时拒绝运行。事件序列基准与 OpenAPI 快照的重写（`--write-event-baselines`、`--write-openapi-snapshot`）同样只允许单进程。
+
+## 3. 目录与共用代码
+
+```
+harness/tests/
+  conftest.py            根：命令行选项、data_dir 夹具、多进程检查
+  support/               共用的辅助代码，不含测试
+  unit/      conftest.py 边界检查与时间上限
+  module/    conftest.py
+  integration/ conftest.py
+  event_sequences/  openapi/  fixtures/   基准、快照与材料，位置不变
+```
+
+- 现有的 `helpers.py`、`api_helpers.py`、`console_helpers.py`、`protocol_helpers.py`、`first_request.py`、`event_sequence.py`、`contract_checks.py`、`saved_rewrite.py` 移入 `support/`。
+- 测试文件之间不再互相导入。现在被其他文件导入的辅助函数移入 `support/`：`test_web.py` 的 `running_server`、`request`、`get_json`、`wait_until`；`test_responses.py` 的 `_server`、`_stream`、`_submit_stream`、`_event`、`_response`、`_send`；`test_event_sequence.py` 的 `HTTP_REPLIES`、`HTTP_SCRIPT`、`product_spec_reply`、`BROKEN_STREAMS`、`PARTIAL_OUTPUT`；`test_compaction_engine._runner`。`test_provider_config_web.py` 自己定义的同名 `running_server` 与 `support/` 中的合并为一个。
+- 混合了不同层级的文件按层拆开，拆开后的文件名保持 `test_<模块或功能>.py`，同一主题在不同层中可以同名。
+
+## 4. 各角色运行哪一层
+
+| 时机 | 角色 | 运行内容 | 方式 |
+| --- | --- | --- | --- |
+| 开发中 | 执行者 | 与改动相关的测试文件 | 单进程 |
+| 交付前 | 执行者 | 单元层与模块层全部，本次改动或新增的集成层测试文件，前端测试 | 单进程 |
+| 审查 | 审查者 | 同交付前 | 单进程 |
+| 每 5 个 PR 合并以后，以及工作包父工单关闭之前 | 架构师 | 集成层全部 | 多进程 |
+
+本次改动或新增的集成层测试文件在 PR 中运行，保证合并进 main 的集成测试本身可以运行，例如重写了事件序列基准的 PR。
+
+### 4.1 常用命令
+
+```bash
+uv run python -m pytest harness/tests/unit harness/tests/module
+uv run python -m pytest harness/tests/integration/<本次改动的文件>
+node --test --test-reporter=dot harness/tests/unit/test_web_ui.js
+uv run python -m pytest harness/tests/integration -n 4 --junitxml=.tmp/test-results/integration.xml
+```
+
+最后一条只由架构师在集成层的批量运行中使用。
+
+### 4.2 集成层的批量运行
+
+```mermaid
+flowchart TD
+    M[合并 PR] --> C{上次通过以后合并的 PR 达到 5 个，或者要关闭工作包父工单}
+    C -- 否 --> M
+    C -- 是 --> R[在集成 worktree 中检出 main 当前提交，运行集成层全部]
+    R --> P{结果}
+    P -- 通过 --> G[在阶段父工单评论 INTEGRATION: PASS 与提交号，成为下一批的起点]
+    G --> M
+    P -- 失败 --> S[暂停合并]
+    S --> A[单进程重新运行失败的测试]
+    A -- 重新运行通过 --> F[建工单修正不稳定的测试，恢复合并]
+    A -- 仍然失败 --> B[git bisect run 只运行失败的测试，找出第一个出问题的提交]
+    B --> T[建修复工单，关联出问题的 PR 的工单，排在最前]
+    T --> X[修复工单审查时加跑失败的集成测试，合并]
+    X --> R
+```
+
+- 集成 worktree 的位置是 `C:\project\yudao-worktrees\integration`，每次运行前检出 main 的当前提交并执行 `uv sync --frozen`。主工作区经常有未提交的文档，不在那里运行。
+- 起点是阶段父工单上最近一条 `INTEGRATION: PASS` 评论中的提交号；「合并的 PR 数」按起点之后 main 上的 squash 合并提交计数。
+- 暂停合并期间，已经 `review-passed` 的 PR 等待；执行者与审查者照常工作。
+- squash 合并使每个 PR 在 main 上只有一个提交，`git bisect` 找到的提交对应一个 PR。
+- 重新运行能通过的失败说明测试依赖机器负载或时间，这本身是缺陷，由工单修正测试，不暂停合并。
+
+## 5. 测试往下层移
+
+分层以后大多数测试仍在集成层，就没有形成金字塔。按下面的规则把测试移到能到达其结论的最低一层：
+
+1. 只需要一份真实运行记录的测试（审计、投影、导出、归档完整性，例如 `test_smoke.py`、`test_smoke_guidance_audit.py`、`test_release_archive_integrity.py`、`test_event_log.py`）：每个文件用 module 作用域的夹具跑一次完整循环并保存数据目录，每项测试复制一份数据目录后再改写与检查。数据仍来自真实运行，开销从每项一次循环变为每个文件一次。这类测试属于集成层。
+2. 检查单个部门一步的结论（提案校验、裁决、工具结果、上下文装配）：改用 `activate_once` 构造状态，放进模块层。
+3. 检查纯规则或纯转换（停止原因、视图计算、载荷校验、工具描述）：直接调用函数，放进单元层。
+4. OpenAPI 快照直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi()` 文档与快照比较。生成文档不经过生命周期，不打开 `Application`，也不启动服务，放进单元层，使每个 PR 都核对接口合同。
+5. 等待某个条件成立时使用事件或提交通知，不用固定时长的 `sleep`；检查时间限额本身的等待保留，属于集成层。
+6. `test_service_lock.py` 先占用再释放端口（`_free_port`）交给子进程的写法在多进程运行中会冲突，改为子进程自己绑定端口 0 并报告实际端口。
+
+## 6. 输出的读取
+
+- pytest 的默认参数（`pyproject.toml` 的 `addopts`）为 `-q --tb=line -rfE -p no:warnings`：每项失败只打印一行位置与错误信息，结尾是失败与错误的清单和计数。
+- 需要细节时，只对失败的那一项重新运行并加 `--tb=short`。
+- 交付评论与审查评论写每层的计数行与失败项名称，不粘贴测试输出。
+- 集成层批量运行的完整结果写入 `.tmp/test-results/integration.xml`，失败时从中读取失败项名称用于重新运行与 `git bisect`。
+
+## 7. 前端与浏览器测试
+
+- `test_web_ui.js` 移入单元层，由 `node --test --test-reporter=dot` 运行；删除 `test_web.py` 中经子进程重复运行它的测试项。
+- 删除 `test_b3_shell_browser.spec.js` 与 `test_s3_acceptance_browser.spec.js`：两者是 Stage 2 的验收证据脚本（固定日期、固定端口、写死的 Chromium 路径），没有接入任何运行入口。桌面客户端的浏览器测试随客户端设计（[D30](../requirements/web-game-frontend.md)、#71）。
+
+## 8. 模块交互
+
+```mermaid
+flowchart LR
+    subgraph tests[harness/tests]
+        R[根 conftest<br/>选项 data_dir 多进程检查]
+        U[unit/<br/>审计钩子：无子进程 无网络 无临时目录<br/>上限 5 秒]
+        M[module/<br/>审计钩子：无网络<br/>上限 60 秒]
+        I[integration/<br/>上限 300 秒]
+        S[support/<br/>系统构造 脚本循环 本地 Provider 服务<br/>HTTP 服务 事件序列比较 保存数据改写]
+    end
+    U --> S
+    M --> S
+    I --> S
+    R --- U & M & I
+    S --> H[harness 包<br/>控制核心 应用层 接口层 Provider]
+    PT[pytest-timeout] --> U & M & I
+    XD[pytest-xdist] --> I
+```
+
+依赖方向：各层测试只依赖 `support/` 与 `harness` 包；`support/` 不依赖任何测试文件；层与层之间不互相导入。
+
+## 9. 实施顺序
+
+1. 建立 `support/` 与三个层目录；根与各层的 `conftest.py`（边界检查、时间上限、多进程检查）；`addopts` 输出参数；pytest-timeout 加入 dev 依赖组。
+2. 搬迁与拆分：移动辅助函数，按第 2 节把每个文件放进对应层，拆开混合文件；只移动与拆分，不改测试内容；删除两个浏览器脚本与重复运行前端测试的测试项。
+3. 往下层移：按第 5 节修改测试，包括只需要运行记录的测试改为每个文件一次循环、局部结论改用 `activate_once`、OpenAPI 快照不启动服务、去掉等待用的固定时长、`_free_port`。
+4. 规则文件：AGENTS.md「常用命令」「执行者」「审查者」与 CLAUDE.md「自主推进模式」按第 4、6 节修改，在第 2 步合并以后生效。
+
+每一步完成后，三层合计的测试项数与移动前相同（第 3 步中合并或删除的重复项在工单中逐项列出）。
