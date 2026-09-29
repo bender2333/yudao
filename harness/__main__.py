@@ -4,12 +4,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from filelock import FileLock, Timeout
 
 from .api.server import LOOPBACK_HOSTS
 from .api.server import serve as serve_api
 from .app.application import Application
+from .app.project_queries import NotFound, ProjectOverview, ProjectsList, ReplayCheck
 from .demo import run_demo
 from .providers import ProviderFacade
 from .runtime import LoopSystem
@@ -73,8 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     command = args.command or "serve"
 
     if command == "demo":
-        lock = _lock_data_dir(args.data_dir) if args.serve else None
-        if args.serve and lock is None:
+        lock = _lock_data_dir(args.data_dir)
+        if lock is None:
             return 1
         system, run_id = run_demo(args.data_dir)
         projection = system.project(run_id)
@@ -107,39 +109,18 @@ def main(argv: list[str] | None = None) -> int:
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):
             parser.error("replay needs exactly one of: run_id or --project <project_id>")
-        system = LoopSystem(args.data_dir)
-        if args.project_id is not None:
-            first = system.projects.projection(args.project_id).canonical_state()
-            second = system.projects.projection(args.project_id).canonical_state()
-            print(json.dumps(first, ensure_ascii=False, indent=2))
-            if first != second:
-                print("project replay is not deterministic", file=sys.stderr)
-                return 1
-            return 0
-        try:
-            projection = system.replay(args.run_id)
-        except (ValueError, OSError) as exc:
-            print(f"replay failed: {exc}", file=sys.stderr)
-            return 1
-        print(json.dumps(projection.canonical_state(), ensure_ascii=False, indent=2))
-        return 0
+        request = (ReplayCheck(project_id=args.project_id) if args.project_id is not None
+                   else ReplayCheck(run_id=args.run_id))
+        return _print_query(args.data_dir, "replay.check", request)
     if command == "project":
-        system = LoopSystem(args.data_dir)
         if args.project_command == "list":
-            rows = [
-                {
-                    "project_id": item.project_id, "name": item.name, "pinned": item.pinned, "archived": item.archived,
-                    "created_at": item.created_at, "updated_at": item.updated_at,
-                    "work_item_count": len(item.work_items), "active_work_item_id": item.active_work_item_id,
-                    "current_adoption": None if item.current_adoption is None else item.current_adoption.adoption_id,
-                }
-                for item in system.projects.list_projects(include_archived=args.archived)
-            ]
-            print(json.dumps(rows, ensure_ascii=False, indent=2))
-            return 0
-        print(json.dumps(system.projects.projection(args.project_id).to_dict(), ensure_ascii=False, indent=2))
-        return 0
+            return _print_query(args.data_dir, "projects.list",
+                                ProjectsList(include_archived=args.archived))
+        return _print_query(args.data_dir, "project.overview", ProjectOverview(project_id=args.project_id))
     if command == "smoke":
+        lock = _lock_data_dir(args.data_dir)
+        if lock is None:
+            return 1
         scenarios = ["happy", "collaboration"] if args.scenario == "all" else [args.scenario]
         report = run_smoke(
             args.data_dir,
@@ -175,6 +156,22 @@ def _serve(system: LoopSystem, host: str, port: int) -> int:
     finally:
         server.server_close()
         system.close()
+    return 0
+
+
+def _print_query(data_dir: str | Path, name: str, request: Any) -> int:
+    # 只读的子命令：经应用层的查询以只读方式打开数据目录，不写保存的投影，不需要进程锁
+    application = Application.open_readonly(data_dir)
+    try:
+        snapshot = application.query(name, request)
+    except NotFound as exc:
+        print(f"{name}: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        application.close()
+    print(json.dumps(snapshot.model_dump(mode="json"), ensure_ascii=False, indent=2))
+    if name == "replay.check" and not snapshot.data.consistent:
+        return 1
     return 0
 
 
