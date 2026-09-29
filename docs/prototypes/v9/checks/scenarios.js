@@ -17,15 +17,15 @@ const ROOT = v9Url;
     errors.push(msg.text());
   });
   page.on('pageerror', (err) => { console.log('PAGEERROR@', String((err && err.stack) || err).slice(0, 400)); errors.push(String(err)); });
-  await page.addInitScript(() => sessionStorage.setItem('y8.level', JSON.stringify('S5')));
+  await page.addInitScript(() => sessionStorage.setItem('y9.level', JSON.stringify('S5')));
   await page.goto(ROOT + '#/home');
   await page.waitForTimeout(900);
 
   // 先离开首页再回来，让楼与机房在包装之后重新挂载；计数器统计 playEvent 的调用
   await page.evaluate(async () => {
-    window.Y8.go('#/sys/machines');
+    window.Y9.go('#/sys/machines');
     await new Promise((r) => setTimeout(r, 500));
-    const P = window.Y8.pixel;
+    const P = window.Y9.pixel;
     const cnt = window.__cnt = { buildingMount: 0, roomMount: 0, buildingPlay: 0, roomPlay: 0 };
     const wrap = (name, key) => {
       const orig = P[name];
@@ -39,27 +39,27 @@ const ROOT = v9Url;
     };
     wrap('createBuildingScene', 'building');
     wrap('createMachineRoomScene', 'room');
-    window.Y8.go('#/home');
+    window.Y9.go('#/home');
     await new Promise((r) => setTimeout(r, 500));
     // 记录访问过的路由
     window.__seen = new Set([location.hash]);
     const track = () => window.__seen.add(location.hash);
     window.addEventListener('hashchange', track);
-    window.Y8.bus.on('route-changed', track);
+    window.Y9.bus.on('route-changed', track);
   });
 
-  const ids = await page.evaluate(() => window.Y8.backend.scenarios().map((s) => ({ id: s.id, name: s.name, level: s.level })));
+  const ids = await page.evaluate(() => window.Y9.backend.scenarios().map((s) => ({ id: s.id, name: s.name, level: s.level })));
   const report = [];
   for (const sc of ids) {
     const res = await page.evaluate(async (sid) => {
-      window.Y8.scenario.select(sid);
-      const total = window.Y8.scenario.current().steps.length;
+      window.Y9.scenario.select(sid);
+      const total = window.Y9.scenario.current().steps.length;
       let guard = 0;
-      while (window.Y8.scenario.state().step < total && guard++ < 90) {
-        window.Y8.scenario.step();
+      while (window.Y9.scenario.state().step < total && guard++ < 90) {
+        window.Y9.scenario.step();
         await new Promise((r) => setTimeout(r, 340));
       }
-      return { total, reached: window.Y8.scenario.state().step, routes: Array.from(window.__seen) };
+      return { total, reached: window.Y9.scenario.state().step, routes: Array.from(window.__seen) };
     }, sc.id);
     report.push({
       id: sc.id, name: sc.name, level: sc.level, total: res.total, reached: res.reached,

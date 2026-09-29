@@ -1,8 +1,8 @@
 # 浏览器与 computer use 设计说明
 
-更新：2026-09-29。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
+更新：2026-09-30。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
 
-依据：需求 [D34](../requirements/browser-and-computer-use.md)；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、本机容器、执行代理、执行位置、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v8 设计说明](../prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)、[computer use 实现调研](../research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 工具）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#142](https://github.com/bender2333/yudao/issues/142)（3.2C 的 F）。用词以 `CONTEXT.md` 为准。
+依据：需求 [D34](../requirements/browser-and-computer-use.md)；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、本机容器、执行代理、执行位置、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)、[computer use 实现调研](../research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 工具）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#142](https://github.com/bender2333/yudao/issues/142)（3.2C 的 F）。用词以 `CONTEXT.md` 为准。
 
 参照实现的提交号：Playwright MCP `microsoft/playwright-mcp` v0.0.83（2026-09-28，`main` 提交 `f183dad`，依赖 Playwright `1.64.0-alpha-1790635538000`）；Anthropic `claude-quickstarts` 提交 `dee7116`；OMP `C:\project\codes\oh-my-pi` 提交 `fdfeef1f78`；OpenCode `C:\project\codes\opencode` 提交 `0027387`。
 
@@ -315,13 +315,13 @@ Playwright MCP 是 Yudao 内置的 MCP 服务，由试用会话在容器中以 s
 
 ### 7.3 界面
 
-按原型 v8：
+按原型 v9（下面的章节号沿用 v8 设计说明）：
 
 - **部门房间**（第 8.3 节）：质检的试用台显示器与工程的显示器嵌入最近一张截图的缩略图，来自最新的浏览器或屏幕动作的 `tool_called` 事件。浏览器的每一步都有截图，模型不能看图时显示器同样显示截图，角落标明「模型只读取文字」。
 - **部门工作间的试用记录页签**（第 7.1 节）：按用例列出引用的验收条件、计划的操作、每一步的操作、截图与结论；每张截图标明模型是否看到它；点击截图查看原尺寸，旁边列出同一步的可访问性结构摘录。
 - **资料页的质检一项**（第 7.3 节）：每份 QAReview 的逐条结论表，每条验收条件一行，列出结果、证据与截图缩略图；表头写明交付快照的摘要。
 - **工具与扩展页**（第 9.4 节）：内置的浏览器工具与屏幕工具。
-- 原型 v8 第 15 节「试用台截图的尺寸与缩放」确定为 1280×800（16:10），界面等比缩放。
+- 原型 v9 沿用 v8 设计说明第 15 节「试用台截图的尺寸与缩放」的决定：1280×800（16:10），界面等比缩放。
 
 ## 8. 质检从 PRD 生成测试与试用记录
 

@@ -1,7 +1,7 @@
 // 家庭温湿度监测服务。种子是出现时的状态，历史补丁收到现在。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
   const P = 'p-sensor';
 
   function modelOf(definition, source, unusable) {
@@ -136,7 +136,7 @@
     }, extra || {});
   }
 
-  Y8.data.define({
+  Y9.data.define({
     seed: {
       projects: [{
         id: P, name: '家庭温湿度监测服务',

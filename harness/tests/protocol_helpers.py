@@ -265,12 +265,12 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
     facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
     facade.store_document({
         "providers": [{
-            "id": "go", "name": "Go", "base_url": base_url,
+            "id": "go", "name": "Go", "protocol": protocol, "base_url": base_url,
             "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": preset_id,
         }],
         "models": [{
             "id": "m-go", "provider_id": "go", "model": model,
-            "protocol": protocol, "context_window": 32000, "max_output_tokens": 2048,
+            "context_window": 32000, "max_output_tokens": 2048,
             "capability_source": "preset-v1",
         }],
         "bindings": {},
@@ -331,9 +331,9 @@ def provider_system(data_dir: Path, base: str, protocol: str, *, timeout_sec: fl
     # 经真实 Provider 模块的系统：三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
     facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
     facade.store_document({
-        "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
+        "providers": [{"id": "local", "name": "Local", "protocol": protocol, "base_url": base + "/v1",
                        "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
-        "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model", "protocol": protocol,
+        "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model",
                     "context_window": 32000, "max_output_tokens": 2048}],
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
     })
@@ -394,12 +394,12 @@ def _build_delegate(config: ResponsesConfig, loop: ConnectionLoop | None) -> Mod
     facade.store_document({
         "providers": [{
             "id": config.provider or "test-provider", "name": config.provider or "test-provider",
-            "base_url": config.base_url, "credential_ref": "TEST_CREDENTIAL",
+            "protocol": "responses", "base_url": config.base_url, "credential_ref": "TEST_CREDENTIAL",
             "timeout_sec": float(config.timeout_sec),
         }],
         "models": [{
             "id": "test-model", "provider_id": config.provider or "test-provider",
-            "model": config.model, "protocol": "responses",
+            "model": config.model,
             "context_window": 128000, "max_output_tokens": 4096,
         }],
         "bindings": {},

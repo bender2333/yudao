@@ -1,7 +1,7 @@
 // 待办清单网页（评测场景 1，WebGen-Bench 000080）：项目、两个事项与它们的 run、资料、设置、决定、离开期间的事件与场景
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
 
   const PRODUCT_PROMPT = '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的需求咨询时，只依据有效要求与用户原文；需要取舍时写明理由。';
   const ENGINEERING_PROMPT = '你是工程部门。依据有效 PRD 先写工程计划，计划项逐条对应要求；再按计划实现代码、编写单元测试，并用登记命令自测。交付说明逐条写明完成的计划项与处理的缺陷；实现有疑问时向产品咨询，不自行改变要求。';
@@ -9,7 +9,7 @@
 
   const INTEND_TEXT = 'Please implement an advanced to-do list web application where users can create, edit, and delete to-do items. The application should have functionalities for adding new tasks, marking tasks as completed, deleting tasks, filtering tasks, and searching tasks. Users should be able to browse all to-do items, create new tasks, edit existing tasks, and delete unnecessary tasks. Set all pages to have a lavender background and indigo components.';
 
-  Y8.data.define({
+  Y9.data.define({
     seed: {
       projects: [
         {

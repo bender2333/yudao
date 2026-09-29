@@ -26,9 +26,10 @@ ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
 
 
 class ProviderInput(Contract):
-    # 一份 Provider 配置：协议在模型访问定义上声明，这里不含协议
+    # 一份 Provider 配置：声明一种协议（ADR-0004），地址是该协议的请求基址
     id: Text
     name: Text
+    protocol: ProtocolName
     base_url: str = ""
     credential_ref: str = ""
     timeout_sec: float = 600.0
@@ -37,10 +38,9 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；容量逐行在这条命令中确认（窗口与输出上限）
+    # 一条模型访问定义；协议取自所属连接，容量逐行在这条命令中确认（窗口与输出上限）
     id: Text
     model: Text
-    protocol: ProtocolName
     context_window: int | None = None
     max_output_tokens: PositiveInt
     capability_source: str = ""

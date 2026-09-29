@@ -1,7 +1,7 @@
 // 预留入口页（设计说明第 9.5 节）：元观察、演化、经验只写所属阶段与产品结果
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
 
   const RESERVED = {
     meta: {
@@ -26,14 +26,14 @@
 
   function render(ctx) {
     const info = entry(ctx);
-    const body = Y8.ui.kv([
-      ['所属阶段', Y8.esc(info.stage)],
-      ['产品结果', Y8.esc(info.outcome)]
-    ]) + Y8.ui.note('进入该阶段时设计。');
-    return '<div class="y8-sys-reserved">' + Y8.ui.block({ title: info.title, className: 'y8-reserved', body }) + '</div>';
+    const body = Y9.ui.kv([
+      ['所属阶段', Y9.esc(info.stage)],
+      ['产品结果', Y9.esc(info.outcome)]
+    ]) + Y9.ui.note('进入该阶段时设计。');
+    return '<div class="y9-sys-reserved">' + Y9.ui.block({ title: info.title, className: 'y9-reserved', body }) + '</div>';
   }
 
-  Y8.views.register('sys-reserved', {
+  Y9.views.register('sys-reserved', {
     title: (ctx) => (RESERVED[ctx.route.params.which] || { title: '预留入口' }).title,
     render
   });

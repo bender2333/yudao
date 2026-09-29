@@ -3,7 +3,7 @@
 // --event idle 不放事件，观察待机时小人的走动；联系表存在 .tmp/v9-checks/。
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v8Url, v9Url, outDir } = require('./env.js');
+const { chromium, EXE, v9Url, outDir, spaceOf } = require('./env.js');
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; };
 const REC = arg('rec', 'sc-todo-loop');
@@ -16,8 +16,8 @@ const OUT = arg('out', 'life-' + REC + '-' + EVENT + '-' + NTH + '.png');
 const rec = JSON.parse(fs.readFileSync(path.join(outDir, arg('recs', 'recordings.json')), 'utf8')).find((r) => r.id === REC);
 if (!rec) throw new Error('没有这个录制：' + REC);
 
-const DRIVER = async ({ ops, EVENT, NTH, FRAMES, INTERVAL }) => {
-  const P = window.Y8.pixel;
+const DRIVER = async ({ ops, EVENT, NTH, FRAMES, INTERVAL, space }) => {
+  const P = window[space].pixel;
   let t = 0;
   const q = [];
   window.requestAnimationFrame = (cb) => { q.push(cb); return q.length; };
@@ -86,10 +86,11 @@ const DRIVER = async ({ ops, EVENT, NTH, FRAMES, INTERVAL }) => {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+  const { ns, prefix } = spaceOf(ROOT);
+  await page.addInitScript(([key, lv]) => sessionStorage.setItem(key, JSON.stringify(lv)), [prefix + '.level', 'S5']);
   await page.goto(ROOT + '#/sys/machines');
   await page.waitForTimeout(600);
-  const frames = await page.evaluate(DRIVER, { ops: rec.ops, EVENT, NTH, FRAMES, INTERVAL });
+  const frames = await page.evaluate(DRIVER, { ops: rec.ops, EVENT, NTH, FRAMES, INTERVAL, space: ns });
   await ctx.close();
   if (!frames.length) { console.log('没有找到事件', EVENT, NTH); process.exit(1); }
   // 联系表：每帧裁出楼层中间的房间区域（y 从 20 到 250），三列排开

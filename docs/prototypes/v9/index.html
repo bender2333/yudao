@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yudao 界面原型 v8</title>
+  <title>Yudao 界面原型 v9</title>
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/home.css">
   <link rel="stylesheet" href="styles/project.css">
@@ -12,28 +12,28 @@
   <link rel="stylesheet" href="styles/gallery.css">
 </head>
 <body>
-  <div class="y8-banner" role="note">
+  <div class="y9-banner" role="note">
     <strong>原型示例数据</strong>
-    <span class="y8-banner-text">界面内容全部为示例数据，不连接控制主机；底部工具条切换档位、标注、场景与模拟</span>
+    <span class="y9-banner-text">界面内容全部为示例数据，不连接控制主机；底部工具条切换档位、标注、场景与模拟</span>
   </div>
 
-  <div id="y8-window-note" class="y8-window-note" hidden></div>
+  <div id="y9-window-note" class="y9-window-note" hidden></div>
 
-  <div class="y8-app">
-    <aside id="y8-sidebar" class="y8-sidebar" aria-label="首页、项目与系统"></aside>
-    <div class="y8-scrim" data-act="shell.drawer" aria-hidden="true"></div>
-    <div class="y8-main">
-      <header id="y8-topbar" class="y8-topbar"></header>
-      <nav id="y8-tabs" class="y8-tabbar" aria-label="项目页面" hidden></nav>
-      <main id="y8-content" class="y8-content"></main>
+  <div class="y9-app">
+    <aside id="y9-sidebar" class="y9-sidebar" aria-label="首页、项目与系统"></aside>
+    <div class="y9-scrim" data-act="shell.drawer" aria-hidden="true"></div>
+    <div class="y9-main">
+      <header id="y9-topbar" class="y9-topbar"></header>
+      <nav id="y9-tabs" class="y9-tabbar" aria-label="项目页面" hidden></nav>
+      <main id="y9-content" class="y9-content"></main>
     </div>
   </div>
 
-  <div id="y8-toolbar" class="y8-toolbar" aria-label="原型工具条"></div>
-  <div id="y8-modal-root"></div>
-  <div id="y8-toast-root" class="y8-toast-root" aria-live="polite"></div>
+  <div id="y9-toolbar" class="y9-toolbar" aria-label="原型工具条"></div>
+  <div id="y9-modal-root"></div>
+  <div id="y9-toast-root" class="y9-toast-root" aria-live="polite"></div>
 
-  <script src="js/y8.js"></script>
+  <script src="js/y9.js"></script>
   <script src="js/contract/registry.js"></script>
   <script src="js/contract/backend.js"></script>
   <script src="js/contract/handlers/core.js"></script>
@@ -48,6 +48,7 @@
   <script src="js/pixel/sprites.js"></script>
   <script src="js/pixel/engine.js"></script>
   <script src="js/pixel/ecs.js"></script>
+  <script src="js/pixel/say.js"></script>
   <script src="js/pixel/floor-decl.js"></script>
   <script src="js/pixel/decision-card.js"></script>
   <script src="js/pixel/room.js"></script>

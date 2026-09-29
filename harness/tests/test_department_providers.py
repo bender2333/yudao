@@ -256,20 +256,20 @@ def _facade(
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store_document({
         "providers": [
-            {"id": "provider-a", "name": "Provider A", "base_url": product_url,
+            {"id": "provider-a", "name": "Provider A", "protocol": "responses", "base_url": product_url,
              "credential_ref": "credential-a", "timeout_sec": timeout_sec},
-            {"id": "provider-b", "name": "Provider B", "base_url": engineering_url,
+            {"id": "provider-b", "name": "Provider B", "protocol": "responses", "base_url": engineering_url,
              "credential_ref": "credential-b", "timeout_sec": timeout_sec},
         ],
         "models": [
             {"id": "model-a-product", "provider_id": "provider-a", "model": "a-product",
-             "protocol": "responses", "context_window": product_context_window, "max_output_tokens": 1_000},
+             "context_window": product_context_window, "max_output_tokens": 1_000},
             {"id": "model-a-quality", "provider_id": "provider-a", "model": "a-quality",
-             "protocol": "responses", "context_window": 20_000, "max_output_tokens": 1_000},
+             "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-b-engineering", "provider_id": "provider-b", "model": "b-engineering",
-             "protocol": "responses", "context_window": 20_000, "max_output_tokens": 1_000},
+             "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-b-product", "provider_id": "provider-b", "model": "b-product",
-             "protocol": "responses", "context_window": product_context_window, "max_output_tokens": 1_000},
+             "context_window": product_context_window, "max_output_tokens": 1_000},
         ],
         "bindings": {
             "product": {"provider_id": product_provider, "model_id": product_model_id},
@@ -824,19 +824,21 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store_document({
         "providers": [
-            {"id": "provider-p", "name": "Messages 服务", "base_url": product_url,
+            {"id": "provider-p", "name": "Messages 服务", "protocol": "messages", "base_url": product_url,
              "credential_ref": "credential-p", "timeout_sec": 10, "preset_id": "opencode-go"},
-            {"id": "provider-e", "name": "Chat 服务", "base_url": engineering_url,
+            {"id": "provider-e", "name": "Chat 服务", "protocol": "chat_completions",
+             "base_url": engineering_url,
              "credential_ref": "credential-e", "timeout_sec": 10, "preset_id": "opencode-go"},
-            {"id": "provider-q", "name": "Responses 服务", "base_url": quality_url,
+            {"id": "provider-q", "name": "Responses 服务", "protocol": "responses",
+             "base_url": quality_url,
              "credential_ref": "credential-q", "timeout_sec": 10, "preset_id": "opencode-go"},
         ],
         "models": [
-            {"id": "model-p", "provider_id": "provider-p", "model": "p-model", "protocol": "messages",
+            {"id": "model-p", "provider_id": "provider-p", "model": "p-model",
              "context_window": 6_000, "max_output_tokens": 1_000},
-            {"id": "model-e", "provider_id": "provider-e", "model": "e-model", "protocol": "chat_completions",
+            {"id": "model-e", "provider_id": "provider-e", "model": "e-model",
              "context_window": 20_000, "max_output_tokens": 1_000},
-            {"id": "model-q", "provider_id": "provider-q", "model": "q-model", "protocol": "responses",
+            {"id": "model-q", "provider_id": "provider-q", "model": "q-model",
              "context_window": 20_000, "max_output_tokens": 1_000},
         ],
         "bindings": {

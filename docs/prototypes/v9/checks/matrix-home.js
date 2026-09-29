@@ -23,8 +23,8 @@ const THEMES = ['light', 'dark'];
           page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
           page.on('pageerror', (err) => errors.push(String((err && err.stack) || err)));
           await page.addInitScript(([lv, th]) => {
-            sessionStorage.setItem('y8.level', JSON.stringify(lv));
-            localStorage.setItem('y8.theme', JSON.stringify(th));
+            sessionStorage.setItem('y9.level', JSON.stringify(lv));
+            localStorage.setItem('y9.theme', JSON.stringify(th));
           }, [level, theme]);
           await page.goto(ROOT + route);
           await page.waitForTimeout(1100);

@@ -23,24 +23,23 @@ class CatalogCredential(Contract):
 
 
 class CatalogModel(Contract):
-    # 模型访问定义与它的准入事实；stale 表示准入以后目录修订号又变化过
+    # 模型访问定义与它的准入事实；协议取自所属连接；stale 表示准入以后目录修订号又变化过
     id: str
     provider_id: str
     model: str
-    protocol: str
     context_window: int | None
     max_output_tokens: int
     capability_source: str
     admitted_at: str | None
     admitted_revision: int | None
     admitted_model: str | None
-    admitted_protocol: str | None
     stale: bool
 
 
 class CatalogProvider(Contract):
     id: str
     name: str
+    protocol: str
     base_url: str
     credential_ref: str
     timeout_sec: float
@@ -57,8 +56,8 @@ class CatalogBinding(Contract):
 
 
 class CatalogPresets(Contract):
-    # 服务方案预置表与它的版本与来源
-    table_version: str
+    # 服务方案预置表与它的 revision 与来源
+    revision: str
     source: str
     presets: list[dict[str, Any]]
 
@@ -111,7 +110,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         revision=revision,
         config_state=status["config_state"],
         reload_error=status["reload_error"],
-        presets=CatalogPresets(table_version=presets["table_version"], source=presets["source"],
+        presets=CatalogPresets(revision=presets["revision"], source=presets["source"],
                                presets=list(presets["presets"])),
         providers=providers,
         models=[_model(item, revision) for item in view["models"]],

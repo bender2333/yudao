@@ -2,7 +2,7 @@
 // replay 表示查询可回放（接受 at 参数，应用层设计说明第 4.1 节）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
 
   const q = (level, label, extra) => Object.assign({ level, label }, extra || {});
 
@@ -169,7 +169,7 @@
     return t;
   }
 
-  Y8.registry = {
+  Y9.registry = {
     queries, commands, decisions, overlays, events, KEY_KINDS,
     has(kind, name) {
       return Object.prototype.hasOwnProperty.call(table(kind), name);
@@ -180,10 +180,10 @@
       return t[name];
     },
     levelOf(kind, name) {
-      return Y8.registry.entry(kind, name).level;
+      return Y9.registry.entry(kind, name).level;
     },
     tagOf(kind, name) {
-      return Y8.LEVEL_TAGS[Y8.registry.levelOf(kind, name)];
+      return Y9.LEVEL_TAGS[Y9.registry.levelOf(kind, name)];
     },
     // 关键事实的种类；qa_submitted 按结论分为放行与返工；不是关键事实时返回 null
     keyOf(event) {

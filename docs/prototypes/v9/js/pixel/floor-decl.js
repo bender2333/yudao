@@ -2,8 +2,8 @@
 // 加一个部门只需要在这里写它的房间节点与任务种类，ecs.js 与 floor.js 里没有任何具体的部门名（checks/declarative.js 检查这一点）。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.ecs) throw new Error('floor-decl.js 需要先加载 js/pixel/ecs.js');
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;
@@ -164,9 +164,9 @@
     context_assembled: { label: '整理资料', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 900 },
     model_requested: { label: '打字', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
     model_stream_progress: { label: '', spot: 'desk', pose: 'type', bubble: 'say', ms: 1, streaming: true },
-    model_attempt_finished: { label: '有想法了', spot: 'desk', pose: 'sit_happy', bubble: null, ms: 600, icon: 'bulb' },
+    model_attempt_finished: { label: '有想法了', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 600, icon: 'bulb' },
     model_retry_scheduled: { label: '等待重试', spot: 'desk', pose: 'sit_wait', bubble: 'say', ms: 1400, icon: 'hourglass' },
-    model_attempt_failed: { label: '失败了', spot: 'desk', pose: 'slump', bubble: null, ms: 900, icon: 'cross' },
+    model_attempt_failed: { label: '失败了', spot: 'desk', pose: 'slump', bubble: 'say', ms: 900, icon: 'cross' },
     tool_started_search: { label: '翻找资料', spot: 'cabinet', pose: 'magnify', bubble: 'say', ms: 1200 },
     tool_started_read: { label: '阅读文件', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 1100 },
     tool_started_write: { label: '编辑', spot: 'desk', pose: 'type', bubble: 'say', ms: 1200 },
@@ -176,7 +176,7 @@
     tool_started_browser: { label: '试用网页', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
     tool_started_test: { label: '自测网页', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
     tool_started_scan: { label: '阅读旧档案', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 1200 },
-    tool_skipped: { label: '', spot: 'desk', pose: 'sit_scratch', bubble: null, ms: 700, icon: 'cross' },
+    tool_skipped: { label: '工具没有获准', spot: 'desk', pose: 'sit_scratch', bubble: 'say', ms: 700, icon: 'cross' },
     proposal_submitted: { label: '提交提案', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 900 },
     proposal_rejected: { label: '提案被退回', spot: 'desk', pose: 'sit_scratch', bubble: 'say', ms: 900, icon: 'question' },
     spec_accepted: { label: '盖上有效章', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 800, icon: 'check' },
@@ -186,35 +186,38 @@
     qa_started: { label: '放大镜检查', spot: 'inspect', pose: 'magnify', bubble: 'say', ms: 1200 },
     qa_submitted_release: { label: '放行', spot: 'inspect', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'check' },
     qa_submitted_rework: { label: '打回返工', spot: 'inspect', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'exclaim' },
-    department_guidance_received: { label: '门缝塞进纸条', by: 'manager', spot: 'port_in', pose: 'crouch', bubble: null, ms: 700, icon: 'exclaim' },
+    department_guidance_received: { label: '门缝塞进纸条', by: 'manager', spot: 'port_in', pose: 'crouch', bubble: 'say', ms: 700, icon: 'exclaim' },
     department_guidance_applied: { label: '阅读指导', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 900 },
     department_guidance_responded: { label: '写回复', spot: 'desk', pose: 'type', bubble: 'say', ms: 900 },
     compaction_recorded: { label: '整理摘要', spot: 'cabinet', pose: 'sit_up', bubble: 'say', ms: 900 },
     compaction_failed: { label: '重新整理', spot: 'desk', pose: 'sit_scratch', bubble: 'say', ms: 900, icon: 'cross' },
-    run_paused: { label: '事项暂停', spot: 'desk', pose: 'sit_relax', bubble: null, ms: 1200, icon: 'zzz' },
-    run_failed: { label: '事项失败', spot: 'desk', pose: 'slump', bubble: null, ms: 1200, icon: 'cross' },
-    run_done: { label: '举手欢呼', spot: 'stand', pose: 'cheer', bubble: null, ms: 1200 },
-    x_run_stopped_for_upgrade: { label: '收拾桌面', spot: 'stand', pose: 'tidy', bubble: null, ms: 1200 },
+    run_paused: { label: '事项暂停', spot: 'desk', pose: 'sit_relax', bubble: 'say', ms: 1200, icon: 'zzz' },
+    run_failed: { label: '事项失败', spot: 'desk', pose: 'slump', bubble: 'say', ms: 1200, icon: 'cross' },
+    run_done: { label: '事项完成', spot: 'stand', pose: 'cheer', bubble: 'say', ms: 1200 },
+    x_run_stopped_for_upgrade: { label: '收拾桌面', spot: 'stand', pose: 'tidy', bubble: 'say', ms: 1200 },
     x_run_auto_resumed: { label: '伸懒腰', spot: 'desk', pose: 'stretch_sit', bubble: null, ms: 800 },
     x_provider_wait_left: { label: '模型服务恢复', spot: 'desk', pose: 'sit_up', bubble: 'say', ms: 700 },
-    x_auto_repair_stopped: { dept: 'operations', label: '停止自动修复', spot: 'desk', pose: 'sit_wait', bubble: null, ms: 1200, icon: 'cross' },
+    x_auto_repair_stopped: { dept: 'operations', label: '停止自动修复', spot: 'desk', pose: 'sit_wait', bubble: 'say', ms: 1200, icon: 'cross' },
     // 交接：把包裹放进管道口、从管道口取出；返工与回流走另一侧的管道口。对外的事由经理做
-    package_handoff_out: { label: '放进管道口', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: null, ms: 520, facing: 1 },
-    package_handoff_in: { label: '从管道口取出', by: 'manager', spot: 'port_in', pose: 'crouch', bubble: null, ms: 520, facing: -1 },
-    package_return_out: { label: '放进回流口', by: 'manager', spot: 'port_in', pose: 'side_place', bubble: null, ms: 520, facing: -1 },
-    package_return_in: { label: '从回流口取出', by: 'manager', spot: 'port_out', pose: 'crouch', bubble: null, ms: 520, facing: 1 },
-    // 传信：信件塞进传信管口（方向由 spot 与 facing 决定）
+    package_handoff_out: { label: '放进管道口', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
+    package_handoff_in: { label: '从管道口取出', by: 'manager', spot: 'port_in', pose: 'crouch', bubble: 'say', ms: 520, facing: -1 },
+    package_return_out: { label: '放进回流口', by: 'manager', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 },
+    package_return_in: { label: '从回流口取出', by: 'manager', spot: 'port_out', pose: 'crouch', bubble: 'say', ms: 520, facing: 1 },
+    // 传信：信件塞进传信管口（方向由 spot 与 facing 决定），收信的经理走到信来的那一侧管口取信
     letter_out: { label: '发出询问', by: 'manager', spot: 'port_out', pose: 'side_place', bubble: 'say', ms: 520, facing: 1 },
     letter_in: { label: '回答询问', by: 'manager', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 520, facing: -1 },
+    letter_arrive_in: { label: '收到来信', by: 'manager', spot: 'port_in', pose: 'crouch', bubble: 'say', ms: 520, facing: -1 },
+    letter_arrive_out: { label: '收到来信', by: 'manager', spot: 'port_out', pose: 'crouch', bubble: 'say', ms: 520, facing: 1 },
     // 决定请求：提出决定的部门的小人走到门口送出决定单，回答以后在门口收下（决定单在大厅的板上，由 floor.js 处理）
-    x_decision_issued: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
-    project_decision_requested: { label: '送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
-    x_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
-    project_decision_answered: { label: '收到回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
+    x_decision_issued: { label: '现在送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
+    project_decision_requested: { label: '现在送出决定单', by: 'manager', spot: 'door', pose: 'give', bubble: 'say', ms: 600, must: true },
+    x_decision_answered: { label: '收到你的回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
+    project_decision_answered: { label: '收到你的回答', by: 'manager', spot: 'door', pose: 'take', bubble: 'say', ms: 600, must: true },
     // 部门内的角色之间（Stage 5）：经理把任务卡递到工具角色的工位，工具角色把结果卡交回经理，审查者盖章，探索者查资料
-    x_role_task_assigned: { label: '分派任务', actor: 'manager', spot: 'peer', toward: 'role', pose: 'give', bubble: 'say', ms: 700 },
+    x_role_task_assigned: { label: '分派任务', actor: 'manager', spot: 'peer', toward: 'role', pose: 'give', bubble: 'say', ms: 700, then: 'role_task_received' },
+    role_task_received: { label: '收到任务', spot: 'desk', pose: 'take', bubble: 'say', ms: 600 },
     x_role_result_returned: { label: '交回结果', by: 'manager', spot: 'peer', toward: 'manager', pose: 'give', bubble: 'say', ms: 600, then: 'role_result_received' },
-    role_result_received: { label: '', spot: 'desk', pose: 'take', bubble: null, ms: 600 },
+    role_result_received: { label: '收到结果', spot: 'desk', pose: 'take', bubble: 'say', ms: 600 },
     x_review_recorded_passed: { label: '审查通过', spot: 'desk', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'check' },
     x_review_recorded_returned: { label: '审查退回', spot: 'desk', pose: 'stamp_once', bubble: 'say', ms: 1100, icon: 'exclaim' },
     x_explorer_fetch: { label: '查资料', spot: 'cabinet', pose: 'rummage', bubble: 'say', ms: 1400 },
@@ -257,9 +260,10 @@
     if (ev.type === 'qa_submitted') return pl.verdict === 'release' ? 'qa_submitted_release' : 'qa_submitted_rework';
     if (ev.type === 'x_review_recorded') return pl.verdict === 'passed' ? 'x_review_recorded_passed' : 'x_review_recorded_returned';
     if (ev.type === 'tool_started') {
-      const tool = String(pl.tool || '');
+      const tool = String(ev.tool || pl.tool || '');
       if (tool === 'search') return 'tool_started_search';
       if (tool === 'run_command') return 'tool_started_run_command';
+      if (tool === 'run_check') return 'qa_started';
       if (/write|edit/.test(tool)) return 'tool_started_write';
       if (/fetch|http|net|url/.test(tool)) return 'tool_started_fetch';
       if (/mcp/.test(tool)) return 'tool_started_mcp';

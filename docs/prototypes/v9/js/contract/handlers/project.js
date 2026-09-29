@@ -1,8 +1,8 @@
 // 概览、恢复、资料的查询与命令（BUILD.md 第 5.3 节）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const B = Y8.backend;
+  const Y9 = window.Y9;
+  const B = Y9.backend;
   if (!B || !B.helpers) throw new Error('handlers/project.js 需要先加载 handlers/core.js');
   const H = B.helpers;
 
@@ -81,7 +81,7 @@
   function providerProblem(db, projectId) {
     const models = B.models;
     if (!models || typeof models.resolve !== 'function') {
-      throw new Error('模型解析还没有登记：Y8.backend.models.resolve');
+      throw new Error('模型解析还没有登记：Y9.backend.models.resolve');
     }
     for (const dept of ['product', 'engineering', 'quality']) {
       const target = models.resolve(db, projectId || null, dept);
@@ -186,7 +186,7 @@
         });
       });
     });
-    rows.sort((a, b) => Y8.time.ms(b.at) - Y8.time.ms(a.at));
+    rows.sort((a, b) => Y9.time.ms(b.at) - Y9.time.ms(a.at));
     return rows;
   }
 
@@ -574,7 +574,7 @@
     const name = textOf(params.name);
     if (!name) throw new Error('请填写项目名称');
     if ((db.raw.projects || []).some((project) => project.name === name)) return H.reject('already_exists', '已经有同名项目：' + name);
-    const id = Y8.uid('p');
+    const id = Y9.uid('p');
     const goal = textOf(params.goal);
     return {
       events: [{
@@ -604,8 +604,8 @@
     }
     const unavailable = providerProblem(db, null);
     if (unavailable) return H.reject('provider_unavailable', unavailable);
-    const id = Y8.uid('p');
-    const workId = Y8.uid('w');
+    const id = Y9.uid('p');
+    const workId = Y9.uid('w');
     const runId = 'r' + workId.slice(1);
     const goal = textOf(params.goal);
     const sourceName = textOf(params.source_name);
@@ -681,7 +681,7 @@
     const dirs = settings && settings.source_directories || [];
     const source = dirs.find((dir) => dir.name === params.source_name);
     if (!source) return H.reject('source_invalid', '没有这个源目录：' + (params.source_name || ''));
-    const workId = Y8.uid('w');
+    const workId = Y9.uid('w');
     const runId = 'r' + workId.slice(1);
     const text = '重新开始建档，源目录「' + source.name + '」。';
     const items = db.workItemsOf(project.id);
@@ -819,7 +819,7 @@
     const text = textOf(params.text);
     if (!text) throw new Error('请先输入要记录的原文');
     if (params.department && !DEPT[params.department]) throw new Error('未知部门：' + params.department);
-    const id = Y8.uid('m');
+    const id = Y9.uid('m');
     return {
       events: [{
         type: 'material_recorded', project_id: project.id,
@@ -854,7 +854,7 @@
     }
     const unavailable = providerProblem(db, project.id);
     if (unavailable) return H.reject('provider_unavailable', unavailable);
-    const workId = Y8.uid('w');
+    const workId = Y9.uid('w');
     const runId = 'r' + workId.slice(1);
     const plan = planStart(db, project.id, running);
     let message = '已提交：已新建事项，进入产品部门';
