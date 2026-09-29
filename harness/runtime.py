@@ -20,6 +20,7 @@ from .streams import (
     DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED, RUN_EVENT_VERSION,
     STOP_REASON_UPGRADE, DrainState, classify_startup_runs,
 )
+from .replay_check import verify_replay
 from .workspace import Workspace
 
 __all__ = [
