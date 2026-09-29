@@ -3,8 +3,8 @@
 // 状态以 setModel 为准，事件变成角色的任务或者信号
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('floor.js 需要先加载 js/pixel/engine.js');
   if (!P.ecs) throw new Error('floor.js 需要先加载 js/pixel/ecs.js');
   if (!P.floorDecl) throw new Error('floor.js 需要先加载 js/pixel/floor-decl.js');
@@ -119,7 +119,7 @@
     const sig = (name) => ECS.signalOn(world, scene, name);
 
     // 声明里的规则读取画面数据的窗口
-    const ctx = { model, order: world.roomOrder, waitingDept, time: Y8.time, sig, get reduced() { return scene.reduced; } };
+    const ctx = { model, order: world.roomOrder, waitingDept, time: Y9.time, sig, get reduced() { return scene.reduced; } };
 
     // -------------------------------------------------------------------------
     // 房间里的小人：每个房间按角色设置有几个，没有角色设置时一个部门一个
@@ -562,7 +562,7 @@
       (model.waiting_provider || []).forEach((w) => {
         const r = roomById(w.department);
         if (!r) return;
-        const text = '等待模型服务' + (w.next_retry_at ? ' · ' + Y8.time.clock(w.next_retry_at) + ' 重试' : '');
+        const text = '等待模型服务' + (w.next_retry_at ? ' · ' + Y9.time.clock(w.next_retry_at) + ' 重试' : '');
         P.sign(c, r.x + r.w / 2, PIPE_Y - 12, text, { size: 5.5, bg: PAL.grey1, stripe: PAL.grey3, maxW: r.w + 20 });
       });
       // 未回答的询问：信件停在接收方的传信管出口
@@ -806,12 +806,12 @@
           const path = pathFor(s.from, s.to) || { pts: tubeFor(s.from, s.to) };
           if (!path || !path.pts) return;
           const [x, y] = ECS.pointAt(path.pts, ECS.polyLength(path.pts) / 2);
-          label(x, y - 6, s.count + ' 次 · ' + Y8.time.clock(s.last_at), s.kind === 'rework' ? PAL.red1 : PAL.white);
+          label(x, y - 6, s.count + ' 次 · ' + Y9.time.clock(s.last_at), s.kind === 'rework' ? PAL.red1 : PAL.white);
         });
       } else if (overlay.id === 'waiting') {
         (data.entries || []).forEach((e) => {
           const r = roomById(e.department) || lay.hall;
-          label(r.x + r.w / 2, (e.row || 0) * 14 + TOP + 44, e.text + ' · ' + Y8.time.duration(e.waited_sec), PAL.yellow1);
+          label(r.x + r.w / 2, (e.row || 0) * 14 + TOP + 44, e.text + ' · ' + Y9.time.duration(e.waited_sec), PAL.yellow1);
         });
       } else if (overlay.id === 'recovery') {
         (data.entries || []).forEach((e) => {

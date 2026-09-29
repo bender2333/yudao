@@ -1,7 +1,7 @@
 // 部门房间画面（设计说明第 8.1 至 8.3 节）：房间布置、按 roomModel 决定的状态姿势、按事件播放的一次性动作。
 (function () {
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('room.js 需要先加载 js/pixel/engine.js');
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;
@@ -96,7 +96,7 @@
     const D = P.DEPTS[dept];
     let level = o.level || 'ui';
     P.levelAtLeast(level, 'ui');
-    if (level !== 'ui' && !Y8.LEVELS.includes(level)) throw new Error('未知档位：' + level);
+    if (level !== 'ui' && !Y9.LEVELS.includes(level)) throw new Error('未知档位：' + level);
 
     // 画面上的数量（信箱、档案盒编号、卷轴、钉着的纸条、语义卡片）一律取自 roomModel；
     // st 只保存动作过程中的临时状态，动作结束后画面回到只由数据决定的样子
@@ -1896,7 +1896,7 @@
       const prevStatus = effStatus();
       model = Object.assign({}, m);
       if (m.level && m.level !== level) {
-        if (m.level !== 'ui' && !Y8.LEVELS.includes(m.level)) throw new Error('未知档位：' + m.level);
+        if (m.level !== 'ui' && !Y9.LEVELS.includes(m.level)) throw new Error('未知档位：' + m.level);
         level = m.level;
       }
       st.eventStatus = null; st.eventCard = null; st.eventTool = null;

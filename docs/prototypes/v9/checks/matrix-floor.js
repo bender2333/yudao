@@ -22,13 +22,13 @@ const THEMES = ['light', 'dark'];
           page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
           page.on('pageerror', (e) => errors.push(String((e && e.stack) || e).slice(0, 300)));
           await page.addInitScript(([lv, th]) => {
-            sessionStorage.setItem('y8.level', JSON.stringify(lv));
-            localStorage.setItem('y8.theme', JSON.stringify(th));
+            sessionStorage.setItem('y9.level', JSON.stringify(lv));
+            localStorage.setItem('y9.theme', JSON.stringify(th));
           }, [level, theme]);
           await page.goto(v9Url + '#/p/' + pid + '/overview');
           await page.waitForTimeout(1300);
           const info = await page.evaluate(() => {
-            const cv = document.querySelector('.y8-floor-wrap canvas');
+            const cv = document.querySelector('.y9-floor-wrap canvas');
             let ink = 0;
             if (cv) {
               const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;

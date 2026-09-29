@@ -2,8 +2,8 @@
 // 加一个部门只需要在这里写它的房间节点与任务种类，ecs.js 与 floor.js 里没有任何具体的部门名（checks/declarative.js 检查这一点）。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.ecs) throw new Error('floor-decl.js 需要先加载 js/pixel/ecs.js');
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;

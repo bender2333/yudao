@@ -1,9 +1,9 @@
 // 部门工作间（设计说明第 7.1 节）：标题区、部门房间、检查区、部门消息与指导、部门设置弹窗；运维工作间（Stage 4）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const esc = Y8.esc;
-  const ui = Y8.ui;
+  const Y9 = window.Y9;
+  const esc = Y9.esc;
+  const ui = Y9.ui;
 
   const DEPT = {
     product: { label: '产品', duty: '维护原始意图与有效规范，回答需求咨询' },
@@ -18,7 +18,7 @@
   const ATTEMPT_KIND = { work: '工作请求', compaction: '压缩请求', collaboration: '协作请求', review: '审查请求' };
   const ACTION_STATE_TEXT = { not_sent: '未发送', done: '已完成', unknown: '结果未知', running: '进行中' };
   const ITEM_STATUS = { assigned: ['queued', '已分派'], working: ['running', '进行中'], returned: ['succeeded', '已交回'], failed: ['failed', '失败'], cancelled: ['cancelled', '已取消'] };
-  const AT_LEAST_S5 = () => Y8.cap.query('role.detail');
+  const AT_LEAST_S5 = () => Y9.cap.query('role.detail');
 
   const st = { role: null, scene: null, modal: null, pending: null };
 
@@ -28,30 +28,30 @@
   }
 
   function rerender() {
-    Y8.app.renderContent(true);
+    Y9.app.renderContent(true);
   }
 
   function workspace(ctx) {
     const params = { project: ctx.projectId, department: ctx.department };
     if (ctx.workItemId) params.work_item = ctx.workItemId;
-    return Y8.api.query('department.workspace', params).data;
+    return Y9.api.query('department.workspace', params).data;
   }
 
   function actions(ctx, v) {
-    if (!Y8.cap.query('run.actions')) return null;
+    if (!Y9.cap.query('run.actions')) return null;
     const workItem = ctx.workItemId || (v.work_item ? v.work_item.id : null);
     if (!workItem) return [];
-    return Y8.api.query('run.actions', { work_item: workItem, department: ctx.department }).data.actions;
+    return Y9.api.query('run.actions', { work_item: workItem, department: ctx.department }).data.actions;
   }
 
   function catalog() {
-    if (!Y8.cap.query('catalog')) return null;
-    return Y8.api.query('catalog', {}).data;
+    if (!Y9.cap.query('catalog')) return null;
+    return Y9.api.query('catalog', {}).data;
   }
 
   function settings(ctx) {
-    if (!Y8.cap.query('project.settings')) return null;
-    return Y8.api.query('project.settings', { project: ctx.projectId }).data;
+    if (!Y9.cap.query('project.settings')) return null;
+    return Y9.api.query('project.settings', { project: ctx.projectId }).data;
   }
 
   // ---------------------------------------------------------------------------
@@ -61,11 +61,11 @@
     const m = v.model;
     const parts = [];
     if (!m.definition) {
-      parts.push('<span class="y8-ws-inline"><span class="y8-muted">未设置</span></span>');
+      parts.push('<span class="y9-ws-inline"><span class="y9-muted">未设置</span></span>');
     } else {
-      parts.push('<span class="y8-ws-inline"><strong>' + esc(m.label) + '</strong>' + ui.tag(m.source || '—') + '</span>');
+      parts.push('<span class="y9-ws-inline"><strong>' + esc(m.label) + '</strong>' + ui.tag(m.source || '—') + '</span>');
       if (m.problem) parts.push(ui.status('unusable', '无法使用：' + m.problem));
-      parts.push('<small class="y8-muted">发送档位 ' + esc(m.sent_level || '不带推理参数') + (m.request_level ? '（请求 ' + esc(m.request_level) + '）' : '') + '</small>');
+      parts.push('<small class="y9-muted">发送档位 ' + esc(m.sent_level || '不带推理参数') + (m.request_level ? '（请求 ' + esc(m.request_level) + '）' : '') + '</small>');
     }
     return parts.join(' ');
   }
@@ -73,8 +73,8 @@
   function headInner(v) {
     const item = v.work_item;
     const itemLine = item
-      ? '<p class="y8-ws-item"><span class="y8-muted">事项</span><strong>' + esc(item.title) + '</strong>' + statusOfItem(item) + '</p>'
-      : '<p class="y8-ws-item y8-muted">本项目没有进行中的事项</p>';
+      ? '<p class="y9-ws-item"><span class="y9-muted">事项</span><strong>' + esc(item.title) + '</strong>' + statusOfItem(item) + '</p>'
+      : '<p class="y9-ws-item y9-muted">本项目没有进行中的事项</p>';
     const last = v.last_target;
     const lastLine = last
       ? ui.kv([
@@ -82,21 +82,21 @@
         ['协议与档位', esc(last.protocol || '—') + ' · ' + esc(last.sent_level || '不带推理参数')],
         ['部门 Prompt 版本', 'v' + esc(last.prompt_version === null || last.prompt_version === undefined ? '—' : last.prompt_version)],
         ['状态', esc(last.status_text || last.status)]
-      ], 'is-inline y8-ws-model')
+      ], 'is-inline y9-ws-model')
       : '';
     const warning = v.image_warning
-      ? ui.note(esc(v.image_warning.text) + '<span class="y8-note-actions">' +
+      ? ui.note(esc(v.image_warning.text) + '<span class="y9-note-actions">' +
         ui.button({ label: '前往模型管理', kind: 'small', go: '#/sys/models' }) +
         ui.button({ label: '前往本项目的部门设置', kind: 'small', act: 'dept.selfSettings' }) + '</span>', 'warn')
       : '';
-    return '<div class="y8-ws-head">' +
-        '<div class="y8-ws-titles">' +
-          '<p class="y8-eyebrow">部门工作间</p>' +
-          '<div class="y8-ws-title-row"><h1>' + esc(v.department.label) + '部门</h1>' + ui.status(v.status.kind, v.status.text) + '</div>' +
-          '<p class="y8-ws-duty">' + esc(v.department.duty) + '</p>' + itemLine +
-          '<div class="y8-ws-inline"><span class="y8-ws-k">当前生效模型</span>' + modelHtml(v) + '</div>' +
+    return '<div class="y9-ws-head">' +
+        '<div class="y9-ws-titles">' +
+          '<p class="y9-eyebrow">部门工作间</p>' +
+          '<div class="y9-ws-title-row"><h1>' + esc(v.department.label) + '部门</h1>' + ui.status(v.status.kind, v.status.text) + '</div>' +
+          '<p class="y9-ws-duty">' + esc(v.department.duty) + '</p>' + itemLine +
+          '<div class="y9-ws-inline"><span class="y9-ws-k">当前生效模型</span>' + modelHtml(v) + '</div>' +
         '</div>' +
-        '<div class="y8-ws-head-actions">' +
+        '<div class="y9-ws-head-actions">' +
           ui.button({ label: '部门设置', icon: 'tools', kind: 'small', act: 'dept.openSettings', data: { project: v.project.id, department: v.department.id } }) +
           ui.button({ label: '本部门的模型请求', icon: 'search', kind: 'small', go: observeLink(v) }) +
         '</div>' +
@@ -104,7 +104,7 @@
   }
 
   function observeLink(v) {
-    const base = Y8.paths.observe(v.project.id, v.work_item ? v.work_item.id : null);
+    const base = Y9.paths.observe(v.project.id, v.work_item ? v.work_item.id : null);
     return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'dept=' + v.department.id;
   }
 
@@ -126,15 +126,15 @@
     const facts = ui.kv([
       ['状态', esc(v.status.text)],
       ['第几轮', v.run ? esc('第 ' + v.run.cycle + ' 轮') : ''],
-      ['已用时间 / 上限', v.run ? esc(Y8.ui.duration(v.run.elapsed_sec) + ' / ' + Y8.ui.duration(v.run.limit_sec)) : ''],
-      ['执行机器', room.machine ? esc(room.machine) : '<span class="y8-muted">—</span>'],
+      ['已用时间 / 上限', v.run ? esc(Y9.ui.duration(v.run.elapsed_sec) + ' / ' + Y9.ui.duration(v.run.limit_sec)) : ''],
+      ['执行机器', room.machine ? esc(room.machine) : '<span class="y9-muted">—</span>'],
       ['信箱', esc(String(room.mailbox)) + ' 封未读指导'],
-      ['待核实动作', room.pending_tool ? ui.code(room.pending_tool) : '<span class="y8-muted">没有</span>']
-    ], 'is-inline y8-ws-facts');
-    const roles = '<div class="y8-ws-roles"><span class="y8-ws-k">房间里的角色</span><ul>' + room.roles.map((role) =>
+      ['待核实动作', room.pending_tool ? ui.code(room.pending_tool) : '<span class="y9-muted">没有</span>']
+    ], 'is-inline y9-ws-facts');
+    const roles = '<div class="y9-ws-roles"><span class="y9-ws-k">房间里的角色</span><ul>' + room.roles.map((role) =>
       '<li><strong>' + esc(role.name) + '</strong>' + ui.status(role.kind === 'ops' ? 'running' : 'idle', role.task || ROLE_STATUS_TEXT[role.status] || role.status) + '</li>'
     ).join('') + '</ul></div>';
-    const door = room.door ? '<p class="y8-ws-event"><code>' + esc(room.door) + '</code><span>' + esc(room.hold_card || '门口立起了牌子') + '</span></p>' : '';
+    const door = room.door ? '<p class="y9-ws-event"><code>' + esc(room.door) + '</code><span>' + esc(room.hold_card || '门口立起了牌子') + '</span></p>' : '';
     return facts + roles + door;
   }
 
@@ -145,63 +145,63 @@
     const list = actions(ctx, v);
     if (list === null) return ui.empty('本页没有登记动作查询');
     if (!list.length) return ui.empty('本部门还没有动作记录');
-    return '<div class="y8-ws-acts">' + list.slice().sort((a, b) => Y8.time.ms(b.at) - Y8.time.ms(a.at)).map((action) => {
+    return '<div class="y9-ws-acts">' + list.slice().sort((a, b) => Y9.time.ms(b.at) - Y9.time.ms(a.at)).map((action) => {
       const kind = action.state === 'unknown' ? 'is-unknown' : '';
-      const head = '<div class="y8-ws-act-head"><strong>' + esc(action.summary) + '</strong>' +
-        '<span class="y8-ws-act-tool">' + esc(action.tool) + '</span>' +
+      const head = '<div class="y9-ws-act-head"><strong>' + esc(action.summary) + '</strong>' +
+        '<span class="y9-ws-act-tool">' + esc(action.tool) + '</span>' +
         (action.state_text ? ui.status(action.state === 'unknown' ? 'unknown' : action.state === 'not_sent' ? 'idle' : 'succeeded', action.state_text) : '') +
         (action.machine_name ? ui.tag(action.machine_name) : '') + '</div>';
       const meta = ui.kv([
-        ['时间', esc(Y8.ui.time(action.at))],
+        ['时间', esc(Y9.ui.time(action.at))],
         ['角色', action.role ? esc(action.role) : ''],
         ['执行机器', action.machine_name ? esc(action.machine_name) : '']
-      ], 'is-inline y8-ws-act-meta');
+      ], 'is-inline y9-ws-act-meta');
       const snaps = (action.before || action.after)
-        ? '<div class="y8-ws-snaps"><span class="y8-muted">快照</span><span>' + esc(action.before || '—') + '</span><span class="y8-ws-arrow">→</span><span>' + esc(action.after || '—') + '</span></div>'
+        ? '<div class="y9-ws-snaps"><span class="y9-muted">快照</span><span>' + esc(action.before || '—') + '</span><span class="y9-ws-arrow">→</span><span>' + esc(action.after || '—') + '</span></div>'
         : '';
-      const input = '<div class="y8-ws-snaps"><span class="y8-muted">输入依据</span><span>' + esc(action.input || '—') + '</span></div>';
+      const input = '<div class="y9-ws-snaps"><span class="y9-muted">输入依据</span><span>' + esc(action.input || '—') + '</span></div>';
       let receipt = '';
       const r = action.receipt;
       if (r) {
-        receipt = '<div class="y8-ws-receipt"><div class="y8-ws-receipt-title">回执' +
+        receipt = '<div class="y9-ws-receipt"><div class="y9-ws-receipt-title">回执' +
           (r.exit_code !== undefined ? ui.status(r.exit_code === 0 ? 'succeeded' : 'failed', '退出码 ' + r.exit_code) : '') +
           (r.timed_out ? ui.status('failed', '超时') : '') +
           (r.truncated ? ui.tag('输出截断') : '') +
-          '<span class="y8-muted">' + esc(Y8.ui.duration(Math.round((r.duration_ms || 0) / 1000))) + '</span></div>' +
+          '<span class="y9-muted">' + esc(Y9.ui.duration(Math.round((r.duration_ms || 0) / 1000))) + '</span></div>' +
           ui.kv([
             ['登记名', ui.code(r.command || '—')],
             ['命令', ui.code((r.argv || []).join(' '))],
             ['快照', ui.code(r.snapshot || '—')]
-          ], 'is-inline y8-ws-receipt-kv') +
+          ], 'is-inline y9-ws-receipt-kv') +
           (r.output ? ui.pre(r.output) : '') + '</div>';
       }
-      return '<article class="y8-ws-act ' + kind + '">' + head + meta + input + snaps + receipt + '</article>';
+      return '<article class="y9-ws-act ' + kind + '">' + head + meta + input + snaps + receipt + '</article>';
     }).join('') + '</div>';
   }
 
   // 试用记录（3.2D，查询 run.trials）：每一步的操作、截图缩略图与对应的需求条目；每张截图标明模型是否看到它，
   // 点击截图查看原尺寸（evidence.screenshot），旁边列出同一步的可访问性结构摘录
   function trialsPanel(v) {
-    const data = Y8.api.query('run.trials', { work_item: v.work_item.id }).data;
+    const data = Y9.api.query('run.trials', { work_item: v.work_item.id }).data;
     if (!data.trials.length) return ui.empty('还没有试用记录');
-    const head = '<p class="y8-muted y8-small">质检模型：' + esc(data.model) + (data.image_input ? '（支持图像输入）' : '（只有文本输入：显示器照常显示截图，模型只读取可访问性结构的文字）') + '</p>';
-    return head + '<ol class="y8-ws-summaries y8-trials">' + data.trials.map((trial) =>
+    const head = '<p class="y9-muted y9-small">质检模型：' + esc(data.model) + (data.image_input ? '（支持图像输入）' : '（只有文本输入：显示器照常显示截图，模型只读取可访问性结构的文字）') + '</p>';
+    return head + '<ol class="y9-ws-summaries y9-trials">' + data.trials.map((trial) =>
       '<li><strong>第 ' + esc(trial.step) + ' 步</strong><span>' + esc(trial.action) + '</span>' +
-      (trial.requirement ? ui.tag('对应需求：' + trial.requirement) : '') + '<span class="y8-muted">' + esc(Y8.ui.time(trial.at)) + '</span>' +
+      (trial.requirement ? ui.tag('对应需求：' + trial.requirement) : '') + '<span class="y9-muted">' + esc(Y9.ui.time(trial.at)) + '</span>' +
       (trial.screenshot
-        ? '<button type="button" class="y8-trial-shot" data-act="dept.shot" data-work-item="' + esc(v.work_item.id) + '" data-step="' + esc(trial.step) + '" title="查看原尺寸">' +
+        ? '<button type="button" class="y9-trial-shot" data-act="dept.shot" data-work-item="' + esc(v.work_item.id) + '" data-step="' + esc(trial.step) + '" title="查看原尺寸">' +
           '<img src="assets/' + esc(trial.screenshot) + '" alt="第 ' + esc(trial.step) + ' 步的截图" loading="lazy"></button>'
         : '') +
-      '<span class="y8-trial-saw' + (trial.model_saw ? '' : ' is-text') + '">' + (trial.model_saw ? '模型看到了这张截图' : '模型只读取文字') + '</span></li>'
+      '<span class="y9-trial-saw' + (trial.model_saw ? '' : ' is-text') + '">' + (trial.model_saw ? '模型看到了这张截图' : '模型只读取文字') + '</span></li>'
     ).join('') + '</ol>';
   }
 
   function contextPanel(v) {
     const snaps = v.context.snapshots || [];
     const list = snaps.length
-      ? '<ul class="y8-ws-summaries">' + snaps.map((snap) =>
-        '<li><strong>' + esc(snap.title || snap.id) + '</strong><span class="y8-muted">' + esc(Y8.ui.time(snap.at)) + '</span>' + ui.code(snap.attempt_id || '') +
-        '<ul class="y8-obs-sources">' + (snap.sources || []).map((source) =>
+      ? '<ul class="y9-ws-summaries">' + snaps.map((snap) =>
+        '<li><strong>' + esc(snap.title || snap.id) + '</strong><span class="y9-muted">' + esc(Y9.ui.time(snap.at)) + '</span>' + ui.code(snap.attempt_id || '') +
+        '<ul class="y9-obs-sources">' + (snap.sources || []).map((source) =>
           '<li>' + ui.status(source.included ? 'succeeded' : 'idle', source.included ? '装入' : '未装入') +
           '<span>' + esc(source.label) + '</span>' + (source.version ? ui.tag(source.version) : '') + '</li>'
         ).join('') + '</ul></li>'
@@ -211,57 +211,57 @@
       ? ui.table({
         columns: [
           { key: 'n', label: '编号', render: (row) => esc('摘要 ' + row.n) },
-          { key: 'at', label: '时间', render: (row) => esc(Y8.ui.time(row.at)) },
+          { key: 'at', label: '时间', render: (row) => esc(Y9.ui.time(row.at)) },
           { key: 'coverage', label: '覆盖范围' }
         ],
         rows: v.context.compactions
       })
       : ui.empty('还没有压缩记录');
-    return '<h3 class="y8-h3">上下文清单</h3>' + list + '<h3 class="y8-h3">压缩记录</h3>' + compactions;
+    return '<h3 class="y9-h3">上下文清单</h3>' + list + '<h3 class="y9-h3">压缩记录</h3>' + compactions;
   }
 
   function promptPanel(v) {
     const p = v.prompt;
-    const config = '<section><h3 class="y8-h3">项目当前配置 ' + ui.tag(p.config_version ? 'v' + p.config_version : '内置默认 v0') + '</h3>' +
+    const config = '<section><h3 class="y9-h3">项目当前配置 ' + ui.tag(p.config_version ? 'v' + p.config_version : '内置默认 v0') + '</h3>' +
       ui.pre(p.config_text || '（没有配置文本）') + '</section>';
-    const request = '<section><h3 class="y8-h3">所选请求实际使用 ' + ui.tag(p.request_version === null ? '尚未发生请求' : 'v' + p.request_version) + '</h3>' +
-      (p.request_text ? ui.pre(p.request_text) : '<p class="y8-muted">这个事项还没有发生本部门的模型请求。</p>') + '</section>';
-    return '<div class="y8-ws-prompt y8-grid-2">' + config + request + '</div>';
+    const request = '<section><h3 class="y9-h3">所选请求实际使用 ' + ui.tag(p.request_version === null ? '尚未发生请求' : 'v' + p.request_version) + '</h3>' +
+      (p.request_text ? ui.pre(p.request_text) : '<p class="y9-muted">这个事项还没有发生本部门的模型请求。</p>') + '</section>';
+    return '<div class="y9-ws-prompt y9-grid-2">' + config + request + '</div>';
   }
 
   function rolesPanel(ctx, v) {
     if (!v.roles) return ui.empty('本页没有角色名单');
     const table = ui.table({
       columns: [
-        { key: 'name', label: '角色', render: (row) => '<div class="y8-cell-stack"><strong>' + esc(row.name) + '</strong><small class="y8-muted">' + esc(ROLE_KIND[row.kind] || row.kind) + (row.predictive ? ' · 预测性任务' : '') + '</small></div>' },
-        { key: 'status', label: '状态', className: 'y8-col-status', render: (row) => ui.status(ROLE_STATUS[row.status] || 'idle', ROLE_STATUS_TEXT[row.status] || row.status) },
+        { key: 'name', label: '角色', render: (row) => '<div class="y9-cell-stack"><strong>' + esc(row.name) + '</strong><small class="y9-muted">' + esc(ROLE_KIND[row.kind] || row.kind) + (row.predictive ? ' · 预测性任务' : '') + '</small></div>' },
+        { key: 'status', label: '状态', className: 'y9-col-status', render: (row) => ui.status(ROLE_STATUS[row.status] || 'idle', ROLE_STATUS_TEXT[row.status] || row.status) },
         { key: 'model', label: '模型', render: (row) => (row.resolved && row.resolved.definition
-          ? '<div class="y8-cell-stack"><span>' + esc(row.resolved.model || row.resolved.definition) + '</span><small class="y8-muted">来源：' + esc(row.resolved.source || '—') + ' · 发送 ' + esc(row.resolved.sent_level || '不带推理参数') + '</small></div>'
-          : '<span class="y8-muted">未设置</span>') },
-        { key: 'task', label: '当前任务', render: (row) => (row.task ? esc(row.task) : '<span class="y8-muted">没有任务</span>') },
-        { key: 'ops', label: '详情', className: 'y8-col-actions', render: (row) => ui.button({ label: '查看', kind: 'small', act: 'dept.roleDetail', data: { role: row.id } }) }
+          ? '<div class="y9-cell-stack"><span>' + esc(row.resolved.model || row.resolved.definition) + '</span><small class="y9-muted">来源：' + esc(row.resolved.source || '—') + ' · 发送 ' + esc(row.resolved.sent_level || '不带推理参数') + '</small></div>'
+          : '<span class="y9-muted">未设置</span>') },
+        { key: 'task', label: '当前任务', render: (row) => (row.task ? esc(row.task) : '<span class="y9-muted">没有任务</span>') },
+        { key: 'ops', label: '详情', className: 'y9-col-actions', render: (row) => ui.button({ label: '查看', kind: 'small', act: 'dept.roleDetail', data: { role: row.id } }) }
       ],
       rows: v.roles
     });
     let detail = '';
     if (st.role) {
-      const d = Y8.api.query('role.detail', { project: ctx.projectId, department: v.department.id, role: st.role, work_item: ctx.workItemId || undefined });
+      const d = Y9.api.query('role.detail', { project: ctx.projectId, department: v.department.id, role: st.role, work_item: ctx.workItemId || undefined });
       const role = d.role;
       const history = d.history.length
         ? ui.table({
           columns: [
-            { key: 'started_at', label: '开始', render: (row) => esc(Y8.ui.time(row.started_at)) },
+            { key: 'started_at', label: '开始', render: (row) => esc(Y9.ui.time(row.started_at)) },
             { key: 'status', label: '状态', render: (row) => esc(row.status_text) },
             { key: 'kind', label: '请求类型', render: (row) => esc(ATTEMPT_KIND[row.kind] || row.kind || '') },
-            { key: 'requested_model', label: '请求模型', render: (row) => '<span class="y8-obs-model">' + esc(row.requested_model || '—') + '</span>' },
-            { key: 'usage', label: '输入 / 输出', render: (row) => row.usage ? '<span class="y8-obs-num">' + esc(row.usage.input) + ' / ' + esc(row.usage.output) + '</span>' : '' },
-            { key: 'ops', label: '详情', className: 'y8-col-actions', render: (row) => ui.button({ label: '查看', kind: 'small', go: Y8.paths.observeDetail(ctx.projectId, row.id, row.work_item_id) }) }
+            { key: 'requested_model', label: '请求模型', render: (row) => '<span class="y9-obs-model">' + esc(row.requested_model || '—') + '</span>' },
+            { key: 'usage', label: '输入 / 输出', render: (row) => row.usage ? '<span class="y9-obs-num">' + esc(row.usage.input) + ' / ' + esc(row.usage.output) + '</span>' : '' },
+            { key: 'ops', label: '详情', className: 'y9-col-actions', render: (row) => ui.button({ label: '查看', kind: 'small', go: Y9.paths.observeDetail(ctx.projectId, row.id, row.work_item_id) }) }
           ],
           rows: d.history
         })
         : ui.empty('这个角色还没有历史请求');
       const actions = d.steps.length
-        ? d.steps.map((step) => '<h4 class="y8-h3">事项 ' + esc(step.work_item_id) + '</h4>' + ui.table({
+        ? d.steps.map((step) => '<h4 class="y9-h3">事项 ' + esc(step.work_item_id) + '</h4>' + ui.table({
           columns: [
             { key: 'summary', label: '动作' },
             { key: 'tool', label: '工具' },
@@ -270,7 +270,7 @@
           rows: step.actions
         })).join('')
         : ui.empty('这个角色还没有动作记录');
-      detail = '<section class="y8-ws-ctx-detail"><h3 class="y8-h3">' + esc(role.name) + ' 的详情</h3>' +
+      detail = '<section class="y9-ws-ctx-detail"><h3 class="y9-h3">' + esc(role.name) + ' 的详情</h3>' +
         ui.kv([
           ['职责', esc(role.duty)],
           ['状态', esc(ROLE_STATUS_TEXT[role.status] || role.status)],
@@ -279,8 +279,8 @@
           ['目录', role.directory ? ui.code(role.directory) : ''],
           ['已附加的实体', (role.entities || []).map((entity) => ui.tag(entity)).join(' ') || '']
         ]) +
-        '<h3 class="y8-h3">历史请求</h3>' + history +
-        '<h3 class="y8-h3">每一步的动作</h3>' + actions + '</section>';
+        '<h3 class="y9-h3">历史请求</h3>' + history +
+        '<h3 class="y9-h3">每一步的动作</h3>' + actions + '</section>';
     }
     return table + detail;
   }
@@ -288,7 +288,7 @@
   // 账本的分派对象是角色标识；页面上显示角色名，找不到时退回标识
   function roleNameOf(projectId, roleId) {
     if (!roleId) return roleId;
-    const data = Y8.api.query('project.settings', { project: projectId }).data;
+    const data = Y9.api.query('project.settings', { project: projectId }).data;
     const groups = data && data.roles ? data.roles : {};
     let name = null;
     Object.keys(groups).forEach((department) => {
@@ -316,51 +316,51 @@
       ? ui.kv((ledger.facts || []).map((fact) => [fact.id || '事实', esc(fact.text || fact)]))
       : ui.empty('还没有事实');
     const questions = (ledger.questions || []).length
-      ? '<ul class="y8-ws-progress">' + ledger.questions.map((q) =>
+      ? '<ul class="y9-ws-progress">' + ledger.questions.map((q) =>
         '<li>' + ui.status(q.status === 'answered' ? 'succeeded' : 'asking', q.status === 'answered' ? '已回答' : '待决') +
         '<span>' + esc(q.text || q.question || '') + '</span>' + (q.to ? ui.tag('询问 ' + q.to) : '') + '</li>'
       ).join('') + '</ul>'
       : ui.empty('没有待决问题与对外询问');
     const progress = (ledger.progress || []).length
-      ? '<ul class="y8-ws-progress">' + ledger.progress.map((entry) =>
+      ? '<ul class="y9-ws-progress">' + ledger.progress.map((entry) =>
         '<li' + (entry.stalled ? ' class="is-stalled"' : '') + '><strong>第 ' + esc(entry.cycle || '—') + ' 轮</strong><span>' + esc(entry.text || '') + '</span>' +
         (entry.review_count !== undefined ? ui.tag('审查 ' + entry.review_count + ' 次') : '') + '</li>'
       ).join('') + '</ul>'
       : ui.empty('还没有每轮的进展判断');
-    return '<div class="y8-ws-ledger"><h3 class="y8-h3">计划条目</h3>' + items +
-      '<h3 class="y8-h3">事实</h3>' + facts +
-      '<h3 class="y8-h3">待决问题与对外询问</h3>' + questions +
-      '<h3 class="y8-h3">每轮的进展判断</h3>' + progress + '</div>';
+    return '<div class="y9-ws-ledger"><h3 class="y9-h3">计划条目</h3>' + items +
+      '<h3 class="y9-h3">事实</h3>' + facts +
+      '<h3 class="y9-h3">待决问题与对外询问</h3>' + questions +
+      '<h3 class="y9-h3">每轮的进展判断</h3>' + progress + '</div>';
   }
 
   function semanticPanel(ctx, v) {
-    if (!Y8.cap.query('semantic.records')) return ui.empty('本页没有登记语义记录查询');
-    const data = Y8.api.query('semantic.records', { project: ctx.projectId, department: v.department.id }).data;
+    if (!Y9.cap.query('semantic.records')) return ui.empty('本页没有登记语义记录查询');
+    const data = Y9.api.query('semantic.records', { project: ctx.projectId, department: v.department.id }).data;
     const groups = { valid: [], invalid: [], superseded: [] };
     data.entries.forEach((unit) => { (groups[unit.status] || groups.valid).push(unit); });
     const group = (title, list, cls) => list.length
-      ? '<section class="y8-ws-unit-group"><h4 class="y8-h3">' + esc(title) + '（' + list.length + '）</h4><ul>' + list.map((unit) =>
-        '<li class="y8-ws-unit ' + cls + '"><div class="y8-ws-unit-head"><span class="y8-ws-unit-type">' + esc(unit.type || '记录') + '</span>' + ui.tag(unit.scope || '') + '</div>' +
-        '<p>' + esc(unit.text) + '</p><small class="y8-muted">' + esc(unit.id) + ' · ' + esc(unit.at ? Y8.ui.time(unit.at) : '') + (unit.reason ? ' · ' + esc(unit.reason) : '') + '</small></li>'
+      ? '<section class="y9-ws-unit-group"><h4 class="y9-h3">' + esc(title) + '（' + list.length + '）</h4><ul>' + list.map((unit) =>
+        '<li class="y9-ws-unit ' + cls + '"><div class="y9-ws-unit-head"><span class="y9-ws-unit-type">' + esc(unit.type || '记录') + '</span>' + ui.tag(unit.scope || '') + '</div>' +
+        '<p>' + esc(unit.text) + '</p><small class="y9-muted">' + esc(unit.id) + ' · ' + esc(unit.at ? Y9.ui.time(unit.at) : '') + (unit.reason ? ' · ' + esc(unit.reason) : '') + '</small></li>'
       ).join('') + '</ul></section>'
       : '';
     const conflicts = data.conflicts.length
-      ? '<h3 class="y8-h3">冲突（' + data.conflicts.length + '）</h3><ul class="y8-ws-inactive">' + data.conflicts.map((entry) =>
-        '<li class="y8-ws-unit is-conflict"><p>' + esc(entry.text || (entry.a + ' 与 ' + entry.b + ' 冲突')) + '</p><small class="y8-muted">' + esc(entry.a || '') + ' · ' + esc(entry.b || '') + '</small></li>'
+      ? '<h3 class="y9-h3">冲突（' + data.conflicts.length + '）</h3><ul class="y9-ws-inactive">' + data.conflicts.map((entry) =>
+        '<li class="y9-ws-unit is-conflict"><p>' + esc(entry.text || (entry.a + ' 与 ' + entry.b + ' 冲突')) + '</p><small class="y9-muted">' + esc(entry.a || '') + ' · ' + esc(entry.b || '') + '</small></li>'
       ).join('') + '</ul>'
       : '';
     const chains = data.chains.length
-      ? '<h3 class="y8-h3">更替链</h3><ul class="y8-ws-chain">' + data.chains.map((chain) =>
-        '<li><span class="y8-ws-chain-step">' + ui.code(chain.from) + '<span class="y8-ws-arrow">→</span>' + ui.code(chain.to) + '</span><span class="y8-muted">' + esc(chain.reason || '') + '</span></li>'
+      ? '<h3 class="y9-h3">更替链</h3><ul class="y9-ws-chain">' + data.chains.map((chain) =>
+        '<li><span class="y9-ws-chain-step">' + ui.code(chain.from) + '<span class="y9-ws-arrow">→</span>' + ui.code(chain.to) + '</span><span class="y9-muted">' + esc(chain.reason || '') + '</span></li>'
       ).join('') + '</ul>'
       : '';
-    return '<div class="y8-ws-units">' + group('有效', groups.valid, '') + group('已失效', groups.invalid, 'is-invalid') + group('已被取代', groups.superseded, 'is-superseded') + '</div>' + conflicts + chains;
+    return '<div class="y9-ws-units">' + group('有效', groups.valid, '') + group('已失效', groups.invalid, 'is-invalid') + group('已被取代', groups.superseded, 'is-superseded') + '</div>' + conflicts + chains;
   }
 
   function checksInner(ctx, v) {
     const items = [
       { id: 'actions', label: '动作与回执' },
-      { id: 'trials', label: '试用记录', tag: '3.2D', show: Boolean(v.trials && v.work_item && Y8.cap.query('run.trials')) },
+      { id: 'trials', label: '试用记录', tag: '3.2D', show: Boolean(v.trials && v.work_item && Y9.cap.query('run.trials')) },
       { id: 'context', label: 'Context' },
       { id: 'prompt', label: '部门 Prompt' },
       { id: 'roles', label: '角色名单', tag: v.roles ? 'Stage 5' : null, show: Boolean(v.roles) },
@@ -390,47 +390,47 @@
 
   function commsInner(ctx, v) {
     const log = v.messages.length
-      ? '<ul class="y8-ws-log">' + v.messages.map((message) =>
-        '<li class="is-' + esc(message.source) + '"><div class="y8-ws-log-meta"><span class="y8-ws-src">' + esc(SOURCE_LABELS[message.source] || message.source) + '</span>' +
-        '<span class="y8-muted">' + esc(Y8.ui.time(message.at)) + '</span>' + ui.tag('#' + message.seq) + '</div><p>' + esc(message.text) + '</p></li>'
+      ? '<ul class="y9-ws-log">' + v.messages.map((message) =>
+        '<li class="is-' + esc(message.source) + '"><div class="y9-ws-log-meta"><span class="y9-ws-src">' + esc(SOURCE_LABELS[message.source] || message.source) + '</span>' +
+        '<span class="y9-muted">' + esc(Y9.ui.time(message.at)) + '</span>' + ui.tag('#' + message.seq) + '</div><p>' + esc(message.text) + '</p></li>'
       ).join('') + '</ul>'
       : ui.empty('本部门还没有消息');
     const records = v.guidance.length
-      ? '<ul class="y8-ws-guidance">' + v.guidance.map((entry) =>
-        '<li><div class="y8-ws-log-meta"><strong>指导 v' + esc(entry.version) + '</strong>' +
+      ? '<ul class="y9-ws-guidance">' + v.guidance.map((entry) =>
+        '<li><div class="y9-ws-log-meta"><strong>指导 v' + esc(entry.version) + '</strong>' +
         ui.status(GUIDANCE_KIND[entry.status] || 'idle', entry.status_text || entry.status) +
-        '<span class="y8-muted">' + esc(Y8.ui.time(entry.at)) + '</span></div><p>' + esc(entry.text) + '</p>' +
-        (entry.response ? '<p class="y8-ws-reply">' + esc(entry.response) + '</p>' : '') + '</li>'
+        '<span class="y9-muted">' + esc(Y9.ui.time(entry.at)) + '</span></div><p>' + esc(entry.text) + '</p>' +
+        (entry.response ? '<p class="y9-ws-reply">' + esc(entry.response) + '</p>' : '') + '</li>'
       ).join('') + '</ul>'
-      : '<p class="y8-muted y8-small">还没有部门指导</p>';
+      : '<p class="y9-muted y9-small">还没有部门指导</p>';
     const active = v.run && !['DONE', 'PAUSED', 'FAILED'].includes(v.run.phase);
     const composer = active
-      ? '<div class="y8-ws-composer"><p class="y8-ws-recipient"><span class="y8-muted">当前接收方</span><strong>发给' + esc(v.department.label) + '部门</strong></p>' +
-        '<label class="y8-field"><span>向' + esc(v.department.label) + '部门下达指导或追加人类反馈</span>' +
-        '<textarea class="y8-textarea" rows="3" id="y8-ws-guidance" data-draft="' + esc('dept.guidance.' + v.run.id + '.' + v.department.id) + '" placeholder="追加对话或指导"></textarea></label>' +
-        '<div class="y8-row">' + ui.button({ label: '发送指导', kind: 'primary small', act: 'dept.sendGuidance', data: { workItem: v.work_item.id, department: v.department.id, draftKey: 'dept.guidance.' + v.run.id + '.' + v.department.id } }) +
-        '<small class="y8-muted">由目标部门在下一次安全激活中处理；与修改 Prompt、模型回复分开记录。</small></div></div>'
+      ? '<div class="y9-ws-composer"><p class="y9-ws-recipient"><span class="y9-muted">当前接收方</span><strong>发给' + esc(v.department.label) + '部门</strong></p>' +
+        '<label class="y9-field"><span>向' + esc(v.department.label) + '部门下达指导或追加人类反馈</span>' +
+        '<textarea class="y9-textarea" rows="3" id="y9-ws-guidance" data-draft="' + esc('dept.guidance.' + v.run.id + '.' + v.department.id) + '" placeholder="追加对话或指导"></textarea></label>' +
+        '<div class="y9-row">' + ui.button({ label: '发送指导', kind: 'primary small', act: 'dept.sendGuidance', data: { workItem: v.work_item.id, department: v.department.id, draftKey: 'dept.guidance.' + v.run.id + '.' + v.department.id } }) +
+        '<small class="y9-muted">由目标部门在下一次安全激活中处理；与修改 Prompt、模型回复分开记录。</small></div></div>'
       : ui.note(v.run ? '事项已结束，不会自动新建；草稿保留在输入框中。' : '本项目没有进行中的事项；在概览页新建事项。', 'info');
-    return '<div class="y8-ws-comms-grid"><div class="y8-ws-col"><h3 class="y8-h3">部门消息 <span class="y8-muted y8-small">最新在上 · 用户、本部门与其他部门分开标记</span></h3>' + log + '</div>' +
-      '<div class="y8-ws-col"><h3 class="y8-h3">部门指导</h3>' + composer + '<h3 class="y8-h3">指导记录</h3>' + records + '</div></div>';
+    return '<div class="y9-ws-comms-grid"><div class="y9-ws-col"><h3 class="y9-h3">部门消息 <span class="y9-muted y9-small">最新在上 · 用户、本部门与其他部门分开标记</span></h3>' + log + '</div>' +
+      '<div class="y9-ws-col"><h3 class="y9-h3">部门指导</h3>' + composer + '<h3 class="y9-h3">指导记录</h3>' + records + '</div></div>';
   }
 
   // ---------------------------------------------------------------------------
   // 运维工作间（Stage 4）
 
   function opsBlocks(ctx) {
-    if (ctx.department !== 'operations' || !Y8.cap.query('ops.status')) return '';
-    const data = Y8.api.query('ops.status', { project: ctx.projectId }).data;
+    if (ctx.department !== 'operations' || !Y9.cap.query('ops.status')) return '';
+    const data = Y9.api.query('ops.status', { project: ctx.projectId }).data;
     let env;
     if (data.env) {
       const standing = (data.env.standing || []).length
         ? data.env.standing.map((entry) => ui.tag(entry.machine_name + '：' + (entry.standing.join('、') || '空'))).join(' ')
-        : '<span class="y8-muted">没有</span>';
+        : '<span class="y9-muted">没有</span>';
       const backups = data.backups.length
-        ? '<h3 class="y8-h3">最近备份</h3>' + ui.table({
+        ? '<h3 class="y9-h3">最近备份</h3>' + ui.table({
           columns: [
             { key: 'id', label: '编号', render: (row) => ui.code(row.id) },
-            { key: 'at', label: '时间', render: (row) => esc(Y8.ui.time(row.at)) },
+            { key: 'at', label: '时间', render: (row) => esc(Y9.ui.time(row.at)) },
             { key: 'version', label: '版本', render: (row) => esc(row.version || '') },
             { key: 'note', label: '说明', render: (row) => esc(row.note || '') }
           ],
@@ -452,17 +452,17 @@
     const faults = ui.block({
       title: '故障记录', query: 'ops.status',
       subtitle: '状态、关联的修复事项、修复失败次数与观察窗口剩余时间。',
-      body: data.faults.length ? '<div class="y8-ws-incident">' + data.faults.map((fault) =>
-        '<div class="y8-ws-incident"><header><strong>' + esc(fault.title) + '</strong>' + ui.status(fault.status === 'open' ? 'failed' : fault.status === 'repairing' ? 'running' : 'done', fault.status === 'open' ? '未处理' : fault.status === 'repairing' ? '修复中' : '观察中') +
-        ui.tag('修复 ' + fault.failures + ' 次') + (fault.observe_remaining_sec !== null ? '<span class="y8-muted">观察窗口剩余 ' + esc(Y8.ui.duration(fault.observe_remaining_sec)) + '</span>' : '') + '</header>' +
-        (fault.repairs.length ? ui.table({ columns: [{ key: 'work_item_id', label: '修复事项', render: (row) => esc(row.title) }], rows: fault.repairs }) : '<p class="y8-muted">还没有修复事项</p>') +
+      body: data.faults.length ? '<div class="y9-ws-incident">' + data.faults.map((fault) =>
+        '<div class="y9-ws-incident"><header><strong>' + esc(fault.title) + '</strong>' + ui.status(fault.status === 'open' ? 'failed' : fault.status === 'repairing' ? 'running' : 'done', fault.status === 'open' ? '未处理' : fault.status === 'repairing' ? '修复中' : '观察中') +
+        ui.tag('修复 ' + fault.failures + ' 次') + (fault.observe_remaining_sec !== null ? '<span class="y9-muted">观察窗口剩余 ' + esc(Y9.ui.duration(fault.observe_remaining_sec)) + '</span>' : '') + '</header>' +
+        (fault.repairs.length ? ui.table({ columns: [{ key: 'work_item_id', label: '修复事项', render: (row) => esc(row.title) }], rows: fault.repairs }) : '<p class="y9-muted">还没有修复事项</p>') +
         '</div>').join('') + '</div>' : ui.empty('还没有故障记录')
     });
     const releases = ui.block({
       title: '发布与回滚记录', query: 'ops.status',
       body: data.releases.length ? ui.table({
         columns: [
-          { key: 'at', label: '时间', render: (row) => esc(Y8.ui.time(row.at)) },
+          { key: 'at', label: '时间', render: (row) => esc(Y9.ui.time(row.at)) },
           { key: 'version', label: '版本', render: (row) => esc(row.version) },
           { key: 'method', label: '方式', render: (row) => esc(row.method || '') },
           { key: 'note', label: '说明', render: (row) => esc(row.note || '') }
@@ -472,15 +472,15 @@
     });
     const indicators = ui.block({
       title: '运行指标与报到', query: 'ops.status',
-      body: '<div class="y8-ws-indicators">' + data.indicators.map((indicator) =>
-        '<div class="y8-ws-indicator"><span>' + esc(indicator.label) + '</span><strong>' + esc(indicator.value) + ' / ' + esc(indicator.of) + '</strong><small>' + esc(indicator.unit || '') + '</small></div>'
+      body: '<div class="y9-ws-indicators">' + data.indicators.map((indicator) =>
+        '<div class="y9-ws-indicator"><span>' + esc(indicator.label) + '</span><strong>' + esc(indicator.value) + ' / ' + esc(indicator.of) + '</strong><small>' + esc(indicator.unit || '') + '</small></div>'
       ).join('') + '</div>' +
-      (data.check_in ? ui.kv([['最近报到', esc(Y8.ui.time(data.check_in.last_at))], ['报到间隔', esc(data.check_in.every_min + ' 分钟')], ['状态', data.check_in.ok ? '正常' : '异常']]) : ui.note('还没有报到记录', 'info'))
+      (data.check_in ? ui.kv([['最近报到', esc(Y9.ui.time(data.check_in.last_at))], ['报到间隔', esc(data.check_in.every_min + ' 分钟')], ['状态', data.check_in.ok ? '正常' : '异常']]) : ui.note('还没有报到记录', 'info'))
     });
     const decisions = data.decisions.length
       ? ui.block({
         title: '等待回答的决定', query: 'ops.status', command: 'decision.answer',
-        body: '<div class="y8-cards">' + data.decisions.map((d) => Y8.cards.render(d, { compact: true })).join('') + '</div>'
+        body: '<div class="y9-cards">' + data.decisions.map((d) => Y9.cards.render(d, { compact: true })).join('') + '</div>'
       })
       : '';
     return env + faults + releases + indicators + decisions;
@@ -488,7 +488,7 @@
 
   function opsInner(ctx) {
     if (ctx.department !== 'operations') return '';
-    if (!Y8.cap.query('ops.status')) {
+    if (!Y9.cap.query('ops.status')) {
       return ui.block({ title: '运维工作间', body: ui.note('运维工作间属于「Stage 4」，控制主机的能力清单里还没有 <code>ops.status</code>。', 'info') });
     }
     return opsBlocks(ctx);
@@ -499,15 +499,15 @@
 
   function pageHtml(ctx) {
     const v = workspace(ctx);
-    return '<div class="y8-ws" data-dept="' + esc(ctx.department) + '">' +
+    return '<div class="y9-ws" data-dept="' + esc(ctx.department) + '">' +
       ui.block({
-        query: 'department.workspace', className: 'y8-ws-head-block',
+        query: 'department.workspace', className: 'y9-ws-head-block',
         body: '<div data-ws-head>' + headInner(v) + '</div>'
       }) +
       ui.block({
         title: '部门房间', query: 'department.workspace',
-        body: '<div class="y8-ws-stage"><canvas class="y8-ws-canvas"></canvas></div>' +
-          '<div class="y8-ws-room-info" data-ws-info>' + infoInner(v) + '</div>'
+        body: '<div class="y9-ws-stage"><canvas class="y9-ws-canvas"></canvas></div>' +
+          '<div class="y9-ws-room-info" data-ws-info>' + infoInner(v) + '</div>'
       }) +
       ui.block({
         title: '检查区', query: ['department.workspace', 'run.actions'],
@@ -538,14 +538,14 @@
   }
 
   function mountRoom(ctx, root) {
-    const canvas = root.querySelector('canvas.y8-ws-canvas');
+    const canvas = root.querySelector('canvas.y9-ws-canvas');
     if (!canvas) throw new Error('部门工作间缺少房间画布');
     const v = workspace(ctx);
-    st.scene = Y8.pixel.createRoomScene(canvas, { department: ctx.department });
+    st.scene = Y9.pixel.createRoomScene(canvas, { department: ctx.department });
     st.scene.setModel(v.room);
   }
 
-  Y8.views.register('dept', {
+  Y9.views.register('dept', {
     title: (ctx) => deptLabel(ctx.department) + '部门',
     needs: { queries: ['department.workspace', 'run.actions'], commands: ['guidance.send'] },
     scope: (ctx) => ({ project: ctx.projectId }),
@@ -566,7 +566,7 @@
     },
     unmount() {
       if (st.modal) {
-        Y8.ui.closeModal();
+        Y9.ui.closeModal();
         st.modal = null;
       }
       if (st.scene) {
@@ -604,29 +604,29 @@
     const entry = m.entry;
     const dept = v.department.id;
     const rolesSection = m.rolesSettings && m.rolesSettings.roles && m.rolesSettings.roles[dept] && m.rolesSettings.roles[dept].length
-      ? '<section class="y8-dm-roles"><h3 class="y8-h3">本项目各角色设置 ' + ui.tag('Stage 5') + '</h3>' +
-        '<p class="y8-muted y8-small">解析顺序：项目角色设置、角色默认、项目部门设置、部门默认，取第一个写入了的。角色 Prompt 没有写入时使用内置角色 Prompt；部门 Prompt 作为全部门规则放入每个角色的请求。</p>' +
+      ? '<section class="y9-dm-roles"><h3 class="y9-h3">本项目各角色设置 ' + ui.tag('Stage 5') + '</h3>' +
+        '<p class="y9-muted y9-small">解析顺序：项目角色设置、角色默认、项目部门设置、部门默认，取第一个写入了的。角色 Prompt 没有写入时使用内置角色 Prompt；部门 Prompt 作为全部门规则放入每个角色的请求。</p>' +
         m.rolesSettings.roles[dept].map((role) => {
           const spec = { name: role.name || role.role_id, duty: role.duty || '' };
-          return '<div class="y8-dm-role" data-role-id="' + esc(role.role_id) + '">' +
-            '<div class="y8-dm-role-name"><strong>' + esc(spec.name) + '</strong><small class="y8-muted">' + esc(spec.duty) + '</small></div>' +
-            '<label class="y8-field"><span>模型</span><select class="y8-select" data-role-model>' + modelOptions(admitted, role.model, '跟随角色默认') + '</select></label>' +
-            '<label class="y8-field"><span>推理档位</span><select class="y8-select" data-role-level>' + levelOptions(role.request_level, '跟随模型默认') + '</select></label>' +
-            '<label class="y8-field y8-dm-role-prompt"><span>角色 Prompt</span><textarea class="y8-textarea" rows="2" data-role-prompt placeholder="空为内置默认">' + esc(role.prompt_text || '') + '</textarea></label>' +
+          return '<div class="y9-dm-role" data-role-id="' + esc(role.role_id) + '">' +
+            '<div class="y9-dm-role-name"><strong>' + esc(spec.name) + '</strong><small class="y9-muted">' + esc(spec.duty) + '</small></div>' +
+            '<label class="y9-field"><span>模型</span><select class="y9-select" data-role-model>' + modelOptions(admitted, role.model, '跟随角色默认') + '</select></label>' +
+            '<label class="y9-field"><span>推理档位</span><select class="y9-select" data-role-level>' + levelOptions(role.request_level, '跟随模型默认') + '</select></label>' +
+            '<label class="y9-field y9-dm-role-prompt"><span>角色 Prompt</span><textarea class="y9-textarea" rows="2" data-role-prompt placeholder="空为内置默认">' + esc(role.prompt_text || '') + '</textarea></label>' +
             '</div>';
         }).join('') +
-        '<div class="y8-row">' + ui.button({ label: '保存角色设置', kind: 'primary small', act: 'dept.saveRoles' }) +
-        '<small class="y8-muted">从这些角色下一次模型请求起生效。当前版本 v' + esc(m.rolesSettings.roles_version) + '。</small></div></section>'
+        '<div class="y9-row">' + ui.button({ label: '保存角色设置', kind: 'primary small', act: 'dept.saveRoles' }) +
+        '<small class="y9-muted">从这些角色下一次模型请求起生效。当前版本 v' + esc(m.rolesSettings.roles_version) + '。</small></div></section>'
       : '';
     const promptText = entry.prompt_text || '';
-    return '<div class="y8-form">' +
-      '<label class="y8-field"><span>模型</span><select class="y8-select" id="y8-dm-model">' + modelOptions(admitted, entry.model, '跟随部门默认') + '</select>' +
-      '<small class="y8-muted">只列出已准入的模型访问定义；留空表示跟随部门默认。</small></label>' +
-      '<label class="y8-field"><span>推理档位</span><select class="y8-select" id="y8-dm-level">' + levelOptions(entry.request_level, '跟随模型默认') + '</select></label>' +
-      '<label class="y8-field"><span>部门 Prompt</span><textarea class="y8-textarea" rows="6" id="y8-dm-prompt" placeholder="留空表示使用内置默认 Prompt">' + esc(promptText) + '</textarea>' +
-      '<small class="y8-muted">当前版本 v' + esc(entry.version) + '；保存只写入本项目' + esc(v.department.label) + '部门的项目部门设置，不改部门默认。</small></label>' +
+    return '<div class="y9-form">' +
+      '<label class="y9-field"><span>模型</span><select class="y9-select" id="y9-dm-model">' + modelOptions(admitted, entry.model, '跟随部门默认') + '</select>' +
+      '<small class="y9-muted">只列出已准入的模型访问定义；留空表示跟随部门默认。</small></label>' +
+      '<label class="y9-field"><span>推理档位</span><select class="y9-select" id="y9-dm-level">' + levelOptions(entry.request_level, '跟随模型默认') + '</select></label>' +
+      '<label class="y9-field"><span>部门 Prompt</span><textarea class="y9-textarea" rows="6" id="y9-dm-prompt" placeholder="留空表示使用内置默认 Prompt">' + esc(promptText) + '</textarea>' +
+      '<small class="y9-muted">当前版本 v' + esc(entry.version) + '；保存只写入本项目' + esc(v.department.label) + '部门的项目部门设置，不改部门默认。</small></label>' +
       rolesSection +
-      '<div class="y8-row">' + ui.button({ label: '保存部门设置', kind: 'primary', act: 'dept.saveSettings' }) + ui.button({ label: '关闭', close: true }) + '</div>' +
+      '<div class="y9-row">' + ui.button({ label: '保存部门设置', kind: 'primary', act: 'dept.saveSettings' }) + ui.button({ label: '关闭', close: true }) + '</div>' +
       '</div>';
   }
 
@@ -642,66 +642,66 @@
       entry: entry,
       rolesSettings: AT_LEAST_S5() && hasRoles ? s : null
     };
-    Y8.ui.modal({
+    Y9.ui.modal({
       title: '本项目 · ' + v.department.label + '部门设置',
       wide: Boolean(st.modal.rolesSettings),
-      className: 'y8-dm',
+      className: 'y9-dm',
       body: modalBody()
     });
   }
 
-  Y8.actions.register('dept.shot', (el) => {
-    const s = Y8.api.query('evidence.screenshot', { work_item: el.dataset.workItem, step: Number(el.dataset.step) }).data;
+  Y9.actions.register('dept.shot', (el) => {
+    const s = Y9.api.query('evidence.screenshot', { work_item: el.dataset.workItem, step: Number(el.dataset.step) }).data;
     const lines = s.text_lines.length ? ui.pre(s.text_lines.join('\n')) : ui.empty('这一步没有记录可访问性结构摘录');
     ui.modal({
       title: '第 ' + s.step + ' 步的截图', wide: true,
-      body: '<div class="y8-shot-view"><figure><img src="assets/' + esc(s.screenshot) + '" alt="第 ' + esc(s.step) + ' 步的截图">' +
+      body: '<div class="y9-shot-view"><figure><img src="assets/' + esc(s.screenshot) + '" alt="第 ' + esc(s.step) + ' 步的截图">' +
         '<figcaption>' + esc(s.action || '') + ' · 虚拟屏幕 ' + s.width + '×' + s.height + ' · ' + (s.model_saw ? '模型看到了这张截图' : '模型只读取文字') + '</figcaption></figure>' +
-        '<div><h3 class="y8-h3">同一步的可访问性结构摘录</h3>' + lines + '</div></div>',
+        '<div><h3 class="y9-h3">同一步的可访问性结构摘录</h3>' + lines + '</div></div>',
       actions: [{ label: '关闭', close: true }]
     });
   });
 
-  Y8.actions.register('dept.openSettings', (el) => {
-    const ctx = Y8.app.ctx();
+  Y9.actions.register('dept.openSettings', (el) => {
+    const ctx = Y9.app.ctx();
     const target = { project: el.dataset.project || ctx.projectId, department: el.dataset.department || ctx.department };
     if (target.project !== ctx.projectId || target.department !== ctx.department) {
       st.pending = target;
-      Y8.go(Y8.paths.dept(target.project, target.department, ctx.workItemId));
+      Y9.go(Y9.paths.dept(target.project, target.department, ctx.workItemId));
       return;
     }
     openSettings(ctx);
   });
 
-  Y8.actions.register('dept.selfSettings', () => {
-    openSettings(Y8.app.ctx());
+  Y9.actions.register('dept.selfSettings', () => {
+    openSettings(Y9.app.ctx());
   });
 
-  Y8.actions.register('dept.roleDetail', (el) => {
+  Y9.actions.register('dept.roleDetail', (el) => {
     st.role = st.role === el.dataset.role ? null : el.dataset.role;
     rerender();
   });
 
-  Y8.actions.register('dept.sendGuidance', (el) => {
-    const area = document.getElementById('y8-ws-guidance');
+  Y9.actions.register('dept.sendGuidance', (el) => {
+    const area = document.getElementById('y9-ws-guidance');
     const text = area ? area.value.trim() : '';
     if (!text) {
-      Y8.ui.toast('请先写明指导内容', 'warn');
+      Y9.ui.toast('请先写明指导内容', 'warn');
       return;
     }
-    const result = Y8.run('guidance.send', { work_item: el.dataset.workItem, department: el.dataset.department, text: text });
+    const result = Y9.run('guidance.send', { work_item: el.dataset.workItem, department: el.dataset.department, text: text });
     if (!result.accepted) return;
-    Y8.app.clearDraft(el.dataset.draftKey);
+    Y9.app.clearDraft(el.dataset.draftKey);
     if (area) area.value = '';
   });
 
-  Y8.actions.register('dept.saveSettings', () => {
+  Y9.actions.register('dept.saveSettings', () => {
     const m = st.modal;
     if (!m) return;
-    const model = document.getElementById('y8-dm-model');
-    const level = document.getElementById('y8-dm-level');
-    const prompt = document.getElementById('y8-dm-prompt');
-    const result = Y8.run('department_settings.save', {
+    const model = document.getElementById('y9-dm-model');
+    const level = document.getElementById('y9-dm-level');
+    const prompt = document.getElementById('y9-dm-prompt');
+    const result = Y9.run('department_settings.save', {
       project: m.projectId,
       department: m.department,
       model: model ? model.value || null : null,
@@ -710,31 +710,31 @@
       base_version: m.entry.version
     });
     if (!result.accepted) return;
-    if (result.refs && result.refs.warning) Y8.ui.toast(result.refs.warning.text, 'warn');
-    Y8.ui.closeModal();
+    if (result.refs && result.refs.warning) Y9.ui.toast(result.refs.warning.text, 'warn');
+    Y9.ui.closeModal();
     st.modal = null;
     rerender();
   });
 
-  Y8.actions.register('dept.saveRoles', () => {
+  Y9.actions.register('dept.saveRoles', () => {
     const m = st.modal;
     if (!m || !m.rolesSettings) return;
-    const rows = Array.prototype.slice.call(document.querySelectorAll('.y8-dm-role[data-role-id]'));
+    const rows = Array.prototype.slice.call(document.querySelectorAll('.y9-dm-role[data-role-id]'));
     const roles = rows.map((row) => ({
       role_id: row.dataset.roleId,
       model: row.querySelector('[data-role-model]').value || null,
       request_level: row.querySelector('[data-role-level]').value || null,
       prompt_text: row.querySelector('[data-role-prompt]').value.trim() || null
     }));
-    const result = Y8.run('role_settings.save', {
+    const result = Y9.run('role_settings.save', {
       project: m.projectId,
       department: m.department,
       roles: roles,
       base_version: m.rolesSettings.roles_version
     });
     if (!result.accepted) return;
-    if (result.refs && result.refs.warning) Y8.ui.toast(result.refs.warning.text, 'warn');
-    Y8.ui.closeModal();
+    if (result.refs && result.refs.warning) Y9.ui.toast(result.refs.warning.text, 'warn');
+    Y9.ui.closeModal();
     st.modal = null;
     rerender();
   });

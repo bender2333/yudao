@@ -3,8 +3,8 @@
 // 整个回答过程在世界里完成，不跳到画面以外的页面（材料里指向别的页面的链接是例外：那些页面自己还没有搬进世界）。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('decision-card.js 需要先加载 js/pixel/engine.js');
   const PAL = P.PAL;
   const R = P.R, RB = P.RB;
@@ -15,7 +15,7 @@
   // 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色
   const KIND_COLOR = { waiting_resume: PAL.orange2, unknown_action: PAL.orange2, rollback_restore: PAL.red2, repair_stopped: PAL.red2, provider_wait: PAL.blue2, rework_reminder: PAL.blue2 };
 
-  // face：Y8.cards.face(决定请求) 给出的卡片内容
+  // face：Y9.cards.face(决定请求) 给出的卡片内容
   // opts：{ onDecide({ decision_id, option, note, base_version }) → 命令的结果, onGo(链接), onChange() }
   P.createDecisionCard = function createDecisionCard(scene, canvas, opts) {
     const o = opts || {};

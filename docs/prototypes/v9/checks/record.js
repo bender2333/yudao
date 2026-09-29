@@ -4,11 +4,12 @@
 // 写出 .tmp/v9-checks/<文件名>。在 v8 页面上录的调用给 replay.js 与 v8 逐像素比较；在 v9 页面上录的调用带着部门角色，给 life.js 看多角色。
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v8Url, outDir } = require('./env');
+const { chromium, EXE, v8Url, outDir, spaceOf } = require('./env');
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; };
 const ROOT = arg('root', v8Url);
 const OUT = path.join(outDir, arg('out', 'recordings.json'));
+const { ns, prefix } = spaceOf(ROOT);
 
 (async () => {
   const browser = await chromium.launch({ executablePath: EXE });
@@ -17,15 +18,15 @@ const OUT = path.join(outDir, arg('out', 'recordings.json'));
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript(() => sessionStorage.setItem('y8.level', JSON.stringify('S5')));
+  await page.addInitScript((key) => sessionStorage.setItem(key, JSON.stringify('S5')), prefix + '.level');
   await page.goto(ROOT + '#/home');
   await page.waitForTimeout(900);
 
   // 先离开楼层页，再装上包装，让下一次挂载被记录
-  await page.evaluate(async () => {
-    window.Y8.go('#/sys/machines');
+  await page.evaluate(async (space) => {
+    window[space].go('#/sys/machines');
     await new Promise((r) => setTimeout(r, 400));
-    const P = window.Y8.pixel;
+    const P = window[space].pixel;
     window.__rec = null;
     const orig = P.createFloorScene;
     P.createFloorScene = function wrapped(canvas, opts) {
@@ -44,9 +45,9 @@ const OUT = path.join(outDir, arg('out', 'recordings.json'));
       obj.destroy = function () { push('destroy'); return d.apply(this, arguments); };
       return obj;
     };
-  });
+  }, ns);
 
-  const scenarios = await page.evaluate(() => window.Y8.backend.scenarios().map((s) => {
+  const scenarios = await page.evaluate((space) => window[space].backend.scenarios().map((s) => {
     const m = /^#\/p\/([^/]+)\//.exec(s.go || '');
     let pid = m ? m[1] : null;
     if (!pid) {
@@ -54,31 +55,32 @@ const OUT = path.join(outDir, arg('out', 'recordings.json'));
       pid = ev || null;
     }
     return { id: s.id, name: s.name, level: s.level, go: s.go, pid, steps: s.steps.length };
-  }));
+  }), ns);
 
   const recordings = [];
   for (const sc of scenarios) {
     if (!sc.pid) { console.log('跳过（没有项目）', sc.id); continue; }
-    const rec = await page.evaluate(async ({ sid, pid }) => {
+    const rec = await page.evaluate(async ({ sid, pid, space }) => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const app = window[space];
       const overview = '#/p/' + pid + '/overview';
       window.__rec = [];
-      window.Y8.scenario.select(sid);
+      app.scenario.select(sid);
       await sleep(350);
-      if (location.hash !== overview) window.Y8.go(overview);
+      if (location.hash !== overview) app.go(overview);
       await sleep(600);
-      const total = window.Y8.scenario.current().steps.length;
+      const total = app.scenario.current().steps.length;
       let guard = 0;
-      while (window.Y8.scenario.state().step < total && guard++ < 90) {
-        window.Y8.scenario.step();
+      while (app.scenario.state().step < total && guard++ < 90) {
+        app.scenario.step();
         await sleep(420);
-        if (location.hash !== overview) { window.Y8.go(overview); await sleep(400); }
+        if (location.hash !== overview) { app.go(overview); await sleep(400); }
       }
       await sleep(600);
       const out = window.__rec;
       window.__rec = null;
       return out;
-    }, { sid: sc.id, pid: sc.pid });
+    }, { sid: sc.id, pid: sc.pid, space: ns });
     recordings.push({ id: sc.id, name: sc.name, level: sc.level, project: sc.pid, ops: rec });
     const counts = rec.reduce((m, r) => { m[r.op] = (m[r.op] || 0) + 1; return m; }, {});
     console.log(sc.id, sc.pid, JSON.stringify(counts));

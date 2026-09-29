@@ -2,8 +2,8 @@
 // 播放、暂停、单步、三档速度；点击刻度直接显示该时刻的状态。回放位置写在路径参数 at 中
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const esc = Y8.esc;
+  const Y9 = window.Y9;
+  const esc = Y9.esc;
 
   const SPEEDS = [1, 2, 4];
   const BASE_MS = 1600;
@@ -20,7 +20,7 @@
     function load() {
       const params = { range: ctl.range };
       if (opts.project) params.project = opts.project;
-      ctl.report = Y8.api.query('home.away_report', params).data;
+      ctl.report = Y9.api.query('home.away_report', params).data;
       ctl.facts = ctl.report.facts;
     }
 
@@ -32,7 +32,7 @@
 
     function setPosition(pos, fact) {
       ctl.position = pos;
-      Y8.replaceQuery('at', pos);
+      Y9.replaceQuery('at', pos);
       opts.onPosition(pos);
       if (fact) opts.onFact(fact);
       render();
@@ -104,11 +104,11 @@
     };
 
     function tickHtml(f, i) {
-      const kind = Y8.registry.KEY_KINDS[f.kind];
+      const kind = Y9.registry.KEY_KINDS[f.kind];
       const on = i === ctl.index;
       const hl = ctl.highlight.has(f.position);
-      return '<button type="button" class="y8-tick' + (on ? ' is-current' : '') + (hl ? ' is-highlight' : '') + (i < ctl.index ? ' is-past' : '') + '" style="--tick:' + kind.color +
-        '" data-act="replay.seek" data-index="' + i + '" title="' + esc(Y8.time.format(f.at, Y8.app.now()) + ' · ' + kind.label + ' · ' + f.label) + '"><span></span></button>';
+      return '<button type="button" class="y9-tick' + (on ? ' is-current' : '') + (hl ? ' is-highlight' : '') + (i < ctl.index ? ' is-past' : '') + '" style="--tick:' + kind.color +
+        '" data-act="replay.seek" data-index="' + i + '" title="' + esc(Y9.time.format(f.at, Y9.app.now()) + ' · ' + kind.label + ' · ' + f.label) + '"><span></span></button>';
     }
 
     function render() {
@@ -116,28 +116,28 @@
       const parts = [];
       facts.forEach((f, i) => {
         if (i > 0) {
-          const gap = Y8.time.between(facts[i - 1].at, f.at);
-          if (gap > GAP_SEC) parts.push('<span class="y8-tick-break" title="跳过 ' + esc(Y8.time.duration(gap)) + '">⫽<small>' + esc(Y8.time.duration(gap)) + '</small></span>');
+          const gap = Y9.time.between(facts[i - 1].at, f.at);
+          if (gap > GAP_SEC) parts.push('<span class="y9-tick-break" title="跳过 ' + esc(Y9.time.duration(gap)) + '">⫽<small>' + esc(Y9.time.duration(gap)) + '</small></span>');
         }
         parts.push(tickHtml(f, i));
       });
       const current = ctl.index >= 0 ? facts[ctl.index] : null;
-      const legend = Object.keys(Y8.registry.KEY_KINDS).filter((k) => facts.some((f) => f.kind === k))
-        .map((k) => '<span class="y8-legend" style="--tick:' + Y8.registry.KEY_KINDS[k].color + '"><i></i>' + esc(Y8.registry.KEY_KINDS[k].label) + '</span>').join('');
+      const legend = Object.keys(Y9.registry.KEY_KINDS).filter((k) => facts.some((f) => f.kind === k))
+        .map((k) => '<span class="y9-legend" style="--tick:' + Y9.registry.KEY_KINDS[k].color + '"><i></i>' + esc(Y9.registry.KEY_KINDS[k].label) + '</span>').join('');
       const status = ctl.position !== null
-        ? '<span class="y8-replay-on">回放中 · ' + esc(current ? Y8.time.format(current.at, Y8.app.now()) : Y8.time.format(ctl.report.range.from_at, Y8.app.now())) + '</span>' +
-          (current ? '<span class="y8-replay-fact">' + esc(current.label) + '</span>' : '<span class="y8-replay-fact">范围的起点</span>')
-        : '<span class="y8-muted">实时画面 · ' + facts.length + ' 条关键事实</span>';
-      opts.el.innerHTML = '<div class="y8-replay">' +
-        '<div class="y8-replay-bar">' +
-          '<button type="button" class="y8-btn small" data-act="replay.toggle"' + (facts.length ? '' : ' disabled') + '>' + Y8.ui.icon(ctl.playing ? 'pause' : 'play') + '<span>' + (ctl.playing ? '暂停' : '播放') + '</span></button>' +
-          '<button type="button" class="y8-btn small" data-act="replay.step"' + (facts.length ? '' : ' disabled') + '>' + Y8.ui.icon('step') + '<span>单步</span></button>' +
-          '<span class="y8-seg">' + SPEEDS.map((s) => '<button type="button" class="y8-seg-btn' + (s === ctl.speed ? ' is-on' : '') + '" data-act="replay.speed" data-speed="' + s + '">' + s + '×</button>').join('') + '</span>' +
-          '<button type="button" class="y8-btn small" data-act="replay.live"' + (ctl.position === null ? ' disabled' : '') + '>回到现在</button>' +
+        ? '<span class="y9-replay-on">回放中 · ' + esc(current ? Y9.time.format(current.at, Y9.app.now()) : Y9.time.format(ctl.report.range.from_at, Y9.app.now())) + '</span>' +
+          (current ? '<span class="y9-replay-fact">' + esc(current.label) + '</span>' : '<span class="y9-replay-fact">范围的起点</span>')
+        : '<span class="y9-muted">实时画面 · ' + facts.length + ' 条关键事实</span>';
+      opts.el.innerHTML = '<div class="y9-replay">' +
+        '<div class="y9-replay-bar">' +
+          '<button type="button" class="y9-btn small" data-act="replay.toggle"' + (facts.length ? '' : ' disabled') + '>' + Y9.ui.icon(ctl.playing ? 'pause' : 'play') + '<span>' + (ctl.playing ? '暂停' : '播放') + '</span></button>' +
+          '<button type="button" class="y9-btn small" data-act="replay.step"' + (facts.length ? '' : ' disabled') + '>' + Y9.ui.icon('step') + '<span>单步</span></button>' +
+          '<span class="y9-seg">' + SPEEDS.map((s) => '<button type="button" class="y9-seg-btn' + (s === ctl.speed ? ' is-on' : '') + '" data-act="replay.speed" data-speed="' + s + '">' + s + '×</button>').join('') + '</span>' +
+          '<button type="button" class="y9-btn small" data-act="replay.live"' + (ctl.position === null ? ' disabled' : '') + '>回到现在</button>' +
           status +
         '</div>' +
-        '<div class="y8-ticks" role="list" aria-label="关键事实的时间轴">' + (parts.length ? parts.join('') : '<span class="y8-muted">所选范围内没有关键事实</span>') + '</div>' +
-        (legend ? '<div class="y8-legends">' + legend + '</div>' : '') +
+        '<div class="y9-ticks" role="list" aria-label="关键事实的时间轴">' + (parts.length ? parts.join('') : '<span class="y9-muted">所选范围内没有关键事实</span>') + '</div>' +
+        (legend ? '<div class="y9-legends">' + legend + '</div>' : '') +
       '</div>';
     }
 
@@ -145,7 +145,7 @@
     render();
     active = api;
     // 路径中带 at 时从该位置开始（刷新后保持）
-    const at = Y8.route().query.at;
+    const at = Y9.route().query.at;
     if (at !== undefined) {
       const idx = ctl.facts.findIndex((f) => String(f.position) === String(at));
       ctl.index = idx;
@@ -163,12 +163,12 @@
     return active;
   }
 
-  Y8.actions.register('replay.toggle', () => { const a = need(); if (a._ctl.playing) a.pause(); else a.play(); });
-  Y8.actions.register('replay.step', () => need().step());
-  Y8.actions.register('replay.start', () => need().start());
-  Y8.actions.register('replay.live', () => need().live());
-  Y8.actions.register('replay.seek', (el) => need().seek(Number(el.dataset.index)));
-  Y8.actions.register('replay.speed', (el) => need().setSpeed(Number(el.dataset.speed)));
+  Y9.actions.register('replay.toggle', () => { const a = need(); if (a._ctl.playing) a.pause(); else a.play(); });
+  Y9.actions.register('replay.step', () => need().step());
+  Y9.actions.register('replay.start', () => need().start());
+  Y9.actions.register('replay.live', () => need().live());
+  Y9.actions.register('replay.seek', (el) => need().seek(Number(el.dataset.index)));
+  Y9.actions.register('replay.speed', (el) => need().setSpeed(Number(el.dataset.speed)));
 
-  Y8.replay = { create, active: () => active };
+  Y9.replay = { create, active: () => active };
 })();

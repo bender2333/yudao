@@ -1,7 +1,7 @@
 // 北京地铁票价（评测场景 3，PRDBench 44）。种子是出现时的状态，历史补丁收到现在。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
   const P = 'p-metro';
 
   function modelOf(definition, source, unusable) {
@@ -84,7 +84,7 @@
   const fareAsk = '12 公里整是否按 6 元？分段表里 12 公里是 4 元档的上界，还是已经进入 6 元档？';
   const fareAnswer = '12 公里整按 4 元。分段按左开右闭：6 公里及以内 3 元，超过 6 公里至 12 公里（含）4 元，超过 12 公里至 22 公里 5 元，超过 22 公里至 32 公里 6 元。12 公里整不进入 6 元档。Sum_money 的输入单位是米，12000 米对应 4 元。';
 
-  Y8.data.define({
+  Y9.data.define({
     seed: {
       projects: [{
         id: P, name: '北京地铁票价',

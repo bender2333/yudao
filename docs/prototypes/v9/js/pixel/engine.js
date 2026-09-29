@@ -1,8 +1,8 @@
 // 像素画面引擎：小人合成与离屏缓存、姿势与动作帧、画布缩放与动画循环、路径移动与缓动、粒子、
 // 共用物件的绘制，以及事件到动作的对照表（设计说明第 8.3 节）。
 (function () {
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.PAL || !P.CHAR) throw new Error('engine.js 需要先加载 js/pixel/sprites.js');
   const PAL = P.PAL;
   const FONT = '"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Source Han Sans SC", sans-serif';
@@ -157,10 +157,10 @@
     return entry.map[key] || entry.default || null;
   };
 
-  // 档位比较：按 Y8.LEVELS 的顺序；level 为空时取界面工作线
+  // 档位比较：按 Y9.LEVELS 的顺序；level 为空时取界面工作线
   P.levelAtLeast = function levelAtLeast(level, min) {
-    const a = Y8.LEVELS.indexOf(level || 'ui');
-    const b = Y8.LEVELS.indexOf(min || 'ui');
+    const a = Y9.LEVELS.indexOf(level || 'ui');
+    const b = Y9.LEVELS.indexOf(min || 'ui');
     if (a < 0 || b < 0) throw new Error('未知档位：' + level + ' / ' + min);
     return a >= b;
   };

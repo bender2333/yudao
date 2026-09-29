@@ -1,10 +1,10 @@
 // 动作图鉴（原型专用，#/gallery）：按角色与动作列出全部小人动画，每一项写明驱动它的事实、来源事件与所属档位；
-// 另有一节「管道与画面」，列出楼层画面的状态（由 floor.js 的 Y8.pixel.FLOOR_VIEWS 提供）。
+// 另有一节「管道与画面」，列出楼层画面的状态（由 floor.js 的 Y9.pixel.FLOOR_VIEWS 提供）。
 (function () {
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createVignette || !P.renderSprite) throw new Error('gallery.js 需要先加载 js/pixel/*.js');
-  const esc = Y8.esc;
+  const esc = Y9.esc;
 
   // 部门的衣物颜色与角色的配件（设计说明第 8.2 节）
   const ROLE_ORDER = [
@@ -27,23 +27,23 @@
     idle: '部门未工作', paused: '已暂停', failed: '失败', done: '已完成', cancelled: '已取消',
     interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复'
   };
-  const LEVEL_OPTIONS = Y8.LEVELS.map((lv) => [lv, Y8.LEVEL_LABELS[lv]]);
+  const LEVEL_OPTIONS = Y9.LEVELS.map((lv) => [lv, Y9.LEVEL_LABELS[lv]]);
 
   // 页面选择，重新渲染后保留
   const sel = { role: '', stage: 'all' };
   let live = null;
 
   function levelTag(level) {
-    return Y8.ui.tag(Y8.LEVEL_TAGS[level]) || Y8.ui.tag('界面工作线');
+    return Y9.ui.tag(Y9.LEVEL_TAGS[level]) || Y9.ui.tag('界面工作线');
   }
   function reached(level) {
-    return Y8.level.atLeast(level || 'ui');
+    return Y9.level.atLeast(level || 'ui');
   }
   function lockNote(level) {
-    return reached(level) ? '' : '<span class="y8-g-lock">档位未到：' + esc(Y8.LEVEL_LABELS[level]) + '</span>';
+    return reached(level) ? '' : '<span class="y9-g-lock">档位未到：' + esc(Y9.LEVEL_LABELS[level]) + '</span>';
   }
   function select(opts) {
-    return '<label class="y8-g-ctl y8-field is-inline"><span>' + esc(opts.label) + '</span><select class="y8-select" data-act="' + esc(opts.act) + '">' +
+    return '<label class="y9-g-ctl y9-field is-inline"><span>' + esc(opts.label) + '</span><select class="y9-select" data-act="' + esc(opts.act) + '">' +
       opts.options.map(([value, label]) => '<option value="' + esc(value) + '"' + (value === opts.value ? ' selected' : '') + '>' + esc(label) + '</option>').join('') +
       '</select></label>';
   }
@@ -56,15 +56,15 @@
   }
 
   function roleCards() {
-    return '<div class="y8-g-grid is-roles">' + ROLE_ORDER.map((key) => {
+    return '<div class="y9-g-grid is-roles">' + ROLE_ORDER.map((key) => {
       const kind = key.split('.')[1];
       const level = P.SPRITE_LEVELS[key];
       const look = ROLE_LOOK[kind] || '';
       const locked = reached(level) ? '' : ' is-locked';
-      return '<figure class="y8-g-card' + locked + '">' +
-        '<div class="y8-g-strip"><canvas data-role="' + esc(key) + '" width="64" height="80" aria-label="' + esc(P.ROLE_NAMES[key]) + '"></canvas></div>' +
-        '<figcaption><div class="y8-g-name">' + esc(P.ROLE_NAMES[key]) + levelTag(level) + '</div>' +
-        '<p class="y8-g-desc">' + esc(look) + '</p>' + lockNote(level) + '</figcaption></figure>';
+      return '<figure class="y9-g-card' + locked + '">' +
+        '<div class="y9-g-strip"><canvas data-role="' + esc(key) + '" width="64" height="80" aria-label="' + esc(P.ROLE_NAMES[key]) + '"></canvas></div>' +
+        '<figcaption><div class="y9-g-name">' + esc(P.ROLE_NAMES[key]) + levelTag(level) + '</div>' +
+        '<p class="y9-g-desc">' + esc(look) + '</p>' + lockNote(level) + '</figcaption></figure>';
     }).join('') + '</div>';
   }
 
@@ -76,21 +76,21 @@
     const locked = reached(level) ? '' : ' is-locked';
     const sprite = spriteForAction(name);
     const facts = def.source === undefined
-      ? '<dl class="y8-g-facts"><dt>用途</dt><dd>' + esc(def.fact) + '</dd></dl>'
-      : '<dl class="y8-g-facts"><dt>事实</dt><dd>' + esc(def.fact) + '</dd>' +
-        '<dt>来源</dt><dd class="y8-g-mono">' + esc(def.source) + '</dd>' +
+      ? '<dl class="y9-g-facts"><dt>用途</dt><dd>' + esc(def.fact) + '</dd></dl>'
+      : '<dl class="y9-g-facts"><dt>事实</dt><dd>' + esc(def.fact) + '</dd>' +
+        '<dt>来源</dt><dd class="y9-g-mono">' + esc(def.source) + '</dd>' +
         '<dt>小人动作</dt><dd>' + esc(def.action) + '</dd>' +
         '<dt>房间变化</dt><dd>' + esc(def.room) + '</dd></dl>';
-    return '<figure class="y8-g-card' + locked + '" data-act-card="' + esc(name) + '">' +
-      '<div class="y8-g-stage"><canvas data-vig="' + esc(name) + '" data-sprite="' + esc(sprite) + '" aria-label="' + esc(def.label) + '"></canvas></div>' +
-      '<figcaption><div class="y8-g-name">' + esc(def.label) + levelTag(level) + '</div>' + facts + lockNote(level) + '</figcaption></figure>';
+    return '<figure class="y9-g-card' + locked + '" data-act-card="' + esc(name) + '">' +
+      '<div class="y9-g-stage"><canvas data-vig="' + esc(name) + '" data-sprite="' + esc(sprite) + '" aria-label="' + esc(def.label) + '"></canvas></div>' +
+      '<figcaption><div class="y9-g-name">' + esc(def.label) + levelTag(level) + '</div>' + facts + lockNote(level) + '</figcaption></figure>';
   }
 
   function actionCards() {
     const base = Object.keys(P.BASE_MOTIONS).map((name) => actionCard(name, P.BASE_MOTIONS[name])).join('');
     const list = Object.keys(P.ACTIONS).map((name) => actionCard(name, P.ACTIONS[name])).join('');
-    return '<h3 class="y8-g-sub">基础动作</h3><div class="y8-g-grid">' + base + '</div>' +
-      '<h3 class="y8-g-sub">事实驱动的动作</h3><div class="y8-g-grid">' + list + '</div>';
+    return '<h3 class="y9-g-sub">基础动作</h3><div class="y9-g-grid">' + base + '</div>' +
+      '<h3 class="y9-g-sub">事实驱动的动作</h3><div class="y9-g-grid">' + list + '</div>';
   }
 
   function statusRows() {
@@ -107,15 +107,15 @@
   function floorViewsBlock() {
     const views = P.FLOOR_VIEWS;
     if (!Array.isArray(views) || !views.length) {
-      return Y8.ui.note(esc('楼层画面的说明由 floor.js 提供'));
+      return Y9.ui.note(esc('楼层画面的说明由 floor.js 提供'));
     }
-    return Y8.ui.table({
+    return Y9.ui.table({
       columns: [
         { key: 'fact', label: '事实' },
-        { key: 'source', label: '来源', className: 'y8-g-mono' },
+        { key: 'source', label: '来源', className: 'y9-g-mono' },
         { key: 'picture', label: '画面' },
         { key: 'level', label: '档位', render: (r) => levelTag(r.level) },
-        { key: 'events', label: '事件', className: 'y8-g-mono', render: (r) => esc((r.events || []).join('、')) }
+        { key: 'events', label: '事件', className: 'y9-g-mono', render: (r) => esc((r.events || []).join('、')) }
       ],
       rows: views
     });
@@ -125,7 +125,7 @@
   // 渲染与挂载
 
   function render() {
-    const filters = '<div class="y8-g-ctls">' + select({
+    const filters = '<div class="y9-g-ctls">' + select({
       act: 'gallery.role',
       label: '角色',
       value: sel.role,
@@ -136,25 +136,25 @@
       value: sel.stage,
       options: [['all', '全部档位']].concat(LEVEL_OPTIONS)
     }) + '</div>';
-    return '<header class="y8-page-head"><div class="y8-page-titles"><p class="y8-eyebrow">原型专用</p><h1>动作图鉴</h1>' +
-      '<p class="y8-g-intro">部门房间与楼层画面里的全部小人和动画。每个动作写明驱动它的事实、来源事件、小人动作、房间变化与所属档位。' +
-      '当前档位：' + esc(Y8.LEVEL_LABELS[Y8.level.current()]) + '；档位未到的项灰色显示并写明档位。系统设置为减少动画时，每个画面停在动作的关键姿势。</p></div></header>' +
-      Y8.ui.block({ title: '角色', subtitle: '衣服颜色按部门区分，角色靠配件区分（设计说明第 8.2 节）。', body: roleCards(), className: 'y8-gallery' }) +
-      Y8.ui.block({ title: '动作', subtitle: '每项循环播放一次该动作；可以统一换成某个角色查看。', body: filters + '<div data-g-action-list>' + actionCards() + '</div>', className: 'y8-gallery' }) +
-      Y8.ui.block({
+    return '<header class="y9-page-head"><div class="y9-page-titles"><p class="y9-eyebrow">原型专用</p><h1>动作图鉴</h1>' +
+      '<p class="y9-g-intro">部门房间与楼层画面里的全部小人和动画。每个动作写明驱动它的事实、来源事件、小人动作、房间变化与所属档位。' +
+      '当前档位：' + esc(Y9.LEVEL_LABELS[Y9.level.current()]) + '；档位未到的项灰色显示并写明档位。系统设置为减少动画时，每个画面停在动作的关键姿势。</p></div></header>' +
+      Y9.ui.block({ title: '角色', subtitle: '衣服颜色按部门区分，角色靠配件区分（设计说明第 8.2 节）。', body: roleCards(), className: 'y9-gallery' }) +
+      Y9.ui.block({ title: '动作', subtitle: '每项循环播放一次该动作；可以统一换成某个角色查看。', body: filters + '<div data-g-action-list>' + actionCards() + '</div>', className: 'y9-gallery' }) +
+      Y9.ui.block({
         title: '部门状态对应的姿势', subtitle: '由部门状态或恢复观察状态张贴（engine.js 的 P.STATUS_ACTIONS）。',
-        body: Y8.ui.table({
+        body: Y9.ui.table({
           columns: [
             { key: 'status', label: '状态' },
-            { key: 'status_id', label: '状态标识', className: 'y8-g-mono' },
+            { key: 'status_id', label: '状态标识', className: 'y9-g-mono' },
             { key: 'action', label: '姿势' },
             { key: 'level', label: '档位', render: (r) => levelTag(r.level) }
           ],
           rows: statusRows()
         }),
-        className: 'y8-gallery'
+        className: 'y9-gallery'
       }) +
-      Y8.ui.block({ title: '管道与画面', subtitle: '楼层画面的状态与画面（设计说明第 5.3、5.4 节）。', body: floorViewsBlock(), className: 'y8-gallery' });
+      Y9.ui.block({ title: '管道与画面', subtitle: '楼层画面的状态与画面（设计说明第 5.3、5.4 节）。', body: floorViewsBlock(), className: 'y9-gallery' });
   }
 
   function applyStageFilter(root) {
@@ -203,14 +203,14 @@
     live = null;
   }
 
-  Y8.views.register('gallery', {
+  Y9.views.register('gallery', {
     title: () => '动作图鉴',
     render,
     mount,
     unmount
   });
 
-  Y8.actions.register('gallery.role', (el) => {
+  Y9.actions.register('gallery.role', (el) => {
     sel.role = el.value;
     if (!live) return;
     destroyVignettes();
@@ -219,8 +219,8 @@
     applyStageFilter(live.root);
   });
 
-  Y8.actions.register('gallery.stage', (el) => {
+  Y9.actions.register('gallery.stage', (el) => {
     sel.stage = el.value;
-    applyStageFilter(Y8.app.dom.content);
+    applyStageFilter(Y9.app.dom.content);
   });
 })();

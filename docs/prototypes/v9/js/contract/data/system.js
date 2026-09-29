@@ -1,9 +1,9 @@
 // 系统数据：部署、首页、系统状态、机器、执行槽位、工具、模型目录、内置 Prompt 与跨项目场景（BUILD.md 第 8、9 节）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
 
-  Y8.data.define({
+  Y9.data.define({
     seed: {
       now: '2026-09-29T15:30:00+08:00',
       deployment: { log_id: 'log-7f3a', boot_id: 'boot-0929-0313', service_version: '0.8.0', api_version: 1, access: 'lan' },
