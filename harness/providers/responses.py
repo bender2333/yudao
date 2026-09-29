@@ -29,6 +29,7 @@ from openai import (
 )
 from openai.types.responses import ResponseStreamEvent
 
+from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
@@ -85,6 +86,8 @@ class _InvokeRequest:
     attempt_id: str
     emit: Emit
     config: ResponsesConfig
+    # 输出片段（设计说明第 5.6 节）：按通道保存已发出的字数，作为下一段的起始位置
+    channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
 class _TransportTrace:
@@ -430,6 +433,7 @@ class _ResponsesInvoker:
                 "payload": event_payload,
                 "stage": _stream_stage(event_payload),
                 "response_id": _stream_response_id(event_payload),
+                "deltas": _stream_deltas(event_payload, invocation.channel_offsets),
             })
             event_index += 1
             yield event
@@ -595,6 +599,22 @@ class _ResponsesInvoker:
             "payload": item,
         })
 
+
+def _stream_deltas(payload: dict[str, Any], offsets: dict[str, int]) -> list[ModelDelta]:
+    # 这一条流事件里的文字片段：回答文字进 output，推理摘要进 reasoning，工具调用的参数进 tool_arguments
+    event_type = str(payload.get("type") or "")
+    if event_type == "response.output_text.delta":
+        return [_delta("output", str(payload.get("delta") or ""), offsets)]
+    if event_type.startswith("response.reasoning") and payload.get("delta"):
+        return [_delta("reasoning", str(payload["delta"]), offsets)]
+    if event_type == "response.function_call_arguments.delta":
+        return [_delta("tool_arguments", str(payload.get("delta") or ""), offsets)]
+    return []
+
+def _delta(channel: str, text: str, offsets: dict[str, int]) -> ModelDelta:
+    offset = offsets.get(channel, 0)
+    offsets[channel] = offset + len(text)
+    return ModelDelta(channel=channel, offset=offset, text=text)
 
 def _stream_stage(payload: dict[str, Any]) -> str:
     # Responses 流事件的进度阶段

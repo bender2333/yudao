@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -19,6 +19,7 @@ from anthropic import (
 )
 from anthropic.types import RawMessageStreamEvent
 
+from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
@@ -54,6 +55,8 @@ class _MessagesInvocation:
     session_id: str
     attempt_id: str
     emit: Emit
+    # 输出片段（设计说明第 5.6 节）：按通道保存已发出的字数，作为下一段的起始位置
+    channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
 def anthropic_base_url(base_url: str) -> str:
@@ -159,6 +162,23 @@ def _event_stage(payload: dict[str, Any]) -> str:
     return "event"
 
 
+def _event_deltas(payload: dict[str, Any], offsets: dict[str, int]) -> list[ModelDelta]:
+    # 这一条流事件里的文字片段：回答文字进 output，推理进 reasoning，工具调用的参数进 tool_arguments
+    delta = payload.get("delta") or {}
+    kind = delta.get("type")
+    if kind == "text_delta":
+        return [_delta("output", str(delta.get("text") or ""), offsets)]
+    if kind == "thinking_delta":
+        return [_delta("reasoning", str(delta.get("thinking") or ""), offsets)]
+    if kind == "input_json_delta":
+        return [_delta("tool_arguments", str(delta.get("partial_json") or ""), offsets)]
+    return []
+
+def _delta(channel: str, text: str, offsets: dict[str, int]) -> ModelDelta:
+    offset = offsets.get(channel, 0)
+    offsets[channel] = offset + len(text)
+    return ModelDelta(channel=channel, offset=offset, text=text)
+
 def _event_response_id(payload: dict[str, Any]) -> str | None:
     # 提供方的回答身份在 message_start 的 message 中
     message = payload.get("message")
@@ -221,6 +241,7 @@ class _MessagesInvoker:
             "payload": payload,
             "stage": _event_stage(payload),
             "response_id": _event_response_id(payload),
+            "deltas": _event_deltas(payload, invocation.channel_offsets),
         })
 
     async def _stream_with_client(self, invocation: _MessagesInvocation, trace: _TransportTrace,

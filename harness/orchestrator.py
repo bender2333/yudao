@@ -29,6 +29,7 @@ from .decisions import (
     MODEL_UNAVAILABLE, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision, blocks_run,
 )
 from .environment import LocalEnvironment
+from .deltas import DeltaChannel
 from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
@@ -187,10 +188,12 @@ class Orchestrator:
         test_model: str = "fake-script",
         sessions: SessionFactory | None = None,
         step_limits: StepLimits = StepLimits(),
+        deltas: DeltaChannel | None = None,
     ) -> None:
         self.store = store
         self.writes = writes
         self.step_limits = step_limits
+        self.deltas = deltas if deltas is not None else DeltaChannel()
         self.artifacts = artifacts
         self.workspace_root = Path(workspace_root)
         self.materials_root = self.workspace_root.parent / "materials"
@@ -880,6 +883,7 @@ class Orchestrator:
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
+                deltas=self.deltas,
             )
             result = await activation.driver.result()
         except Exception as exc:

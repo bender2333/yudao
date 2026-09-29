@@ -18,6 +18,7 @@ from openai import (
 )
 from openai.types.chat import ChatCompletionChunk
 
+from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
@@ -170,6 +171,8 @@ class _ChatInvoker:
             **(call_params | ({"extra_headers": headers} if headers else {})),
         ), trace)
         event_index = 0
+        # 输出片段（设计说明第 5.6 节）：按通道记录已发出的字数作为下一段的起始位置
+        channel_offsets: dict[str, int] = {}
         async for chunk in _provider_events(stream, trace):
             payload = _sdk_json(chunk, secrets=(invocation.frozen_target.api_key,))
             await invocation.emit({
@@ -184,6 +187,7 @@ class _ChatInvoker:
                 "payload": payload,
                 "stage": _chunk_stage(payload),
                 "response_id": _chunk_id(payload),
+                "deltas": _chunk_deltas(payload, channel_offsets),
             })
             event_index += 1
             response_id = _chunk_id(payload) or response_id
@@ -236,6 +240,29 @@ class _ChatInvoker:
                            "response_id": response_id},
         )
 
+
+def _chunk_deltas(payload: dict[str, Any], offsets: dict[str, int]) -> list[ModelDelta]:
+    # 这一块里的文字片段：回答文字进 output，工具调用的参数进 tool_arguments；
+    # offsets 按通道保存已发出的字数，作为每段的起始位置
+    deltas: list[ModelDelta] = []
+    for choice in payload.get("choices") or []:
+        if not isinstance(choice, dict):
+            continue
+        delta = choice.get("delta") or {}
+        content = delta.get("content")
+        if isinstance(content, str) and content:
+            deltas.append(_delta("output", content, offsets))
+        for call in delta.get("tool_calls") or []:
+            function = (call or {}).get("function") or {}
+            arguments = function.get("arguments")
+            if isinstance(arguments, str) and arguments:
+                deltas.append(_delta("tool_arguments", arguments, offsets))
+    return deltas
+
+def _delta(channel: str, text: str, offsets: dict[str, int]) -> ModelDelta:
+    offset = offsets.get(channel, 0)
+    offsets[channel] = offset + len(text)
+    return ModelDelta(channel=channel, offset=offset, text=text)
 
 def _chunk_stage(payload: dict[str, Any]) -> str:
     # Chat Completions 流式块的进度阶段：带文字或工具调用增量的块是输出；带结束原因的块与结束以后只带用量的块

@@ -1004,7 +1004,8 @@ def _stream_event(event: Mapping[str, Any]) -> ModelStreamEvent | None:
         return ModelStreamEvent(kind="request", **identity)
     if kind == "stream_event":
         return ModelStreamEvent(kind="stream_event", source="sdk_decoded_stream", sequence=event.get("sequence"),
-                                stage=event["stage"], response_id=event["response_id"], **identity)
+                                stage=event["stage"], response_id=event["response_id"],
+                                deltas=tuple(event.get("deltas") or ()), **identity)
     if kind == "response":
         return ModelStreamEvent(kind="response", source="sdk_response", **identity)
     if kind == "usage":
