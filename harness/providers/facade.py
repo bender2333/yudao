@@ -7,7 +7,7 @@ import os
 import tempfile
 import threading
 import time
-from collections.abc import AsyncIterator, Container
+from collections.abc import AsyncIterator, Callable, Container
 from contextlib import aclosing
 from dataclasses import replace
 from pathlib import Path
@@ -79,10 +79,19 @@ class ProviderFacade:
         self._watch_thread: threading.Thread | None = None
         self._watch_stop = threading.Event()
         self._watch_interval_sec = 1.0
+        # 凭据版本：每次被接受的凭据命令推进，供基准版本核对；只在本次进程内累计
+        self._credential_versions: dict[str, int] = {}
+        # 目录文件被外部修改并发布以后的回调，由系统装配登记（写入口据它补写 catalog_revised）
+        self._reload_listener: Callable[[], None] | None = None
 
     @property
     def revision(self) -> int:
         return self._revision
+
+    def catalog_revision(self) -> int:
+        # 目录修订号：保存在目录文件里，重启以后继续可比；目录内容修改一次就推进
+        with self._lock:
+            return self._store.revision
 
     @property
     def config_path(self) -> Path | None:
@@ -141,9 +150,11 @@ class ProviderFacade:
             return {key: dict(value) for key, value in self._bindings.items()}
 
     def save_bindings(self, raw: Mapping[str, Any]) -> int:
-        # 整体替换部门绑定，只校验引用结构，不验证凭据就绪
+        # 整体替换部门绑定，只校验引用结构，不验证凭据就绪；有变化时推进目录修订号
         with self._lock:
             bindings = _parse_bindings(raw, self._store)
+            if bindings != self._bindings:
+                self._store.bump_revision()
             self._bindings = bindings
             self._publish()
             return self._revision
@@ -163,6 +174,39 @@ class ProviderFacade:
             self._bindings = bindings
             self._publish()
             return self._revision
+
+    def replace_catalog_document(self, raw: Mapping[str, Any]) -> int:
+        # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退
+        with self._lock:
+            document = dict(raw)
+            document["revision"] = self._store.revision + 1
+            self.store_document(document)
+            return self._store.revision
+
+    def merge_model_admissions(self, models: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        # 命令保存访问定义时保留已有的准入事实：准入只由模型测试写入，客户端不提交它
+        merged: list[dict[str, Any]] = []
+        for item in models:
+            entry = dict(item)
+            existing = self._store.models.get(str(entry.get("id")))
+            if existing is not None:
+                for key in ("admitted_at", "admitted_revision", "admitted_model", "admitted_protocol"):
+                    if getattr(existing, key) is not None:
+                        entry[key] = getattr(existing, key)
+            merged.append(entry)
+        return merged
+
+    def persist_catalog(self, previous: Mapping[str, Any]) -> str | None:
+        # 保存以后落盘；失败时恢复上一份文档并返回错误说明；没有配置路径时不做任何事
+        with self._lock:
+            if self._config_path is None:
+                return None
+            try:
+                self.persist_document(self._config_path)
+                return None
+            except OSError as exc:
+                self.store_document(previous)
+                return f"目录文件写入失败：{exc}"
 
     def load_document(self, path: str | Path) -> int:
         # 启动与短命 CLI 读取一致版本：缺文件即空态发布，坏内容报错并保留内存
@@ -267,7 +311,8 @@ class ProviderFacade:
             return self._revision
 
     def delete_provider(self, provider_id: str) -> int:
-        # 删除无引用 Provider 及其模型，被模型或绑定引用时报可定位错误，不删改
+        # 删除 Provider 配置：其下的模型访问定义一并删除（定义本身不算引用方）；
+        # 仍被部门默认引用时拒绝并列出引用方，不删改
         with self._lock:
             key = str(provider_id)
             if key not in self._store.providers:
@@ -333,6 +378,60 @@ class ProviderFacade:
             self._credentials.remove_dotenv_value(key)
             self._note_dotenv_written(target, parsed)
             return {**self._credentials.describe(key), "removed": removed}
+
+    def credential_version(self, ref: str) -> int:
+        # 凭据版本：目录查询返回它，凭据命令的基准版本与它核对
+        with self._lock:
+            return self._credential_versions.get(str(ref), 0)
+
+    def credential_status(self, ref: str) -> dict[str, Any]:
+        # 脱敏状态加版本，不含 Key
+        with self._lock:
+            status: dict[str, Any] = dict(self._credentials.describe(ref))
+            status["version"] = self._credential_versions.get(str(ref), 0)
+            return status
+
+    def set_credential(self, ref: str, secret: str, *, persist: bool) -> dict[str, Any]:
+        # 保存 Key：只在本进程内覆盖，或同时写入独立 .env；落盘失败时不报成功
+        with self._lock:
+            key = str(ref)
+            self._credentials.set_override(key, secret)
+            persisted = False
+            if persist:
+                if self._dotenv_path is None:
+                    self._credentials.clear_override(key)
+                    raise CatalogValidationError((ValidationIssue("credentials.ref", "未配置凭据文件路径"),))
+                try:
+                    self.save_dotenv_value(self._dotenv_path, key, secret)
+                except OSError as exc:
+                    self._credentials.clear_override(key)
+                    raise CatalogValidationError((ValidationIssue(
+                        "credentials.ref", f"持凭据写入失败：{exc}"),))
+                persisted = True
+            version = self._credential_versions[key] = self._credential_versions.get(key, 0) + 1
+            return {"status": dict(self._credentials.describe(key)), "version": version, "persisted": persisted}
+
+    def clear_credential(self, ref: str) -> dict[str, Any]:
+        # 清除内存覆盖，露出下层来源；版本照常推进
+        with self._lock:
+            key = str(ref)
+            cleared = self._credentials.clear_override(key)
+            version = self._credential_versions[key] = self._credential_versions.get(key, 0) + 1
+            return {"status": dict(self._credentials.describe(key)), "version": version, "cleared": cleared}
+
+    def remove_persisted_credential(self, ref: str) -> dict[str, Any]:
+        # 删除独立 .env 中的单个值；版本照常推进
+        with self._lock:
+            if self._dotenv_path is None:
+                raise CatalogValidationError((ValidationIssue("credentials.ref", "未配置凭据文件路径"),))
+            key = str(ref)
+            try:
+                result = self.remove_dotenv_value(self._dotenv_path, key)
+            except (ValueError, OSError) as exc:
+                raise CatalogValidationError((ValidationIssue("credentials.ref", f"删除凭据失败：{exc}"),))
+            version = self._credential_versions[key] = self._credential_versions.get(key, 0) + 1
+            return {"status": dict(self._credentials.describe(key)), "version": version,
+                    "removed": bool(result.get("removed"))}
 
     def validate(self) -> None:
         with self._lock:
@@ -755,6 +854,11 @@ class ProviderFacade:
             self._watch_thread = worker
             worker.start()
 
+    def set_reload_listener(self, listener: Callable[[], None] | None) -> None:
+        # 目录文件被外部修改并成功发布以后的回调；由系统装配登记
+        with self._lock:
+            self._reload_listener = listener
+
     def stop_watching(self) -> None:
         # 服务关闭停止轮询
         with self._lock:
@@ -767,14 +871,23 @@ class ProviderFacade:
     def _watch_loop(self) -> None:
         while not self._watch_stop.wait(self._watch_interval_sec):
             try:
+                changed = False
                 with self._lock:
                     if self._config_path is not None:
-                        self._poll_config_file()
+                        changed = self._poll_config_file() or changed
                     if self._dotenv_path is not None:
-                        self._poll_dotenv_file()
+                        changed = self._poll_dotenv_file() or changed
+                if changed:
+                    self._notify_reload()
             except Exception as exc:
                 with self._lock:
                     self._reload_error = f"配置轮询失败：{exc}"
+
+    def _notify_reload(self) -> None:
+        # 在锁外调用：回调要经写入口追加目录事件
+        listener = self._reload_listener
+        if listener is not None:
+            listener()
 
     def _poll_config_file(self) -> bool:
         # 返回磁盘内容是否导致内存发布变化；失败保留上一有效版本
@@ -784,8 +897,10 @@ class ProviderFacade:
         except OSError:
             if self._disk_config_seen and self._disk_config_hash is None:
                 return False
-            # 明确删除目录文件表示撤销默认配置：新任务停止创建，旧任务不变
+            # 明确删除目录文件表示撤销默认配置：新任务停止创建，旧任务不变；修订号继续前进
+            previous_revision = self._store.revision
             self._store = ProviderStore.empty()
+            self._store.revision = previous_revision + 1
             self._bindings = {}
             self._config_state = "missing"
             self._reload_error = None
@@ -796,6 +911,7 @@ class ProviderFacade:
         digest = hashlib.sha256(data).digest()
         if self._disk_config_seen and digest == self._disk_config_hash:
             return False
+        previous_revision = self._store.revision
         try:
             raw = json.loads(data.decode("utf-8"))
         except (UnicodeError, ValueError) as exc:
@@ -810,6 +926,9 @@ class ProviderFacade:
             self._disk_config_hash = digest
             self._disk_config_seen = True
             return False
+        # 外部修改的事件必须带新修订号：文件里的修订号不比当前大时推进一号
+        if store.revision <= previous_revision:
+            store.revision = previous_revision + 1
         self._store = store
         self._bindings = bindings
         self._config_state = "loaded" if (store.providers or store.models or bindings) else "empty"
@@ -988,17 +1107,13 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
 
 def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[str, str]],
                          provider_id: str) -> list[str]:
+    # 定义本身不算引用方：删除连接时它下面的定义一并删除；只有部门默认等引用会拒绝
     dependents: list[str] = []
-    model_ids = []
-    for model_id in sorted(store.models):
-        if store.models[model_id].provider_id == provider_id:
-            dependents.append(f"models.{model_id}")
-            model_ids.append(model_id)
+    model_ids = {model_id for model_id in store.models
+                 if store.models[model_id].provider_id == provider_id}
     for department in sorted(bindings):
         binding = bindings[department]
-        if binding.get("provider_id") == provider_id:
-            dependents.append(f"bindings.{department}")
-        elif binding.get("model_id") in model_ids:
+        if binding.get("provider_id") == provider_id or binding.get("model_id") in model_ids:
             dependents.append(f"bindings.{department}")
     return dependents
 

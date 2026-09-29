@@ -9,9 +9,10 @@ from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
 from .engine import StepLimits
 from .environment import LocalEnvironment
-from .event_store import EventStore
+from .event_store import EventStore, catalog_stream
+from .models import CatalogEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
-from .write_path import WritePath
+from .write_path import NewCatalogEvent, WritePath
 from .projection import RunProjection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
@@ -76,6 +77,25 @@ class LoopSystem:
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
+        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
+        self.facade.set_reload_listener(self.sync_catalog_revision)
+
+    def sync_catalog_revision(self, *, operation: str = "reload") -> int | None:
+        # 目录修订号与最后一条 catalog_revised 不同就补写一条；相同或已补写过时什么也不写
+        revision = self.facade.catalog_revision()
+
+        def decide(transaction):
+            if transaction.projection.revision == revision:
+                return None
+            transaction.append(NewCatalogEvent(CatalogEventType.CATALOG_REVISED, {
+                "revision": revision,
+                "base_revision": transaction.projection.revision or None,
+                "operation": operation,
+                "provider_id": None,
+            }, actor="system"))
+            return revision
+
+        return self.writes.transact(catalog_stream(), decide)
 
     @property
     def provider_config_path(self) -> Path | None:

@@ -1,5 +1,5 @@
-# 事件日志：系统唯一的事实来源。run 事件与项目事件在同一份日志中：每条事件有全局位置（跨项目递增）、
-# 所属的流（run:<run_id>、project:<project_id>）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
+# 事件日志：系统唯一的事实来源。run 事件、项目事件与目录事件在同一份日志中：每条事件有全局位置（跨项目递增）、
+# 所属的流（run:<run_id>、project:<project_id>、catalog:main）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
 # 建立索引供范围读取；另存引起事件的命令身份与事件的提出者。日志只追加，日志身份在建立日志时生成，不再改变。
 # 每个流保存一份投影，流中的每个决定请求另存一份投影（按身份查找，按项目、事项、种类与状态列出）；
 # 投影的内容由写入口计算，这里按 JSON 文本存放。提交在一个数据库事务中核对流版本、执行权编号与命令身份，
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .models import Event, ProjectEvent, json_dumps, new_id, utc_now
+from .models import CatalogEvent, Event, ProjectEvent, json_dumps, new_id, utc_now
 
 
 SCHEMA = """
@@ -99,6 +99,18 @@ def run_stream(run_id: str) -> str:
 
 def project_stream(project_id: str) -> str:
     return _PROJECT + project_id
+
+
+_CATALOG = "catalog:"
+
+
+def catalog_stream() -> str:
+    # 模型目录与凭据只有一份，不按项目分开
+    return _CATALOG + "main"
+
+
+def is_catalog_stream(stream: str) -> bool:
+    return stream.startswith(_CATALOG)
 
 
 def is_run_stream(stream: str) -> bool:
@@ -526,7 +538,7 @@ def _end_position(connection: sqlite3.Connection) -> int:
     return int(row["position"])
 
 
-def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent) -> int:
+def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent | CatalogEvent) -> int:
     if isinstance(event, Event):
         run_columns = (event.role, event.parent_event_id, event.state_before, event.state_after,
                        json_dumps(event.artifact_hashes), event.session_id, event.provider, event.model,
@@ -548,7 +560,7 @@ def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent) -> int:
     return int(cursor.lastrowid)
 
 
-def _from_row(row: sqlite3.Row) -> Event | ProjectEvent:
+def _from_row(row: sqlite3.Row) -> Event | ProjectEvent | CatalogEvent:
     if row["stream"].startswith(_RUN):
         return Event(
             event_id=row["event_id"], run_id=row["run_id"], type=row["type"], role=row["role"],
@@ -560,6 +572,14 @@ def _from_row(row: sqlite3.Row) -> Event | ProjectEvent:
             position=row["position"], stream=row["stream"], stream_version=row["stream_version"],
             project_id=row["project_id"], work_item_id=row["work_item_id"], department=row["department"],
             epoch=row["epoch"], command_id=row["command_id"], actor=row["actor"],
+        )
+    if row["stream"].startswith(_CATALOG):
+        return CatalogEvent(
+            event_id=row["event_id"], type=row["type"], payload=json.loads(row["payload_json"]),
+            created_at=row["created_at"], position=row["position"], stream=row["stream"],
+            stream_version=row["stream_version"], project_id=row["project_id"], work_item_id=row["work_item_id"],
+            run_id=row["run_id"], department=row["department"], epoch=row["epoch"], command_id=row["command_id"],
+            actor=row["actor"],
         )
     return ProjectEvent(
         event_id=row["event_id"], project_id=row["project_id"], type=row["type"],
