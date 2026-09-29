@@ -20,6 +20,7 @@ from harness.models import ArtifactRef, EventType, Usage
 from harness.observability import ObservabilityQuery
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
+from harness.tests.saved_rewrite import rewrite_saved_event
 from harness.tests.test_responses import _event, _response, _send, _server, _stream, _submit_stream
 from harness.web.server import serve
 from harness.adapters.fake import FakeAdapter, FakeTurn
@@ -425,16 +426,18 @@ def test_context_parts_are_verified_and_missing_current_parts_do_not_fallback(tm
         query.model_attempt_detail(run_id, row["id"])
 
 
-def test_department_prompt_does_not_fallback_when_adopted_version_is_missing(tmp_path: Path, monkeypatch):
+def test_department_prompt_does_not_fallback_when_adopted_version_is_missing(tmp_path: Path):
     with _server([_submit_stream()]) as (config, *_):
         system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
         run_id = system.create_run("prompt identity")
         system.activate_once(run_id)
+    query = ObservabilityQuery(system.store, system.artifacts)
+    assert query.department(run_id, "product")["prompt"]["status"] == "adopted"
     events = system.store.list_events(run_id)
     activation = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED)
     activation.payload["prompt_hash"] = "sha256:" + "0" * 64
-    monkeypatch.setattr(system.store, "list_events", lambda _run_id, after_version=0: events if after_version == 0 else [event for event in events if event.stream_version > after_version])
-    department = ObservabilityQuery(system.store, system.artifacts).department(run_id, "product")
+    rewrite_saved_event(system.store, activation)
+    department = query.department(run_id, "product")
     assert department["prompt"]["status"] == "unknown"
     assert department["prompt"]["text"] is None
     assert department["prompt_latest"]["text"]

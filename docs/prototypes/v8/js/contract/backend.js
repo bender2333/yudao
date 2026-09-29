@@ -424,7 +424,7 @@
       need(Y8.isLevel(sc.level || 'ui'), '场景 ' + sc.id + ' 的档位无效');
       need(Array.isArray(sc.steps) && sc.steps.length, '场景 ' + sc.id + ' 没有步骤');
       sc.steps.forEach((st, i) => {
-        need(st.event || st.act, '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步没有 event 或 act');
+        need(st.event || st.act || (st.go && st.label), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步没有 event、act，也不是带 label 的跳转');
         if (st.event) need(Y8.registry.has('event', st.event.type), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步的事件种类没有登记：' + st.event.type);
       });
     });

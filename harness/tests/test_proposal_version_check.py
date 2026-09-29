@@ -6,30 +6,26 @@ from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
 
 # 提案校验与提交：流程编排校验提案时记下读取的流版本，提交以它作为期望版本追加；校验以后另一方写入了这个 run，
-# 写入口拒绝提交，流程编排按写入以后的状态重新校验与判断。测试包装公开的 WritePath.read（校验时读取运行状态）
-# 与 WritePath.transact（记下写入口的拒绝），在校验以后、提交之前从另一个线程完成一次用户操作。
+# 写入口拒绝提交，流程编排按写入以后的状态重新校验与判断。测试包装公开的 WritePath.transact：记下每次判断使用的
+# 流版本、写入口的拒绝，并在校验以后、提交读取之前从另一个线程完成一次用户操作。
 
 
 def _write_after_validation(monkeypatch, system, operation):
-    read, transact = system.writes.read, system.writes.transact
+    transact = system.writes.transact
     versions, done, conflicts = [], [], []
 
-    def read_then_operate(stream):
-        snapshot = read(stream)
-        versions.append(snapshot.version)
-        if len(versions) == 1:
-            done.append(from_another_thread(operation))
-        return snapshot
-
-    def transact_recording_conflicts(stream, decide, **options):
+    def transact_after_validation(stream, decide, **options):
+        if options.get("expected_version") is not None:
+            versions.append(options["expected_version"])
+            if len(versions) == 1:
+                done.append(from_another_thread(operation))
         try:
             return transact(stream, decide, **options)
         except StreamVersionConflict as exc:
             conflicts.append(exc)
             raise
 
-    monkeypatch.setattr(system.writes, "read", read_then_operate)
-    monkeypatch.setattr(system.writes, "transact", transact_recording_conflicts)
+    monkeypatch.setattr(system.writes, "transact", transact_after_validation)
     return versions, done, conflicts
 
 

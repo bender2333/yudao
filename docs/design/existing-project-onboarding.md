@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-更新：2026-09-29。状态：设计说明草稿，待用户确认；未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
+更新：2026-09-29。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
 
 依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节与[构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
@@ -139,7 +139,7 @@ flowchart TB
 | 工程 | 仓库概况 → 清单、构建与测试配置、持续集成 → 入口与包的边界 → 代表性的实现文件 → 用 `run_check` 核实构建与测试命令 |
 | 质检 | 初始 PRD → 测试与持续集成配置，自己找出测试命令 → 用 `run_check` 运行已有测试（可以按目录或文件分组）→ 对没有测试覆盖的要求写临时检查（`run_check` 的 argv） |
 
-**运行限额。** 建档 run 与普通 run 使用同一份限额定义（D09）：运行时间上限 `run_time_limit_sec`、工具输出上限与截断后的继续取回、按 D10 的自动压缩。每一轮（包括修改轮）是一个新的 run，有自己的运行时间。检查的时限为定义中的 `check_timeout_sec`，超时的检查记为失败并带超时说明，按第 4.5 节处理。
+**运行限额。** 建档 run 与普通 run 使用同一份限额定义（D09）：运行时间上限 `run_time_limit_sec`、工具输出上限与截断后的继续取回、按 D10 的自动压缩。建档 run 的运行时间上限与普通事项相同（定义中的 7200 秒）；每一轮（包括修改轮）是一个新的 run，单独计算运行时间。仓库概况与读取顺序限制了阅读的范围，没有核实的功能区域写进初始 PRD 的边界（第 4.3 节）。检查的时限为定义中的 `check_timeout_sec`，限额定义的新版本中为 600 秒（与登记命令的最大时限 `command_timeout_max_sec` 相同），普通事项的检查同样适用；超时的检查记为失败并带超时说明，按第 4.5 节处理。
 
 ### 4.3 产品：初始 PRD
 
@@ -238,6 +238,8 @@ sequenceDiagram
 - **项目上下文中的基线。** 项目上下文（`project_context_text`，`projects.py:211-241`）对建档采纳写出：「已有项目的代码快照」、文件数、git 提交、基线检查与现有缺陷；不逐个列出快照中的文件。
 - **现有缺陷。** 基线核验中的 `existing_defect` 与其他失败记为采纳成果的已知风险，用户以后可以为它们新建事项修复。
 - 源目录在整个过程中只被读取，不被改写；以后的变更由交付提供（本地通用工具设计说明第 1 节）。
+- **源目录以后的修改不进入项目。** 项目从快照开始在 Yudao 中独立演进，建档以后源目录中的修改不会同步进来；要在源目录的新代码上工作，把它接入为新项目。
+- **已有代码的唯一入口。** 已有代码只经 `project.onboard` 进入 Yudao；`work_item.create` 没有代码快照来源参数，事项总是从项目的采纳成果（或新项目的空树）开始。
 
 ## 6. 失败与中断
 
@@ -298,7 +300,7 @@ flowchart LR
 | 位置 | 现状 | 本设计的关系 |
 | --- | --- | --- |
 | `harness/projects.py:325-339` `register` | 写入 `project_registered`，`source` 固定为 `idea` | `project.onboard` 使用同一个事件，`source` 为 `existing`，与源目录登记、建档事项在同一个项目流事务中 |
-| `harness/projects.py:416-440` `start_work_item_from_snapshot` | 快照接入后以普通事项开始，`baseline` 为空 | 建档事项沿用 `ingest_snapshot` 与 `_work_item_created`，另写 `kind` |
+| `harness/projects.py:416-440` `start_work_item_from_snapshot` | 快照接入后以普通事项开始，`baseline` 为空；Web 的新建事项接口以 `source_dir` 调用它（`harness/web/server.py:116-122`） | 删除这个函数与 `source_dir`，`work_item.create` 不提供代码快照来源；建档事项沿用 `ingest_snapshot` 与 `_work_item_created`，另写 `kind` |
 | `harness/projects.py:475-492` `_start` | 先登记事项再创建 run，失败时写 `work_item_start_failed` | 建档事项与修改轮沿用 |
 | `harness/projects.py:518-548` `_settle_run` | DONE 且有 release 时写 `deliverable_adopted` 或 `adoption_held` | 建档事项的结算另走一支：写 `initial_prd_proposed` 与项目流决定请求；确认时写 `baseline_adopted` |
 | `harness/projects.py:211-268` `project_context_text` | 从采纳成果所属 run 的 ProductSpec 写出「仍有效的决定」 | 建档采纳作为当前采纳成果进入同一段；当前 PRD 按 #126 从项目流取得 |
@@ -322,7 +324,7 @@ flowchart LR
 
 所有验收使用真实运行的系统；自动化测试中的模型回答由 FakeAdapter 脚本给出，事件日志、工件与工作区都是真实实现，不使用模拟对象。真实项目验收使用真实模型。
 
-1. **真实项目建档（Stage 3 计划 3.8 行）。** 一个没有经过 Yudao 的真实代码项目经 `project.onboard` 完成建档，用户在桌面客户端的决定卡片中确认初始 PRD，随后一个事项在它的基础上完成修改并采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。
+1. **真实项目建档（Stage 3 计划 3.8 行）。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v8 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在桌面客户端的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。
 2. **界面。** 接入入口、建档状态与阅读动作、`initial_prd` 决定卡片（含第 3.2 节的材料与两个选项）、资料页的各轮初始 PRD、确认记录、结构说明与基线核验，在真实运行的系统上通过 Playwright 端到端测试，页面上的数据都来自查询与事件流。
 3. **修改的往返。** 用户提出修改并附说明：出现第二轮 run，产品的 ProductSpec 处理了修改意见，质检重新核验，新的决定请求出现；空说明的「提出修改」被拒绝。
 4. **退回产品。** 质检提交带 `unsupported` 或遗漏的基线核验时，run 退回产品；提交 `consistent` 时有 `unsupported` 或未说明的失败检查被拒绝。
@@ -333,33 +335,38 @@ flowchart LR
 9. **源目录无效。** 源目录不存在、含有宿主私有路径或公开树中有无法表示的条目时，`project.onboard` 返回 `source_invalid` 与相对路径，没有建立项目。
 10. **建档之前的事项。** 3.4A 之前在建档中的项目新建事项被拒绝（`work_item_in_progress`）；3.4A 之后进入队列显示「等待建档」，确认以后从基线开始。
 11. **失败与中断（第 6 节）。** 建档 run 在工具执行时被真实进程终止，重启后自动继续；在 run 结束与候选写入之间终止，重启后补做一次结算，只有一个决定请求；回答「提出修改」以后、新 run 创建之前终止，重启后建立缺少的 run；用 run 事件版本较早的数据目录启动，等待确认的决定请求照常显示并可以回答；运行时间用完以后 `onboarding.restart` 可用；`work_item.cancel` 撤销等待中的决定请求。
-12. **版本回归。** 如果评测工作线（#118）的 Yudao 运行器已经完成：运行场景 2、3 的版本回归，与上一次结果比较；3.2D 完成以后加上场景 1（Stage 3 计划第 7 节）。
+12. **版本回归。** 如果评测工作线（#118）的 Yudao 运行器已经完成：运行场景 2、3 的版本回归，与上一次结果比较；3.2D 完成以后加上场景 1（Stage 3 计划第 7 节）。场景 2 的 Yudao 一侧先建档，运行器回答确认（[评测场景设计](evaluation-scenarios.md)第 9 节）。
+13. **快照来源与检查时限。** `work_item.create` 的合同与 OpenAPI 中没有代码快照来源参数；`check_timeout_sec` 在当前限额定义中为 600 秒。
 
 ## 11. 对其他文档的影响
 
 本文件确定以后，由架构师修改：
 
-- [应用层与接口层设计说明](app-and-interface.md)：第 3.2 节项目命令表加入 `project.onboard`、`onboarding.restart`；第 3.1 节拒绝原因加入 `source_invalid`；第 3.3 节 `initial_prd` 一行写明项目流中的决定；第 4.3 节 `decisions.list`、`projects.list`、`project.overview`、`project.loop`、`work_item.materials` 加入第 3.4 节的内容；命令数量随之修改。
+- [应用层与接口层设计说明](app-and-interface.md)：第 3.2 节项目命令表加入 `project.onboard`、`onboarding.restart`，`work_item.create` 没有代码快照来源，`source_directory.save` 服务于接入已有项目；第 3.1 节拒绝原因加入 `source_invalid`；第 3.3 节 `initial_prd` 一行写明项目流中的决定；第 4.3 节 `decisions.list`、`projects.list`、`project.overview`、`project.loop`、`work_item.materials` 加入第 3.4 节的内容；第 10 节第 6 项改为接入已有项目的源目录；命令数量随之修改。
+- [本地通用工具设计说明](local-tools.md)第 1 节：已有项目经建档进入。
+- [评测场景设计](evaluation-scenarios.md)：场景 2 的 Yudao 一侧先建档，建档的用量与耗时单独列出。
 - [原型 v8 构建约定](../prototypes/v8/BUILD.md)：`project.onboard` 去掉「合同待补」并增加源目录名称参数；3.8 的临时事件改为第 3.3 节的事件；`p-agents` 的示例数据按第 3.2 节的决定材料编写。
 - [D33](../requirements/existing-project-onboarding.md)：「设计中待确定的内容」四项的结论指向本文第 4.2 至 4.7 节，实现状态写明设计完成。
 - [设计文档索引](README.md)、[Stage 3 计划](../stage-3-plan.md) 3.8 行、`docs/CHANGELOG.md`。
 
-## 12. 待用户确认
+## 12. 用户确认的决定
 
-1. **`work_item.create` 的代码快照来源是否删除。** 建档以后，已有代码有两个进入方式：`project.onboard`，以及 `work_item.create` 的代码快照来源（3.2A）。后者开始的事项没有初始 PRD，采纳以后项目的当前 PRD 只覆盖一次变更，正是 D33 要解决的问题。推荐：删除 `work_item.create` 的代码快照来源（#74 的范围随之缩小），已有代码只经 `project.onboard` 进入；评测场景 2 的 Yudao 运行器先建档并由运行器回答确认，再新建事项，建档的用量与耗时在报告中单列（需要同时修改[评测场景设计](evaluation-scenarios.md)第 9 节中场景 2 的 Yudao 一侧）。
-2. **建档以后源目录的修改不进入项目。** Yudao 从快照开始独立演进，源目录以后的修改不会同步进来；需要 Yudao 在新代码上工作时，把源目录接入为新项目。推荐接受这个边界：同步外部修改需要合并两条独立演进的代码与 PRD，属于单独的需求。
-3. **检查的时限。** 定义中的 `check_timeout_sec` 为 30 秒，真实仓库的测试集常常超过这个时间，超时的检查只能记为失败，基线失真。推荐在限额定义的新版本中改为 600 秒（与登记命令的最大时限 `command_timeout_max_sec` 相同），普通事项的检查同样适用。
-4. **验收使用的真实项目。** 推荐 openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v8 的示例项目），建档以后的事项实现 issue 842；这个仓库约 1.3 万行、有完整的测试集，与原型的示例数据一致。
-5. **建档 run 的运行时间上限。** 推荐与普通事项相同（定义中的 7200 秒，每一轮单独计算）；仓库概况与读取顺序限制了阅读的范围，没有核实的功能区域写进初始 PRD 的边界。
+2026-09-29 用户采纳以下五项，原话：「采纳推荐，目前先支持本机进行，容器就是走本机RPC?这样的话与远程机器通信一致了，当前阶段我还不能提供树莓派，需要等等」。
+
+1. **已有代码只经 `project.onboard` 进入。** `work_item.create` 没有代码快照来源参数（#74 的范围随之缩小为 `source_directory.save`）。由代码快照开始的普通事项没有初始 PRD，采纳以后项目的当前 PRD 只覆盖一次变更，正是 D33 要解决的问题。评测场景 2 的 Yudao 运行器先建档，由运行器回答初始 PRD 的确认，再新建事项；建档的用量与耗时在报告中单独列出（[评测场景设计](evaluation-scenarios.md)第 5.2、9 节）。
+2. **建档以后源目录的修改不进入项目。** Yudao 从快照开始独立演进，源目录以后的修改不会同步进来；要在新代码上工作时，把源目录接入为新项目（第 5 节）。同步外部修改需要合并两条独立演进的代码与 PRD，属于单独的需求。
+3. **检查的时限为 600 秒。** 原来定义中的 `check_timeout_sec` 为 30 秒，真实仓库的测试集常常超过这个时间，超时的检查只能记为失败，基线失真。限额定义的新版本中改为 600 秒（与登记命令的最大时限 `command_timeout_max_sec` 相同），普通事项的检查同样适用（第 4.2 节）。
+4. **验收使用的真实项目。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v8 的示例项目），建档以后的事项实现 issue 842；这个仓库约 1.3 万行、有完整的测试集，与原型的示例数据一致（第 10 节第 1 项）。
+5. **建档 run 的运行时间上限与普通事项相同。** 定义中的 7200 秒，每一轮单独计算；仓库概况与读取顺序限制了阅读的范围，没有核实的功能区域写进初始 PRD 的边界（第 4.2 节）。
 
 ## 13. 建议的工单拆分
 
-全部挂在 #124 下。后端工单不被界面工单阻塞；界面工单被自己的后端工单与 #80 阻塞（Stage 3 计划第 3 节的规则），并以原型 v8（#125）为依据。
+全部挂在 #124 下，编号依次为 #134 至 #139。后端工单不被界面工单阻塞；界面工单被自己的后端工单与 #80 阻塞（Stage 3 计划第 3 节的规则），并以原型 v8（#125）为依据。
 
 | 工单 | 内容 | 验收 | 阻塞 |
 | --- | --- | --- | --- |
-| [3.8] 建档事项的定义与部门产出 | 定义中的事项种类 `onboarding`：三个部门的说明、工具清单、提案合同 `submit_structure` 与 `submit_baseline_review`、阶段迁移、停止原因 `baseline_verified`、文件名模式表；U 的校验与树摘要不变的核对；P 的 `existing_overview`、`existing_structure` 与工程可见范围；主机生成 STRUCTURE.md 与仓库概况；run 流事件 `structure_accepted`、`baseline_review_accepted`（第 3.3、4.2 至 4.5 节） | 第 10 节第 4、5、6、7 项，用 FakeAdapter 从快照开始的建档 run 走到 `baseline_verified` | #126 |
-| [3.8] 接入命令与建档事项的开始 | `project.onboard`、`onboarding.restart`、`source_invalid`；快照的 git 来源；`project_registered` 的 `existing` 与 `work_item_created` 的 `kind`（登记在项目流字段清单）；建档之前新建事项的拒绝与排队规则；`work_item.cancel` 对建档事项的处理；`projects.list`、`project.loop` 的状态（第 2、3.1、3.4 节） | 第 10 节第 8、9、10 项；经 HTTP 命令完成从接入到 `baseline_verified` | 上一张；#74；#126 |
+| [3.8] 建档事项的定义与部门产出 | 定义中的事项种类 `onboarding`：三个部门的说明、工具清单、提案合同 `submit_structure` 与 `submit_baseline_review`、阶段迁移、停止原因 `baseline_verified`、文件名模式表；U 的校验与树摘要不变的核对；P 的 `existing_overview`、`existing_structure` 与工程可见范围；主机生成 STRUCTURE.md 与仓库概况；run 流事件 `structure_accepted`、`baseline_review_accepted`；限额定义的新版本把 `check_timeout_sec` 改为 600 秒（第 3.3、4.2 至 4.5 节） | 第 10 节第 4、5、6、7 项与第 13 项的检查时限，用 FakeAdapter 从快照开始的建档 run 走到 `baseline_verified` | #126 |
+| [3.8] 接入命令与建档事项的开始 | `project.onboard`、`onboarding.restart`、`source_invalid`；删除 `work_item.create` 的代码快照来源与 `start_work_item_from_snapshot`；快照的 git 来源；`project_registered` 的 `existing` 与 `work_item_created` 的 `kind`（登记在项目流字段清单）；建档之前新建事项的拒绝与排队规则；`work_item.cancel` 对建档事项的处理；`projects.list`、`project.loop` 的状态（第 2、3.1、3.4、5 节） | 第 10 节第 8、9、10 项与第 13 项的快照来源；经 HTTP 命令完成从接入到 `baseline_verified` | 上一张；#74；#126 |
 | [3.8] 初始 PRD 的确认与基线采纳 | 建档 run 结束后的结算；项目流中的决定事件与 `initial_prd` 种类，`decisions.list` 与 `decision.answer` 支持项目流的决定；确认写 `baseline_adopted`，当前 PRD 进入项目流；提出修改开始新一轮 run；以后事项的项目上下文；启动时的补做与强制升级的处理；`project.overview`、`work_item.materials` 的内容（第 3.2、4.7、5、6 节） | 第 10 节第 3、11 项；确认以后新建的事项从基线开始并完成采纳 | 上一张；#16 |
 | [3.8] 界面：接入入口与建档状态 | 左侧栏「接入已有项目」与对话框（名称、长期目标、源目录名称与路径），`source_invalid` 的提示；项目列表与楼层中的建档状态标记；部门房间中「阅读已有项目」的动作，由建档事项的读取与搜索工具事件驱动（原型 v8 第 4、8、12 节 3.8 档，场景 13） | Playwright 在真实运行的系统上完成接入并看到状态与动作 | 接入命令工单；#80；#125 |
 | [3.8] 界面：初始 PRD 的决定卡片与资料 | 首页与项目页面的 `initial_prd` 决定卡片：第 3.2 节的材料、确认与提出修改（说明必填）；资料页的各轮初始 PRD 与确认记录、项目材料中的结构说明、基线核验与基线检查（原型 v8 第 6、7.3 节） | Playwright 完成确认与一次提出修改的往返 | 确认工单；#80；#125 |

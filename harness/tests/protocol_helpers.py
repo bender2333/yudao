@@ -282,6 +282,50 @@ def bound_target(facade: ProviderFacade) -> FrozenTarget:
     return facade.resolve_snapshot([{"key": "k", "provider_id": "go", "model_id": "m-go"}]).target("k")
 
 
+class HandleAdapter:
+    # 运行时的门面适配器不保存调用目标：目标在每次逻辑调用之前按部门默认解析。
+    # 测试直接使用协议实现时没有步骤驱动，这里按公开解析入口登记一次目标，再按每次调用的逻辑身份绑定句柄
+    name = "facade"
+
+    def __init__(self, facade: ProviderFacade, model_id: str,
+                 *, connections: ProviderConnections | None = None) -> None:
+        self._facade = facade
+        self._model_id = str(model_id)
+        self._adapter = FacadeAdapter(facade, connections=connections)
+        self._bound: str | None = None
+        self.model = self._model_id
+
+    def availability(self) -> Availability:
+        return self._adapter.availability()
+
+    def cancel(self, attempt_id: str) -> None:
+        self._adapter.cancel(attempt_id)
+
+    async def stream(self, call: ModelCall) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
+        # 与步骤驱动相同：每次逻辑调用解析一次目标，重试沿用同一个句柄，调用换了才释放上一个
+        if self._bound != call.logical_call_id:
+            if self._bound is not None:
+                self._facade.release_call_handle(self._bound)
+            resolution = self._facade.resolve_call_target(self._model_id)
+            if not resolution.available:
+                raise ProviderError(resolution.message, reason=resolution.reason)
+            self._facade.bind_call_key(resolution.handle_id, call.logical_call_id)
+            self._bound = call.logical_call_id
+        async with aclosing(self._adapter.stream(call)) as items:
+            async for item in items:
+                yield item
+
+
+def bound_adapter(facade: ProviderFacade, *, provider_id: str = "go", model_id: str = "m-go",
+                  connections: ProviderConnections | None = None) -> HandleAdapter:
+    # 记录一次模型测试准入，再交给按句柄调用的桥接（准入是真实协议解析的前置条件）
+    model = next((item for item in facade.providers_view()["models"] if item["id"] == model_id), None)
+    if model is None:
+        raise AssertionError(f"test model {model_id} is not in the facade catalog")
+    facade.record_admission(provider_id, model_id, admitted_model=model["model"])
+    return HandleAdapter(facade, model_id, connections=connections)
+
+
 def provider_system(data_dir: Path, base: str, protocol: str, *, timeout_sec: float = 20.0,
                     step_limits: StepLimits = StepLimits()) -> tuple[LoopSystem, str]:
     # 经真实 Provider 模块的系统：三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
@@ -360,17 +404,17 @@ def _build_delegate(config: ResponsesConfig, loop: ConnectionLoop | None) -> Mod
         }],
         "bindings": {},
     })
-    snapshot = facade.resolve_snapshot([{
-        "key": "test", "provider_id": config.provider or "test-provider", "model_id": "test-model",
-    }])
-    return FacadeAdapter(facade, snapshot.target("test"), connections=None if loop is None else loop.connections)
+    facade.record_admission(config.provider or "test-provider", "test-model", admitted_model=config.model)
+    return HandleAdapter(facade, "test-model", connections=None if loop is None else loop.connections)
 
 
 __all__ = [
     "Capture",
     "ConnectionLoop",
+    "HandleAdapter",
     "ResponsesAdapter",
     "ScriptedProvider",
+    "bound_adapter",
     "bound_target",
     "chat_responder",
     "complete",

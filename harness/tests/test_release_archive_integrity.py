@@ -5,11 +5,11 @@ import shutil
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.event_store import run_stream
 from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.public_tree import CapturedFile, CapturedTree, capture_public_tree, materialize_tree
+from harness.tests.saved_rewrite import rewrite_saved_projection
 from harness.tree_archive import load_tree
 
 
@@ -117,20 +117,13 @@ def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(tmp_pa
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
 
 
-def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tmp_path, monkeypatch):
+def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tmp_path):
     system, run_ids, ready = _quality_ready(tmp_path)
     run_id = run_ids[0]
-    original_read = system.writes.read
-
-    def read(stream):
-        # 提案校验读取的运行状态中，当前交付的摘要与工作区不同
-        snapshot = original_read(stream)
-        if stream == run_stream(run_id) and snapshot.projection.phase == "QUALITY":
-            delivery = replace(snapshot.projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
-            snapshot.projection = replace(snapshot.projection, delivery_spec=delivery)
-        return snapshot
-
-    monkeypatch.setattr(system.writes, "read", read)
+    projection = system.project(run_id)
+    delivery = replace(projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
+    # 保存的运行状态中，当前交付的摘要与工作区不同：写回这个流保存的投影
+    rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
     result = system.activate_once(run_id)
     recorded = system.project(run_id)
 

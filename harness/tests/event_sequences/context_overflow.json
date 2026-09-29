@@ -69,7 +69,6 @@
     "project_id": null,
     "prompt_config_versions": {},
     "provider": "fake",
-    "provider_snapshot": {},
     "registered_commands": {},
     "run_time_limit_sec": 7200,
     "sessions": {
@@ -119,11 +118,6 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
-    "base_url": null,
-    "configured_max_output_tokens": null,
-    "context_window": null,
-    "credential_ref": null,
-    "credential_version": null,
     "cycle": 1,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -131,52 +125,14 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "model_id": null,
     "prompt_hash": "<sha256#2>",
     "prompt_version": 1,
-    "protocol": "test",
-    "provider_config_id": null,
-    "provider_name": "fake",
     "request_id": null,
-    "requested_model": "fake-script",
-    "requested_protocol": "test",
-    "requested_provider": "fake",
-    "snapshot_id": null,
     "yielded_work": null
    }
   },
   {
    "event": "<evt#4>",
-   "type": "department_input",
-   "role": "product",
-   "state_before": "PRODUCT_SPEC",
-   "state_after": "PRODUCT_SPEC",
-   "parent_event_id": "<evt#3>",
-   "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
-   "stop_reason": null,
-   "error": null,
-   "artifact_hashes": [
-    "<sha256#3>"
-   ],
-   "payload": {
-    "activation_id": "<act#1>",
-    "effective_contract_hash": null,
-    "engineering_plan_hash": null,
-    "guidance_ids": [],
-    "guidance_only": false,
-    "input_ref": "<art#5>",
-    "input_version": 1,
-    "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
-    "request_id": null,
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#5>",
    "type": "run_failed",
    "role": "product",
    "state_before": "PRODUCT_SPEC",
@@ -187,21 +143,21 @@
    "model": null,
    "context_digest": null,
    "stop_reason": "context_overflow",
-   "error": "Pinned intend/current work and tool schemas leave no room for history and a response",
+   "error": "the model request leaves no room for model output",
    "artifact_hashes": [],
    "payload": {
     "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
-    "message": "Pinned intend/current work and tool schemas leave no room for history and a response",
+    "message": "the model request leaves no room for model output",
     "stop_reason": "context_overflow"
    }
   },
   {
-   "event": "<evt#6>",
+   "event": "<evt#5>",
    "type": "lesson_candidate_recorded",
    "role": "product",
    "state_before": "FAILED",
    "state_after": "FAILED",
-   "parent_event_id": "<evt#5>",
+   "parent_event_id": "<evt#4>",
    "session_id": null,
    "provider": null,
    "model": null,
@@ -216,18 +172,18 @@
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
     "observation": {
-     "message": "Pinned intend/current work and tool schemas leave no room for history and a response",
+     "message": "the model request leaves no room for model output",
      "stop_reason": "context_overflow"
     },
     "product_spec_hash": null,
-    "source_event_id": "<evt#5>",
+    "source_event_id": "<evt#4>",
     "source_type": "run_failed",
     "status": "unverified",
     "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
    }
   },
   {
-   "event": "<evt#7>",
+   "event": "<evt#6>",
    "type": "activation_finished",
    "role": "product",
    "state_before": "FAILED",
@@ -265,6 +221,7 @@
   "cycle_count": 1,
   "delivery_spec": null,
   "delivery_specs": [],
+  "department_call_targets": {},
   "department_guidance": [],
   "department_prompts": {
    "engineering": {
@@ -294,7 +251,7 @@
   "effective_decisions": [],
   "engineering_plan": null,
   "engineering_plans": [],
-  "error": "Pinned intend/current work and tool schemas leave no room for history and a response",
+  "error": "the model request leaves no room for model output",
   "evidence": [],
   "git_version": {
    "commit": "<git#1>",
@@ -335,17 +292,17 @@
   "lesson_candidates": [
    {
     "checks": [],
-    "created_event_id": "<evt#6>",
+    "created_event_id": "<evt#5>",
     "delivery_spec_hash": null,
     "evidence_refs": [],
     "id": "<lesson#1>",
     "observation": {
-     "message": "Pinned intend/current work and tool schemas leave no room for history and a response",
+     "message": "the model request leaves no room for model output",
      "stop_reason": "context_overflow"
     },
     "product_spec_hash": null,
     "run_id": "<run#1>",
-    "source_event_id": "<evt#5>",
+    "source_event_id": "<evt#4>",
     "source_type": "run_failed",
     "status": "unverified",
     "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
@@ -391,7 +348,6 @@
    }
   ],
   "provider": "fake",
-  "provider_snapshot": {},
   "registered_commands": {},
   "rejections": [],
   "request_count": 0,
@@ -426,7 +382,7 @@
   },
   "snapshot": null,
   "stop_reason": "context_overflow",
-  "stream_version": 7,
+  "stream_version": 6,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 0,
@@ -458,14 +414,6 @@
    "kind": "user_input",
    "media_type": "text/plain; charset=utf-8",
    "content": "build an echo CLI"
-  },
-  "<art#5>": {
-   "kind": "department_input",
-   "media_type": "application/json",
-   "content": {
-    "content": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-    "role": "user"
-   }
   }
  },
  "shared": {

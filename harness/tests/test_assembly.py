@@ -11,12 +11,12 @@ from harness.tests.helpers import list_files_turn
 from harness.tests.test_compaction_engine import _runner
 
 
-def test_model_limits_keep_the_wide_window_and_reserve_half_of_a_narrow_one():
-    # 有效窗口取 run 与调用目标中较小的一个；宽窗口保留 15%，窄窗口最多保留一半给回复
-    assert model_limits(32000, 32000, 4096) == ModelLimits(32000, 4096, 4800)
-    assert model_limits(32000, 8000, 4096) == ModelLimits(8000, 4096, 4000)
-    assert model_limits(32000, 6000, 1000) == ModelLimits(6000, 1000, 1000)
-    assert model_limits(32000) == ModelLimits(32000, None, 4800)
+def test_model_limits_use_the_call_target_window_and_reserve_half_of_a_narrow_one():
+    # 阈值只用本次调用目标的窗口；宽窗口保留 15%，窄窗口最多保留一半给回复
+    assert model_limits(32000, 4096) == ModelLimits(32000, 4096, 4800)
+    assert model_limits(8000, 4096) == ModelLimits(8000, 4096, 4000)
+    assert model_limits(6000, 1000) == ModelLimits(6000, 1000, 1000)
+    assert model_limits(32000, None) == ModelLimits(32000, None, 4800)
 
 
 def _rebuild_recorded_steps(system, run_id):
@@ -41,7 +41,8 @@ def _rebuild_recorded_steps(system, run_id):
             )
         elif event.type == EventType.CONTEXT_ASSEMBLED:
             before = events[:index]
-            pinned = assembly.pin(projection, frames[payload["activation_id"]], model_limits(projection.context_window),
+            limits = model_limits(payload["context_window"], payload["configured_max_output_tokens"])
+            pinned = assembly.pin(projection, frames[payload["activation_id"]], limits,
                                   step_id=payload["step_id"], events=before, snapshot_hash=payload["snapshot_hash"])
             step = assembly.request(pinned, assembly.department_history(before, event.role))
             assert step.payload == artifact(payload["request_ref"])

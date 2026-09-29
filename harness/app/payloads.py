@@ -163,8 +163,7 @@ class WorkBasis(Payload):
 
 
 class CallTarget(Payload):
-    # 调用目标：配置的与实际解析的提供方、协议与模型，凭据只有引用与版本
-    snapshot_id: str | None
+    # 调用目标：这次请求解析出的连接、协议与模型，凭据只有引用与版本；原始请求档位与实际发送的档位
     provider_config_id: str | None
     model_id: str | None
     provider_name: str
@@ -177,6 +176,9 @@ class CallTarget(Payload):
     credential_version: str | None
     context_window: int | None
     configured_max_output_tokens: int | None
+    selection_source: str | None
+    requested_tier: str | None
+    sent_tier: str | None
 
 
 class AttemptIdentity(Payload):
@@ -239,8 +241,6 @@ class RunCreatedPayload(Payload):
     context_window: int
     provider: str
     adapter: str
-    # Provider 模块给出的调用目标快照（没有冻结目标时为空），结构由 Provider 模块确定
-    provider_snapshot: dict[str, Any]
     sessions: dict[Department, str]
     project_id: str | None
     work_item_id: str | None
@@ -296,7 +296,7 @@ class DepartmentGuidanceRespondedPayload(Payload):
     content_hash: str
 
 
-class DepartmentActivatedPayload(Versions, WorkBasis, CallTarget):
+class DepartmentActivatedPayload(Versions, WorkBasis):
     activation_id: str
     cycle: int
     yielded_work: YieldedWork | None

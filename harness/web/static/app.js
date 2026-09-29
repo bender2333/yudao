@@ -850,7 +850,7 @@
   function providerMarkup(provider) {
     const value = provider || {};
     const rows = [["提供方", value.provider], ["模型", value.model], ["协议", value.protocol], ["温度", value.temperature], ["上下文窗", value.context_window], ["最大输出", value.max_output_tokens]];
-    return `<div class="dw-inspect-panel" id="dw-panel-provider" role="tabpanel" aria-labelledby="dw-tab-provider"><h3>Provider 配置</h3><dl class="dw-data-list">${rows.map(([key, item]) => `<div class="dw-data-row"><dt>${key}</dt><dd>${text(item)}</dd></div>`).join("")}</dl><p class="dw-small">以上为本次任务采用的只读快照。</p></div>`;
+    return `<div class="dw-inspect-panel" id="dw-panel-provider" role="tabpanel" aria-labelledby="dw-tab-provider"><h3>Provider 配置</h3><dl class="dw-data-list">${rows.map(([key, item]) => `<div class="dw-data-row"><dt>${key}</dt><dd>${text(item)}</dd></div>`).join("")}</dl><p class="dw-small">以上为该部门最近一次模型请求记录的调用目标。</p></div>`;
   }
 
 
