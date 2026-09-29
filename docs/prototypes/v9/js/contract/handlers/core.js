@@ -2,8 +2,8 @@
 // event.detail；decision.answer、home.mark_seen
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const B = Y8.backend;
+  const Y9 = window.Y9;
+  const B = Y9.backend;
   if (!B) throw new Error('handlers/core.js 需要先加载 contract/backend.js');
 
   const TERMINAL_PHASES = ['DONE', 'PAUSED', 'FAILED'];
@@ -12,7 +12,7 @@
   B.checks = B.checks || {};
 
   function since(db, iso) {
-    return Math.max(0, Y8.time.between(iso, db.now));
+    return Math.max(0, Y9.time.between(iso, db.now));
   }
 
   function requireProject(db, id) {
@@ -60,7 +60,7 @@
   function signOf(status, run, db, item) {
     if (status === 'waiting_decision') {
       const d = db && item ? (db.data.decisions || []).find((x) => x.status === 'waiting' && x.blocks && x.blocks.work_item_id === item.id) : null;
-      return '待你决定' + (d ? '：' + Y8.registry.entry('decision', d.kind).label : '');
+      return '待你决定' + (d ? '：' + Y9.registry.entry('decision', d.kind).label : '');
     }
     if (status === 'waiting_resume') {
       const u = run.recovery && run.recovery.unusable;
@@ -154,7 +154,7 @@
   }
 
   function waitingDecisions(db, filter) {
-    return (db.data.decisions || []).filter((d) => d.status === 'waiting' && Y8.level.atLeast(Y8.registry.levelOf('decision', d.kind)) &&
+    return (db.data.decisions || []).filter((d) => d.status === 'waiting' && Y9.level.atLeast(Y9.registry.levelOf('decision', d.kind)) &&
       (!filter || !filter.project || d.project_id === filter.project));
   }
 
@@ -171,7 +171,7 @@
     const firstOf = (list) => (list.length ? { project_id: list[0].project_id, work_item_id: list[0].work_item_id } : null);
     const out = {
       now: db.now,
-      deployment: Y8.clone(db.data.deployment),
+      deployment: Y9.clone(db.data.deployment),
       booted_at: s.booted_at,
       provider_ready: s.provider_ready,
       catalog_revision: s.catalog_revision,
@@ -223,16 +223,16 @@
       return out;
     });
     return list.sort((a, b) => (Number(a.archived) - Number(b.archived)) || (Number(b.pinned) - Number(a.pinned)) ||
-      (Y8.time.ms(b.last_activity_at) - Y8.time.ms(a.last_activity_at)));
+      (Y9.time.ms(b.last_activity_at) - Y9.time.ms(a.last_activity_at)));
   });
 
   function decisionOut(db, d) {
     const project = db.project(d.project_id);
     const item = d.work_item_id ? db.workItem(d.work_item_id) : null;
     const blocked = d.blocks && d.blocks.work_item_id ? db.workItem(d.blocks.work_item_id) : null;
-    const out = Y8.clone(d);
+    const out = Y9.clone(d);
     out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null, note_required: Boolean(o.note_required) }));
-    out.kind_label = Y8.registry.entry('decision', d.kind).label;
+    out.kind_label = Y9.registry.entry('decision', d.kind).label;
     out.project_name = project ? project.name : d.project_id;
     out.work_item_title = item ? item.title : null;
     out.waited_sec = since(db, d.issued_at);
@@ -244,12 +244,12 @@
   B.query('decisions.list', (params, db) => {
     const statuses = params.status ? [].concat(params.status) : ['waiting'];
     return (db.data.decisions || [])
-      .filter((d) => Y8.level.atLeast(Y8.registry.levelOf('decision', d.kind)))
+      .filter((d) => Y9.level.atLeast(Y9.registry.levelOf('decision', d.kind)))
       .filter((d) => statuses.includes(d.status))
       .filter((d) => !params.project || d.project_id === params.project)
       .filter((d) => !params.work_item || d.work_item_id === params.work_item)
       .filter((d) => !params.kind || d.kind === params.kind)
-      .sort((a, b) => Y8.time.ms(a.issued_at) - Y8.time.ms(b.issued_at))
+      .sort((a, b) => Y9.time.ms(a.issued_at) - Y9.time.ms(b.issued_at))
       .map((d) => decisionOut(db, d));
   });
 
@@ -315,13 +315,13 @@
       fromPosition = home.last_seen_position;
       fromAt = home.last_seen_at;
     } else {
-      fromAt = Y8.time.add(db.now, range === '24h' ? -86400 : -7 * 86400);
-      const earlier = db.log().filter((ev) => Y8.time.ms(ev.at) <= Y8.time.ms(fromAt));
+      fromAt = Y9.time.add(db.now, range === '24h' ? -86400 : -7 * 86400);
+      const earlier = db.log().filter((ev) => Y9.time.ms(ev.at) <= Y9.time.ms(fromAt));
       fromPosition = earlier.length ? earlier[earlier.length - 1].position : 0;
     }
     const events = db.log().filter((ev) => ev.position > fromPosition && (!params.project || ev.project_id === params.project));
     const facts = events.map((ev) => {
-      const kind = Y8.registry.keyOf(ev);
+      const kind = Y9.registry.keyOf(ev);
       return kind ? { position: ev.position, at: ev.at, kind, project_id: ev.project_id, work_item_id: ev.work_item_id, label: ev.label, event: ev } : null;
     }).filter(Boolean);
     const summary = [];
@@ -338,7 +338,7 @@
     (db.data.runs || []).forEach((run) => {
       if (params.project && run.project_id !== params.project) return;
       (run.attempts || []).forEach((a) => {
-        if (Y8.time.ms(a.started_at) > Y8.time.ms(fromAt) && a.usage && typeof a.usage.total === 'number') {
+        if (Y9.time.ms(a.started_at) > Y9.time.ms(fromAt) && a.usage && typeof a.usage.total === 'number') {
           tokens += a.usage.total;
           attempts += 1;
         }
@@ -391,17 +391,17 @@
     const note = (params.note || '').trim();
     if (option.note_required && !note) return reject('not_allowed', '「' + option.label + '」需要写明说明');
     const path = 'decisions[id=' + raw.id + ']';
-    const projectStream = Y8.registry.entry('decision', raw.kind).stream === 'project';
+    const projectStream = Y9.registry.entry('decision', raw.kind).stream === 'project';
     const answered = {
       type: projectStream ? 'project_decision_answered' : 'x_decision_answered', project_id: raw.project_id, work_item_id: raw.work_item_id, run_id: raw.run_id,
-      label: '用户回答「' + Y8.registry.entry('decision', raw.kind).label + '」：' + option.label,
+      label: '用户回答「' + Y9.registry.entry('decision', raw.kind).label + '」：' + option.label,
       payload: { decision_id: raw.id, kind: raw.kind, option: option.id },
       patch: [
         { path: path + '.status', value: 'answered' },
         { path: path + '.answer', value: { option: option.id, label: option.label, note, at: db.now } }
       ]
     };
-    return { events: [answered].concat(Y8.clone(option.events || [])), message: '已提交回答：' + option.label };
+    return { events: [answered].concat(Y9.clone(option.events || [])), message: '已提交回答：' + option.label };
   });
 
   B.command('home.mark_seen', (params, db) => {

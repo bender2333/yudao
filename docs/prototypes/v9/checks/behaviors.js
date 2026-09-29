@@ -26,7 +26,7 @@ function staticChecks() {
 // ---------------------------------------------------------------------------
 // 在页面里运行的检查
 const DRIVER = async () => {
-  const P = window.Y8.pixel;
+  const P = window.Y9.pixel;
   const E = P.ecs;
   const results = [];
   const check = (name, ok, detail) => results.push({ name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail) });
@@ -330,6 +330,161 @@ const DRIVER = async () => {
     check('决定卡片：决定单落到板上，飞行结束', m.fl.scene.flyers.length === 0);
     drop(m);
 
+    // ------------------------------------------------------------------ 说话气泡
+    // 目录：每个会引起动作的事件都有一句话；话的内容来自事件已经带着的事实
+    const say = (ev) => P.say(ev);
+    check('说话气泡：每个会引起动作的事件类型都在目录里', Object.keys(P.EVENT_ACTIONS).every((k) => k in P.say.catalog), Object.keys(P.EVENT_ACTIONS).filter((k) => !(k in P.say.catalog)).join());
+    check('说话气泡：提交事件取事件说明里「提交」后面的部分',
+      say({ type: 'proposal_submitted', department: 'engineering', label: '工程经理代表部门提交交付说明', payload: {} }) === '现在提交交付说明');
+    check('说话气泡：提交事件带着提案种类时用提案种类', say({ type: 'proposal_submitted', department: 'quality', payload: { kind: 'qa_review' } }) === '现在提交质检结论');
+    check('说话气泡：工具事件的话带着文件名', say({ type: 'tool_started', tool: 'edit_range', department: 'engineering', label: '工程部门按区间编辑 app.js：导出为 CSV', payload: {} }) === '现在编辑 app.js');
+    check('说话气泡：登记命令的话带着命令名', say({ type: 'tool_started', tool: 'run_command', department: 'engineering', label: '工程部门走到终端执行登记命令 npm_test', payload: {} }) === '现在执行 npm_test');
+    check('说话气泡：交接的两端说不同的话',
+      P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'engineering' }) === '现在把交付箱送给质检'
+      && P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'quality' }) === '收到交付箱，来自工程');
+
+    // 部门房间：工程经理提交交付说明时头顶冒泡
+    const roomModel = (department, roles) => ({
+      department, level: 'S5', status: 'working', crt: {}, roles, pose: null, door: null, hold_card: null, pending_tool: null,
+      mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0, machine: null, remote_unknown: false,
+      waiting_provider: false, pipes: null, existing_read: false, trial: null, tool_panel: null, self_test: null
+    });
+    const mountRoom = (department, roles) => {
+      const bx = box();
+      const rm = P.createRoomScene(bx.canvas, { department });
+      rm.setModel(roomModel(department, roles));
+      return Object.assign(bx, { rm });
+    };
+    const dropRoom = (r) => { r.rm.destroy(); r.host.remove(); };
+    const saidBy = (r, id) => { const a = r.rm.scene.actors.find((x) => x.id === id); return a && a.data.say ? a.data.say.text : null; };
+    const taskOf = (c) => c.current || c.queue[0] || null;
+    // 画一帧，收集画出来的文字
+    const drawnTexts = (scene) => {
+      const orig = P.text;
+      const out = [];
+      P.text = function (c, str) { out.push(String(str)); return orig.apply(this, arguments); };
+      try { scene.drawNow(); } finally { P.text = orig; }
+      return out;
+    };
+    const engRoles = [role('eng-manager', 'manager', '工程经理'), role('eng-architect', 'architect', '工程架构师', 'working'), role('eng-lead', 'lead', '主程')];
+    const proR = [role('p-mgr', 'manager', '产品部门经理'), role('p-arch', 'architect', '产品架构师', 'working')];
+    const quaR = [role('q-mgr', 'manager', '质检经理'), role('q-test', 'tester', '测试工程师', 'working')];
+    let rm = mountRoom('engineering', engRoles);
+    step(500);
+    rm.rm.playEvent({ type: 'proposal_submitted', department: 'engineering', role: 'eng-manager', work_item_id: 'w1', label: '工程经理代表部门提交交付说明', payload: {} });
+    step(1200);
+    check('说话气泡：工程经理代表部门提交交付说明，头顶说「现在提交交付说明」', saidBy(rm, 'eng-manager') === '现在提交交付说明', saidBy(rm, 'eng-manager'));
+    check('说话气泡：这句话画在画面上', drawnTexts(rm.rm.scene).includes('现在提交交付说明'));
+    rm.rm.scene.reduced = true;
+    check('说话气泡：减少动画时照样画出来', drawnTexts(rm.rm.scene).includes('现在提交交付说明'));
+    rm.rm.scene.reduced = false;
+    step(6000);
+    check('说话气泡：说完过几秒气泡消失', !drawnTexts(rm.rm.scene).includes('现在提交交付说明'));
+    // 分派与交回：两端的角色各说一句
+    rm.rm.playEvent({ type: 'x_role_task_assigned', department: 'engineering', role: 'eng-lead', work_item_id: 'w1', payload: { to: 'eng-lead', task: '起草 PLAN' } });
+    step(1200);
+    check('说话气泡：经理分派任务时说要把任务交给谁', saidBy(rm, 'eng-manager') === '现在把任务交给主程：起草 PLAN', saidBy(rm, 'eng-manager'));
+    step(9000);
+    check('说话气泡：接任务的角色收到任务时说话', saidBy(rm, 'eng-lead') === '收到任务：起草 PLAN', saidBy(rm, 'eng-lead'));
+    rm.rm.playEvent({ type: 'x_role_result_returned', department: 'engineering', role: 'eng-lead', work_item_id: 'w1', payload: { to: 'eng-lead' } });
+    step(1500);
+    check('说话气泡：交回结果的角色说要把结果交回经理', saidBy(rm, 'eng-lead') === '现在把结果交回经理', saidBy(rm, 'eng-lead'));
+    step(9000);
+    check('说话气泡：经理收下结果时说话', saidBy(rm, 'eng-manager') === '收到结果', saidBy(rm, 'eng-manager'));
+    // 打字思考时头顶已经有思考气泡，不再重复说话
+    const beforeThink = saidBy(rm, 'eng-architect');
+    rm.rm.playEvent({ type: 'model_requested', department: 'engineering', role: 'eng-architect', work_item_id: 'w1', payload: {} });
+    step(1500);
+    check('说话气泡：模型请求时只有思考气泡，不重复说话', saidBy(rm, 'eng-architect') === beforeThink, saidBy(rm, 'eng-architect'));
+    // 交接：交出的部门说送给谁，收下的部门说收到什么
+    rm.rm.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
+    step(100);
+    check('说话气泡：交出交付箱的部门说「现在把交付箱送给质检」', saidBy(rm, 'eng-architect') === '现在把交付箱送给质检', saidBy(rm, 'eng-architect'));
+    let qr = mountRoom('quality', quaR);
+    step(500);
+    qr.rm.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
+    step(6000);
+    check('说话气泡：收下交付箱的部门说「收到交付箱，来自工程」', saidBy(qr, 'q-test') === '收到交付箱，来自工程', saidBy(qr, 'q-test'));
+    qr.rm.playEvent({ type: 'tool_started', tool: 'browser_navigate', department: 'quality', role: 'q-test', work_item_id: 'w1', label: '质检打开页面', payload: {} });
+    step(300);
+    check('说话气泡：没有专门动作的工具事件也说话', saidBy(qr, 'q-test') === '现在试用网页', saidBy(qr, 'q-test'));
+    dropRoom(qr);
+    dropRoom(rm);
+    // 询问与回答：发问方、回答方各说各的；收到询问的房间走到传信管口取信，而不是写信
+    const ask = { type: 'collaboration_requested', department: 'engineering', work_item_id: 'w1', label: '工程询问产品：线路偏好是否改变最短距离', payload: { from: 'engineering', to: 'product', request_id: 'q1' } };
+    const reply = { type: 'collaboration_responded', department: 'product', work_item_id: 'w1', label: '产品回答：不改变', payload: { from: 'product', to: 'engineering', request_id: 'q1' } };
+    rm = mountRoom('engineering', engRoles);
+    const pr = mountRoom('product', proR);
+    step(500);
+    rm.rm.playEvent(ask); pr.rm.playEvent(ask);
+    step(1200);
+    check('说话气泡：发问的部门说「现在向产品发出询问：……」', saidBy(rm, 'eng-architect') === '现在向产品发出询问：线路偏好是否改变最短距离', saidBy(rm, 'eng-architect'));
+    check('说话气泡：收到询问的部门说「收到工程的询问：……」', saidBy(pr, 'p-arch') === '收到工程的询问：线路偏好是否改变最短距离', saidBy(pr, 'p-arch'));
+    check('说话气泡：收到询问的部门的小人走到传信管口取信（不是写信）', pr.rm.scene.actors.find((x) => x.id === 'p-arch').data.doing === 'answer_letter', pr.rm.scene.actors.find((x) => x.id === 'p-arch').data.doing);
+    step(6000);
+    rm.rm.playEvent(reply); pr.rm.playEvent(reply);
+    step(1500);
+    check('说话气泡：回答的部门说「现在回答工程的询问」', saidBy(pr, 'p-arch') === '现在回答工程的询问', saidBy(pr, 'p-arch'));
+    check('说话气泡：收到回答的部门说「收到产品的回答：……」', (saidBy(rm, 'eng-architect') || '').indexOf('收到产品的回答：') === 0, saidBy(rm, 'eng-architect'));
+    dropRoom(pr);
+    dropRoom(rm);
+
+    // 项目楼层：同样的话
+    m = mountFloor(MODEL());
+    step(500);
+    m.fl.playEvent({ type: 'proposal_submitted', department: 'engineering', role: 'e-mgr', work_item_id: 'w1', label: '工程经理代表部门提交交付说明', payload: {} });
+    step(100);
+    let mgr = m.fl.inspect().world.characters['e-mgr'];
+    check('说话气泡：楼层里经理提交交付说明，头顶也说「现在提交交付说明」', mgr.bubble && mgr.bubble.text === '现在提交交付说明' && mgr.bubble.kind === 'say', JSON.stringify(mgr.bubble));
+    check('说话气泡：楼层里这句话画在画面上', drawnTexts(m.fl.scene).includes('现在提交交付说明'));
+    step(6000);
+    check('说话气泡：楼层里说完过几秒气泡消失', !drawnTexts(m.fl.scene).includes('现在提交交付说明'));
+    m.fl.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
+    step(100);
+    mgr = taskOf(m.fl.inspect().world.characters['e-mgr']);
+    check('说话气泡：楼层里交出交付箱的经理说「现在把交付箱送给质检」', mgr && mgr.label === '现在把交付箱送给质检', mgr && mgr.label);
+    let recv = null;
+    for (let i = 0; i < 80 && !recv; i++) {
+      step(100);
+      const qm = m.fl.inspect().world.characters['q-mgr'];
+      if (qm.current && qm.current.taskKey === 'package_handoff_in') recv = qm.current.label;
+    }
+    check('说话气泡：楼层里收下交付箱的经理说「收到交付箱，来自工程」', recv === '收到交付箱，来自工程', recv);
+    step(3000);
+    m.fl.playEvent(ask);
+    step(100);
+    const asking = taskOf(m.fl.inspect().world.characters['e-mgr']);
+    check('说话气泡：楼层里发问的经理说「现在向产品发出询问：……」', asking && asking.label === '现在向产品发出询问：线路偏好是否改变最短距离', asking && asking.label);
+    recv = null;
+    for (let i = 0; i < 80 && !recv; i++) {
+      step(100);
+      const pm = m.fl.inspect().world.characters['p-mgr'];
+      if (pm.current && /^letter_arrive_/.test(pm.current.taskKey)) recv = pm.current.label;
+    }
+    check('说话气泡：楼层里收到询问的经理走到管口说「收到工程的询问：……」', recv === '收到工程的询问：线路偏好是否改变最短距离', recv);
+    step(4000);
+    m.fl.playEvent({ type: 'x_role_task_assigned', department: 'engineering', role: 'e-lead', work_item_id: 'w1', payload: { to: 'e-lead', task: '实现' } });
+    step(100);
+    const giving = taskOf(m.fl.inspect().world.characters['e-mgr']);
+    check('说话气泡：楼层里经理分派任务时说要把任务交给谁', giving && giving.label === '现在把任务交给主程：实现', giving && giving.label);
+    recv = null;
+    for (let i = 0; i < 80 && !recv; i++) {
+      step(100);
+      const lead = m.fl.inspect().world.characters['e-lead'];
+      if (lead.current && lead.current.taskKey === 'role_task_received') recv = lead.current.label;
+    }
+    check('说话气泡：楼层里接任务的角色说「收到任务：实现」', recv === '收到任务：实现', recv);
+    drop(m);
+    // 减少动画：小人不走动，交接的话仍然在原处说出来
+    m = mountFloor(MODEL());
+    step(500);
+    m.fl.scene.reduced = true;
+    m.fl.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
+    step(200);
+    const reducedTexts = drawnTexts(m.fl.scene);
+    check('说话气泡：减少动画时交接的两端仍然说话', reducedTexts.includes('现在把交付箱送给质检') && reducedTexts.includes('收到交付箱，来自工程'), reducedTexts.filter((s) => /交付箱/.test(s)).join('|'));
+    drop(m);
+
     // ------------------------------------------------------------------ 声明
     const D = P.floorDecl;
     const savedRooms = D.rooms.slice();
@@ -394,7 +549,7 @@ const DRIVER = async () => {
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+  await page.addInitScript((lv) => sessionStorage.setItem('y9.level', JSON.stringify(lv)), 'S5');
   await page.goto(v9Url + '#/sys/machines');
   await page.waitForTimeout(700);
   const inPage = await page.evaluate(DRIVER);
@@ -407,20 +562,20 @@ const DRIVER = async () => {
     const errs = [];
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
     p.on('pageerror', (e) => errs.push(String(e)));
-    await p.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+    await p.addInitScript((lv) => sessionStorage.setItem('y9.level', JSON.stringify(lv)), 'S5');
     await p.goto(v9Url + hash);
     await p.waitForTimeout(1500);
     const info = await act(p);
-    const canvas = await p.locator('.y8-floor-wrap canvas').count();
+    const canvas = await p.locator('.y9-floor-wrap canvas').count();
     const hashAfter = new URL(p.url()).hash;
     await p.close();
     return { errs, canvas, info, hashAfter };
   };
   const seek = await replayPage('#/p/p-todo/overview', async (p) => {
-    const ticks = p.locator('.y8-floor-timeline [data-act="replay.seek"]');
+    const ticks = p.locator('.y9-floor-timeline [data-act="replay.seek"]');
     const n = await ticks.count();
     if (n) { await ticks.nth(Math.min(3, n - 1)).click(); await p.waitForTimeout(600); }
-    await p.locator('.y8-floor-timeline [data-act="replay.step"]').first().click();
+    await p.locator('.y9-floor-timeline [data-act="replay.step"]').first().click();
     await p.waitForTimeout(600);
     return n;
   });

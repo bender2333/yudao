@@ -5,15 +5,16 @@
 // 两版画面应当完全相同；任何残余差异都是真实画面差异，不是动画相位差。
 // 自检：同一份设置在同一版本里跑两次，第二次换时间基准，两次的画面必须不同（证明比较确实在看内容，
 // 不会因两次都截到空白而假通过）。
-const { chromium, EXE, v8Url, v9Url } = require('./env.js');
+const { chromium, EXE, v8Url, v9Url, spaceOf } = require('./env.js');
 
 const V9 = v9Url;
 const V8 = v8Url;
 
 const SETUP = (opts) => {
   const ANIM = (opts && opts.animT) || 2400;
+  const P = window[opts.space].pixel;
   // 自主行为（管线光点的惯性）关掉：静止的画面只由数据决定，才能与 v8 逐像素比较
-  if (window.Y8.pixel.ecs) window.Y8.pixel.ecs.config.autonomy = false;
+  if (P.ecs) P.ecs.config.autonomy = false;
   const mk = (pid, lit, status, decisions) => ({
     project_id: pid, name: pid.toUpperCase(), status,
     lit: { product: false, engineering: false, quality: false, operations: false, ...lit },
@@ -47,10 +48,10 @@ const SETUP = (opts) => {
     return { host, canvas };
   };
   const b = box('probe-building');
-  const building = window.Y8.pixel.createBuildingScene(b.canvas, {});
+  const building = P.createBuildingScene(b.canvas, {});
   building.setModel({ floors, show_basement: true });
   const m = box('probe-room');
-  const machine = window.Y8.pixel.createMachineRoomScene(m.canvas, { onMachineClick: () => {} });
+  const machine = P.createMachineRoomScene(m.canvas, { onMachineClick: () => {} });
   machine.setModel(room);
   const pin = (sc) => {
     sc.frozen = true;
@@ -94,7 +95,7 @@ async function shoot(browser, root, sel, animT) {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(root + '#/home');
   await page.waitForTimeout(900);
-  const info = await page.evaluate(SETUP, { animT });
+  const info = await page.evaluate(SETUP, { animT, space: spaceOf(root).ns });
   const b = await page.locator(sel + ' >> nth=0').screenshot();
   const r = await page.locator('.probe-room canvas').screenshot();
   await ctx.close();

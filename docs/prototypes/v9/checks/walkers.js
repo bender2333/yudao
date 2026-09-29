@@ -24,7 +24,7 @@ function floor(pid, lit) {
     errors.push(msg.text());
   });
   page.on('pageerror', (err) => { console.log('PAGEERROR@', String((err && err.stack) || err).slice(0, 400)); errors.push(String(err)); });
-  await page.addInitScript(() => sessionStorage.setItem('y8.level', JSON.stringify('3.2C')));
+  await page.addInitScript(() => sessionStorage.setItem('y9.level', JSON.stringify('3.2C')));
   await page.goto(ROOT + '#/home');
   await page.waitForTimeout(900);
 
@@ -34,7 +34,7 @@ function floor(pid, lit) {
     const canvas = document.createElement('canvas');
     host.appendChild(canvas);
     document.body.appendChild(host);
-    const building = window.Y8.pixel.createBuildingScene(canvas, {});
+    const building = window.Y9.pixel.createBuildingScene(canvas, {});
     building.setModel({ floors: JSON.parse(floorsJson), show_basement: false });
     const sc = building.scene;
     const sample = () => sc.actors.filter((a) => a.data.walker).map((a) => ({
@@ -72,7 +72,7 @@ function floor(pid, lit) {
     const canvas = document.createElement('canvas');
     host.appendChild(canvas);
     document.body.appendChild(host);
-    const building = window.Y8.pixel.createBuildingScene(canvas, {});
+    const building = window.Y9.pixel.createBuildingScene(canvas, {});
     building.setModel({
       floors: [
         { project_id: 'p-a', name: 'p-a', status: 'running',

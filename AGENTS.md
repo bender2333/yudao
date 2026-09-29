@@ -34,6 +34,7 @@ Python 包 `harness/`，分三层：
   - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/<文件>`
   - 前端测试：`node --test --test-reporter=dot harness/tests/test_web_ui.js`
   - 登记表建立之前（#158 合并之前）：运行与本次改动相关的测试文件与前端测试。
+  - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。
   - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试。
   - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
   - 新增测试文件时在登记表中加一行，放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。

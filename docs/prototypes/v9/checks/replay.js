@@ -7,7 +7,7 @@
 // step：每个事件之后静置 14 秒再比较；burst：事件连续播放，只在最后静置以后比较；--reduced：系统设置为减少动画。
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v8Url, v9Url, outDir } = require('./env');
+const { chromium, EXE, v8Url, v9Url, outDir, spaceOf } = require('./env');
 
 const arg = (name, dflt) => { const i = process.argv.indexOf('--' + name); return i >= 0 ? process.argv[i + 1] : dflt; };
 const V8 = v8Url;
@@ -23,8 +23,8 @@ const recordings = JSON.parse(fs.readFileSync(path.join(outDir, 'recordings.json
   .filter((r) => !ONLY || ONLY.includes(r.id));
 
 // 在页面里运行的回放驱动
-const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER }) => {
-  const P = window.Y8.pixel;
+const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) => {
+  const P = window[space].pixel;
   // 确定的时钟与随机数
   let t = 0;
   const q = [];
@@ -118,11 +118,12 @@ async function version(browser, root, rec) {
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+  const { ns, prefix } = spaceOf(root);
+  await page.addInitScript(([key, lv]) => sessionStorage.setItem(key, JSON.stringify(lv)), [prefix + '.level', 'S5']);
   await page.goto(root + '#/sys/machines');
   await page.waitForTimeout(700);
   const res = await page.evaluate(DRIVER, {
-    ops: rec.ops, mode: MODE, DT: 50, SETTLE: 14000, GAP_EVENT: 900, GAP_OTHER: 50
+    ops: rec.ops, mode: MODE, DT: 50, SETTLE: 14000, GAP_EVENT: 900, GAP_OTHER: 50, space: ns
   });
   await ctx.close();
   return Object.assign(res, { errors });
