@@ -225,7 +225,7 @@ const DRIVER = async () => {
     const click = (x, y) => m.canvas.dispatchEvent(new MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
     let card = m.fl.inspect().card;
     check('决定卡片：没有点开以前卡片关着', !card.isOpen());
-    click(81, 98);
+    click(82, 172);
     check('决定卡片：点大厅的板子打开卡片', card.isOpen() && card.openId() === 'd1');
     step(100);
     click(110, 270);
@@ -239,10 +239,81 @@ const DRIVER = async () => {
     m = mountFloor(MODEL({ decisions: [needNote] }), { onDecide: (p) => { answers.push(p); return { accepted: true }; } });
     step(200);
     card = m.fl.inspect().card;
-    click(81, 98);
+    click(82, 172);
     step(100);
     click(110, 270);
     check('决定卡片：需要说明的选项，没写说明就不提交', answers.length === 0 && card.isOpen());
+    drop(m);
+    // 回答以后事件流带来的新列表里已经没有这个决定：纸留到盖章结束，说明栏的文字也留着
+    const pixel = (canvas, x, y) => Array.from(canvas.getContext('2d').getImageData(x, y, 1, 1).data.slice(0, 3));
+    const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    answers.length = 0;
+    m = mountFloor(MODEL({ decisions: [face('d5')] }), { onDecide: (p) => { answers.push(p); return { accepted: true }; } });
+    step(200);
+    card = m.fl.inspect().card;
+    click(82, 172);
+    step(100);
+    const noteBox = m.host.querySelector('textarea[aria-label="决定的说明"]');
+    noteBox.value = '照旧继续';
+    noteBox.dispatchEvent(new Event('input', { bubbles: true }));
+    click(110, 270);
+    m.fl.setModel(clone(MODEL({ decisions: [] })));
+    step(300);
+    check('决定卡片：回答以后列表里没有这个决定，纸仍然留着', card.isOpen() && JSON.stringify(pixel(m.canvas, 200, 130)) === JSON.stringify(hex(P.PAL.paper)), JSON.stringify(pixel(m.canvas, 200, 130)));
+    check('决定卡片：盖章期间说明栏的文字还在', noteBox.value === '照旧继续', noteBox.value);
+    step(1500);
+    check('决定卡片：盖章结束纸收起', !card.isOpen());
+    drop(m);
+    // 翻页与关闭：两组按钮不重叠，点翻页翻到下一张，点关闭关上；别处文本框里的方向键不翻页
+    m = mountFloor(MODEL({ decisions: [face('d6'), face('d7')] }));
+    step(200);
+    card = m.fl.inspect().card;
+    click(82, 172);
+    step(100);
+    click(506, 38);
+    check('决定卡片：点翻页按钮的中心翻到下一张', card.isOpen() && card.openId() === 'd7', card.openId());
+    const other = document.createElement('input');
+    document.body.appendChild(other);
+    other.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    check('决定卡片：别处文本框里的方向键不翻页', card.openId() === 'd7', card.openId());
+    other.remove();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    check('决定卡片：方向键翻页', card.openId() === 'd6', card.openId());
+    click(536, 38);
+    check('决定卡片：点关闭按钮关上', !card.isOpen());
+    drop(m);
+    // 板子立在地面上，不压槽位灯与墙钟：槽位总数很多时板子所在的位置仍然是木板
+    m = mountFloor(MODEL({ slots: { total: 8, used: 2 }, decisions: [face('d8')] }));
+    step(300);
+    check('决定板：槽位灯很多时板子不被压住', JSON.stringify(pixel(m.canvas, 94, 180)) === JSON.stringify(hex('#c9955c')), JSON.stringify(pixel(m.canvas, 94, 180)));
+    drop(m);
+    // 回答的方向：回答方是事件所在的部门
+    m = mountFloor(MODEL());
+    step(500);
+    m.fl.playEvent({ type: 'collaboration_responded', department: 'product', work_item_id: 'w1', payload: { from: 'product', to: 'engineering', request_id: 'q1' } });
+    step(200);
+    ins = m.fl.inspect();
+    const answerTask = ins.world.characters['p-mgr'].current || ins.world.characters['p-mgr'].queue[0];
+    check('询问的回答：回答的部门的经理走到传信管口', answerTask && answerTask.taskKey === 'letter_out', answerTask && answerTask.taskKey);
+    let flew = false;
+    for (let i = 0; i < 60 && !flew; i++) { step(100); flew = Object.values(m.fl.inspect().world.packages).some((pk) => pk.transit && pk.transit.linkKey === 'product~engineering'); }
+    check('询问的回答：回信沿产品到工程的传信管走', flew);
+    drop(m);
+    // 快照里运维数据出现：房间重新声明，在途的包裹、角色与任务原样保留
+    m = mountFloor(MODEL());
+    step(500);
+    m.fl.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
+    let inFlightPk = 0;
+    for (let i = 0; i < 80 && !inFlightPk; i++) { step(100); inFlightPk = Object.keys(m.fl.inspect().world.packages).length; }
+    const before = m.fl.inspect().world.characters['e-mgr'];
+    m.fl.setModel(clone(MODEL({ ops: { version: 'r1', fault: false } })));
+    step(100);
+    ins = m.fl.inspect();
+    check('运维数据出现：房间重新声明，运维房间出现', ins.world.roomOrder.indexOf('operations') >= 0);
+    check('运维数据出现：在途的包裹与原来的角色实体保留', inFlightPk === 1 && Object.keys(ins.world.packages).length === 1 && ins.world.characters['e-mgr'] === before);
+    step(8000);
+    ins = m.fl.inspect();
+    check('运维数据出现：包裹照常走完，接收方的经理取出', Object.keys(ins.world.packages).length === 0 && !ins.world.characters['q-mgr'].current && !ins.world.characters['q-mgr'].queue.length);
     drop(m);
     // 决定请求发出：提出决定的部门的经理走到门口送出决定单
     m = mountFloor(MODEL({ decisions: [face('d3')] }));
@@ -327,9 +398,37 @@ const DRIVER = async () => {
   await page.goto(v9Url + '#/sys/machines');
   await page.waitForTimeout(700);
   const inPage = await page.evaluate(DRIVER);
-  await browser.close();
   results.push(...inPage);
   results.push({ name: '页面没有控制台错误', ok: errors.length === 0, detail: errors.slice(0, 3).join(' | ') });
+
+  // 回放：Stage 5 档位下项目概览页点时间轴的刻度与单步没有错误；带回放位置的地址直接打开也能装载
+  const replayPage = async (hash, act) => {
+    const p = await ctx.newPage();
+    const errs = [];
+    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    p.on('pageerror', (e) => errs.push(String(e)));
+    await p.addInitScript((lv) => sessionStorage.setItem('y8.level', JSON.stringify(lv)), 'S5');
+    await p.goto(v9Url + hash);
+    await p.waitForTimeout(1500);
+    const info = await act(p);
+    const canvas = await p.locator('.y8-floor-wrap canvas').count();
+    const hashAfter = new URL(p.url()).hash;
+    await p.close();
+    return { errs, canvas, info, hashAfter };
+  };
+  const seek = await replayPage('#/p/p-todo/overview', async (p) => {
+    const ticks = p.locator('.y8-floor-timeline [data-act="replay.seek"]');
+    const n = await ticks.count();
+    if (n) { await ticks.nth(Math.min(3, n - 1)).click(); await p.waitForTimeout(600); }
+    await p.locator('.y8-floor-timeline [data-act="replay.step"]').first().click();
+    await p.waitForTimeout(600);
+    return n;
+  });
+  results.push({ name: '回放：Stage 5 档位下点时间轴的刻度与单步没有错误', ok: seek.info > 0 && seek.errs.length === 0 && seek.canvas === 1, detail: seek.info + ' 个刻度；' + seek.errs.slice(0, 2).join(' | ') });
+  // 点刻度以后地址里带着回放位置：用这个地址重新打开
+  const loadAt = await replayPage(seek.hashAfter.includes('at=') ? seek.hashAfter : '#/p/p-todo/overview?at=40', async () => 0);
+  results.push({ name: '回放：带回放位置的地址直接打开概览页能装载楼层画面', ok: loadAt.errs.length === 0 && loadAt.canvas === 1, detail: loadAt.canvas + ' 个画布；' + loadAt.errs.slice(0, 2).join(' | ') });
+  await browser.close();
   results.forEach((r) => console.log((r.ok ? 'PASS ' : 'FAIL ') + r.name + (r.ok || !r.detail ? '' : '  ← ' + r.detail)));
   const bad = results.filter((r) => !r.ok);
   console.log('共 ' + results.length + ' 项，失败 ' + bad.length + ' 项');

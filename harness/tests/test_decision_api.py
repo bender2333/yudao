@@ -339,6 +339,8 @@ def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection
         assert _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
                        base_version=1, note="凭据已经补上").status_code == 200
         assert _wait_for_completion(service.system, run_id).phase == "DONE"
+        # run 结束时由流程编排结算（采纳）；这里显式结算一次，作为重启以后补结算的对照
+        service.system.projects.settle(run_id)
         before = _list(client, project_id=project_id, work_item_id=work_item_id)
         before_all = _list(client)
 

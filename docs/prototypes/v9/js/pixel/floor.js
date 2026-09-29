@@ -287,9 +287,12 @@
           return;
         }
         case 'collaboration_responded': {
-          const pts = tubeFor(pl.to, pl.from);
-          const key = order.indexOf(pl.from) > order.indexOf(pl.to) ? 'letter_out' : 'letter_in';
-          trip(pl.to, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(pl.to, pl.from) }), { label: '回答询问' });
+          // 回答方是事件所在的部门（示例数据里 from 是回答方，v8 构建约定里 to 是回答方），另一头是发问方
+          const answerer = ev.department || pl.to;
+          const asker = pl.from === answerer ? pl.to : pl.from;
+          const pts = tubeFor(answerer, asker);
+          const key = order.indexOf(asker) > order.indexOf(answerer) ? 'letter_out' : 'letter_in';
+          trip(answerer, key, () => send(pts, 'letter', { small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker) }), { label: '回答询问' });
           return;
         }
         case 'deliverable_adopted':
@@ -336,7 +339,7 @@
           const d = ev.department || (it && it.department);
           const room = d && world.rooms[d] && world.rooms[d].roomKind === 'dept' ? world.rooms[d] : null;
           const b = boardRect();
-          if (pl.decision_id) st.hidden[pl.decision_id] = true;
+          if (pl.decision_id) st.hidden[pl.decision_id] = scene.realT + 12000;
           let posted = false;
           const post = () => {
             if (posted) return;
@@ -601,11 +604,15 @@
       drawBoard(c);
     }
 
-    // 大厅的决定板：等待回答的决定请求一张一张贴在上面（还在路上的不算），点板子打开卡片
+    // 大厅的决定板：立在大厅地面上的告示板，等待回答的决定请求一张一张贴在上面（还在路上的不算），点板子打开卡片。
+    // 板子在地面上，不与墙上的钟、槽位灯、管道重叠
     function boardRect() {
       const h = lay.hall;
-      return { x: h.x + 60, y: TOP + 36, w: 34, h: 24 };
+      return { x: h.x + 62, y: FLOOR_LINE + 10, w: 32, h: 24 };
     }
+
+    // 决定单还在路上（从部门门口飞往板子）：最长藏 12 秒，落到板上时提前解除
+    const inFlight = (id) => (st.hidden[id] || 0) > scene.realT;
 
     function decisionColor(d) {
       const it = d.work_item_id ? itemById(d.work_item_id) : null;
@@ -617,9 +624,11 @@
       if (!ds.length) return;
       const b = boardRect();
       P.sign(c, b.x + b.w / 2, b.y - 3, '待你决定', { size: 5.5, bg: PAL.yellow1, stripe: PAL.orange2 });
+      R(c, b.x + 3, b.y + b.h + 2, 2, 8, PAL.wood4);
+      R(c, b.x + b.w - 5, b.y + b.h + 2, 2, 8, PAL.wood4);
       RB(c, b.x - 2, b.y - 2, b.w + 4, b.h + 4, PAL.wood3);
       R(c, b.x, b.y, b.w, b.h, '#c9955c');
-      const shown = ds.filter((d) => !st.hidden[d.id]);
+      const shown = ds.filter((d) => !inFlight(d.id));
       shown.slice(0, 6).forEach((d, i) => {
         const nx = b.x + 3 + (i % 3) * 10, ny = b.y + 3 + Math.floor(i / 3) * 12;
         RB(c, nx, ny, 8, 10, PAL.white);
@@ -633,7 +642,7 @@
 
     const overBoard = (x, y) => {
       const b = boardRect();
-      return (model.decisions || []).length > 0 && x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 2;
+      return (model.decisions || []).length > 0 && x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 10;
     };
 
     // -------------------------------------------------------------------------
@@ -964,15 +973,18 @@
       model = Object.assign({ open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false, roles: null, decisions: [] }, m);
       const next = flagsOf(model);
       if (JSON.stringify(next) !== JSON.stringify(flags)) {
+        // 快照里的运维数据出现或消失：房间与管道按新的条件重新声明，角色、包裹、信号与管道的流动状态原样带过去
         flags = next;
+        const old = world;
         world = declareWorld(flags);
+        world.characters = old.characters;
+        world.packages = old.packages;
+        world.signals = old.signals;
+        Object.keys(world.links).forEach((k) => { if (old.links[k]) world.links[k].flow = old.links[k].flow; });
         lay = layOf(world);
         bg = null;
-        scene.actors.filter((a) => a.data.ecsChar).forEach((a) => scene.removeActor(a));
       }
       if (m.focus_id !== undefined && focusId === null) focusId = m.focus_id;
-      // 决定请求已经不在等待列表里的，去掉还在路上的标记
-      Object.keys(st.hidden).forEach((id) => { if (!(model.decisions || []).some((d) => d.id === id)) delete st.hidden[id]; });
       card.setDecisions(model.decisions || []);
       syncWorkers();
       scene.frozen = Boolean(model.interrupted);

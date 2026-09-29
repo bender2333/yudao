@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import tempfile
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from .adjudication import offered_tools
+from .app.application import Application
+from .app.contracts import Rejected
+from .app.project_and_work_item_commands import WorkItemCreate
+from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
@@ -97,29 +103,53 @@ def run_smoke(
 
 
 def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
+    # smoke 经应用层的命令新建项目与事项（应用层与接口层设计说明第 7.4 节）：
+    # run 结束时由流程编排结算（采纳）
     task = HAPPY_TASK if name == "happy" else COLLABORATION_TASK
-    max_cycles = 12 if name == "happy" else 20
-    run_id = system.create_run(
-        task,
-        max_cycles=max_cycles,
-        context_window=32_000,
-    )
+    application = Application(system)
     try:
-        projection = system.run_until_stop(run_id)
-    except Exception as exc:  # noqa: BLE001 - smoke must record provider failure
+        _work_item_id, run_id = asyncio.run(_create_and_run(application, task))
+    except _ScenarioFailed as failure:
         try:
-            failed_projection = system.project(run_id)
+            failed_projection = system.project(failure.run_id)
         except Exception:  # noqa: BLE001 - preserve the original smoke failure
             failed_projection = None
         return {
-            "run_id": run_id,
+            "run_id": failure.run_id,
             "scenario": name,
             "phase": "FAILED",
             "stop_reason": "provider_error",
-            "error": str(exc),
+            "error": str(failure.cause),
             "fake_used": _fake_used(failed_projection),
         }
     return summarize_run(system, run_id, scenario=name)
+
+
+class _ScenarioFailed(Exception):
+    # 场景的 run 没有正常结束：带上 run_id 以便报告里记录失败的一次
+    def __init__(self, run_id: str, cause: Exception) -> None:
+        super().__init__(str(cause))
+        self.run_id = run_id
+        self.cause = cause
+
+
+async def _create_and_run(application: Application, task: str) -> tuple[str, str]:
+    created_project = await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="Smoke 项目", goal=task),
+        actor="user:local")
+    if isinstance(created_project, Rejected):
+        raise RuntimeError(f"project.create rejected: {created_project.reason} {created_project.message}")
+    created = await application.command(
+        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=created_project.refs.project_id,
+                                           text=task), actor="user:local")
+    if isinstance(created, Rejected):
+        raise RuntimeError(f"work_item.create rejected: {created.reason} {created.message}")
+    run_id = created.refs.run_id
+    try:
+        await application.system.orchestrator.work_item_execution(run_id)
+    except Exception as exc:  # noqa: BLE001 - smoke must record provider failure
+        raise _ScenarioFailed(run_id, exc) from exc
+    return created.refs.work_item_id, run_id
 
 
 def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str, Any]:

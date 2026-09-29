@@ -27,6 +27,7 @@ from .models import (
     PromptConfig,
     RegisteredCommand,
     RunProjection,
+    SourceDirectory,
     TERMINAL_PHASES,
     WorkItem,
     department_for_phase,
@@ -67,6 +68,13 @@ class CommandConfigConflict(Exception):
     """所编辑的命令版本已过期；`current` 是项目当前命令的读取体。"""
     def __init__(self, current: dict[str, Any]) -> None:
         super().__init__("registered command changed since base_version")
+        self.current = current
+
+
+class SourceDirectoryConflict(Exception):
+    """所编辑的源目录登记版本已过期；`current` 是该项目当前源目录登记的读取体。"""
+    def __init__(self, current: dict[str, Any]) -> None:
+        super().__init__("source directory changed since base_version")
         self.current = current
 
 
@@ -341,16 +349,16 @@ class ProjectService:
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
 
-    def rename(self, project_id: str, name: str) -> None:
+    def rename(self, project_id: str, name: str, *, command: Command | None = None) -> None:
         _require_text("name", name)
 
         def rename(transaction: Transaction) -> None:
             self._writable_in(transaction, project_id)
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}))
 
-        self.writes.transact(project_stream(project_id), rename)
+        self.writes.transact(project_stream(project_id), rename, command=command)
 
-    def pin(self, project_id: str, pinned: bool) -> None:
+    def pin(self, project_id: str, pinned: bool, *, command: Command | None = None) -> None:
         if not isinstance(pinned, bool):
             raise ValueError("pinned must be a boolean")
 
@@ -358,30 +366,30 @@ class ProjectService:
             self._writable_in(transaction, project_id)
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_PINNED, {"pinned": pinned}))
 
-        self.writes.transact(project_stream(project_id), pin)
+        self.writes.transact(project_stream(project_id), pin, command=command)
 
-    def archive(self, project_id: str) -> None:
+    def archive(self, project_id: str, *, command: Command | None = None) -> None:
         def archive(transaction: Transaction) -> None:
             if self._saved_in(transaction, project_id).archived:
                 return
             self._reject_in_progress(transaction, project_id)
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_ARCHIVED))
 
-        self.writes.transact(project_stream(project_id), archive)
+        self.writes.transact(project_stream(project_id), archive, command=command)
 
-    def restore(self, project_id: str) -> None:
+    def restore(self, project_id: str, *, command: Command | None = None) -> None:
         def restore(transaction: Transaction) -> None:
             if self._saved_in(transaction, project_id).archived:
                 transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RESTORED))
 
-        self.writes.transact(project_stream(project_id), restore)
+        self.writes.transact(project_stream(project_id), restore, command=command)
 
     # 事项
 
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
                         max_cycles: int = DEFINITIONS.limits.max_cycles,
                         run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
-                        context_window: int = 32_000) -> tuple[str, str]:
+                        context_window: int = 32_000, command: Command | None = None) -> tuple[str, str]:
         _require_text("text", text)
         _require_title(title)
         self._writable(project_id)
@@ -414,7 +422,7 @@ class ProjectService:
                 work_item_id=work_item_id, run_id=run_id,
             )
 
-        return self._start(project_id, create)
+        return self._start(project_id, create, command=command)
 
     def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
                                       title: str | None = None,
@@ -475,13 +483,14 @@ class ProjectService:
             ),
         )
 
-    def _start(self, project_id: str, create: Callable[[Transaction], _NewWorkItem]) -> tuple[str, str]:
+    def _start(self, project_id: str, create: Callable[[Transaction], _NewWorkItem], *,
+               command: Command | None = None) -> tuple[str, str]:
         # 在项目流登记事项，再创建它的 run；创建失败时在项目流记下失败的原因。
         # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
         token = object()
         self._starting.setdefault(project_id, set()).add(token)
         try:
-            item = self.writes.transact(project_stream(project_id), create)
+            item = self.writes.transact(project_stream(project_id), create, command=command)
             try:
                 self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
             except Exception as exc:
@@ -518,6 +527,17 @@ class ProjectService:
                 written.append(event)
         return written
 
+    def settle_pending_on_startup(self) -> list[ProjectEvent]:
+        """服务启动时由流程编排补做未完成的结算（应用层与接口层设计说明第 7.2 节）。"""
+        written: list[ProjectEvent] = []
+        for project_id in self.store.list_project_ids():
+            written.extend(self.settle_pending(project_id))
+        return written
+
+    def starting(self) -> bool:
+        # 有事项正在开始（已经登记、run 还没有创建）时占用执行槽位
+        return any(items for items in self._starting.values())
+
     @staticmethod
     def _settle_run(transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
@@ -552,7 +572,8 @@ class ProjectService:
 
     # 部门 Prompt 项目配置
 
-    def configure_prompt(self, project_id: str, department: str, text: str, base_version: int) -> dict[str, Any]:
+    def configure_prompt(self, project_id: str, department: str, text: str, base_version: int, *,
+                         command: Command | None = None) -> dict[str, Any]:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
@@ -573,14 +594,15 @@ class ProjectService:
             }))
             return None
 
-        unchanged = self.writes.transact(project_stream(project_id), configure)
+        unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
         return unchanged or {**self.read_prompt(project_id, department), "unchanged": False}
 
     # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
 
     def configure_command(self, project_id: str, name: str, argv: list[str], *,
                           args: list[str] | None = None, timeout_sec: int | None = None,
-                          output_limit: int | None = None, base_version: int = 0) -> dict[str, Any]:
+                          output_limit: int | None = None, base_version: int = 0,
+                          command: Command | None = None) -> dict[str, Any]:
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
 
@@ -601,12 +623,42 @@ class ProjectService:
             }))
             return None
 
-        unchanged = self.writes.transact(project_stream(project_id), configure)
+        unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
         return unchanged or {**self.read_command(project_id, name), "unchanged": False}
+
+    # 源目录登记（#74）
+
+    def configure_source_directory(self, project_id: str, name: str, path: str, *,
+                                   base_version: int, command: Command | None = None) -> dict[str, Any]:
+        # 登记与修改本项目的源目录：名称是登记名，路径是控制主机上的路径；
+        # 基准版本是该项目源目录登记的版本（初次登记为 0），不相等时拒绝并返回当前版本
+        _require_text("name", name)
+        _require_text("path", path)
+        if type(base_version) is not int or base_version < 0:
+            raise ValueError("base_version must be a non-negative integer")
+
+        def configure(transaction: Transaction) -> None:
+            current = self._writable_in(transaction, project_id).source_directories.get(name)
+            current_version = 0 if current is None else current.version
+            if base_version != current_version:
+                raise SourceDirectoryConflict({} if current is None else _source_directory_view(current))
+            transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
+                "name": name, "path": path, "version": current_version + 1, "base_version": base_version,
+            }))
+
+        self.writes.transact(project_stream(project_id), configure, command=command)
+        return self.read_source_directory(project_id, name)
+
+    def read_source_directory(self, project_id: str, name: str) -> dict[str, Any]:
+        directory = self.projection(project_id).source_directories.get(name)
+        if directory is None:
+            raise ValueError(f"unknown source directory: {name}")
+        return _source_directory_view(directory)
 
     # 材料（D-H：无活跃事项时记录原文）
 
-    def record_material(self, project_id: str, text: str, *, department: str | None = None) -> str:
+    def record_material(self, project_id: str, text: str, *, department: str | None = None,
+                        command: Command | None = None) -> str:
         _require_text("text", text)
         if department is not None and department not in DEPARTMENTS:
             raise ValueError("unknown department")
@@ -621,7 +673,7 @@ class ProjectService:
             }))
             return material_id
 
-        return self.writes.transact(project_stream(project_id), record)
+        return self.writes.transact(project_stream(project_id), record, command=command)
 
     def _writable(self, project_id: str) -> ProjectProjection:
         project = self.projection(project_id)
@@ -681,6 +733,15 @@ def _command_view(config: RegisteredCommand) -> dict[str, Any]:
         "args": list(config.args),
         "timeout_sec": config.timeout_sec,
         "output_limit": config.output_limit,
+        "version": config.version,
+        "updated_at": config.updated_at,
+    }
+
+
+def _source_directory_view(config: SourceDirectory) -> dict[str, Any]:
+    return {
+        "name": config.name,
+        "path": config.path,
         "version": config.version,
         "updated_at": config.updated_at,
     }

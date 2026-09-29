@@ -47,6 +47,7 @@ from .models import (
     RegisteredCommand,
     RunProjection,
     SessionRecord,
+    SourceDirectory,
     UserInput,
     TERMINAL_PHASES,
     WorkItem,
@@ -966,4 +967,12 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             department=payload["department"], recorded_at=event.created_at, stream_version=event.stream_version,
             event_id=event.event_id,
         ))
+        return
+    if etype == ProjectEventType.SOURCE_DIRECTORY_CONFIGURED:
+        directory = SourceDirectory(
+            name=payload["name"], path=payload["path"], version=int(payload["version"]),
+            base_version=payload["base_version"], updated_at=event.created_at, event_id=event.event_id,
+        )
+        state.source_directories[directory.name] = directory
+        state.source_directory_history.append(directory)
         return
