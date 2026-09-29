@@ -464,8 +464,6 @@ html.is-annotate .y8-block { outline: 1.5px dashed color-mix(in srgb, var(--viol
 .y8-seg-btn.is-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--shadow-color); font-weight: 600; }
 .y8-count.is-decide { background: var(--amber-bg); color: var(--amber); margin-left: 6px; }
 .y8-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.y8-tag.is-pending { background: var(--red-bg); color: var(--red); }
-.y8-annot-pending { font-style: normal; margin-left: 4px; padding: 0 4px; border-radius: 4px; background: var(--red-bg); color: var(--red); font-size: 10.5px; }
 .y8-btn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
 .y8-side-actions { display: grid; gap: 6px; margin: 8px 0 10px; }
 .y8-onboard { justify-content: flex-start; }
