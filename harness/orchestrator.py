@@ -214,6 +214,10 @@ class Orchestrator:
         self._run_start_times: dict[str, float] = {}
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
+        # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
+        self._work_item_tasks: dict[str, asyncio.Task[Any]] = {}
+        # 项目服务在装配以后回填，用于结算与判断执行槽位（busy）
+        self.projects: Any = None
 
     def create_run(
         self,
@@ -328,7 +332,8 @@ class Orchestrator:
     def _environment(self, run_id: str) -> LocalEnvironment:
         return LocalEnvironment.open(self.workspace_root / run_id)
 
-    def add_input(self, run_id: str, text: str) -> RunProjection:
+    def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
+                  command: Command | None = None) -> RunProjection:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("input must be a non-empty string")
         if text.strip() in {"/stop", "/cancel"}:
@@ -336,9 +341,9 @@ class Orchestrator:
 
         def receive(transaction: Transaction) -> None:
             self._require_open(run_id, transaction.projection, "This run has ended; create a new task for this input.")
-            self.interactions.receive(transaction, text, command=False)
+            self.interactions.receive(transaction, text, command=False, base_version=base_version)
 
-        self.writes.transact(run_stream(run_id), receive)
+        self.writes.transact(run_stream(run_id), receive, command=command)
         self._wake(run_id)
         return self.project(run_id)
 
@@ -444,15 +449,16 @@ class Orchestrator:
         self.writes.transact(run_stream(run_id), update)
         return self.project(run_id)
 
-    def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
+    def add_guidance(self, run_id: str, department: str, text: str, *,
+                     base_version: int | None = None, command: Command | None = None) -> RunProjection:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
 
         def receive(transaction: Transaction) -> None:
             self._require_open(run_id, transaction.projection, "This run has ended; guidance can be sent to a new task.")
-            self.interactions.receive_guidance(transaction, department, text)
+            self.interactions.receive_guidance(transaction, department, text, base_version=base_version)
 
-        self.writes.transact(run_stream(run_id), receive)
+        self.writes.transact(run_stream(run_id), receive, command=command)
         self._wake(run_id)
         return self.project(run_id)
 
@@ -564,7 +570,7 @@ class Orchestrator:
         return self._close_request(transaction, status="superseded", reason="The request basis changed outside its authorized work.",
                                    return_phase=phase, return_work_valid=False)
 
-    def cancel(self, run_id: str) -> RunProjection:
+    def cancel(self, run_id: str, *, command: Command | None = None) -> RunProjection:
         # 已经结束的运行不变；否则中止并取消正在进行的步骤，再写入取消。取消正在进行的步骤出错时，
         # 取消照常写入，再通知一次，错误交给调用方
         with self._cancelling(run_id):
@@ -573,7 +579,7 @@ class Orchestrator:
             activation, cancel_error = self._abort_run(run_id)
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
-                    transaction, "cancelled", "run cancelled"))
+                    transaction, "cancelled", "run cancelled"), command=command)
             finally:
                 if cancel_error is not None:
                     self._cancel_driver(activation)
@@ -621,6 +627,45 @@ class Orchestrator:
     def execution(self, run_id: str) -> asyncio.Task[RunProjection] | None:
         # 这个 run 正在进行的任务；没有时为空
         return self._tasks.get(run_id)
+
+    def work_item_execution(self, run_id: str) -> asyncio.Task[Any] | None:
+        # 这个事项的 run 正在进行的执行任务（由 start_work_item 建立）；没有时为空
+        return self._work_item_tasks.get(run_id)
+
+    # 执行与结算的入口（应用层与接口层设计说明第 7.2 节）。
+    # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝（busy）
+
+    def busy(self) -> bool:
+        # 有事项的 run 正在作为任务运行、有 run 正在激活、有 run 正在作为任务运行（start），
+        # 或有事项正在开始（run 还没有创建）时算作占用执行槽位
+        if self._tasks or self._work_item_tasks or self._running or self._active:
+            return True
+        return bool(getattr(self.projects, "starting", lambda: False)())
+
+    def start_work_item(self, run_id: str) -> asyncio.Task[ProjectEvent | None]:
+        # 在接口进程的事件循环中把事项的 run 作为任务运行；run 结束以后由流程编排结算（采纳）。
+        # 任务出错时交给事件循环的异常处理报告
+        previous = self._work_item_tasks.get(run_id)
+        task = asyncio.get_running_loop().create_task(self._run_work_item(previous, run_id))
+        self._work_item_tasks[run_id] = task
+        task.add_done_callback(lambda done: self._work_item_task_done(run_id, done))
+        return task
+
+    async def _run_work_item(self, previous: asyncio.Task[Any] | None, run_id: str) -> ProjectEvent | None:
+        # 先运行到停止，再由流程编排结算这一次 run（幂等）
+        if previous is not None:
+            await asyncio.wait([previous])
+        await self.run_until_stop(run_id)
+        return await asyncio.to_thread(self.projects.settle, run_id)
+
+    def _work_item_task_done(self, run_id: str, task: asyncio.Task[Any]) -> None:
+        if self._work_item_tasks.get(run_id) is task:
+            del self._work_item_tasks[run_id]
+        if not task.cancelled() and task.exception() is not None:
+            task.get_loop().call_exception_handler({
+                "message": f"work item run {run_id} stopped with an error",
+                "exception": task.exception(), "task": task,
+            })
 
     async def _run_after(self, previous: asyncio.Task[RunProjection] | None, run_id: str) -> RunProjection:
         if previous is not None:

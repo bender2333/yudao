@@ -1,5 +1,5 @@
 // 事件过程截图：按固定时钟回放录制的调用，在指定事件发生之后每隔一段时间截一帧，拼成一张联系表。
-// 用法：先运行 record.js；node docs/prototypes/v9/checks/life.js --rec sc-todo-loop --event transition --nth 1 --frames 12 --interval 300 [--root file:///.../index.html] [--out 文件名]
+// 用法：先运行 record.js；node docs/prototypes/v9/checks/life.js --rec sc-todo-loop --event transition --nth 1 --frames 12 --interval 300 [--root file:///.../index.html] [--out 文件名] [--recs 录制文件名]
 // --event idle 不放事件，观察待机时小人的走动；联系表存在 .tmp/v9-checks/。
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +13,7 @@ const FRAMES = Number(arg('frames', 12));
 const INTERVAL = Number(arg('interval', 300));
 const ROOT = arg('root', v9Url);
 const OUT = arg('out', 'life-' + REC + '-' + EVENT + '-' + NTH + '.png');
-const rec = JSON.parse(fs.readFileSync(path.join(outDir, 'recordings.json'), 'utf8')).find((r) => r.id === REC);
+const rec = JSON.parse(fs.readFileSync(path.join(outDir, arg('recs', 'recordings.json')), 'utf8')).find((r) => r.id === REC);
 if (!rec) throw new Error('没有这个录制：' + REC);
 
 const DRIVER = async ({ ops, EVENT, NTH, FRAMES, INTERVAL }) => {
@@ -35,7 +35,7 @@ const DRIVER = async ({ ops, EVENT, NTH, FRAMES, INTERVAL }) => {
   let fl = null;
   let seen = 0;
   const frames = [];
-  const isWorker = (a) => /\.(agent|ops)$/.test(a.sprite);
+  const isWorker = (a) => /\.(agent|ops|manager|architect|lead|explorer|reviewer|tester)$/.test(a.sprite);
   for (let i = 0; i < ops.length; i++) {
     const o = ops[i];
     if (o.op === 'mount') { fl = P.createFloorScene(canvas, { onDoorClick() {} }); continue; }

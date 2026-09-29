@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from pathlib import Path
 
 from .adapters.fake import FakeAdapter
+from .app.application import Application
+from .app.contracts import Rejected
+from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCreate
+from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
 from .proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from .runtime import LoopSystem
 
 DEMO_TASK = "Build a local echo CLI that prints its argument and follows product decisions on flags."
 DEMO_CHANGE = "\n  Change direction: treat every single argument, including --unknown, as ordinary text and echo it unchanged. Retire unknown-flag rejection. Keep ordinary echo and missing-argument usage with exit 2.\r\n"
-
 V1 = product_spec(
     goal="Build a local echo CLI",
     requirements=["Print the given argument to stdout"],
@@ -127,15 +132,48 @@ def demo_script():
 
 
 def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
+    # demo 经应用层的命令新建项目与事项（应用层与接口层设计说明第 7.4 节）：
+    # 事项由流程编排在接口进程的事件循环中作为任务运行，run 结束时由流程编排结算
     system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script()))
-    run_id = system.create_run(DEMO_TASK, max_cycles=20)
-    for _ in range(7):
-        system.activate_once(run_id)
-    if system.project(run_id).engineering_plan is None:
-        raise RuntimeError("demo did not reach its initial accepted engineering plan")
-    system.add_input(run_id, DEMO_CHANGE)
-    system.update_prompt(run_id, "product", DEFINITIONS.role("product").prompt + "\nExplicitly account for changed, retained, and retired requirements.")
-    projection = system.run_until_stop(run_id)
+    application = Application(system)
+    return asyncio.run(_run_demo(application, system))
+
+
+async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopSystem, str]:
+    created_project = await _command(application, "project.create",
+                                     ProjectCreate(command_id=str(uuid.uuid4()), name="Demo 项目", goal=DEMO_TASK))
+    project_id = created_project.refs.project_id
+    # work_item.create 的 handle 已经由流程编排在事件循环中把 run 作为任务开始（run 结束时自动结算）
+    created = await _command(application, "work_item.create",
+                             WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text=DEMO_TASK))
+    work_item_id, run_id = created.refs.work_item_id, created.refs.run_id
+    task = system.orchestrator.work_item_execution(run_id)
+    assert task is not None, "work_item.create did not start the run task"
+    # 等到第一次工程计划被接纳，再追加变更、更新 Prompt
+    await _wait_for(lambda: system.project(run_id).engineering_plan is not None)
+    await _command(application, "work_item.append_input",
+                   WorkItemAppendInput(command_id=str(uuid.uuid4()), work_item_id=work_item_id, text=DEMO_CHANGE))
+    system.update_prompt(
+        run_id, "product",
+        DEFINITIONS.role("product").prompt + "\nExplicitly account for changed, retained, and retired requirements.")
+    await task
+    projection = system.project(run_id)
     if projection.phase != "DONE":
         raise RuntimeError(f"demo did not finish: {projection.phase} {projection.stop_reason} {projection.error}")
     return system, run_id
+
+
+async def _wait_for(predicate, timeout_sec: float = 300.0) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout_sec
+    while asyncio.get_running_loop().time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.02)
+    raise RuntimeError("demo did not reach its initial accepted engineering plan")
+
+
+async def _command(application: Application, name: str, request):
+    result = await application.command(name, request, actor="user:local")
+    if isinstance(result, Rejected):
+        raise RuntimeError(f"{name} rejected: {result.reason} {result.message}")
+    return result

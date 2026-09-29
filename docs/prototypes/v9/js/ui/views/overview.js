@@ -77,17 +77,10 @@
     });
   }
 
-  function decisionsBlock(pid) {
-    return Y8.ui.block({
-      id: 'ov-decisions', title: '待你决定', query: 'decisions.list', command: 'decision.answer',
-      subtitle: '本项目等待回答的决定请求', body: Y8.cards.list({ project: pid })
-    });
-  }
-
   function loopBlock(pid, workItemId) {
     return Y8.ui.block({
       id: 'ov-loop', title: '循环画面', query: ['project.loop', 'project.flow'],
-      subtitle: '三部门循环、包裹与管道；右上角切换覆盖层，下方时间轴回放本项目的关键事实',
+      subtitle: '三部门循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实',
       body: '<div id="ov-floor"></div>'
     });
   }
@@ -310,7 +303,6 @@
     const target = activeOf(ov, ctx);
     return '<div class="y8-pp y8-ov">' +
       summaryBlock(ov) +
-      decisionsBlock(pid) +
       loopBlock(pid, ctx.workItemId) +
       currentBlock(ov, target, ctx) +
       boardBlock(ov) +
@@ -375,7 +367,6 @@
     const ov = overview(pid);
     const target = activeOf(ov, ctx);
     refresh(root, '#ov-summary', summaryBlock(ov));
-    refresh(root, '#ov-decisions', decisionsBlock(pid));
     refresh(root, '#ov-current', currentBlock(ov, target, ctx));
     refresh(root, '#ov-board', boardBlock(ov));
     refresh(root, '#ov-flow', flowBlock(pid, ctx.workItemId));

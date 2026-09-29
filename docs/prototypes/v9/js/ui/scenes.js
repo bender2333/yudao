@@ -170,10 +170,28 @@
     throw new Error('未知的覆盖层：' + id);
   }
 
-  function floorList(loop) {
+  // Stage 5：部门里有几个角色，各自的状态（空闲、被分派、工作、交回、外出）；低档位没有角色，画面按一个部门一个小人画
+  function rolesFor(loop, projectId, workItemId, at) {
+    if (!Y8.cap.query('role.detail')) return null;
+    const out = {};
+    Object.keys(DEPT).filter((d) => d !== 'operations' || loop.ops).forEach((d) => {
+      out[d] = q('department.workspace', { project: projectId, department: d, work_item: workItemId || undefined }, at).roles;
+    });
+    return out;
+  }
+
+  // 等待回答的决定请求：像素画面里在大厅的板上，点开以后在画面里回答；这里给出同样内容的文字版本（画面之外的读取与操作方式）。
+  // 回放到过去的时间点时不显示：回放里不能回答决定
+  function decisionsFor(projectId, at) {
+    if (at !== null || !Y8.cap.query('decisions.list')) return [];
+    return q('decisions.list', { project: projectId }).map(Y8.cards.face);
+  }
+
+  function floorList(loop, projectId) {
     const rows = loop.items.map((it) => '<li><span class="y8-dot-color" style="--c:' + P.ITEM_COLORS[it.color_index % 6] + '"></span>' + esc(it.title) +
       '<span>' + esc(it.department ? DEPT[it.department] : '大厅') + '</span><span>' + (it.cycle ? '第 ' + it.cycle + ' 轮' : '') + '</span><span>' + esc(STATUS_TEXT[it.status] || it.status) + '</span></li>').join('');
-    return '<details class="y8-scene-list"><summary>文字列表</summary><ul>' + (rows || '<li class="y8-muted">没有事项</li>') + '</ul></details>';
+    const decisions = loop.decisions && loop.decisions.length ? '<h4>待你决定</h4>' + Y8.cards.list({ project: projectId }) : '';
+    return '<details class="y8-scene-list"><summary>文字列表</summary><ul>' + (rows || '<li class="y8-muted">没有事项</li>') + '</ul>' + decisions + '</details>';
   }
 
   function mountFloor(el, opts) {
@@ -195,15 +213,20 @@
           const home = Y8.views.get('home');
           if (home && home.highlightMachines) home.highlightMachines(ids);
         }));
-      }
+      },
+      // 决定请求在画面里回答：命令与提示跟页面上的卡片一样
+      onDecide: (payload) => Y8.run('decision.answer', payload),
+      onGo: (href) => Y8.go(href)
     });
     function refresh() {
       const loop = q('project.loop', { project: o.projectId }, at);
       loop.focus_id = o.workItemId || null;
+      loop.roles = rolesFor(loop, o.projectId, o.workItemId, at);
+      loop.decisions = decisionsFor(o.projectId, at);
       floor.setModel(loop);
       floor.focus(o.workItemId || null);
       floor.setOverlay(overlay, overlay && at === null ? overlayData(overlay, o.projectId, loop) : null);
-      el.querySelector('.y8-scene-text').innerHTML = floorList(loop);
+      el.querySelector('.y8-scene-text').innerHTML = floorList(loop, o.projectId);
     }
     el.querySelectorAll('[data-overlay]').forEach((btn) => btn.addEventListener('click', () => {
       overlay = overlay === btn.dataset.overlay ? null : btn.dataset.overlay;

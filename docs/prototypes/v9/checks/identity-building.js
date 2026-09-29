@@ -12,6 +12,8 @@ const V8 = v8Url;
 
 const SETUP = (opts) => {
   const ANIM = (opts && opts.animT) || 2400;
+  // 自主行为（管线光点的惯性）关掉：静止的画面只由数据决定，才能与 v8 逐像素比较
+  if (window.Y8.pixel.ecs) window.Y8.pixel.ecs.config.autonomy = false;
   const mk = (pid, lit, status, decisions) => ({
     project_id: pid, name: pid.toUpperCase(), status,
     lit: { product: false, engineering: false, quality: false, operations: false, ...lit },

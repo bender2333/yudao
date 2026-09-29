@@ -28,6 +28,7 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects.configure_command(project_id, "unit-tests", ["python", "-m", "unittest"], args=["-v"])
     projects.record_material(project_id, "一段原文", department="product")
     projects.record_material(project_id, "不属于部门的原文")
+    projects.configure_source_directory(project_id, "src", "C:/repo/src", base_version=0)
     projects.archive(project_id)
     projects.restore(project_id)
     with pytest.raises(ValueError, match="max_cycles"):
