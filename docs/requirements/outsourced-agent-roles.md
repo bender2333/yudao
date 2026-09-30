@@ -21,7 +21,7 @@
 
 以下是架构师的分析，未经用户逐项确认。
 
-1. 外包角色与自有角色使用同一个角色定义（职责、输入、输出、权限）。自有角色的步骤由控制核心驱动（[ADR-0010](../adr/0010-control-core-drives-role-steps.md)）；外包角色由控制核心派发给外部 agent，外部 agent 收到分派说明与该角色可以看到的资料，交回提案与证据（ADR-0007 第 1 条）。外部 agent 在自己的容器中运行，使用按内容摘要取出的工作区快照（ADR-0007 第 4 条）。
+1. 外包角色与自有角色使用同一个角色定义（职责、输入、输出、权限）。自有角色的步骤由控制核心驱动（[ADR-0010](../adr/0010-control-core-drives-role-steps.md)）；外包角色由控制核心派发给外部 agent，外部 agent 收到分派说明与该角色可以看到的资料，交回提案与证据（ADR-0007 第 1 条）。外部 agent 在执行位置上以自己的进程运行，使用按内容摘要取出的工作区快照（ADR-0007 第 4 条、[ADR-0022](../adr/0022-run-directly-without-containers.md)）。
 2. 接入方式使用 ACP（Agent Client Protocol），Yudao 作为客户端。Claude 通过基于 Claude Agent SDK 的 `@agentclientprotocol/claude-agent-acp` 接入；pi 通过 `pi-acp` 适配程序接入；OMP（提交 `fdfeef1f78`）自带 ACP 模式，位于 `packages/coding-agent/src/modes/acp`；OpenCode（提交 `0027387`）自带 ACP 支持，位于 `packages/opencode/src/acp`。
 3. ACP 提供以下控制手段。外部 agent 调用工具之前向客户端请求许可，Yudao 按角色权限批准或拒绝。客户端声明文件与终端能力后，agent 的文件读写与命令执行交给客户端完成（OMP 的 `packages/coding-agent/src/modes/acp/acp-client-bridge.ts` 第 26 至 66 行），Yudao 把这些操作转交工具执行服务，登记命令、工具回执与工作区控制继续有效。agent 的消息、工具调用与计划以流的形式发给客户端，作为证据记录。客户端可以取消会话，也可以载入以前的会话（OMP 的 `acp-agent.ts` 第 657 行）。Claude 的适配程序是否同样把文件读写与命令执行交给客户端完成，待核实。
 4. 模型调用：ADR-0007 第 6 条规定模型调用只通过 Provider。Provider 对外提供兼容 OpenAI 与 Anthropic 协议的模型入口（D23 已实现 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages 三种协议的适配），外部 agent 把模型地址指向这个入口，凭据由 Yudao 管理，调用尝试与用量照样记录。使用订阅账号还是 API 密钥、使用条款是否允许自动化调用，待核实。
