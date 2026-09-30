@@ -247,7 +247,8 @@ class StepDriver:
         for step_id in range(1, limits.max_model_steps + 1):
             if not self._proceed():
                 return Stopped(self._version)
-            prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
+            prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
+                                     replies_without_tool_call)
             if isinstance(prepared, Stopped):
                 return prepared
             request = prepared
@@ -412,8 +413,18 @@ class StepDriver:
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
+    def _tool_choice(self, purpose: str, tools: list[dict[str, Any]], replies_without_tool_call: int) -> str:
+        # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
+        declaration = (self._call_public or {}).get("accepts_required_tool_call", True)
+        if (purpose == "work" and tools
+                and replies_without_tool_call >= DEFINITIONS.limits.tool_call_required_limit
+                and declaration is not False):
+            return "required"
+        return "auto"
+
     def _prepare(self, step_id: int, attempt: int, root_step_id: int,
-                 retry_of_step_id: int | None) -> Stopped | ModelRequest | None:
+                 retry_of_step_id: int | None,
+                 replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
         # 新的逻辑调用先按部门默认解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
@@ -458,6 +469,8 @@ class StepDriver:
                                    step_id, assembled, assembled.tools,
                                    purpose=assembled.manifest.purpose,
                                    max_output_tokens=assembled.manifest.max_output_tokens,
+                                   tool_choice=self._tool_choice(assembled.manifest.purpose, assembled.tools,
+                                                                 replies_without_tool_call),
                                    effective_contract_hash=scope.basis.effective_contract_hash,
                                    engineering_plan_hash=scope.basis.engineering_plan_hash,
                                    request_id=scope.basis.request_id,

@@ -294,6 +294,7 @@ class StepRecorder:
                      **self._call_target(request),
                      "effective_context_window": request.context.manifest.budget,
                      "max_output_tokens": request.max_output_tokens,
+                     "tool_choice": request.tool_choice,
                      "definitions_version": DEFINITIONS.version}))
         self._record_in(transaction, *drafts)
 

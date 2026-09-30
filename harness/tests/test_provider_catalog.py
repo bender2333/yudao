@@ -80,6 +80,56 @@ def test_new_document_round_trip_contains_only_non_sensitive_fields(tmp_path):
     assert "api_key" not in json.dumps(reloaded.to_document())
 
 
+def test_model_definition_declares_whether_it_accepts_a_required_tool_call():
+    # 模型访问定义声明是否接受要求调用工具（#102）：没有写入时为接受；声明不接受时随目录保存并重新读出，
+    # 修改后准入保持，解析出的调用目标带着这一项；取值必须是 true 或 false
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    assert facade.providers_view()["models"][0]["accepts_required_tool_call"] is True
+    assert facade.resolve_departments().target("product").accepts_required_tool_call is True
+
+    document = _document()
+    document["models"][0]["accepts_required_tool_call"] = False
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    facade.store_document(document)
+    admit_bound_models(facade, document)
+    admitted_at = facade.providers_view()["models"][0]["admitted_at"]
+    assert admitted_at is not None
+    assert facade.resolve_departments().target("product").accepts_required_tool_call is False
+
+    reloaded = ProviderFacade()
+    reloaded.store_document(facade.to_document())
+    view = reloaded.providers_view()
+    assert view["models"][0]["accepts_required_tool_call"] is False
+    assert view["models"][0]["admitted_at"] == admitted_at
+
+    bad = _document()
+    bad["models"][0]["accepts_required_tool_call"] = "yes"
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(bad)
+    assert any(issue.location == "models[0].accepts_required_tool_call" for issue in caught.value.issues)
+
+
+def test_providers_view_model_dict_carries_capability_source_and_tool_call_declaration():
+    # 对外目录的模型字典同时给出能力来源与是否接受要求调用工具（#102）；
+    # 模型测试记录准入以后两项都保持，前端模型列表才能继续显示能力来源
+    document = _document()
+    document["models"][0]["capability_source"] = "preset-v1"
+    document["models"][0]["accepts_required_tool_call"] = False
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    model = facade.providers_view()["models"][0]
+    assert model["capability_source"] == "preset-v1"
+    assert model["accepts_required_tool_call"] is False
+
+    admit_bound_models(facade, document)
+    admitted = facade.providers_view()["models"][0]
+    assert admitted["admitted_at"] is not None
+    assert admitted["capability_source"] == "preset-v1"
+    assert admitted["accepts_required_tool_call"] is False
+    assert admitted["admitted_model"] == "model-a"
+
+
 def test_provider_config_requires_a_protocol():
     # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
     document = _document()

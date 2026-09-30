@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial
+from .discovery import probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
 from .invoke import (
@@ -552,13 +553,24 @@ class ProviderFacade:
 
     def refresh_candidates(self, provider_id: str,
                            *, models_url_override: str | None = None) -> dict[str, Any]:
-        # 显式刷新候选：结果只服务本次会话，不落盘、不自动绑定
+        # 显式刷新候选：按连接协议的认证方式带上凭据，结果只服务本次会话，不落盘、不自动绑定
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             if provider is None:
                 raise CatalogValidationError((ValidationIssue(
                     f"providers.{provider_id}", "Provider 配置不存在"),))
-        return _refresh_candidates(provider, models_url_override=models_url_override)
+            api_key = self._resolve_api_key(provider)
+        return _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key)
+
+    def _resolve_api_key(self, provider: Any) -> str:
+        # 模型列表地址要求认证时按协议取凭据；fake 不需要凭据。
+        # 凭据引用无法解析时交回空串，由获取模型列表与连接测试报告「候选未知」并说明原因
+        if provider.protocol == "fake" or not provider.credential_ref:
+            return ""
+        material = self._credentials.resolve(provider.credential_ref)
+        if material is None:
+            return ""
+        return material.secret
 
     def record_admission(self, provider_id: str, model_id: str,
                          *, admitted_model: str | None) -> dict[str, Any]:
@@ -783,7 +795,8 @@ class ProviderFacade:
         return self._cancels.cancel(attempt_id)
 
     def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
-        # 连接测试只证明地址与凭据可用，不证明具体模型可调；三种协议同一套缺失项检查
+        # 连接测试读取模型列表地址，按该连接协议的认证方式带上凭据，证明地址与凭据可用；
+        # 不证明具体模型可调，不改变任何准入。fake 没有上游，只做同一套缺失项检查
         snapshot = resolve_snapshot(self._store, [selection], self._credentials)
         key = str(selection.get("key", selection.get("target_key", selection.get("department", "target"))))
         frozen_target = snapshot.target(key)
@@ -796,8 +809,15 @@ class ProviderFacade:
             return {"ok": False, "kind": "connection", "target_key": key,
                     "revision": snapshot.revision, "protocol": protocol,
                     "reason": availability["reason"], "message": availability["message"]}
-        return {"ok": True, "kind": "connection", "target_key": key,
-                "revision": snapshot.revision, "protocol": protocol}
+        if protocol == "fake":
+            return {"ok": True, "kind": "connection", "target_key": key,
+                    "revision": snapshot.revision, "protocol": protocol,
+                    "reason": "", "message": ""}
+        probed = _probe_connection(self._store.providers[frozen_target.provider_id],
+                                   api_key=frozen_target.api_key, timeout_sec=frozen_target.timeout_sec)
+        return {"ok": probed["ok"], "kind": "connection", "target_key": key,
+                "revision": snapshot.revision, "protocol": protocol,
+                "reason": probed["reason"], "message": probed["message"]}
 
     def configure_paths(self, config_path: str | Path | None,
                         dotenv_path: str | Path | None = None) -> None:

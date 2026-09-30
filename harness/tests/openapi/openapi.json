@@ -3256,6 +3256,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -3305,6 +3316,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier"
@@ -3782,6 +3794,10 @@
             "type": "string",
             "title": "Capability Source"
           },
+          "accepts_required_tool_call": {
+            "type": "boolean",
+            "title": "Accepts Required Tool Call"
+          },
           "admitted_at": {
             "anyOf": [
               {
@@ -3829,6 +3845,7 @@
           "context_window",
           "max_output_tokens",
           "capability_source",
+          "accepts_required_tool_call",
           "admitted_at",
           "admitted_revision",
           "admitted_model",
@@ -4861,6 +4878,11 @@
             "title": "Capability Source",
             "default": ""
           },
+          "accepts_required_tool_call": {
+            "type": "boolean",
+            "title": "Accepts Required Tool Call",
+            "default": true
+          },
           "provider_id": {
             "type": "string",
             "minLength": 1,
@@ -5249,6 +5271,11 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "accepts_required_tool_call": {
+            "type": "boolean",
+            "title": "Accepts Required Tool Call",
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -8175,6 +8202,14 @@
             "title": "Fetched At",
             "type": "string"
           },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
           "candidate_ids": {
             "items": {
               "type": "string"
@@ -8200,6 +8235,7 @@
           "status",
           "source_url",
           "fetched_at",
+          "candidates",
           "candidate_ids",
           "error"
         ],
@@ -10028,6 +10064,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -10199,6 +10246,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -10523,6 +10571,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -10797,6 +10856,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -14634,6 +14694,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -14938,6 +15009,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -15220,6 +15292,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -15497,6 +15580,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -15774,6 +15858,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -15956,6 +16051,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -16221,6 +16317,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -16401,6 +16508,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -16667,6 +16775,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -16848,6 +16967,14 @@
             ],
             "title": "Max Output Tokens"
           },
+          "tool_choice": {
+            "enum": [
+              "auto",
+              "required"
+            ],
+            "title": "Tool Choice",
+            "type": "string"
+          },
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
@@ -16866,6 +16993,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -16892,6 +17020,7 @@
           "purpose",
           "effective_context_window",
           "max_output_tokens",
+          "tool_choice",
           "definitions_version"
         ],
         "title": "ModelRequestedPayload",
@@ -17135,6 +17264,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -17327,6 +17467,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -21647,6 +21788,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -21838,6 +21990,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -22250,6 +22403,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -22419,6 +22583,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -23157,6 +23322,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -23328,6 +23504,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",

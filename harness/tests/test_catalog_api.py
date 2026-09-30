@@ -207,36 +207,39 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
 
 def test_model_test_admits_and_connection_test_does_not(tmp_path):
     server, _capture, base = serve(responses_responder)
-    try:
-        opened = _Opened(tmp_path, _document(base_url=base + "/v1"))
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            tested = _command(client, "catalog.model.test", base_version=current, provider_id="p1", model_id="m1")
-            assert tested.status_code == 200, tested.text
-            [finished] = _wait_for(opened.store,
-                                   lambda item: item.payload.get("kind") == "model", timeout=15.0,
-                                   description="catalog_test_finished (model)")
-            assert finished.payload["ok"] is True and finished.payload["admitted"] is True
-            assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
-            assert finished.payload["base_revision"] == current
-            admitted = _catalog(client)["models"][0]
-            assert admitted["admitted_at"] is not None
+    # 连接测试读取模型列表地址：该连接没有地址时不提供连接测试，这里给出一份真实的上游
+    with _models_server({"data": [{"id": "model-x"}]}) as models_url:
+        try:
+            opened = _Opened(tmp_path, _document(base_url=base + "/v1", models_url=models_url))
+            with running_api(opened) as client:
+                current = _catalog(client)["revision"]
+                tested = _command(client, "catalog.model.test", base_version=current, provider_id="p1",
+                                  model_id="m1")
+                assert tested.status_code == 200, tested.text
+                [finished] = _wait_for(opened.store,
+                                       lambda item: item.payload.get("kind") == "model", timeout=15.0,
+                                       description="catalog_test_finished (model)")
+                assert finished.payload["ok"] is True and finished.payload["admitted"] is True
+                assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
+                assert finished.payload["base_revision"] == current
+                admitted = _catalog(client)["models"][0]
+                assert admitted["admitted_at"] is not None
 
-            # 连接测试不改变准入
-            before_connection = _catalog(client)
-            tested = _command(client, "catalog.connection.test", base_version=before_connection["revision"],
-                              provider_id="p1")
-            assert tested.status_code == 200, tested.text
-            [connection] = _wait_for(opened.store,
-                                     lambda item: item.payload.get("kind") == "connection", timeout=15.0,
-                                     description="catalog_test_finished (connection)")
-            assert connection.payload["ok"] is True and connection.payload["admitted"] is None
-            assert connection.payload["base_revision"] == before_connection["revision"]
-            assert _catalog(client)["models"][0]["admitted_at"] == admitted["admitted_at"]
-            _assert_no_secret(client, opened)
-    finally:
-        server.shutdown()
-        server.server_close()
+                # 连接测试不改变准入
+                before_connection = _catalog(client)
+                tested = _command(client, "catalog.connection.test",
+                                  base_version=before_connection["revision"], provider_id="p1")
+                assert tested.status_code == 200, tested.text
+                [connection] = _wait_for(opened.store,
+                                         lambda item: item.payload.get("kind") == "connection", timeout=15.0,
+                                         description="catalog_test_finished (connection)")
+                assert connection.payload["ok"] is True and connection.payload["admitted"] is None
+                assert connection.payload["base_revision"] == before_connection["revision"]
+                assert _catalog(client)["models"][0]["admitted_at"] == admitted["admitted_at"]
+                _assert_no_secret(client, opened)
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 def test_candidates_collect_reads_the_models_url_and_writes_an_event(tmp_path):

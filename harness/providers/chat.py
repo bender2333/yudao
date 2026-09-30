@@ -267,7 +267,9 @@ def _chat_request_params(invocation: _ChatInvocation, target: FrozenTarget) -> d
     tools = _chat_tools(invocation.provider_input)
     if tools:
         params["tools"] = tools
-        params["tool_choice"] = invocation.provider_input.tool_choice
+        # 要求调用工具时发送 tool_choice: required；自动时不发送（#102）
+        if invocation.provider_input.tool_choice == "required":
+            params["tool_choice"] = "required"
     limit = invocation.provider_input.max_output_tokens
     if limit is not None:
         params["max_tokens"] = int(limit)
