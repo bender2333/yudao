@@ -26,7 +26,7 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision,
+    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, UNKNOWN_ACTION, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision,
     blocks_run,
 )
 from .environment import LocalEnvironment
@@ -51,6 +51,7 @@ from .providers import ProviderConnections, ProviderFacade
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
+from .recovery import classify_actions, build_unknown_action_request
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import normalize_registered_commands
@@ -610,6 +611,8 @@ class Orchestrator:
         if projection.definitions_version != DEFINITIONS.version:
             self._await_definitions(run_id, projection.definitions_version)
             return None
+        # 工单 #17：检查是否有未确认的动作，为 unknown 动作发出决定请求
+        self._await_unknown_actions(run_id)
         return self._claim_and_resume(run_id)
 
     def _await_definitions(self, run_id: str, recorded: str) -> None:
@@ -638,6 +641,44 @@ class Orchestrator:
                 },
             ))
             transaction.on_commit(lambda: self._wake(run_id))
+
+        self.writes.transact(run_stream(run_id), request)
+    def _await_unknown_actions(self, run_id: str) -> None:
+        # 工单 #17：恢复时检查是否有未确认的动作，为每个 unknown 动作发出决定请求。
+        # 动作级阻塞（blocks="action"）不阻塞整个 run，只阻塞该动作的执行。
+        def request(transaction: Transaction) -> None:
+            projection = transaction.projection
+            if projection.phase in TERMINAL_PHASES:
+                return
+            # 分类所有动作，找出 status="unknown" 的
+            actions = classify_actions(transaction.events())
+            for action_id, info in actions.items():
+                if info["status"] != "unknown":
+                    continue
+                # 检查是否已有针对该动作的 open 决定请求
+                has_open_request = any(
+                    decision.request.get("kind") == UNKNOWN_ACTION.name
+                    and decision.request.get("action_id") == action_id
+                    and decision.status == "open"
+                    for decision in transaction.decisions.values()
+                )
+                if has_open_request:
+                    continue
+                # 构造决定请求
+                tool_name = info["tool"]
+                request_payload = build_unknown_action_request(
+                    action_id=action_id,
+                    tool_name=tool_name,
+                    department=projection.active_department,
+                    phase=projection.phase,
+                    repeatable=info.get("repeatable", False),
+                )
+                transaction.append(NewEvent(
+                    EventType.DECISION_REQUESTED, actor="system", role=projection.active_department,
+                    state_before=projection.phase, state_after=projection.phase,
+                    payload=request_payload,
+                ))
+                transaction.on_commit(lambda: self._wake(run_id))
 
         self.writes.transact(run_stream(run_id), request)
 
@@ -1315,7 +1356,7 @@ class Orchestrator:
                 payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
             ))
             transaction.on_commit(lambda: self._wake(projection.run_id))
-            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
+            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name, UNKNOWN_ACTION.name):
                 self._fail(transaction, "cancelled", "run stopped by the user's decision")
                 return None
             if blocks_run(transaction.decisions.values()):

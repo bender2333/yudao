@@ -509,6 +509,8 @@ class ToolCallResult(ToolRecord):
     ok: bool
     error: str | None
     output_ref: ArtifactRef | None = None
+    before_snapshot_ref: ArtifactRef | None = None
+    after_snapshot_ref: ArtifactRef | None = None
 
 
 class UsageCharge(Versions, CallTarget):
@@ -850,8 +852,24 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class UnknownActionRequested(Payload):
+    # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
+    # 只阻塞该动作（blocks="action"），不阻塞整个 run。
+    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute
+    kind: Literal["unknown_action"]
+    blocks: Literal["action"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    action_id: str
+    tool: str
+    action_kind: str
+    repeatable: bool
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested
+DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested
 
 
 class DecisionAnsweredPayload(Payload):

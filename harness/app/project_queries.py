@@ -635,13 +635,15 @@ class ActionView(Contract):
     action_id: str
     tool: str
     department: str | None
-    status: Literal["running", "completed", "failed"]
+    status: Literal["running", "completed", "failed", "unknown"]
     activation_id: str | None
     step_id: int | None
     input_version: int | None
     prompt_version: int | None
     created_at: str
     receipt: ActionReceipt | None
+    before_snapshot_ref: dict[str, Any] | None = None
+    after_snapshot_ref: dict[str, Any] | None = None
 
 
 class RunActionsResult(Contract):
@@ -663,8 +665,20 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
             continue
         started_event = started.pop(action_id, None)
         actions.append(_action_view(event, action_id, started_event, completed=True))
+    # 工单 #17：检测结果未知的动作（有 tool_started 但无 tool_called）
     for action_id, event in started.items():
-        actions.append(_action_view(event, action_id, None, completed=False))
+        payload = event.payload or {}
+        # 检查是否有对应的 tool_called 事件
+        has_called = any(
+            e.type == EventType.TOOL_CALLED and str(e.payload.get("id") or e.event_id) == action_id
+            for e in _tool_events(store, request.run_id)
+        )
+        if has_called:
+            # 有 tool_called 但仍在 started 中，说明是 running 状态
+            actions.append(_action_view(event, action_id, None, completed=False))
+        else:
+            # 没有 tool_called，是 unknown 状态
+            actions.append(_action_view(event, action_id, None, completed=False, unknown=True))
     actions.sort(key=lambda item: item.created_at)
     return Snapshot[RunActionsResult](position=store.end_position(), data=RunActionsResult(actions=actions))
 
@@ -683,9 +697,17 @@ def _tool_events(store: Any, run_id: str) -> list[Any]:
     return collected
 
 
-def _action_view(event: Any, action_id: str, started_event: Any, *, completed: bool) -> ActionView:
+def _action_view(event: Any, action_id: str, started_event: Any, *, completed: bool, unknown: bool = False) -> ActionView:
     payload = event.payload or {}
     started_payload = {} if started_event is None else started_event.payload
+    if unknown:
+        # 工单 #17：结果未知的动作（有 tool_started 但无 tool_called）
+        return ActionView(
+            action_id=action_id, tool=str(payload.get("name") or ""), department=event.role,
+            status="unknown", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
+            created_at=event.created_at, receipt=None,
+        )
     if not completed:
         return ActionView(
             action_id=action_id, tool=str(payload.get("name") or ""), department=event.role,
@@ -707,6 +729,8 @@ def _action_view(event: Any, action_id: str, started_event: Any, *, completed: b
             ok=ok, error=payload.get("error"), output_ref=payload.get("output_ref"),
             event_id=event.event_id, created_at=event.created_at,
         ),
+        before_snapshot_ref=payload.get("before_snapshot_ref"),
+        after_snapshot_ref=payload.get("after_snapshot_ref"),
     )
 
 
@@ -1377,6 +1401,78 @@ RUN_EXPORT = QueryDefinition(
 
 REPLAY_CHECK = QueryDefinition(
     name="replay.check", request=ReplayCheck, result=ReplayCheckResult, handle=_replay_check, changed_by=(),
+)
+
+
+# ---------------------------------------------------------------------------
+# run.recovery (工单 #17)
+
+class RunRecovery(Contract):
+    run_id: str
+
+class UnknownAction(Contract):
+    action_id: str
+    tool: str
+    department: str | None
+    created_at: str
+    repeatable: bool
+
+class RunRecoveryResult(Contract):
+    has_unknown_actions: bool
+    unknown_actions: list[UnknownAction]
+
+def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[RunRecoveryResult]:
+    # 工单 #17：检查 run 中是否有结果未知的动作
+    store = application.system.store
+    _run(application, request.run_id)
+    
+    unknown_actions: list[UnknownAction] = []
+    started: dict[str, Any] = {}
+    
+    # 收集所有工具事件
+    for event in _tool_events(store, request.run_id):
+        payload = event.payload or {}
+        if payload.get("name") == "provider_usage":
+            continue
+        action_id = str(payload.get("id") or event.event_id)
+        
+        if event.type == EventType.TOOL_STARTED:
+            started[action_id] = event
+        elif event.type == EventType.TOOL_CALLED:
+            # 有 tool_called，从 started 中移除
+            started.pop(action_id, None)
+    
+    # 检查剩余的 started 事件（没有对应的 tool_called）
+    from ..definitions import DEFINITIONS
+    for action_id, event in started.items():
+        payload = event.payload or {}
+        tool_name = str(payload.get("name") or "")
+        
+        # 检查工具是否可重复执行
+        tool_def = DEFINITIONS.tools.get(tool_name)
+        repeatable = tool_def.repeatable if tool_def else False
+        
+        unknown_actions.append(UnknownAction(
+            action_id=action_id,
+            tool=tool_name,
+            department=event.role,
+            created_at=event.created_at,
+            repeatable=repeatable,
+        ))
+    
+    unknown_actions.sort(key=lambda item: item.created_at)
+    
+    return Snapshot[RunRecoveryResult](
+        position=store.end_position(),
+        data=RunRecoveryResult(
+            has_unknown_actions=len(unknown_actions) > 0,
+            unknown_actions=unknown_actions,
+        )
+    )
+
+
+RUN_RECOVERY = QueryDefinition(
+    name="run.recovery", request=RunRecovery, result=RunRecoveryResult, handle=_run_recovery, changed_by=(),
 )
 
 PROJECT_QUERIES = (

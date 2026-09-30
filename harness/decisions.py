@@ -32,7 +32,15 @@ MODEL_UNAVAILABLE = DecisionKind("model_unavailable", "run", (Option("continue",
 DEFINITIONS_CHANGED = DecisionKind("definitions_changed", "run",
                                    (Option("continue", "按新版本继续"), Option("stop", "停止事项")))
 
-DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED)}
+# 结果未知的动作（工单 #17，恢复契约第 4 节）：工具已发出但结果未确认，由用户决定如何处理。
+# 阻塞范围为动作（不是 run），其他合法动作可以继续；「重新执行」只在契约声明该动作可以重复时提供，
+# 创建决定请求时按动作的 repeatable 属性过滤选项
+UNKNOWN_ACTION = DecisionKind("unknown_action", "action",
+                              (Option("reexecute", "重新执行"),
+                               Option("continue", "按当前实际状态继续"),
+                               Option("stop", "停止事项")))
+
+DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:

@@ -358,6 +358,9 @@ class StepDriver:
                 identity = str(item.get("call_id") or "")
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
+                # 工单 #17：初始化快照变量（循环层级，避免 try/else 分支导致 NameError）
+                before_snapshot = None
+                after_snapshot = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -383,6 +386,8 @@ class StepDriver:
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
                         # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
+                        # 工单 #17：使用 facts 作为动作前状态（来自 _begin_tool）
+                        before_snapshot = facts.tree.model_dump() if facts.tree else None
                         try:
                             receipt = await self._perform(Action(
                                 action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
@@ -392,11 +397,18 @@ class StepDriver:
                         except UnrepresentableWorkspace as exc:
                             raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
                         ok, output, error = receipt.ok, receipt.output, receipt.error
+                        # 工单 #17：查询动作后状态（轻量级，不含文件内容）
+                        try:
+                            after_facts = self._environment.query(FactsQuery(tree=True))
+                            after_snapshot = after_facts.tree.model_dump() if after_facts.tree else None
+                        except UnrepresentableWorkspace:
+                            after_snapshot = None
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": ok, "output": output, "error": error})}
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
-                self._recorder.tool_called(request, call)
+                # 工单 #17：传递前后快照给记录器
+                self._recorder.tool_called(request, call, before_snapshot=before_snapshot, after_snapshot=after_snapshot)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):
                     raise ProviderError(output["workspace_unrepresentable"], reason="workspace_unrepresentable")

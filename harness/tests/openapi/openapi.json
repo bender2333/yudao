@@ -2905,7 +2905,8 @@
             "enum": [
               "running",
               "completed",
-              "failed"
+              "failed",
+              "unknown"
             ],
             "title": "Status"
           },
@@ -2966,6 +2967,30 @@
                 "type": "null"
               }
             ]
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Snapshot Ref"
           }
         },
         "additionalProperties": false,
@@ -4665,7 +4690,15 @@
             "title": "Requested At"
           },
           "request": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Request"
           },
           "answer": {
             "anyOf": [
@@ -6966,6 +6999,78 @@
           "drain"
         ],
         "title": "SystemStatus"
+      },
+      "UnknownActionRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unknown_action",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "action",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "action_kind": {
+            "type": "string",
+            "title": "Action Kind"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "action_id",
+          "tool",
+          "action_kind",
+          "repeatable"
+        ],
+        "title": "UnknownActionRequested"
       },
       "UsageGroup": {
         "properties": {
@@ -11922,7 +12027,15 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Payload"
           }
         },
         "required": [
@@ -22738,6 +22851,28 @@
             "title": "Error"
           },
           "output_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "after_snapshot_ref": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ArtifactRef"

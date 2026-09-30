@@ -328,7 +328,26 @@ class StepRecorder:
         ))
         self._record(*drafts)
 
-    def tool_called(self, request: ModelRequest, call: dict[str, Any]) -> None:
+    def tool_called(self, request: ModelRequest, call: dict[str, Any], 
+                   before_snapshot: dict[str, Any] | None = None,
+                   after_snapshot: dict[str, Any] | None = None) -> None:
+        # 工单 #17：存储前后快照为工件，并在事件中记录引用
+        if before_snapshot:
+            before_ref = self._artifacts.put(
+                request.run_id,
+                f"snapshot/before/{call['id']}",
+                json_dumps(before_snapshot),
+                media_type="application/json",
+            )
+            call["before_snapshot_ref"] = asdict(before_ref)
+        if after_snapshot:
+            after_ref = self._artifacts.put(
+                request.run_id,
+                f"snapshot/after/{call['id']}",
+                json_dumps(after_snapshot),
+                media_type="application/json",
+            )
+            call["after_snapshot_ref"] = asdict(after_ref)
         self._record(*self._observe(request, _Observation(call["id"], "tool", call)))
 
     def tool_skipped(self, request: ModelRequest, call: dict[str, Any]) -> None:
