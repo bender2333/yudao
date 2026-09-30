@@ -42,6 +42,8 @@ class ModelRequest:
     tools: list[dict[str, Any]]
     purpose: str = "work"
     max_output_tokens: int | None = None
+    # 是否要求调用工具：最后一次主机提示之后的工作请求为 required（#102）
+    tool_choice: str = "auto"
     effective_contract_hash: str | None = None
     engineering_plan_hash: str | None = None
     request_id: str | None = None
@@ -76,7 +78,7 @@ class ModelRequest:
             activation_id=self.activation_id, step_id=self.step_id,
             logical_call_id=self.logical_call_id, attempt=self.attempt, attempt_id=self.attempt_id,
             purpose=self.purpose, input_items=self.input_items, tools=self.tools,
-            max_output_tokens=self.max_output_tokens,
+            max_output_tokens=self.max_output_tokens, tool_choice=self.tool_choice,
         )
 
 

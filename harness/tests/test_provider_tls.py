@@ -104,7 +104,8 @@ def test_model_list_is_read_over_the_same_trust_source(trusted_ca):
     # 模型列表同样是 Provider 的连接，信任同一个来源
     provider = ScriptedProvider([_model_list], tls=_server_context(trusted_ca))
     try:
-        result = refresh_candidates(ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models"))
+        result = refresh_candidates(ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models"),
+                                    api_key="tls-secret")
     finally:
         provider.close()
     assert result["status"] == "ok", result["error"]
@@ -115,7 +116,8 @@ def test_model_list_is_read_over_the_same_trust_source(trusted_ca):
 def test_model_list_reports_the_certificate_verification_failure():
     provider = ScriptedProvider([_model_list], tls=_server_context(trustme.CA()))
     try:
-        result = refresh_candidates(ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models"))
+        result = refresh_candidates(ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models"),
+                                    api_key="tls-secret")
     finally:
         provider.close()
     assert result["status"] == "unknown"

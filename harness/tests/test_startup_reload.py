@@ -25,14 +25,13 @@ def _fake_doc() -> dict:
     """包含一个 fake 协议 Provider、一个模型和三部门绑定的有效文档。"""
     return {
         "providers": [
-            {"id": "pf", "name": "测试服务"},
+            {"id": "pf", "name": "测试服务", "protocol": "fake"},
         ],
         "models": [
             {
                 "id": "mf",
                 "provider_id": "pf",
                 "model": "fake-model",
-                "protocol": "fake",
                 "context_window": 8000,
                 "max_output_tokens": 512,
             },
@@ -49,14 +48,13 @@ def _fake_catalog_only() -> dict:
     """只有目录和模型，没有绑定。"""
     return {
         "providers": [
-            {"id": "pf", "name": "测试服务"},
+            {"id": "pf", "name": "测试服务", "protocol": "fake"},
         ],
         "models": [
             {
                 "id": "mf",
                 "provider_id": "pf",
                 "model": "fake-model",
-                "protocol": "fake",
                 "context_window": 8000,
                 "max_output_tokens": 512,
             },
@@ -66,7 +64,7 @@ def _fake_catalog_only() -> dict:
 
 def _fake_provider_entry() -> dict:
     """单个 Provider 结构条目，无 credential_ref。"""
-    return {"id": "pf", "name": "测试服务"}
+    return {"id": "pf", "name": "测试服务", "protocol": "fake"}
 
 
 def _write_json(path, data) -> None:
@@ -91,7 +89,7 @@ def test_no_config_start(tmp_path):
     missing_config = tmp_path / "nonexistent" / "providers.json"
     missing_dotenv = tmp_path / "nonexistent" / ".env"
 
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(missing_config, missing_dotenv)
     facade.reload()
 
@@ -149,11 +147,20 @@ def _startup_config(state: str):
     if state == "empty_catalog":
         return {"providers": [], "models": [], "bindings": {}}
     if state == "unbound":
-        return _fake_catalog_only()
+        # 目录有内容但没有部门绑定；fake 协议在正常启动被拒绝（工单 #86），这里用真实协议
+        return {
+            "providers": [{"id": "p1", "name": "P1", "protocol": "responses",
+                           "base_url": "https://example.com/v1",
+                           "credential_ref": _ABSENT_KEY, "timeout_sec": 60}],
+            "models": [{"id": "m1", "provider_id": "p1", "model": "m",
+                        "context_window": 8000, "max_output_tokens": 512}],
+            "bindings": {},
+        }
     return {
-        "providers": [{"id": "p1", "name": "P1", "base_url": "https://example.com/v1",
+        "providers": [{"id": "p1", "name": "P1", "protocol": "responses",
+                       "base_url": "https://example.com/v1",
                        "credential_ref": _ABSENT_KEY, "timeout_sec": 60}],
-        "models": [{"id": "m1", "provider_id": "p1", "model": "m", "protocol": "responses",
+        "models": [{"id": "m1", "provider_id": "p1", "model": "m",
                     "context_window": 8000, "max_output_tokens": 512}],
         "bindings": {department: {"provider_id": "p1", "model_id": "m1"}
                      for department in ("product", "engineering", "quality")},
@@ -213,7 +220,7 @@ def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_
 def test_structural_partial_save(tmp_path):
     """save_provider_entry 保存结构合法的 Provider（无 credential、无 model）-> 发布成功；
     describe_readiness available False 且含定位 issues；落盘可重新加载且非敏感内容一致。"""
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     # 保存结构条目，不传 models_raw
     rev = facade.save_provider_entry(_fake_provider_entry())
     assert rev >= 1
@@ -233,7 +240,7 @@ def test_structural_partial_save(tmp_path):
     assert "credential_ref" not in loaded["providers"][0] or loaded["providers"][0].get("credential_ref", "") == ""
 
     # 验证已持久化的文档能被全新 facade 加载且结构一致
-    facade2 = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade2 = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade2.load_document(doc_path)
     doc2 = facade2.to_document()
     assert doc2["providers"] == loaded["providers"]
@@ -245,7 +252,7 @@ def test_structural_partial_save(tmp_path):
 
 def test_frozen_snapshot_immutability(tmp_path):
     """resolve_departments 返回的快照 public_dict 在后续 save_bindings 推进修订后不变。"""
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
 
     # 先写入目录与模型（fake 协议无需凭据）
     facade.store(_fake_catalog_only())
@@ -269,7 +276,7 @@ def test_frozen_snapshot_immutability(tmp_path):
     # 推进新修订：新增一个模型并重新绑定到新模型
     facade.save_model({
         "id": "mf2", "provider_id": "pf", "model": "fake-model-2",
-        "protocol": "fake", "context_window": 4000, "max_output_tokens": 256,
+        "context_window": 4000, "max_output_tokens": 256,
     })
     facade.save_bindings({
         "product": {"provider_id": "pf", "model_id": "mf2"},
@@ -294,7 +301,7 @@ def test_corrupt_external_edit(tmp_path):
     """有效文档加载后，外部覆写为非法 JSON -> reload ok=False，保留上一版本；
     修复后 reload ok=True 且错误清除。"""
     config_path = tmp_path / "providers.json"
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path)
 
     # 写入有效文档并加载
@@ -330,7 +337,7 @@ def test_clear_withdraw(tmp_path):
     """删除 providers.json -> reload config_state=missing，readiness 不可用；
     重建有效空文档 -> reload 发布。"""
     config_path = tmp_path / "providers.json"
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path)
 
     # 写入有效文档并加载
@@ -362,7 +369,7 @@ def test_clear_withdraw(tmp_path):
 def test_same_size_rewrite(tmp_path):
     """不同 JSON 内容但完全相同字节数 -> reload 必须检测变化并发布。"""
     config_path = tmp_path / "providers.json"
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path)
 
     doc_a = _fake_doc()
@@ -397,7 +404,7 @@ def test_watcher_detects_external_write(tmp_path):
     """facade.start_watching(interval_sec=0.05) 后写入新文档 -> 轮询约 3 秒内
     检测到修订变化；stop_watching 后线程停止。"""
     config_path = tmp_path / "providers.json"
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path)
 
     # 初始加载
@@ -443,16 +450,17 @@ def test_credentials_chain(tmp_path, monkeypatch):
     config_path = tmp_path / "providers.json"
     dotenv_path = tmp_path / ".env"
 
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path, dotenv_path)
     _write_json(config_path, {
         "providers": [
-            {"id": "p1", "name": "P1", "credential_ref": "TEST_CRED_SECRET",
+            {"id": "p1", "name": "P1", "protocol": "responses",
+             "credential_ref": "TEST_CRED_SECRET",
              "base_url": "https://example.com/v1", "timeout_sec": 60},
         ],
         "models": [
             {"id": "m1", "provider_id": "p1", "model": "m",
-             "protocol": "responses", "context_window": 8000, "max_output_tokens": 512},
+             "context_window": 8000, "max_output_tokens": 512},
         ],
         "bindings": {
             "product": {"provider_id": "p1", "model_id": "m1"},
@@ -527,16 +535,17 @@ def test_secret_hygiene(tmp_path, monkeypatch):
     config_path = tmp_path / "providers.json"
     dotenv_path = tmp_path / ".env"
 
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(config_path, dotenv_path)
     _write_json(config_path, {
         "providers": [
-            {"id": "p1", "name": "P1", "credential_ref": "SECRET_REF",
+            {"id": "p1", "name": "P1", "protocol": "responses",
+             "credential_ref": "SECRET_REF",
              "base_url": "https://example.com/v1", "timeout_sec": 60},
         ],
         "models": [
             {"id": "m1", "provider_id": "p1", "model": "m",
-             "protocol": "responses", "context_window": 8000, "max_output_tokens": 512},
+             "context_window": 8000, "max_output_tokens": 512},
         ],
         "bindings": {
             "product": {"provider_id": "p1", "model_id": "m1"},

@@ -25,7 +25,7 @@ from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
-from .public_tree import CapturedTree, TreeError, capture_public_tree, is_private_path, materialize_tree
+from .public_tree import CapturedTree, TreeError, UnrepresentableWorkspace, capture_public_tree, is_private_path, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .redact import redact_text, sanitized_env
 from .tools import normalize_registered_commands
@@ -120,7 +120,8 @@ class LocalEnvironment:
             raise TreeError("Public tree does not match the complete recorded manifest")
 
     async def perform(self, action: Action) -> ActionReceipt:
-        # 工具的执行出错时回执为 failed，错误说明交回模型
+        # 工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法表示的条目时
+        # （UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行
         process = self._processes.get(action.tool)
         handler = None if process is not None else self._handlers[action.tool]
         stop = asyncio.Event()
@@ -132,9 +133,16 @@ class LocalEnvironment:
             self._running[action.action_id] = (asyncio.get_running_loop(), stop)
         try:
             if process is not None:
-                output, status = await process(action, stop)
+                result = await process(action, stop)
+                # 登记命令结束后主机立即取得的公开树核对结果随回执交回：附在回执上，步骤驱动在
+                # 回执照常记录之后按它以 workspace_unrepresentable 暂停
+                output, status, workspace_error = result if len(result) == 3 else (*result, None)
+                if workspace_error is not None:
+                    output = {**output, "workspace_unrepresentable": workspace_error}
             else:
                 output, status = handler(action.input), "completed"
+        except UnrepresentableWorkspace:
+            raise
         except Exception as exc:
             return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc))
         finally:
@@ -252,7 +260,7 @@ class LocalEnvironment:
             if cursor.get("path") != rel or cursor.get("start_line") != start or cursor.get("end_line") != end:
                 raise ValueError("cursor does not match the current read_range arguments")
             offset = cursor["offset"]
-        self.workspace.resolve(rel)
+        self.workspace.resolve_readable(rel)
         snapshot = self.workspace.snapshot()
         digest = snapshot.digest
         if cursor is not None and cursor.get("digest") != digest:
@@ -310,8 +318,8 @@ class LocalEnvironment:
                 value.encode("utf-8", errors="strict")
             except (UnicodeEncodeError, ValueError) as exc:
                 raise ValueError(f"encoding difference: {label} cannot be encoded as UTF-8 identically") from exc
-        # 路径校验复用公开树规则，私有、逃逸、链接与歧义名称直接报错
-        target = self.workspace.resolve(rel)
+        # 路径校验复用公开树规则，私有、逃逸、链接与歧义名称直接报错；被忽略规则排除的路径拒绝编辑
+        target = self.workspace.resolve_writable(rel)
         if not os.path.lexists(target):
             raise FileNotFoundError(f"file not found: {rel}")
         if not target.is_file():
@@ -371,7 +379,7 @@ class LocalEnvironment:
         _require_reason(args)
         return self.workspace.move_file(args["source"], args["destination"])
 
-    async def _run_command(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+    async def _run_command(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str, str | None]:
         args = action.input
         name = args.get("name")
         if not isinstance(name, str) or not name:
@@ -415,6 +423,14 @@ class LocalEnvironment:
         else:
             exit_code = finished.returncode
             status = "ok" if exit_code == 0 else "failed"
+        # 登记命令结束后主机立即取得公开树核对。命令留下无法表示的条目（例如链接）时，核对结果
+        # 随回执交回，步骤驱动在回执照常记录之后以 workspace_unrepresentable 暂停；被忽略的条目
+        # 不进入公开树，核对通过
+        workspace_error = None
+        try:
+            self.workspace.snapshot()
+        except UnrepresentableWorkspace as exc:
+            workspace_error = str(exc)
         return {
             "name": name,
             "argv": argv,
@@ -425,7 +441,7 @@ class LocalEnvironment:
             "snapshot_hash": snapshot.digest,
             "executor": "host",
             "attempt": attempt,
-        }, finished.status
+        }, finished.status, workspace_error
 
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input
@@ -456,9 +472,10 @@ class LocalEnvironment:
             snapshot_hash = original_digest
             verification_errors = []
             # A process result remains evidence even when its tested bytes cannot be verified.
+            # 两处读取都按项目的忽略规则取得公开树；说明文字只出现标签，主机路径不进入模型可见的回执
             for label, root in (("tested tree", copy_root), ("source workspace", self.workspace.root)):
                 try:
-                    observed_digest = capture_public_tree(root).digest
+                    observed_digest = capture_public_tree(root, True).digest
                     if label == "tested tree":
                         snapshot_hash = observed_digest
                     if observed_digest != original_digest:

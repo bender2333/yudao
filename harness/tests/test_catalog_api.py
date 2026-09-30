@@ -19,19 +19,21 @@ UPSTREAM_BASE = "http://127.0.0.1:9/v1"
 
 
 def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
-    return {"id": provider_id, "name": provider_id, "base_url": base_url, "credential_ref": REF,
-            "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
+    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+            "credential_ref": REF, "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
 
 
 def _model(model_id="m1", *, model="model-x"):
-    # 连接保存用的模型访问定义：所属连接由命令参数给出
-    return {"id": model_id, "model": model, "protocol": "responses",
+    # 连接保存用的模型访问定义：所属连接由命令参数给出，协议取自连接；
+    # 每一行带容量确认（工单 #86）
+    return {"id": model_id, "model": model, "capacity_confirmed": True,
             "context_window": 32000, "max_output_tokens": 2048}
 
 
 def _document_model(provider_id, model_id="m1"):
-    # 目录文档中的定义自己带上所属连接
-    return {**_model(model_id), "provider_id": provider_id}
+    # 目录文档中的定义自己带上所属连接；文档不带逐行容量确认标记（工单 #86）
+    return {key: value for key, value in {**_model(model_id), "provider_id": provider_id}.items()
+            if key != "capacity_confirmed"}
 
 
 def _document(*, provider_id="p1", model_id="m1", base_url=UPSTREAM_BASE, models_url="", bindings=None):
@@ -179,6 +181,8 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
     opened = _Opened(tmp_path)
     with running_api(opened) as client:
         current = _catalog(client)["revision"]
+        # 保存部门默认要求所选定义已准入（工单 #86）：先经模块接口记录模型测试通过的事实
+        opened.application.system.facade.record_admission("p1", "m1", admitted_model="model-x")
         bindings = {department: {"provider_id": "p1", "model_id": "m1"} for department in DEPARTMENTS}
         defaults = _command(client, "catalog.department_defaults.save", base_version=current, bindings=bindings)
         assert defaults.status_code == 200, defaults.text
@@ -207,36 +211,41 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
 
 def test_model_test_admits_and_connection_test_does_not(tmp_path):
     server, _capture, base = serve(responses_responder)
-    try:
-        opened = _Opened(tmp_path, _document(base_url=base + "/v1"))
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            tested = _command(client, "catalog.model.test", base_version=current, provider_id="p1", model_id="m1")
-            assert tested.status_code == 200, tested.text
-            [finished] = _wait_for(opened.store,
-                                   lambda item: item.payload.get("kind") == "model", timeout=15.0,
-                                   description="catalog_test_finished (model)")
-            assert finished.payload["ok"] is True and finished.payload["admitted"] is True
-            assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
-            assert finished.payload["base_revision"] == current
-            admitted = _catalog(client)["models"][0]
-            assert admitted["admitted_at"] is not None
+    # 连接测试读取模型列表地址：该连接没有地址时不提供连接测试，这里给出一份真实的上游
+    with _models_server({"data": [{"id": "model-x"}]}) as models_url:
+        try:
+            opened = _Opened(tmp_path, _document(base_url=base + "/v1", models_url=models_url))
+            with running_api(opened) as client:
+                current = _catalog(client)["revision"]
+                tested = _command(client, "catalog.model.test", base_version=current, provider_id="p1",
+                                  model_id="m1")
+                assert tested.status_code == 200, tested.text
+                [finished] = _wait_for(opened.store,
+                                       lambda item: item.payload.get("kind") == "model", timeout=15.0,
+                                       description="catalog_test_finished (model)")
+                assert finished.payload["ok"] is True and finished.payload["admitted"] is True
+                assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
+                assert finished.payload["base_revision"] == current
+                admitted = next(item for item in _catalog(client)["admissions"]
+                                if item["model_id"] == "m1")
+                assert admitted["admitted"] is True and admitted["admitted_at"] is not None
 
-            # 连接测试不改变准入
-            before_connection = _catalog(client)
-            tested = _command(client, "catalog.connection.test", base_version=before_connection["revision"],
-                              provider_id="p1")
-            assert tested.status_code == 200, tested.text
-            [connection] = _wait_for(opened.store,
-                                     lambda item: item.payload.get("kind") == "connection", timeout=15.0,
-                                     description="catalog_test_finished (connection)")
-            assert connection.payload["ok"] is True and connection.payload["admitted"] is None
-            assert connection.payload["base_revision"] == before_connection["revision"]
-            assert _catalog(client)["models"][0]["admitted_at"] == admitted["admitted_at"]
-            _assert_no_secret(client, opened)
-    finally:
-        server.shutdown()
-        server.server_close()
+                # 连接测试不改变准入
+                before_connection = _catalog(client)
+                tested = _command(client, "catalog.connection.test",
+                                  base_version=before_connection["revision"], provider_id="p1")
+                assert tested.status_code == 200, tested.text
+                [connection] = _wait_for(opened.store,
+                                         lambda item: item.payload.get("kind") == "connection", timeout=15.0,
+                                         description="catalog_test_finished (connection)")
+                assert connection.payload["ok"] is True and connection.payload["admitted"] is None
+                assert connection.payload["base_revision"] == before_connection["revision"]
+                assert next(item for item in _catalog(client)["admissions"]
+                            if item["model_id"] == "m1")["admitted_at"] == admitted["admitted_at"]
+                _assert_no_secret(client, opened)
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 def test_candidates_collect_reads_the_models_url_and_writes_an_event(tmp_path):

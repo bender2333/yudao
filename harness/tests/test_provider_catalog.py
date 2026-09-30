@@ -15,16 +15,16 @@ from harness.providers import (
 def _document(**overrides):
     document = {
         "providers": [
-            {"id": "provider-a", "name": "Provider A",
+            {"id": "provider-a", "name": "Provider A", "protocol": "responses",
              "base_url": "https://a.example/v1", "credential_ref": "credential-a"},
-            {"id": "provider-b", "name": "Provider B",
+            {"id": "provider-b", "name": "Provider B", "protocol": "responses",
              "base_url": "https://b.example/v1", "credential_ref": "credential-b"},
         ],
         "models": [
             {"id": "model-a", "provider_id": "provider-a", "model": "model-a",
-             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+             "context_window": 32000, "max_output_tokens": 4096},
             {"id": "model-b", "provider_id": "provider-b", "model": "model-b",
-             "protocol": "responses", "context_window": 32000, "max_output_tokens": 4096},
+             "context_window": 32000, "max_output_tokens": 4096},
         ],
         "bindings": {
             "product": {"provider_id": "provider-a", "model_id": "model-a"},
@@ -48,7 +48,9 @@ def _facade(**credential_overrides):
 def admit_bound_models(facade, document=None):
     # 真实协议模型须先经模型测试准入才能用于任务；测试通过模块接口记录该事实
     bindings = (document or facade.to_document())["bindings"]
-    models = {item["id"]: item for item in facade.providers_view()["models"]}
+    view = facade.providers_view()
+    models = {item["id"]: item for item in view["models"]}
+    protocols = {item["id"]: item["protocol"] for item in view["providers"]}
     admitted: set[tuple[str, str]] = set()
     for item in bindings.values():
         provider_id, model_id = item.get("provider_id"), item.get("model_id")
@@ -56,7 +58,7 @@ def admit_bound_models(facade, document=None):
             continue
         admitted.add((provider_id, model_id))
         model = models.get(model_id)
-        if model is None or model["protocol"] == "fake":
+        if model is None or protocols.get(provider_id) == "fake":
             continue
         facade.record_admission(provider_id, model_id, admitted_model=model["model"])
 
@@ -78,22 +80,86 @@ def test_new_document_round_trip_contains_only_non_sensitive_fields(tmp_path):
     assert "api_key" not in json.dumps(reloaded.to_document())
 
 
-def test_old_provider_level_protocol_is_rejected_without_migration():
+def test_model_definition_declares_whether_it_accepts_a_required_tool_call():
+    # 模型访问定义声明是否接受要求调用工具（#102）：没有写入时为接受；声明不接受时随目录保存并重新读出，
+    # 修改后准入保持，解析出的调用目标带着这一项；取值必须是 true 或 false
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    assert facade.providers_view()["models"][0]["accepts_required_tool_call"] is True
+    assert facade.resolve_departments().target("product").accepts_required_tool_call is True
+
     document = _document()
-    document["providers"][0]["protocol"] = "responses"
+    document["models"][0]["accepts_required_tool_call"] = False
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    facade.store_document(document)
+    admit_bound_models(facade, document)
+    admitted_at = next(item["admitted_at"] for item in facade.model_admissions()
+                       if item["model_id"] == "model-a")
+    assert admitted_at is not None
+    assert facade.resolve_departments().target("product").accepts_required_tool_call is False
+
+    reloaded = ProviderFacade()
+    reloaded.store_document(facade.to_document())
+    view = reloaded.providers_view()
+    assert view["models"][0]["accepts_required_tool_call"] is False
+    # 准入记录与目录分开保存（#86），不随目录文档重新读出
+    assert reloaded.model_admissions() == []
+
+    bad = _document()
+    bad["models"][0]["accepts_required_tool_call"] = "yes"
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(bad)
+    assert any(issue.location == "models[0].accepts_required_tool_call" for issue in caught.value.issues)
+
+
+def test_providers_view_model_dict_carries_capability_source_and_tool_call_declaration():
+    # 对外目录的模型字典同时给出能力来源与是否接受要求调用工具（#102）；
+    # 模型测试记录准入以后两项都保持，前端模型列表才能继续显示能力来源
+    document = _document()
+    document["models"][0]["capability_source"] = "preset-v1"
+    document["models"][0]["accepts_required_tool_call"] = False
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    model = facade.providers_view()["models"][0]
+    assert model["capability_source"] == "preset-v1"
+    assert model["accepts_required_tool_call"] is False
+
+    admit_bound_models(facade, document)
+    model = facade.providers_view()["models"][0]
+    assert model["capability_source"] == "preset-v1"
+    assert model["accepts_required_tool_call"] is False
+    admission = next(item for item in facade.model_admissions() if item["model_id"] == "model-a")
+    assert admission["admitted_at"] is not None
+    assert admission["admitted_model"] == "model-a"
+
+
+def test_provider_config_requires_a_protocol():
+    # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
+    document = _document()
+    del document["providers"][0]["protocol"]
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "providers[0].protocol" for issue in caught.value.issues)
 
 
-def test_model_protocol_is_required_per_model_definition():
+def test_model_definition_declaring_protocol_is_rejected_without_migration():
+    # 模型访问定义不再声明协议（ADR-0004）：指出字段位置，不迁移
     document = _document()
-    del document["models"][0]["protocol"]
+    document["models"][0]["protocol"] = "responses"
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "models[0].protocol" for issue in caught.value.issues)
+
+
+def test_model_without_protocol_is_accepted():
+    facade = ProviderFacade()
+    assertion = facade.store_document(_document())
+    assert assertion >= 1
+    view = facade.providers_view()
+    assert "protocol" not in view["models"][0]
+    assert view["providers"][0]["protocol"] == "responses"
 
 
 def test_snapshot_freezes_three_targets_without_persisting_secrets():
@@ -115,7 +181,7 @@ def test_each_target_is_independent_and_frozen_after_publish():
     revision_before = facade.revision
     facade.save_model({
         "id": "model-c", "provider_id": "provider-a", "model": "model-c",
-        "protocol": "responses", "context_window": 8000, "max_output_tokens": 512,
+        "context_window": 8000, "max_output_tokens": 512,
     })
     assert facade.revision > revision_before
     assert snapshot.target("product").model == "model-a"
@@ -143,6 +209,7 @@ def test_dangling_binding_references_are_rejected():
     facade.store_document(_document(bindings={
         "product": {"provider_id": "provider-a", "model_id": "model-a"},
     }))
+    admit_bound_models(facade)
     with pytest.raises(CatalogValidationError):
         facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "missing-model"}})
     facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "model-a"}})

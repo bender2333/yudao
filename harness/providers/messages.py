@@ -345,6 +345,9 @@ def _messages_request_params(invocation: _MessagesInvocation, target: FrozenTarg
     tools = _messages_tools(invocation.provider_input)
     if tools:
         params["tools"] = tools
+        # 要求调用工具时 tool_choice 为 {"type": "any"}；自动时不发送（#102）
+        if invocation.provider_input.tool_choice == "required":
+            params["tool_choice"] = {"type": "any"}
     return params
 
 

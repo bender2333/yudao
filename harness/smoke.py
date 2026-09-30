@@ -66,6 +66,7 @@ def run_smoke(
     provider_config: str | Path | None = None,
     dotenv_path: str | Path | None = None,
     scenarios: list[str] | None = None,
+    startup_mode: str = "normal",
 ) -> dict[str, Any]:
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -78,8 +79,9 @@ def run_smoke(
         "available": False,
         "scenarios": {},
     }
-    # 短命 CLI 执行前读取一致版本，缺可用配置明确失败，不偷换 Fake
-    facade = ProviderFacade()
+    # 短命 CLI 执行前读取一致版本，缺可用配置明确失败，不偷换 Fake；
+    # 默认以 normal 启动读取目录，fake 连接被拒绝（工单 #86）
+    facade = ProviderFacade(startup_mode=startup_mode)
     facade.configure_paths(config_path, None if dotenv_path is None else Path(dotenv_path))
     facade.reload()
     system = LoopSystem(data_dir, facade=facade)

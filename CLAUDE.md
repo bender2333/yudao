@@ -105,7 +105,8 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 3. 规格：`/to-spec` 把讨论结果整理成父工单。
 4. 拆分：`/to-tickets` 把父工单拆成可以独立验证的子工单，写明阻塞关系，添加 `ready-for-agent` 标签。
 5. 执行：执行者按 `AGENTS.md` 领取子工单，实现、自测、提交并关闭。
-6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图与验收基线。
+6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图、验收基线，以及需求索引（`docs/requirements/README.md`）与设计索引（`docs/design/README.md`）中对应条目的状态。
+7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组。一个里程碑的工单全部关闭、集成层批量运行通过以后，架构师在该阶段的文档目录（例如 `docs/stage-3/`）写试用指南，先用真实模型按指南走一遍（桌面客户端用 Playwright 操作），再交给用户试用；用户用 `/qa` 反馈的问题建成工单，排在队列最前面；用户确认以后关闭试用工单与里程碑。试用期间继续推进下一个里程碑。
 
 第 1 至 4 步在同一个上下文窗口中完成，`/to-tickets` 完成之前不清空、不压缩上下文。
 
@@ -119,20 +120,20 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 分工：Claude 建立工单并推进流程，omp 担任执行者，OpenCode 担任审查者。三方通过 issue 评论、标签与 PR 交换信息，执行者与审查者的规则都在 `AGENTS.md`。
 
 流程：
-1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，在后台运行
-   `omp -p --prewalk --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，同时可以开始的工单中先派发较早里程碑的工单，在后台运行
+   `omp -p --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
 2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
    `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
 3. 收尾：
    - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
-4. 集成层：上次 `INTEGRATION: PASS` 以后合并满 5 个 PR，或者关闭工作包父工单之前，Claude 暂停派发，在 `C:\project\yudao-worktrees\integration` 检出 main 的当前提交并执行 `uv sync --frozen`，在后台运行
+4. 集成层：上次 `INTEGRATION: PASS` 以后合并满 5 个 PR、关闭工作包父工单之前，或者把里程碑交给用户试用之前，Claude 暂停派发，在 `C:\project\yudao-worktrees\integration` 检出 main 的当前提交并执行 `uv sync --frozen`，在后台运行
    `uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml`（登记表建立之前运行 `uv run python -m pytest harness/tests -n 4 --junitxml=.tmp/test-results/integration.xml`）
    - 通过：在阶段父工单下评论，第一行写 `INTEGRATION: PASS <提交号>`，附结尾的计数行，作为下一批的起点，恢复派发。
    - 失败：暂停合并。先用单进程重新运行失败的测试：通过时建工单修正这个不稳定的测试，恢复合并；仍然失败时用 `git bisect run` 只运行失败的测试，找到出问题的提交，建修复工单并关联那个 PR 的工单，排在最前；修复合并后再运行集成层全部，通过后恢复合并。步骤见 `docs/design/test-pyramid.md` 第 4.2 节。
 5. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
 
-命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。omp 使用 prewalk：用默认模型阅读与规划，写下 todo 列表后第一次修改文件时切换到 smol 模型；omp 的错误输出出现 `prewalk disabled` 时，说明 smol 模型无法使用，本轮按异常结束处理。
+命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。
 
 ## 工单规范
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。

@@ -16,12 +16,14 @@ from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial
+from .discovery import probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
 from .invoke import (
     CancelRegistry,
     InvokeResult,
     ProviderInput,
+    check_target_availability,
     provider_input_for,
     stream_invocation,
     to_provider_input,
@@ -35,12 +37,22 @@ from .resolve import (
     resolve_call_target as _resolve_call_target,
     resolve_snapshot,
 )
-from .responses import ProviderConnections, check_availability
-from .store import ProviderStore
+from .responses import ProviderConnections
+from .store import (
+    SUPPORTED_PROTOCOLS,
+    AdmissionRecord,
+    ProviderStore,
+    _parse_admission_document,
+    _utc_now,
+    admission_is_current,
+)
 
 
 # 三部门默认绑定键，模块自身不硬编码部门语义，只提供默认选择
 REQUIRED_DEPARTMENTS = ("product", "engineering", "quality")
+
+# 启动方式：normal 读取真实目录，拒绝 fake 连接；test 与 demo 为测试和演示放行 fake（工单 #86）
+STARTUP_MODES = ("normal", "test", "demo")
 
 
 class ProviderFacade:
@@ -49,7 +61,10 @@ class ProviderFacade:
         self,
         store: ProviderStore | None = None,
         credentials: CredentialChain | Mapping[str, Any] | None = None,
+        startup_mode: str = "normal",
     ) -> None:
+        if startup_mode not in STARTUP_MODES:
+            raise ValueError("startup_mode 只能是 " + "、".join(STARTUP_MODES))
         self._store = store if store is not None else ProviderStore.empty()
         if isinstance(credentials, CredentialChain):
             self._credentials = credentials
@@ -83,6 +98,12 @@ class ProviderFacade:
         self._credential_versions: dict[str, int] = {}
         # 目录文件被外部修改并发布以后的回调，由系统装配登记（写入口据它补写 catalog_revised）
         self._reload_listener: Callable[[], None] | None = None
+        # 启动方式：normal 拒绝 fake 连接，test 与 demo 放行（工单 #86）
+        self._startup_mode = startup_mode
+        # 准入记录：model_id -> AdmissionRecord，与目录分开保存，按受影响字段逐项判有效性
+        self._admissions: dict[str, AdmissionRecord] = {}
+        self._admission_path: Path | None = None
+        self._admission_seen = False
 
     @property
     def revision(self) -> int:
@@ -101,13 +122,25 @@ class ProviderFacade:
     def dotenv_path(self) -> Path | None:
         return self._dotenv_path
 
-    def load(self, path: str | Path) -> int:
-        # 读取本地非敏感目录并整体发布
+    @property
+    def admission_path(self) -> Path | None:
+        return self._admission_path
+
+    @property
+    def startup_mode(self) -> str:
+        # 启动方式属性：normal 拒绝 fake 连接，test 与 demo 放行（工单 #86）
+        return self._startup_mode
+
+    @startup_mode.setter
+    def startup_mode(self, value: str) -> None:
+        if value not in STARTUP_MODES:
+            raise ValueError("startup_mode 只能是 " + "、".join(STARTUP_MODES))
         with self._lock:
-            loaded = ProviderStore.load(path)
-            self._store = loaded
-            self._publish()
-            return self._revision
+            self._startup_mode = value
+
+    def load(self, path: str | Path) -> int:
+        # 读取本地非敏感目录并整体发布；fake 门禁在 _parse_document，故走整份文档路径
+        return self.load_document(path)
 
     def load_dotenv_file(self, path: str | Path) -> int:
         # 载入独立 .env 字典来源，缺失即空
@@ -150,9 +183,11 @@ class ProviderFacade:
             return {key: dict(value) for key, value in self._bindings.items()}
 
     def save_bindings(self, raw: Mapping[str, Any]) -> int:
-        # 整体替换部门绑定，只校验引用结构，不验证凭据就绪；有变化时推进目录修订号
+        # 保存部门默认要求所选定义已准入且未作废；引用结构不合法或未准入都整份拒绝，
+        # 有变化时推进目录修订号（准入有效性按字段比较，与目录修订无关）
         with self._lock:
             bindings = _parse_bindings(raw, self._store)
+            _require_bound_admissions(bindings, self._store, self._admissions)
             if bindings != self._bindings:
                 self._store.bump_revision()
             self._bindings = bindings
@@ -169,7 +204,7 @@ class ProviderFacade:
     def store_document(self, raw: Mapping[str, Any]) -> int:
         # 校验整份文档后整体发布，失败不改内存，落盘由 persist_document 完成
         with self._lock:
-            store, bindings = _parse_document(raw)
+            store, bindings = _parse_document(raw, self._startup_mode)
             self._store = store
             self._bindings = bindings
             self._publish()
@@ -182,19 +217,6 @@ class ProviderFacade:
             document["revision"] = self._store.revision + 1
             self.store_document(document)
             return self._store.revision
-
-    def merge_model_admissions(self, models: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-        # 命令保存访问定义时保留已有的准入事实：准入只由模型测试写入，客户端不提交它
-        merged: list[dict[str, Any]] = []
-        for item in models:
-            entry = dict(item)
-            existing = self._store.models.get(str(entry.get("id")))
-            if existing is not None:
-                for key in ("admitted_at", "admitted_revision", "admitted_model", "admitted_protocol"):
-                    if getattr(existing, key) is not None:
-                        entry[key] = getattr(existing, key)
-            merged.append(entry)
-        return merged
 
     def persist_catalog(self, previous: Mapping[str, Any]) -> str | None:
         # 保存以后落盘；失败时恢复上一份文档并返回错误说明；没有配置路径时不做任何事
@@ -230,7 +252,7 @@ class ProviderFacade:
                 self._reload_error = f"Provider 配置无法解析：{exc}"
                 raise CatalogValidationError((ValidationIssue("catalog", "无法读取 Provider 目录"),)) from exc
             try:
-                store, bindings = _parse_document(raw)
+                store, bindings = _parse_document(raw, self._startup_mode)
             except CatalogValidationError as exc:
                 self._config_state = "invalid"
                 self._reload_error = str(exc)
@@ -241,6 +263,7 @@ class ProviderFacade:
             self._reload_error = None
             self._disk_config_hash = hashlib.sha256(data).digest()
             self._disk_config_seen = True
+            self._load_admissions_file()
             self._publish()
             return self._revision
 
@@ -248,7 +271,7 @@ class ProviderFacade:
         # 校验成功后原子落盘整份非敏感文档，落盘成功才发布跟踪哈希
         with self._lock:
             document = self.to_document()
-            store, bindings = _parse_document(document)
+            store, bindings = _parse_document(document, self._startup_mode)
             payload = json.dumps(
                 {"revision": document["revision"], "providers": document["providers"],
                  "models": document["models"], "bindings": document["bindings"]},
@@ -280,6 +303,7 @@ class ProviderFacade:
     def save_provider_entry(self, provider_raw: Mapping[str, Any],
                             models_raw: Sequence[Mapping[str, Any]] | None = None) -> int:
         # 单个 Provider 连带其模型一次提交：先按合并后整份校验，通过才逐项应用
+        # 每行容量必须有值；新增行还必须带容量确认，已存在的行提交即带值视为已确认（工单 #86）
         with self._lock:
             if not isinstance(provider_raw, Mapping):
                 raise CatalogValidationError((ValidationIssue("providers", "应为对象"),))
@@ -289,24 +313,31 @@ class ProviderFacade:
             entry = dict(provider_raw)
             entry.pop("models", None)
             providers.append(entry)
-            if models_raw is not None:
+            if models_raw is None:
+                models = document["models"]
+            else:
                 if not isinstance(models_raw, list):
                     raise CatalogValidationError((ValidationIssue("models", "应为数组"),))
                 models = [item for item in document["models"] if item.get("provider_id") != provider_id]
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
+                    nested.pop("capacity_confirmed", None)
                     models.append(nested)
-            else:
-                models = document["models"]
             merged = {"providers": providers, "models": models, "bindings": document["bindings"]}
-            _parse_document(merged)
+            _parse_document(merged, self._startup_mode)
+            if models_raw is not None:
+                _require_capacity(models_raw, provider_id, set(self._store.models))
             self._store.save_provider(entry)
             if models_raw is not None:
+                submitted: set[str] = set()
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
+                    nested.pop("capacity_confirmed", None)
                     self._store.save_model(nested)
+                    submitted.add(str(nested.get("id")))
+                self._prune_admissions(str(provider_id), submitted)
             self._publish()
             return self._revision
 
@@ -465,7 +496,7 @@ class ProviderFacade:
         departments: Sequence[str] = REQUIRED_DEPARTMENTS,
     ) -> ResolveSnapshot:
         # 按当前默认绑定一次读取一致的目录版本、凭据来源与目标列表；
-        # 真实协议要求模型已通过模型测试准入，fake 只用于确定性测试不设门槛
+        # 真实协议要求模型已准入且按受影响字段判定为有效，fake 不设此门槛（工单 #86）
         with self._lock:
             selections = []
             issues: list[ValidationIssue] = []
@@ -483,10 +514,14 @@ class ProviderFacade:
             for key in sorted(snapshot.targets):
                 binding = self._bindings.get(key, {})
                 model = self._store.models.get(binding.get("model_id", ""))
-                if model is not None and model.protocol != "fake" and not model.admitted:
+                provider = self._store.providers.get(binding.get("provider_id", ""))
+                if model is None or provider is None or provider.protocol == "fake":
+                    continue
+                record = self._admissions.get(model.id)
+                if record is None or not admission_is_current(record, model, provider):
                     admission_issues.append(ValidationIssue(
                         f"bindings.{key}.model_id",
-                        f"模型 {model.id} 尚未通过模型测试准入，请先执行模型测试",
+                        f"模型 {model.id} {_admission_state_text(record)}，请先执行模型测试",
                     ))
             if admission_issues:
                 raise CatalogValidationError(admission_issues)
@@ -497,7 +532,8 @@ class ProviderFacade:
         # 检查定义存在、所属连接存在、准入有效、窗口已知、凭据可用；凭据材料留在 Provider 模块内，
         # 交回的公开部分不含密钥，执行调用时按句柄取出材料
         with self._lock:
-            resolution, target = _resolve_call_target(self._store, self._credentials, model_id, requested_tier)
+            resolution, target = _resolve_call_target(self._store, self._credentials, model_id, requested_tier,
+                                                      self._admissions)
             if target is None:
                 return resolution
             handle_id = f"target_{uuid4().hex[:16]}"
@@ -523,6 +559,7 @@ class ProviderFacade:
                 )
             resolution, target = _resolve_call_target(
                 self._store, self._credentials, binding.get("model_id"), requested_tier,
+                self._admissions,
             )
             if target is None:
                 return resolution
@@ -542,43 +579,64 @@ class ProviderFacade:
     def presets_public_view(self) -> dict[str, Any]:
         # 预置表数据与版本由模块提供，Web 只读取，不做远端热更
         return {
-            "table_version": PRESET_TABLE_VERSION,
+            "revision": PRESET_TABLE_VERSION,
             "source": PRESET_TABLE_SOURCE,
             "presets": list_presets(),
         }
 
     def refresh_candidates(self, provider_id: str,
                            *, models_url_override: str | None = None) -> dict[str, Any]:
-        # 显式刷新候选：结果只服务本次会话，不落盘、不自动绑定
+        # 显式刷新候选：按连接协议的认证方式带上凭据，结果只服务本次会话，不落盘、不自动绑定
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             if provider is None:
                 raise CatalogValidationError((ValidationIssue(
                     f"providers.{provider_id}", "Provider 配置不存在"),))
-        return _refresh_candidates(provider, models_url_override=models_url_override)
+            api_key = self._resolve_api_key(provider)
+        return _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key)
+
+    def _resolve_api_key(self, provider: Any) -> str:
+        # 模型列表地址要求认证时按协议取凭据；fake 不需要凭据。
+        # 凭据引用无法解析时交回空串，由获取模型列表与连接测试报告「候选未知」并说明原因
+        if provider.protocol == "fake" or not provider.credential_ref:
+            return ""
+        material = self._credentials.resolve(provider.credential_ref)
+        if material is None:
+            return ""
+        return material.secret
 
     def record_admission(self, provider_id: str, model_id: str,
                          *, admitted_model: str | None) -> dict[str, Any]:
-        # 记录一次已通过的模型测试，绑定当前发布修订
+        # 记录一次已通过的模型测试：写独立的准入记录，不改动目录文件，也不推进目录修订号（工单 #86）
+        # 内容含测试时间、实际返回模型与协议，外加测试时受影响字段快照（地址、凭据引用、协议、上游模型 ID）
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             model = self._store.models.get(str(model_id))
             if provider is None or model is None or model.provider_id != provider.id:
                 raise CatalogValidationError((ValidationIssue(
                     f"models.{model_id}", "模型访问定义不存在"),))
-            revision = self._store.mark_admitted(model.id, admitted_model=admitted_model)
+            record = AdmissionRecord(
+                model_id=model.id,
+                provider_id=provider.id,
+                admitted_at=_utc_now(),
+                admitted_model="" if admitted_model is None else str(admitted_model),
+                protocol=provider.protocol,
+                base_url=provider.base_url,
+                credential_ref=provider.credential_ref,
+                model=model.model,
+            )
+            self._admissions[model.id] = record
             self._publish()
-            stored = self._store.models[model.id]
             return {
-                "model_id": stored.id,
-                "revision": revision,
-                "admitted_at": stored.admitted_at,
-                "admitted_model": stored.admitted_model,
-                "admitted_protocol": stored.admitted_protocol,
+                "model_id": record.model_id,
+                "revision": self._revision,
+                "admitted_at": record.admitted_at,
+                "admitted_model": record.admitted_model,
+                "admitted_protocol": record.protocol,
             }
 
     def model_test(self, provider_id: str, model_id: str) -> dict[str, Any]:
-        # 对某个模型访问定义发一次真实最小推理；通过后记录准入，失败不记录
+        # 对某个模型访问定义发一次真实最小推理；通过且容量已确认才记录准入，失败不记录（工单 #86）
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             model = self._store.models.get(str(model_id))
@@ -602,16 +660,22 @@ class ProviderFacade:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             return {
                 "ok": False, "error": str(exc), "model": None, "admitted": False,
-                "protocol": model.protocol, "revision": self.revision,
+                "protocol": provider.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
             }
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
         actual = result.actual_model or result.model or None
-        admission = self.record_admission(provider_id, model.id, admitted_model=actual)
-        persisted, persist_error = self._persist_admission()
+        capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
+        if capacity_confirmed:
+            self.record_admission(provider_id, model.id, admitted_model=actual)
+        persisted, persist_error = self._persist_admissions()
         payload = {
-            "ok": True, "error": None, "model": actual, "admitted": True,
-            "protocol": model.protocol, "revision": admission["revision"],
+            "ok": True,
+            "error": None,
+            "model": actual,
+            "admitted": bool(capacity_confirmed),
+            "protocol": provider.protocol,
+            "revision": self.revision,
             "elapsed_ms": elapsed_ms,
             "usage_reported": bool(result.usage.get("reported", False)),
             "persisted": persisted,
@@ -620,16 +684,73 @@ class ProviderFacade:
             payload["persist_error"] = persist_error
         return payload
 
-    def _persist_admission(self) -> tuple[bool, str | None]:
-        # 准入是需落盘的结果：CLI 与 smoke 在独立进程读取同一份配置；
-        # 写入失败时保留内存准入并如实报告，不谎称已持久化
-        if self._config_path is None:
+    def _persist_admissions(self) -> tuple[bool, str | None]:
+        # 准入记录落在与目录分开的文件里：CLI 与 smoke 在独立进程读取同一份配置；
+        # 写入失败时保留内存记录并如实报告，不谎称已持久化
+        if self._admission_path is None:
             return False, None
         try:
-            self.persist_document(self._config_path)
+            self.persist_admissions()
         except OSError as exc:
-            return False, f"准入未能写入 {self._config_path}：{exc}"
+            return False, f"准入记录未能写入 {self._admission_path}：{exc}"
         return True, None
+
+    def persist_admissions(self) -> Path:
+        # 原子落盘准入记录：只写文件自身的结构，坏内容下次读取时报错
+        with self._lock:
+            if self._admission_path is None:
+                raise CatalogValidationError((ValidationIssue("admissions", "未配置准入记录路径"),))
+            payload = json.dumps(
+                {"admissions": [self._admissions[key].public_dict()
+                                for key in sorted(self._admissions)]},
+                ensure_ascii=False, indent=2, sort_keys=True,
+            ) + "\n"
+            target = self._admission_path
+            parent = target.parent
+            if str(parent) not in ("", "."):
+                parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(dir=str(parent) if str(parent) not in ("", ".") else None,
+                                             prefix=target.name + ".", suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(tmp_name, target)
+            except Exception:
+                try:
+                    os.unlink(tmp_name)
+                except OSError:
+                    pass
+                raise
+            self._admission_seen = True
+            return target
+
+    def _load_admissions_file(self) -> None:
+        # 读取独立准入文件：缺文件即空记录，坏内容报错并保留内存记录
+        if self._admission_path is None:
+            return
+        try:
+            data = self._admission_path.read_bytes()
+        except OSError:
+            self._admissions = {}
+            self._admission_seen = True
+            return
+        raw = json.loads(data.decode("utf-8"))
+        self._admissions = _parse_admission_document(raw)
+        self._admission_seen = True
+
+    def _prune_admissions(self, provider_id: str, submitted_ids: Container[str]) -> None:
+        # 保存连接时丢弃不再存在的定义的准入记录；仍在的定义保留记录，
+        # 是否作废由受影响字段逐项判断，不在这里预先删除（工单 #86）
+        kept: dict[str, AdmissionRecord] = {}
+        for model_id, record in self._admissions.items():
+            if record.provider_id == provider_id and model_id not in submitted_ids:
+                model = self._store.models.get(model_id)
+                if model is None:
+                    continue
+            kept[model_id] = record
+        self._admissions = kept
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
                          model: Any) -> InvokeResult:
@@ -674,7 +795,7 @@ class ProviderFacade:
                     "departments": {},
                     "issues": issues,
                     "revision": self._revision,
-                    "model_admissions": self._model_admissions(),
+                    "model_admissions": self.model_admissions(),
                 }
             return {
                 "available": True,
@@ -685,27 +806,35 @@ class ProviderFacade:
                 },
                 "issues": [],
                 "revision": self._revision,
-                "model_admissions": self._model_admissions(),
+                "model_admissions": self.model_admissions(),
             }
 
-    def _model_admissions(self) -> list[dict[str, Any]]:
-        # 逐模型的准入事实与陈旧标记：陈旧结果保留为历史，绑定不因此失效；
-        # 陈旧按目录修订判断，部门绑定变化不使已通过的模型测试失效
-        catalog_revision = self._store.revision
-        admissions = []
-        for model_id in sorted(self._store.models):
-            model = self._store.models[model_id]
-            admissions.append({
-                "model_id": model.id,
-                "provider_id": model.provider_id,
-                "protocol": model.protocol,
-                "admitted": model.admitted,
-                "admitted_at": model.admitted_at,
-                "admitted_revision": model.admitted_revision,
-                "admitted_model": model.admitted_model,
-                "stale": bool(model.admitted and model.admitted_revision != catalog_revision),
-            })
-        return admissions
+    def model_admissions(self) -> list[dict[str, Any]]:
+        # 有准入记录的定义逐条交回准入事实与作废标记（工单 #86）：有效性按受影响字段逐项比较，
+        # 记录存在且字段全等才算已准入；字段不等保留为历史并标为已作废，引用不因此删除。
+        # 没有记录的定义没有这一行：未测试与未记录是同一事实；定义已删除的记录不再可见
+        with self._lock:
+            rows: list[dict[str, Any]] = []
+            for model_id in sorted(self._store.models):
+                record = self._admissions.get(model_id)
+                if record is None:
+                    continue
+                model = self._store.models[model_id]
+                provider = self._store.providers.get(model.provider_id)
+                current = bool(provider is not None and admission_is_current(record, model, provider))
+                rows.append({
+                    "model_id": model_id,
+                    "provider_id": model.provider_id,
+                    "protocol": None if provider is None else provider.protocol,
+                    "admitted": current,
+                    "stale": not current,
+                    "admitted_at": record.admitted_at,
+                    "admitted_model": record.admitted_model,
+                    "base_url": record.base_url,
+                    "credential_ref": record.credential_ref,
+                    "model": record.model,
+                })
+            return rows
 
     def providers_view(self) -> dict[str, Any]:
         # 可编辑目录及就绪状态：凭据只显示 configured/source/覆盖状态
@@ -731,6 +860,7 @@ class ProviderFacade:
                 "providers": providers,
                 "models": [self._store.models[key].public_dict() for key in sorted(self._store.models)],
                 "bindings": {key: dict(value) for key, value in self._bindings.items()},
+                "admissions": self.model_admissions(),
             }
 
     async def stream(
@@ -779,35 +909,39 @@ class ProviderFacade:
         return self._cancels.cancel(attempt_id)
 
     def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
-        # 连接测试只证明地址与凭据可用，不证明具体模型可调
+        # 连接测试读取模型列表地址，按该连接协议的认证方式带上凭据，证明地址与凭据可用；
+        # 不证明具体模型可调，不改变任何准入。fake 没有上游，只做同一套缺失项检查
         snapshot = resolve_snapshot(self._store, [selection], self._credentials)
         key = str(selection.get("key", selection.get("target_key", selection.get("department", "target"))))
         frozen_target = snapshot.target(key)
-        if frozen_target.protocol == "fake":
+        protocol = frozen_target.protocol
+        if protocol not in SUPPORTED_PROTOCOLS:
+            raise ProviderError(f"unsupported provider protocol: {protocol}",
+                                reason="unsupported_protocol")
+        availability = check_target_availability(frozen_target)
+        if not availability["available"]:
+            return {"ok": False, "kind": "connection", "target_key": key,
+                    "revision": snapshot.revision, "protocol": protocol,
+                    "reason": availability["reason"], "message": availability["message"]}
+        if protocol == "fake":
             return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": "fake"}
-        if frozen_target.protocol == "responses":
-            from .responses import ResponsesConfig
-            availability = check_availability(ResponsesConfig(
-                model=frozen_target.model, api_key=frozen_target.api_key,
-                provider=frozen_target.provider_id, base_url=frozen_target.base_url,
-                timeout_sec=frozen_target.timeout_sec,
-            ))
-            if not availability["available"]:
-                return {"ok": False, "kind": "connection", "target_key": key,
-                        "revision": snapshot.revision, "reason": availability["reason"],
-                        "message": availability["message"]}
-            return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": "responses"}
-        raise ProviderError(f"unsupported provider protocol: {frozen_target.protocol}",
-                            reason="unsupported_protocol")
+                    "revision": snapshot.revision, "protocol": protocol,
+                    "reason": "", "message": ""}
+        probed = _probe_connection(self._store.providers[frozen_target.provider_id],
+                                   api_key=frozen_target.api_key, timeout_sec=frozen_target.timeout_sec)
+        return {"ok": probed["ok"], "kind": "connection", "target_key": key,
+                "revision": snapshot.revision, "protocol": protocol,
+                "reason": probed["reason"], "message": probed["message"]}
 
     def configure_paths(self, config_path: str | Path | None,
                         dotenv_path: str | Path | None = None) -> None:
         # 记录本地源固定路径，不读取，读取由 load/reload/轮询完成
+        # 准入记录与目录分开保存：与目录文件同目录的 admissions.json（工单 #86）
         with self._lock:
             self._config_path = None if config_path is None else Path(config_path)
             self._dotenv_path = None if dotenv_path is None else Path(dotenv_path)
+            self._admission_path = None if self._config_path is None \
+                else self._config_path.with_name("admissions.json")
 
     def config_status(self) -> dict[str, Any]:
         # 健康检查用：配置路径、有效修订、最近重载状态与 issues，不露密钥
@@ -920,7 +1054,7 @@ class ProviderFacade:
             self._disk_config_seen = True
             return False
         try:
-            store, bindings = _parse_document(raw)
+            store, bindings = _parse_document(raw, self._startup_mode)
         except CatalogValidationError as exc:
             self._reload_error = str(exc)
             self._disk_config_hash = digest
@@ -1051,8 +1185,9 @@ def _call_usage(raw: Any) -> CallUsage:
     )
 
 
-def _parse_document(raw: Any) -> tuple[ProviderStore, dict[str, dict[str, str]]]:
-    # 整份非敏感文档：providers/models 走目录校验，bindings 校验引用结构
+def _parse_document(raw: Any, startup_mode: str = "normal") -> tuple[ProviderStore, dict[str, dict[str, str]]]:
+    # 整份非敏感文档：providers/models 走目录校验，bindings 校验引用结构（读取时容忍陈旧引用）
+    # 文档键只认这四个：带 admitted_* 的定义或顶层 admissions 会作为未知字段整份拒绝（工单 #86）
     if not isinstance(raw, Mapping):
         raise CatalogValidationError((ValidationIssue("catalog", "应为 JSON 对象"),))
     allowed = {"providers", "models", "bindings", "revision"}
@@ -1067,8 +1202,23 @@ def _parse_document(raw: Any) -> tuple[ProviderStore, dict[str, dict[str, str]]]
         "revision": raw.get("revision", 1),
     }
     store = ProviderStore.from_dict(catalog_part)
+    _reject_fake_if_normal(store, startup_mode)
     bindings = _parse_bindings(raw.get("bindings", {}), store)
     return store, bindings
+
+
+def _reject_fake_if_normal(store: ProviderStore, startup_mode: str) -> None:
+    # fake 协议只在测试/演示方式启动的系统可用；正常启动读取目录时拒绝，错误指出字段位置（工单 #86）
+    if startup_mode != "normal":
+        return
+    issues = [
+        ValidationIssue(f"providers.{provider_id}.protocol",
+                        "正常启动的系统不允许 fake 协议连接，fake 只在测试或演示方式下可用")
+        for provider_id in sorted(store.providers)
+        if store.providers[provider_id].protocol == "fake"
+    ]
+    if issues:
+        raise CatalogValidationError(issues)
 
 
 def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]:
@@ -1104,6 +1254,60 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
     if issues:
         raise CatalogValidationError(issues)
     return bindings
+
+
+def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
+                              store: ProviderStore,
+                              admissions: Mapping[str, AdmissionRecord]) -> None:
+    # 保存部门默认要求所选定义已准入且未作废；fake 连接无真实上游可测，豁免该要求（工单 #86）
+    issues: list[ValidationIssue] = []
+    for department in sorted(bindings):
+        model_id = bindings[department].get("model_id", "")
+        model = store.models.get(model_id)
+        if model is None:
+            continue
+        provider = store.providers.get(model.provider_id)
+        if provider is not None and provider.protocol == "fake":
+            continue
+        record = admissions.get(model_id)
+        location = f"bindings.{department}.model_id"
+        if record is None:
+            issues.append(ValidationIssue(location, "该模型访问定义尚未通过模型测试准入"))
+            continue
+        if provider is None or not admission_is_current(record, model, provider):
+            issues.append(ValidationIssue(location, "该模型访问定义的准入已作废，请重新执行模型测试"))
+    if issues:
+        raise CatalogValidationError(issues)
+
+
+def _require_capacity(rows: Sequence[Mapping[str, Any]], provider_id: Any,
+                      known_ids: Container[str]) -> None:
+    # 表单每一行都必须填写窗口与输出上限；新增行还必须有容量确认标记，
+    # 已存在的行带着容量值提交即等同 JSON 中修改容量视为确认（工单 #86）
+    # 窗口与输出上限的大小关系由目录校验判定，这里只管必填与确认标记
+    issues: list[ValidationIssue] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            continue
+        model_id = row.get("id")
+        location = f"models[{index}]"
+        if isinstance(model_id, str) and model_id.strip():
+            location = f"models.{model_id}"
+        if row.get("context_window") is None or row.get("max_output_tokens") is None:
+            issues.append(ValidationIssue(f"{location}.context_window",
+                                          "每行模型访问定义都必须填写窗口与输出上限"))
+            continue
+        if isinstance(model_id, str) and model_id not in known_ids \
+                and row.get("capacity_confirmed") is not True:
+            issues.append(ValidationIssue(f"{location}.capacity_confirmed",
+                                          f"新增的模型访问定义 {model_id} 需要容量确认"))
+    if issues:
+        raise CatalogValidationError(issues)
+
+
+def _admission_state_text(record: AdmissionRecord | None) -> str:
+    # 未写记录与已作废分开表述，各处解析入口共用同一措辞
+    return "尚未通过模型测试准入" if record is None else "准入已作废"
 
 
 def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[str, str]],

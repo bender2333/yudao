@@ -1,17 +1,17 @@
 // 界面层的主体：路由、页面注册与渲染、能力核对、事件流分发、草稿、事件委托、标注与主题（BUILD.md 第 6 节）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
+  const Y9 = window.Y9;
 
   const state = {
     route: { name: null, params: {}, query: {}, hash: '' },
     projectId: null,
     workItemId: null,
-    annotate: Y8.store.get('annotate', false),
-    theme: Y8.store.get('theme', 'system', true),
-    drafts: Y8.store.get('drafts', {}),
-    source: Y8.store.get('source', null),
-    lastWorkItem: Y8.store.get('lastWorkItem', {}),
+    annotate: Y9.store.get('annotate', false),
+    theme: Y9.store.get('theme', 'system', true),
+    drafts: Y9.store.get('drafts', {}),
+    source: Y9.store.get('source', null),
+    lastWorkItem: Y9.store.get('lastWorkItem', {}),
     drawerOpen: false
   };
 
@@ -19,7 +19,7 @@
   // 页面与界面动作的注册
 
   const views = {};
-  Y8.views = {
+  Y9.views = {
     register(name, view) {
       if (views[name]) throw new Error('页面重复注册：' + name);
       if (!view || typeof view.render !== 'function') throw new Error('页面缺少 render：' + name);
@@ -29,7 +29,7 @@
   };
 
   const actions = {};
-  Y8.actions = {
+  Y9.actions = {
     register(name, fn) {
       if (actions[name]) throw new Error('界面动作重复注册：' + name);
       actions[name] = fn;
@@ -45,7 +45,7 @@
   // ---------------------------------------------------------------------------
   // 草稿
 
-  function saveDrafts() { Y8.store.set('drafts', state.drafts); }
+  function saveDrafts() { Y9.store.set('drafts', state.drafts); }
   function restoreDrafts(scope) {
     scope.querySelectorAll('[data-draft]').forEach((el) => {
       const key = el.dataset.draft;
@@ -99,7 +99,7 @@
 
   const scopeQuery = (workItemId) => (workItemId ? '?w=' + encodeURIComponent(workItemId) : '');
 
-  Y8.paths = {
+  Y9.paths = {
     home: () => '#/home',
     overview: (projectId, workItemId) => '#/p/' + projectId + '/overview' + scopeQuery(workItemId),
     dept: (projectId, department, workItemId) => '#/p/' + projectId + '/dept/' + department + scopeQuery(workItemId),
@@ -114,35 +114,35 @@
   };
 
   // 同一页面换一个事项范围
-  Y8.paths.withScope = function withScope(route, workItemId) {
+  Y9.paths.withScope = function withScope(route, workItemId) {
     const p = route.params;
     switch (route.name) {
-      case 'overview': return Y8.paths.overview(p.projectId, workItemId);
-      case 'dept': return Y8.paths.dept(p.projectId, p.department, workItemId);
-      case 'recovery': return workItemId ? Y8.paths.recovery(p.projectId, workItemId) : Y8.paths.overview(p.projectId, null);
-      case 'materials': return Y8.paths.materials(p.projectId, workItemId);
-      case 'observe': case 'observe-detail': return Y8.paths.observe(p.projectId, workItemId);
-      default: return Y8.paths.overview(state.projectId, workItemId);
+      case 'overview': return Y9.paths.overview(p.projectId, workItemId);
+      case 'dept': return Y9.paths.dept(p.projectId, p.department, workItemId);
+      case 'recovery': return workItemId ? Y9.paths.recovery(p.projectId, workItemId) : Y9.paths.overview(p.projectId, null);
+      case 'materials': return Y9.paths.materials(p.projectId, workItemId);
+      case 'observe': case 'observe-detail': return Y9.paths.observe(p.projectId, workItemId);
+      default: return Y9.paths.overview(state.projectId, workItemId);
     }
   };
 
   const isSystemRoute = (name) => typeof name === 'string' && (name.startsWith('sys-') || name === 'connect');
 
-  Y8.go = function go(hash) {
+  Y9.go = function go(hash) {
     if (typeof hash !== 'string' || !hash.startsWith('#/')) throw new Error('跳转路径无效：' + hash);
     state.drawerOpen = false;
     if (location.hash === hash) handleRoute();
     else location.hash = hash;
   };
 
-  Y8.back = function back() {
-    Y8.go(state.source || Y8.paths.home());
+  Y9.back = function back() {
+    Y9.go(state.source || Y9.paths.home());
   };
 
-  Y8.route = () => state.route;
+  Y9.route = () => state.route;
 
   // 只改写查询参数中的一项（回放位置），不重新渲染页面
-  Y8.replaceQuery = function replaceQuery(key, value) {
+  Y9.replaceQuery = function replaceQuery(key, value) {
     const route = state.route;
     const query = Object.assign({}, route.query);
     if (value === null || value === undefined || value === '') delete query[key];
@@ -163,13 +163,13 @@
     const previous = state.route;
     if (isSystemRoute(route.name) && previous.name && !isSystemRoute(previous.name) && lastHash) {
       state.source = lastHash;
-      Y8.store.set('source', state.source);
+      Y9.store.set('source', state.source);
     }
     if (route.params.projectId) {
       state.projectId = route.params.projectId;
       state.workItemId = route.params.workItemId || route.query.w || null;
       state.lastWorkItem[route.params.projectId] = state.workItemId;
-      Y8.store.set('lastWorkItem', state.lastWorkItem);
+      Y9.store.set('lastWorkItem', state.lastWorkItem);
     } else if (route.name === 'home') {
       state.projectId = null;
       state.workItemId = null;
@@ -179,7 +179,7 @@
     lastHash = route.hash;
     state.drawerOpen = false;
     renderAll(sameRoute);
-    Y8.bus.emit('route-changed', route);
+    Y9.bus.emit('route-changed', route);
   }
 
   // ---------------------------------------------------------------------------
@@ -195,43 +195,43 @@
       projectId: state.projectId,
       workItemId: state.workItemId,
       department: route.params.department || null,
-      capabilities: Y8.cap.get()
+      capabilities: Y9.cap.get()
     };
   }
 
   function gateHtml(title, text, button) {
-    return '<div class="y8-gate"><div class="y8-gate-card"><h1>' + Y8.esc(title) + '</h1><p>' + text + '</p>' +
-      '<div class="y8-row">' + (button || '<button class="y8-btn" data-go="#/home">回到首页</button>') + '</div></div></div>';
+    return '<div class="y9-gate"><div class="y9-gate-card"><h1>' + Y9.esc(title) + '</h1><p>' + text + '</p>' +
+      '<div class="y9-row">' + (button || '<button class="y9-btn" data-go="#/home">回到首页</button>') + '</div></div></div>';
   }
 
   function levelButton(level) {
-    return '<button class="y8-btn primary" data-act="app.level" data-level="' + level + '">切换到「' + Y8.esc(Y8.LEVEL_LABELS[level]) + '」档</button>';
+    return '<button class="y9-btn primary" data-act="app.level" data-level="' + level + '">切换到「' + Y9.esc(Y9.LEVEL_LABELS[level]) + '」档</button>';
   }
 
   // 页面需要的查询没有部署、对象不存在时显示的说明；返回 null 表示可以渲染
   function gateFor(ctx) {
     const route = ctx.route;
-    if (route.name === 'not-found') return gateHtml('找不到这个页面', '路径「' + Y8.esc(route.hash) + '」不对应任何页面。');
+    if (route.name === 'not-found') return gateHtml('找不到这个页面', '路径「' + Y9.esc(route.hash) + '」不对应任何页面。');
     const view = views[route.name];
     if (view && view.needs) {
-      const missingQuery = (view.needs.queries || []).find((name) => !Y8.cap.query(name));
-      const missingCommand = (view.needs.commands || []).find((name) => !Y8.cap.command(name));
+      const missingQuery = (view.needs.queries || []).find((name) => !Y9.cap.query(name));
+      const missingCommand = (view.needs.commands || []).find((name) => !Y9.cap.command(name));
       const missing = missingQuery ? ['query', missingQuery] : missingCommand ? ['command', missingCommand] : null;
       if (missing) {
-        const level = Y8.registry.levelOf(missing[0], missing[1]);
+        const level = Y9.registry.levelOf(missing[0], missing[1]);
         const title = typeof view.title === 'function' ? view.title(ctx) : route.name;
-        return gateHtml('「' + title + '」属于「' + Y8.LEVEL_LABELS[level] + '」',
-          '控制主机的能力清单中没有 <code>' + Y8.esc(missing[1]) + '</code>，这个页面不显示。', levelButton(level));
+        return gateHtml('「' + title + '」属于「' + Y9.LEVEL_LABELS[level] + '」',
+          '控制主机的能力清单中没有 <code>' + Y9.esc(missing[1]) + '</code>，这个页面不显示。', levelButton(level));
       }
     }
     if (route.params.projectId) {
-      const list = Y8.api.query('projects.list', {}).data;
+      const list = Y9.api.query('projects.list', {}).data;
       if (!list.some((p) => p.id === route.params.projectId)) {
-        return gateHtml('找不到项目', '控制主机上没有项目「' + Y8.esc(route.params.projectId) + '」，或者它属于还没有部署的工作包。');
+        return gateHtml('找不到项目', '控制主机上没有项目「' + Y9.esc(route.params.projectId) + '」，或者它属于还没有部署的工作包。');
       }
     }
     if (route.name === 'dept' && !['product', 'engineering', 'quality', 'operations'].includes(route.params.department)) {
-      return gateHtml('找不到部门', '部门「' + Y8.esc(route.params.department) + '」不存在。');
+      return gateHtml('找不到部门', '部门「' + Y9.esc(route.params.department) + '」不存在。');
     }
     return null;
   }
@@ -243,17 +243,17 @@
   }
 
   function renderShell() {
-    if (!Y8.shell || typeof Y8.shell.render !== 'function') throw new Error('外壳未注册：js/ui/shell.js 需要定义 Y8.shell.render');
-    Y8.shell.render(buildCtx());
+    if (!Y9.shell || typeof Y9.shell.render !== 'function') throw new Error('外壳未注册：js/ui/shell.js 需要定义 Y9.shell.render');
+    Y9.shell.render(buildCtx());
     document.body.classList.toggle('is-drawer-open', state.drawerOpen);
   }
 
   function renderContent(keepScroll) {
     // 连接断开时保留最后一次的页面，由外壳整体变灰
-    if (!Y8.api.connected()) return;
+    if (!Y9.api.connected()) return;
     const scrollY = window.scrollY;
     unmountCurrent();
-    if (Y8.shell.blocking()) {
+    if (Y9.shell.blocking()) {
       dom.content.innerHTML = '';
       return;
     }
@@ -268,7 +268,7 @@
     }
     const view = views[ctx.route.name];
     if (!view) {
-      dom.content.innerHTML = gateHtml('页面尚未注册', '页面「' + Y8.esc(ctx.route.name) + '」的文件还没有注册它。');
+      dom.content.innerHTML = gateHtml('页面尚未注册', '页面「' + Y9.esc(ctx.route.name) + '」的文件还没有注册它。');
       mounted = { name: ctx.route.name, view: null, ctx };
       throw new Error('页面未注册：' + ctx.route.name);
     }
@@ -278,9 +278,9 @@
     if (view.mount) view.mount(ctx, dom.content);
     const scope = view.scope ? view.scope(ctx) : null;
     const current = mounted;
-    mounted.unsubscribe = Y8.api.subscribe(scope, (event) => onPageEvent(current, event));
+    mounted.unsubscribe = Y9.api.subscribe(scope, (event) => onPageEvent(current, event));
     window.scrollTo(0, keepScroll ? scrollY : 0);
-    Y8.bus.emit('content-rendered', ctx);
+    Y9.bus.emit('content-rendered', ctx);
   }
 
   function onPageEvent(entry, event) {
@@ -297,9 +297,9 @@
   }
 
   function renderAll(keepScroll) {
-    if (Y8.api.connected()) Y8.cap.refresh();
+    if (Y9.api.connected()) Y9.cap.refresh();
     renderShell();
-    if (Y8.toolbar) Y8.toolbar.render();
+    if (Y9.toolbar) Y9.toolbar.render();
     renderContent(keepScroll);
   }
 
@@ -318,39 +318,39 @@
     const out = {};
     Object.keys(el.dataset).forEach((key) => {
       if (key === 'cmd') return;
-      out[Y8.snake(key)] = el.dataset[key];
+      out[Y9.snake(key)] = el.dataset[key];
     });
     return out;
   }
 
-  // 执行命令并提示结果；返回 Y8.api.command 的结果
-  Y8.run = function run(name, params) {
-    const result = Y8.api.command(name, params || {});
+  // 执行命令并提示结果；返回 Y9.api.command 的结果
+  Y9.run = function run(name, params) {
+    const result = Y9.api.command(name, params || {});
     if (result.accepted) {
-      if (result.message) Y8.ui.toast(result.message, 'ok');
+      if (result.message) Y9.ui.toast(result.message, 'ok');
     } else {
-      Y8.ui.toast(result.message || '命令被拒绝：' + result.reason, 'warn');
+      Y9.ui.toast(result.message || '命令被拒绝：' + result.reason, 'warn');
     }
     return result;
   };
 
   function dispatch(el, ev) {
     if (el.dataset.tab && el.dataset.tabGroup) {
-      Y8.ui.selectTab(el.dataset.tabGroup, el.dataset.tab);
+      Y9.ui.selectTab(el.dataset.tabGroup, el.dataset.tab);
       return;
     }
     if (el.dataset.go) {
       ev.preventDefault();
-      Y8.go(el.dataset.go);
+      Y9.go(el.dataset.go);
     }
-    if (el.dataset.cmd) Y8.run(el.dataset.cmd, paramsOf(el));
-    if (el.dataset.act) Y8.actions.run(el.dataset.act, el, ev);
-    if (el.hasAttribute('data-close-modal')) Y8.ui.closeModal();
+    if (el.dataset.cmd) Y9.run(el.dataset.cmd, paramsOf(el));
+    if (el.dataset.act) Y9.actions.run(el.dataset.act, el, ev);
+    if (el.hasAttribute('data-close-modal')) Y9.ui.closeModal();
   }
 
   function onClick(ev) {
     if (ev.target.matches('[data-modal-backdrop]')) {
-      Y8.ui.closeModal();
+      Y9.ui.closeModal();
       return;
     }
     const el = closestAction(ev.target);
@@ -361,8 +361,8 @@
   function onChange(ev) {
     const el = ev.target;
     if (!isFormControl(el) || isTextual(el)) return;
-    if (el.dataset.act) Y8.actions.run(el.dataset.act, el, ev);
-    if (el.dataset.go) Y8.go(el.dataset.go);
+    if (el.dataset.act) Y9.actions.run(el.dataset.act, el, ev);
+    if (el.dataset.go) Y9.go(el.dataset.go);
   }
 
   function onInput(ev) {
@@ -373,12 +373,12 @@
       else state.drafts[el.dataset.draft] = el.value;
       saveDrafts();
     }
-    if (isTextual(el) && el.dataset.act) Y8.actions.run(el.dataset.act, el, ev);
+    if (isTextual(el) && el.dataset.act) Y9.actions.run(el.dataset.act, el, ev);
   }
 
   function onKeydown(ev) {
     if (ev.key !== 'Escape') return;
-    if (Y8.ui.modalOpen()) Y8.ui.closeModal();
+    if (Y9.ui.modalOpen()) Y9.ui.closeModal();
     else if (state.drawerOpen) {
       state.drawerOpen = false;
       document.body.classList.remove('is-drawer-open');
@@ -394,7 +394,7 @@
   // ---------------------------------------------------------------------------
   // 接口
 
-  Y8.app = {
+  Y9.app = {
     state,
     dom,
     parseHash,
@@ -406,7 +406,7 @@
     annotate: () => state.annotate,
     setAnnotate(on) {
       state.annotate = Boolean(on);
-      Y8.store.set('annotate', state.annotate);
+      Y9.store.set('annotate', state.annotate);
       document.documentElement.classList.toggle('is-annotate', state.annotate);
       renderAll(true);
     },
@@ -414,7 +414,7 @@
     setTheme(theme) {
       if (!['system', 'light', 'dark'].includes(theme)) throw new Error('未知主题：' + theme);
       state.theme = theme;
-      Y8.store.set('theme', theme, true);
+      Y9.store.set('theme', theme, true);
       applyTheme();
     },
     draft: (key) => (key in state.drafts ? state.drafts[key] : ''),
@@ -428,15 +428,15 @@
     },
     // 控制主机的现在：取自 system.status 的 now；断开连接时保留最后一次读到的值
     now() {
-      if (Y8.api.connected()) lastNow = Y8.api.query('system.status', {}).data.now;
+      if (Y9.api.connected()) lastNow = Y9.api.query('system.status', {}).data.now;
       if (!lastNow) throw new Error('还没有读到控制主机的时间');
       return lastNow;
     },
     start() {
-      ['y8-sidebar', 'y8-topbar', 'y8-tabs', 'y8-content', 'y8-toolbar', 'y8-modal-root', 'y8-toast-root', 'y8-window-note'].forEach((id) => {
+      ['y9-sidebar', 'y9-topbar', 'y9-tabs', 'y9-content', 'y9-toolbar', 'y9-modal-root', 'y9-toast-root', 'y9-window-note'].forEach((id) => {
         const el = document.getElementById(id);
         if (!el) throw new Error('index.html 缺少外壳元素：' + id);
-        dom[id.replace('y8-', '').replace('-', '_')] = el;
+        dom[id.replace('y9-', '').replace('-', '_')] = el;
       });
       applyTheme();
       document.documentElement.classList.toggle('is-annotate', state.annotate);
@@ -445,10 +445,10 @@
       document.addEventListener('input', onInput);
       document.addEventListener('keydown', onKeydown);
       window.addEventListener('hashchange', handleRoute);
-      Y8.bus.on('level-changed', () => renderAll(true));
-      Y8.bus.on('connection-changed', () => renderAll(true));
-      Y8.bus.on('api-version-changed', () => renderAll(true));
-      Y8.bus.on('last-seen-changed', () => renderAll(true));
+      Y9.bus.on('level-changed', () => renderAll(true));
+      Y9.bus.on('connection-changed', () => renderAll(true));
+      Y9.bus.on('api-version-changed', () => renderAll(true));
+      Y9.bus.on('last-seen-changed', () => renderAll(true));
       if (!location.hash) history.replaceState(null, '', '#/home');
       handleRoute();
     }
@@ -456,6 +456,6 @@
 
   let lastNow = null;
 
-  Y8.actions.register('app.level', (el) => Y8.level.set(el.dataset.level));
-  Y8.actions.register('app.back', () => Y8.back());
+  Y9.actions.register('app.level', (el) => Y9.level.set(el.dataset.level));
+  Y9.actions.register('app.back', () => Y9.back());
 })();

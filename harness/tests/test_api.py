@@ -177,6 +177,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "credential.set", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
         {"name": "credential.clear_override", "reasons": ["stale_base", "command_id_reused"]},
         {"name": "credential.remove_persisted", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "runtime.start_drain", "reasons": ["not_allowed", "command_id_reused"]},
+        {"name": "runtime.force_upgrade", "reasons": ["not_allowed", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]

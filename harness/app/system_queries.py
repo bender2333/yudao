@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Literal
 from pydantic import AwareDatetime
-
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition
 
@@ -26,6 +24,14 @@ class CatalogState(Contract):
     reload_error: str | None
 
 
+class DrainStatus(Contract):
+    # 排空状态（ADR-0019）：未排空、排空中或已排空可以升级；排空中的剩余 run 数与期间排队的事项数。
+    # version 是排空状态的版本，命令的基准版本与它记录在一起
+    state: Literal["idle", "draining", "ready"]
+    version: int
+    running_runs: int
+    queued_work_items: int
+
 class SystemStatus(Contract):
     # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误
     log_id: str
@@ -33,18 +39,25 @@ class SystemStatus(Contract):
     started_at: AwareDatetime
     provider: ProviderReadiness
     catalog: CatalogState
+    # 排空状态（ADR-0019，3.1）：未排空、排空中与剩余的 run 数、已排空可以升级
+    drain: DrainStatus
 
+# 这个文件用了 from __future__ import annotations，SystemStatus 引用 DrainStatus 时需要重建模型
+SystemStatus.model_rebuild()
 
 def _system_status(application: Application, _request: None) -> Snapshot[SystemStatus]:
     system = application.system
     position = system.store.end_position()
     readiness = system.provider_status()
     catalog = system.facade.config_status()
+    drain = system.drain
     return Snapshot[SystemStatus](position=position, data=SystemStatus(
         log_id=system.store.log_id, boot_id=application.boot_id, started_at=application.started_at,
         provider=ProviderReadiness(available=readiness["available"], reason=readiness["reason"],
                                    message=readiness["message"]),
         catalog=CatalogState(revision=catalog["revision"], reload_error=catalog["reload_error"]),
+        drain=DrainStatus(state=drain.state, version=drain.version, running_runs=drain.running_runs,
+                          queued_work_items=drain.queued_work_items),
     ))
 
 

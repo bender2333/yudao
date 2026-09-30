@@ -2,8 +2,8 @@
 // 连接断开与接口版本不同时的整窗提示（设计说明第 3、4.1、10 节）
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const esc = Y8.esc;
+  const Y9 = window.Y9;
+  const esc = Y9.esc;
 
   let searchText = '';
   let menuOpen = false;
@@ -33,7 +33,7 @@
   const isSystemRoute = (name) => typeof name === 'string' && (name.startsWith('sys-') || name === 'connect' || name === 'gallery');
 
   function pageTitle(ctx) {
-    const view = Y8.views.get(ctx.route.name);
+    const view = Y9.views.get(ctx.route.name);
     if (ctx.route.name === 'dept' && DEPT_LABELS[ctx.route.params.department]) return DEPT_LABELS[ctx.route.params.department] + '部门';
     if (ctx.route.name === 'sys-reserved') {
       const found = RESERVED_LINKS.find((item) => item.id === ctx.route.params.which);
@@ -47,17 +47,17 @@
   // 状态项：首页的一排、顶栏亮起的项与托盘图标使用同一份数据（设计说明第 4.1 节）
 
   function statusItems() {
-    const status = Y8.api.query('system.status', {}).data;
+    const status = Y9.api.query('system.status', {}).data;
     const hs = status.home_status;
-    const waiting = Y8.api.query('decisions.list', {}).data;
+    const waiting = Y9.api.query('decisions.list', {}).data;
     const items = [{
       id: 'decisions', label: '待你决定', icon: 'decide', count: waiting.length, lit: waiting.length > 0,
       go: '#/home', anchor: 'home-decisions', query: 'decisions.list'
     }];
     const itemGo = (first, page) => {
       if (!first) return null;
-      if (page === 'recovery') return Y8.paths.recovery(first.project_id, first.work_item_id);
-      return Y8.paths.overview(first.project_id, first.work_item_id);
+      if (page === 'recovery') return Y9.paths.recovery(first.project_id, first.work_item_id);
+      return Y9.paths.overview(first.project_id, first.work_item_id);
     };
     if (hs.unknown_actions) {
       items.push({ id: 'unknown_actions', label: '结果未知的动作', icon: 'unknown', count: hs.unknown_actions.count, lit: hs.unknown_actions.count > 0,
@@ -86,9 +86,9 @@
     const value = item.lit ? (item.count !== null ? String(item.count) : item.text) : '无';
     const title = item.label + '：' + (item.lit ? value : '无') + (item.lit && item.go ? '，点击查看' : '');
     const attrs = item.lit && item.go ? ' data-act="shell.status" data-go-to="' + esc(item.go) + '"' + (item.anchor ? ' data-anchor="' + esc(item.anchor) + '"' : '') : ' disabled';
-    return '<button type="button" class="y8-stat is-' + item.id + (item.lit ? ' is-lit' : '') + (compact ? ' is-compact' : '') + '"' + attrs + ' title="' + esc(title) + '">' +
-      Y8.ui.icon(item.icon, 'y8-icon y8-stat-icon') + '<span class="y8-stat-label">' + esc(item.label) + '</span>' +
-      '<span class="y8-stat-value">' + esc(value) + '</span></button>';
+    return '<button type="button" class="y9-stat is-' + item.id + (item.lit ? ' is-lit' : '') + (compact ? ' is-compact' : '') + '"' + attrs + ' title="' + esc(title) + '">' +
+      Y9.ui.icon(item.icon, 'y9-icon y9-stat-icon') + '<span class="y9-stat-label">' + esc(item.label) + '</span>' +
+      '<span class="y9-stat-value">' + esc(value) + '</span></button>';
   }
 
   // ---------------------------------------------------------------------------
@@ -96,46 +96,46 @@
 
   function projectRow(entry, ctx) {
     const selected = !isSystemRoute(ctx.route.name) && entry.id === ctx.projectId;
-    const remembered = Y8.app.state.lastWorkItem[entry.id] || null;
-    const marker = entry.marker && entry.marker.status !== 'idle' ? '<span class="y8-project-marker">' + Y8.ui.status(entry.marker.kind, entry.marker.text) + '</span>' : '';
-    const decisions = entry.decisions_waiting ? '<span class="y8-count is-decide" title="待你决定">' + entry.decisions_waiting + '</span>' : '';
+    const remembered = Y9.app.state.lastWorkItem[entry.id] || null;
+    const marker = entry.marker && entry.marker.status !== 'idle' ? '<span class="y9-project-marker">' + Y9.ui.status(entry.marker.kind, entry.marker.text) + '</span>' : '';
+    const decisions = entry.decisions_waiting ? '<span class="y9-count is-decide" title="待你决定">' + entry.decisions_waiting + '</span>' : '';
     const hidden = searchText && !entry.name.toLowerCase().includes(searchText.toLowerCase()) ? ' hidden' : '';
-    return '<li' + hidden + ' data-project-name="' + esc(entry.name) + '"><button type="button" class="y8-project' + (selected ? ' is-selected' : '') + (entry.archived ? ' is-archived' : '') + '" data-go="' + Y8.paths.overview(entry.id, remembered) + '"' + (selected ? ' aria-current="page"' : '') + '>' +
-      '<span class="y8-project-name">' + (entry.pinned ? '<span class="y8-pin" title="已置顶">★</span>' : '') + esc(entry.name) + decisions + '</span>' + marker + '</button></li>';
+    return '<li' + hidden + ' data-project-name="' + esc(entry.name) + '"><button type="button" class="y9-project' + (selected ? ' is-selected' : '') + (entry.archived ? ' is-archived' : '') + '" data-go="' + Y9.paths.overview(entry.id, remembered) + '"' + (selected ? ' aria-current="page"' : '') + '>' +
+      '<span class="y9-project-name">' + (entry.pinned ? '<span class="y9-pin" title="已置顶">★</span>' : '') + esc(entry.name) + decisions + '</span>' + marker + '</button></li>';
   }
 
   function sidebarHtml(ctx) {
-    const projects = Y8.api.query('projects.list', {}).data;
+    const projects = Y9.api.query('projects.list', {}).data;
     const homeActive = ctx.route.name === 'home';
-    const systemLinks = SYSTEM_LINKS.filter((link) => Y8.cap.query(link.query)).map((link) => {
+    const systemLinks = SYSTEM_LINKS.filter((link) => Y9.cap.query(link.query)).map((link) => {
       const active = ctx.route.name === link.route;
-      const tag = Y8.registry.tagOf('query', link.query);
-      return '<li><button type="button" class="y8-side-link' + (active ? ' is-active' : '') + '" data-go="' + Y8.paths.sys(link.id) + '"' + (active ? ' aria-current="page"' : '') + '>' +
-        Y8.ui.icon(link.icon) + '<span>' + esc(link.label) + '</span>' + (tag ? Y8.ui.tag(tag) : '') + '</button></li>';
+      const tag = Y9.registry.tagOf('query', link.query);
+      return '<li><button type="button" class="y9-side-link' + (active ? ' is-active' : '') + '" data-go="' + Y9.paths.sys(link.id) + '"' + (active ? ' aria-current="page"' : '') + '>' +
+        Y9.ui.icon(link.icon) + '<span>' + esc(link.label) + '</span>' + (tag ? Y9.ui.tag(tag) : '') + '</button></li>';
     }).join('');
     const reserved = RESERVED_LINKS.map((link) => {
       const active = ctx.route.name === 'sys-reserved' && ctx.route.params.which === link.id;
-      return '<li><button type="button" class="y8-side-link is-reserved' + (active ? ' is-active' : '') + '" data-go="' + Y8.paths.sys(link.id) + '" title="预留入口：' + esc(link.stage) + '">' +
-        Y8.ui.icon(link.icon) + '<span>' + esc(link.label) + '</span><span class="y8-side-stage">' + esc(link.stage) + '</span></button></li>';
+      return '<li><button type="button" class="y9-side-link is-reserved' + (active ? ' is-active' : '') + '" data-go="' + Y9.paths.sys(link.id) + '" title="预留入口：' + esc(link.stage) + '">' +
+        Y9.ui.icon(link.icon) + '<span>' + esc(link.label) + '</span><span class="y9-side-stage">' + esc(link.stage) + '</span></button></li>';
     }).join('');
-    const onboard = Y8.cap.command('project.onboard')
-      ? '<button type="button" class="y8-btn y8-onboard" data-act="shell.onboard">' + Y8.ui.icon('import') + '<span>接入已有项目</span>' + Y8.ui.tag('3.8') + '</button>'
+    const onboard = Y9.cap.command('project.onboard')
+      ? '<button type="button" class="y9-btn y9-onboard" data-act="shell.onboard">' + Y9.ui.icon('import') + '<span>接入已有项目</span>' + Y9.ui.tag('3.8') + '</button>'
       : '';
-    return '<div class="y8-side-top">' +
-        '<div class="y8-brand">' + Y8.ui.icon('brand', 'y8-icon y8-brand-icon') + '<span class="y8-brand-name">Yudao<small>枢道</small></span><span class="y8-proto-chip">v8 原型</span>' +
-          '<button type="button" class="y8-icon-btn y8-drawer-close" data-act="shell.drawer" aria-label="收起左侧栏">' + Y8.ui.icon('close') + '</button></div>' +
-        '<button type="button" class="y8-side-link y8-home-link' + (homeActive ? ' is-active' : '') + '" data-go="#/home"' + (homeActive ? ' aria-current="page"' : '') + '>' + Y8.ui.icon('home') + '<span>首页</span></button>' +
-        '<div class="y8-side-actions"><button type="button" class="y8-btn primary y8-new-project" data-act="shell.newProject">' + Y8.ui.icon('plus') + '<span>从想法新建</span></button>' + onboard + '</div>' +
-        '<label class="y8-search">' + Y8.ui.icon('search') + '<input type="search" placeholder="搜索项目" value="' + esc(searchText) + '" data-act="shell.search" aria-label="搜索项目"></label>' +
-        '<div class="y8-side-label"><span>项目</span><span class="y8-count">' + projects.length + '</span></div>' +
-        '<ul class="y8-project-list">' + projects.map((entry) => projectRow(entry, ctx)).join('') + '</ul>' +
+    return '<div class="y9-side-top">' +
+        '<div class="y9-brand">' + Y9.ui.icon('brand', 'y9-icon y9-brand-icon') + '<span class="y9-brand-name">Yudao<small>枢道</small></span><span class="y9-proto-chip">v9 原型</span>' +
+          '<button type="button" class="y9-icon-btn y9-drawer-close" data-act="shell.drawer" aria-label="收起左侧栏">' + Y9.ui.icon('close') + '</button></div>' +
+        '<button type="button" class="y9-side-link y9-home-link' + (homeActive ? ' is-active' : '') + '" data-go="#/home"' + (homeActive ? ' aria-current="page"' : '') + '>' + Y9.ui.icon('home') + '<span>首页</span></button>' +
+        '<div class="y9-side-actions"><button type="button" class="y9-btn primary y9-new-project" data-act="shell.newProject">' + Y9.ui.icon('plus') + '<span>从想法新建</span></button>' + onboard + '</div>' +
+        '<label class="y9-search">' + Y9.ui.icon('search') + '<input type="search" placeholder="搜索项目" value="' + esc(searchText) + '" data-act="shell.search" aria-label="搜索项目"></label>' +
+        '<div class="y9-side-label"><span>项目</span><span class="y9-count">' + projects.length + '</span></div>' +
+        '<ul class="y9-project-list">' + projects.map((entry) => projectRow(entry, ctx)).join('') + '</ul>' +
       '</div>' +
-      '<div class="y8-side-bottom">' +
-        '<div class="y8-side-label"><span>系统</span></div>' +
-        '<ul class="y8-side-links">' + systemLinks + '</ul>' +
-        '<div class="y8-side-label is-sub"><span>预留入口</span></div>' +
-        '<ul class="y8-side-links">' + reserved + '</ul>' +
-        '<button type="button" class="y8-side-link y8-connect-link" data-go="#/connect">' + Y8.ui.icon('plug') + '<span>连接设置</span></button>' +
+      '<div class="y9-side-bottom">' +
+        '<div class="y9-side-label"><span>系统</span></div>' +
+        '<ul class="y9-side-links">' + systemLinks + '</ul>' +
+        '<div class="y9-side-label is-sub"><span>预留入口</span></div>' +
+        '<ul class="y9-side-links">' + reserved + '</ul>' +
+        '<button type="button" class="y9-side-link y9-connect-link" data-go="#/connect">' + Y9.ui.icon('plug') + '<span>连接设置</span></button>' +
       '</div>';
   }
 
@@ -143,19 +143,19 @@
   // 顶栏
 
   function connectionHtml() {
-    const cap = Y8.cap.get();
-    return '<span class="y8-service" title="与控制主机的连接"><span class="y8-dot"></span>已连接 · 接口版本 ' + esc(cap.deployment.api_version) + '</span>';
+    const cap = Y9.cap.get();
+    return '<span class="y9-service" title="与控制主机的连接"><span class="y9-dot"></span>已连接 · 接口版本 ' + esc(cap.deployment.api_version) + '</span>';
   }
 
   // project 为 projects.list 中的该项目；项目不在当前能力范围内时为 null，不查询项目内容
   function scopeSelect(ctx, project) {
     if (!project || isSystemRoute(ctx.route.name)) return '';
-    const items = Y8.api.query('project.overview', { project: ctx.projectId }).data.work_items;
+    const items = Y9.api.query('project.overview', { project: ctx.projectId }).data.work_items;
     const current = ctx.workItemId || '';
     const options = '<option value="">整个项目</option>' + items.map((item) =>
       '<option value="' + esc(item.id) + '"' + (item.id === current ? ' selected' : '') + '>' + esc(item.title) + (item.display ? ' · ' + esc(item.display.text) : '') + '</option>'
     ).join('');
-    return '<label class="y8-scope"><span class="y8-scope-label">范围</span><select data-act="shell.scope" aria-label="事项范围">' + options + '</select></label>';
+    return '<label class="y9-scope"><span class="y9-scope-label">范围</span><select data-act="shell.scope" aria-label="事项范围">' + options + '</select></label>';
   }
 
   function projectMenu(ctx, project) {
@@ -166,35 +166,35 @@
       project.archived
         ? '<button type="button" role="menuitem" data-cmd="project.restore" data-project="' + esc(project.id) + '" data-base-version="' + esc(project.version) + '">恢复项目</button>'
         : '<button type="button" role="menuitem" data-cmd="project.archive" data-project="' + esc(project.id) + '" data-base-version="' + esc(project.version) + '">归档</button>',
-      '<button type="button" role="menuitem" data-go="' + Y8.paths.settings(project.id) + '">项目设置</button>'
+      '<button type="button" role="menuitem" data-go="' + Y9.paths.settings(project.id) + '">项目设置</button>'
     ];
-    return '<div class="y8-menu-wrap y8-top-menu"><button type="button" class="y8-icon-btn" data-act="shell.menu" aria-haspopup="menu" aria-expanded="' + menuOpen + '" aria-label="项目菜单">' + Y8.ui.icon('more') + '</button>' +
-      (menuOpen ? '<div class="y8-menu" role="menu">' + items.join('') + '</div>' : '') + '</div>';
+    return '<div class="y9-menu-wrap y9-top-menu"><button type="button" class="y9-icon-btn" data-act="shell.menu" aria-haspopup="menu" aria-expanded="' + menuOpen + '" aria-label="项目菜单">' + Y9.ui.icon('more') + '</button>' +
+      (menuOpen ? '<div class="y9-menu" role="menu">' + items.join('') + '</div>' : '') + '</div>';
   }
 
   function topbarHtml(ctx, project) {
-    const drawerButton = '<button type="button" class="y8-icon-btn y8-drawer-open" data-act="shell.drawer" aria-label="打开左侧栏">' + Y8.ui.icon('menu') + '</button>';
+    const drawerButton = '<button type="button" class="y9-icon-btn y9-drawer-open" data-act="shell.drawer" aria-label="打开左侧栏">' + Y9.ui.icon('menu') + '</button>';
     const lit = statusItems().filter((item) => item.lit).map((item) => statusItemHtml(item, true)).join('');
-    const stats = lit ? '<div class="y8-top-stats" aria-label="亮起的状态项">' + lit + '</div>' : '';
+    const stats = lit ? '<div class="y9-top-stats" aria-label="亮起的状态项">' + lit + '</div>' : '';
     const name = ctx.route.name;
     if (isSystemRoute(name)) {
       return drawerButton +
-        '<nav class="y8-crumbs" aria-label="路径"><strong>' + esc(pageTitle(ctx)) + '</strong>' + (name === 'gallery' ? '' : '<span class="y8-crumb-note">系统</span>') + '</nav>' +
-        '<div class="y8-top-actions">' + stats + connectionHtml() +
-        '<button type="button" class="y8-btn small" data-act="app.back">' + Y8.ui.icon('back') + '<span>返回原界面</span></button></div>';
+        '<nav class="y9-crumbs" aria-label="路径"><strong>' + esc(pageTitle(ctx)) + '</strong>' + (name === 'gallery' ? '' : '<span class="y9-crumb-note">系统</span>') + '</nav>' +
+        '<div class="y9-top-actions">' + stats + connectionHtml() +
+        '<button type="button" class="y9-btn small" data-act="app.back">' + Y9.ui.icon('back') + '<span>返回原界面</span></button></div>';
     }
-    const crumbs = ['<button type="button" class="y8-crumb" data-go="#/home">首页</button>'];
+    const crumbs = ['<button type="button" class="y9-crumb" data-go="#/home">首页</button>'];
     if (project) {
-      crumbs.push('<button type="button" class="y8-crumb" data-go="' + Y8.paths.overview(project.id, null) + '">' + esc(project.name) + '</button>');
+      crumbs.push('<button type="button" class="y9-crumb" data-go="' + Y9.paths.overview(project.id, null) + '">' + esc(project.name) + '</button>');
       if (ctx.workItemId) {
-        const item = Y8.api.query('project.overview', { project: project.id }).data.work_items.find((w) => w.id === ctx.workItemId);
-        if (item) crumbs.push('<button type="button" class="y8-crumb" data-go="' + Y8.paths.overview(project.id, item.id) + '">' + esc(item.title) + '</button>');
+        const item = Y9.api.query('project.overview', { project: project.id }).data.work_items.find((w) => w.id === ctx.workItemId);
+        if (item) crumbs.push('<button type="button" class="y9-crumb" data-go="' + Y9.paths.overview(project.id, item.id) + '">' + esc(item.title) + '</button>');
       }
     }
     if (name !== 'home') crumbs.push('<strong>' + esc(pageTitle(ctx)) + '</strong>');
     return drawerButton +
-      '<nav class="y8-crumbs" aria-label="路径">' + crumbs.join('<span class="y8-crumb-sep">/</span>') + '</nav>' +
-      '<div class="y8-top-actions">' + scopeSelect(ctx, project) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
+      '<nav class="y9-crumbs" aria-label="路径">' + crumbs.join('<span class="y9-crumb-sep">/</span>') + '</nav>' +
+      '<div class="y9-top-actions">' + scopeSelect(ctx, project) + stats + connectionHtml() + '</div>' + projectMenu(ctx, project);
   }
 
   // ---------------------------------------------------------------------------
@@ -202,15 +202,15 @@
 
   function nextHtml(ctx) {
     if (!ctx.projectId || !ctx.workItemId) return '';
-    const item = Y8.api.query('project.overview', { project: ctx.projectId }).data.work_items.find((w) => w.id === ctx.workItemId);
+    const item = Y9.api.query('project.overview', { project: ctx.projectId }).data.work_items.find((w) => w.id === ctx.workItemId);
     if (!item) return '';
-    const waiting = Y8.api.query('decisions.list', { work_item: item.id }).data;
+    const waiting = Y9.api.query('decisions.list', { work_item: item.id }).data;
     const parts = [];
-    if (item.display && item.status !== 'in_progress') parts.push(Y8.ui.status(item.display.kind, item.display.text));
+    if (item.display && item.status !== 'in_progress') parts.push(Y9.ui.status(item.display.kind, item.display.text));
     if (waiting.length) {
-      parts.push('<button type="button" class="y8-btn small primary" data-act="shell.decide" data-work-item="' + esc(item.id) + '">' + Y8.ui.icon('decide') + '<span>待你决定 · ' + waiting.length + '</span></button>');
+      parts.push('<button type="button" class="y9-btn small primary" data-act="shell.decide" data-work-item="' + esc(item.id) + '">' + Y9.ui.icon('decide') + '<span>待你决定 · ' + waiting.length + '</span></button>');
     }
-    return parts.length ? '<div class="y8-next" aria-label="所选事项的状态">' + parts.join('') + '</div>' : '';
+    return parts.length ? '<div class="y9-next" aria-label="所选事项的状态">' + parts.join('') + '</div>' : '';
   }
 
   function tabsHtml(ctx) {
@@ -220,43 +220,43 @@
     const w = ctx.workItemId;
     const dept = ctx.route.params.department;
     const tabs = [
-      { id: 'overview', label: '概览', go: Y8.paths.overview(pid, w), active: name === 'overview' },
-      { id: 'product', label: '产品', go: Y8.paths.dept(pid, 'product', w), active: name === 'dept' && dept === 'product' },
-      { id: 'engineering', label: '工程', go: Y8.paths.dept(pid, 'engineering', w), active: name === 'dept' && dept === 'engineering' },
-      { id: 'quality', label: '质检', go: Y8.paths.dept(pid, 'quality', w), active: name === 'dept' && dept === 'quality' },
-      { id: 'operations', label: '运维', go: Y8.paths.dept(pid, 'operations', w), active: name === 'dept' && dept === 'operations', show: Y8.cap.query('ops.status'), tag: 'Stage 4' },
-      { id: 'materials', label: '资料', go: Y8.paths.materials(pid, w), active: name === 'materials' },
-      { id: 'observe', label: '观测', go: Y8.paths.observe(pid, w), active: name === 'observe' || name === 'observe-detail' },
-      { id: 'settings', label: '设置', go: Y8.paths.settings(pid), active: name === 'settings' }
+      { id: 'overview', label: '概览', go: Y9.paths.overview(pid, w), active: name === 'overview' },
+      { id: 'product', label: '产品', go: Y9.paths.dept(pid, 'product', w), active: name === 'dept' && dept === 'product' },
+      { id: 'engineering', label: '工程', go: Y9.paths.dept(pid, 'engineering', w), active: name === 'dept' && dept === 'engineering' },
+      { id: 'quality', label: '质检', go: Y9.paths.dept(pid, 'quality', w), active: name === 'dept' && dept === 'quality' },
+      { id: 'operations', label: '运维', go: Y9.paths.dept(pid, 'operations', w), active: name === 'dept' && dept === 'operations', show: Y9.cap.query('ops.status'), tag: 'Stage 4' },
+      { id: 'materials', label: '资料', go: Y9.paths.materials(pid, w), active: name === 'materials' },
+      { id: 'observe', label: '观测', go: Y9.paths.observe(pid, w), active: name === 'observe' || name === 'observe-detail' },
+      { id: 'settings', label: '设置', go: Y9.paths.settings(pid), active: name === 'settings' }
     ].filter((tab) => tab.show !== false);
     const links = tabs.map((tab) =>
-      '<button type="button" class="y8-ptab' + (tab.active ? ' is-active' : '') + '" data-go="' + esc(tab.go) + '"' + (tab.active ? ' aria-current="page"' : '') + '>' + esc(tab.label) + (tab.tag ? Y8.ui.tag(tab.tag) : '') + '</button>'
+      '<button type="button" class="y9-ptab' + (tab.active ? ' is-active' : '') + '" data-go="' + esc(tab.go) + '"' + (tab.active ? ' aria-current="page"' : '') + '>' + esc(tab.label) + (tab.tag ? Y9.ui.tag(tab.tag) : '') + '</button>'
     ).join('');
-    return '<div class="y8-ptabs" role="navigation" aria-label="项目页面">' + links + '</div>' + nextHtml(ctx);
+    return '<div class="y9-ptabs" role="navigation" aria-label="项目页面">' + links + '</div>' + nextHtml(ctx);
   }
 
   // ---------------------------------------------------------------------------
   // 整窗提示：接口版本不同、连接断开
 
   function versionMismatch() {
-    return Y8.api.connected() && Y8.cap.get().deployment.api_version !== Y8.CLIENT_API_VERSION;
+    return Y9.api.connected() && Y9.cap.get().deployment.api_version !== Y9.CLIENT_API_VERSION;
   }
 
   function windowNote() {
-    const note = Y8.app.dom.window_note;
-    document.body.classList.toggle('is-disconnected', !Y8.api.connected());
+    const note = Y9.app.dom.window_note;
+    document.body.classList.toggle('is-disconnected', !Y9.api.connected());
     document.body.classList.toggle('is-version-mismatch', versionMismatch());
     if (versionMismatch()) {
       note.hidden = false;
-      note.className = 'y8-window-note is-version';
-      note.innerHTML = '<div class="y8-update-card"><h1>请更新客户端</h1><p>控制主机的接口版本是 <b>' + esc(Y8.cap.get().deployment.api_version) + '</b>，这个客户端的接口版本是 <b>' + Y8.CLIENT_API_VERSION +
-        '</b>。更新客户端之前不打开任何页面，也不执行命令。</p><p class="y8-muted">原型：在底部工具条的「模拟」中把控制主机的接口版本改回 ' + Y8.CLIENT_API_VERSION + '。</p></div>';
+      note.className = 'y9-window-note is-version';
+      note.innerHTML = '<div class="y9-update-card"><h1>请更新客户端</h1><p>控制主机的接口版本是 <b>' + esc(Y9.cap.get().deployment.api_version) + '</b>，这个客户端的接口版本是 <b>' + Y9.CLIENT_API_VERSION +
+        '</b>。更新客户端之前不打开任何页面，也不执行命令。</p><p class="y9-muted">原型：在底部工具条的「模拟」中把控制主机的接口版本改回 ' + Y9.CLIENT_API_VERSION + '。</p></div>';
       return;
     }
-    if (!Y8.api.connected()) {
+    if (!Y9.api.connected()) {
       note.hidden = false;
-      note.className = 'y8-window-note is-offline';
-      note.innerHTML = Y8.ui.icon('offline') + '<span>与控制主机的连接已断开（' + esc(Y8.time.clock(disconnectedAt || Y8.app.now())) + ' 起），正在重新连接。界面保留最后一次的数据。</span>';
+      note.className = 'y9-window-note is-offline';
+      note.innerHTML = Y9.ui.icon('offline') + '<span>与控制主机的连接已断开（' + esc(Y9.time.clock(disconnectedAt || Y9.app.now())) + ' 起），正在重新连接。界面保留最后一次的数据。</span>';
       return;
     }
     note.hidden = true;
@@ -269,23 +269,23 @@
   const NOTIFY_TYPES = ['x_decision_issued', 'project_decision_requested', 'x_provider_wait_entered'];
 
   function trayHtml() {
-    const count = Y8.api.connected() ? Y8.api.query('decisions.list', {}).data.length : null;
-    return '<button type="button" class="y8-tray" data-act="shell.tray" title="托盘图标（模拟）：等待回答的决定数">' +
-      Y8.ui.icon('brand', 'y8-icon y8-tray-icon') + (count ? '<span class="y8-tray-badge">' + count + '</span>' : '') + '<span class="y8-tray-label">托盘</span></button>';
+    const count = Y9.api.connected() ? Y9.api.query('decisions.list', {}).data.length : null;
+    return '<button type="button" class="y9-tray" data-act="shell.tray" title="托盘图标（模拟）：等待回答的决定数">' +
+      Y9.ui.icon('brand', 'y9-icon y9-tray-icon') + (count ? '<span class="y9-tray-badge">' + count + '</span>' : '') + '<span class="y9-tray-label">托盘</span></button>';
   }
 
   function notify(title, text, go, anchor) {
-    let host = document.getElementById('y8-notify-root');
+    let host = document.getElementById('y9-notify-root');
     if (!host) {
       host = document.createElement('div');
-      host.id = 'y8-notify-root';
-      host.className = 'y8-notify-root';
+      host.id = 'y9-notify-root';
+      host.className = 'y9-notify-root';
       document.body.appendChild(host);
     }
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'y8-notify';
-    el.innerHTML = '<span class="y8-notify-app">' + Y8.ui.icon('brand') + 'Yudao · 系统通知（模拟）</span><strong>' + esc(title) + '</strong><span>' + esc(text) + '</span>';
+    el.className = 'y9-notify';
+    el.innerHTML = '<span class="y9-notify-app">' + Y9.ui.icon('brand') + 'Yudao · 系统通知（模拟）</span><strong>' + esc(title) + '</strong><span>' + esc(text) + '</span>';
     el.addEventListener('click', () => {
       el.remove();
       openAt(go, anchor);
@@ -296,7 +296,7 @@
 
   function openAt(go, anchor) {
     if (!go) return;
-    Y8.go(go);
+    Y9.go(go);
     if (anchor) {
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const target = document.getElementById(anchor);
@@ -306,41 +306,41 @@
   }
 
   function onStreamEvent(event) {
-    const tray = document.getElementById('y8-tray-host');
+    const tray = document.getElementById('y9-tray-host');
     if (tray) tray.innerHTML = trayHtml();
     if (!NOTIFY_TYPES.includes(event.type)) return;
     if (event.type === 'x_decision_issued' || event.type === 'project_decision_requested') {
-      const d = Y8.api.query('decisions.list', {}).data.find((item) => item.id === event.payload.decision_id);
+      const d = Y9.api.query('decisions.list', {}).data.find((item) => item.id === event.payload.decision_id);
       if (d) notify('新的决定请求：' + d.kind_label, d.project_name + (d.work_item_title ? ' · ' + d.work_item_title : ''), '#/home', 'decision-' + d.id);
     } else if (event.type === 'x_provider_wait_entered') {
-      notify('进入等待模型服务', event.label, Y8.paths.overview(event.project_id, event.work_item_id));
+      notify('进入等待模型服务', event.label, Y9.paths.overview(event.project_id, event.work_item_id));
     }
   }
 
   function ensureTray() {
-    let tray = document.getElementById('y8-tray-host');
+    let tray = document.getElementById('y9-tray-host');
     if (!tray) {
       tray = document.createElement('div');
-      tray.id = 'y8-tray-host';
-      tray.className = 'y8-tray-host';
+      tray.id = 'y9-tray-host';
+      tray.className = 'y9-tray-host';
       document.body.appendChild(tray);
-      Y8.api.subscribe(null, onStreamEvent);
+      Y9.api.subscribe(null, onStreamEvent);
     }
     tray.innerHTML = trayHtml();
   }
 
   // ---------------------------------------------------------------------------
 
-  Y8.shell = {
+  Y9.shell = {
     title: pageTitle,
     statusItems,
     statusItemHtml,
     blocking: versionMismatch,
     openAt,
     render(ctx) {
-      const dom = Y8.app.dom;
-      if (!Y8.api.connected()) {
-        if (!disconnectedAt) disconnectedAt = Y8.app.now();
+      const dom = Y9.app.dom;
+      if (!Y9.api.connected()) {
+        if (!disconnectedAt) disconnectedAt = Y9.app.now();
         windowNote();
         return;
       }
@@ -353,18 +353,18 @@
         dom.tabs.hidden = true;
         return;
       }
-      const project = ctx.projectId ? Y8.api.query('projects.list', {}).data.find((p) => p.id === ctx.projectId) || null : null;
+      const project = ctx.projectId ? Y9.api.query('projects.list', {}).data.find((p) => p.id === ctx.projectId) || null : null;
       lastSidebar = sidebarHtml(ctx);
       dom.sidebar.innerHTML = lastSidebar;
       dom.topbar.innerHTML = topbarHtml(ctx, project);
       const tabs = project ? tabsHtml(ctx) : '';
       dom.tabs.innerHTML = tabs;
       dom.tabs.hidden = !tabs;
-      document.title = pageTitle(ctx) + (project && !isSystemRoute(ctx.route.name) ? ' · ' + project.name : '') + ' · Yudao v8 原型';
-      document.documentElement.dataset.level = Y8.level.current();
+      document.title = pageTitle(ctx) + (project && !isSystemRoute(ctx.route.name) ? ' · ' + project.name : '') + ' · Yudao v9 原型';
+      document.documentElement.dataset.level = Y9.level.current();
     },
     simulateNotification() {
-      const d = Y8.api.query('decisions.list', {}).data[0];
+      const d = Y9.api.query('decisions.list', {}).data[0];
       if (d) notify('新的决定请求：' + d.kind_label, d.project_name + (d.work_item_title ? ' · ' + d.work_item_title : ''), '#/home', 'decision-' + d.id);
       else notify('没有等待回答的决定', '托盘图标不显示数字', '#/home');
     }
@@ -373,108 +373,108 @@
   // ---------------------------------------------------------------------------
   // 界面动作
 
-  Y8.actions.register('shell.drawer', () => Y8.app.toggleDrawer());
+  Y9.actions.register('shell.drawer', () => Y9.app.toggleDrawer());
 
-  Y8.actions.register('shell.search', (el) => {
+  Y9.actions.register('shell.search', (el) => {
     searchText = el.value.trim();
-    document.querySelectorAll('.y8-project-list li').forEach((li) => {
+    document.querySelectorAll('.y9-project-list li').forEach((li) => {
       li.hidden = Boolean(searchText) && !li.dataset.projectName.toLowerCase().includes(searchText.toLowerCase());
     });
   });
 
-  Y8.actions.register('shell.scope', (el) => Y8.go(Y8.paths.withScope(Y8.route(), el.value || null)));
+  Y9.actions.register('shell.scope', (el) => Y9.go(Y9.paths.withScope(Y9.route(), el.value || null)));
 
-  Y8.actions.register('shell.status', (el) => openAt(el.dataset.goTo, el.dataset.anchor));
+  Y9.actions.register('shell.status', (el) => openAt(el.dataset.goTo, el.dataset.anchor));
 
-  Y8.actions.register('shell.tray', () => openAt('#/home', 'home-decisions'));
+  Y9.actions.register('shell.tray', () => openAt('#/home', 'home-decisions'));
 
-  Y8.actions.register('shell.decide', (el) => {
-    const list = Y8.api.query('decisions.list', { work_item: el.dataset.workItem }).data;
-    Y8.ui.modal({ title: '待你决定', wide: true, body: list.map((d) => Y8.cards.render(d, {})).join('') });
+  Y9.actions.register('shell.decide', (el) => {
+    const list = Y9.api.query('decisions.list', { work_item: el.dataset.workItem }).data;
+    Y9.ui.modal({ title: '待你决定', wide: true, body: list.map((d) => Y9.cards.render(d, {})).join('') });
   });
 
-  Y8.actions.register('shell.menu', () => {
+  Y9.actions.register('shell.menu', () => {
     menuOpen = !menuOpen;
-    Y8.app.renderShell();
+    Y9.app.renderShell();
   });
 
   document.addEventListener('click', (ev) => {
     if (!menuOpen) return;
-    if (ev.target.closest('.y8-top-menu > .y8-icon-btn')) return;
+    if (ev.target.closest('.y9-top-menu > .y9-icon-btn')) return;
     menuOpen = false;
-    Y8.app.renderShell();
+    Y9.app.renderShell();
   });
 
-  Y8.actions.register('shell.newProject', () => {
-    Y8.ui.modal({
+  Y9.actions.register('shell.newProject', () => {
+    Y9.ui.modal({
       title: '从想法新建项目',
-      body: '<div class="y8-form">' +
-        '<label class="y8-field"><span>项目名称</span><input type="text" class="y8-input" id="y8-new-name" data-draft="shell.newProject.name" placeholder="例如：门店排班"></label>' +
-        '<label class="y8-field"><span>长期目标</span><textarea class="y8-textarea" id="y8-new-goal" rows="4" data-draft="shell.newProject.goal" placeholder="这个项目长期要达成什么"></textarea></label>' +
-        '<p class="y8-muted y8-small">新建项目不调用模型；之后在概览中记录原文或作为新事项开始。</p></div>',
+      body: '<div class="y9-form">' +
+        '<label class="y9-field"><span>项目名称</span><input type="text" class="y9-input" id="y9-new-name" data-draft="shell.newProject.name" placeholder="例如：门店排班"></label>' +
+        '<label class="y9-field"><span>长期目标</span><textarea class="y9-textarea" id="y9-new-goal" rows="4" data-draft="shell.newProject.goal" placeholder="这个项目长期要达成什么"></textarea></label>' +
+        '<p class="y9-muted y9-small">新建项目不调用模型；之后在概览中记录原文或作为新事项开始。</p></div>',
       actions: [{ label: '取消', close: true }, { label: '新建', kind: 'primary', act: 'shell.createProject' }]
     });
   });
 
-  Y8.actions.register('shell.createProject', () => {
-    const result = Y8.run('project.create', { name: document.getElementById('y8-new-name').value, goal: document.getElementById('y8-new-goal').value });
+  Y9.actions.register('shell.createProject', () => {
+    const result = Y9.run('project.create', { name: document.getElementById('y9-new-name').value, goal: document.getElementById('y9-new-goal').value });
     if (!result.accepted) return;
-    Y8.app.clearDraft('shell.newProject.name');
-    Y8.app.clearDraft('shell.newProject.goal');
-    Y8.ui.closeModal();
-    setTimeout(() => Y8.go(Y8.paths.overview(result.refs.project_id, null)), Y8.backend.latency + 50);
+    Y9.app.clearDraft('shell.newProject.name');
+    Y9.app.clearDraft('shell.newProject.goal');
+    Y9.ui.closeModal();
+    setTimeout(() => Y9.go(Y9.paths.overview(result.refs.project_id, null)), Y9.backend.latency + 50);
   });
 
-  Y8.actions.register('shell.onboard', () => {
-    Y8.ui.modal({
+  Y9.actions.register('shell.onboard', () => {
+    Y9.ui.modal({
       title: '接入已有项目',
-      body: '<div class="y8-form">' +
-        '<label class="y8-field"><span>项目名称</span><input type="text" class="y8-input" id="y8-onboard-name" data-draft="shell.onboard.name" placeholder="例如：openai-agents 增加功能"></label>' +
-        '<label class="y8-field"><span>长期目标</span><textarea class="y8-textarea" id="y8-onboard-goal" rows="3" data-draft="shell.onboard.goal"></textarea></label>' +
-        '<label class="y8-field"><span>源目录名称</span><input type="text" class="y8-input" id="y8-onboard-source" data-draft="shell.onboard.source" placeholder="例如：openai-agents"></label>' +
-        '<label class="y8-field"><span>源目录路径（控制主机上的路径）</span><input type="text" class="y8-input" id="y8-onboard-dir" data-draft="shell.onboard.dir" placeholder="例如：D:\\code\\openai-agents-python"></label>' +
-        '<p class="y8-muted y8-small">产品阅读已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构说明。初始 PRD 由你确认以后成为当前有效的要求。</p></div>',
+      body: '<div class="y9-form">' +
+        '<label class="y9-field"><span>项目名称</span><input type="text" class="y9-input" id="y9-onboard-name" data-draft="shell.onboard.name" placeholder="例如：openai-agents 增加功能"></label>' +
+        '<label class="y9-field"><span>长期目标</span><textarea class="y9-textarea" id="y9-onboard-goal" rows="3" data-draft="shell.onboard.goal"></textarea></label>' +
+        '<label class="y9-field"><span>源目录名称</span><input type="text" class="y9-input" id="y9-onboard-source" data-draft="shell.onboard.source" placeholder="例如：openai-agents"></label>' +
+        '<label class="y9-field"><span>源目录路径（控制主机上的路径）</span><input type="text" class="y9-input" id="y9-onboard-dir" data-draft="shell.onboard.dir" placeholder="例如：D:\\code\\openai-agents-python"></label>' +
+        '<p class="y9-muted y9-small">产品阅读已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构说明。初始 PRD 由你确认以后成为当前有效的要求。</p></div>',
       actions: [{ label: '取消', close: true }, { label: '开始接入', kind: 'primary', act: 'shell.startOnboard' }]
     });
   });
 
-  Y8.actions.register('shell.startOnboard', () => {
-    const result = Y8.run('project.onboard', {
-      name: document.getElementById('y8-onboard-name').value,
-      goal: document.getElementById('y8-onboard-goal').value,
-      source_name: document.getElementById('y8-onboard-source').value,
-      source_path: document.getElementById('y8-onboard-dir').value
+  Y9.actions.register('shell.startOnboard', () => {
+    const result = Y9.run('project.onboard', {
+      name: document.getElementById('y9-onboard-name').value,
+      goal: document.getElementById('y9-onboard-goal').value,
+      source_name: document.getElementById('y9-onboard-source').value,
+      source_path: document.getElementById('y9-onboard-dir').value
     });
     if (!result.accepted) return;
-    ['name', 'goal', 'source', 'dir'].forEach((k) => Y8.app.clearDraft('shell.onboard.' + k));
-    Y8.ui.closeModal();
-    setTimeout(() => Y8.go(Y8.paths.overview(result.refs.project_id, null)), Y8.backend.latency + 50);
+    ['name', 'goal', 'source', 'dir'].forEach((k) => Y9.app.clearDraft('shell.onboard.' + k));
+    Y9.ui.closeModal();
+    setTimeout(() => Y9.go(Y9.paths.overview(result.refs.project_id, null)), Y9.backend.latency + 50);
   });
 
-  Y8.actions.register('shell.rename', () => {
-    const project = Y8.api.query('projects.list', {}).data.find((p) => p.id === Y8.app.state.projectId);
+  Y9.actions.register('shell.rename', () => {
+    const project = Y9.api.query('projects.list', {}).data.find((p) => p.id === Y9.app.state.projectId);
     menuOpen = false;
-    Y8.app.renderShell();
-    Y8.ui.modal({
+    Y9.app.renderShell();
+    Y9.ui.modal({
       title: '重命名项目',
-      body: '<label class="y8-field"><span>项目名称</span><input type="text" class="y8-input" id="y8-rename" value="' + esc(project.name) + '"></label>' +
-        (project.archived ? '<p class="y8-note is-warn">归档项目只读：写命令会被拒绝。</p>' : ''),
+      body: '<label class="y9-field"><span>项目名称</span><input type="text" class="y9-input" id="y9-rename" value="' + esc(project.name) + '"></label>' +
+        (project.archived ? '<p class="y9-note is-warn">归档项目只读：写命令会被拒绝。</p>' : ''),
       actions: [{ label: '取消', close: true }, { label: '保存', kind: 'primary', act: 'shell.saveRename' }]
     });
   });
 
-  Y8.actions.register('shell.saveRename', () => {
-    const project = Y8.api.query('projects.list', {}).data.find((p) => p.id === Y8.app.state.projectId);
-    const result = Y8.run('project.rename', { project: project.id, name: document.getElementById('y8-rename').value, base_version: project.version });
-    if (result.accepted) Y8.ui.closeModal();
+  Y9.actions.register('shell.saveRename', () => {
+    const project = Y9.api.query('projects.list', {}).data.find((p) => p.id === Y9.app.state.projectId);
+    const result = Y9.run('project.rename', { project: project.id, name: document.getElementById('y9-rename').value, base_version: project.version });
+    if (result.accepted) Y9.ui.closeModal();
   });
 
   // 事件流推送的事件会改变状态项与左侧栏：外壳订阅全部事件并刷新
   let shellRefresh = null;
-  Y8.bus.on('route-changed', () => {
+  Y9.bus.on('route-changed', () => {
     if (shellRefresh) return;
-    shellRefresh = Y8.api.subscribe(null, () => {
-      if (Y8.api.connected() && !versionMismatch()) Y8.app.renderShell();
+    shellRefresh = Y9.api.subscribe(null, () => {
+      if (Y9.api.connected() && !versionMismatch()) Y9.app.renderShell();
     });
   });
 })();

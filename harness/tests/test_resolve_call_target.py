@@ -22,6 +22,7 @@ PUBLIC_FIELDS = {
     "credential_version",
     "context_window",
     "configured_max_output_tokens",
+    "accepts_required_tool_call",
     "requested_tier",
     "sent_tier",
 }
@@ -41,6 +42,7 @@ def _responses_document():
             {
                 "id": "provider-a",
                 "name": "Provider A",
+                "protocol": "responses",
                 "base_url": "https://a.example/v1",
                 "credential_ref": "credential-a",
             },
@@ -50,7 +52,6 @@ def _responses_document():
                 "id": "model-a",
                 "provider_id": "provider-a",
                 "model": "upstream-a",
-                "protocol": "responses",
                 "context_window": 32000,
                 "max_output_tokens": 4096,
             },
@@ -86,6 +87,7 @@ def test_resolved_public_result_has_no_secret():
         "credential_version": "override",
         "context_window": 32000,
         "configured_max_output_tokens": 4096,
+        "accepts_required_tool_call": True,
         "requested_tier": None,
         "sent_tier": None,
     }
@@ -159,9 +161,12 @@ def test_missing_credential_material_is_unavailable():
 
 
 def test_fake_protocol_needs_neither_admission_nor_credential():
+    # fake 只在测试或演示方式启动的系统中可用（工单 #86）：演示方式不要求准入与凭据
     document = _responses_document()
-    document["models"][0].update({"protocol": "fake", "model": "fake-script"})
-    facade = _facade(document)
+    document["providers"][0]["protocol"] = "fake"
+    document["models"][0]["model"] = "fake-script"
+    facade = ProviderFacade(startup_mode="demo", credentials=CredentialChain(use_env=False))
+    facade.store_document(document)
 
     resolved = facade.resolve_call_target("model-a")
 

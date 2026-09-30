@@ -26,9 +26,10 @@ ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
 
 
 class ProviderInput(Contract):
-    # 一份 Provider 配置：协议在模型访问定义上声明，这里不含协议
+    # 一份 Provider 配置：声明一种协议（ADR-0004），地址是该协议的请求基址
     id: Text
     name: Text
+    protocol: ProtocolName
     base_url: str = ""
     credential_ref: str = ""
     timeout_sec: float = 600.0
@@ -37,13 +38,16 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；容量逐行在这条命令中确认（窗口与输出上限）
+    # 一条模型访问定义；协议取自所属连接，容量逐行在这条命令中确认（窗口与输出上限）。
+    # capacity_confirmed 是这一行的容量确认标记：新增行必须显式确认才能保存；
+    # 目录文档中的定义带容量即视为已确认，确认标记只存在于这条命令（工单 #86）
     id: Text
     model: Text
-    protocol: ProtocolName
     context_window: int | None = None
     max_output_tokens: PositiveInt
     capability_source: str = ""
+    capacity_confirmed: bool = False
+    accepts_required_tool_call: bool = True
 
 
 class DocumentModelInput(ModelInput):
@@ -176,7 +180,7 @@ async def _save_connection(application: Application, command: Command, request: 
     before = facade.catalog_revision()
     previous = facade.to_document()
     provider = request.provider.model_dump()
-    models = facade.merge_model_admissions([item.model_dump() for item in request.models])
+    models = [item.model_dump() for item in request.models]
     try:
         facade.save_provider_entry(provider, models)
     except CatalogValidationError as exc:
@@ -216,7 +220,10 @@ async def _save_document(application: Application, command: Command, request: Ca
     previous = facade.to_document()
     document = {
         "providers": [item.model_dump() for item in request.document.providers],
-        "models": facade.merge_model_admissions([item.model_dump() for item in request.document.models]),
+        # 目录文档不含逐行容量确认标记：确认只发生在 catalog.connection.save（工单 #86），
+        # 文档中的定义带容量值即视为已确认
+        "models": [{key: value for key, value in item.model_dump().items() if key != "capacity_confirmed"}
+                   for item in request.document.models],
         "bindings": {key: item.model_dump() for key, item in request.document.bindings.items()},
     }
     try:
@@ -282,13 +289,13 @@ async def _collect_candidates(application: Application, command: Command, reques
             _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
                 "base_revision": request.base_version,
                 "provider_id": request.provider_id, "status": "unknown", "source_url": request.models_url or "",
-                "fetched_at": "", "candidate_ids": [], "error": str(exc),
+                "fetched_at": "", "candidates": [], "candidate_ids": [], "error": str(exc),
             })
             return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
             "base_revision": request.base_version,
             "provider_id": request.provider_id, "status": result["status"], "source_url": result["source_url"],
-            "fetched_at": result["fetched_at"],
+            "fetched_at": result["fetched_at"], "candidates": result["candidates"],
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
         })
 

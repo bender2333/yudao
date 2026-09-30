@@ -7,7 +7,14 @@ from typing import Any, Mapping, Sequence
 from .credentials import CredentialChain, CredentialMaterial
 from .errors import CatalogValidationError, ValidationIssue
 from .presets import preset_header_profile
-from .store import SUPPORTED_PROTOCOLS, ModelDefinition, ProviderDefinition, ProviderStore
+from .store import (
+    SUPPORTED_PROTOCOLS,
+    AdmissionRecord,
+    ModelDefinition,
+    ProviderDefinition,
+    ProviderStore,
+    admission_is_current,
+)
 
 
 # 冻结目标：任务创建时取得的不可变调用目标，只持有认证句柄
@@ -25,6 +32,8 @@ class FrozenTarget:
     timeout_sec: float
     credential_ref: str | None = None
     capability_source: str = ""
+    # 模型访问定义声明的是否接受要求调用工具（#102）
+    accepts_required_tool_call: bool = True
     header_profile: str = ""
     preset_id: str = ""
     revision: int = 0
@@ -46,6 +55,7 @@ class FrozenTarget:
             "timeout_sec": self.timeout_sec,
             "credential_ref": self.credential_ref,
             "capability_source": self.capability_source,
+            "accepts_required_tool_call": self.accepts_required_tool_call,
             "header_profile": self.header_profile,
             "preset_id": self.preset_id,
             "revision": self.revision,
@@ -102,14 +112,14 @@ def resolve_snapshot(
         if model.provider_id != provider.id:
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
-        if model.protocol not in SUPPORTED_PROTOCOLS:
+        if provider.protocol not in SUPPORTED_PROTOCOLS:
             issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             continue
         if model.context_window is None:
             issues.append(ValidationIssue(f"{location}.model_id", "模型缺少 context_window，无法用于任务"))
             continue
         material = None
-        if model.protocol != "fake":
+        if provider.protocol != "fake":
             if not provider.credential_ref:
                 issues.append(ValidationIssue(f"{location}.credential", "凭据引用无法解析"))
                 continue
@@ -122,7 +132,7 @@ def resolve_snapshot(
             provider_id=provider.id,
             provider_name=provider.name,
             model_id=model.id,
-            protocol=model.protocol,
+            protocol=provider.protocol,
             base_url=provider.base_url,
             model=model.model,
             context_window=model.context_window,
@@ -130,6 +140,7 @@ def resolve_snapshot(
             timeout_sec=provider.timeout_sec,
             credential_ref=provider.credential_ref or None,
             capability_source=model.capability_source,
+            accepts_required_tool_call=model.accepts_required_tool_call,
             header_profile=preset_header_profile(provider.preset_id),
             preset_id=provider.preset_id,
             revision=store.revision,
@@ -190,15 +201,16 @@ def call_target_public(
         "provider_config_id": None if provider is None else provider.id,
         "model_id": model.id if model is not None else (model_id if isinstance(model_id, str) else None),
         "provider_name": None if provider is None else provider.name,
-        "protocol": None if model is None else model.protocol,
+        "protocol": None if provider is None else provider.protocol,
         "base_url": None if provider is None else provider.base_url,
         "requested_provider": None if provider is None else provider.id,
-        "requested_protocol": None if model is None else model.protocol,
+        "requested_protocol": None if provider is None else provider.protocol,
         "requested_model": None if model is None else model.model,
         "credential_ref": None if provider is None else (provider.credential_ref or None),
         "credential_version": None if material is None else material.version,
         "context_window": None if model is None else model.context_window,
         "configured_max_output_tokens": None if model is None else model.max_output_tokens,
+        "accepts_required_tool_call": None if model is None else model.accepts_required_tool_call,
         "requested_tier": requested_tier,
         "sent_tier": None,
     }
@@ -238,10 +250,12 @@ def resolve_call_target(
     credentials: CredentialChain | None,
     model_id: Any,
     requested_tier: str | None = None,
+    admissions: Mapping[str, AdmissionRecord] | None = None,
 ) -> tuple[CallTargetResolution, FrozenTarget | None]:
     # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不接收部门。
     # 检查定义存在、所属连接存在、协议受支持、窗口已知、准入有效、凭据引用可解析；
-    # fake 只用于确定性测试，不要求准入与凭据。请求档位本次原样记录，不限制到支持范围也不编码（#87）
+    # 准入有效性按受影响字段逐项比较（工单 #86），fake 只用于确定性测试，不要求准入与凭据。
+    # 请求档位本次原样记录，不限制到支持范围也不编码（#87）
     def unavailable(message: str, public: dict[str, Any]) -> tuple[CallTargetResolution, None]:
         return CallTargetResolution(False, "provider_unavailable", message, public), None
 
@@ -254,14 +268,17 @@ def resolve_call_target(
     public = call_target_public(model_id, requested_tier, model=model, provider=provider)
     if provider is None:
         return unavailable("Provider 配置不存在", public)
-    if model.protocol not in SUPPORTED_PROTOCOLS:
+    if provider.protocol not in SUPPORTED_PROTOCOLS:
         return unavailable("协议不受支持", public)
     if model.context_window is None:
         return unavailable("模型缺少 context_window，无法用于任务", public)
     material = None
-    if model.protocol != "fake":
-        if not model.admitted:
+    if provider.protocol != "fake":
+        record = None if admissions is None else admissions.get(model.id)
+        if record is None:
             return unavailable(f"模型 {model.id} 尚未通过模型测试准入，请先执行模型测试", public)
+        if not admission_is_current(record, model, provider):
+            return unavailable(f"模型 {model.id} 的准入已作废，请重新执行模型测试", public)
         if not provider.credential_ref:
             return unavailable("Provider 配置没有凭据引用", public)
         material = credentials.resolve(provider.credential_ref) if credentials is not None else None
@@ -272,7 +289,7 @@ def resolve_call_target(
         provider_id=provider.id,
         provider_name=provider.name,
         model_id=model.id,
-        protocol=model.protocol,
+        protocol=provider.protocol,
         base_url=provider.base_url,
         model=model.model,
         context_window=model.context_window,
@@ -280,6 +297,7 @@ def resolve_call_target(
         timeout_sec=provider.timeout_sec,
         credential_ref=provider.credential_ref or None,
         capability_source=model.capability_source,
+        accepts_required_tool_call=model.accepts_required_tool_call,
         header_profile=preset_header_profile(provider.preset_id),
         preset_id=provider.preset_id,
         revision=store.revision,

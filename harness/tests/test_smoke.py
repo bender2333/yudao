@@ -83,11 +83,13 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
 
 
 def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
-    facade = ProviderFacade()
+    # fake 协议只在测试或演示方式启动的系统中可用（工单 #86）：本用例以测试方式启动，
+    # fake 连接可以进入目录；它仍然不能作为真实工作通过
+    facade = ProviderFacade(startup_mode="test")
     facade.store_document({
-        "providers": [{"id": "fake-provider", "name": "Fake"}],
+        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
         "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
-                    "protocol": "fake", "context_window": 32_000, "max_output_tokens": 4_096}],
+                    "context_window": 32_000, "max_output_tokens": 4_096}],
         "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
                      for department in ("product", "engineering", "quality")},
     })
@@ -555,13 +557,14 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     # 模型目录使用 fake 协议，场景照常运行并写出报告
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "fake-provider", "name": "Fake"}],
+        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
         "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
-                    "protocol": "fake", "context_window": 32_000, "max_output_tokens": 4_096}],
+                    "context_window": 32_000, "max_output_tokens": 4_096}],
         "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
                      for department in ("product", "engineering", "quality")},
     }), encoding="utf-8")
-    report = run_smoke(tmp_path / "smoke", provider_config=config, scenarios=["happy"])
+    report = run_smoke(tmp_path / "smoke", provider_config=config, scenarios=["happy"],
+                       startup_mode="test")
     scenario = report["scenarios"]["happy"]
     assert "model_input_audit" in scenario, scenario
     text = (tmp_path / "smoke" / "smoke-report.md").read_text(encoding="utf-8")

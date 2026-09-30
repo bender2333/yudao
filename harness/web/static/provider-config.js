@@ -18,17 +18,18 @@
   const PROTOCOL_ORDER = ["responses", "chat_completions", "messages"];
 
   const emptyProvider = () => ({
-    id: "", name: "", base_url: "", credential_ref: "", timeout_sec: 600,
+    id: "", name: "", protocol: "", base_url: "", credential_ref: "", timeout_sec: 600,
     preset_id: "", models_url: "",
   });
   const emptyModel = () => ({
-    id: "", provider_id: "", model: "", protocol: "",
+    id: "", provider_id: "", model: "",
     context_window: "", max_output_tokens: "", capability_source: "",
+    accepts_required_tool_call: true,
   });
 
   let root = null;
   let data = { providers: [], models: [], bindings: {} };
-  let presets = { table_version: "", presets: [] };
+  let presets = { revision: "", presets: [] };
   let presetError = "";
   // 候选刷新结果只保存在本次页面会话内存，不落盘；unknown 时清空旧列表
   let candidateMap = new Map();
@@ -122,7 +123,7 @@
     creatingProvider = asNew || !id;
     const item = selectedProvider();
     providerForm = item ? {
-      id: item.id, name: item.name, base_url: item.base_url || "",
+      id: item.id, name: item.name, protocol: item.protocol || "", base_url: item.base_url || "",
       credential_ref: item.credential_ref || "", timeout_sec: item.timeout_sec ?? 600,
       preset_id: item.preset_id || "", models_url: item.models_url || "",
     } : emptyProvider();
@@ -137,9 +138,9 @@
     const item = allModels().find(model => model.id === id) || null;
     modelForm = item ? {
       id: item.id, provider_id: item.provider_id, model: item.model,
-      protocol: item.protocol || "",
       context_window: item.context_window ?? "", max_output_tokens: item.max_output_tokens ?? "",
       capability_source: item.capability_source || "",
+      accepts_required_tool_call: item.accepts_required_tool_call !== false,
     } : { ...emptyModel(), provider_id: providerId || "" };
   }
 
@@ -188,6 +189,7 @@
     // 选择方案只预填表单，不自动保存任何配置或任务绑定
     providerForm.preset_id = preset.id;
     providerForm.name = preset.name || providerForm.name;
+    providerForm.protocol = providerForm.protocol || "responses";
     providerForm.base_url = primaryBaseUrl(preset);
     providerForm.models_url = preset.models_url || "";
     if (preset.auth === "api_key") providerForm.credential_ref = defaultCredentialRef(preset.id);
@@ -197,7 +199,7 @@
     try {
       presets = await fetchJSON("/api/provider-presets");
     } catch (error) {
-      presets = { table_version: "", presets: [] };
+      presets = { revision: "", presets: [] };
       presetError = error.message;
     }
   }
@@ -224,7 +226,7 @@
       ${baseUrls ? `<div class="yp-small">请求基址（按协议）</div>${baseUrls}` : ""}
       <p class="yp-small">模型列表地址 ${escapeHtml(preset.models_url || "—")}</p>
       ${preset.docs_url ? `<a class="yp-link" href="${escapeHtml(preset.docs_url)}" target="_blank" rel="noreferrer">官方文档与 Key 获取</a>` : ""}
-      <p class="yp-small">来源 ${escapeHtml(preset.source || "—")} · 预置表版本 ${escapeHtml(presets.table_version || "—")}</p>
+      <p class="yp-small">来源 ${escapeHtml(preset.source || "—")} · 预置表版本 ${escapeHtml(presets.revision || "—")}</p>
     </div>`;
   }
 
@@ -244,33 +246,31 @@
 
   // —— 准入状态 ——
 
-  function catalogRevision() {
-    // 准入跟随目录修订（Provider 与模型定义），部门绑定变化不使模型测试失效
-    const value = data.catalog_revision ?? data.revision;
-    return value === null || value === undefined || value === "" ? null : Number(value);
+  function admissionOf(modelId) {
+    // 准入记录与目录分开返回（工单 #86）：按模型 ID 在单独的列表中查找
+    return (data.admissions || []).find(item => item.model_id === modelId) || null;
   }
 
   function admissionState(model) {
-    const admittedRevision = model.admitted_revision;
-    if (admittedRevision === null || admittedRevision === undefined || admittedRevision === "") {
-      return { key: "unadmitted", label: "未准入" };
-    }
-    const current = catalogRevision();
-    if (current !== null && !Number.isNaN(current) && Number(admittedRevision) !== current) {
-      return { key: "stale", label: "测试结果不对应当前修订" };
-    }
+    const record = admissionOf(model.id);
+    if (!record) return { key: "unadmitted", label: "未准入" };
+    if (record.stale) return { key: "stale", label: "准入已作废，需重新测试" };
     return { key: "admitted", label: "已准入" };
   }
 
   function applyAdmission(providerId, modelId, result) {
-    // 模型测试在服务端记录准入；本地同步徽章与修订，避免整页重拉覆盖正在编辑的表单
+    // 模型测试在服务端写入准入记录；本地同步徽章，避免整页重拉覆盖正在编辑的表单
     if (result.revision === null || result.revision === undefined) return;
-    const model = allModels().find(item => item.provider_id === providerId && item.id === modelId);
-    if (model) {
-      model.admitted_revision = result.revision;
-      model.admitted_model = result.actual_model || model.model;
-    }
-    data.catalog_revision = result.revision;
+    const record = admissionOf(modelId);
+    const next = {
+      model_id: modelId, provider_id: providerId, protocol: result.protocol || null,
+      admitted: Boolean(result.admitted), stale: false,
+      admitted_at: new Date().toISOString(),
+      admitted_model: result.actual_model || null,
+      base_url: null, credential_ref: null, model: null,
+    };
+    if (record) Object.assign(record, next);
+    else data.admissions = [...(data.admissions || []), next];
   }
 
   // —— 就绪状态条：配置、凭据、准入、额度分开呈现，不合并成一个绿点 ——
@@ -328,7 +328,7 @@
       const admitted = models.filter(model => admissionState(model).key === "admitted").length;
       const stale = models.filter(model => admissionState(model).key === "stale").length;
       const label = admitted
-        ? `准入：${admitted}/${models.length} 已准入${stale ? ` · ${stale} 测试结果不对应当前修订` : ""}`
+        ? `准入：${admitted}/${models.length} 已准入${stale ? ` · ${stale} 准入已作废` : ""}`
         : "准入：候选未准入 · 建访问定义、测试后再绑定";
       chips.push(`<span class="yp-chip ${admitted ? "ok" : "warn"}">${label}</span>`);
     }
@@ -353,14 +353,11 @@
       </section>`;
     }
     const rows = (state.candidates || []).map(candidate => {
-      const protocolCell = candidate.protocol
-        ? escapeHtml(candidate.protocol)
-        : '<span class="warn">需选择协议</span>';
-      return `<tr data-candidate-id="${escapeHtml(candidate.id)}"><td data-label="模型 ID" title="${escapeHtml(candidate.id)}">${escapeHtml(candidate.id)}</td><td data-label="建议协议">${protocolCell}</td><td data-label="能力来源">${escapeHtml(candidate.capability_source || "—")}</td><td data-label="操作"><button class="yp-btn" type="button" data-pc-action="admit-candidate" data-candidate-id="${escapeHtml(candidate.id)}">建立访问定义</button></td></tr>`;
-    }).join("") || '<tr><td colspan="4" class="yp-small">上游返回空列表</td></tr>';
+      return `<tr data-candidate-id="${escapeHtml(candidate.id)}"><td data-label="模型 ID" title="${escapeHtml(candidate.id)}">${escapeHtml(candidate.id)}</td><td data-label="操作"><button class="yp-btn" type="button" data-pc-action="admit-candidate" data-candidate-id="${escapeHtml(candidate.id)}">建立访问定义</button></td></tr>`;
+    }).join("") || '<tr><td colspan="2" class="yp-small">上游返回空列表</td></tr>';
     return `<section class="yp-section" data-candidates="ok"><h2>候选模型</h2>
-      <p class="yp-small">来源 ${escapeHtml(state.source_url || "—")} · 采集时间 ${escapeHtml(state.fetched_at || "—")} · 候选不落盘、不自动绑定，需建访问定义并测试准入。</p>
-      <div class="yp-provider-table-wrap"><table class="yp-provider-table yp-candidate-table"><thead><tr><th>模型 ID</th><th>建议协议</th><th>能力来源</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="yp-small">来源 ${escapeHtml(state.source_url || "—")} · 采集时间 ${escapeHtml(state.fetched_at || "—")} · 候选不落盘、不自动绑定，需建访问定义并测试准入。协议取自所属连接的协议。</p>
+      <div class="yp-provider-table-wrap"><table class="yp-provider-table yp-candidate-table"><thead><tr><th>模型 ID</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>`;
   }
 
@@ -369,16 +366,16 @@
     const candidate = (state?.candidates || []).find(item => item.id === candidateId);
     if (!candidate) return;
     syncFormsFromDom();
-    // 建立访问定义只预填表单：协议缺建议时必须手动选择，容量字段不造默认值
+    // 建立访问定义只预填表单：协议取自所属连接，容量字段不造默认值
     selectedModelId = null;
     creatingModel = true;
     modelForm = {
       id: candidate.id, provider_id: selectedProviderId, model: candidate.id,
-      protocol: candidate.protocol || "",
       context_window: "", max_output_tokens: "",
       capability_source: candidate.capability_source || "",
+      accepts_required_tool_call: candidate.accepts_required_tool_call !== false,
     };
-    setMessage(`已填入候选 ${candidate.id}：选择协议、按需填写容量后保存，再执行模型测试`, "");
+    setMessage(`已填入候选 ${candidate.id}：按需填写容量后保存，再执行模型测试`, "");
     render();
   }
 
@@ -441,9 +438,12 @@
       const selectedState = item.id === selectedModelId ? "true" : "false";
       const admission = admissionState(item);
       const testingThis = testingModelId === item.id;
+      // 协议取自所属连接（ADR-0004）
+      const owner = (data.providers || []).find(entry => entry.id === item.provider_id);
+      const protocol = owner ? (owner.protocol || "—") : "—";
       // 任一测试进行中时禁用全部测试按钮，避免并发测试互相覆盖结果
       const testDisabled = testing || testingModelId ? " disabled" : "";
-      return `<tr class="${selected}" data-model-id="${escapeHtml(item.id)}" tabindex="0" role="button" aria-selected="${selectedState}" aria-label="选择模型 ${escapeHtml(item.model)}"><td data-label="ID" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</td><td data-label="模型" title="${escapeHtml(item.model)}">${escapeHtml(item.model)}</td><td data-label="协议">${escapeHtml(item.protocol || "—")}</td><td data-label="窗口">${escapeHtml(item.context_window ?? "—")}</td><td data-label="输出上限">${escapeHtml(item.max_output_tokens ?? "—")}</td><td data-label="准入与测试"><span class="admission ${admission.key}">${escapeHtml(admission.label)}</span> <button class="yp-btn" type="button" data-pc-action="test-model" data-test-model="${escapeHtml(item.id)}"${testDisabled}>${testingThis ? "测试中…" : "测试模型"}</button></td></tr>`;
+      return `<tr class="${selected}" data-model-id="${escapeHtml(item.id)}" tabindex="0" role="button" aria-selected="${selectedState}" aria-label="选择模型 ${escapeHtml(item.model)}"><td data-label="ID" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</td><td data-label="模型" title="${escapeHtml(item.model)}">${escapeHtml(item.model)}</td><td data-label="协议">${escapeHtml(protocol)}</td><td data-label="窗口">${escapeHtml(item.context_window ?? "—")}</td><td data-label="输出上限">${escapeHtml(item.max_output_tokens ?? "—")}</td><td data-label="准入与测试"><span class="admission ${admission.key}">${escapeHtml(admission.label)}</span> <button class="yp-btn" type="button" data-pc-action="test-model" data-test-model="${escapeHtml(item.id)}"${testDisabled}>${testingThis ? "测试中…" : "测试模型"}</button></td></tr>`;
     }).join("") || `<tr><td colspan="6" class="yp-small">还没有模型</td></tr>`;
   }
 
@@ -464,6 +464,14 @@
     }).join("");
   }
 
+  function providerProtocolOptions() {
+    // 连接声明一种协议（ADR-0004）
+    return [`<option value=""${providerForm.protocol ? "" : " selected"}>需选择协议</option>`]
+      .concat(PROTOCOLS.map(([value, label]) =>
+        `<option value="${value}"${providerForm.protocol === value ? " selected" : ""}>${label}</option>`))
+      .join("");
+  }
+
   function pairOptions(current) {
     const options = ['<option value="">未绑定</option>'];
     for (const model of allModels()) {
@@ -471,11 +479,11 @@
       const value = pairValue(model.provider_id, model.id);
       const base = `${provider ? provider.name : model.provider_id} / ${model.id} · 窗口 ${model.context_window ?? "?"} · 输出 ${model.max_output_tokens ?? "?"}`;
       const admission = admissionState(model);
-      // 未准入或测试结果陈旧时在下拉中标注原因并禁止选择；已准入模型不带原因、可直接选择
+      // 未准入或准入已作废时在下拉中标注原因并禁止选择；已准入模型不带原因、可直接选择
       const suffix = admission.key === "admitted"
         ? ""
         : admission.key === "stale"
-          ? " · 测试结果不对应当前修订，需重新测试"
+          ? " · 准入已作废，需重新测试"
           : " · 未准入，需先通过模型测试";
       const selectedAttr = value === current ? " selected" : "";
       const disabledAttr = admission.key === "admitted" ? "" : " disabled";
@@ -493,11 +501,12 @@
       ${presetDetailsMarkup()}
       <label>ID<input name="id" value="${escapeHtml(providerForm.id)}"${idReadonly} required></label>
       <label>名称<input name="name" value="${escapeHtml(providerForm.name)}" required></label>
+      <label>协议<select name="protocol" data-pc-field="provider-protocol">${providerProtocolOptions()}</select></label>
       <label>地址<input name="base_url" value="${escapeHtml(providerForm.base_url)}" placeholder="https://..."></label>
       <label>凭据引用<input name="credential_ref" value="${escapeHtml(providerForm.credential_ref)}" placeholder="YUDAO_BACK_KEY" data-pc-field="provider-credential-ref"></label>
       <label>模型列表地址（可覆写）<input name="models_url" value="${escapeHtml(providerForm.models_url)}" placeholder="留空使用服务方案默认"></label>
       <label>超时（秒）<input name="timeout_sec" type="number" min="1" value="${escapeHtml(providerForm.timeout_sec)}"></label>
-      <p class="yp-small">协议在每个模型上声明。测试连接只检查地址与凭据，不创建事项。表单不保存密钥。</p>
+      <p class="yp-small">连接声明一种协议，地址是该协议的请求基址；模型访问定义不再声明协议。测试连接只检查地址与凭据，不创建事项。表单不保存密钥。</p>
       <div class="yp-heading-actions">
         ${setup ? '<button class="yp-btn" type="button" data-pc-action="back-setup">返回选择</button>' : '<button class="yp-btn" type="button" data-pc-action="new-provider">新建</button>'}
         <button class="yp-btn primary" type="submit">保存</button>
@@ -509,19 +518,22 @@
   }
 
   function modelFormMarkup() {
-    const protocolOptions = [`<option value=""${modelForm.protocol ? "" : " selected"}>需选择协议</option>`]
-      .concat(PROTOCOLS.map(([value, label]) =>
-        `<option value="${value}"${modelForm.protocol === value ? " selected" : ""}>${label}</option>`))
-      .join("");
+    // 新增的行必须逐行确认容量：没有勾选时提交会被目录校验拒绝（工单 #86）；
+    // 判据与 saveModel 一致，该 id 不在已有目录里才算新增
+    const isNewRow = !allModels().some(item => item.id === selectedModelId);
+    const capacityConfirmation = isNewRow
+      ? '<label><input name="capacity_confirmed" type="checkbox" required> 已核对这一行的窗口与输出上限</label>'
+      : "";
     const admissionInfo = creatingModel ? "" : (() => {
       const item = allModels().find(model => model.id === selectedModelId);
       if (!item) return "";
-      const admission = admissionState(item);
-      if (admission.key === "admitted") {
-        return `<p class="yp-small">上次测试：实际返回 ${escapeHtml(item.admitted_model || item.model)} · 修订 ${escapeHtml(String(item.admitted_revision ?? "—"))} · 已准入</p>`;
+      const record = admissionOf(item.id);
+      const state = admissionState(item);
+      if (state.key === "admitted") {
+        return `<p class="yp-small">上次测试：实际返回 ${escapeHtml(record.admitted_model || item.model)} · 测试时间 ${escapeHtml(record.admitted_at || "—")} · 已准入</p>`;
       }
-      if (admission.key === "stale") {
-        return `<p class="yp-small warn">上次测试修订 ${escapeHtml(String(item.admitted_revision ?? "—"))} 不对应当前目录修订 ${escapeHtml(String(catalogRevision() ?? "—"))}，需重新测试后才能绑定。</p>`;
+      if (state.key === "stale") {
+        return '<p class="yp-small warn">准入已作废：连接字段或上游模型 ID 在测试之后被修改，需重新测试后才能绑定。</p>';
       }
       return '<p class="yp-small warn">尚未通过模型测试，未准入的模型不能绑定到部门。</p>';
     })();
@@ -529,10 +541,12 @@
       <label>ID<input name="id" value="${escapeHtml(modelForm.id)}" required data-pc-field="model-id"></label>
       <label>所属 Provider<select name="provider_id">${providerOptions()}</select></label>
       <label>模型名<input name="model" value="${escapeHtml(modelForm.model)}" required></label>
-      <label>协议<select name="protocol">${protocolOptions}</select></label>
       <label>context_window<input name="context_window" type="number" min="1" value="${escapeHtml(modelForm.context_window)}" required></label>
       <label>max_output_tokens<input name="max_output_tokens" type="number" min="1" value="${escapeHtml(modelForm.max_output_tokens)}" required></label>
       <label>能力来源<input name="capability_source" value="${escapeHtml(modelForm.capability_source)}" readonly placeholder="预置提示或手动填写来源"></label>
+      ${capacityConfirmation}
+      <label><input name="accepts_required_tool_call" type="checkbox"${modelForm.accepts_required_tool_call ? " checked" : ""}> 是否接受要求调用工具</label>
+      <p class="yp-small">默认为接受。不接受时，最后一次主机提示之后的请求不要求调用工具。</p>
       ${admissionInfo}
       <div class="yp-heading-actions">
         <button class="yp-btn" type="button" data-pc-action="new-model">新建模型</button>
@@ -615,7 +629,7 @@
             <h3>选择服务方案</h3>
             ${presetError
               ? `<p class="yp-small bad" data-preset-error>服务方案列表读取失败：${escapeHtml(presetError)}；可先使用自定义连接。</p>`
-              : `<p class="yp-small">预置表版本 ${escapeHtml(presets.table_version || "—")}；选择后预填请求基址、模型列表地址与凭据引用默认值。</p>`}
+              : `<p class="yp-small">预置表版本 ${escapeHtml(presets.revision || "—")}；选择后预填请求基址、模型列表地址与凭据引用默认值。</p>`}
             ${presetCardsMarkup()}
           </div>
           <div class="yp-setup-path">
@@ -789,11 +803,13 @@
   }
 
   function modelDocument(model) {
-    // 提交目录时只带文档字段；admitted_* 是服务端记录的视图字段，不随表单回传
+    // 提交目录时只带文档字段；admitted_* 与容量确认标记属于服务端记录的视图字段与命令字段，
+    // 不随表单回传；协议取自所属连接
     return {
       id: model.id, provider_id: model.provider_id, model: model.model,
-      protocol: model.protocol, context_window: model.context_window,
+      context_window: model.context_window,
       max_output_tokens: model.max_output_tokens, capability_source: model.capability_source || "",
+      accepts_required_tool_call: model.accepts_required_tool_call !== false,
     };
   }
 
@@ -805,6 +821,7 @@
       providerForm = {
         id: String(fields.id ?? ""),
         name: String(fields.name ?? ""),
+        protocol: String(fields.protocol ?? ""),
         base_url: String(fields.base_url ?? ""),
         credential_ref: String(fields.credential_ref ?? ""),
         timeout_sec: String(fields.timeout_sec ?? "600"),
@@ -819,10 +836,10 @@
         id: String(fields.id ?? ""),
         provider_id: String(fields.provider_id ?? ""),
         model: String(fields.model ?? ""),
-        protocol: String(fields.protocol ?? ""),
         context_window: String(fields.context_window ?? ""),
         max_output_tokens: String(fields.max_output_tokens ?? ""),
         capability_source: String(fields.capability_source ?? ""),
+        accepts_required_tool_call: fields.accepts_required_tool_call === "on",
       };
     }
     const credentialNode = root?.querySelector("[data-pc-form='credential']");
@@ -839,12 +856,18 @@
     const payload = {
       id: String(fields.id || "").trim(),
       name: String(fields.name || "").trim(),
+      protocol: String(fields.protocol || "").trim(),
       base_url: String(fields.base_url || "").trim(),
       credential_ref: String(fields.credential_ref || "").trim(),
       timeout_sec: Number(fields.timeout_sec),
       preset_id: String(fields.preset_id || "").trim(),
       models_url: String(fields.models_url || "").trim(),
     };
+    if (!payload.protocol) {
+      setMessage("需选择协议：连接声明一种协议（Responses、Chat Completions 或 Anthropic Messages）", "bad");
+      render();
+      return;
+    }
     try {
       if (creatingProvider) {
         const currentModels = modelsOf(payload.id);
@@ -898,19 +921,23 @@
       render();
       return;
     }
-    if (!String(fields.protocol || "").trim()) {
-      setMessage("需选择协议：候选未给出建议协议时必须手动选择一条", "bad");
+    if (!String(fields.model || "").trim()) {
+      setMessage("需填写模型名", "bad");
       render();
       return;
     }
+    // 新增行的判据是该 id 不在已有目录里：只编辑已有行时不能要求容量确认（工单 #86）
+    const isNewRow = !allModels().some(item => item.id === selectedModelId);
     const model = {
       id: String(fields.id || "").trim(),
       provider_id: providerId,
       model: String(fields.model || "").trim(),
-      protocol: String(fields.protocol || "").trim(),
       context_window: Number(fields.context_window),
       max_output_tokens: Number(fields.max_output_tokens),
       capability_source: String(fields.capability_source || "").trim(),
+      // 新增的行必须显式确认容量才能保存；已有行带着容量值提交即视为已确认（工单 #86）
+      capacity_confirmed: isNewRow,
+      accepts_required_tool_call: fields.accepts_required_tool_call === "on",
     };
     const provider = (data.providers || []).find(item => item.id === providerId);
     if (!provider) {
@@ -943,7 +970,7 @@
       .map(modelDocument);
     if (!creatingModel) {
       const rest = models.filter(item => item.id !== model.id);
-      rest.push(model);
+      rest.push(isNewRow ? model : modelDocument(model));
       models.length = 0;
       models.push(...rest);
     } else {
@@ -1066,14 +1093,15 @@
   function exportDocument() {
     return {
       providers: (data.providers || []).map(item => ({
-        id: item.id, name: item.name, base_url: item.base_url,
+        id: item.id, name: item.name, protocol: item.protocol, base_url: item.base_url,
         credential_ref: item.credential_ref, timeout_sec: item.timeout_sec,
         preset_id: item.preset_id || "", models_url: item.models_url || "",
       })),
       models: allModels().map(item => ({
         id: item.id, provider_id: item.provider_id, model: item.model,
-        protocol: item.protocol, context_window: item.context_window,
+        context_window: item.context_window,
         max_output_tokens: item.max_output_tokens, capability_source: item.capability_source || "",
+        accepts_required_tool_call: item.accepts_required_tool_call !== false,
       })),
       bindings: data.bindings || {},
     };

@@ -53,13 +53,13 @@ def _text(response: ModelResponse) -> str:
 def _catalog(credential_ref: str = "TEST_REF", protocol: str = "responses") -> dict:
     return {
         "providers": [{
-            "id": "p1", "name": "服务一",
+            "id": "p1", "name": "服务一", "protocol": protocol,
             "base_url": "https://api.example.com/v1",
             "credential_ref": credential_ref, "timeout_sec": 30.0,
         }],
         "models": [{
             "id": "m1", "provider_id": "p1", "model": "model-a",
-            "protocol": protocol, "context_window": 8000,
+            "context_window": 8000,
             "max_output_tokens": 512, "capability_source": "preset-v1",
         }],
     }
@@ -67,10 +67,10 @@ def _catalog(credential_ref: str = "TEST_REF", protocol: str = "responses") -> d
 
 def _fake_catalog() -> dict:
     return {
-        "providers": [{"id": "pf", "name": "测试服务"}],
+        "providers": [{"id": "pf", "name": "测试服务", "protocol": "fake"}],
         "models": [{
             "id": "mf", "provider_id": "pf", "model": "fake-model",
-            "protocol": "fake", "context_window": 8000,
+            "context_window": 8000,
             "max_output_tokens": 512, "capability_source": "test",
         }],
     }
@@ -99,10 +99,10 @@ def test_structural_save_without_ready_credential(tmp_path):
     assert on_disk["providers"][0]["credential_ref"] == "MISSING_REF"
 
 
-def test_old_provider_level_protocol_rejected():
+def test_provider_config_requires_a_protocol():
     facade = ProviderFacade()
     bad = _catalog()
-    bad["providers"][0]["protocol"] = "responses"
+    del bad["providers"][0]["protocol"]
     with pytest.raises(CatalogValidationError) as exc_info:
         facade.store(bad)
     assert any("protocol" in issue.location for issue in exc_info.value.issues)
@@ -121,7 +121,7 @@ def test_frozen_snapshot_immutable():
     facade.set_credential_override("TEST_REF", "secret-b")
     facade.save_model({
         "id": "m2", "provider_id": "p1", "model": "model-b",
-        "protocol": "responses", "context_window": 8000,
+        "context_window": 8000,
         "max_output_tokens": 256, "capability_source": "preset-v1",
     })
     assert snapshot.revision == revision_before
@@ -132,16 +132,16 @@ def test_missing_credentials_reported_per_item():
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store({
         "providers": [
-            {"id": "pa", "name": "服务甲", "base_url": "https://a.example.com",
-             "credential_ref": "REF_A"},
-            {"id": "pb", "name": "服务乙", "base_url": "https://b.example.com",
-             "credential_ref": "REF_B"},
+            {"id": "pa", "name": "服务甲", "protocol": "responses",
+             "base_url": "https://a.example.com", "credential_ref": "REF_A"},
+            {"id": "pb", "name": "服务乙", "protocol": "responses",
+             "base_url": "https://b.example.com", "credential_ref": "REF_B"},
         ],
         "models": [
             {"id": "ma", "provider_id": "pa", "model": "model-a",
-             "protocol": "responses", "context_window": 8000, "max_output_tokens": 128},
+             "context_window": 8000, "max_output_tokens": 128},
             {"id": "mb", "provider_id": "pb", "model": "model-b",
-             "protocol": "responses", "context_window": 8000, "max_output_tokens": 128},
+             "context_window": 8000, "max_output_tokens": 128},
         ],
     })
     with pytest.raises(CatalogValidationError) as exc_info:
@@ -229,8 +229,11 @@ def test_connection_and_model_tests_on_fake():
     assert model["admitted"] is True
     assert model["protocol"] == "fake"
     assert model["revision"] == facade.revision
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "mf")
-    assert stored["admitted_revision"] == facade.revision
+    # 准入记录与目录分开保存（工单 #86）：记录里带测试时间与实际返回的模型
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "mf")
+    assert stored["admitted"] is True
+    assert stored["admitted_at"]
+    assert stored["protocol"] == "fake"
 
 
 class _LocalResponsesUpstream:
@@ -297,9 +300,10 @@ def test_provider_module_imports_without_web_or_department_kernel():
 def _local_target(tmp_path, upstream: _LocalResponsesUpstream):
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "p1", "name": "本地服务", "base_url": upstream.base_url,
+        "providers": [{"id": "p1", "name": "本地服务", "protocol": "responses",
+                       "base_url": upstream.base_url,
                        "credential_ref": "LOCAL_REF", "timeout_sec": 10.0}],
-        "models": [{"id": "m1", "provider_id": "p1", "model": "model-a", "protocol": "responses",
+        "models": [{"id": "m1", "provider_id": "p1", "model": "model-a",
                     "context_window": 8000, "max_output_tokens": 256}],
         "bindings": {},
     }, ensure_ascii=False), encoding="utf-8")

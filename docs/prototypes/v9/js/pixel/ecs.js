@@ -3,8 +3,8 @@
 // 声明（floor-decl.js），floor.js、building.js 在这之上改写。
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('ecs.js 需要先加载 js/pixel/engine.js');
 
   const ECS = {};
@@ -290,7 +290,8 @@
   };
 
   // 事件到达：命中任务目录则入队（角色的动作走队列）；没有任务的事件返回 false，由调用方按信号处理
-  // 参数 make(task 定义, 事件, 执行的角色)：调用方为任务装上事件相关的字段（效果回调、气泡文字……），可以省略
+  // 参数 make(task 定义, 事件, 执行的角色, 一方)：调用方为任务装上事件相关的字段（效果回调、气泡文字……），可以省略；
+  // 一方为 'to' 表示这个任务是事件里收东西的一方做的（任务的 then 后续任务）
   ECS.dispatch = function dispatch(world, ev, make) {
     if (!ev || !ev.type) throw new Error('dispatch 需要事件对象');
     const key = world.catalog.keyOf(ev);
@@ -321,7 +322,7 @@
       const to = def.toward === 'role' ? ECS.charFor(world, dept, ev.role) : ECS.charFor(world, dept, null, def.toward);
       if (!to || to === ch) return false;
       extra.withId = to.id;
-      if (def.then) extra.onDone = () => { ECS.enqueue(world, to.id, def.then); };
+      if (def.then) extra.onDone = () => { ECS.enqueue(world, to.id, def.then, make ? make(world.catalog.tasks[def.then], ev, to, 'to') : null); };
     }
     if (make) Object.assign(extra, make(def, ev, ch));
     return Boolean(ECS.enqueue(world, ch.id, key, extra));
@@ -469,7 +470,7 @@
   // 第 3.4 节：P.ecs.bubbleFor —— 只读取已有的任务数据，不产生新的事实
   ECS.bubbleFor = function bubbleFor(ch) {
     const cur = ch.current;
-    if (cur && cur.bubble === 'say' && cur.label) return { text: cur.label, kind: 'say' };
+    if (cur && cur.bubble === 'say' && cur.label) return { text: cur.label, kind: 'say', tail: Boolean(cur.streamed) };
     const next = ch.queue[0];
     if (next && next.bubble === 'say' && next.label) return { text: next.label, kind: 'think' };
     return null;

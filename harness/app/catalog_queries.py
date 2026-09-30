@@ -23,24 +23,33 @@ class CatalogCredential(Contract):
 
 
 class CatalogModel(Contract):
-    # 模型访问定义与它的准入事实；stale 表示准入以后目录修订号又变化过
+    # 模型访问定义；协议取自所属连接。准入记录由 catalog.admissions 单独返回（工单 #86）
     id: str
     provider_id: str
     model: str
-    protocol: str
     context_window: int | None
     max_output_tokens: int
     capability_source: str
-    admitted_at: str | None
-    admitted_revision: int | None
-    admitted_model: str | None
-    admitted_protocol: str | None
-    stale: bool
+    accepts_required_tool_call: bool
 
+
+class CatalogAdmission(Contract):
+    # 一条定义的准入事实：是否已准入、是否已作废、测试时间与实际返回的模型（工单 #86）
+    model_id: str
+    provider_id: str
+    protocol: str | None
+    admitted: bool
+    stale: bool
+    admitted_at: str | None
+    admitted_model: str | None
+    base_url: str | None
+    credential_ref: str | None
+    model: str | None
 
 class CatalogProvider(Contract):
     id: str
     name: str
+    protocol: str
     base_url: str
     credential_ref: str
     timeout_sec: float
@@ -57,20 +66,21 @@ class CatalogBinding(Contract):
 
 
 class CatalogPresets(Contract):
-    # 服务方案预置表与它的版本与来源
-    table_version: str
+    # 服务方案预置表与它的 revision 与来源
+    revision: str
     source: str
     presets: list[dict[str, Any]]
 
 
 class Catalog(Contract):
-    # 查询 catalog：目录内容、准入与凭据状态、预置表，以及目录修订号
+    # 查询 catalog：目录内容、凭据状态、预置表、准入记录与目录修订号（准入与目录分开返回，工单 #86）
     revision: int
     config_state: str
     reload_error: str | None
     presets: CatalogPresets
     providers: list[CatalogProvider]
     models: list[CatalogModel]
+    admissions: list[CatalogAdmission]
     bindings: dict[str, CatalogBinding]
 
 
@@ -82,12 +92,8 @@ class CatalogDocument(Contract):
     bindings: dict[str, dict[str, Any]]
 
 
-def _model(item: dict[str, Any], revision: int) -> CatalogModel:
-    admitted = item.get("admitted_at") is not None
-    return CatalogModel.model_validate({
-        **item,
-        "stale": bool(admitted and item.get("admitted_revision") != revision),
-    })
+def _model(item: dict[str, Any]) -> CatalogModel:
+    return CatalogModel.model_validate(dict(item))
 
 
 def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
@@ -104,17 +110,18 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
                       {"ref": "", "configured": True, "source": "none", "has_override": False, "version": 0})
         providers.append(CatalogProvider.model_validate({
             **item, "credential": credential,
-            "models": [_model(model, revision) for model in item["models"]],
+            "models": [_model(model) for model in item["models"]],
         }))
     presets = facade.presets_public_view()
     data = Catalog(
         revision=revision,
         config_state=status["config_state"],
         reload_error=status["reload_error"],
-        presets=CatalogPresets(table_version=presets["table_version"], source=presets["source"],
+        presets=CatalogPresets(revision=presets["revision"], source=presets["source"],
                                presets=list(presets["presets"])),
         providers=providers,
-        models=[_model(item, revision) for item in view["models"]],
+        models=[_model(item) for item in view["models"]],
+        admissions=[CatalogAdmission.model_validate(item) for item in view["admissions"]],
         bindings={key: CatalogBinding.model_validate(value) for key, value in view["bindings"].items()},
     )
     return Snapshot[Catalog](position=position, data=data)

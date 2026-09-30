@@ -1,8 +1,8 @@
 # 执行环境服务设计说明
 
-更新：2026-09-29。状态：设计已确认（2026-09-29 用户确认第 11 节的决定），未实施；本阶段先完成本机进程与本机容器，远程机器的真实验收等用户提供树莓派（第 1.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2C，父工单 [#120](https://github.com/bender2333/yudao/issues/120)。
+更新：2026-09-30。状态：设计已确认（2026-09-29 用户确认第 11 节的决定），未实施；本阶段先完成本机进程与本机容器，远程机器的真实验收等用户提供树莓派（第 1.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2C，父工单 [#120](https://github.com/bender2333/yudao/issues/120)。
 
-依据：需求 [D29](../requirements/remote-execution.md)；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)（其余边界作为执行环境服务的合同）、[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（服务之间使用 HTTP 加 JSON）；[总体架构](architecture/overall-architecture.md)第 3、6.3、7 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 3、4、6 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、4.3、6.3 节；[本地通用工具设计说明](local-tools.md)；[原型 v8 设计说明](../prototypes/v8/design.md)第 4.2、9.2 节。调研：[执行环境服务调研](../research/execution-environment.md)。用词以 `CONTEXT.md` 为准。
+依据：需求 [D29](../requirements/remote-execution.md)；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)（其余边界作为执行环境服务的合同）、[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（服务之间使用 HTTP 加 JSON）；[总体架构](architecture/overall-architecture.md)第 3、6.3、7 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 3、4、6 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、4.3、6.3 节；[本地通用工具设计说明](local-tools.md)；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4.2、9.2 节）。调研：[执行环境服务调研](../research/execution-environment.md)。用词以 `CONTEXT.md` 为准。
 
 ## 1. 范围
 
@@ -470,8 +470,6 @@ sequenceDiagram
 6. **取消与失去联系**：断开树莓派网络期间取消事项。动作显示待核实；网络恢复以后确认进程已经停止。
 7. **版本不同**：树莓派上安装另一个提交的执行代理。机器页显示需要升级与升级命令，该机器上的动作不派发，run 待恢复；升级以后自动继续。
 8. **执行权编号**：以较小的执行权编号向执行代理提交动作，请求被拒绝，工作区没有变化。
-
-评测工作线的 Yudao 运行器已经完成时，父工单验收同时运行场景 2、3 的版本回归（Stage 3 计划第 7 节）。
 
 ## 11. 用户确认的决定
 

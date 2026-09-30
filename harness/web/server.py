@@ -534,8 +534,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             model = models.get(binding.get("model_id", ""))
             if provider is not None:
                 item["provider_name"] = provider["name"]
+                item["protocol"] = provider["protocol"]
             if model is not None:
-                item["protocol"] = model["protocol"]
                 item["model"] = model["model"]
                 item["context_window"] = model["context_window"]
                 item["max_output_tokens"] = model["max_output_tokens"]
@@ -1283,13 +1283,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
 
 
 def _validate_provider_entry(body: dict[str, Any]) -> None:
-    # 新结构：协议在模型访问定义声明，Provider 级 protocol 明确拒绝
-    required = {"id", "name"}
+    # 连接声明一种协议（ADR-0004）；模型访问定义不再声明协议
+    required = {"id", "name", "protocol"}
     missing = required - set(body)
     if missing:
         raise ValueError("缺少字段：" + ", ".join(sorted(missing)))
-    if "protocol" in body:
-        raise ValueError("Provider 级 protocol 已移除，请在模型访问定义声明 protocol")
     timeout = body.get("timeout_sec", 600)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
         raise ValueError("timeout_sec 必须是正数")

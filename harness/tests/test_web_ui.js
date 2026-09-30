@@ -967,32 +967,41 @@ function samplePreset() {
     models_url: "https://go.example.com/models",
     docs_url: "https://go.example.com/docs",
     source: "official", notes: "OpenCode Go 订阅接入",
-    known_models: [{ model_id: "gpt-5.6-luna", protocol: "responses", capability_source: "preset-v1" }],
   };
 }
 
 function catalogModel(id, model, overrides = {}) {
   return {
-    id, provider_id: "p1", model, protocol: "responses",
+    id, provider_id: "p1", model,
     context_window: 128000, max_output_tokens: 4096, capability_source: "preset-v1",
-    admitted_at: null, admitted_model: null, admitted_revision: null,
     ...overrides,
   };
 }
 
-function catalogView({ revision = 5, credential = { ref: "K", configured: true, source: "env", has_override: false }, models = [], bindings = {} } = {}) {
+function catalogAdmission(modelId, overrides = {}) {
+  // 准入记录与目录分开返回（工单 #86）
+  return {
+    model_id: modelId, provider_id: "p1", protocol: "responses",
+    admitted: true, stale: false,
+    admitted_at: "2026-09-19T09:00:00Z", admitted_model: modelId,
+    base_url: "https://go.example.com/v1", credential_ref: "K", model: modelId,
+    ...overrides,
+  };
+}
+
+function catalogView({ revision = 5, credential = { ref: "K", configured: true, source: "env", has_override: false }, models = [], admissions = [], bindings = {} } = {}) {
   const provider = {
-    id: "p1", name: "Go 连接", base_url: "https://go.example.com/v1",
+    id: "p1", name: "Go 连接", protocol: "responses", base_url: "https://go.example.com/v1",
     credential_ref: "K", timeout_sec: 600, preset_id: "", models_url: "",
     credential, credential_configured: credential.configured !== false,
     models,
   };
-  return { revision, providers: [provider], models, bindings };
+  return { revision, providers: [provider], models, admissions, bindings };
 }
 
 test("provider empty state lists presets and prefills the form without auto-saving", async () => {
   const { calls, fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "preset-v1", presets: [samplePreset()] },
+    "/api/provider-presets": { revision: "preset-v1", presets: [samplePreset()] },
     "/api/providers": { revision: 3, providers: [], models: [], bindings: {} },
   });
   const config = loadProviderConfig(fetchImpl);
@@ -1013,9 +1022,10 @@ test("provider empty state lists presets and prefills the form without auto-savi
   assert.match(html, /https:\/\/go\.example\.com\/v1/);
   assert.match(html, /https:\/\/go\.example\.com\/models/);
   assert.match(html, /请求基址（按协议）/);
-  // 连接地址预填为请求基址，请求路径由协议适配器拼接
+  // 连接地址预填为请求基址，协议与请求基址都在连接上（ADR-0004）
   const providerFormAfter = root.querySelector("[data-pc-form='provider']");
   assert.equal(providerFormAfter._fields.find(field => field.name === "base_url").node.value, "https://go.example.com/v1");
+  assert.equal(providerFormAfter._fields.find(field => field.name === "protocol").node.value, "responses");
   assert.match(html, /官方文档与 Key 获取/);
   // 选择方案后展示 Key 输入与内存作用域说明
   assert.match(html, /name="secret"/);
@@ -1026,10 +1036,10 @@ test("provider empty state lists presets and prefills the form without auto-savi
   assert.equal(calls.some(([url]) => String(url).includes("/api/department-bindings")), false);
 });
 
-test("candidate refresh renders suggested protocols and drops the older list on unknown", async () => {
+test("candidate refresh renders candidates and drops the older list on unknown", async () => {
   let candidatesStatus = "ok";
   const { calls, fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": () => catalogView({ models: [catalogModel("m1", "luna")] }),
     "/api/providers/p1/candidates": options => {
       const body = JSON.parse(options.body || "{}");
@@ -1038,10 +1048,7 @@ test("candidate refresh renders suggested protocols and drops the older list on 
         return {
           provider_id: "p1", source_url: "https://go.example.com/models",
           fetched_at: "2026-09-19T10:00:00Z", status: "ok",
-          candidates: [
-            { id: "gpt-5.6-luna", protocol: "responses", capability_source: "preset-v1" },
-            { id: "mystery-7", protocol: null, capability_source: null },
-          ],
+          candidates: [{ id: "gpt-5.6-luna" }, { id: "mystery-7" }],
           error: null,
         };
       }
@@ -1060,18 +1067,16 @@ test("candidate refresh renders suggested protocols and drops the older list on 
   let html = root.innerHTML;
   assert.match(html, /data-candidates="ok"/);
   assert.match(html, /gpt-5\.6-luna/);
-  assert.match(html, /需选择协议/);
   assert.match(html, /建立访问定义/);
   assert.match(html, /候选不落盘、不自动绑定/);
-  // 建立访问定义只预填表单：无建议协议时必须手动选择，容量字段不造默认值
+  // 建立访问定义只预填表单：协议取自所属连接，容量字段不造默认值
   const admitButton = root.querySelectorAll("[data-pc-action='admit-candidate']")
     .find(button => button.dataset.candidateId === "mystery-7");
   await admitButton.dispatch("click");
   const modelForm = root.querySelector("[data-pc-form='model']");
-  assert.equal(modelForm._fields.find(field => field.name === "protocol").node.value, "");
   assert.equal(modelForm._fields.find(field => field.name === "context_window").node.value, "");
   assert.equal(modelForm._fields.find(field => field.name === "max_output_tokens").node.value, "");
-  assert.match(root.innerHTML, /需选择协议/);
+  assert.equal(modelForm._fields.some(field => field.name === "protocol"), false);
   // 覆写模型列表地址后刷新：上游不可达时显示候选未知，且不沿用上一次列表
   const providerForm = root.querySelector("[data-pc-form='provider']");
   providerForm._fields.find(field => field.name === "models_url").node.value = "https://custom.example.com/models";
@@ -1086,15 +1091,20 @@ test("candidate refresh renders suggested protocols and drops the older list on 
   assert.equal(calls.filter(([url]) => String(url).endsWith("/candidates")).length, 2);
 });
 
-test("model rows show admission badges for admitted, unadmitted and stale revisions", async () => {
+test("model rows show admission badges for admitted, unadmitted and stale records", async () => {
   const models = [
-    catalogModel("m-admitted", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna-actual", admitted_revision: 7 }),
+    catalogModel("m-admitted", "luna"),
     catalogModel("m-fresh", "nova", { protocol: "chat_completions", capability_source: "" }),
-    catalogModel("m-stale", "orion", { protocol: "messages", admitted_at: "2026-09-18T09:00:00Z", admitted_model: "orion", admitted_revision: 6 }),
+    catalogModel("m-stale", "orion", { protocol: "messages" }),
+  ];
+  const admissions = [
+    catalogAdmission("m-admitted", { admitted_model: "luna-actual" }),
+    catalogAdmission("m-stale", { stale: true, admitted: false, admitted_at: "2026-09-18T09:00:00Z" }),
   ];
   const { fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
-    "/api/providers": catalogView({ revision: 7, models, bindings: { product: { provider_id: "p1", model_id: "m-admitted" } } }),
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": catalogView({ revision: 7, models, admissions,
+                                    bindings: { product: { provider_id: "p1", model_id: "m-admitted" } } }),
   });
   const config = loadProviderConfig(fetchImpl);
   const root = providerRoot();
@@ -1103,7 +1113,7 @@ test("model rows show admission badges for admitted, unadmitted and stale revisi
   assert.match(html, /class="admission admitted"/);
   assert.match(html, /class="admission unadmitted"/);
   assert.match(html, /class="admission stale"/);
-  assert.match(html, /测试结果不对应当前修订/);
+  assert.match(html, /准入已作废，需重新测试/);
   // 配置、凭据、准入、额度分开呈现，不合并成一个绿点
   assert.match(html, /data-status-strip/);
   assert.match(html, /配置：就绪 · 1\/3 模型已准入/);
@@ -1115,7 +1125,7 @@ test("model rows show admission badges for admitted, unadmitted and stale revisi
 test("saved key is never echoed back and credential status shows source and override", async () => {
   let view = catalogView({ credential: { ref: "K", configured: false, source: "missing", has_override: false }, models: [catalogModel("m1", "luna")] });
   const { calls, fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": () => view,
     "/api/provider-credentials": options => {
       const body = JSON.parse(options.body);
@@ -1155,7 +1165,7 @@ test("model test shows inline progress then result and keeps filled fields", asy
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push([String(url), options]);
-    if (url === "/api/provider-presets") return response({ table_version: "v1", presets: [] });
+    if (url === "/api/provider-presets") return response({ revision: "v1", presets: [] });
     if (url === "/api/providers") return response(catalogView({ models: [catalogModel("m1", "luna")] }));
     if (String(url).endsWith("/test")) return testResponse.then(payload => response(payload));
     return response({ error: "not found" }, 404);
@@ -1187,9 +1197,41 @@ test("model test shows inline progress then result and keeps filled fields", asy
   assert.deepEqual(JSON.parse(testCall[1].body), { model_id: "m1", kind: "model" });
 });
 
+test("new model row requires per-row capacity confirmation while an existing row does not", async () => {
+  const models = [catalogModel("m1", "luna")];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": catalogView({ revision: 5, models }),
+    "/api/providers/p1": { revision: 6 },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  // 已有行：表单没有容量确认勾选框，重新提交时不带该标记
+  let modelForm = root.querySelector("[data-pc-form='model']");
+  assert.equal(modelForm._fields.some(field => field.name === "capacity_confirmed"), false);
+  await modelForm.dispatch("submit");
+  let saved = calls.filter(([url, options]) => url === "/api/providers/p1" && options.method === "PUT").pop();
+  assert.equal("capacity_confirmed" in JSON.parse(saved[1].body).models[0], false);
+  // 新行：表单出现容量确认勾选框，提交时带 capacity_confirmed
+  await root.querySelector("[data-pc-action='new-model']").dispatch("click");
+  modelForm = root.querySelector("[data-pc-form='model']");
+  const confirmation = modelForm._fields.find(field => field.name === "capacity_confirmed");
+  assert.ok(confirmation, "新建行应有容量确认勾选框");
+  confirmation.node.checked = true;
+  modelForm._fields.find(field => field.name === "id").node.value = "m2";
+  modelForm._fields.find(field => field.name === "model").node.value = "nova";
+  modelForm._fields.find(field => field.name === "context_window").node.value = "128000";
+  modelForm._fields.find(field => field.name === "max_output_tokens").node.value = "4096";
+  await modelForm.dispatch("submit");
+  saved = calls.filter(([url, options]) => url === "/api/providers/p1" && options.method === "PUT").pop();
+  const submitted = JSON.parse(saved[1].body).models;
+  assert.equal(submitted.find(item => item.id === "m2").capacity_confirmed, true);
+});
+
 test("model test failure keeps the verifiable reason and filled fields", async () => {
   const { fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
     "/api/providers/p1/test": { ok: false, error: "缺少凭据环境变量 K，请补充后重试", actual_model: null, elapsed_ms: 3, revision: 5, admitted: false, protocol: null },
   });
@@ -1207,14 +1249,39 @@ test("model test failure keeps the verifiable reason and filled fields", async (
   assert.equal(modelFormAfter._fields.find(field => field.name === "max_output_tokens").node.value, "2048");
 });
 
-test("binding options mark unadmitted models unavailable with the reason visible", async () => {
-  const models = [
-    catalogModel("m1", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna", admitted_revision: 5 }),
-    catalogModel("m2", "nova"),
-  ];
+test("model form edits the required tool call declaration and keeps it for the other models", async () => {
+  // 模型访问定义声明是否接受要求调用工具（#102）：勾选随表单读取与提交，默认为接受
+  const models = [catalogModel("m1", "luna"), catalogModel("m2", "nova", { accepts_required_tool_call: false })];
   const { calls, fetchImpl } = providerFetch({
     "/api/provider-presets": { table_version: "v1", presets: [] },
-    "/api/providers": () => catalogView({ revision: 5, models, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
+    "/api/providers": catalogView({ models }),
+    "/api/providers/p1": catalogView({ models }),
+    "/api/department-bindings": { bindings: {} },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const checkbox = () => root.querySelector("[data-pc-form='model']")._fields
+    .find(field => field.name === "accepts_required_tool_call").node;
+  // 默认的模型是接受：勾选框选中
+  assert.equal(checkbox().checked, true);
+  // 打开声明不接受的模型：勾选框取消
+  await root.querySelector("[data-model-id='m2']").dispatch("click");
+  assert.equal(checkbox().checked, false);
+  // 保存：这一条为 false，另一条保持 true
+  await root.querySelector("[data-pc-form='model']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => String(url) === "/api/providers/p1" && options.method === "PUT");
+  const sent = JSON.parse(putCall[1].body).models;
+  assert.equal(sent.find(model => model.id === "m2").accepts_required_tool_call, false);
+  assert.equal(sent.find(model => model.id === "m1").accepts_required_tool_call, true);
+});
+
+test("binding options mark unadmitted models unavailable with the reason visible", async () => {
+  const models = [catalogModel("m1", "luna"), catalogModel("m2", "nova")];
+  const admissions = [catalogAdmission("m1", { admitted_model: "luna" })];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
     "/api/department-bindings": { bindings: { product: { provider_id: "p1", model_id: "m1" } } },
   });
   const config = loadProviderConfig(fetchImpl);
@@ -1237,7 +1304,7 @@ test("binding options mark unadmitted models unavailable with the reason visible
 
 test("readiness gap chip jumps to the missing credential field", async () => {
   const { fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": catalogView({ credential: { ref: "K", configured: false, source: "missing", has_override: false }, models: [] }),
   });
   const config = loadProviderConfig(fetchImpl);
@@ -1254,7 +1321,7 @@ test("readiness gap chip jumps to the missing credential field", async () => {
 
 test("reload error keeps a visible notice that the current revision stays in use", async () => {
   const { fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
     "/api/providers/reload": { ok: false, revision: 4, reload_error: "Provider 配置无法解析：Expecting value", changed: false },
   });
@@ -1271,7 +1338,7 @@ test("reload error keeps a visible notice that the current revision stays in use
 
 test("provider level connection test posts kind=connection and reports the revision", async () => {
   const { calls, fetchImpl } = providerFetch({
-    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/provider-presets": { revision: "v1", presets: [] },
     "/api/providers": catalogView({ models: [catalogModel("m1", "luna")] }),
     "/api/providers/p1/test": { ok: true, error: null, actual_model: "luna", elapsed_ms: 120, revision: 5, admitted: false, protocol: "responses" },
   });

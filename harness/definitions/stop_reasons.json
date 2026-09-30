@@ -58,5 +58,9 @@
   "host_commit_error": {
     "outcome": "failed",
     "human_action": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。"
+  },
+  "run_event_version_changed": {
+    "outcome": "failed",
+    "human_action": "Yudao 升级以后这个运行的事件版本与当前版本不同，运行已记为因升级停止；对应的事项已用当前采纳成果重新开始，旧的运行事件保留供查阅。"
   }
 }

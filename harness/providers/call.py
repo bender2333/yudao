@@ -43,8 +43,8 @@ class ModelCall(BaseModel):
     input_items: list[dict[str, Any]]
     tools: list[dict[str, Any]]
     max_output_tokens: int | None = None
-    # 是否要求调用工具；#102 在最后一次主机提示时增加 required
-    tool_choice: Literal["auto"] = "auto"
+    # 是否要求调用工具（#102）：auto 由模型决定；required 用于最后一次主机提示之后的工作请求
+    tool_choice: Literal["auto", "required"] = "auto"
 
 
 class ModelDelta(BaseModel):

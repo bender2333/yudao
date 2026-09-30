@@ -200,8 +200,10 @@ def test_model_test_admits_a_chat_model():
     assert result["ok"] is True
     assert result["admitted"] is True
     assert result["protocol"] == "chat_completions"
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
-    assert stored["admitted_revision"] == result["revision"]
+    # 准入记录与目录分开保存（工单 #86）：记录里带协议与实际返回模型
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
+    assert stored["admitted"] is True
+    assert stored["protocol"] == "chat_completions"
 
 
 @pytest.mark.parametrize(("protocol", "responder", "official"), [
@@ -234,15 +236,15 @@ def test_one_preset_supports_independent_connections_with_own_address_and_key():
             overrides={"GO_KEY_A": "key-a", "GO_KEY_B": "key-b"}, use_env=False))
         facade.store_document({
             "providers": [
-                {"id": "go-a", "name": "Go 个人", "base_url": base_a + "/v1", "credential_ref": "GO_KEY_A",
-                 "timeout_sec": 20.0, "preset_id": "opencode-go"},
-                {"id": "go-b", "name": "Go 团队", "base_url": base_b + "/v1", "credential_ref": "GO_KEY_B",
-                 "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                {"id": "go-a", "name": "Go 个人", "protocol": "responses", "base_url": base_a + "/v1",
+                 "credential_ref": "GO_KEY_A", "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                {"id": "go-b", "name": "Go 团队", "protocol": "responses", "base_url": base_b + "/v1",
+                 "credential_ref": "GO_KEY_B", "timeout_sec": 20.0, "preset_id": "opencode-go"},
             ],
             "models": [
-                {"id": "m-a", "provider_id": "go-a", "model": "model-x", "protocol": "responses",
+                {"id": "m-a", "provider_id": "go-a", "model": "model-x",
                  "context_window": 32000, "max_output_tokens": 2048},
-                {"id": "m-b", "provider_id": "go-b", "model": "model-x", "protocol": "responses",
+                {"id": "m-b", "provider_id": "go-b", "model": "model-x",
                  "context_window": 32000, "max_output_tokens": 2048},
             ],
             "bindings": {},
@@ -307,9 +309,11 @@ def test_concurrent_model_tests_of_one_model_both_admit():
     assert [results[key]["ok"] for key in ("first", "second")] == [True, True], results
     assert [results[key]["admitted"] for key in ("first", "second")] == [True, True]
     assert len(capture.requests) == 2
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
+    # 两次测试都通过，准入记录只有一份且与目录分开保存（工单 #86）
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
     assert stored["admitted_at"] is not None
-    assert stored["admitted_revision"] == max(results[key]["revision"] for key in ("first", "second"))
+    assert stored["admitted"] is True
+    assert len(facade.model_admissions()) == 1
 
 
 def test_anthropic_base_url_does_not_duplicate_v1():

@@ -1,19 +1,19 @@
 // 示例后端：初始数据与事件日志、按档位与位置折叠、查询与命令的执行、事件流、断开与接口版本的模拟、场景的数据部分。
-// 界面层只通过 Y8.api 使用这里（BUILD.md 第 5 节）；真实客户端接入时整个 js/contract 目录被替换
+// 界面层只通过 Y9.api 使用这里（BUILD.md 第 5 节）；真实客户端接入时整个 js/contract 目录被替换
 (function () {
   'use strict';
-  const Y8 = window.Y8;
-  if (!Y8.registry) throw new Error('backend.js 需要先加载 contract/registry.js');
+  const Y9 = window.Y9;
+  if (!Y9.registry) throw new Error('backend.js 需要先加载 contract/registry.js');
 
   // ---------------------------------------------------------------------------
-  // 数据登记：各 data/*.js 调用 Y8.data.define
+  // 数据登记：各 data/*.js 调用 Y9.data.define
 
   const parts = [];
-  Y8.data = {
+  Y9.data = {
     define(part) {
-      if (!part || typeof part !== 'object') throw new Error('Y8.data.define 需要对象');
+      if (!part || typeof part !== 'object') throw new Error('Y9.data.define 需要对象');
       Object.keys(part).forEach((key) => {
-        if (!['seed', 'history', 'scenarios'].includes(key)) throw new Error('Y8.data.define 不认识的键：' + key);
+        if (!['seed', 'history', 'scenarios'].includes(key)) throw new Error('Y9.data.define 不认识的键：' + key);
       });
       parts.push(part);
     }
@@ -24,15 +24,15 @@
     Object.keys(source).forEach((key) => {
       const value = source[key];
       if (!(key in target)) {
-        target[key] = Y8.clone(value);
+        target[key] = Y9.clone(value);
         return;
       }
       if (Array.isArray(target[key]) && Array.isArray(value)) {
-        target[key] = target[key].concat(Y8.clone(value));
-      } else if (Y8.isPlainObject(target[key]) && Y8.isPlainObject(value)) {
+        target[key] = target[key].concat(Y9.clone(value));
+      } else if (Y9.isPlainObject(target[key]) && Y9.isPlainObject(value)) {
         Object.keys(value).forEach((sub) => {
           if (sub in target[key]) throw new Error('示例数据重复：' + where + ' 的 ' + key + '.' + sub);
-          target[key][sub] = Y8.clone(value[sub]);
+          target[key][sub] = Y9.clone(value[sub]);
         });
       } else {
         throw new Error('示例数据重复：' + key + '（' + where + '）');
@@ -60,11 +60,11 @@
   const commandHandlers = {};
 
   function reached(ev) {
-    return Y8.level.reached(ev);
+    return Y9.level.reached(ev);
   }
 
   function isObjectWithVersion(value) {
-    return Y8.isPlainObject(value) && typeof value.version === 'number';
+    return Y9.isPlainObject(value) && typeof value.version === 'number';
   }
 
   // 沿补丁路径找到被修改的最深的一个带 version 的对象，版本号加一
@@ -74,13 +74,13 @@
     let owner = isObjectWithVersion(root) ? root : null;
     const walk = 'value' in patch ? segments.length - 1 : segments.length;
     for (let i = 0; i < walk; i++) {
-      container = Y8.path.get(container, segments[i]);
+      container = Y9.path.get(container, segments[i]);
       if (isObjectWithVersion(container)) owner = container;
     }
     if ('value' in patch) {
       const last = segments[segments.length - 1];
       if (/\[\w+=/.test(last)) {
-        const replaced = Y8.path.get(container, last);
+        const replaced = Y9.path.get(container, last);
         if (isObjectWithVersion(replaced)) owner = replaced;
       }
     }
@@ -90,7 +90,7 @@
   function applyEvent(target, ev) {
     (ev.patch || []).forEach((patch) => {
       try {
-        Y8.applyPatch(target, patch);
+        Y9.applyPatch(target, patch);
       } catch (error) {
         throw new Error('事件 ' + ev.position + '（' + ev.type + '，' + ev.at + '）的补丁无法应用：' + error.message);
       }
@@ -99,7 +99,7 @@
   }
 
   function fold(upTo) {
-    const out = Y8.clone(seed);
+    const out = Y9.clone(seed);
     for (const ev of log) {
       if (upTo !== undefined && ev.position > upTo) break;
       if (reached(ev)) applyEvent(out, ev);
@@ -132,21 +132,21 @@
 
   function makeVisible(timeMs) {
     return function visible(obj) {
-      if (!Y8.isPlainObject(obj)) return true;
-      if (!Y8.level.reached(obj)) return false;
-      if (timeMs !== null && obj.born_at && Y8.time.ms(obj.born_at) > timeMs) return false;
+      if (!Y9.isPlainObject(obj)) return true;
+      if (!Y9.level.reached(obj)) return false;
+      if (timeMs !== null && obj.born_at && Y9.time.ms(obj.born_at) > timeMs) return false;
       return true;
     };
   }
 
   function resolveTree(value, visible) {
     if (Array.isArray(value)) return value.filter(visible).map((item) => resolveTree(item, visible));
-    if (!Y8.isPlainObject(value)) return value;
+    if (!Y9.isPlainObject(value)) return value;
     const out = {};
     Object.keys(value).forEach((key) => {
-      if ((key === 'level' || key === 'until') && Y8.isLevel(value[key])) return;
+      if ((key === 'level' || key === 'until') && Y9.isLevel(value[key])) return;
       const item = value[key];
-      if (Y8.isPlainObject(item) && !visible(item)) return;
+      if (Y9.isPlainObject(item) && !visible(item)) return;
       out[key] = resolveTree(item, visible);
     });
     return out;
@@ -155,7 +155,7 @@
   function strip(ev) {
     const out = {};
     ['position', 'event_id', 'type', 'at', 'project_id', 'work_item_id', 'run_id', 'department', 'role', 'actor', 'command_id', 'label', 'payload']
-      .forEach((key) => { out[key] = key in ev ? Y8.clone(ev[key]) : null; });
+      .forEach((key) => { out[key] = key in ev ? Y9.clone(ev[key]) : null; });
     if (!out.payload) out.payload = {};
     return out;
   }
@@ -169,14 +169,14 @@
 
   // 数据视图：查询与命令的处理函数读取它
   function makeDb(raw, position, time) {
-    const data = resolveTree(raw, makeVisible(time ? Y8.time.ms(time) : null));
+    const data = resolveTree(raw, makeVisible(time ? Y9.time.ms(time) : null));
     const find = (list, id) => (data[list] || []).find((item) => item.id === id) || null;
     const db = {
       data,
       raw: null,
       position,
       now: time || data.now,
-      atLeast: (level) => Y8.level.atLeast(level),
+      atLeast: (level) => Y9.level.atLeast(level),
       project: (id) => find('projects', id),
       workItem: (id) => find('work_items', id),
       run: (id) => find('runs', id),
@@ -189,9 +189,9 @@
       machine: (id) => find('machines', id),
       settings: (projectId) => (data.project_settings && data.project_settings[projectId]) || null,
       log(filter) {
-        const timeMs = time ? Y8.time.ms(time) : null;
+        const timeMs = time ? Y9.time.ms(time) : null;
         return log
-          .filter((ev) => ev.position <= position && reached(ev) && !ev.silent && (timeMs === null || Y8.time.ms(ev.at) <= timeMs))
+          .filter((ev) => ev.position <= position && reached(ev) && !ev.silent && (timeMs === null || Y9.time.ms(ev.at) <= timeMs))
           .filter((ev) => eventMatches(ev, filter))
           .map(strip);
       }
@@ -200,7 +200,7 @@
   }
 
   function currentView() {
-    const key = 'now|' + Y8.level.current() + '|' + stateVersion;
+    const key = 'now|' + Y9.level.current() + '|' + stateVersion;
     if (!viewCache.has(key)) viewCache.set(key, makeDb(state, reachedHead(), null));
     return viewCache.get(key);
   }
@@ -208,7 +208,7 @@
   function viewAt(position) {
     const p = Number(position);
     if (!Number.isInteger(p) || p < 0 || p > head()) throw new Error('回放位置无效：' + position);
-    const key = 'at|' + Y8.level.current() + '|' + p + '|' + stateVersion;
+    const key = 'at|' + Y9.level.current() + '|' + p + '|' + stateVersion;
     if (!viewCache.has(key)) {
       const ev = log.find((item) => item.position === p);
       const time = ev ? ev.at : WINDOW_START;
@@ -223,11 +223,11 @@
   function append(spec, opts) {
     const o = opts || {};
     if (!spec || !spec.type) throw new Error('事件缺少 type');
-    if (!Y8.registry.has('event', spec.type)) throw new Error('事件种类没有登记：' + spec.type);
+    if (!Y9.registry.has('event', spec.type)) throw new Error('事件种类没有登记：' + spec.type);
     const ev = Object.assign({
       project_id: null, work_item_id: null, run_id: null, department: null, role: null,
       actor: o.actor || 'system', command_id: o.command_id || null, payload: {}, patch: []
-    }, Y8.clone(spec));
+    }, Y9.clone(spec));
     ev.position = head() + 1;
     ev.event_id = 'ev-' + ev.position;
     ev.at = spec.at || state.now;
@@ -250,7 +250,7 @@
       if (!reached(ev) || ev.silent) return;
       const out = strip(ev);
       subscribers.slice().forEach((sub) => {
-        if (eventMatches(out, sub.filter)) sub.fn(Y8.clone(out));
+        if (eventMatches(out, sub.filter)) sub.fn(Y9.clone(out));
       });
     });
   }
@@ -259,8 +259,8 @@
   // 能力清单
 
   function capabilities() {
-    const level = (entry) => Y8.level.atLeast(entry.level);
-    const r = Y8.registry;
+    const level = (entry) => Y9.level.atLeast(entry.level);
+    const r = Y9.registry;
     const queries = Object.keys(r.queries).filter((name) => level(r.queries[name]) && queryHandlers[name]);
     const commands = Object.keys(r.commands).filter((name) => level(r.commands[name]) && commandHandlers[name]);
     const overlays = Object.keys(r.overlays)
@@ -288,7 +288,7 @@
   // ---------------------------------------------------------------------------
   // 接口
 
-  Y8.api = {
+  Y9.api = {
     // 与控制主机的连接状态（真实客户端取事件流连接的状态）
     connected: () => connected,
     capabilities() {
@@ -298,9 +298,9 @@
     query(name, params) {
       requireConnected();
       const p = params || {};
-      if (!Y8.registry.has('query', name)) throw new Error('查询没有登记：' + name);
-      const entry = Y8.registry.entry('query', name);
-      if (!Y8.level.atLeast(entry.level)) throw new Error('查询「' + name + '」在当前档位没有部署');
+      if (!Y9.registry.has('query', name)) throw new Error('查询没有登记：' + name);
+      const entry = Y9.registry.entry('query', name);
+      if (!Y9.level.atLeast(entry.level)) throw new Error('查询「' + name + '」在当前档位没有部署');
       const fn = queryHandlers[name];
       if (!fn) throw new Error('查询没有处理函数：' + name);
       let db;
@@ -312,17 +312,17 @@
       }
       const data = fn(p, db);
       if (data === undefined) throw new Error('查询「' + name + '」没有返回结果');
-      return { position: db.position, data: Y8.clone(data) };
+      return { position: db.position, data: Y9.clone(data) };
     },
     command(name, params) {
       requireConnected();
       const p = Object.assign({}, params || {});
-      if (!Y8.registry.has('command', name)) throw new Error('命令没有登记：' + name);
-      const entry = Y8.registry.entry('command', name);
-      if (!Y8.level.atLeast(entry.level)) throw new Error('命令「' + name + '」在当前档位没有部署');
+      if (!Y9.registry.has('command', name)) throw new Error('命令没有登记：' + name);
+      const entry = Y9.registry.entry('command', name);
+      if (!Y9.level.atLeast(entry.level)) throw new Error('命令「' + name + '」在当前档位没有部署');
       const fn = commandHandlers[name];
       if (!fn) throw new Error('命令没有处理函数：' + name);
-      const commandId = p.command_id || Y8.uid('cmd');
+      const commandId = p.command_id || Y9.uid('cmd');
       if (commandResults.has(commandId)) return Object.assign({}, commandResults.get(commandId), { duplicate: true });
       const db = Object.assign({}, currentView(), { raw: state });
       const result = fn(p, db);
@@ -335,7 +335,7 @@
       const position = events.length ? events[events.length - 1].position : reachedHead();
       const out = { accepted: true, command_id: commandId, position, refs: result.refs || {}, message: result.message || null, duplicate: false };
       commandResults.set(commandId, out);
-      setTimeout(() => deliverUpTo(position), Y8.backend.latency);
+      setTimeout(() => deliverUpTo(position), Y9.backend.latency);
       return out;
     },
     subscribe(filter, fn, opts) {
@@ -354,17 +354,17 @@
     }
   };
 
-  Y8.CLIENT_API_VERSION = 1;
+  Y9.CLIENT_API_VERSION = 1;
 
   // 界面层按能力清单决定显示什么
   let capCache = null;
-  Y8.cap = {
+  Y9.cap = {
     refresh() { capCache = connected ? capabilities() : capCache; return capCache; },
-    get() { return capCache || Y8.cap.refresh(); },
-    query: (name) => Y8.cap.get().queries.some((item) => item.name === name),
-    command: (name) => Y8.cap.get().commands.some((item) => item.name === name),
-    decision: (kind) => Y8.cap.get().decisions.includes(kind),
-    overlay: (id) => Y8.cap.get().overlays.some((item) => item.id === id)
+    get() { return capCache || Y9.cap.refresh(); },
+    query: (name) => Y9.cap.get().queries.some((item) => item.name === name),
+    command: (name) => Y9.cap.get().commands.some((item) => item.name === name),
+    decision: (kind) => Y9.cap.get().decisions.includes(kind),
+    overlay: (id) => Y9.cap.get().overlays.some((item) => item.id === id)
   };
 
   // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@
       need(has('work_items', run.work_item_id), 'run ' + run.id + ' 的事项不存在：' + run.work_item_id);
     });
     (s.decisions || []).forEach((dec) => {
-      need(Y8.registry.has('decision', dec.kind), '决定请求 ' + dec.id + ' 的种类没有登记：' + dec.kind);
+      need(Y9.registry.has('decision', dec.kind), '决定请求 ' + dec.id + ' 的种类没有登记：' + dec.kind);
       need(has('projects', dec.project_id), '决定请求 ' + dec.id + ' 的项目不存在');
       if (dec.work_item_id) need(has('work_items', dec.work_item_id), '决定请求 ' + dec.id + ' 的事项不存在');
       if (dec.run_id) need(has('runs', dec.run_id), '决定请求 ' + dec.id + ' 的 run 不存在');
@@ -400,7 +400,7 @@
     (s.materials || []).forEach((m) => need(has('projects', m.project_id), '资料 ' + m.id + ' 的项目不存在'));
     Object.keys(s.project_settings || {}).forEach((pid) => need(has('projects', pid), '项目设置的项目不存在：' + pid));
     history.forEach((ev) => {
-      need(Y8.time.ms(ev.at) <= Y8.time.ms(s.now), '事件晚于现在：' + ev.type + ' ' + ev.at);
+      need(Y9.time.ms(ev.at) <= Y9.time.ms(s.now), '事件晚于现在：' + ev.type + ' ' + ev.at);
       if (ev.project_id) need(has('projects', ev.project_id), '事件 ' + ev.position + ' 的项目不存在：' + ev.project_id);
       if (ev.work_item_id) need(has('work_items', ev.work_item_id), '事件 ' + ev.position + ' 的事项不存在：' + ev.work_item_id);
       if (ev.run_id) need(has('runs', ev.run_id), '事件 ' + ev.position + ' 的 run 不存在：' + ev.run_id);
@@ -421,25 +421,25 @@
       need(sc.id && sc.name && Number.isInteger(sc.no), '场景缺少 id、name 或 no');
       need(!nos.has(sc.no), '场景编号重复：' + sc.no);
       nos.add(sc.no);
-      need(Y8.isLevel(sc.level || 'ui'), '场景 ' + sc.id + ' 的档位无效');
+      need(Y9.isLevel(sc.level || 'ui'), '场景 ' + sc.id + ' 的档位无效');
       need(Array.isArray(sc.steps) && sc.steps.length, '场景 ' + sc.id + ' 没有步骤');
       sc.steps.forEach((st, i) => {
         need(st.event || st.act || (st.go && st.label), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步没有 event、act，也不是带 label 的跳转');
-        if (st.event) need(Y8.registry.has('event', st.event.type), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步的事件种类没有登记：' + st.event.type);
+        if (st.event) need(Y9.registry.has('event', st.event.type), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步的事件种类没有登记：' + st.event.type);
       });
     });
     // 在全部档位上折叠一次，确认每条补丁都能应用
-    const saved = Y8.level.current();
+    const saved = Y9.level.current();
     const probe = { level: 'S5' };
-    Y8.LEVELS.forEach((lv) => {
+    Y9.LEVELS.forEach((lv) => {
       probe.level = lv;
-      const out = Y8.clone(seed);
+      const out = Y9.clone(seed);
       log.forEach((ev) => {
-        const ok = (!ev.level || Y8.level.compare(lv, ev.level) >= 0) && (!ev.until || Y8.level.compare(lv, ev.until) < 0);
+        const ok = (!ev.level || Y9.level.compare(lv, ev.level) >= 0) && (!ev.until || Y9.level.compare(lv, ev.until) < 0);
         if (ok) applyEvent(out, ev);
       });
     });
-    need(Y8.level.current() === saved, '检查改变了档位');
+    need(Y9.level.current() === saved, '检查改变了档位');
   }
 
   // ---------------------------------------------------------------------------
@@ -448,33 +448,33 @@
   let scenarioList = [];
 
   function lastSeenPosition(iso) {
-    const t = Y8.time.ms(iso);
+    const t = Y9.time.ms(iso);
     let pos = 0;
-    history.forEach((ev) => { if (Y8.time.ms(ev.at) <= t) pos = ev.position; });
+    history.forEach((ev) => { if (Y9.time.ms(ev.at) <= t) pos = ev.position; });
     return pos;
   }
 
   function buildLog() {
-    log = history.map((ev) => Y8.clone(ev));
+    log = history.map((ev) => Y9.clone(ev));
     refold();
     delivered = head();
   }
 
-  Y8.backend = {
+  Y9.backend = {
     latency: 500,
     WINDOW_START,
     query(name, fn) {
-      if (!Y8.registry.has('query', name)) throw new Error('查询没有登记：' + name);
+      if (!Y9.registry.has('query', name)) throw new Error('查询没有登记：' + name);
       if (queryHandlers[name]) throw new Error('查询处理函数重复：' + name);
       queryHandlers[name] = fn;
     },
     command(name, fn) {
-      if (!Y8.registry.has('command', name)) throw new Error('命令没有登记：' + name);
+      if (!Y9.registry.has('command', name)) throw new Error('命令没有登记：' + name);
       if (commandHandlers[name]) throw new Error('命令处理函数重复：' + name);
       commandHandlers[name] = fn;
     },
     init() {
-      if (!parts.length) throw new Error('没有示例数据：js/contract/data/*.js 需要调用 Y8.data.define');
+      if (!parts.length) throw new Error('没有示例数据：js/contract/data/*.js 需要调用 Y9.data.define');
       seed = {};
       const events = [];
       scenarioList = [];
@@ -486,11 +486,11 @@
       ['now', 'deployment', 'home', 'system'].forEach((key) => {
         if (!seed[key]) throw new Error('示例数据缺少 ' + key + '（由 data/system.js 登记）');
       });
-      events.sort((a, b) => (Y8.time.ms(a.ev.at) - Y8.time.ms(b.ev.at)) || (a.index - b.index) || (a.order - b.order));
+      events.sort((a, b) => (Y9.time.ms(a.ev.at) - Y9.time.ms(b.ev.at)) || (a.index - b.index) || (a.order - b.order));
       history = events.map((item, i) => {
-        const ev = Y8.clone(item.ev);
+        const ev = Y9.clone(item.ev);
         if (!ev.type || !ev.at) throw new Error('历史事件缺少 type 或 at');
-        if (!Y8.registry.has('event', ev.type)) throw new Error('历史事件的种类没有登记：' + ev.type);
+        if (!Y9.registry.has('event', ev.type)) throw new Error('历史事件的种类没有登记：' + ev.type);
         return Object.assign({ project_id: null, work_item_id: null, run_id: null, department: null, role: null, actor: 'system', command_id: null, payload: {}, patch: [] },
           ev, { position: i + 1, event_id: 'ev-' + (i + 1) });
       });
@@ -505,14 +505,14 @@
     // 档位切换以后重新折叠
     refold() {
       refold();
-      Y8.cap.refresh();
+      Y9.cap.refresh();
     },
     scenarios: () => scenarioList,
     // 回到默认数据与事件日志（选择场景、重置）
     reset() {
       buildLog();
       commandResults.clear();
-      Y8.cap.refresh();
+      Y9.cap.refresh();
     },
     // 场景的准备：作为一条不进入报告、不推送的事件应用
     setup(patches, label) {
@@ -532,16 +532,16 @@
       setConnected(on) {
         connected = Boolean(on);
         if (connected) {
-          Y8.cap.refresh();
+          Y9.cap.refresh();
           deliverUpTo(head());
         }
-        Y8.bus.emit('connection-changed', connected);
+        Y9.bus.emit('connection-changed', connected);
       },
       apiVersion: () => (apiVersionOverride === null ? state.deployment.api_version : apiVersionOverride),
       setApiVersion(n) {
         apiVersionOverride = n === null || n === undefined ? null : Number(n);
-        Y8.cap.refresh();
-        Y8.bus.emit('api-version-changed', Y8.backend.sim.apiVersion());
+        Y9.cap.refresh();
+        Y9.bus.emit('api-version-changed', Y9.backend.sim.apiVersion());
       },
       setLastSeen(iso) {
         state.home.last_seen_at = iso;
@@ -550,10 +550,10 @@
         seed.home.last_seen_position = state.home.last_seen_position;
         stateVersion += 1;
         viewCache.clear();
-        Y8.bus.emit('last-seen-changed', iso);
+        Y9.bus.emit('last-seen-changed', iso);
       }
     }
   };
 
-  Y8.bus.on('level-changed', () => Y8.backend.refold());
+  Y9.bus.on('level-changed', () => Y9.backend.refold());
 })();

@@ -40,8 +40,8 @@ REJECTION_REASONS: tuple[str, ...] = get_args(RejectionReason)
 
 
 class CommandRequest(Contract):
-    # 每个命令请求的公共字段：命令身份由客户端生成，重试使用同一个值；基准版本是用户作出操作时所依据对象的版本。
-    # 新建类命令没有依据的对象，把 base_version 限定为空
+    # 每个命令请求的公共字段：命令身份由客户端生成，重试使用同一个值；经接口提交时必须带身份。
+    # 基准版本是用户作出操作时所依据对象的版本，新建类命令没有依据的对象，把 base_version 限定为空
     command_id: CommandId
     base_version: int | None = None
 

@@ -1,7 +1,7 @@
 // 部门房间画面（设计说明第 8.1 至 8.3 节）：房间布置、按 roomModel 决定的状态姿势、按事件播放的一次性动作。
 (function () {
-  const Y8 = window.Y8;
-  const P = Y8.pixel;
+  const Y9 = window.Y9;
+  const P = Y9.pixel;
   if (!P || !P.createScene) throw new Error('room.js 需要先加载 js/pixel/engine.js');
   const PAL = P.PAL;
   const R = P.R, RB = P.RB, paint = P.paint;
@@ -96,7 +96,7 @@
     const D = P.DEPTS[dept];
     let level = o.level || 'ui';
     P.levelAtLeast(level, 'ui');
-    if (level !== 'ui' && !Y8.LEVELS.includes(level)) throw new Error('未知档位：' + level);
+    if (level !== 'ui' && !Y9.LEVELS.includes(level)) throw new Error('未知档位：' + level);
 
     // 画面上的数量（信箱、档案盒编号、卷轴、钉着的纸条、语义卡片）一律取自 roomModel；
     // st 只保存动作过程中的临时状态，动作结束后画面回到只由数据决定的样子
@@ -220,6 +220,25 @@
     function keep(a, key) { ds(a)[key] = scene.realT + PROP_KEEP; }
     function drop(a, key) { ds(a)[key] = 0; }
     function shown(s, key) { return s[key] > scene.realT; }
+
+    // 说话气泡：小人开始做一件事时头顶说一句话（内容来自 P.say，js/pixel/say.js），说完在头顶留一段时间
+    function nameOfRole(k) {
+      const x = roleActors().find((r) => r.id === k || r.data.role.kind === k || r.data.role.name === k);
+      return x ? x.data.role.name : null;
+    }
+    // side 为 'to' 表示这个小人是事件里收东西的一方
+    function say(ev, a, side) {
+      const text = P.say(ev, { dept, side, roleName: nameOfRole });
+      if (a && text) a.data.say = { text, until: scene.realT + P.sayMs(text) };
+    }
+
+    // 询问信的两端：发问的部门与回答的部门（示例数据里回答事件的 from 是回答方，v8 构建约定里 to 是回答方）
+    function letterSides(ev) {
+      const pl = ev.payload || {};
+      if (ev.type === 'collaboration_requested') return { asker: pl.from || ev.department, answerer: pl.to };
+      const answerer = ev.department || pl.to;
+      return { asker: pl.from === answerer ? pl.to : pl.from, answerer };
+    }
     // 工作台上的物件：每次改动后保留 12 秒，之后工作台回到空的样子
     function tickBench() {
       const b = st.bench;
@@ -808,18 +827,18 @@
         p.back();
         p.run(() => { a.hold = null; });
       },
-      // 收到询问并回答：从传信管口取出信筒，写回答后塞回；发问方在管道口接住回答
+      // 从传信管口取出信筒：收到询问的一方与收到回答的一方读信，回答方读完询问以后写回答塞回；发问方在管道口接住回答
       answer_letter(ev, a) {
         setPersist(a, null);
-        const pl = ev.payload || {};
-        const asker = pl.from === dept && pl.to !== dept;
+        const sides = letterSides(ev);
+        const reads = ev.type === 'collaboration_requested' || sides.asker === dept;
         const p = plan(a);
         const take = (ms) => S.call(() => {
           scene.fly({ bmp: 'letter', from: [L.tube.x + 4, L.tube.base - 8], to: [a.x + 4, a.y - 20], ms, arc: 8, onDone: () => { a.hold = 'letter'; } });
         });
         p.spot('tube');
         p.add(take(600), S.anim('reach', 800, true), S.anim('catch', 700));
-        if (asker) {
+        if (reads) {
           p.add(S.anim('read_stand', 1500, true), S.hold(null));
         } else {
           p.add(S.hold('letter'), S.anim('write', 1400));
@@ -1015,6 +1034,7 @@
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
           keep(target, 'card');
           st.wbTags[target.id] = true;
+          say(ev, target, 'to');
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
         p.run(() => { mgr.hold = null; if (!shown(ds(target), 'card')) keep(target, 'card'); st.wbTags[target.id] = true; });
@@ -1025,6 +1045,7 @@
         const worker = a === mgr ? roleActors().find((x) => x !== mgr) : a;
         if (!worker) return;
         const gs = giveSpot(mgr.data.desk);
+        say(ev, worker);
         const p = plan(worker);
         p.stand();
         p.add(S.call(() => { drop(worker, 'card'); }), S.hold('card_result'));
@@ -1032,6 +1053,7 @@
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
           keep(mgr, 'cardResult');
           st.wbDone[worker.id] = true;
+          say(ev, mgr, 'to');
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
         p.run(() => { worker.hold = null; if (!shown(ds(mgr), 'cardResult')) keep(mgr, 'cardResult'); st.wbDone[worker.id] = true; });
@@ -1286,6 +1308,7 @@
       if (!bmp) return;
       const a = primary();
       if (pl.from === dept) {
+        say(ev, a, 'from');
         // 交出的物件先在工作台上或卷轴架上取走
         const p = plan(a);
         p.stand();
@@ -1304,6 +1327,7 @@
         const p = plan(a);
         p.spot('pipe');
         p.add(S.call(() => {
+          say(ev, a, 'to');
           scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [a.x + 6, a.y - 18], ms: 620, arc: 8, ease: 'out', onDone: () => { a.hold = bmp; } });
         }), S.anim('reach', 700, true), S.anim('catch', 900));
         if (isOps() || art === 'prd') {
@@ -1337,10 +1361,16 @@
       let action = P.resolveAction(ev);
       // 建档事项（3.8）中读取与搜索工具的 tool_started 播放「阅读已有项目」：接入已有项目设计说明第 3.3 节
       if (model.existing_read && (action === 'read' || action === 'search')) action = 'read_existing';
+      // 收到询问的部门走到传信管口取信阅读
+      if (action === 'send_letter') {
+        const sides = letterSides(ev);
+        if (sides.answerer === dept && sides.asker !== dept) action = 'answer_letter';
+      }
       if (!action) {
         if (ev.type === 'tool_started') {
           const a = actorFor(ev);
           setPersist(a, { anim: 'type' });
+          if (!scene.frozen) say(ev, a);
         }
         return;
       }
@@ -1352,7 +1382,7 @@
       if (scene.frozen && action !== 'resume' && action !== 'puzzled' && action !== 'hold_card') return;
       if (a.data.role && a.data.role.status === 'away' && action !== 'explore') return;
       // 只改变房间物件的事件不影响小人正在做和排队的动作
-      if (SIDE_ONLY.has(action)) { fn(ev, a); return; }
+      if (SIDE_ONLY.has(action)) { say(ev, a); fn(ev, a); return; }
       // 正在做同一个动作时，重复的事件并入当前动作（告警只延长告警灯）
       if (!IMMEDIATE.has(action) && !scene.inTail(a) && a.data.doing === action) {
         if (action === 'run_alarm') st.alarmUntil = scene.realT + 9000;
@@ -1363,6 +1393,7 @@
       const start = () => {
         a.icon = null;
         a.data.doing = action;
+        if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
         fn(ev, a);
       };
       // 状态类动作立即执行；其他动作在当前动作的主要部分做完后执行
@@ -1376,6 +1407,9 @@
       if (a.data.queue.length > 3) a.data.queue.shift();
     }
     const SIDE_ONLY = new Set(['guidance_in', 'semantic', 'freeze']);
+    // hand_back 由动作自己让交回结果的角色与收下结果的经理各说一句；打字思考时头顶已经有思考气泡
+    const OWN_SPEECH = new Set(['hand_back']);
+    const THINK_ACTIONS = new Set(['type_think', 'stream_text']);
     const PROPOSAL_DONE = new Set(['spec_accepted', 'contract_accepted', 'plan_accepted', 'delivery_accepted', 'qa_submitted', 'proposal_rejected']);
     const IMMEDIATE = new Set(['paused', 'failed', 'done', 'cancelled', 'puzzled', 'hold_card', 'resume']);
 
@@ -1571,6 +1605,13 @@
         }
         P.drawIcon(c, sc, a);
       });
+      // 说话气泡：画在最上层，减少动画时也照说
+      const says = [];
+      sc.actors.forEach((a) => {
+        const s = a.data.say;
+        if (s && a.visible && sc.realT < s.until) says.push({ a, text: s.text, kind: 'say', until: s.until });
+      });
+      P.drawSpeeches(c, sc, says, { W, size: 7, maxW: 108 });
     }
 
     // 茶水台：饮水机、茶壶与杯子
@@ -1855,7 +1896,7 @@
       const prevStatus = effStatus();
       model = Object.assign({}, m);
       if (m.level && m.level !== level) {
-        if (m.level !== 'ui' && !Y8.LEVELS.includes(m.level)) throw new Error('未知档位：' + m.level);
+        if (m.level !== 'ui' && !Y9.LEVELS.includes(m.level)) throw new Error('未知档位：' + m.level);
         level = m.level;
       }
       st.eventStatus = null; st.eventCard = null; st.eventTool = null;

@@ -33,6 +33,7 @@ from .deltas import DeltaChannel
 from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
+from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
@@ -48,7 +49,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree
+from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
@@ -303,6 +304,7 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
+                "run_event_version": RUN_EVENT_VERSION,
             },
         )
         transition = NewEvent(
@@ -329,10 +331,10 @@ class Orchestrator:
         provider_id = self.test_provider
         model_id = f"{provider_id}-model"
         self.facade.store_document({
-            "providers": [{"id": provider_id, "name": provider_id, "base_url": ""}],
+            "providers": [{"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""}],
             "models": [{
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
-                "protocol": "fake", "context_window": context_window,
+                "context_window": context_window,
                 "max_output_tokens": response_reserve(context_window, None),
             }],
             "bindings": {department: {"provider_id": provider_id, "model_id": model_id}
@@ -594,6 +596,12 @@ class Orchestrator:
                     self._cancel_driver(activation)
         if cancel_error is not None:
             raise cancel_error
+        return self.project(run_id)
+    def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
+        # 因升级停止（ADR-0019，工单 #126）：run 事件版本与当前版本不同的未结束 run 记为因升级停止，
+        # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
+        message = f"run event version differs from the current version: {reason}"
+        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
         return self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
@@ -868,6 +876,7 @@ class Orchestrator:
             "context_window": None,
             "configured_max_output_tokens": None,
             "selection_source": None,
+            "accepts_required_tool_call": None,
             "requested_tier": None,
             "sent_tier": None,
         }
@@ -894,6 +903,10 @@ class Orchestrator:
                 deltas=self.deltas,
             )
             result = await activation.driver.result()
+        except UnrepresentableWorkspace as exc:
+            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停
+            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version)
+            return
         except Exception as exc:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
@@ -928,6 +941,9 @@ class Orchestrator:
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
                 model=submission.response.model,
             )
+        except UnrepresentableWorkspace as exc:
+            # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
+            self._end_run(activation, "workspace_unrepresentable", str(exc), None)
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
 
@@ -1258,10 +1274,11 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入。
+        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径
         outcome = DEFINITIONS.stop_reason(reason).outcome
         if outcome == "paused":
-            self._pause(transaction, reason)
+            self._pause(transaction, reason, message)
         elif outcome == "failed":
             self._fail(transaction, reason, message)
         else:
@@ -1279,7 +1296,7 @@ class Orchestrator:
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
-    def _pause(self, transaction: Transaction, reason: str) -> None:
+    def _pause(self, transaction: Transaction, reason: str, message: str | None = None) -> None:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
             return
@@ -1290,10 +1307,12 @@ class Orchestrator:
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, actor="system", department=department,
             state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
+            error=message,
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
                 "human_action": DEFINITIONS.stop_reason(reason).human_action,
+                **({"message": message} if message else {}),
                 "paused_at_phase": projection.phase,
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,

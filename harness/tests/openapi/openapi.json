@@ -1280,6 +1280,108 @@
         }
       }
     },
+    "/api/commands/runtime.start_drain": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "runtime.start_drain",
+        "operationId": "command_runtime_start_drain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeStartDrain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/runtime.force_upgrade": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "runtime.force_upgrade",
+        "operationId": "command_runtime_force_upgrade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeForceUpgrade"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -3510,6 +3612,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -3559,6 +3672,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier"
@@ -3660,6 +3774,13 @@
             "type": "array",
             "title": "Models"
           },
+          "admissions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAdmission"
+            },
+            "type": "array",
+            "title": "Admissions"
+          },
           "bindings": {
             "additionalProperties": {
               "$ref": "#/components/schemas/CatalogBinding"
@@ -3677,9 +3798,111 @@
           "presets",
           "providers",
           "models",
+          "admissions",
           "bindings"
         ],
         "title": "Catalog"
+      },
+      "CatalogAdmission": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "admitted": {
+            "type": "boolean",
+            "title": "Admitted"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "admitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted At"
+          },
+          "admitted_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted Model"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider_id",
+          "protocol",
+          "admitted",
+          "stale",
+          "admitted_at",
+          "admitted_model",
+          "base_url",
+          "credential_ref",
+          "model"
+        ],
+        "title": "CatalogAdmission"
       },
       "CatalogBinding": {
         "properties": {
@@ -4021,10 +4244,6 @@
             "type": "string",
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -4044,53 +4263,9 @@
             "type": "string",
             "title": "Capability Source"
           },
-          "admitted_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted At"
-          },
-          "admitted_revision": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Revision"
-          },
-          "admitted_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Model"
-          },
-          "admitted_protocol": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Protocol"
-          },
-          "stale": {
+          "accepts_required_tool_call": {
             "type": "boolean",
-            "title": "Stale"
+            "title": "Accepts Required Tool Call"
           }
         },
         "additionalProperties": false,
@@ -4099,15 +4274,10 @@
           "id",
           "provider_id",
           "model",
-          "protocol",
           "context_window",
           "max_output_tokens",
           "capability_source",
-          "admitted_at",
-          "admitted_revision",
-          "admitted_model",
-          "admitted_protocol",
-          "stale"
+          "accepts_required_tool_call"
         ],
         "title": "CatalogModel"
       },
@@ -4145,9 +4315,9 @@
       },
       "CatalogPresets": {
         "properties": {
-          "table_version": {
+          "revision": {
             "type": "string",
-            "title": "Table Version"
+            "title": "Revision"
           },
           "source": {
             "type": "string",
@@ -4165,7 +4335,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "table_version",
+          "revision",
           "source",
           "presets"
         ],
@@ -4180,6 +4350,10 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
           },
           "base_url": {
             "type": "string",
@@ -4221,6 +4395,7 @@
         "required": [
           "id",
           "name",
+          "protocol",
           "base_url",
           "credential_ref",
           "timeout_sec",
@@ -5110,16 +5285,6 @@
             "minLength": 1,
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "chat_completions",
-              "fake",
-              "messages",
-              "responses"
-            ],
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -5141,6 +5306,16 @@
             "title": "Capability Source",
             "default": ""
           },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
+          },
+          "accepts_required_tool_call": {
+            "type": "boolean",
+            "title": "Accepts Required Tool Call",
+            "default": true
+          },
           "provider_id": {
             "type": "string",
             "minLength": 1,
@@ -5152,11 +5327,44 @@
         "required": [
           "id",
           "model",
-          "protocol",
           "max_output_tokens",
           "provider_id"
         ],
         "title": "DocumentModelInput"
+      },
+      "DrainStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "draining",
+              "ready"
+            ],
+            "title": "State"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "running_runs": {
+            "type": "integer",
+            "title": "Running Runs"
+          },
+          "queued_work_items": {
+            "type": "integer",
+            "title": "Queued Work Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "version",
+          "running_runs",
+          "queued_work_items"
+        ],
+        "title": "DrainStatus"
       },
       "EventDetailResult": {
         "properties": {
@@ -5537,16 +5745,6 @@
             "minLength": 1,
             "title": "Model"
           },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "chat_completions",
-              "fake",
-              "messages",
-              "responses"
-            ],
-            "title": "Protocol"
-          },
           "context_window": {
             "anyOf": [
               {
@@ -5567,6 +5765,16 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
+          },
+          "accepts_required_tool_call": {
+            "type": "boolean",
+            "title": "Accepts Required Tool Call",
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -5574,7 +5782,6 @@
         "required": [
           "id",
           "model",
-          "protocol",
           "max_output_tokens"
         ],
         "title": "ModelInput"
@@ -6185,6 +6392,16 @@
             "minLength": 1,
             "title": "Name"
           },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "fake",
+              "messages",
+              "responses"
+            ],
+            "title": "Protocol"
+          },
           "base_url": {
             "type": "string",
             "title": "Base Url",
@@ -6215,7 +6432,8 @@
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "protocol"
         ],
         "title": "ProviderInput"
       },
@@ -6523,6 +6741,58 @@
           "usage"
         ],
         "title": "RunExportResult"
+      },
+      "RuntimeForceUpgrade": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id"
+        ],
+        "title": "RuntimeForceUpgrade"
+      },
+      "RuntimeStartDrain": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id"
+        ],
+        "title": "RuntimeStartDrain"
       },
       "Snapshot_CatalogDocument_": {
         "properties": {
@@ -7005,6 +7275,9 @@
           },
           "catalog": {
             "$ref": "#/components/schemas/CatalogState"
+          },
+          "drain": {
+            "$ref": "#/components/schemas/DrainStatus"
           }
         },
         "additionalProperties": false,
@@ -7014,7 +7287,8 @@
           "boot_id",
           "started_at",
           "provider",
-          "catalog"
+          "catalog",
+          "drain"
         ],
         "title": "SystemStatus"
       },
@@ -8523,6 +8797,14 @@
             "title": "Fetched At",
             "type": "string"
           },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
           "candidate_ids": {
             "items": {
               "type": "string"
@@ -8548,6 +8830,7 @@
           "status",
           "source_url",
           "fetched_at",
+          "candidates",
           "candidate_ids",
           "error"
         ],
@@ -10376,6 +10659,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -10547,6 +10841,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -10871,6 +11166,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -11145,6 +11451,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -12125,7 +12432,8 @@
               "retry_after_too_long",
               "context_overflow",
               "compaction_failed",
-              "host_commit_error"
+              "host_commit_error",
+              "run_event_version_changed"
             ],
             "title": "Reason",
             "type": "string"
@@ -14982,6 +15290,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -15286,6 +15605,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -15568,6 +15888,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -15845,6 +16176,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -16122,6 +16454,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -16304,6 +16647,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -16569,6 +16913,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -16749,6 +17104,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -17015,6 +17371,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -17196,6 +17563,14 @@
             ],
             "title": "Max Output Tokens"
           },
+          "tool_choice": {
+            "enum": [
+              "auto",
+              "required"
+            ],
+            "title": "Tool Choice",
+            "type": "string"
+          },
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
@@ -17214,6 +17589,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -17240,6 +17616,7 @@
           "purpose",
           "effective_context_window",
           "max_output_tokens",
+          "tool_choice",
           "definitions_version"
         ],
         "title": "ModelRequestedPayload",
@@ -17483,6 +17860,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -17675,6 +18063,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -20432,6 +20821,10 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "run_event_version": {
+            "title": "Run Event Version",
+            "type": "integer"
           }
         },
         "required": [
@@ -20456,7 +20849,8 @@
           "prompt_config_versions",
           "registered_commands",
           "command_versions",
-          "definitions_version"
+          "definitions_version",
+          "run_event_version"
         ],
         "title": "RunCreatedPayload",
         "type": "object"
@@ -20766,7 +21160,8 @@
               "retry_after_too_long",
               "context_overflow",
               "compaction_failed",
-              "host_commit_error"
+              "host_commit_error",
+              "run_event_version_changed"
             ],
             "title": "Stop Reason",
             "type": "string"
@@ -20961,6 +21356,18 @@
             "title": "Human Action",
             "type": "string"
           },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
           "paused_at_phase": {
             "enum": [
               "CREATED",
@@ -20999,6 +21406,331 @@
           "token_used"
         ],
         "title": "RunPausedPayload",
+        "type": "object"
+      },
+      "RuntimeDrainStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "runtime_drain_started",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RuntimeDrainStartedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RuntimeDrainStartedEvent",
+        "type": "object"
+      },
+      "RuntimeDrainStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "running_runs": {
+            "title": "Running Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "running_runs"
+        ],
+        "title": "RuntimeDrainStartedPayload",
+        "type": "object"
+      },
+      "RuntimeForceUpgradeRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "runtime_force_upgrade_requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RuntimeForceUpgradeRequestedEvent",
+        "type": "object"
+      },
+      "RuntimeForceUpgradeRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "stopped_runs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stopped Runs",
+            "type": "array"
+          },
+          "restarted_work_items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Restarted Work Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "version",
+          "stopped_runs",
+          "restarted_work_items"
+        ],
+        "title": "RuntimeForceUpgradeRequestedPayload",
         "type": "object"
       },
       "SourceDirectoryConfiguredEvent": {
@@ -21983,6 +22715,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -22174,6 +22917,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -22586,6 +23330,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -22755,6 +23510,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -23493,6 +24249,17 @@
             ],
             "title": "Configured Max Output Tokens"
           },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -23664,6 +24431,7 @@
           "credential_version",
           "context_window",
           "configured_max_output_tokens",
+          "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -24116,6 +24884,11 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "priority": {
+            "default": "user",
+            "title": "Priority",
+            "type": "string"
           }
         },
         "required": [
@@ -24412,6 +25185,8 @@
             "run_done": "#/components/schemas/RunDoneEvent",
             "run_failed": "#/components/schemas/RunFailedEvent",
             "run_paused": "#/components/schemas/RunPausedEvent",
+            "runtime_drain_started": "#/components/schemas/RuntimeDrainStartedEvent",
+            "runtime_force_upgrade_requested": "#/components/schemas/RuntimeForceUpgradeRequestedEvent",
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
             "spec_accepted": "#/components/schemas/SpecAcceptedEvent",
             "spec_superseded": "#/components/schemas/SpecSupersededEvent",
@@ -24606,6 +25381,12 @@
           },
           {
             "$ref": "#/components/schemas/CredentialChangedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuntimeDrainStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedEvent"
           }
         ]
       },

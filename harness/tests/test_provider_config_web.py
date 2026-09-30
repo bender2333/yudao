@@ -11,14 +11,16 @@ from harness.providers import ProviderFacade
 from harness.runtime import LoopSystem
 from harness.web.server import serve
 
+# OpenCode Go 连接的凭据：获取模型列表与连接测试都按协议带上它（#85）
+GO_SECRET = "go-catalog-secret"
 
-def _model_document(model_id, provider_id, *, protocol="fake", model="fake-script",
+
+def _model_document(model_id, provider_id, *, model="fake-script",
                     context_window=32000, max_output_tokens=4096):
     return {
         "id": model_id,
         "provider_id": provider_id,
         "model": model,
-        "protocol": protocol,
         "context_window": context_window,
         "max_output_tokens": max_output_tokens,
     }
@@ -28,14 +30,16 @@ def _catalog_document(provider_id="fake-a", model_id="model-a", *, protocol="fak
     provider = {
         "id": provider_id,
         "name": provider_fields.get("name", provider_id),
+        "protocol": protocol,
         "base_url": provider_fields.get("base_url", ""),
         "credential_ref": provider_fields.get("credential_ref", ""),
         "timeout_sec": provider_fields.get("timeout_sec", 600),
+        "models_url": provider_fields.get("models_url", ""),
     }
     return {
         "providers": [provider],
         "models": [_model_document(
-            model_id, provider_id, protocol=protocol,
+            model_id, provider_id,
             model=provider_fields.get("model", "fake-script"))],
         "bindings": {
             department: {"provider_id": provider_id, "model_id": model_id}
@@ -88,7 +92,7 @@ def catalog_system(tmp_path, document=None, *, credentials=None, dotenv=None, **
     config = tmp_path / "providers.json"
     payload = _catalog_document(**kwargs) if document is None else document
     write_document(config, payload)
-    facade = ProviderFacade()
+    facade = ProviderFacade(startup_mode="test")
     dotenv_path = tmp_path / ".env" if dotenv is not None else None
     if dotenv is not None:
         dotenv_path.write_text(dotenv, encoding="utf-8")
@@ -105,9 +109,10 @@ def _admit_bound_models(facade):
     # 真实协议模型须先经模型测试准入；测试通过模块接口记录该事实
     view = facade.providers_view()
     models = {item["id"]: item for item in view["models"]}
+    protocols = {item["id"]: item["protocol"] for item in view["providers"]}
     for binding in view["bindings"].values():
         model = models.get(binding.get("model_id"))
-        if model is not None and model["protocol"] != "fake":
+        if model is not None and protocols.get(binding.get("provider_id")) != "fake":
             facade.record_admission(binding["provider_id"], model["id"],
                                     admitted_model=model["model"])
 
@@ -143,12 +148,13 @@ def test_list_create_update_and_bindings_round_trip(tmp_path):
         created = {
             "id": "fake-b",
             "name": "Second",
+            "protocol": "fake",
             "models": [{
                 "id": "model-b",
                 "model": "other-script",
-                "protocol": "fake",
                 "context_window": 16000,
                 "max_output_tokens": 2048,
+                "capacity_confirmed": True,
             }],
         }
         status, body = request(host, port, "POST", "/api/providers", created)
@@ -158,6 +164,7 @@ def test_list_create_update_and_bindings_round_trip(tmp_path):
 
         status, body = request(host, port, "PUT", "/api/providers/fake-b", {
             "name": "Second renamed",
+            "protocol": "fake",
             "timeout_sec": 30,
             "models": created["models"],
         })
@@ -197,15 +204,26 @@ def test_validation_and_delete_dependents(tmp_path):
         assert status == 400, body
 
         status, body = request(host, port, "POST", "/api/providers", {
-            "id": "ok", "name": "BadProto", "protocol": "responses",
+            "id": "ok", "name": "BadProto", "protocol": "grpc",
         })
         assert status == 400, body
         assert "protocol" in body
 
+        # 模型访问定义不再声明协议（ADR-0004）：拒绝并指出字段位置
+        status, body = request(host, port, "POST", "/api/providers", {
+            "id": "ok2", "name": "ModelProto", "protocol": "responses",
+            "models": [{
+                "id": "model-x", "model": "m", "protocol": "responses",
+                "context_window": 8000, "max_output_tokens": 4096,
+            }],
+        })
+        assert status == 400, body
+        assert "models[1].protocol" in body
+
         status, body = request(host, port, "PUT", "/api/providers/fake-a", {
             "name": "Still fake",
             "models": [{
-                "id": "model-a", "model": "fake-script", "protocol": "fake",
+                "id": "model-a", "model": "fake-script",
                 "context_window": 0, "max_output_tokens": 4096,
             }],
         })
@@ -220,6 +238,7 @@ def test_validation_and_delete_dependents(tmp_path):
         extra = {
             "id": "spare",
             "name": "Spare",
+            "protocol": "fake",
         }
         status, body = request(host, port, "POST", "/api/providers", extra)
         assert status == 201, body
@@ -260,7 +279,8 @@ def test_import_keeps_old_catalog_on_invalid_document(tmp_path):
 
 def test_moving_a_model_to_another_connection_keeps_one_owner_and_moves_bindings(tmp_path):
     def provider(provider_id):
-        return {"id": provider_id, "name": provider_id, "base_url": "", "credential_ref": "", "timeout_sec": 600}
+        return {"id": provider_id, "name": provider_id, "protocol": "fake",
+                "base_url": "", "credential_ref": "", "timeout_sec": 600}
 
     def bindings(provider_id):
         return {department: {"provider_id": provider_id, "model_id": "model-a"} for department in DEPARTMENTS}
@@ -310,36 +330,39 @@ def test_fake_test_connection_skips_network(tmp_path):
 
 def test_test_connection_reports_missing_credential_without_secrets(tmp_path):
     secret = "super-secret-test-key"
-    document = _catalog_document(
-        "resp-a", "model-a", protocol="responses",
-        base_url="https://provider.example/v1", credential_ref="YUDAO_TEST_KEY",
-        model="listed-model",
-    )
-    system, _config = catalog_system(tmp_path, document)
-    with running_server(system) as (_server, host, port):
-        listed = get_json(host, port, "/api/providers")
-        assert secret not in json.dumps(listed)
-        assert listed["providers"][0]["credential_configured"] is False
-        status, body = request(host, port, "POST", "/api/providers/resp-a/test")
-        assert status == 200, body
-        payload = json.loads(body)
-        assert payload["ok"] is False
-        assert "YUDAO_TEST_KEY" in payload["error"]
-        assert secret not in body
+    # 连接测试读取模型列表地址：给出一份真实的上游，凭据缺失与凭据可用都能真实到达上游（#85）
+    with models_server({"data": [{"id": "listed-model"}]}) as models_url:
+        document = _catalog_document(
+            "resp-a", "model-a", protocol="responses",
+            base_url="https://provider.example/v1", credential_ref="YUDAO_TEST_KEY",
+            model="listed-model", models_url=models_url,
+        )
+        system, _config = catalog_system(tmp_path, document)
+        with running_server(system) as (_server, host, port):
+            listed = get_json(host, port, "/api/providers")
+            assert secret not in json.dumps(listed)
+            assert listed["providers"][0]["credential_configured"] is False
+            status, body = request(host, port, "POST", "/api/providers/resp-a/test")
+            assert status == 200, body
+            payload = json.loads(body)
+            assert payload["ok"] is False
+            assert "YUDAO_TEST_KEY" in payload["error"]
+            assert secret not in body
 
-        status, body = request(host, port, "POST", "/api/provider-credentials", {
-            "ref": "YUDAO_TEST_KEY", "action": "set", "secret": secret,
-        })
-        assert status == 200, body
-        assert secret not in body
-        listed = get_json(host, port, "/api/providers")
-        assert listed["providers"][0]["credential_configured"] is True
-        status, body = request(host, port, "POST", "/api/providers/resp-a/test")
-        assert status == 200, body
-        payload = json.loads(body)
-        assert payload["ok"] is True
-        assert payload["actual_model"] == "listed-model"
-        assert secret not in body
+            status, body = request(host, port, "POST", "/api/provider-credentials", {
+                "ref": "YUDAO_TEST_KEY", "action": "set", "secret": secret,
+            })
+            assert status == 200, body
+            assert secret not in body
+            listed = get_json(host, port, "/api/providers")
+            assert listed["providers"][0]["credential_configured"] is True
+            status, body = request(host, port, "POST", "/api/providers/resp-a/test")
+            assert status == 200, body
+            payload = json.loads(body)
+            # 该上游不校验凭据，配置凭据以后请求到达上游即通过
+            assert payload["ok"] is True
+            assert payload["actual_model"] == "listed-model"
+            assert secret not in body
 
 
 def test_replacing_catalog_only_affects_the_next_request(tmp_path):
@@ -392,7 +415,7 @@ def test_unwritable_catalog_keeps_old_directory(tmp_path, monkeypatch):
     monkeypatch.setattr("harness.providers.facade.os.replace", boom)
     with running_server(system) as (_server, host, port):
         status, body = request(host, port, "POST", "/api/providers", {
-            "id": "spare", "name": "Spare",
+            "id": "spare", "name": "Spare", "protocol": "fake",
         })
         assert status == 503, body
         assert all(item["id"] != "spare"
@@ -456,7 +479,7 @@ def test_manual_reload_picks_up_disk_changes_and_reports_corruption(tmp_path):
     with running_server(system) as (_server, host, port):
         document = json.loads(config.read_text(encoding="utf-8"))
         document["models"].append(_model_document(
-            "model-extra", "fake-a", protocol="fake", model="extra-script"))
+            "model-extra", "fake-a", model="extra-script"))
         config.write_text(json.dumps(document), encoding="utf-8")
         status, body = request(host, port, "POST", "/api/providers/reload")
         assert status == 200, body
@@ -540,24 +563,25 @@ def models_server(payload, *, status=200):
 def _go_document(models_url: str) -> dict:
     return {
         "providers": [{
-            "id": "go", "name": "OpenCode Go", "base_url": "https://opencode.ai/zen/go/v1",
+            "id": "go", "name": "OpenCode Go", "protocol": "responses",
+            "base_url": "https://opencode.ai/zen/go/v1",
             "credential_ref": "GO_KEY", "timeout_sec": 60, "preset_id": "opencode-go",
             "models_url": models_url,
         }],
         "models": [{
             "id": "go-luna", "provider_id": "go", "model": "gpt-5.6-luna",
-            "protocol": "responses", "context_window": 32000, "max_output_tokens": 2048,
+            "context_window": 32000, "max_output_tokens": 2048,
             "capability_source": "preset-v1",
         }],
         "bindings": {},
     }
 
 
-def test_provider_presets_endpoint_exposes_version_and_go_endpoints(tmp_path):
+def test_provider_presets_endpoint_exposes_revision_and_go_endpoints(tmp_path):
     system, _config = catalog_system(tmp_path)
     with running_server(system) as (_server, host, port):
         payload = get_json(host, port, "/api/provider-presets")
-    assert payload["table_version"]
+    assert payload["revision"]
     assert payload["source"]
     preset = payload["presets"][0]
     assert preset["id"] == "opencode-go"
@@ -568,14 +592,17 @@ def test_provider_presets_endpoint_exposes_version_and_go_endpoints(tmp_path):
     }
     assert preset["models_url"].endswith("/zen/go/v1/models")
     assert preset["auth"] == "api_key"
-    assert {hint["protocol"] for hint in preset["known_models"]} == {
-        "responses", "chat_completions", "messages"}
+    # 预置表只含接入规则，不带模型（#84）
+    assert "known_models" not in preset
+    assert "models" not in preset
 
 
 def test_candidates_refresh_reads_models_url_without_persisting(tmp_path):
     upstream = models_server({"data": [{"id": "gpt-5.6-luna"}, {"id": "never-heard-of-it"}]})
     with upstream as models_url:
-        system, config = catalog_system(tmp_path, _go_document(models_url))
+        # 获取模型列表按连接协议的认证方式带上凭据（#85）
+        system, config = catalog_system(tmp_path, _go_document(models_url),
+                                        credentials={"GO_KEY": GO_SECRET})
         before = config.read_text(encoding="utf-8")
         with running_server(system) as (_server, host, port):
             status, body = request(host, port, "POST", "/api/providers/go/candidates", {})
@@ -585,10 +612,10 @@ def test_candidates_refresh_reads_models_url_without_persisting(tmp_path):
     assert payload["status"] == "ok"
     assert payload["source_url"] == models_url
     assert [item["id"] for item in payload["candidates"]] == ["gpt-5.6-luna", "never-heard-of-it"]
+    # 候选只有上游模型 ID；协议与容量由访问定义与模型测试决定（#84）
     hint = next(item for item in payload["candidates"] if item["id"] == "gpt-5.6-luna")
-    assert hint["protocol"] == "responses"
-    unknown = next(item for item in payload["candidates"] if item["id"] == "never-heard-of-it")
-    assert unknown["protocol"] is None
+    assert "protocol" not in hint
+    assert "capability_source" not in hint
     # 候选不落盘、不自动成为可用模型
     assert config.read_text(encoding="utf-8") == before
     assert [item["id"] for item in listed["models"]] == ["go-luna"]
@@ -620,16 +647,22 @@ def test_model_test_records_admission_with_revision(tmp_path):
         assert payload["revision"] > before["revision"]
         assert payload["persisted"] is True
         listed = get_json(host, port, "/api/providers")
-        model = next(item for item in listed["models"] if item["id"] == "model-a")
-        assert model["admitted_revision"] == payload["revision"]
-        assert model["admitted_at"]
+        # 准入记录与目录分开返回（工单 #86）：目录定义上没有准入字段
+        record = next(item for item in listed["admissions"] if item["model_id"] == "model-a")
+        assert record["admitted"] is True
+        assert record["admitted_at"]
+        for model in listed["models"]:
+            assert "admitted_at" not in model
+            assert "admitted_revision" not in model
 
-        # 准入结果落盘：独立进程（CLI/smoke）读取同一份配置也应看到准入
-        reloaded = ProviderFacade()
+        # 准入结果落盘：独立进程（CLI/smoke）读取同一份准入文件也应看到准入
+        reloaded = ProviderFacade(startup_mode="test")
+        reloaded.configure_paths(config, None)
         reloaded.load_document(config)
-        stored = next(item for item in reloaded.providers_view()["models"] if item["id"] == "model-a")
-        assert stored["admitted_revision"] == payload["revision"]
-        assert stored["admitted_at"]
+        stored = next(item for item in reloaded.providers_view()["admissions"]
+                      if item["model_id"] == "model-a")
+        assert stored["admitted"] is True
+        assert stored["admitted_at"] == record["admitted_at"]
 
         status, body = request(host, port, "POST", "/api/providers/fake-a/test",
                                {"kind": "model"})

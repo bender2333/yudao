@@ -85,6 +85,7 @@
       "timeout_sec": 60
      }
     },
+    "run_event_version": 1,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -198,6 +199,7 @@
     "<sha256#6>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
@@ -370,6 +372,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
@@ -408,7 +411,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -427,6 +431,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "base_url": "",
@@ -480,6 +485,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#1>",
     "base_url": "",
@@ -537,6 +543,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -665,6 +672,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "args": {
      "acceptance_criteria": [
@@ -979,6 +987,7 @@
     "<sha256#27>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "admitted": true,
     "attempt": 1,
@@ -1157,6 +1166,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
@@ -1195,7 +1205,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -1214,6 +1225,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "base_url": "",
@@ -1267,6 +1279,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#2>",
     "base_url": "",
@@ -1324,6 +1337,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -1447,6 +1461,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "args": {
      "assumptions": [],
@@ -1696,6 +1711,7 @@
     "<sha256#43>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "admitted": true,
     "attempt": 1,
@@ -1880,6 +1896,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
@@ -1918,7 +1935,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -1937,6 +1955,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "",
@@ -1990,6 +2009,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "",
@@ -2043,6 +2063,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#3>",
     "base_url": "",
@@ -2100,6 +2121,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -2237,6 +2259,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "args": {
      "name": "serve"
@@ -2298,6 +2321,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "",
@@ -2383,6 +2407,7 @@
   "delivery_specs": [],
   "department_call_targets": {
    "engineering": {
+    "accepts_required_tool_call": true,
     "base_url": "",
     "configured_max_output_tokens": 4800,
     "context_window": 32000,
@@ -2400,6 +2425,7 @@
     "sent_tier": null
    },
    "product": {
+    "accepts_required_tool_call": true,
     "base_url": "",
     "configured_max_output_tokens": 4800,
     "context_window": 32000,
@@ -2989,6 +3015,7 @@
   "model": "fake-script",
   "model_requests": [
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -3041,6 +3068,7 @@
     "usage": null
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -3093,6 +3121,7 @@
     "usage": null
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "actual_model": "fake-script",
     "actual_provider": "fake",
@@ -3267,6 +3296,7 @@
   "responses": [],
   "reviews": [],
   "rework_count": 0,
+  "run_event_version": 1,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {

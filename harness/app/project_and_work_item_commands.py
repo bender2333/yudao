@@ -157,6 +157,10 @@ async def _create_work_item(application: "Application", command: Command, reques
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     if project.archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能新建事项")
+    # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
+    if system.drain.state != "idle":
+        system.projects.queue_work_item(request.project_id, request.text, title=request.title, command=command)
+        return
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝
     if system.orchestrator.busy():
         raise Rejection("busy", "已有事项正在执行，等它结束以后才能新建")

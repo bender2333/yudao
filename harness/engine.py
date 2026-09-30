@@ -29,6 +29,7 @@ from .environment import LocalEnvironment
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
+from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import decision_call_target, event_call_target
@@ -182,6 +183,9 @@ class StepDriver:
         except ProviderError as exc:
             return Stopped(self._version, exc.reason, str(exc),
                            decision_call_target(self._call_public or {}))
+        except UnrepresentableWorkspace as exc:
+            # 工作区在记录或其他主机工作中出现无法表示的条目：以 workspace_unrepresentable 暂停
+            return Stopped(self._version, "workspace_unrepresentable", str(exc))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
             return Stopped(self._version, "provider_error", f"{type(exc).__name__}: {exc}")
@@ -245,7 +249,8 @@ class StepDriver:
         for step_id in range(1, limits.max_model_steps + 1):
             if not self._proceed():
                 return Stopped(self._version)
-            prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id)
+            prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
+                                     replies_without_tool_call)
             if isinstance(prepared, Stopped):
                 return prepared
             request = prepared
@@ -363,8 +368,12 @@ class StepDriver:
                     args = {"invalid_arguments": raw_args}
                     ok, output, error = False, None, f"invalid tool arguments: {exc}"
                 else:
-                    permission, facts = self._begin_tool(request, {"id": identity, "name": name, "args": args,
-                                                                   "step_id": step_id})
+                    try:
+                        permission, facts = self._begin_tool(request, {"id": identity, "name": name, "args": args,
+                                                                       "step_id": step_id})
+                    except UnrepresentableWorkspace as exc:
+                        # 工具许可需要工作区事实时发现无法表示的条目：以 workspace_unrepresentable 暂停运行
+                        raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
@@ -374,18 +383,25 @@ class StepDriver:
                     elif tool_kind(name) == "host":
                         ok, output, error = True, _run_host_tool(name, args), None
                     else:
-                        # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要
-                        receipt = await self._perform(Action(
-                            action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
-                            tool=name, department=request.department, input=args,
-                            preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
-                        ))
+                        # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
+                        # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
+                        try:
+                            receipt = await self._perform(Action(
+                                action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
+                                tool=name, department=request.department, input=args,
+                                preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
+                            ))
+                        except UnrepresentableWorkspace as exc:
+                            raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
                         ok, output, error = receipt.ok, receipt.output, receipt.error
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": ok, "output": output, "error": error})}
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
                 self._recorder.tool_called(request, call)
+                # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
+                if isinstance(output, dict) and output.get("workspace_unrepresentable"):
+                    raise ProviderError(output["workspace_unrepresentable"], reason="workspace_unrepresentable")
                 if not self._proceed():
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
@@ -399,8 +415,18 @@ class StepDriver:
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
+    def _tool_choice(self, purpose: str, tools: list[dict[str, Any]], replies_without_tool_call: int) -> str:
+        # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
+        declaration = (self._call_public or {}).get("accepts_required_tool_call", True)
+        if (purpose == "work" and tools
+                and replies_without_tool_call >= DEFINITIONS.limits.tool_call_required_limit
+                and declaration is not False):
+            return "required"
+        return "auto"
+
     def _prepare(self, step_id: int, attempt: int, root_step_id: int,
-                 retry_of_step_id: int | None) -> Stopped | ModelRequest | None:
+                 retry_of_step_id: int | None,
+                 replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
         # 新的逻辑调用先按部门默认解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
@@ -423,6 +449,9 @@ class StepDriver:
                 snapshot_hash = self._environment.query(FactsQuery(tree=True)).tree.digest
                 pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
                                             events=transaction.events(), snapshot_hash=snapshot_hash)
+            except UnrepresentableWorkspace as exc:
+                # 请求装配时发现工作区有公开树无法表示的条目：以 workspace_unrepresentable 暂停
+                return _Unassembled("workspace_unrepresentable", exc)
             except ValueError as exc:
                 return _Unassembled("context_overflow", exc)
             department_input = pinned.department_input
@@ -431,6 +460,8 @@ class StepDriver:
             history = self._assembly.department_history(transaction.events(), scope.department)
             try:
                 step = self._assembly.request(pinned, history)
+            except UnrepresentableWorkspace as exc:
+                return _Unassembled("workspace_unrepresentable", exc)
             except (CompactionError, ValueError, FileNotFoundError) as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
@@ -440,6 +471,8 @@ class StepDriver:
                                    step_id, assembled, assembled.tools,
                                    purpose=assembled.manifest.purpose,
                                    max_output_tokens=assembled.manifest.max_output_tokens,
+                                   tool_choice=self._tool_choice(assembled.manifest.purpose, assembled.tools,
+                                                                 replies_without_tool_call),
                                    effective_contract_hash=scope.basis.effective_contract_hash,
                                    engineering_plan_hash=scope.basis.engineering_plan_hash,
                                    request_id=scope.basis.request_id,
