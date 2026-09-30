@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-更新：2026-09-30。状态：设计，场景与评分方法经用户确认，2026-09-30 用户逐项审阅完毕（确定各部分所属的里程碑、版本回归的时机与次数、超时的评分），未实施，#118 的子工单待建。路线位置：Stage 3 的评测工作线，与界面工作线和后端工单并行进行，Stage 3 结束之前必须完成；评测工具与 OpenCode 基础分属于里程碑 M2，场景 2、3 的 Yudao 一侧属于 M3，场景 1 的 Yudao 一侧属于 M4（[Stage 3 计划](../stage-3-plan.md)第 9 节）。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。选题依据：[评测场景选题调研](../research/evaluation-benchmarks.md)。
+更新：2026-09-30。状态：设计，场景与评分方法经用户确认，2026-09-30 用户逐项审阅完毕（确定各部分所属的里程碑、版本回归的时机与次数、超时的评分），未实施，工单为 #118 的子工单 #188 至 #198。路线位置：Stage 3 的评测工作线，与界面工作线和后端工单并行进行，Stage 3 结束之前必须完成；评测工具与 OpenCode 基础分属于里程碑 M2，场景 2、3 的 Yudao 一侧属于 M3，场景 1 的 Yudao 一侧属于 M4（[Stage 3 计划](../stage-3-plan.md)第 9 节）。需求：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)。选题依据：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 
 ## 1. 用途
 
