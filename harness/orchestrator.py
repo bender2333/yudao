@@ -935,10 +935,11 @@ class Orchestrator:
 
     def _department_prompt(self, projection: RunProjection, department: str) -> DepartmentPrompt:
         # 部门 Prompt 从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）。
+        # 请求事件记录的 Prompt 版本是项目部门设置中写入的部门 Prompt 版本，没有写入时为 0。
         # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
         setting = self._project_department_setting(projection, department)
-        if setting is None or setting.prompt_ref is None:
-            text = DEFINITIONS.role(department).prompt
+        if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
+            text = DEFINITIONS.role(department).prompt if setting is None else setting.text
             ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(

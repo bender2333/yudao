@@ -196,7 +196,8 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_ru
     manifests = [(request.department, recorded_context(system, request).manifest)
                  for request in system.test_adapter.invocations]
     assert {manifest.input_version for _department, manifest in manifests} == {1, 2}
-    assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {1, 2}
+    # demo 在事项进行中修改产品部门的部门 Prompt：修改前的请求用内置默认（版本 0），之后用项目设置（版本 1）
+    assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {0, 1}
 
 
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])

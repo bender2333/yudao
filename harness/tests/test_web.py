@@ -381,7 +381,7 @@ def test_second_start_returns_409_until_worker_exits(data_dir):
         assert json.loads(body)["run_id"] != first_id
 
 
-def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_dir):
+def test_live_input_keeps_originals_and_activates_next_versions(data_dir):
     entered, release = threading.Event(), threading.Event()
 
     def held(_request):
@@ -391,7 +391,7 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
 
     adapter = FakeAdapter([held, *happy_script()])
     system = LoopSystem.for_testing(data_dir, adapter)
-    original, addition, prompt = "  echo\r\n", "继续\n  ", "  PRODUCT_PROMPT_V2\r\n按原文处理需求。  "
+    original, addition = "  echo\r\n", "继续\n  "
     with running_server(system) as (server, host, port):
         project_id = register_project(host, port)
         status, body, _ = start_work_item(host, port, project_id, original)
@@ -402,8 +402,6 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
             status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", {"text": addition})
             assert status == 201 and json.loads(body)["input_version"] == 2, body
             assert json.loads(body)["processed_input_version"] == 0
-            status, body, _ = request(host, port, "POST", f"/api/runs/{run_id}/prompts/product", {"text": prompt})
-            assert status == 201 and json.loads(body)["prompt_version"] == 2, body
             live = get_json(host, port, f"/api/runs/{run_id}")
             assert live["board"]["task"] == original + addition
             assert [item["text"] for item in live["inputs"]] == [original, addition]
@@ -412,10 +410,8 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
             item = live["inputs"][1]
             detail = get_json(host, port, f"/api/runs/{run_id}/events/{item['created_event_id']}")
             assert detail["input"] == addition and detail["intend"] == original + addition
-            current = live["prompts"]["current"]["product"]
-            assert current["text"] == prompt
-            detail = get_json(host, port, f"/api/runs/{run_id}/events/{current['created_event_id']}")
-            assert detail["prompt"] == prompt
+            # run 内没有部门 Prompt 的副本：只列出每次激活记录的版本与摘要
+            assert "current" not in live["prompts"] and "versions" not in live["prompts"]
             assert server.busy()
         finally:
             release.set()
@@ -423,9 +419,7 @@ def test_live_input_and_prompt_keep_originals_and_activate_next_versions(data_di
         assert finished["board"]["phase"] == "DONE", finished["board"]
         assert finished["board"]["processed_input_version"] == 2
         manifests = [recorded_context(system, item).manifest for item in adapter.invocations[:2]]
-        assert [(item.input_version, item.prompt_version) for item in manifests] == [(1, 1), (2, 2)]
-        assert "PRODUCT_PROMPT_V2" not in adapter.invocations[0].input_items[0]["content"]
-        assert prompt in adapter.invocations[1].input_items[0]["content"]
+        assert [(item.input_version, item.prompt_version) for item in manifests] == [(1, 0), (2, 0)]
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
 
 
@@ -541,22 +535,21 @@ def test_cancel_button_needs_no_git_save_or_raw_command(data_dir, monkeypatch):
         wait_until(lambda: not server.busy())
 
 
-def test_input_and_prompt_api_reject_unknown_fields_and_terminal_runs(data_dir):
+def test_input_api_rejects_unknown_fields_and_terminal_runs(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("echo")
     with running_server(system) as (_server, host, port):
-        for suffix in ("inputs", "prompts/product"):
-            for body in ({"text": "x", "attachments": []}, {"text": "x", "extra": True}, {"text": []}, {"text": "  "}):
-                status, raw, _ = request(host, port, "POST", f"/api/runs/{run_id}/{suffix}", body)
-                assert status == 400, raw
-        status, _, _ = request(host, port, "POST", f"/api/runs/{run_id}/prompts/unknown", {"text": "x"})
-        assert status == 400
+        for body in ({"text": "x", "attachments": []}, {"text": "x", "extra": True}, {"text": []}, {"text": "  "}):
+            status, raw, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", body)
+            assert status == 400, raw
+        # run 内没有部门 Prompt 编辑入口
+        status, _, _ = request(host, port, "POST", f"/api/runs/{run_id}/prompts/product", {"text": "x"})
+        assert status == 404
         system.cancel(run_id)
         before = system.project(run_id)
         assert len(before.inputs) == 1
-        for suffix in ("inputs", "prompts/product"):
-            status, raw, _ = request(host, port, "POST", f"/api/runs/{run_id}/{suffix}", {"text": "new"})
-            assert status == 409 and json.loads(raw)["reason"] == "run_terminal", raw
+        status, raw, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", {"text": "new"})
+        assert status == 409 and json.loads(raw)["reason"] == "run_terminal", raw
         assert system.project(run_id).canonical_state() == before.canonical_state()
 
 

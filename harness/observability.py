@@ -707,7 +707,7 @@ def _project_department_prompt(store: EventStore, project_id: str | None, depart
         if state is not None:
             _default_settings(state)
             setting = state.department_settings.get(department)
-            if setting is not None:
+            if setting is not None and setting.configured_prompt:
                 version = setting.version
                 text = setting.text
                 if setting.prompt_ref is not None:

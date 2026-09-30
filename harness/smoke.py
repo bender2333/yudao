@@ -24,10 +24,9 @@ from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
 from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
-from .models import (ArtifactRef, DepartmentPrompt, EventType, RunProjection, canonical_hash, department_for_phase,
-                     estimate_tokens, hash_bytes, json_dumps)
-from .projection import apply_event, project_run, saved_project
-from .projects import _default_settings
+from .models import (ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, RunProjection, canonical_hash,
+                     department_for_phase, estimate_tokens, hash_bytes, json_dumps)
+from .projection import apply_event, project_run
 from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
@@ -508,24 +507,28 @@ def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
     return snapshot
 
 
-def _project_prompt(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> DepartmentPrompt:
-    # 重新装配请求需要这次激活采用的部门 Prompt：从该 run 所属项目当前的部门设置读取（run 内没有副本），
-    # 不属于项目的运行使用内置默认 Prompt
-    projection = project_run(store, run_id)
+def _project_prompt(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str,
+                    version: int) -> DepartmentPrompt:
+    # 重新装配请求需要这次激活采用的部门 Prompt：run 内没有副本，按激活事件记录的 prompt_version
+    # 从项目部门设置的版本历史取出当时的文本；version 为 0 表示内置默认 Prompt
     text = DEFINITIONS.role(department).prompt
-    version = 0
     ref = None
-    if projection.project_id is not None:
-        state = saved_project(store, projection.project_id)
-        if state is not None:
-            _default_settings(state)
-            setting = state.department_settings.get(department)
-            if setting is not None:
-                version = setting.version
-                text = setting.text
-                ref = None if setting.prompt_ref is None else ArtifactRef(**setting.prompt_ref)
+    if version > 0:
+        projection = project_run(store, run_id)
+        if projection.project_id is not None:
+            for event in store.list_project_events(projection.project_id):
+                if event.type != ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED:
+                    continue
+                payload = event.payload
+                if payload.get("department") != department or int(payload.get("version", 0)) != version:
+                    continue
+                text = payload.get("department_prompt", payload.get("text")) or text
+                prompt_ref = payload.get("department_prompt_ref", payload.get("prompt_ref"))
+                if prompt_ref is not None:
+                    ref = ArtifactRef(**prompt_ref)
+                break
     if ref is None:
-        # 内置默认 Prompt（版本 0）每次激活写 run 作用域工件，内容哈希只由文本决定
+        # 内置默认 Prompt（版本 0）与没有带引用的记录：内容哈希只由文本决定
         ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
     return DepartmentPrompt(department=department, version=version, text=text, prompt_ref=ref,
                             created_event_id="")
@@ -599,7 +602,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             else:
                 # 部门 Prompt 来自项目部门设置，run 内没有副本；激活事件记录这次采用的版本与摘要
                 activations[activation] = (event.department, event.session_id, event.event_id)
-                activation_prompts[activation] = _project_prompt(store, artifacts, run_id, event.department)
+                activation_prompts[activation] = _project_prompt(
+                    store, artifacts, run_id, event.department, int(payload.get("prompt_version", 0)))
                 activation_intends[activation] = current_work.task
                 basis = {**work_basis, "input_version": current_work.input_version,
                          "prompt_version": payload.get("prompt_version"),
