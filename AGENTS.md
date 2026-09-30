@@ -20,10 +20,14 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - **模型接入子系统（Provider）**：建立单协议连接、访问定义与严格的模型测试准入机制，提供稳定的推理服务。
 
 ## 代码位置
-Python 包 `harness/`，分三层：
-- 任务与观察层：`web/server.py`（REST 与 SSE）、`web/static/`（控制台页面）、`__main__.py`（命令行入口）。
-- 三部门循环核：`orchestrator.py`（部门激活与交接）、`engine.py`（单个部门的模型步骤）、`context.py`（逐步装配上下文）、`compaction.py`（上下文压缩）、`validation.py` 与 `contracts.py`（提案校验与当前合同）、`collaboration.py`（部门之间的请求与回应）。
-- 基础能力层：`providers/`（模型接入：配置、目标解析、三种协议的调用）、`tools.py` 与 `workspace.py`（工具与工作区）、`event_store.py` 与 `projection.py`（事件存储与状态投影）、`artifacts.py`、`git_versions.py`、`tree_archive.py`（工件、Git 版本与交付封存）、`projects.py`（项目与事项）。
+Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-architecture.md)的职责分层；控制核心各模块与文件的对应见总体架构第 6.1 节。
+- 接口层：`api/`（FastAPI 应用、访问方式、服务启动）、`__main__.py`（命令行入口、数据目录的进程锁）；`web/` 是旧 Web 控制台。
+- 应用层：`app/`（命令、查询、读取模型与合同）。
+- 控制核心：`orchestrator.py`（流程编排）、`engine.py` 与 `recording.py`（步骤驱动与记录）、`assembly.py`、`context.py`、`compaction.py`（上下文装配）、`adjudication.py` 与 `validation.py`（裁决规则）、`write_path.py`、`event_store.py`、`projection.py`（写入口、事件日志与投影）、`decisions.py`（用户决定）、`runtime.py`（`LoopSystem`，组装整个系统）。
+- 定义：`definitions/`（限额、停止原因、组织、角色、工具、提案合同、服务方案预置表）。
+- 执行层：`providers/`（模型接入：配置、调用目标解析、三种协议的调用）、`adapters/`（模型适配器，包括测试用的 FakeAdapter）、`environment.py` 与 `actions.py`（执行环境与动作合同）、`workspace.py`、`public_tree.py`、`tools.py`（工作区、公开树、工具定义）、`artifacts.py`、`tree_archive.py`、`git_versions.py`、`git_audit.py`（工件、封存与 Git 版本）。
+- 观察与分析：`observability.py`、`replay_check.py`、`views.py`、`analysis/`。
+- 演示与真实模型 smoke：`demo.py`、`smoke.py`、`compare.py`。
 - 测试：`harness/tests/`。
 
 ## 常用命令
