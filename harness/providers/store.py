@@ -19,6 +19,17 @@ from .presets import preset_exists
 SUPPORTED_PROTOCOLS = frozenset({"responses", "chat_completions", "messages", "fake"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
+# 推理档位全集，由低到高排列（ADR-0006）；模型访问定义声明其中的一个子集
+REASONING_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
+# 推理参数方式：一份声明只使用一种，只用于与它相符的协议（设计说明第 7.4 节）
+REASONING_MODES = frozenset({"effort", "adaptive", "budget"})
+# 推理参数方式与协议的相符关系
+REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
+    "effort": frozenset({"responses", "chat_completions"}),
+    "adaptive": frozenset({"messages"}),
+    "budget": frozenset({"messages"}),
+})
+
 
 # Provider 配置：一份服务连接，声明一种协议（ADR-0004）；地址保存该协议的请求基址
 @dataclass(frozen=True)
@@ -66,6 +77,11 @@ class ModelDefinition:
     capability_source: str = ""
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
+    # 推理档位声明（ADR-0006）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
+    # 推理参数方式与所属连接的协议相符；三项一起声明，没有任何一项时不发送推理参数
+    reasoning_levels: tuple[str, ...] = ()
+    default_reasoning_level: str | None = None
+    reasoning_mode: str = ""
     admitted_at: str | None = None
     admitted_revision: int | None = None
     admitted_model: str | None = None
@@ -93,6 +109,9 @@ class ModelDefinition:
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
+            "reasoning_levels": list(self.reasoning_levels),
+            "default_reasoning_level": self.default_reasoning_level,
+            "reasoning_mode": self.reasoning_mode,
             "admitted_at": self.admitted_at,
             "admitted_revision": self.admitted_revision,
             "admitted_model": self.admitted_model,
@@ -232,6 +251,9 @@ class ProviderStore:
             context_window=current.context_window,
             max_output_tokens=current.max_output_tokens, capability_source=current.capability_source,
             accepts_required_tool_call=current.accepts_required_tool_call,
+            reasoning_levels=current.reasoning_levels,
+            default_reasoning_level=current.default_reasoning_level,
+            reasoning_mode=current.reasoning_mode,
             admitted_at=_utc_now(), admitted_revision=self.revision,
             admitted_model=(admitted_model or current.model),
         )
@@ -275,6 +297,7 @@ class ProviderStore:
     def _validate_definition_shape(self) -> None:
         issues: list[ValidationIssue] = []
         provider_ids: set[str] = set()
+        provider_by_id: dict[str, ProviderDefinition] = {}
         for index, provider in enumerate(self._provider_items):
             location = f"providers[{index}]"
             if not isinstance(provider, ProviderDefinition):
@@ -286,6 +309,7 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.id", "Provider 配置 ID 重复"))
             if _hashable(provider.id):
                 provider_ids.add(provider.id)
+                provider_by_id.setdefault(provider.id, provider)
             if not isinstance(provider.name, str) or not provider.name:
                 issues.append(ValidationIssue(f"{location}.name", "必须是非空字符串"))
             if not isinstance(provider.protocol, str) or provider.protocol not in SUPPORTED_PROTOCOLS:
@@ -329,8 +353,45 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
             if not isinstance(model.accepts_required_tool_call, bool):
                 issues.append(ValidationIssue(f"{location}.accepts_required_tool_call", "必须为 true 或 false"))
+            _validate_reasoning_declaration(model, location, provider_by_id, issues)
         if issues:
             raise CatalogValidationError(issues)
+
+def _validate_reasoning_declaration(model: ModelDefinition, location: str,
+                                    provider_by_id: Mapping[str, ProviderDefinition],
+                                    issues: list[ValidationIssue]) -> None:
+    # 推理档位声明（ADR-0006）：三项一起声明，部分声明直接拒绝；默认档位属于支持档位；
+    # 推理参数方式取值受限并与所属连接的协议相符（设计说明第 7.1、7.4 节）
+    declared = (bool(model.reasoning_levels), model.default_reasoning_level is not None,
+                bool(model.reasoning_mode))
+    if any(declared) and not all(declared):
+        if not model.reasoning_levels:
+            issues.append(ValidationIssue(f"{location}.reasoning_levels", "声明推理档位时必须同时给出支持档位"))
+        if model.default_reasoning_level is None:
+            issues.append(ValidationIssue(f"{location}.default_reasoning_level", "声明推理档位时必须同时给出默认档位"))
+        if not model.reasoning_mode:
+            issues.append(ValidationIssue(f"{location}.reasoning_mode", "声明推理档位时必须同时给出推理参数方式"))
+        return
+    if not declared[0]:
+        return
+    known = set(model.reasoning_levels)
+    unknown = sorted(known - set(REASONING_LEVELS), key=str)
+    if unknown:
+        issues.append(ValidationIssue(
+            f"{location}.reasoning_levels", "包含不支持的档位：" + "、".join(unknown)))
+    if len(model.reasoning_levels) != len(known):
+        issues.append(ValidationIssue(f"{location}.reasoning_levels", "支持档位不能重复"))
+    if model.default_reasoning_level not in known:
+        issues.append(ValidationIssue(
+            f"{location}.default_reasoning_level", "默认档位必须属于支持档位"))
+    if model.reasoning_mode not in REASONING_MODES:
+        issues.append(ValidationIssue(f"{location}.reasoning_mode", "推理参数方式不受支持"))
+        return
+    provider = provider_by_id.get(model.provider_id)
+    if provider is not None and provider.protocol and provider.protocol not in REASONING_MODE_PROTOCOLS[model.reasoning_mode]:
+        issues.append(ValidationIssue(
+            f"{location}.reasoning_mode",
+            f"推理参数方式 {model.reasoning_mode} 与连接协议 {provider.protocol} 不相符"))
 
 
 def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], list[ModelDefinition]]:
@@ -388,7 +449,9 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         return None, [ValidationIssue(location, "应为对象")]
     allowed = {
         "id", "provider_id", "model", "context_window", "max_output_tokens",
-        "capability_source", "accepts_required_tool_call", "admitted_at", "admitted_revision", "admitted_model",
+        "capability_source", "accepts_required_tool_call",
+        "reasoning_levels", "default_reasoning_level", "reasoning_mode",
+        "admitted_at", "admitted_revision", "admitted_model",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
     if "protocol" in raw:
@@ -400,11 +463,28 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
+    levels = raw.get("reasoning_levels", ())
+    if isinstance(levels, list) and all(isinstance(item, str) for item in levels):
+        # 支持档位去重后按全集由低到高保存；取值本身由形状校验核对
+        seen = set(levels)
+        levels = tuple(level for level in REASONING_LEVELS if level in seen)
+    default_level = raw.get("default_reasoning_level")
+    if isinstance(default_level, str):
+        default_level = default_level.strip() or None
+    elif default_level is not None:
+        default_level = None
+        issues.append(ValidationIssue(f"{location}.default_reasoning_level", "必须为档位名或 null"))
+    mode = raw.get("reasoning_mode", "")
+    if isinstance(mode, str):
+        mode = mode.strip()
     return ModelDefinition(
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
         context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
         accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
+        reasoning_levels=levels if isinstance(levels, tuple) else (),
+        default_reasoning_level=default_level,
+        reasoning_mode=mode if isinstance(mode, str) else "",
         admitted_at=raw.get("admitted_at"), admitted_revision=raw.get("admitted_revision"),
         admitted_model=raw.get("admitted_model"),
     ), issues
