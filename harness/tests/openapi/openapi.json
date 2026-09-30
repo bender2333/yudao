@@ -5249,6 +5249,11 @@
             "type": "string",
             "title": "Version"
           },
+          "api_version": {
+            "type": "integer",
+            "title": "Api Version",
+            "example": 1
+          },
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
@@ -5268,6 +5273,7 @@
           "log_id",
           "boot_id",
           "version",
+          "api_version",
           "contract_digest",
           "access"
         ],
