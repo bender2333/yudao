@@ -239,19 +239,17 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
                    if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_command")
     command_output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**command.payload["output_ref"])))
     assert command.payload["ok"] is True and command_output["exit_code"] == 0, command_output
-    link = workspace.root / "src" / "linked.txt"
-    assert link.is_symlink() and link.resolve() == outside.resolve()
-    # 工具许可阶段拒绝：编辑没有开始执行，拒绝原因作为该调用的工具结果交回部门
+    # 登记命令留下链接：命令的回执照常记录，主机随即核对公开树，运行以 workspace_unrepresentable 暂停，
+    # 停止说明写这个链接在工作区内的相对路径；同一回答中的其余调用不执行
+    pause = next(event for event in events if event.type == EventType.RUN_PAUSED)
+    assert pause.payload["stop_reason"] == "workspace_unrepresentable"
+    assert "src/linked.txt" in pause.payload["human_action"] or "src/linked.txt" in str(pause.payload)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "edit_range"
                    for event in events)
-    edit = next(event for event in events
-                if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "edit_range")
-    assert edit.payload["ok"] is False
-    assert "Links and reparse points are not supported" in edit.payload["error"]
-    assert edit.payload["input_item"]["call_id"] == "edit-link"
-    assert json.loads(edit.payload["input_item"]["output"]) == {
-        "ok": False, "output": None, "error": edit.payload["error"],
-    }
+    assert not any(event.type == EventType.TOOL_CALLED and event.payload.get("name") == "edit_range"
+                   for event in events)
+    link = workspace.root / "src" / "linked.txt"
+    assert link.is_symlink() and link.resolve() == outside.resolve()
     assert outside.read_text(encoding="utf-8") == "VALUE = 9\n"
 
 

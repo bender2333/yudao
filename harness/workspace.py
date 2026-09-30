@@ -12,7 +12,7 @@ from typing import Iterator
 
 from .actions import TreeFacts
 from .models import CheckReceipt, json_dumps
-from .public_tree import CapturedTree, capture_public_tree, materialize_tree, resolve_public_path, validate_public_path
+from .public_tree import CapturedTree, TreeError, capture_public_tree, excluded_by_ignore_rules, materialize_tree, resolve_public_path, validate_public_path
 
 CHECKS_DIR = ".checks"
 
@@ -64,33 +64,45 @@ class Workspace:
     def resolve(self, rel: str) -> Path:
         return resolve_public_path(self.root, rel)
 
+    def resolve_writable(self, rel: str) -> Path:
+        # 写入、删除与移动的目标：被项目忽略规则排除的路径拒绝执行，原因写明忽略规则
+        if rel in excluded_by_ignore_rules(self.root, (rel,)):
+            raise TreeError(f"Excluded by the project's ignore rules: {rel}")
+        return self.resolve(rel)
+
+    def resolve_readable(self, rel: str) -> Path:
+        # 按路径阅读的目标：与写入、目录与搜索一致，被项目忽略规则排除的路径拒绝阅读
+        if rel in excluded_by_ignore_rules(self.root, (rel,)):
+            raise TreeError(f"Excluded by the project's ignore rules: {rel}")
+        return self.resolve(rel)
+
     def write_file(self, rel: str, content: str) -> str:
-        path = self.resolve(rel)
+        path = self.resolve_writable(rel)
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.resolve(rel)
+        self.resolve_writable(rel)
         path.write_text(content, encoding="utf-8")
         return rel
 
     def read_file(self, rel: str) -> str:
-        path = self.resolve(rel)
+        path = self.resolve_readable(rel)
         return path.read_text(encoding="utf-8")
 
     def list_files(self, prefix: str | None = None) -> list[str]:
-        files = [item.path for item in capture_public_tree(self.root).files]
+        files = [item.path for item in self._public_tree().files]
         if not prefix:
             return files
         validate_public_path(prefix.rstrip("/"))
         return [rel for rel in files if rel.startswith(prefix)]
 
     def delete_file(self, rel: str) -> str:
-        path = self.resolve(rel)
+        path = self.resolve_writable(rel)
         if not path.is_file():
             raise ValueError("delete_file requires an existing regular file")
         path.unlink()
         return rel
 
     def move_file(self, source: str, destination: str) -> dict[str, str]:
-        source_path, destination_path = self.resolve(source), self.resolve(destination)
+        source_path, destination_path = self.resolve_writable(source), self.resolve_writable(destination)
         if not source_path.is_file():
             raise ValueError("move_file requires an existing regular source file")
         if os.path.lexists(destination_path):
@@ -107,8 +119,12 @@ class Workspace:
             raise
         return {"source": source, "destination": destination}
 
+    def _public_tree(self) -> CapturedTree:
+        # run 工作区的公开树：按项目的忽略规则取得（Git 命令行判断），被忽略的路径不进入
+        return capture_public_tree(self.root, True)
+
     def digest(self) -> str:
-        return capture_public_tree(self.root).digest
+        return self._public_tree().digest
 
     @contextmanager
     def check_copy(self, tree: CapturedTree) -> Iterator[Path]:
@@ -171,7 +187,7 @@ class Workspace:
         return items
 
     def snapshot(self) -> WorkspaceSnapshot:
-        return WorkspaceSnapshot(tree=capture_public_tree(self.root), checks=tuple(self.receipts()))
+        return WorkspaceSnapshot(tree=self._public_tree(), checks=tuple(self.receipts()))
 
 
 def _receipt_dict(receipt: CheckReceipt) -> dict[str, object]:

@@ -21031,6 +21031,18 @@
             "title": "Human Action",
             "type": "string"
           },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
           "paused_at_phase": {
             "enum": [
               "CREATED",
