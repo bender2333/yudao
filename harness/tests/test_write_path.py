@@ -21,7 +21,7 @@ def _project(data_dir):
 
 
 def _rename(name):
-    return NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name})
+    return NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}, actor="user:local")
 
 
 def _types(system, project_id):
@@ -113,10 +113,10 @@ def test_one_command_identity_is_registered_once(data_dir):
     system.writes.transact(stream, rename, command=command)
     renamed = system.store.list_project_events(project_id)[-1]
     position = renamed.position
-    # 命令追加的事件记下命令身份与提出者；不是由命令写入的事件没有
+    # 命令追加的事件记下命令身份与提出者；不是由命令写入的事件没有命令身份，提出者由写入方声明（第 5.2 节）
     assert (renamed.command_id, renamed.actor) == ("command-1", "user:local")
     assert (system.store.list_project_events(project_id)[0].command_id,
-            system.store.list_project_events(project_id)[0].actor) == (None, None)
+            system.store.list_project_events(project_id)[0].actor) == (None, "user:local")
     assert [event.event_id for event in system.store.command_events("command-1")] == [renamed.event_id]
     record = system.store.command("command-1")
     assert (record.name, record.digest, record.stream, record.position) == (
@@ -197,7 +197,8 @@ def test_the_execution_right_number_is_recorded_and_an_older_number_is_refused(d
 
     def note(transaction):
         phase = transaction.projection.phase
-        return transaction.append(NewEvent("execution_note", state_before=phase, state_after=phase))[0]
+        return transaction.append(NewEvent("execution_note", state_before=phase, state_after=phase,
+                                           actor="user:local"))[0]
 
     first = system.writes.transact(stream, note, epoch=2)
     assert first.epoch == 2 and system.store.get_event(first.event_id).epoch == 2

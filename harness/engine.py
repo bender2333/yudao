@@ -24,6 +24,7 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
 from .definitions import DEFINITIONS
+from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
@@ -123,18 +124,18 @@ class StepDriver:
     def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-              cancelled: Event, limits: StepLimits) -> StepDriver:
+              cancelled: Event, limits: StepLimits, deltas: DeltaChannel) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(scope, prompt, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
-                     cancelled=cancelled, limits=limits)
+                     cancelled=cancelled, limits=limits, deltas=deltas)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-                 cancelled: Event, limits: StepLimits) -> None:
+                 cancelled: Event, limits: StepLimits, deltas: DeltaChannel) -> None:
         self._scope = scope
         basis = scope.basis
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
@@ -149,6 +150,7 @@ class StepDriver:
         self._nodes = nodes
         self._cancelled = cancelled
         self._limits = limits
+        self._deltas = deltas
         self._request: ModelRequest | None = None
         self._action: Action | None = None
         self._step: StepRequest | None = None
@@ -490,6 +492,7 @@ class StepDriver:
                                    retry_of_step_id=retry_of_step_id,
                                    attempt_id=f"{logical_call_id}:attempt-{attempt}",
                                    logical_call_id=logical_call_id,
+                                   project_id=projection.project_id, work_item_id=projection.work_item_id,
                                    call_target=dict(target),
                                    guidance_version=scope.basis.guidance_version, **scope.versions())
             self._recorder.request_assembled(transaction, request, step, snapshot_hash)
@@ -522,13 +525,28 @@ class StepDriver:
         return self._writes.transact(self._stream, start)
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
-        # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果
-        async with aclosing(self._adapter.stream(request.model_call())) as items:
-            async for item in items:
-                if isinstance(item, ModelResponse):
-                    return item
-                self._recorder.stream(request, item)
+        # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果；
+        # 每条观察里的文字片段同时发布到控制核心的输出片段通道，转发给 live=1 的连接（设计说明第 5.6 节）
+        attempt_id = request.attempt_id or ""
+        try:
+            async with aclosing(self._adapter.stream(request.model_call())) as items:
+                async for item in items:
+                    if isinstance(item, ModelResponse):
+                        return item
+                    self._recorder.stream(request, item)
+                    if item.deltas:
+                        self._deltas.publish(self._delta_scope(request), item.deltas)
+        finally:
+            if attempt_id:
+                self._deltas.close_attempt(attempt_id)
         raise ProviderError("model call ended without a response", diagnostics={"error_type": "protocol"})
+
+    def _delta_scope(self, request: ModelRequest) -> DeltaScope:
+        return DeltaScope(
+            attempt_id=request.attempt_id or "", logical_call_id=request.logical_call_id or "",
+            run_id=self._scope.run_id, department=self._scope.department,
+            project_id=request.project_id, work_item_id=request.work_item_id, role=None,
+        )
 
     def _schedule_retry(self, request: ModelRequest, error: ProviderError, delay: float, next_step_id: int) -> bool:
         scope = self._scope

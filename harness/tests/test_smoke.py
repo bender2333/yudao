@@ -285,7 +285,7 @@ def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(coll
     system, run_id = collaboration_run
     events = _saved_events(system, run_id)
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
-    event = [item for item in events if item.type == EventType.CONTEXT_ASSEMBLED and item.role == "quality"][-1]
+    event = [item for item in events if item.type == EventType.CONTEXT_ASSEMBLED and item.department == "quality"][-1]
     request = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
     request["input"][0]["content"] += "\n\n[private_engineering_transcript]\nUNRELATED_PRIVATE_HISTORY_CANARY"
     ref = system.artifacts.put(run_id, "model_request", json_dumps(request), media_type="application/json")
@@ -449,7 +449,7 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_
     ])
     assert isolation_fields(system.store, system.artifacts, projection.run_id)["model_input_audit"]["status"] == "verified"
     events = _saved_events(system, projection.run_id)
-    assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.role == "product"][1]
+    assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.department == "product"][1]
     request = json.loads(system.artifacts.get_text(assembled.payload["request_ref"]["content_hash"]))
     assert request["input"][-1]["role"] == "user"
     request["input"].pop()

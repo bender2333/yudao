@@ -5,7 +5,8 @@
   {
    "event": "<evt#1>",
    "type": "run_created",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -86,7 +87,8 @@
   {
    "event": "<evt#2>",
    "type": "transition",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -106,7 +108,8 @@
   {
    "event": "<evt#3>",
    "type": "department_activated",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -135,7 +138,8 @@
   {
    "event": "<evt#4>",
    "type": "department_input",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -165,7 +169,8 @@
   {
    "event": "<evt#5>",
    "type": "run_failed",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "FAILED",
    "parent_event_id": null,
@@ -185,7 +190,8 @@
   {
    "event": "<evt#6>",
    "type": "lesson_candidate_recorded",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "FAILED",
    "state_after": "FAILED",
    "parent_event_id": "<evt#5>",
@@ -216,7 +222,8 @@
   {
    "event": "<evt#7>",
    "type": "activation_finished",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "FAILED",
    "state_after": "FAILED",
    "parent_event_id": "<evt#3>",

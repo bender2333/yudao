@@ -94,7 +94,7 @@ def test_each_query_returns_a_snapshot_and_later_events_have_greater_positions(d
         before = system.store.end_position()
         assert snapshot.position <= before
         system.writes.append(run_stream(run_id), NewEvent(
-            "marker", state_before="DONE", state_after="DONE", payload={"marker": name},
+            "marker", state_before="DONE", state_after="DONE", actor="system", payload={"marker": name},
         ))
         assert system.store.end_position() > snapshot.position
 
@@ -196,7 +196,8 @@ def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
     assert first.data.attempts
     assert first.data.cursor
     system.writes.append(run_stream(run_id), NewEvent(
-        EventType.MODEL_ATTEMPT_FINISHED, state_before="DONE", state_after="DONE", role="product",
+        EventType.MODEL_ATTEMPT_FINISHED, state_before="DONE", state_after="DONE", actor="system",
+        department="product",
         payload={
             "attempt_id": "late-attempt", "logical_call_id": "late", "collaboration_request_id": None,
             "context_event_id": "ctx", "activation_id": "late", "step_id": 1, "root_step_id": 1,
@@ -262,7 +263,8 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
 
     measure()  # 预热：第一次查询建立读取模型
     baseline = min(measure(), measure(), measure())
-    noise = [NewEvent("noise", state_before="CREATED", state_after="CREATED", payload={"n": index})
+    noise = [NewEvent("noise", state_before="CREATED", state_after="CREATED", actor="system",
+                      payload={"n": index})
              for index in range(system.store.end_position() * 9)]
     system.writes.append(run_stream("run_noise"), *noise)
     measure()  # 订阅把新事件吸收进读取模型；之后的查询不再处理它们

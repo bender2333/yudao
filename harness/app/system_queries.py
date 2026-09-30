@@ -62,3 +62,24 @@ def _system_status(application: Application, _request: None) -> Snapshot[SystemS
 
 
 SYSTEM_STATUS = QueryDefinition(name="system.status", request=None, result=SystemStatus, handle=_system_status)
+
+class LiveAttempt(Contract):
+    # 进行中的调用尝试（设计说明第 5.6 节）：是否在进行中，以及各通道已收到的文字。
+    # 调用尝试结束或失败以后 live 为假，客户端改用 run.attempt 的输出
+    attempt_id: str
+    live: bool
+    channels: dict[str, str]
+
+class LiveAttemptRequest(Contract):
+    attempt_id: str
+
+def _attempt_live(application: Application, request: LiveAttemptRequest) -> Snapshot[LiveAttempt]:
+    channels = application.live_attempt(request.attempt_id)
+    return Snapshot[LiveAttempt](
+        position=application.system.store.end_position(),
+        data=LiveAttempt(attempt_id=request.attempt_id, live=bool(channels), channels=channels),
+    )
+
+ATTEMPT_LIVE = QueryDefinition(
+    name="attempt.live", request=LiveAttemptRequest, result=LiveAttempt, handle=_attempt_live, changed_by=(),
+)

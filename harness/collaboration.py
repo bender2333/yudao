@@ -302,7 +302,7 @@ def guidance_result_summaries(projection: RunProjection, department: str, events
         {
             "event_id": event.event_id,
             "type": event.type,
-            "role": event.role,
+            "department": event.department,
             "name": event.payload.get("name"),
             "ok": event.payload.get("ok"),
             "content_hash": event.payload.get("content_hash"),
@@ -434,17 +434,17 @@ def _authorized_result(event_type: str, request: CollaborationRequest) -> bool:
 def _creation(request: CollaborationRequest, events: list[Event]) -> Event | None:
     return next((event for event in events if event.event_id == request.created_event_id
                  and event.run_id == request.run_id and event.type == EventType.COLLABORATION_REQUESTED
-                 and event.role == request.requester and event.payload.get("id") == request.id
+                 and event.department == request.requester and event.payload.get("id") == request.id
                  and event.payload.get("content_hash") == request.content_hash), None)
 
 
 def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool:
     return (event.run_id == request.run_id and event.stream_version > creation.stream_version
-            and event.role == request.recipient and event.payload.get("request_id") == request.id)
+            and event.department == request.recipient and event.payload.get("request_id") == request.id)
 
 
 def _guidance_owned(event: Event, projection: RunProjection, department: str) -> bool:
-    return event.run_id == projection.run_id and event.role == department
+    return event.run_id == projection.run_id and event.department == department
 
 
 def _event_version(events: list[Event], event_id: str | None) -> int | None:
@@ -487,7 +487,7 @@ def _current_guidance_result(event: Event, projection: RunProjection, snapshot_h
                     and delivery.engineering_plan_hash == _content_hash(projection.engineering_plan))
     pending = projection.pending_request
     return bool(event.type == EventType.COLLABORATION_REQUESTED and pending is not None
-                and pending.created_event_id == event.event_id and pending.requester == event.role)
+                and pending.created_event_id == event.event_id and pending.requester == event.department)
 
 
 def _applied_activation_ids(guidance_id: str, projection: RunProjection, events: list[Event]) -> set[str]:
@@ -504,14 +504,14 @@ def _claimable_results_for_activations(projection: RunProjection, department: st
     activation_ids = {item for item in activation_ids if item}
     starts = [event for event in events
               if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
-              and event.role == department and event.payload.get("activation_id") in activation_ids]
+              and event.department == department and event.payload.get("activation_id") in activation_ids]
     if not starts:
         return []
     windows: list[tuple[Event, int | None]] = []
     for start in starts:
         nxt = next((event for event in events
                     if event.type == EventType.DEPARTMENT_ACTIVATED and event.run_id == projection.run_id
-                    and event.role == department and event.stream_version > start.stream_version), None)
+                    and event.department == department and event.stream_version > start.stream_version), None)
         windows.append((start, None if nxt is None else nxt.stream_version))
     owned = lambda item: _guidance_owned(item, projection, department)
     found: list[Event] = []

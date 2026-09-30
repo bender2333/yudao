@@ -272,7 +272,7 @@ def test_read_and_check_actions_use_real_host_results_even_when_check_finds_fail
     assert current.responses[-1].status == "completed"
     result = system.store.get_event(current.responses[-1].result_event_ids[0])
     assert result.type == EventType.TOOL_CALLED and result.payload["request_id"] == current.requests[-1].id
-    assert result.role == recipient and result.payload["ok"]
+    assert result.department == recipient and result.payload["ok"]
     assert current.product_spec is None and not current.reviews
 
 
@@ -291,7 +291,7 @@ def test_pending_request_is_closed_before_provider_or_loop_stop(tmp_path, reason
     assert current.pending_request is None and current.requests[-1].status == status
     closure = _events(system, run_id, EventType.COLLABORATION_CLOSED)[0]
     terminal = _events(system, run_id, EventType.RUN_FAILED if phase == "FAILED" else EventType.RUN_PAUSED)[0]
-    assert closure.stream_version < terminal.stream_version and terminal.role == "quality"
+    assert closure.stream_version < terminal.stream_version and terminal.department == "quality"
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
 
@@ -362,5 +362,5 @@ def test_private_receiver_history_is_not_injected_into_requester_context(tmp_pat
     system.activate_once(run_id)
     resumed_engineering = system.test_adapter.invocations[-1]
     assert marker in json_dumps(resumed_engineering.input_items)
-    assert all(set(item) == {"event_id", "type", "request_id", "role", "name", "ok", "content_hash"}
+    assert all(set(item) == {"event_id", "type", "request_id", "department", "name", "ok", "content_hash"}
                for item in system.project(run_id).request_results)

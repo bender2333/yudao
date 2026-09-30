@@ -111,9 +111,10 @@ def test_lan_access_serves_the_local_network_and_checks_only_the_origin(data_dir
                                headers={"Origin": "yudao://app"})
         other_host = client.get("/api/capabilities", headers={"Host": "control-host"})
         rejected = client.get("/api/queries/system.status", headers={"Origin": "https://evil.example"})
-        # 事件流路由属于 #75（尚未实施）；这里核对访问检查对它的作用
+        # 事件流路由属于 #75：来源为 yudao://app 的客户端经局域网地址订阅成功（用一个超过日志末尾的
+        # after 位置，服务端据此立即发送 resync 并关闭连接），来源不同的订阅在路由之前被拒绝
         stream_denied = client.get("/api/events", headers={"Origin": "https://evil.example"})
-        stream_allowed = client.get("/api/events", headers={"Origin": "yudao://app"})
+        stream_allowed = client.get("/api/events?after=999999", headers={"Origin": "yudao://app"})
         events = opened.applications[0].system.store.list_project_events(accepted.json()["refs"]["project_id"])
     assert capabilities.status_code == 200
     assert capabilities.json()["deployment"]["access"] == "lan"
@@ -122,6 +123,8 @@ def test_lan_access_serves_the_local_network_and_checks_only_the_origin(data_dir
     assert other_host.status_code == 200
     assert rejected.status_code == 403
     assert stream_denied.status_code == 403
-    # #75 实施以后是 200（订阅成功），在此之前是 404（路由尚未登记）
-    assert stream_allowed.status_code in (200, 404)
+    # 订阅成功：事件流的内容类型正确，连接以重新同步结束
+    assert stream_allowed.status_code == 200
+    assert stream_allowed.headers["content-type"].startswith("text/event-stream")
+    assert "event: resync" in stream_allowed.text
     assert [event.actor for event in events] == ["user:local"]

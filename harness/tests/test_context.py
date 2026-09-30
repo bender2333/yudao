@@ -114,7 +114,7 @@ def test_quality_runs_its_checks_through_run_check(data_dir):
     [quality] = [item for item in adapter.invocations if item.department == "quality"]
     assert [tool["name"] for tool in quality.tools if tool_action(tool["name"]) == "check"] == ["run_check"]
     checks = [event.payload["name"] for event in system.store.list_events(run_id)
-              if event.type == EventType.TOOL_CALLED and event.role == "quality"
+              if event.type == EventType.TOOL_CALLED and event.department == "quality"
               and tool_action(event.payload["name"]) == "check"]
     assert checks == ["run_check"]
 

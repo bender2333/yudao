@@ -65,7 +65,7 @@ class InteractionWriter:
         transaction.on_abort(lambda: self._publish_committed(run_id))
         transaction.on_commit(lambda: self._publish_committed(run_id))
         return transaction.append(NewEvent(
-            EventType.USER_INPUT_RECEIVED, role="user",
+            EventType.USER_INPUT_RECEIVED, actor="user:local",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
         ))[0]
@@ -75,7 +75,7 @@ class InteractionWriter:
         payload = self._prompt(projection.run_id, department, text,
                                projection.department_prompts[department].version + 1)
         return transaction.append(NewEvent(
-            EventType.DEPARTMENT_PROMPT_UPDATED, role="user",
+            EventType.DEPARTMENT_PROMPT_UPDATED, actor="user:local", department=department,
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["prompt_ref"]["content_hash"]],
         ))[0]
@@ -102,7 +102,8 @@ class InteractionWriter:
             payload["base_version"] = base_version
         return transaction.append(NewEvent(
             EventType.DEPARTMENT_GUIDANCE_RECEIVED,
-            role="user",
+            actor="user:local",
+            department=department,
             state_before=projection.phase,
             state_after=projection.phase,
             payload=payload,
