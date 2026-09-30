@@ -4191,6 +4191,7 @@
   "context_window": 32000,
   "cost": 0.0,
   "cycle_count": 5,
+  "definitions_version": "<definitions>",
   "delivery_spec": {
    "check_names": [
     "smoke"
