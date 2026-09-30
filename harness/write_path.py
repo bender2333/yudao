@@ -43,7 +43,7 @@ class NewEvent:
     state_before: str
     state_after: str
     actor: str | None = None
-    role: str | None = None
+    department: str | None = None
     parent_event_id: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
     artifact_hashes: list[str] = field(default_factory=list)
@@ -57,10 +57,10 @@ class NewEvent:
 
 @dataclass(frozen=True)
 class NewProjectEvent:
-    # 一条要追加的项目事件
+    # 一条要追加的项目事件；actor 是写入方声明的提出者，由命令写入时取命令的提出者
     type: str
     payload: dict[str, Any] = field(default_factory=dict)
-
+    actor: str | None = None
 
 @dataclass(frozen=True)
 class NewCatalogEvent:
@@ -215,19 +215,28 @@ class WritePath:
         return streams
 
 
+def _resolve_actor(entry_actor: str | None, command: Command | None, stream: str) -> str:
+    # 提出者由写入方经写入口声明（设计第 5.2 节）：由命令写入时取命令的提出者，
+    # 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
+    actor = command.actor if command is not None else entry_actor
+    if not isinstance(actor, str) or not actor:
+        raise ValueError(f"{stream} event requires a declared actor")
+    return actor
+
+
 def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, version: int,
            command: Command | None) -> Event | ProjectEvent | CatalogEvent:
     identity = stream.split(":", 1)[1]
     # 载荷取它在日志中保存的形式（JSON），并入投影的内容与从日志重放时读到的完全相同
     payload = json.loads(json_dumps(entry.payload))
     command_id = None if command is None else command.command_id
+    actor = _resolve_actor(entry.actor, command, stream)
     if isinstance(entry, NewCatalogEvent):
         if not is_catalog_stream(stream):
             raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
         return CatalogEvent(
             event_id=new_id("cevt"), type=entry.type, payload=payload, created_at=utc_now(), position=0,
-            stream=stream, stream_version=version, command_id=command_id,
-            actor=entry.actor if command is None else command.actor,
+            stream=stream, stream_version=version, command_id=command_id, actor=actor,
         )
     if is_catalog_stream(stream):
         raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
@@ -235,21 +244,23 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
         raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     if isinstance(entry, NewEvent):
         _check_stop_reason(entry)
+        if entry.department is not None and entry.department not in DEPARTMENTS:
+            raise ValueError(f"unknown department {entry.department!r} on a run event")
         return Event(
-            event_id=new_id("evt"), run_id=identity, type=entry.type, role=entry.role,
+            event_id=new_id("evt"), run_id=identity, type=entry.type, role=None,
             parent_event_id=entry.parent_event_id, state_before=entry.state_before, state_after=entry.state_after,
             payload=payload, artifact_hashes=list(entry.artifact_hashes), session_id=entry.session_id,
             provider=entry.provider, model=entry.model, context_digest=entry.context_digest,
             stop_reason=entry.stop_reason, error=entry.error, created_at=utc_now(), position=0, stream=stream,
             stream_version=version, project_id=None, work_item_id=None,
-            department=entry.role if entry.role in DEPARTMENTS else None,
-            command_id=command_id, actor=entry.actor if command is None else command.actor,
+            department=entry.department,
+            command_id=command_id, actor=actor,
         )
     return ProjectEvent(
         event_id=new_id("pevt"), project_id=identity, type=entry.type, payload=payload, created_at=utc_now(),
         position=0, stream=stream, stream_version=version, work_item_id=payload.get("work_item_id"),
         run_id=payload.get("run_id"), department=payload.get("department"),
-        command_id=command_id, actor=None if command is None else command.actor,
+        command_id=command_id, actor=actor,
     )
 
 

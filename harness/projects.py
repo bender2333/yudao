@@ -344,7 +344,7 @@ class ProjectService:
             goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
                 "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
-            }))
+            }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
@@ -354,7 +354,7 @@ class ProjectService:
 
         def rename(transaction: Transaction) -> None:
             self._writable_in(transaction, project_id)
-            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}))
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), rename, command=command)
 
@@ -364,7 +364,8 @@ class ProjectService:
 
         def pin(transaction: Transaction) -> None:
             self._writable_in(transaction, project_id)
-            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_PINNED, {"pinned": pinned}))
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_PINNED, {"pinned": pinned},
+                                               actor="user:local"))
 
         self.writes.transact(project_stream(project_id), pin, command=command)
 
@@ -373,14 +374,14 @@ class ProjectService:
             if self._saved_in(transaction, project_id).archived:
                 return
             self._reject_in_progress(transaction, project_id)
-            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_ARCHIVED))
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_ARCHIVED, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), archive, command=command)
 
     def restore(self, project_id: str, *, command: Command | None = None) -> None:
         def restore(transaction: Transaction) -> None:
             if self._saved_in(transaction, project_id).archived:
-                transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RESTORED))
+                transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RESTORED, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), restore, command=command)
 
@@ -471,7 +472,7 @@ class ProjectService:
             "command_versions": command_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
             "definitions_version": DEFINITIONS.version,
-        }))
+        }, actor="user:local"))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
             run_options=dict(
@@ -497,6 +498,7 @@ class ProjectService:
                 self.writes.append(project_stream(project_id), NewProjectEvent(
                     ProjectEventType.WORK_ITEM_START_FAILED,
                     {"work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__},
+                    actor="system",
                 ))
                 raise
         finally:
@@ -561,14 +563,14 @@ class ProjectService:
                 "work_item_id": item.work_item_id, "run_id": run.run_id,
                 "delivery_event_id": delivery.created_event_id, "code_tree_digest": delivery.code_tree_digest,
                 "reason": "baseline_changed", "expected_adoption_id": expected, "current_adoption_id": current,
-            }))[0]
+            }, actor="system"))[0]
         return transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, {
             "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
             "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
             "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
             "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
             "known_risks": list(delivery.known_risks), "previous_adoption_id": current,
-        }))[0]
+        }, actor="system"))[0]
 
     # 部门 Prompt 项目配置
 
@@ -591,7 +593,7 @@ class ProjectService:
             transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
                 "department": department, "version": current.version + 1, "text": text,
                 "prompt_ref": asdict(ref), "base_version": base_version,
-            }))
+            }, actor="user:local"))
             return None
 
         unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
@@ -620,7 +622,7 @@ class ProjectService:
                 return {**_command_view(current), "unchanged": True}
             transaction.append(NewProjectEvent(ProjectEventType.COMMAND_CONFIGURED, {
                 "name": name, "version": current_version + 1, **normalized, "base_version": base_version,
-            }))
+            }, actor="user:local"))
             return None
 
         unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
@@ -644,7 +646,7 @@ class ProjectService:
                 raise SourceDirectoryConflict({} if current is None else _source_directory_view(current))
             transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
                 "name": name, "path": path, "version": current_version + 1, "base_version": base_version,
-            }))
+            }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), configure, command=command)
         return self.read_source_directory(project_id, name)
@@ -670,7 +672,7 @@ class ProjectService:
             material_id = new_id("material")
             transaction.append(NewProjectEvent(ProjectEventType.MATERIAL_RECORDED, {
                 "material_id": material_id, "text": text, "material_ref": asdict(ref), "department": department,
-            }))
+            }, actor="user:local"))
             return material_id
 
         return self.writes.transact(project_stream(project_id), record, command=command)

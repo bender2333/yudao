@@ -537,9 +537,11 @@ class StepRecorder:
                      **command_basis}))
 
     def _draft(self, type: str, **fields: Any) -> Draft:
-        # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入
+        # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。
+        # 角色任务中的记录由部门提出（设计第 5.2 节）
         scope = self.scope
-        return lambda phase: NewEvent(type, state_before=phase, state_after=phase, role=scope.department,
+        return lambda phase: NewEvent(type, state_before=phase, state_after=phase,
+                                      actor=f"department:{scope.department}", department=scope.department,
                                       parent_event_id=scope.parent_event_id, session_id=scope.session_id, **fields)
 
     def _call_target(self, request: ModelRequest) -> dict[str, Any]:

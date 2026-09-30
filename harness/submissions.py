@@ -50,7 +50,9 @@ class SubmissionWriter:
         # 流程编排给出事务中的运行状态。出错时事务中没有追加任何事件，已经写出的材料恢复原样
         run_id = projection.run_id
         artifact = dict(artifact)
-        metadata = dict(role=department, parent_event_id=parent_event_id, state_before=projection.phase,
+        # 角色任务的提交记录由部门提出（设计第 5.2 节）；接纳事件与预览的 Event 用同一份元数据
+        metadata = dict(actor=f"department:{department}", department=department,
+                        parent_event_id=parent_event_id, state_before=projection.phase,
                         state_after=projection.phase, session_id=session_id, provider=provider, model=model)
         prepared: list[tuple[str, dict[str, Any], list[str]]] = []
         updates: dict[str, bytes | None] = {}
@@ -66,12 +68,12 @@ class SubmissionWriter:
             }:
                 payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
-            event = Event(event_id="uncommitted", run_id=run_id, type=event_type, **metadata, payload=payload,
+            event = Event(event_id="uncommitted", run_id=run_id, type=event_type, role=None, **metadata,
+                          payload=payload,
                           artifact_hashes=hashes or [], context_digest=None, stop_reason=None, error=None,
                           created_at=utc_now(), position=0, stream=run_stream(run_id),
                           stream_version=projection.stream_version + len(prepared),
-                          project_id=projection.project_id, work_item_id=projection.work_item_id,
-                          department=department)
+                          project_id=projection.project_id, work_item_id=projection.work_item_id)
             apply_event(current, event)
             return len(prepared) - 1
 

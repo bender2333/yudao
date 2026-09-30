@@ -56,6 +56,10 @@ from .tools import normalize_registered_commands
 from .validation import ProposalDecision
 from .workspace import WorkspaceSnapshot
 
+# 由用户提出的事件：输入、部门 Prompt 更新与部门指导（提出者为 user:local）
+_USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED,
+                          EventType.DEPARTMENT_GUIDANCE_RECEIVED})
+
 
 @dataclass
 class _Activation:
@@ -275,7 +279,8 @@ class Orchestrator:
             ))
         run_created = NewEvent(
             EventType.RUN_CREATED,
-            role="product",
+            actor="system",
+            department="product",
             state_before="CREATED",
             state_after="PRODUCT_SPEC",
             payload={
@@ -302,7 +307,8 @@ class Orchestrator:
         )
         transition = NewEvent(
             EventType.TRANSITION,
-            role="product",
+            actor="system",
+            department="product",
             state_before="CREATED",
             state_after="PRODUCT_SPEC",
             payload={"from": "CREATED", "to": "PRODUCT_SPEC", "route": "CREATED->PRODUCT_SPEC"},
@@ -480,7 +486,7 @@ class Orchestrator:
                                          reason="New user input requires updated product work.",
                                          return_phase="PRODUCT_SPEC", return_work_valid=False)
         transaction.append(NewEvent(
-            EventType.PRODUCT_INPUT_ASSIGNED, role="product",
+            EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
             state_before=projection.phase, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
         ))
@@ -551,7 +557,7 @@ class Orchestrator:
         if request is None:
             return projection
         transaction.append(NewEvent(
-            EventType.COLLABORATION_CLOSED, role=request.recipient,
+            EventType.COLLABORATION_CLOSED, actor="system", department=request.recipient,
             parent_event_id=request.created_event_id, state_before=projection.phase, state_after=return_phase,
             session_id=projection.sessions[request.recipient].session_id,
             payload={"request_id": request.id, "status": status, "reason": reason,
@@ -710,7 +716,8 @@ class Orchestrator:
                     current = transaction.projection
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
-                        role=scope.department,
+                        actor="system",
+                        department=scope.department,
                         parent_event_id=scope.parent_event_id,
                         state_before=current.phase,
                         state_after=current.phase,
@@ -806,7 +813,8 @@ class Orchestrator:
         provider_name = self._activation_provider(adapter)
         parent = transaction.append(NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
-            role=department,
+            actor="system",
+            department=department,
             state_before=projection.phase,
             state_after=projection.phase,
             session_id=session.session_id,
@@ -993,7 +1001,7 @@ class Orchestrator:
         )
         if proposal is not None:
             transaction.append(NewEvent(
-                EventType.PROPOSAL_SUBMITTED, role=department,
+                EventType.PROPOSAL_SUBMITTED, actor=f"department:{department}", department=department,
                 parent_event_id=parent_event_id,
                 state_before=current.phase, state_after=current.phase,
                 session_id=session_id, provider=provider, model=model,
@@ -1003,7 +1011,7 @@ class Orchestrator:
             ))
         if not judged.accepted:
             transaction.append(NewEvent(
-                EventType.PROPOSAL_REJECTED, role=department,
+                EventType.PROPOSAL_REJECTED, actor=f"department:{department}", department=department,
                 parent_event_id=parent_event_id,
                 state_before=current.phase, state_after=current.phase,
                 session_id=session_id, provider=provider, model=model,
@@ -1059,7 +1067,8 @@ class Orchestrator:
         for source, target in transitions:
             transaction.append(NewEvent(
                 EventType.TRANSITION,
-                role=department_for_phase(target) or department,
+                actor="system",
+                department=department_for_phase(target) or department,
                 parent_event_id=parent_event_id,
                 state_before=source,
                 state_after=target,
@@ -1070,7 +1079,8 @@ class Orchestrator:
                 self._withdraw_decisions(transaction, "released")
                 transaction.append(NewEvent(
                     EventType.RUN_DONE,
-                    role="quality",
+                    actor="system",
+                    department="quality",
                     parent_event_id=parent_event_id,
                     state_before="QUALITY",
                     state_after="DONE",
@@ -1105,7 +1115,8 @@ class Orchestrator:
             return
         transaction.append(NewEvent(
             EventType.TRANSITION,
-            role=department_for_phase(target) or department,
+            actor="system",
+            department=department_for_phase(target) or department,
             parent_event_id=parent_event_id,
             state_before=current.phase,
             state_after=target,
@@ -1137,7 +1148,7 @@ class Orchestrator:
             refs = [asdict(delivery.tree_ref)] if delivery is not None else []
         transaction.append(NewEvent(
             EventType.LESSON_CANDIDATE_RECORDED,
-            role=source.role, parent_event_id=source.event_id,
+            actor="system", department=source.department, parent_event_id=source.event_id,
             state_before=source.state_after, state_after=source.state_after,
             session_id=source.session_id,
             payload={
@@ -1186,7 +1197,7 @@ class Orchestrator:
         kind = MODEL_UNAVAILABLE
         model = "（没有找到调用目标）" if target is None else target["requested_model"]
         transaction.append(NewEvent(
-            EventType.DECISION_REQUESTED, actor="system", role=department,
+            EventType.DECISION_REQUESTED, actor="system", department=department,
             state_before=projection.phase, state_after=projection.phase,
             payload={
                 "kind": kind.name, "blocks": kind.blocks,
@@ -1222,7 +1233,7 @@ class Orchestrator:
                 raise InvalidOption(decision, option)
             projection = transaction.projection
             transaction.append(NewEvent(
-                EventType.DECISION_ANSWERED, role=decision.request["department"], parent_event_id=decision_id,
+                EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
                 state_before=projection.phase, state_after=projection.phase,
                 payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
             ))
@@ -1237,7 +1248,9 @@ class Orchestrator:
         return self.writes.transact(saved.stream, answer, command=command)
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
-        if not any(event.role == "user" for event in transaction.events_after(version)):
+        # 新的输入或指导：user_input_received、department_prompt_updated 与 department_guidance_received 由用户提出，
+        # 部门指导在事件载荷与 department 列中写明部门
+        if not any(event.type in _USER_EVENTS for event in transaction.events_after(version)):
             return False
         projection = transaction.projection
         basis = activation.scope.basis
@@ -1261,7 +1274,7 @@ class Orchestrator:
             if decision.status != "open":
                 continue
             transaction.append(NewEvent(
-                EventType.DECISION_WITHDRAWN, actor="system", role=decision.request["department"],
+                EventType.DECISION_WITHDRAWN, actor="system", department=decision.request["department"],
                 parent_event_id=decision.decision_id, state_before=projection.phase, state_after=projection.phase,
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
@@ -1275,7 +1288,7 @@ class Orchestrator:
                                          return_phase=projection.phase, return_work_valid=False)
         self._withdraw_decisions(transaction, reason)
         transaction.append(NewEvent(
-            EventType.RUN_PAUSED, role=department,
+            EventType.RUN_PAUSED, actor="system", department=department,
             state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
             provider=projection.provider, model=projection.model,
             payload={
@@ -1301,7 +1314,7 @@ class Orchestrator:
                                          return_phase=projection.phase, return_work_valid=False)
         self._withdraw_decisions(transaction, reason)
         source_event = transaction.append(NewEvent(
-            EventType.RUN_FAILED, role=department,
+            EventType.RUN_FAILED, actor="system", department=department,
             state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
             provider=projection.provider, model=projection.model,
             payload={"stop_reason": reason, "human_action": human, "message": message,
