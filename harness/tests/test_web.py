@@ -167,9 +167,9 @@ def sse_id(block: str) -> int:
     raise AssertionError(f"no id in {block!r}")
 
 
-def retry_event(seq, event_type, payload=None, *, role="engineering", error=None, stop_reason=None):
+def retry_event(seq, event_type, payload=None, *, department="engineering", error=None, stop_reason=None):
     return SimpleNamespace(
-        event_id=f"event-{seq}", seq=seq, type=event_type, role=role,
+        event_id=f"event-{seq}", seq=seq, type=event_type, department=department,
         payload=payload or {}, error=error, stop_reason=stop_reason,
     )
 
