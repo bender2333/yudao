@@ -298,3 +298,10 @@
 - 版本回归：每个里程碑交给用户试用之前运行一次，与集成层批量运行放在一起，运行当时已经具备条件的场景，每个场景 3 次；工作包父工单与真实验收工单的验收中删去版本回归的条目。
 - 超时：运行器在 90 分钟时结束运行；OpenCode 按结束时的目录评分；Yudao 按最后一次封存的交付评分并写明质检是否已经放行，没有提交过交付的全部检查记为「没有做」。
 - 修改文件：`docs/design/evaluation-scenarios.md`（开头状态、第 1、3、10 节）、`docs/requirements/comparison-experiment.md`、`docs/design/browser-and-computer-use.md`（第 14 节场景 7）、`docs/design/existing-project-onboarding.md`（第 10 节第 12 项与工单表）、`docs/design/execution-environment.md`（第 10 节末段）、`docs/stage-3-plan.md`（第 3、7、9 节）、`docs/program-roadmap.md`、两份索引；工单 #9、#83、#119 至 #124、#139、#145、#155、#185。
+
+## 2026-09-30 - 评测使用的模型
+
+- 用户提供自己的模型服务（OpenAI 兼容接口），地址与 Key 保存在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志。
+- 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `cc/claude-sonnet-5-5`。
+- 核对的事实：三个模型都能读出网页截图中的文字；这个服务的 `ag`、`gh`、`cc`、`cbcn` 线路只返回流式回复，评测工具与 Yudao 的 Provider 按流式请求；`gemini/` 线路上游返回 401（服务账号已停用），`ag/claude-sonnet-4-6` 线路不传图片。
+- 修改文件：`docs/design/evaluation-scenarios.md`（第 3、4.3、9 节）、`docs/requirements/comparison-experiment.md`。
