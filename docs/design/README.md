@@ -12,7 +12,7 @@
   - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）、[ADR-0018](../adr/0018-single-control-host-remote-execution.md)。需求：[D29](../requirements/remote-execution.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
-  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前），Stage 3 的工作包父工单 #83（子工单 #84 至 #96）。
+  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002 至 0006、[0017](../adr/0017-role-settings-override-department.md)。
 - [本地通用工具](local-tools.md)
   - 内容：代码快照接入的使用过程；公开树、搜索、区间阅读与编辑、本地命令、动作回执、独立质检的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
@@ -20,15 +20,15 @@
   - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节。
 - [执行环境服务](execution-environment.md)
   - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程、本机容器、远程执行代理三种实现；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 11 节的决定：机器流、本机容器经本机端口调用执行代理、本阶段先完成本机进程与本机容器，远程机器的真实验收等树莓派）。工单：父工单 #120（#110、#128 至 #131、#117，其余待建）。
+  - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机容器经本机端口调用执行代理、本阶段先完成本机进程与本机容器，远程机器的真实验收等树莓派）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #131、#140 至 #145，界面 #117），属于里程碑 M3。
   - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
   - 内容：试用会话与试用镜像；交付说明中的启动方式；Playwright MCP 浏览器工具；容器虚拟屏幕中的 computer use；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、本机容器都带试用层、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155）。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、本机容器都带试用层、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（子工单待建）。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。
   - 需求：[D33](../requirements/existing-project-onboarding.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
 - [Provider 层](provider-layer.md)
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
@@ -36,7 +36,7 @@
   - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0004。
 - [应用层与接口层](app-and-interface.md)
   - 内容：应用层（合同、注册表、命令处理、查询处理、读取模型、事件流订阅、输出片段转发）与接口层（FastAPI 路由、OpenAPI、认证）；命令合同（身份、基准版本、结果）与命令清单；查询与读取模型；事件流（范围筛选、按位置补齐、缺口检测与重新同步、模型输出片段）；能力清单与接口版本核对；本机与局域网两种访问方式（令牌与 TLS 保留位置并标为 TODO）；系统首页（待你决定、离开期间的报告）、机器查询与托盘提醒；与现有 Web 的对照与迁移。
-  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。骨架 #72 已完成，其余未实施。工单：父工单 #70（子工单 #73 至 #78），桌面客户端 #71（#79、#80、#82 与原型 v9 #125）；机器页面 #117 属于 3.2C（#120），模型管理页 #93 至 #95 属于 D24（#83）。
+  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。骨架 #72 与 #73、#74、#76、#77 已完成，其余实施中。工单：父工单 #70（子工单 #73 至 #78、#127），桌面客户端 #71（#79、#80、#175 与像素画面 #176、#82、#177 至 #180，依据原型 v9 与 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)），属于里程碑 M1；各工作包的界面工单挂在所属父工单下：模型管理页 #93 至 #95（#83）、3.1 #181（#119）、3.4A #182（#121）、机器页面 #117（#120）、3.8 #137、#138（#124）、3.2D #153、#154（#123）。
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0013](../adr/0013-event-log-and-single-write-path.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。
@@ -52,12 +52,12 @@
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），含模块交互图。
-  - 状态：2026-09-28 设计，场景与评分方法经用户确认，未实施，没有建立工单；用户把评测列为最重要的工作，实施之前逐项审阅；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
+  - 状态：2026-09-28 设计，场景与评分方法经用户确认，未实施，没有建立工单；用户把评测列为最重要的工作，实施之前逐项审阅，审阅以后建立 #118 的子工单（评测工具与 OpenCode 基础分属于里程碑 M2，Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
   - 需求：[D32](../requirements/comparison-experiment.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 - [测试分层](test-pyramid.md)
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。
   - 状态：2026-09-29 设计，用户已确认各角色运行的层、批量运行的规则与规则文件的修改，同日暂缓；未实施。工单：父工单 #157（#158 至 #161）。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
-  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节），未实现；对应工单 #16、#17、#18。
+  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节）；项目流与 run 流（#126）已完成，其余未实现；对应工单 #16、#17、#18，界面 #181，属于里程碑 M2。
   - 计划：[Stage 3 计划](../stage-3-plan.md) 3.1。
