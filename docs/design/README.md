@@ -52,7 +52,7 @@
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），含模块交互图。
-  - 状态：2026-09-28 设计，场景与评分方法经用户确认，未实施，没有建立工单；用户把评测列为最重要的工作，实施之前逐项审阅，审阅以后建立 #118 的子工单（评测工具与 OpenCode 基础分属于里程碑 M2，Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
+  - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，#118 的子工单待建（评测工具与 OpenCode 基础分属于里程碑 M2，场景 2、3 的 Yudao 一侧属于 M3，场景 1 属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
   - 需求：[D32](../requirements/comparison-experiment.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 - [测试分层](test-pyramid.md)
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。

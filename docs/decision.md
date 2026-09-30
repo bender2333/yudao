@@ -290,3 +290,11 @@
 - 界面按原型 v9 拆成工单：#80 项目页面（不含决定卡片）；#175 首页页面与决定卡片；像素画面六张（#176 基础、#82 世界与项目楼层、#177 部门房间、#179 大厅的决定板、#178 首页的楼、#180 时间轴与回放）；3.1 的界面 #181、3.4A 的界面 #182；3.2B 的界面在 3.2C 进行到 #142 时细化原型 v8 第 9.4 节以后建立；旧 Web 控制台（#78）在 M1 删除。原型代码冻结，v8、v9 的设计说明继续作为依据，没有工单引用时再归档。
 - 工作包父工单之间只保留 #121←#119 与 #100 的阻塞，3.2B、3.2D、3.8 的依赖写在子工单之间，不等待树莓派上的真实验收。
 - 修改文件：`CLAUDE.md`（工作流程第 6、7 步，自主推进第 1、4 步）、`AGENTS.md`（代码位置）、新增 `docs/adr/0021-client-pixel-view-follows-v9-structure.md`、`docs/stage-3-plan.md`、`docs/program-roadmap.md`、`docs/requirements/README.md`、`docs/design/README.md`。
+
+## 2026-09-30 - 评测场景设计审阅：各部分所属的里程碑、版本回归的时机、超时的评分
+
+- 用户逐项审阅评测场景设计，其余内容按 2026-09-28 确认的写法保留。
+- 所属里程碑：场景材料、评分器、OpenCode 运行器与基础分属于 M2；Yudao 运行器、过程检查点、版本比较与场景 2、3 的 Yudao 一侧属于 M3（工程与质检的命令在场景镜像派生的本机容器中执行，依赖 3.2C 的 #131、#142；场景 2 另外依赖 3.8）；场景 1 的 Yudao 一侧与 3.9 的对照属于 M4。
+- 版本回归：每个里程碑交给用户试用之前运行一次，与集成层批量运行放在一起，运行当时已经具备条件的场景，每个场景 3 次；工作包父工单与真实验收工单的验收中删去版本回归的条目。
+- 超时：运行器在 90 分钟时结束运行；OpenCode 按结束时的目录评分；Yudao 按最后一次封存的交付评分并写明质检是否已经放行，没有提交过交付的全部检查记为「没有做」。
+- 修改文件：`docs/design/evaluation-scenarios.md`（开头状态、第 1、3、10 节）、`docs/requirements/comparison-experiment.md`、`docs/design/browser-and-computer-use.md`（第 14 节场景 7）、`docs/design/existing-project-onboarding.md`（第 10 节第 12 项与工单表）、`docs/design/execution-environment.md`（第 10 节末段）、`docs/stage-3-plan.md`（第 3、7、9 节）、`docs/program-roadmap.md`、两份索引；工单 #9、#83、#119 至 #124、#139、#145、#155、#185。
