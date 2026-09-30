@@ -131,3 +131,4 @@ qwen3.8 / 2026-09-30 21:30 / #202 / 单执行槽位的「已有事项在执行�
 处理：采纳。事件日志是唯一的事实来源，第 7.2 节「已有事项在执行」指事件日志中有未结束的 run，设计说明的文字不需要修改；已随 #202（PR #205）合并。3.4A 按同一口径计算占用的执行槽位（未结束的 run 数），写在 #19 的评论中。
 
 qwen3.8 / 2026-09-30 23:30 / #134 / 合入 origin/main 时核对交付基线：分支原先基于 `03f55234`，落后 origin/main 7 个提交，其中 #205（`9039d6fb`）修好了 #16 与 #75 合并遗留的两处 `NewEvent(..., role=...)`（`write_path.NewEvent` 已无 `role` 字段，构造即抛 `TypeError`）并重生成 44 个事件序列基准，另一处 `definitions_version` 也随 #16 的投影变化补齐。核对方式：在干净的 `origin/main`（`e1160ab8`）上单独运行 `test_engine.py::test_reactivated_department_restores_its_received_work_outputs_and_complete_submit_pairs`，确认失败属于合入前的基线；#134 合入 origin/main 以后该失败消失，未在本工单内修改这一处。
+处理：不需要修改设计。这一条记录的是合入 main 时的核对，问题已由 #202（PR #205）解决；合入与核对的过程写在交付评论与 `agents_jour.md` 中，这个文件只登记设计冲突与缺漏。
