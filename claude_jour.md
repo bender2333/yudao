@@ -394,3 +394,4 @@ claude-opus-5-5 / 2026-09-30 22:46 / 工单同步完成。#131 关闭；#142、#
 claude-opus-5-5 / 2026-09-30 23:10 / 23:05 四个执行者（#202c、#87b、#134b、#17b）同时因 qdcn/qfmodel 当日额度用完（403 Billing daily count exceeded）退出；四张工单改为 ready-for-human 并评论，工作区保留原样；停止派发，等用户恢复额度或更换默认模型。#202 已有 8 个提交、工作区干净，只差 DELIVERY 与审查
 claude-opus-5-5 / 2026-09-30 23:25 / 用户把 omp 默认模型从 9router qdcn/qfmodel 换成 9router cbcn/deepseek-v4.1-flash；四张工单恢复 ready-for-agent 并写任务评论，重新派发 #202d、#87c、#134c、#17c，已核对四个进程都在使用新模型、没有报错
 claude-opus-5-5 / 2026-10-01 00:35 / #202 第 4 轮交付（1493 passed），启动审查；#134 第 3 轮在上下文压缩写出 <analysis> 总结后结束（smol 为 qdcn/qmodel，与先前 deepseek 的情况相同），27 个未提交文件保留，派发第 4 轮 134d。smol 模型写完压缩总结后停止的问题再出现一次就向用户提出更换 smol
+claude-opus-5-5 / 2026-10-01 01:05 / 按用户要求把 omp 的 smol 角色换成 9router minimax-cn/MiniMax-M3.1-Flash-Preview（不限量，用于小型工作，包括上下文压缩总结），retry.fallbackChains.smol 依次为 qdcn/qfmodel、cbcn/deepseek-v4.1-flash；刷新 9router 模型列表后用 omp -p 核对可用。正在运行的四个进程仍用旧配置，下一轮派发起生效
