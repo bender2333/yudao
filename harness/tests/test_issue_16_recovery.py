@@ -224,8 +224,8 @@ def test_two_processes_recovering_the_same_run_only_one_advances(data_dir):
     assert second_epoch == first_epoch + 1, (first_epoch, second_epoch)
 
     # 旧执行者的迟到结果只能作为历史事实：携带已经不是最新的编号时写入被拒绝
-    late = NewEvent(EventType.DEPARTMENT_INPUT, role="engineering", state_before="ENGINEERING",
-                    state_after="ENGINEERING", payload={"text": "late result"})
+    late = NewEvent(EventType.DEPARTMENT_INPUT, actor="department:engineering", department="engineering",
+                    state_before="ENGINEERING", state_after="ENGINEERING", payload={"text": "late result"})
     first = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
     second = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
     # 两次取得都写进了同一份事件日志（第三个进程的恢复会再取得一次，所以只看前两次）
