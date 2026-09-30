@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.event_store import Command, StreamVersionConflict, run_stream
 from harness.models import EventType
 from harness.projection import saved_decision, saved_decisions
@@ -16,6 +16,17 @@ from harness.write_path import NewEvent
 # 列出，并与日志末尾位置一起读取；删除保存的投影以后由重放补建。这里经写入口直接写入决定事件，检查保存的投影；
 # 由流程编排发出请求、由命令回答的行为在 test_decisions.py。
 
+
+def _plain_reply():
+    # 部门回复文字、没有调用工具：连续 tool_call_required_limit 次以后运行在 safe node 暂停。
+    # 恢复会取得执行权并推进这一步，但不会提交提案，也不进入下一个部门
+    def reply(_call):
+        return FakeTurn(transcript="no tool call in this reply")
+    return reply
+
+def _plain_replies(count: int = 8):
+    # 一次恢复最多消费 tool_call_required_limit + 1 次回答（最后一次回答以后运行暂停）
+    return [_plain_reply() for _ in range(count)]
 
 def _requested(department: str = "product") -> NewEvent:
     return NewEvent(EventType.DECISION_REQUESTED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
@@ -161,11 +172,13 @@ def test_decision_requests_are_rebuilt_from_events_and_the_replay_check_compares
     system.close()
     _delete_saved_projections(data_dir)
 
-    adapter = FakeAdapter([])
+    adapter = FakeAdapter(_plain_replies())
     restarted = LoopSystem.for_testing(data_dir, adapter)
-    assert saved_decisions(restarted.store) == before
+    # 保存的投影被删除以后由重放补建：决定请求逐字相同。日志末尾位置在这一步只说明恢复写过事件
+    # （取得执行权、被继续的 run 的步骤），不参与这条断言
+    assert saved_decisions(restarted.store)[1] == before[1]
+    assert saved_decisions(restarted.store)[0] > before[0]
     assert {run: restarted.store.projection(run_stream(ids[run])).decisions for run in saved} == saved
-    assert adapter.invocations == []
     restarted.replay(ids["run_a"])
     restarted.replay(ids["run_b"])
 

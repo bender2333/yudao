@@ -28,7 +28,11 @@ class DecisionKind:
 # 已完成的工作与已用限额保留；或者停止事项
 MODEL_UNAVAILABLE = DecisionKind("model_unavailable", "run", (Option("continue", "继续执行"), Option("stop", "停止事项")))
 
-DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE,)}
+# 事项记录的定义版本与当前加载的版本不同（ADR-0014，工单 #16）：升级以后继续旧事项时由用户决定按新版本继续还是停止
+DEFINITIONS_CHANGED = DecisionKind("definitions_changed", "run",
+                                   (Option("continue", "按新版本继续"), Option("stop", "停止事项")))
+
+DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:

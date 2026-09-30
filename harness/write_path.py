@@ -197,6 +197,38 @@ class WritePath:
         # 不需要读取投影作判断的追加
         return self.transact(stream, lambda transaction: transaction.append(*entries),
                              expected_version=expected_version, epoch=epoch)
+    def claim_execution_right(self, stream: str, decide: Callable[[Transaction], T], *,
+                              expected_version: int | None = None) -> tuple[int, T]:
+        # 取得这个 run 的执行权（工单 #16，ADR-0018）：读取保存的投影，由 decide 判断并追加事件，
+        # 在一个事务中核对流版本、以已记录的执行权编号加一作为新编号，随这次追加的事件一起写入并更新保存的投影。
+        # 返回这次取得的执行权编号与 decide 的结果；调用方之后的有权推进的写入都携带这个编号，
+        # 编号小于这个流已经记录的编号时由写入口拒绝（StaleExecutionRight）。
+        # 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。
+        # 判断期间不持有锁：另一方先写入同一个流时提交因版本不符被拒绝，按写入以后的状态重新判断
+        attempt = 0
+        while True:
+            attempt += 1
+            transaction = Transaction(self._store, stream, self._store.projection(stream))
+            if expected_version is not None and transaction.version != expected_version:
+                raise StreamVersionConflict(stream, expected_version, transaction.version)
+            try:
+                result = decide(transaction)
+                if not transaction.appended:
+                    raise ValueError("claiming an execution right requires the events that record it")
+                epoch = self._store.claim_execution_right(
+                    stream, transaction.version, transaction.appended, dump_projection(transaction.projection),
+                    decisions=transaction.changed_decisions())
+            except StreamVersionConflict as conflict:
+                transaction._abort()
+                if expected_version is not None or conflict.stream != stream or attempt == MAX_JUDGMENTS:
+                    raise
+                continue
+            except BaseException:
+                transaction._abort()
+                raise
+            transaction._after_commit()
+            self._store.notify(transaction.appended)
+            return epoch, result
 
     def rebuild(self, stream: str) -> Projection:
         # 从这个流的第一条事件重放投影与决定请求，替换保存的投影
