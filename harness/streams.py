@@ -52,6 +52,7 @@ RUN_EVENT_TYPES = frozenset({
     "product_decision_accepted",
     "delivery_accepted",
     "qa_submitted",
+    "lesson_candidate_recorded",
     "structure_accepted",
     "baseline_review_accepted",
     "transition",
