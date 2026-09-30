@@ -2252,6 +2252,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#23>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2286,6 +2287,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
      "path": "src/echo.py"
@@ -2314,7 +2316,7 @@
     "model_id": "fake-model",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#23>",
+    "output_ref": "<art#25>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2353,6 +2355,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2394,6 +2397,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "name": "unit-tests"
     },
@@ -2421,7 +2425,7 @@
     "model_id": "fake-model",
     "name": "run_command",
     "ok": true,
-    "output_ref": "<art#24>",
+    "output_ref": "<art#26>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2533,7 +2537,7 @@
     "model_id": "fake-model",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#25>",
+    "output_ref": "<art#27>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2576,7 +2580,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#26>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -2604,7 +2608,7 @@
     ],
     "input_version": 1,
     "kind": "delivery_spec",
-    "transcript_ref": "<art#26>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -2686,7 +2690,7 @@
     "engineering_plan_hash": "<sha256#39>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#27>",
+    "input_ref": "<art#29>",
     "input_version": 1,
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -2758,7 +2762,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#28>",
+    "parts_ref": "<art#30>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2766,7 +2770,7 @@
     "provider_name": "fake",
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#29>",
+    "request_ref": "<art#31>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -2877,7 +2881,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#30>",
+    "message_ref": "<art#32>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -2931,7 +2935,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#31>",
+    "message_ref": "<art#33>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -2985,7 +2989,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 3,
-    "message_ref": "<art#32>",
+    "message_ref": "<art#34>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -3162,6 +3166,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#49>",
     "effective_contract_hash": "<sha256#22>",
@@ -3196,6 +3201,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "argv": [
       "<python>",
@@ -3228,7 +3234,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#33>",
+    "output_ref": "<art#35>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3268,6 +3274,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#49>",
     "effective_contract_hash": "<sha256#22>",
@@ -3302,6 +3309,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n\n",
      "path": "src/echo.py"
@@ -3330,7 +3338,7 @@
     "model_id": "fake-model",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#23>",
+    "output_ref": "<art#25>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3442,7 +3450,7 @@
     "model_id": "fake-model",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#25>",
+    "output_ref": "<art#27>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3485,7 +3493,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#26>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -3513,7 +3521,7 @@
     ],
     "input_version": 1,
     "kind": "delivery_spec",
-    "transcript_ref": "<art#26>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -3587,7 +3595,7 @@
    "stop_reason": null,
    "error": null,
    "artifact_hashes": [
-    "<sha256#54>"
+    "<sha256#55>"
    ],
    "payload": {
     "activation_id": "<act#5>",
@@ -3595,7 +3603,7 @@
     "engineering_plan_hash": "<sha256#39>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#34>",
+    "input_ref": "<art#37>",
     "input_version": 1,
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -3614,12 +3622,12 @@
    "session_id": "<ses_eng#1>",
    "provider": "fake",
    "model": null,
-   "context_digest": "<sha256#55>",
+   "context_digest": "<sha256#56>",
    "stop_reason": null,
    "error": null,
    "artifact_hashes": [
-    "<sha256#55>",
-    "<sha256#56>"
+    "<sha256#56>",
+    "<sha256#57>"
    ],
    "payload": {
     "accepts_required_tool_call": true,
@@ -3636,7 +3644,7 @@
     "credential_ref": null,
     "credential_version": null,
     "department": "engineering",
-    "digest": "<sha256#55>",
+    "digest": "<sha256#56>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -3667,7 +3675,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#35>",
+    "parts_ref": "<art#38>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3675,7 +3683,7 @@
     "provider_name": "fake",
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#36>",
+    "request_ref": "<art#39>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -3686,7 +3694,7 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "session_id": "<ses_eng#1>",
-    "snapshot_hash": "<sha256#59>",
+    "snapshot_hash": "<sha256#54>",
     "source_event_id": null,
     "step_id": 1,
     "token_estimate": 8879,
@@ -3705,7 +3713,7 @@
    "session_id": "<ses_eng#1>",
    "provider": "fake",
    "model": null,
-   "context_digest": "<sha256#55>",
+   "context_digest": "<sha256#56>",
    "stop_reason": null,
    "error": null,
    "artifact_hashes": [],
@@ -3786,7 +3794,7 @@
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#37>",
+    "message_ref": "<art#40>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -3840,7 +3848,7 @@
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#38>",
+    "message_ref": "<art#41>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
@@ -3930,7 +3938,7 @@
    "session_id": "<ses_eng#1>",
    "provider": "fake",
    "model": "fake-script",
-   "context_digest": "<sha256#55>",
+   "context_digest": "<sha256#56>",
    "stop_reason": null,
    "error": null,
    "artifact_hashes": [],
@@ -4017,6 +4025,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#67>",
     "effective_contract_hash": "<sha256#22>",
@@ -4051,6 +4060,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#5>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -4075,7 +4085,7 @@
     "id": "check-3",
     "input_item": {
      "call_id": "check-3",
-     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#59>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\",\"tree_changed\":false}}",
+     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#54>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
     "input_version": 1,
@@ -4083,7 +4093,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#39>",
+    "output_ref": "<art#42>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -4195,7 +4205,7 @@
     "model_id": "fake-model",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#25>",
+    "output_ref": "<art#27>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -4238,7 +4248,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#40>"
+    "transcript_ref": "<art#43>"
    }
   },
   {
@@ -4272,11 +4282,11 @@
       "exit_code": 0,
       "name": "unit-tests",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"src/echo.py\",\"hello\"] exit=0\nhello"
      }
     ],
-    "code_tree_digest": "<sha256#59>",
+    "code_tree_digest": "<sha256#54>",
     "content_hash": "<sha256#60>",
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
@@ -4298,7 +4308,7 @@
     "revision": 1,
     "status": "active",
     "summary": "echo CLI",
-    "tree_ref": "<art#41>"
+    "tree_ref": "<art#44>"
    }
   },
   {
@@ -4422,7 +4432,7 @@
     "engineering_plan_hash": "<sha256#39>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#43>",
+    "input_ref": "<art#46>",
     "input_version": 1,
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
@@ -4494,7 +4504,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#44>",
+    "parts_ref": "<art#47>",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -4502,7 +4512,7 @@
     "provider_name": "fake",
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#45>",
+    "request_ref": "<art#48>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -4513,7 +4523,7 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "session_id": "<ses_qua#1>",
-    "snapshot_hash": "<sha256#59>",
+    "snapshot_hash": "<sha256#54>",
     "source_event_id": null,
     "step_id": 1,
     "token_estimate": 4660,
@@ -4613,7 +4623,7 @@
     "input_version": 1,
     "logical_call_id": "<act#6>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#46>",
+    "message_ref": "<art#49>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
@@ -4667,7 +4677,7 @@
     "input_version": 1,
     "logical_call_id": "<act#6>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#47>",
+    "message_ref": "<art#50>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
@@ -4845,6 +4855,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#84>",
     "effective_contract_hash": "<sha256#22>",
@@ -4879,6 +4890,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#6>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -4904,7 +4916,7 @@
     "id": "call-<act#6>-1-1",
     "input_item": {
      "call_id": "call-<act#6>-1-1",
-     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#6>\",\"delivery_spec_hash\":\"<sha256#60>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#59>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"print('smoke ok')\\\"] exit=0\\nsmoke ok\",\"tree_changed\":false}}",
+     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#6>\",\"delivery_spec_hash\":\"<sha256#60>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#54>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"print('smoke ok')\\\"] exit=0\\nsmoke ok\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
     "input_version": 1,
@@ -4912,7 +4924,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#48>",
+    "output_ref": "<art#51>",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -5022,7 +5034,7 @@
     "model_id": "fake-model",
     "name": "submit_review",
     "ok": true,
-    "output_ref": "<art#49>",
+    "output_ref": "<art#52>",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -5065,7 +5077,7 @@
      "rationale",
      "verdict"
     ],
-    "transcript_ref": "<art#40>"
+    "transcript_ref": "<art#43>"
    }
   },
   {
@@ -5096,18 +5108,18 @@
       "exit_code": 0,
       "name": "smoke",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"-c\",\"print('smoke ok')\"] exit=0\nsmoke ok"
      }
     ],
-    "code_snapshot_hash": "<sha256#59>",
+    "code_snapshot_hash": "<sha256#54>",
     "content_hash": "<sha256#76>",
     "defects": [],
     "delivery_spec_hash": "<sha256#60>",
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
     "evidence_refs": [
-     "<art#50>"
+     "<art#53>"
     ],
     "git_version": {
      "commit": "<git#9>",
@@ -5206,6 +5218,7 @@
   "context_window": 32000,
   "cost": 0.0,
   "cycle_count": 6,
+  "definitions_version": "<definitions>",
   "delivery_spec": {
    "check_names": [
     "unit-tests"
@@ -5219,11 +5232,11 @@
      "exit_code": 0,
      "name": "unit-tests",
      "product_spec_hash": "<sha256#21>",
-     "snapshot_hash": "<sha256#59>",
+     "snapshot_hash": "<sha256#54>",
      "summary": "host-executed argv=[\"<python>\",\"src/echo.py\",\"hello\"] exit=0\nhello"
     }
    ],
-   "code_tree_digest": "<sha256#59>",
+   "code_tree_digest": "<sha256#54>",
    "content_hash": "<sha256#60>",
    "created_event_id": "<evt#78>",
    "effective_contract_hash": "<sha256#22>",
@@ -5241,7 +5254,7 @@
    "run_id": "<run#1>",
    "status": "active",
    "summary": "echo CLI",
-   "tree_ref": "<art#41>"
+   "tree_ref": "<art#44>"
   },
   "delivery_specs": [
    {
@@ -5257,11 +5270,11 @@
       "exit_code": 0,
       "name": "unit-tests",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"src/echo.py\",\"hello\"] exit=0\nhello"
      }
     ],
-    "code_tree_digest": "<sha256#59>",
+    "code_tree_digest": "<sha256#54>",
     "content_hash": "<sha256#60>",
     "created_event_id": "<evt#78>",
     "effective_contract_hash": "<sha256#22>",
@@ -5279,7 +5292,7 @@
     "run_id": "<run#1>",
     "status": "active",
     "summary": "echo CLI",
-    "tree_ref": "<art#41>"
+    "tree_ref": "<art#44>"
    }
   ],
   "department_call_targets": {
@@ -5451,17 +5464,17 @@
       "exit_code": 0,
       "name": "unit-tests",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"src/echo.py\",\"hello\"] exit=0\nhello"
      }
     ],
-    "code_tree_digest": "<sha256#59>",
+    "code_tree_digest": "<sha256#54>",
     "files": [
      "src/echo.py"
     ],
     "kind": "delivery",
     "summary": "echo CLI",
-    "tree_ref": "<art#41>"
+    "tree_ref": "<art#44>"
    },
    {
     "checks": [
@@ -5473,11 +5486,11 @@
       "exit_code": 0,
       "name": "smoke",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"-c\",\"print('smoke ok')\"] exit=0\nsmoke ok"
      }
     ],
-    "code_snapshot_hash": "<sha256#59>",
+    "code_snapshot_hash": "<sha256#54>",
     "defects": [],
     "kind": "qa_review",
     "product_spec_hash": "<sha256#21>",
@@ -5558,11 +5571,11 @@
      "exit_code": 0,
      "name": "smoke",
      "product_spec_hash": "<sha256#21>",
-     "snapshot_hash": "<sha256#59>",
+     "snapshot_hash": "<sha256#54>",
      "summary": "host-executed argv=[\"<python>\",\"-c\",\"print('smoke ok')\"] exit=0\nsmoke ok"
     }
    ],
-   "code_snapshot_hash": "<sha256#59>",
+   "code_snapshot_hash": "<sha256#54>",
    "content_hash": "<sha256#76>",
    "created_event_id": "<evt#95>",
    "defects": [],
@@ -5570,7 +5583,7 @@
    "effective_contract_hash": "<sha256#22>",
    "engineering_plan_hash": "<sha256#39>",
    "evidence_refs": [
-    "<art#50>"
+    "<art#53>"
    ],
    "id": "<qa#1>",
    "issuer": "quality",
@@ -6030,12 +6043,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#28>",
+    "parts_ref": "<art#30>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#29>",
+    "request_ref": "<art#31>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#49>",
     "step_id": 1,
@@ -6048,7 +6061,7 @@
     "budget": 32000,
     "compaction_event_id": null,
     "department": "engineering",
-    "digest": "<sha256#55>",
+    "digest": "<sha256#56>",
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
     "excluded": [
@@ -6076,12 +6089,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#35>",
+    "parts_ref": "<art#38>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#36>",
+    "request_ref": "<art#39>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#67>",
     "step_id": 1,
@@ -6122,12 +6135,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#44>",
+    "parts_ref": "<art#47>",
     "prompt_hash": "<sha256#63>",
     "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#45>",
+    "request_ref": "<art#48>",
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#84>",
     "step_id": 1,
@@ -6366,7 +6379,7 @@
      "response": "Complete SDK response object exposed by the provider SDK when a terminal response was received, with credential and header fields redacted."
     },
     "configured_max_output_tokens": 4800,
-    "context_digest": "<sha256#55>",
+    "context_digest": "<sha256#56>",
     "context_event_id": "<evt#67>",
     "credential_ref": null,
     "credential_version": null,
@@ -6610,11 +6623,11 @@
       "exit_code": 0,
       "name": "smoke",
       "product_spec_hash": "<sha256#21>",
-      "snapshot_hash": "<sha256#59>",
+      "snapshot_hash": "<sha256#54>",
       "summary": "host-executed argv=[\"<python>\",\"-c\",\"print('smoke ok')\"] exit=0\nsmoke ok"
      }
     ],
-    "code_snapshot_hash": "<sha256#59>",
+    "code_snapshot_hash": "<sha256#54>",
     "content_hash": "<sha256#76>",
     "created_event_id": "<evt#95>",
     "defects": [],
@@ -6622,7 +6635,7 @@
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
     "evidence_refs": [
-     "<art#50>"
+     "<art#53>"
     ],
     "id": "<qa#1>",
     "issuer": "quality",
@@ -7489,11 +7502,29 @@
    }
   },
   "<art#23>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#24>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#48>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#25>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#24>": {
+  "<art#26>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7512,7 +7543,7 @@
     "truncated": false
    }
   },
-  "<art#25>": {
+  "<art#27>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7526,17 +7557,17 @@
     "summary": "echo CLI"
    }
   },
-  "<art#26>": {
+  "<art#28>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n\n"
   },
-  "<art#27>": {
+  "<art#29>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#26>"
   },
-  "<art#28>": {
+  "<art#30>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -7634,7 +7665,7 @@
     "<shared#14>"
    ]
   },
-  "<art#29>": {
+  "<art#31>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -7699,7 +7730,7 @@
     "tools": "<shared#16>"
    }
   },
-  "<art#30>": {
+  "<art#32>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7710,7 +7741,7 @@
     "type": "function_call"
    }
   },
-  "<art#31>": {
+  "<art#33>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7721,7 +7752,7 @@
     "type": "function_call"
    }
   },
-  "<art#32>": {
+  "<art#34>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7732,7 +7763,7 @@
     "type": "function_call"
    }
   },
-  "<art#33>": {
+  "<art#35>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7749,12 +7780,22 @@
     "tree_changed": false
    }
   },
-  "<art#34>": {
+  "<art#36>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#54>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#37>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#28>"
   },
-  "<art#35>": {
+  "<art#38>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -7814,7 +7855,7 @@
      "version": "engineering"
     },
     {
-     "digest": "<sha256#57>",
+     "digest": "<sha256#58>",
      "source": "validation_feedback",
      "text": "{\"department\":\"engineering\",\"errors\":[{\"field\":\"check_names\",\"message\":\"no run_check receipt named unit-tests in this activation for the current snapshot, effective contract, and plan. Call run_check with the name unit-tests on the current workspace, then submit_delivery again; run_command results are action receipts and do not count as check receipts.\"}],\"event_id\":\"<evt#63>\",\"phase\":\"ENGINEERING\"}",
      "version": "<evt#63>"
@@ -7844,7 +7885,7 @@
      "version": null
     },
     {
-     "digest": "<sha256#58>",
+     "digest": "<sha256#59>",
      "source": "department_history",
      "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"engineering\\\",\\\"phase\\\":\\\"ENGINEERING\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"engineering\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":null,\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"ENGINEERING\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"}]\",\"role\":\"user\"},{\"arguments\":\"{\\\"assumptions\\\":[],\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"scope\\\":[\\\"src/\\\"],\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\",\"call_id\":\"call-<act#2>-1-1\",\"id\":\"call-<act#2>-1-1\",\"name\":\"submit_plan\",\"type\":\"function_call\"},{\"call_id\":\"call-<act#2>-1-1\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"assumptions\\\":[],\\\"kind\\\":\\\"engineering_plan\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"scope\\\":[\\\"src/\\\"],\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}}\",\"type\":\"function_call_output\"},{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"engineering\\\",\\\"phase\\\":\\\"ENGINEERING\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"依据当前产品要求实现、运行检查并提交交付。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"engineering\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"ENGINEERING\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_engineering_plan]\\n{\\\"assumptions\\\":[],\\\"content_hash\\\":\\\"<sha256#39>\\\",\\\"created_event_id\\\":\\\"<evt#27>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"id\\\":\\\"<plan#1>\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"parent_hash\\\":null,\\\"plan_ref\\\":{\\\"content_hash\\\":\\\"<sha256#40>\\\",\\\"kind\\\":\\\"engineering_plan\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#40>\\\"},\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"revision\\\":1,\\\"run_id\\\":\\\"<run#1>\\\",\\\"scope\\\":[\\\"src/\\\"],\\\"status\\\":\\\"active\\\",\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"}]\",\"role\":\"user\"},{\"arguments\":\"{\\\"content\\\":\\\"import sys\\\\nprint(sys.argv[1])\\\\n\\\",\\\"path\\\":\\\"src/echo.py\\\"}\",\"call_id\":\"write-1\",\"id\":\"write-1\",\"name\":\"write_file\",\"type\":\"function_call\"},{\"arguments\":\"{\\\"name\\\":\\\"unit-tests\\\"}\",\"call_id\":\"command-1\",\"id\":\"command-1\",\"name\":\"run_command\",\"type\":\"function_call\"},{\"arguments\":\"{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"files\\\":[\\\"src/echo.py\\\"],\\\"summary\\\":\\\"echo CLI\\\"}\",\"call_id\":\"submit-1\",\"id\":\"submit-1\",\"name\":\"submit_delivery\",\"type\":\"function_call\"},{\"call_id\":\"write-1\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":\\\"src/echo.py\\\"}\",\"type\":\"function_call_output\"},{\"call_id\":\"command-1\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"argv\\\":[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"],\\\"attempt\\\":1,\\\"executor\\\":\\\"host\\\",\\\"exit_code\\\":0,\\\"name\\\":\\\"unit-tests\\\",\\\"output\\\":\\\"hello\\\",\\\"snapshot_hash\\\":\\\"<sha256#48>\\\",\\\"status\\\":\\\"ok\\\",\\\"truncated\\\":false}}\",\"type\":\"function_call_output\"},{\"call_id\":\"submit-1\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"files\\\":[\\\"src/echo.py\\\"],\\\"kind\\\":\\\"delivery_spec\\\",\\\"summary\\\":\\\"echo CLI\\\"}}\",\"type\":\"function_call_output\"},{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"engineering\\\",\\\"phase\\\":\\\"ENGINEERING\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"依据当前产品要求实现、运行检查并提交交付。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"engineering\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"ENGINEERING\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[validation_feedback]\\n{\\\"department\\\":\\\"engineering\\\",\\\"errors\\\":[{\\\"field\\\":\\\"check_names\\\",\\\"message\\\":\\\"no run_check receipt named unit-tests in this activation for the current snapshot, effective contract, and plan. Call run_check with the name unit-tests on the current workspace, then submit_delivery again; run_command results are action receipts and do not count as check receipts.\\\"}],\\\"event_id\\\":\\\"<evt#45>\\\",\\\"phase\\\":\\\"ENGINEERING\\\"}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_engineering_plan]\\n{\\\"assumptions\\\":[],\\\"content_hash\\\":\\\"<sha256#39>\\\",\\\"created_event_id\\\":\\\"<evt#27>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"id\\\":\\\"<plan#1>\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"parent_hash\\\":null,\\\"plan_ref\\\":{\\\"content_hash\\\":\\\"<sha256#40>\\\",\\\"kind\\\":\\\"engineering_plan\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#40>\\\"},\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"revision\\\":1,\\\"run_id\\\":\\\"<run#1>\\\",\\\"scope\\\":[\\\"src/\\\"],\\\"status\\\":\\\"active\\\",\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"}]\",\"role\":\"user\"},{\"arguments\":\"{\\\"argv\\\":[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"],\\\"name\\\":\\\"unit-tests\\\"}\",\"call_id\":\"check-2\",\"id\":\"check-2\",\"name\":\"run_check\",\"type\":\"function_call\"},{\"arguments\":\"{\\\"content\\\":\\\"import sys\\\\nprint(sys.argv[1])\\\\n\\\\n\\\",\\\"path\\\":\\\"src/echo.py\\\"}\",\"call_id\":\"write-2\",\"id\":\"write-2\",\"name\":\"write_file\",\"type\":\"function_call\"},{\"arguments\":\"{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"files\\\":[\\\"src/echo.py\\\"],\\\"summary\\\":\\\"echo CLI\\\"}\",\"call_id\":\"submit-2\",\"id\":\"submit-2\",\"name\":\"submit_delivery\",\"type\":\"function_call\"},{\"call_id\":\"check-2\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"activation_id\\\":\\\"<act#4>\\\",\\\"delivery_spec_hash\\\":null,\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"executor\\\":\\\"host\\\",\\\"exit_code\\\":0,\\\"name\\\":\\\"unit-tests\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"snapshot_hash\\\":\\\"<sha256#48>\\\",\\\"summary\\\":\\\"host-executed argv=[\\\\\\\"<python>\\\\\\\",\\\\\\\"src/echo.py\\\\\\\",\\\\\\\"hello\\\\\\\"] exit=0\\\\nhello\\\",\\\"tree_changed\\\":false}}\",\"type\":\"function_call_output\"},{\"call_id\":\"write-2\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":\\\"src/echo.py\\\"}\",\"type\":\"function_call_output\"},{\"call_id\":\"submit-2\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"files\\\":[\\\"src/echo.py\\\"],\\\"kind\\\":\\\"delivery_spec\\\",\\\"summary\\\":\\\"echo CLI\\\"}}\",\"type\":\"function_call_output\"},{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"engineering\\\",\\\"phase\\\":\\\"ENGINEERING\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"依据当前产品要求实现、运行检查并提交交付。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"engineering\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"ENGINEERING\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[validation_feedback]\\n{\\\"department\\\":\\\"engineering\\\",\\\"errors\\\":[{\\\"field\\\":\\\"check_names\\\",\\\"message\\\":\\\"no run_check receipt named unit-tests in this activation for the current snapshot, effective contract, and plan. Call run_check with the name unit-tests on the current workspace, then submit_delivery again; run_command results are action receipts and do not count as check receipts.\\\"}],\\\"event_id\\\":\\\"<evt#63>\\\",\\\"phase\\\":\\\"ENGINEERING\\\"}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_engineering_plan]\\n{\\\"assumptions\\\":[],\\\"content_hash\\\":\\\"<sha256#39>\\\",\\\"created_event_id\\\":\\\"<evt#27>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"id\\\":\\\"<plan#1>\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"parent_hash\\\":null,\\\"plan_ref\\\":{\\\"content_hash\\\":\\\"<sha256#40>\\\",\\\"kind\\\":\\\"engineering_plan\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#40>\\\"},\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"revision\\\":1,\\\"run_id\\\":\\\"<run#1>\\\",\\\"scope\\\":[\\\"src/\\\"],\\\"status\\\":\\\"active\\\",\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"}]\",\"role\":\"user\"}]",
      "version": "engineering"
@@ -7852,7 +7893,7 @@
     "<shared#14>"
    ]
   },
-  "<art#36>": {
+  "<art#39>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -7954,7 +7995,7 @@
     "tools": "<shared#16>"
    }
   },
-  "<art#37>": {
+  "<art#40>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7965,7 +8006,7 @@
     "type": "function_call"
    }
   },
-  "<art#38>": {
+  "<art#41>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7976,7 +8017,7 @@
     "type": "function_call"
    }
   },
-  "<art#39>": {
+  "<art#42>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7988,23 +8029,23 @@
     "exit_code": 0,
     "name": "unit-tests",
     "product_spec_hash": "<sha256#21>",
-    "snapshot_hash": "<sha256#59>",
+    "snapshot_hash": "<sha256#54>",
     "summary": "host-executed argv=[\"<python>\",\"src/echo.py\",\"hello\"] exit=0\nhello",
     "tree_changed": false
    }
   },
-  "<art#40>": {
+  "<art#43>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n"
   },
-  "<art#41>": {
+  "<art#44>": {
    "kind": "tree_manifest",
    "media_type": "application/json",
    "content": {
     "blobs": [
      {
-      "artifact": "<art#42>",
+      "artifact": "<art#45>",
       "path": "src/echo.py"
      }
     ],
@@ -8022,20 +8063,20 @@
      ],
      "format": "yudao-public-tree-v1"
     },
-    "tree_digest": "<sha256#59>"
+    "tree_digest": "<sha256#54>"
    }
   },
-  "<art#42>": {
+  "<art#45>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
    "content": "import sys\r\nprint(sys.argv[1])\r\n\r\n"
   },
-  "<art#43>": {
+  "<art#46>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#30>"
   },
-  "<art#44>": {
+  "<art#47>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -8090,7 +8131,7 @@
     {
      "digest": "<sha256#70>",
      "source": "binding_refs",
-     "text": "{\"delivery_code_tree_digest\":\"<sha256#59>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}",
+     "text": "{\"delivery_code_tree_digest\":\"<sha256#54>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}",
      "version": null
     },
     {
@@ -8120,7 +8161,7 @@
     {
      "digest": "<sha256#72>",
      "source": "current_delivery_spec",
-     "text": "{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#59>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#59>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}",
+     "text": "{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#54>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#54>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}",
      "version": "r1"
     },
     {
@@ -8132,7 +8173,7 @@
     {
      "digest": "<sha256#74>",
      "source": "department_history",
-     "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"quality\\\",\\\"phase\\\":\\\"QUALITY\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"独立验证当前交付，提交放行或返工决定。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":\\\"<sha256#59>\\\",\\\"delivery_spec_hash\\\":\\\"<sha256#60>\\\",\\\"delivery_spec_id\\\":\\\"<del#1>\\\",\\\"department\\\":\\\"quality\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"QUALITY\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_engineering_plan]\\n{\\\"assumptions\\\":[],\\\"content_hash\\\":\\\"<sha256#39>\\\",\\\"created_event_id\\\":\\\"<evt#27>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"id\\\":\\\"<plan#1>\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"parent_hash\\\":null,\\\"plan_ref\\\":{\\\"content_hash\\\":\\\"<sha256#40>\\\",\\\"kind\\\":\\\"engineering_plan\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#40>\\\"},\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"revision\\\":1,\\\"run_id\\\":\\\"<run#1>\\\",\\\"scope\\\":[\\\"src/\\\"],\\\"status\\\":\\\"active\\\",\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[current_delivery_spec]\\n{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"checks\\\":[{\\\"activation_id\\\":\\\"<act#5>\\\",\\\"delivery_spec_hash\\\":null,\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"exit_code\\\":0,\\\"name\\\":\\\"unit-tests\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"snapshot_hash\\\":\\\"<sha256#59>\\\",\\\"summary\\\":\\\"host-executed argv=[\\\\\\\"<python>\\\\\\\",\\\\\\\"src/echo.py\\\\\\\",\\\\\\\"hello\\\\\\\"] exit=0\\\\nhello\\\"}],\\\"code_tree_digest\\\":\\\"<sha256#59>\\\",\\\"content_hash\\\":\\\"<sha256#60>\\\",\\\"created_event_id\\\":\\\"<evt#78>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"files\\\":[\\\"src/echo.py\\\"],\\\"id\\\":\\\"<del#1>\\\",\\\"invalidation_reason\\\":null,\\\"known_risks\\\":[],\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1,\\\"status\\\":\\\"active\\\",\\\"summary\\\":\\\"echo CLI\\\",\\\"tree_ref\\\":{\\\"content_hash\\\":\\\"<sha256#61>\\\",\\\"kind\\\":\\\"tree_manifest\\\",\\\"media_type\\\":\\\"application/json\\\",\\\"path\\\":\\\"<run#1>/<sha256#61>\\\"}}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"hash\\\":\\\"<sha256#60>\\\",\\\"id\\\":\\\"<del#1>\\\",\\\"kind\\\":\\\"delivery_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"ENGINEERING->DELIVERY\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"DELIVERY->QUALITY\\\"}]\",\"role\":\"user\"}]",
+     "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":\\\"build an echo CLI\\\",\\\"department\\\":\\\"quality\\\",\\\"phase\\\":\\\"QUALITY\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"独立验证当前交付，提交放行或返工决定。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":1,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":\\\"<sha256#54>\\\",\\\"delivery_spec_hash\\\":\\\"<sha256#60>\\\",\\\"delivery_spec_id\\\":\\\"<del#1>\\\",\\\"department\\\":\\\"quality\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"QUALITY\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"product_spec_id\\\":\\\"<spec#1>\\\",\\\"product_spec_revision\\\":1,\\\"request_id\\\":null}\\n\\n[current_contract]\\n{\\\"content_hash\\\":\\\"<sha256#22>\\\",\\\"created_event_id\\\":\\\"<evt#14>\\\",\\\"decision_hashes\\\":[],\\\"input_version\\\":1,\\\"prd_ref\\\":{\\\"content_hash\\\":\\\"<sha256#23>\\\",\\\"kind\\\":\\\"prd\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#23>\\\"},\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1}\\n\\n[current_engineering_plan]\\n{\\\"assumptions\\\":[],\\\"content_hash\\\":\\\"<sha256#39>\\\",\\\"created_event_id\\\":\\\"<evt#27>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"id\\\":\\\"<plan#1>\\\",\\\"objective\\\":\\\"Implement and verify the current echo CLI requirements\\\",\\\"parent_hash\\\":null,\\\"plan_ref\\\":{\\\"content_hash\\\":\\\"<sha256#40>\\\",\\\"kind\\\":\\\"engineering_plan\\\",\\\"media_type\\\":\\\"text/markdown\\\",\\\"path\\\":\\\"<run#1>/<sha256#40>\\\"},\\\"reason\\\":\\\"\\\",\\\"refactoring\\\":[],\\\"revision\\\":1,\\\"run_id\\\":\\\"<run#1>\\\",\\\"scope\\\":[\\\"src/\\\"],\\\"status\\\":\\\"active\\\",\\\"tasks\\\":[{\\\"outputs\\\":[\\\"src/echo.py\\\"],\\\"title\\\":\\\"Implement the current contract\\\",\\\"verification\\\":\\\"Run the CLI through host checks against the current requirements\\\"}]}\\n\\n[current_product_spec]\\n{\\\"acceptance_criteria\\\":[\\\"running the program with a word prints that word\\\"],\\\"boundaries\\\":[\\\"do not read files\\\"],\\\"change_record\\\":null,\\\"constraints\\\":[\\\"single file implementation\\\"],\\\"content_hash\\\":\\\"<sha256#21>\\\",\\\"created_event_id\\\":\\\"<evt#13>\\\",\\\"decision_changes\\\":[],\\\"fatal_conditions\\\":[\\\"non-zero exit on valid input\\\"],\\\"goal\\\":\\\"build an echo CLI\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"input_version\\\":1,\\\"non_goals\\\":[\\\"network access\\\"],\\\"requirements\\\":[\\\"print the given argument to stdout\\\"],\\\"revision\\\":1,\\\"status\\\":\\\"active\\\"}\\n\\n[current_delivery_spec]\\n{\\\"check_names\\\":[\\\"unit-tests\\\"],\\\"checks\\\":[{\\\"activation_id\\\":\\\"<act#5>\\\",\\\"delivery_spec_hash\\\":null,\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"exit_code\\\":0,\\\"name\\\":\\\"unit-tests\\\",\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"snapshot_hash\\\":\\\"<sha256#54>\\\",\\\"summary\\\":\\\"host-executed argv=[\\\\\\\"<python>\\\\\\\",\\\\\\\"src/echo.py\\\\\\\",\\\\\\\"hello\\\\\\\"] exit=0\\\\nhello\\\"}],\\\"code_tree_digest\\\":\\\"<sha256#54>\\\",\\\"content_hash\\\":\\\"<sha256#60>\\\",\\\"created_event_id\\\":\\\"<evt#78>\\\",\\\"effective_contract_hash\\\":\\\"<sha256#22>\\\",\\\"engineering_plan_hash\\\":\\\"<sha256#39>\\\",\\\"files\\\":[\\\"src/echo.py\\\"],\\\"id\\\":\\\"<del#1>\\\",\\\"invalidation_reason\\\":null,\\\"known_risks\\\":[],\\\"product_spec_hash\\\":\\\"<sha256#21>\\\",\\\"revision\\\":1,\\\"status\\\":\\\"active\\\",\\\"summary\\\":\\\"echo CLI\\\",\\\"tree_ref\\\":{\\\"content_hash\\\":\\\"<sha256#61>\\\",\\\"kind\\\":\\\"tree_manifest\\\",\\\"media_type\\\":\\\"application/json\\\",\\\"path\\\":\\\"<run#1>/<sha256#61>\\\"}}\\n\\n[causal_chain]\\n[{\\\"hash\\\":\\\"<sha256#21>\\\",\\\"id\\\":\\\"<spec#1>\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"hash\\\":\\\"<sha256#60>\\\",\\\"id\\\":\\\"<del#1>\\\",\\\"kind\\\":\\\"delivery_spec\\\",\\\"revision\\\":\\\"r1\\\",\\\"status\\\":\\\"active\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"PRODUCT_SPEC->ENGINEERING\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"ENGINEERING->DELIVERY\\\"},{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"DELIVERY->QUALITY\\\"}]\",\"role\":\"user\"}]",
      "version": "quality"
     },
     {
@@ -8143,13 +8184,13 @@
     }
    ]
   },
-  "<art#45>": {
+  "<art#48>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
     "input": [
      {
-      "content": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"quality\",\"phase\":\"QUALITY\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"独立验证当前交付，提交放行或返工决定。\"}\n\n[department_rules]\n你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"qa_review\":{\"bind\":[\"current_contract.content_hash\",\"current_engineering_plan.content_hash\",\"current_delivery_spec.content_hash\",\"current code snapshot\",\"quality host check receipts; engineering receipts are rejected\"],\"optional\":[\"defects\"],\"required\":[\"kind=qa_review\",\"verdict\",\"rationale\",\"checks\"],\"verdict\":[\"rework_product\",\"rework_engineering\",\"release\"],\"when\":[\"QUALITY\"]}},\"notes\":[\"release 要求缺陷为空且质量检查 exit_code 均为 0。\",\"rework 至少包含一条缺陷。\"],\"submit_tools\":[\"submit_review\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":\"<sha256#59>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_request\",\"submit_review\"]\n\n[current_contract]\n{\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#23>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#23>\"},\"product_spec_hash\":\"<sha256#21>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#39>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#22>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#40>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#40>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#21>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[current_delivery_spec]\n{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#59>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#59>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}\n\n[causal_chain]\n[{\"hash\":\"<sha256#21>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"hash\":\"<sha256#60>\",\"id\":\"<del#1>\",\"kind\":\"delivery_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"},{\"kind\":\"transition\",\"route\":\"ENGINEERING->DELIVERY\"},{\"kind\":\"transition\",\"route\":\"DELIVERY->QUALITY\"}]",
+      "content": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"quality\",\"phase\":\"QUALITY\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"独立验证当前交付，提交放行或返工决定。\"}\n\n[department_rules]\n你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"qa_review\":{\"bind\":[\"current_contract.content_hash\",\"current_engineering_plan.content_hash\",\"current_delivery_spec.content_hash\",\"current code snapshot\",\"quality host check receipts; engineering receipts are rejected\"],\"optional\":[\"defects\"],\"required\":[\"kind=qa_review\",\"verdict\",\"rationale\",\"checks\"],\"verdict\":[\"rework_product\",\"rework_engineering\",\"release\"],\"when\":[\"QUALITY\"]}},\"notes\":[\"release 要求缺陷为空且质量检查 exit_code 均为 0。\",\"rework 至少包含一条缺陷。\"],\"submit_tools\":[\"submit_review\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":\"<sha256#54>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_request\",\"submit_review\"]\n\n[current_contract]\n{\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#23>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#23>\"},\"product_spec_hash\":\"<sha256#21>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#39>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#22>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#40>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#40>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#21>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[current_delivery_spec]\n{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#54>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#54>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}\n\n[causal_chain]\n[{\"hash\":\"<sha256#21>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"hash\":\"<sha256#60>\",\"id\":\"<del#1>\",\"kind\":\"delivery_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"},{\"kind\":\"transition\",\"route\":\"ENGINEERING->DELIVERY\"},{\"kind\":\"transition\",\"route\":\"DELIVERY->QUALITY\"}]",
       "role": "developer"
      },
      "<shared#30>"
@@ -8414,7 +8455,7 @@
     ]
    }
   },
-  "<art#46>": {
+  "<art#49>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -8425,7 +8466,7 @@
     "type": "function_call"
    }
   },
-  "<art#47>": {
+  "<art#50>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -8436,7 +8477,7 @@
     "type": "function_call"
    }
   },
-  "<art#48>": {
+  "<art#51>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -8448,12 +8489,12 @@
     "exit_code": 0,
     "name": "smoke",
     "product_spec_hash": "<sha256#21>",
-    "snapshot_hash": "<sha256#59>",
+    "snapshot_hash": "<sha256#54>",
     "summary": "host-executed argv=[\"<python>\",\"-c\",\"print('smoke ok')\"] exit=0\nsmoke ok",
     "tree_changed": false
    }
   },
-  "<art#49>": {
+  "<art#52>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -8466,7 +8507,7 @@
     "verdict": "release"
    }
   },
-  "<art#50>": {
+  "<art#53>": {
    "kind": "qa_evidence",
    "media_type": "text/plain",
    "content": "verified the delivered echo CLI"
@@ -8642,7 +8683,7 @@
     "version": "engineering"
    },
    {
-    "digest": "<sha256#57>",
+    "digest": "<sha256#58>",
     "source": "validation_feedback",
     "tokens": 104,
     "version": "<evt#63>"
@@ -8672,7 +8713,7 @@
     "version": null
    },
    {
-    "digest": "<sha256#58>",
+    "digest": "<sha256#59>",
     "source": "department_history",
     "tokens": 4456,
     "version": "engineering"
@@ -9312,6 +9353,6 @@
    "content": "<shared#31>",
    "role": "user"
   },
-  "<shared#31>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"quality\",\"phase\":\"QUALITY\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"独立验证当前交付，提交放行或返工决定。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":\"<sha256#59>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#23>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#23>\"},\"product_spec_hash\":\"<sha256#21>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#39>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#22>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#40>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#40>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#21>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[current_delivery_spec]\n{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#59>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#59>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}\n\n[causal_chain]\n[{\"hash\":\"<sha256#21>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"hash\":\"<sha256#60>\",\"id\":\"<del#1>\",\"kind\":\"delivery_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"},{\"kind\":\"transition\",\"route\":\"ENGINEERING->DELIVERY\"},{\"kind\":\"transition\",\"route\":\"DELIVERY->QUALITY\"}]"
+  "<shared#31>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"quality\",\"phase\":\"QUALITY\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"独立验证当前交付，提交放行或返工决定。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":\"<sha256#54>\",\"delivery_spec_hash\":\"<sha256#60>\",\"delivery_spec_id\":\"<del#1>\",\"department\":\"quality\",\"effective_contract_hash\":\"<sha256#22>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#39>\",\"pending_guidance_ids\":[],\"phase\":\"QUALITY\",\"product_spec_hash\":\"<sha256#21>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#23>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#23>\"},\"product_spec_hash\":\"<sha256#21>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#39>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#22>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#40>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#40>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#21>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[current_delivery_spec]\n{\"check_names\":[\"unit-tests\"],\"checks\":[{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"exit_code\":0,\"name\":\"unit-tests\",\"product_spec_hash\":\"<sha256#21>\",\"snapshot_hash\":\"<sha256#54>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"src/echo.py\\\",\\\"hello\\\"] exit=0\\nhello\"}],\"code_tree_digest\":\"<sha256#54>\",\"content_hash\":\"<sha256#60>\",\"created_event_id\":\"<evt#78>\",\"effective_contract_hash\":\"<sha256#22>\",\"engineering_plan_hash\":\"<sha256#39>\",\"files\":[\"src/echo.py\"],\"id\":\"<del#1>\",\"invalidation_reason\":null,\"known_risks\":[],\"product_spec_hash\":\"<sha256#21>\",\"revision\":1,\"status\":\"active\",\"summary\":\"echo CLI\",\"tree_ref\":{\"content_hash\":\"<sha256#61>\",\"kind\":\"tree_manifest\",\"media_type\":\"application/json\",\"path\":\"<run#1>/<sha256#61>\"}}\n\n[causal_chain]\n[{\"hash\":\"<sha256#21>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"hash\":\"<sha256#60>\",\"id\":\"<del#1>\",\"kind\":\"delivery_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"},{\"kind\":\"transition\",\"route\":\"ENGINEERING->DELIVERY\"},{\"kind\":\"transition\",\"route\":\"DELIVERY->QUALITY\"}]"
  }
 }

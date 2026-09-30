@@ -2198,6 +2198,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#22>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2261,6 +2262,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#22>",
     "args": {
      "name": "serve"
     },
@@ -2288,7 +2290,7 @@
     "model_id": "fake-model",
     "name": "run_command",
     "ok": true,
-    "output_ref": "<art#22>",
+    "output_ref": "<art#23>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2403,6 +2405,7 @@
   "context_window": 32000,
   "cost": 0.0,
   "cycle_count": 3,
+  "definitions_version": "<definitions>",
   "delivery_spec": null,
   "delivery_specs": [],
   "department_call_targets": {
@@ -4135,6 +4138,14 @@
    }
   },
   "<art#22>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#23>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {

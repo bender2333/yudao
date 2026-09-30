@@ -27,7 +27,7 @@ from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
     DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, UNKNOWN_ACTION, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision,
-    blocks_run,
+    blocks_activation, blocks_run,
 )
 from .environment import LocalEnvironment
 from .deltas import DeltaChannel
@@ -46,13 +46,14 @@ from .models import (
     EventType,
     TERMINAL_PHASES,
     department_for_phase,
+    json_dumps,
     new_id,
 )
 from .providers import ProviderConnections, ProviderFacade
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
-from .recovery import classify_actions, build_unknown_action_request
+from .recovery import ACTION_UNKNOWN, build_unknown_action_request, classify_actions, resolved_by_decision
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
 from .tools import normalize_registered_commands
@@ -637,7 +638,7 @@ class Orchestrator:
                 return
             current = DEFINITIONS.version
             transaction.append(NewEvent(
-                EventType.DECISION_REQUESTED, actor="system", role=projection.active_department,
+                EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
                 state_before=projection.phase, state_after=projection.phase,
                 payload={
                     "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
@@ -653,41 +654,36 @@ class Orchestrator:
 
         self.writes.transact(run_stream(run_id), request)
     def _await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #17：恢复时检查是否有未确认的动作，为每个 unknown 动作发出决定请求。
-        # 动作级阻塞（blocks="action"）不阻塞整个 run，只阻塞该动作的执行。
+        # 工单 #17（恢复契约第 4 节）：恢复时找出结果未知的动作，逐个发出「核实结果未知的动作」决定请求。
+        # 请求只阻塞这个动作（blocks=action），不阻塞整个 run；「重新执行」只在动作契约声明可以重复时给出。
+        # 同一个动作只发一次请求：已经有它未回答的请求时不再发
         def request(transaction: Transaction) -> None:
             projection = transaction.projection
             if projection.phase in TERMINAL_PHASES:
                 return
-            # 分类所有动作，找出 status="unknown" 的
             actions = classify_actions(transaction.events())
-            for action_id, info in actions.items():
-                if info["status"] != "unknown":
+            resolved = resolved_by_decision(transaction.events(), transaction.decisions.values())
+            for identity, info in actions.items():
+                if info["status"] != ACTION_UNKNOWN or info["started_event"] is None or identity in resolved:
                     continue
-                # 检查是否已有针对该动作的 open 决定请求
-                has_open_request = any(
-                    decision.request.get("kind") == UNKNOWN_ACTION.name
-                    and decision.request.get("action_id") == action_id
-                    and decision.status == "open"
-                    for decision in transaction.decisions.values()
-                )
-                if has_open_request:
+                action_id = identity[2]
+                if any(decision.request.get("kind") == UNKNOWN_ACTION.name
+                       and decision.request.get("action_id") == action_id
+                       and decision.status == "open"
+                       for decision in transaction.decisions.values()):
                     continue
-                # 构造决定请求
-                tool_name = info["tool"]
-                request_payload = build_unknown_action_request(
-                    action_id=action_id,
-                    tool_name=tool_name,
-                    department=projection.active_department,
-                    phase=projection.phase,
-                    repeatable=info.get("repeatable", False),
-                )
+                tool_def = DEFINITIONS.tools.get(info["tool"])
+                payload = build_unknown_action_request(
+                    action_id=action_id, tool=info["tool"],
+                    action_kind="" if tool_def is None or tool_def.action is None else tool_def.action,
+                    department=projection.active_department or "",
+                    facts=[info["started_event"].event_id])
                 transaction.append(NewEvent(
-                    EventType.DECISION_REQUESTED, actor="system", role=projection.active_department,
+                    EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
                     state_before=projection.phase, state_after=projection.phase,
-                    payload=request_payload,
+                    payload=payload,
                 ))
-                transaction.on_commit(lambda: self._wake(run_id))
+            transaction.on_commit(lambda: self._wake(run_id))
 
         self.writes.transact(run_stream(run_id), request)
 
@@ -701,7 +697,7 @@ class Orchestrator:
             # 执行权编号在写入口以已记录的编号加一确定；另一方先取得时流版本同时改变，
             # 这里的依据过期，事务因版本不符重新判断，因此这个编号与写入口确定的编号相同
             transaction.append(NewEvent(
-                EventType.RUN_RESUMED, role=projection.active_department, actor="system",
+                EventType.RUN_RESUMED, department=projection.active_department, actor="system",
                 state_before=projection.phase, state_after=projection.phase,
                 parent_event_id=projection.last_event_id,
                 payload={
@@ -743,7 +739,7 @@ class Orchestrator:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
                     return await asyncio.to_thread(self._settled, run_id)
-                if blocks_run(snapshot.decisions.values()):
+                if blocks_run(snapshot.decisions.values()) or blocks_activation(snapshot.decisions.values()):
                     return projection
                 await self._activate_once(run_id, connections)
         finally:
@@ -871,8 +867,8 @@ class Orchestrator:
             self._run_start_times[run_id] = time.monotonic()
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
-        if blocks_run(transaction.decisions.values()):
-            # 等待用户回答阻塞 run 的决定请求：不开始新的激活，什么也不写
+        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+            # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
             return None
         projection = self._close_obsolete_request(transaction)
         if projection.phase in TERMINAL_PHASES:
@@ -1374,11 +1370,38 @@ class Orchestrator:
             if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name, UNKNOWN_ACTION.name):
                 self._fail(transaction, "cancelled", "run stopped by the user's decision")
                 return None
-            if blocks_run(transaction.decisions.values()):
+            if decision.kind == UNKNOWN_ACTION.name and option == "continue":
+                # 工单 #17：用户选择按当前实际状态继续——写一条核实记录，不改写原来的观察；它让这个动作
+                # 得到处置，也进入部门历史，模型据此继续。选择重新执行时不写核实记录，由步骤驱动补执行
+                self._verify_unknown_action(transaction, decision, note)
+            if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
                 return None
             return projection.run_id
 
         return self.writes.transact(saved.stream, answer, command=command)
+
+    def _verify_unknown_action(self, transaction: Transaction, decision: DecisionRequest,
+                               note: str | None) -> None:
+        # 核实结果未知的动作（工单 #17）：用户选择按当前实际状态继续时追加一条核实记录。不改写原来的
+        # tool_started 观察；动作身份与上下文取自决定请求的载荷与原始 tool_started 事件
+        action_id = str(decision.request.get("action_id") or "")
+        started = next((event for event in transaction.events()
+                        if event.type == EventType.TOOL_STARTED
+                        and str((event.payload or {}).get("id")) == action_id), None)
+        if started is None:
+            return
+        payload = started.payload
+        result = {"ok": True, "output": {"resolved": "continue", "note": note}, "error": None}
+        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
+        transaction.append(NewEvent(
+            EventType.ACTION_VERIFIED, actor="system", department=started.department,
+            state_before=transaction.projection.phase, state_after=transaction.projection.phase,
+            parent_event_id=started.event_id,
+            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
+                     "activation_id": payload.get("activation_id"),
+                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
+                     "ok": True, "resolution": "continue", "note": note, "decision_id": decision.decision_id},
+        ))
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 新的输入或指导：user_input_received、department_prompt_updated 与 department_guidance_received 由用户提出，

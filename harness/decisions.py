@@ -47,6 +47,11 @@ def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
     # 有未回答、阻塞整个 run 的决定请求
     return any(decision.status == "open" and decision.blocks == "run" for decision in decisions)
 
+def blocks_activation(decisions: Iterable[DecisionRequest]) -> bool:
+    # 有未回答的「核实结果未知的动作」请求：在它得到回答以前，依赖这个动作的下一步不继续。
+    # 动作级阻塞与 run 级阻塞一样不让流程编排开始新的激活，区别只在决定请求的阻塞范围标注为动作
+    return any(decision.status == "open" and decision.kind == UNKNOWN_ACTION.name for decision in decisions)
+
 
 class DecisionNotFound(KeyError):
     def __init__(self, decision_id: str) -> None:

@@ -40,6 +40,7 @@ RUN_EVENT_TYPES = frozenset({
     "tool_called",
     "tool_started",
     "tool_skipped",
+    "action_verified",
     "proposal_submitted",
     "proposal_rejected",
     "spec_accepted",
