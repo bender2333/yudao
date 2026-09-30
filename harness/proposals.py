@@ -142,6 +142,85 @@ def plan_turn(**kwargs: Any) -> Callable[[ModelCall], dict[str, Any]]:
 
     return submit
 
+def structure(
+    *,
+    overall: str = "The repository is a single Python package with a console entry point.",
+    modules: list[dict[str, str]] | None = None,
+    entry_points: list[dict[str, str]] | None = None,
+    build_and_test: list[dict[str, Any]] | None = None,
+    requirement_locations: list[dict[str, Any]] | None = None,
+    conventions: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "kind": "structure",
+        "overall": overall,
+        "modules": modules or [{"path": "src/", "responsibility": "the package implementation"}],
+        "entry_points": entry_points or [{"kind": "command_line", "path": "src/echo.py", "how_to_run": "python src/echo.py"}],
+        "build_and_test": build_and_test or [{"name": "smoke", "argv": ["python", "src/echo.py"], "purpose": "run the CLI"}],
+        "requirement_locations": requirement_locations or [
+            {"requirement": "print the given argument to stdout", "locations": ["src/echo.py"]},
+        ],
+        "conventions": conventions or [],
+    }
+
+def structure_turn(
+    *,
+    overall: str = "The repository is a single Python package with a console entry point.",
+    modules: list[dict[str, str]] | None = None,
+    entry_points: list[dict[str, str]] | None = None,
+    checks: dict[str, int | dict[str, Any]] | None = None,
+    build_and_test: list[dict[str, Any]] | None = None,
+    requirement_locations: list[dict[str, Any]] | None = None,
+    conventions: list[str] | None = None,
+    transcript: str = "",
+) -> FakeTurn:
+    checks = {"smoke": 0} if checks is None else checks
+    if build_and_test is None:
+        build_and_test = [{"name": name, "argv": ["python", "src/echo.py"], "purpose": "run the CLI"} for name in checks]
+    return FakeTurn(
+        proposal=structure(overall=overall, modules=modules, entry_points=entry_points,
+                           build_and_test=build_and_test, requirement_locations=requirement_locations,
+                           conventions=conventions),
+        checks=checks,
+        transcript=transcript,
+    )
+
+def baseline_review(
+    verdict: str = "consistent",
+    *,
+    conclusions: list[dict[str, str]] | None = None,
+    omissions: list[dict[str, str]] | None = None,
+    checks: list[str] | None = None,
+    other_failures: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "kind": "baseline_review",
+        "verdict": verdict,
+        "conclusions": conclusions or [
+            {"requirement": "print the given argument to stdout", "status": "verified", "evidence": "smoke"},
+        ],
+        "omissions": omissions or [],
+        "checks": checks or ["smoke"],
+        "other_failures": other_failures or [],
+    }
+
+def baseline_review_turn(
+    verdict: str = "consistent",
+    *,
+    conclusions: list[dict[str, str]] | None = None,
+    omissions: list[dict[str, str]] | None = None,
+    checks: dict[str, int | dict[str, Any]] | None = None,
+    other_failures: list[dict[str, str]] | None = None,
+    transcript: str = "",
+) -> FakeTurn:
+    checks = {"smoke": 0} if checks is None else checks
+    return FakeTurn(
+        proposal=baseline_review(verdict, conclusions=conclusions, omissions=omissions,
+                                 checks=list(checks), other_failures=other_failures),
+        checks=checks,
+        transcript=transcript,
+    )
+
 
 def review(
     verdict: str,

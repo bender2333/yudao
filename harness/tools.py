@@ -1,5 +1,6 @@
 # 工具：工具的类别、动作类别、提交的提案种类、描述与参数取自定义（definitions/tools.json），各部门可以使用的工具
-# 取自定义的角色（definitions/roles.json）；这里是读取它们的函数，以及项目登记命令的校验。
+# 取自定义的角色（definitions/roles.json）与事项种类（definitions/work_items.json）；这里是读取它们的函数，
+# 以及项目登记命令的校验。
 # 主机工具由步骤驱动执行，环境工具的动作由执行环境（environment.py）执行。
 
 from __future__ import annotations
@@ -44,13 +45,19 @@ def normalize_registered_commands(registry: dict[str, Any] | None) -> dict[str, 
     return {name: validate_registered_command(name, config) for name, config in registry.items()}
 
 
-def tools_for(department: str) -> list[str]:
-    # 部门的角色可以使用的工具，按角色定义中的顺序
-    return list(DEFINITIONS.role(department).tools)
+def tools_for(department: str, kind: str = "change") -> list[str]:
+    # 部门在这种事项种类中可以使用的工具：普通事项按角色定义中的顺序，建档事项按事项种类中的清单
+    return DEFINITIONS.tools_for(department, kind)
 
 
-def has_tool(department: str, name: str) -> bool:
-    return name in DEFINITIONS.role(department).tools
+def has_tool(department: str, name: str, kind: str = "change") -> bool:
+    return name in DEFINITIONS.tools_for(department, kind)
+
+
+def proposal_kinds(department: str, kind: str = "change") -> set[str]:
+    # 部门在这种事项种类中可以提交的提案种类，由该种类给出的工具里的提交类工具得出
+    return {DEFINITIONS.tools[name].proposal for name in DEFINITIONS.tools_for(department, kind)
+            if name in DEFINITIONS.tools and DEFINITIONS.tools[name].proposal is not None}
 
 
 def tool_kind(name: str) -> str | None:
