@@ -38,6 +38,7 @@ from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_ru
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
+from .overview import repository_overview
 from .models import (
     Event as RunEvent,
     DEPARTMENTS,
@@ -248,6 +249,7 @@ class Orchestrator:
         prompt_config_versions: dict[str, int] | None = None,
         registered_commands: dict[str, Any] | None = None,
         command_versions: dict[str, int] | None = None,
+        kind: str = "change",
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -259,6 +261,12 @@ class Orchestrator:
             raise ValueError("context_window must be positive")
         if self.facade is None and self.test_adapter_factory is None:
             raise ValueError("provider facade is required for production runs")
+        if kind not in DEFINITIONS.work_items.kinds:
+            raise ValueError(f"work item kind {kind!r} is not defined in work_items.json")
+        if kind == "onboarding":
+            # 建档事项由快照开始：没有采纳成果，也没有可写的工作区（工单 #134）
+            if code_snapshot is None or initial_tree is None or baseline is not None:
+                raise ValueError("an onboarding run requires a code snapshot with its initial tree and has no baseline")
         _validate_run_ownership(
             project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
             code_snapshot=code_snapshot,
@@ -273,13 +281,28 @@ class Orchestrator:
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
         environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
         workspace_digest = environment.snapshot().digest
-        initial = self.interactions.initial(run_id, task, department_prompts=department_prompts)
+        # 事项种类的部门说明优先于项目里配置的角色说明（工单 #134）：建档的读取顺序与粒度规则写在种类定义中
+        fallback = department_prompts if department_prompts is not None else {
+            department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS
+        }
+        prompts = {
+            department: (work.prompt if (work := DEFINITIONS.department_work(department, kind)) is not None
+                         else fallback[department])
+            for department in DEPARTMENTS
+        }
+        initial = self.interactions.initial(run_id, task, department_prompts=prompts)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
         project_context_ref = None
         if project_context is not None:
             project_context_ref = asdict(self.artifacts.put(
                 run_id, "project_context", project_context, media_type="text/markdown",
+            ))
+        overview_ref = None
+        if kind == "onboarding":
+            # 仓库概况由快照的公开树确定性地生成，作为建档中部门读取的第一项材料（设计第 4.1、4.2 节）
+            overview_ref = asdict(self.artifacts.put(
+                run_id, "repository_overview", repository_overview(initial_tree), media_type="text/markdown",
             ))
         run_created = NewEvent(
             EventType.RUN_CREATED,
@@ -289,6 +312,7 @@ class Orchestrator:
             state_after="PRODUCT_SPEC",
             payload={
                 "task": task,
+                "kind": kind,
                 **initial,
                 "intend_path": (Path("materials") / run_id / "intend.md").as_posix(),
                 "max_cycles": max_cycles,
@@ -301,6 +325,7 @@ class Orchestrator:
                 "work_item_id": work_item_id,
                 "baseline": baseline,
                 "snapshot": code_snapshot,
+                "overview_ref": overview_ref,
                 "workspace_digest": workspace_digest,
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),
@@ -1210,7 +1235,9 @@ class Orchestrator:
                 payload={"from": source, "to": target, "route": f"{source}->{target}"},
             ))
             if target == "DONE":
-                self._withdraw_decisions(transaction, "released")
+                # 进入 DONE 的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
+                stop_reason = DEFINITIONS.work_item(projection.kind).stop_reason
+                self._withdraw_decisions(transaction, stop_reason)
                 transaction.append(NewEvent(
                     EventType.RUN_DONE,
                     actor="system",
@@ -1219,8 +1246,8 @@ class Orchestrator:
                     state_before="QUALITY",
                     state_after="DONE",
                     session_id=session_id,
-                    stop_reason="released",
-                    payload={"stop_reason": "released"},
+                    stop_reason=stop_reason,
+                    payload={"stop_reason": stop_reason},
                 ))
                 transaction.on_commit(lambda: self.sessions.close_run(run_id))
         self._resume_yielded_work(
@@ -1419,7 +1446,7 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入。
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。完成（放行或基线核验）只由接纳写入。
         # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径
         outcome = DEFINITIONS.stop_reason(reason).outcome
         if outcome == "paused":
@@ -1427,7 +1454,7 @@ class Orchestrator:
         elif outcome == "failed":
             self._fail(transaction, reason, message)
         else:
-            raise ValueError(f"stop reason {reason} ends a run by release, which only an accepted QA review records")
+            raise ValueError(f"stop reason {reason} ends a run as completed, which only an accepted final proposal records")
 
     def _withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
         # 运行结束：撤销未回答的决定请求，reason 是结束运行的停止原因

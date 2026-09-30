@@ -772,12 +772,125 @@
         }
       },
       "additionalProperties": false,
-      "required": [
-        "verdict",
-        "rationale",
-        "checks"
-      ]
-    },
-    "repeatable": false
+      "required": ["verdict", "rationale", "checks"]
+    }
+  },
+  "submit_structure": {
+    "kind": "host",
+    "proposal": "structure",
+    "guidance_only": false,
+    "description": "Submit the existing-structure description of an onboarding run. Write only what requires reading several files to establish and what later work can easily get wrong: no generic advice, no complete file tree, nothing you cannot verify. Every entry in build_and_test must have a run_check receipt from this activation on the current workspace snapshot; the recorded exit status is taken from that receipt, and an exit status other than 0 is accepted as it is. Onboarding gives you no write, edit, delete or move tools, so the workspace tree must still equal the snapshot when you submit.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "overall": {"type": "string", "description": "How the repository is composed and how it runs"},
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {"type": "string", "description": "Workspace-relative file or directory"},
+              "responsibility": {"type": "string", "description": "What this module is responsible for"}
+            },
+            "additionalProperties": false,
+            "required": ["path", "responsibility"]
+          }
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {"type": "string", "enum": ["program", "command_line", "service"]},
+              "path": {"type": "string", "description": "Workspace-relative file"},
+              "how_to_run": {"type": "string", "description": "The command that starts it"}
+            },
+            "additionalProperties": false,
+            "required": ["kind", "path", "how_to_run"]
+          }
+        },
+        "build_and_test": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "The name you passed to run_check"},
+              "argv": {"type": "array", "items": {"type": "string"}, "description": "The argv you passed to run_check"},
+              "purpose": {"type": "string", "description": "What this command builds or tests"}
+            },
+            "additionalProperties": false,
+            "required": ["name", "argv", "purpose"]
+          },
+          "description": "Each entry needs a run_check receipt from this activation bound to the current snapshot"
+        },
+        "requirement_locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {"type": "string", "description": "The initial PRD requirement, written as it appears"},
+              "locations": {"type": "array", "items": {"type": "string"}, "description": "Main files or directories, workspace-relative"}
+            },
+            "additionalProperties": false,
+            "required": ["requirement", "locations"]
+          }
+        },
+        "conventions": {"type": "array", "items": {"type": "string"}, "description": "Code generation, special environment variables, slow tests or tests that need an external service"}
+      },
+      "additionalProperties": false,
+      "required": ["overall", "modules", "entry_points", "build_and_test", "requirement_locations"]
+    }
+  },
+  "submit_baseline_review": {
+    "kind": "host",
+    "proposal": "baseline_review",
+    "guidance_only": false,
+    "description": "Submit the baseline review of an onboarding run. Do not apply the release rules of a normal work item: a check that exits non-zero does not by itself reject the baseline. conclusions carries exactly one conclusion for every requirement of the current initial PRD, with status verified (evidence names a passing check), read_only (evidence gives the location that supports it), existing_defect (evidence names the failing check) or unsupported (code, documentation and tests none of them support the description). checks are the run_check receipts of this activation bound to the current snapshot and the current ProductSpec, at least one, and the recorded exit status is taken from the receipt. Every check with a non-zero exit status that no existing_defect conclusion references must appear in other_failures with the reason. consistent requires no unsupported conclusion, no omission and no unexplained failing check; rework_product requires at least one unsupported conclusion or one omission. Engineering receipts are not accepted as QA evidence.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "verdict": {"type": "string", "enum": ["consistent", "rework_product"]},
+        "conclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {"type": "string", "description": "The initial PRD requirement, written as it appears"},
+              "status": {"type": "string", "enum": ["verified", "read_only", "existing_defect", "unsupported"]},
+              "evidence": {"type": "string", "description": "A passing check name, a location, or the failing check name"}
+            },
+            "additionalProperties": false,
+            "required": ["requirement", "status", "evidence"]
+          }
+        },
+        "omissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "capability": {"type": "string", "description": "An outward-facing capability missing from the initial PRD"},
+              "location": {"type": "string", "description": "Where it lives in the repository, workspace-relative"}
+            },
+            "additionalProperties": false,
+            "required": ["capability", "location"]
+          }
+        },
+        "checks": {"type": "array", "items": {"type": "string"}, "description": "Baseline check names run via run_check in this activation"},
+        "other_failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "check": {"type": "string", "description": "The failing check name"},
+              "reason": {"type": "string", "description": "Why it fails, for example it needs network or an external service"}
+            },
+            "additionalProperties": false,
+            "required": ["check", "reason"]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": ["verdict", "conclusions", "checks"]
+    }
   }
 }
