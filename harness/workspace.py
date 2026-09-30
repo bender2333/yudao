@@ -70,6 +70,12 @@ class Workspace:
             raise TreeError(f"Excluded by the project's ignore rules: {rel}")
         return self.resolve(rel)
 
+    def resolve_readable(self, rel: str) -> Path:
+        # 按路径阅读的目标：与写入、目录与搜索一致，被项目忽略规则排除的路径拒绝阅读
+        if rel in excluded_by_ignore_rules(self.root, (rel,)):
+            raise TreeError(f"Excluded by the project's ignore rules: {rel}")
+        return self.resolve(rel)
+
     def write_file(self, rel: str, content: str) -> str:
         path = self.resolve_writable(rel)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,7 +84,7 @@ class Workspace:
         return rel
 
     def read_file(self, rel: str) -> str:
-        path = self.resolve(rel)
+        path = self.resolve_readable(rel)
         return path.read_text(encoding="utf-8")
 
     def list_files(self, prefix: str | None = None) -> list[str]:

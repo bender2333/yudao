@@ -260,7 +260,7 @@ class LocalEnvironment:
             if cursor.get("path") != rel or cursor.get("start_line") != start or cursor.get("end_line") != end:
                 raise ValueError("cursor does not match the current read_range arguments")
             offset = cursor["offset"]
-        self.workspace.resolve(rel)
+        self.workspace.resolve_readable(rel)
         snapshot = self.workspace.snapshot()
         digest = snapshot.digest
         if cursor is not None and cursor.get("digest") != digest:

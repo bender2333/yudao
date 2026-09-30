@@ -201,6 +201,37 @@ def test_write_to_an_ignored_path_is_refused_with_the_ignore_rule_reason(tmp_pat
     assert not os.path.lexists(workspace.root / "node_modules")
     assert str(workspace.root) not in (receipt.error or "")
 
+def test_read_of_an_ignored_regular_file_is_refused_with_the_ignore_rule_reason(tmp_path):
+    try:
+        os.symlink(tmp_path / "nowhere", tmp_path / "link-probe")
+    except OSError:
+        pytest.skip("symbolic links are unavailable")
+    system = _system(tmp_path, [])
+    run_id = system.create_run("Ignored paths refuse reads", registered_commands=REGISTRY,
+                               command_versions={"make-link": 1})
+    workspace = system.workspace(run_id)
+    workspace.write_file(".gitignore", "node_modules/\n")
+    (workspace.root / "node_modules").mkdir()
+    (workspace.root / "node_modules" / "dep.js").write_text("const dep = 1;\n", encoding="utf-8")
+    environment = system.environment(run_id)
+    # 常规文件按路径阅读同样被拒绝，原因写明被忽略规则排除并使用相对路径
+    reading = _perform(environment, "read_file", {"path": "node_modules/dep.js"})
+    assert reading.ok is False
+    assert "Excluded by the project's ignore rules" in (reading.error or "")
+    assert "node_modules/dep.js" in (reading.error or "")
+    assert str(workspace.root) not in (reading.error or "")
+    # read_range 走同一个判断
+    ranged = _perform(environment, "read_range",
+                      {"path": "node_modules/dep.js", "start_line": 1, "end_line": 1})
+    assert ranged.ok is False
+    assert "Excluded by the project's ignore rules" in (ranged.error or "")
+    assert "node_modules/dep.js" in (ranged.error or "")
+    assert str(workspace.root) not in (ranged.error or "")
+    # 未被忽略的常规文件仍可阅读
+    normal = _perform(environment, "read_file", {"path": ".gitignore"})
+    assert normal.ok is True and normal.output == "node_modules/\n"
+
+
 def test_delivery_adoption_tree_excludes_ignored_directories(tmp_path):
     try:
         os.symlink(tmp_path / "nowhere", tmp_path / "link-probe")
