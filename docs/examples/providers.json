@@ -39,10 +39,7 @@
       "model": "gpt-5.6-luna",
       "context_window": 128000,
       "max_output_tokens": 8192,
-      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证",
-      "admitted_at": null,
-      "admitted_revision": null,
-      "admitted_model": null
+      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证"
     },
     {
       "id": "go-glm-chat",
@@ -50,10 +47,7 @@
       "model": "glm-5.1",
       "context_window": 128000,
       "max_output_tokens": 8192,
-      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证",
-      "admitted_at": "2026-09-19T00:00:00+00:00",
-      "admitted_revision": 3,
-      "admitted_model": "glm-5.1"
+      "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证"
     },
     {
       "id": "custom-responses",
@@ -61,10 +55,7 @@
       "model": "your-model-id",
       "context_window": 64000,
       "max_output_tokens": 4096,
-      "capability_source": "自定义连接：按服务实际能力填写",
-      "admitted_at": "2026-09-19T00:00:00+00:00",
-      "admitted_revision": 3,
-      "admitted_model": "your-model-id"
+      "capability_source": "自定义连接：按服务实际能力填写"
     }
   ],
   "bindings": {

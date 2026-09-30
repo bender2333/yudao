@@ -2,6 +2,7 @@
 # 只含可以序列化的数据；OpenAPI 与客户端的接口类型都由这里的 pydantic 类型生成。
 
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union, get_args
+from uuid import uuid4
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, create_model
 
@@ -40,9 +41,10 @@ REJECTION_REASONS: tuple[str, ...] = get_args(RejectionReason)
 
 
 class CommandRequest(Contract):
-    # 每个命令请求的公共字段：命令身份由客户端生成，重试使用同一个值；基准版本是用户作出操作时所依据对象的版本。
-    # 新建类命令没有依据的对象，把 base_version 限定为空
-    command_id: CommandId
+    # 每个命令请求的公共字段：命令身份由客户端生成，重试使用同一个值；经接口提交时必须带身份。
+    # 直接构造（校验请求内容、界面表单行）时可以省略，省略时生成一次性身份；
+    # 基准版本是用户作出操作时所依据对象的版本，新建类命令没有依据的对象，把 base_version 限定为空
+    command_id: CommandId = Field(default_factory=lambda: str(uuid4()))
     base_version: int | None = None
 
 

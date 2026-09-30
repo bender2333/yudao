@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from harness.adapters.fake import FakeAdapter
 from harness.providers import CredentialChain, ProviderFacade
 from harness.providers.store import ProviderStore
 from harness.providers.errors import CatalogValidationError
@@ -199,15 +200,33 @@ def test_changing_capacity_keeps_admission(tmp_path):
     )
     assert facade.model_admissions()[0]["stale"] is False
 
+def test_replacing_the_key_under_the_same_credential_ref_keeps_admission(tmp_path):
+    # 更换同一凭据引用下的 Key 不改动引用字段，准入保持（设计第 4.4 节）
+    from harness.providers import CredentialMaterial
+
+    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade.configure_paths(tmp_path / "providers.json", tmp_path / ".env")
+    facade.store_document({
+        "providers": [_provider()], "models": [_model("m1")], "bindings": {},
+    })
+    facade.set_credential_override("KEY_1", CredentialMaterial("secret-a", version="v1"))
+    facade.record_admission("p1", "m1", admitted_model="model-x")
+    facade.set_credential_override("KEY_1", CredentialMaterial("secret-b", version="v2"))
+    assert facade.model_admissions()[0]["admitted"] is True
+    assert facade.model_admissions()[0]["stale"] is False
+
 def test_testing_one_model_does_not_affect_the_other(tmp_path):
     facade = _facade(tmp_path, providers=[_provider()], models=[_model("m1"), _model("m2")])
     facade.record_admission("p1", "m1", admitted_model="model-x")
     facade.record_admission("p1", "m2", admitted_model="model-x")
-    before = {item["model_id"]: item["admitted_at"] for item in facade.model_admissions()}
+    before = {item["model_id"]: item for item in facade.model_admissions()}
     facade.record_admission("p1", "m2", admitted_model="model-x-again")
-    after = {item["model_id"]: item["admitted_at"] for item in facade.model_admissions()}
+    after = {item["model_id"]: item for item in facade.model_admissions()}
+    # 测试 m2 只重写 m2 的记录：m1 的测试时间、实际返回模型与有效性都不变
     assert after["m1"] == before["m1"]
-    assert after["m2"] != before["m2"] or True
+    assert after["m1"]["admitted"] is True and after["m1"]["stale"] is False
+    assert after["m2"]["admitted_model"] == "model-x-again"
+    assert before["m2"]["admitted_model"] == "model-x"
 
 def test_saving_department_defaults_does_not_make_admission_stale(tmp_path):
     # 评论追加验收：保存部门默认以后，已有准入不显示为陈旧
@@ -268,3 +287,22 @@ def test_fake_protocol_allowed_on_demo_startup(tmp_path):
         "bindings": {},
     })
     assert "p1" in facade.providers_view()["providers"][0]["id"]
+
+def test_system_with_adapter_factory_reads_catalog_in_test_mode(tmp_path):
+    # 只提供适配器工厂的测试系统在运行时写入 fake 连接：装配的目录必须按 test 方式读取，
+    # 与提供单个适配器的系统一致（工单 #86）
+    from harness.runtime import LoopSystem
+
+    system = LoopSystem(tmp_path / "data", test_adapter_factory=lambda _department: FakeAdapter([]))
+    try:
+        assert system.facade.startup_mode == "test"
+        facade = system.facade
+        facade.configure_paths(tmp_path / "providers.json", tmp_path / ".env")
+        facade.store_document({
+            "providers": [_provider(protocol="fake", credential_ref="")],
+            "models": [_model()],
+            "bindings": {},
+        })
+        assert facade.providers_view()["providers"][0]["id"] == "p1"
+    finally:
+        system.close()

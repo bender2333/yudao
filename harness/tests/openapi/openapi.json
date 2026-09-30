@@ -3402,6 +3402,13 @@
             "type": "array",
             "title": "Models"
           },
+          "admissions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAdmission"
+            },
+            "type": "array",
+            "title": "Admissions"
+          },
           "bindings": {
             "additionalProperties": {
               "$ref": "#/components/schemas/CatalogBinding"
@@ -3419,9 +3426,111 @@
           "presets",
           "providers",
           "models",
+          "admissions",
           "bindings"
         ],
         "title": "Catalog"
+      },
+      "CatalogAdmission": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "admitted": {
+            "type": "boolean",
+            "title": "Admitted"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "admitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted At"
+          },
+          "admitted_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted Model"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider_id",
+          "protocol",
+          "admitted",
+          "stale",
+          "admitted_at",
+          "admitted_model",
+          "base_url",
+          "credential_ref",
+          "model"
+        ],
+        "title": "CatalogAdmission"
       },
       "CatalogBinding": {
         "properties": {
@@ -3473,7 +3582,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "provider_id"
         ],
@@ -3499,7 +3607,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "provider_id"
         ],
@@ -3531,7 +3638,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "provider"
         ],
@@ -3583,7 +3689,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "provider_id"
         ],
@@ -3645,7 +3750,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "bindings"
         ],
@@ -3743,7 +3847,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "document"
         ],
@@ -3781,43 +3884,6 @@
           "capability_source": {
             "type": "string",
             "title": "Capability Source"
-          },
-          "admitted_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted At"
-          },
-          "admitted_revision": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Revision"
-          },
-          "admitted_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Model"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale"
           }
         },
         "additionalProperties": false,
@@ -3828,11 +3894,7 @@
           "model",
           "context_window",
           "max_output_tokens",
-          "capability_source",
-          "admitted_at",
-          "admitted_revision",
-          "admitted_model",
-          "stale"
+          "capability_source"
         ],
         "title": "CatalogModel"
       },
@@ -3861,7 +3923,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "provider_id",
           "model_id"
@@ -3977,7 +4038,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version"
         ],
         "title": "CatalogReload"
@@ -4113,7 +4173,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id",
           "name",
@@ -4186,7 +4245,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "ref"
         ],
@@ -4212,7 +4270,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "ref"
         ],
@@ -4248,7 +4305,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "ref",
           "secret"
@@ -4290,7 +4346,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "decision_id",
           "option"
@@ -4661,7 +4716,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id",
           "department",
@@ -4860,6 +4914,11 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
           },
           "provider_id": {
             "type": "string",
@@ -5100,7 +5159,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "work_item_id",
           "department",
           "text"
@@ -5211,7 +5269,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "project_id",
           "text"
         ],
@@ -5249,6 +5306,11 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5380,7 +5442,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id"
         ],
@@ -5440,7 +5501,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "name",
           "goal"
         ],
@@ -5626,7 +5686,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id",
           "pinned"
@@ -5671,7 +5730,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id",
           "name"
@@ -5697,7 +5755,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id"
         ],
@@ -6605,7 +6662,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "base_version",
           "project_id",
           "name",
@@ -7040,7 +7096,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "work_item_id",
           "text"
         ],
@@ -7072,7 +7127,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "work_item_id"
         ],
         "title": "WorkItemCancel"
@@ -7246,7 +7300,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "command_id",
           "project_id",
           "text"
         ],

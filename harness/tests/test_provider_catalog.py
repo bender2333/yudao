@@ -156,6 +156,7 @@ def test_dangling_binding_references_are_rejected():
     facade.store_document(_document(bindings={
         "product": {"provider_id": "provider-a", "model_id": "model-a"},
     }))
+    admit_bound_models(facade)
     with pytest.raises(CatalogValidationError):
         facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "missing-model"}})
     facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "model-a"}})

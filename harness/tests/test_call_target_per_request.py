@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -73,6 +74,26 @@ def _plan_stream(*, response_id: str, model: str) -> bytes:
 
 def _stream_reply(body: bytes) -> tuple[int, str, list[bytes]]:
     return 200, "text/event-stream", [body]
+
+def _request_phase(body: dict[str, Any]) -> str:
+    # 从请求内容里取当前工作相位：步骤驱动把 [current_work] 的 phase 放进请求文本
+    parts: list[str] = []
+    for item in body.get("input", []):
+        content = item.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            for segment in content:
+                if isinstance(segment, dict) and isinstance(segment.get("text"), str):
+                    parts.append(segment["text"])
+    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    return match.group(1) if match else ""
+
+def _department_aware_reply(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
+    # 产品部门返回产品要求，工程部门返回工程计划：同一次运行要跨越两个部门
+    if _request_phase(body) == "ENGINEERING":
+        return _stream_reply(_plan_stream(response_id="resp-plan", model="m-local-target"))
+    return _stream_reply(_product_spec_stream(response_id="resp-1", model="m-local-target"))
 
 
 def _transient_error() -> tuple[int, str, list[bytes]]:
@@ -229,3 +250,56 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         server_a.server_close()
         server_b.shutdown()
         server_b.server_close()
+
+def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
+    # 部门默认所选模型的准入作废（改了连接的地址）以后，该部门的下一次模型请求进入待恢复，
+    # 重新测试通过并回答以后继续执行；引用保留，已完成的工作与已用限额保留（工单 #86）
+    # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回工程计划
+    server, capture, base = serve(_department_aware_reply)
+    try:
+        system, facade, _dotenv = _file_system(tmp_path, base, dotenv_text="SCENARIO_KEY=secret-1\n")
+        run_id = system.create_run("build an echo CLI")
+
+        # 第一次请求按已准入的定义发出，运行推进到工程部门
+        first = system.activate_once(run_id)
+        assert first.phase == "ENGINEERING", first.error
+        assert [item["model"] for item in capture.requests] == ["m-local-target"]
+        positions_before = len(system.store.list_events(run_id))
+
+        # 改连接的地址作废准入：引用保留，解析调用目标时判为不可用
+        document = json.loads((tmp_path / "providers.json").read_text(encoding="utf-8"))
+        document["providers"][0]["base_url"] = "http://127.0.0.1:9/v1"
+        facade.store_document(document)
+        assert facade.get_bindings()["engineering"]["model_id"] == "m-local"
+        record = next(item for item in facade.model_admissions() if item["model_id"] == "m-local")
+        assert record["stale"] is True
+
+        # 下一次请求不发送，运行停在这次请求之前，发出待恢复的决定请求
+        blocked = system.run_until_stop(run_id)
+        assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+        assert [item["model"] for item in capture.requests] == ["m-local-target"]
+        _position, decisions = saved_decisions(system.store, statuses=("open",))
+        assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
+        assert "m-local" in decisions[0].request["description"]
+        # 已完成的工作与已用限额保留：停止发生在这次请求之前，事件只增不改
+        assert len(system.store.list_events(run_id)) > positions_before
+
+        # 把地址改回去并重新测试：准入重新有效，回答以后从这次请求接着进行
+        document["providers"][0]["base_url"] = base
+        facade.store_document(document)
+        facade.record_admission("local", "m-local", admitted_model="m-local-target")
+        assert facade.model_admissions()[0]["stale"] is False
+
+        _answer_open_decision(system, "continue")
+        finished = system.activate_once(run_id)
+        # 从被挡住的那次请求接着进行：工程部门的计划请求重新发出并被接受
+        assert finished.phase == "ENGINEERING", finished.error
+        assert [item["model"] for item in capture.requests] == ["m-local-target", "m-local-target"]
+        plans = [event for event in system.store.list_events(run_id) if event.type == EventType.PLAN_ACCEPTED]
+        assert len(plans) == 1
+        assert plans[0].role == "engineering"
+        # 待恢复的决定已关闭，已完成的工作与已用限额保留
+        assert saved_decisions(system.store, statuses=("open",))[1] == []
+    finally:
+        server.shutdown()
+        server.server_close()
