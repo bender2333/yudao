@@ -285,3 +285,4 @@ claude-opus-5-5 / 2026-09-30 18:58 / 长期目标可以修改：docs/design/app-
 claude-opus-5-5 / 2026-09-30 19:10 / docs/stage-3-plan.md 第 3 节 3.9 一行、docs/program-roadmap.md 第 13 项、docs/requirements/stage-requirements-overview.md 3.9 一行写明组合验收使用 openai-agents-python，浏览器与 computer use 的结论引用 #155；docs/decision.md 新增「3.9 使用 openai-agents-python；模型服务不限流；开发板的登录」 / 用户采纳 3.9 的推荐，说明模型服务不限流，开发板的公钥由架构师添加
 claude-opus-5-5 / 2026-09-30 19:25 / docs/decision.md 新增「不使用容器」，写明需要重新确定的设计与暂停派发的 15 张工单 / 用户决定完全不用容器
 claude-opus-5-5 / 2026-09-30 19:40 / docs/decision.md「不使用容器」一条补充方向：WSL 作为一台登记的机器，以及 WSL 的核对结果 / 用户选择用 WSL 代替本机容器
+claude-opus-5-5 / 2026-09-30 20:37 / docs/decision.md「不使用容器」一条改为：执行环境（包括是否需要 WSL）、computer use、跨平台工具库列为待讨论的专题，记录用户原话与意见；docs/requirements/stage-requirements-overview.md 第 6 节改为 Stage 3 待讨论的专题清单（五项）与以后阶段的讨论；docs/requirements/self-hosting.md（D35）待确认事项增加第 5 项跨平台；docs/research/complexity-and-mutation-testing.md 第 1.4 节增加能在 Windows 上运行的工具与 cosmic-ray 的实测 / 用户要求把这个话题列为 TODO 单独讨论，并记录
