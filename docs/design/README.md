@@ -5,11 +5,11 @@
 - 总体架构设计（`architecture/`）
   - [总体架构：职责分层](architecture/overall-architecture.md)
     - 内容：分层图（客户端、接口层、应用层、控制核心、定义、知识层、观察层、观察者、执行层）、各层职责与边界、十项长期决定、语义系统在各层中的位置、依赖方向、控制核心内部的模块与一步的顺序、两类工具、合同（身份、五种合同、动作契约、用户决定）、路线图对照、使用的技术、近期实施顺序、待讨论的事项。
-    - 状态：2026-09-26 设计，用户已确认（ADR-0010 至 ADR-0015 与十项长期决定）；2026-09-28 按 ADR-0018 修改部署形态与执行环境服务；第 11 节的事项继续讨论。
+    - 状态：2026-09-26 设计，用户已确认（ADR-0010 至 ADR-0015 与十项长期决定）；2026-09-28 按 ADR-0018 修改部署形态与执行环境服务；2026-09-30 按 ADR-0022 修改执行环境的实现；第 11 节的事项继续讨论。
   - [系统架构原理：控制核心与可替换的材料](architecture/core-and-materials.md)
     - 内容：出发点、核心公式与部门的身份、三个控制层次、确定性流程能消除什么、循环系统（Ralph 与 GPT-6 Astra）与控制的位置、与 2026 年 loop 工程、graph 工程、AI-native SDLC 的对照、原生核心与材料、分布式部署（一台控制主机，执行环境分布到多台机器）、外包角色、界面与后端的技术方向、项目的意义，含两张架构图。
-    - 状态：2026-09-26 架构讨论记录；用户陈述与确认单独标注，第 2、4.2、6 至 9 节已按 ADR-0010 至 ADR-0015 与用户同日的决定修改，第 7 节 2026-09-28 按 ADR-0018 修改，第 11 节只剩 D31 的待确认规则。
-  - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）、[ADR-0018](../adr/0018-single-control-host-remote-execution.md)。需求：[D29](../requirements/remote-execution.md)、[D31](../requirements/outsourced-agent-roles.md)。
+    - 状态：2026-09-26 架构讨论记录；用户陈述与确认单独标注，第 2、4.2、6 至 9 节已按 ADR-0010 至 ADR-0015 与用户同日的决定修改，第 7 节 2026-09-28 按 ADR-0018、2026-09-30 按 ADR-0022 修改，第 11 节只剩 D31 的待确认规则。
+  - 依据：[Loop System 原理](../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)、ADR-0010 至 ADR-0015（[0010](../adr/0010-control-core-drives-role-steps.md)、[0011](../adr/0011-async-control-core.md)、[0012](../adr/0012-single-control-core-scalable-execution.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0014](../adr/0014-versioned-definitions.md)、[0015](../adr/0015-desktop-client-and-http-contracts.md)）、[ADR-0018](../adr/0018-single-control-host-remote-execution.md)、[ADR-0022](../adr/0022-run-directly-without-containers.md)。需求：[D29](../requirements/remote-execution.md)、[D31](../requirements/outsourced-agent-roles.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
   - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。
@@ -19,13 +19,13 @@
   - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守。
   - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节。
 - [执行环境服务](execution-environment.md)
-  - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程、本机容器、远程执行代理三种实现；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
-  - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机容器经本机端口调用执行代理、本阶段先完成本机进程与本机容器）；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位，执行代理的安装包由控制主机提供（2026-09-30，第 1.1、5.3.2 节）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #131、#140 至 #145，界面 #117），属于里程碑 M3。
-  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
+  - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程与远程执行代理两种实现；执行位置上的程序与依赖缓存；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
+  - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机进程在进程内调用），2026-09-30 按 ADR-0022 改为代码在执行位置上直接运行；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位，执行代理的安装包由控制主机提供（2026-09-30，第 1.1、5.3.2 节）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #130、#140 至 #145，界面 #117），属于里程碑 M3。
+  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
-  - 内容：试用会话与试用镜像；交付说明中的启动方式；Playwright MCP 浏览器工具；容器虚拟屏幕中的 computer use；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、本机容器都带试用层、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。
-  - 需求：[D34](../requirements/browser-and-computer-use.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
+  - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（屏幕从哪里来待专题 2 讨论）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。
+  - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。
@@ -52,8 +52,8 @@
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），含模块交互图。
-  - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具与 OpenCode 基础分属于里程碑 M2，场景 2、3 的 Yudao 一侧属于 M3，场景 1 属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
-  - 需求：[D32](../requirements/comparison-experiment.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
+  - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。
+  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 - [测试分层](test-pyramid.md)
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。
   - 状态：2026-09-29 设计，用户已确认各角色运行的层、批量运行的规则与规则文件的修改，同日暂缓；未实施。工单：父工单 #157（#158 至 #161）。
