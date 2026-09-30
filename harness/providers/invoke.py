@@ -48,6 +48,10 @@ class ProviderInput:
     # 记录一致；Chat 与 Messages 按原顺序翻译。统一输入仍填写，用于没有原始请求的诊断调用与 fake 回显
     raw_request: Mapping[str, Any] | None = None
     tool_choice: str = "auto"
+    # 推理参数（#87）：sent_tier 是按模型声明限制后的实际发送档位，reasoning_mode 是模型的推理参数方式；
+    # 模型没有声明档位时两者为空，请求不带推理参数
+    sent_tier: str | None = None
+    reasoning_mode: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "messages", tuple(self.messages))
@@ -267,6 +271,8 @@ def provider_input_for(call: ModelCall) -> ProviderInput:
         max_output_tokens=call.max_output_tokens,
         raw_request={"input": list(call.input_items), "tools": list(call.tools)},
         tool_choice=call.tool_choice,
+        sent_tier=call.sent_tier,
+        reasoning_mode=call.reasoning_mode,
     )
 
 
@@ -333,6 +339,9 @@ def to_provider_input(
     tools: Sequence[Mapping[str, Any]] | Sequence[ToolSpec] = (),
     tool_results: Sequence[Mapping[str, Any]] | Sequence[ToolResult] = (),
     max_output_tokens: int | None = None,
+    *,
+    sent_tier: str | None = None,
+    reasoning_mode: str = "",
 ) -> ProviderInput:
     normalized_messages: list[ProviderMessage] = []
     for item in messages:
