@@ -61,24 +61,6 @@ def test_input_after_validation_rejects_the_commit_and_the_proposal_is_judged_ag
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_a_prompt_update_after_validation_is_judged_again_and_the_proposal_is_accepted(tmp_path, monkeypatch):
-    system, run_id = _system(tmp_path, product_spec())
-    versions, done, conflicts = _write_after_validation(
-        monkeypatch, system, lambda: system.update_prompt(run_id, "product", "A revised product prompt"))
-
-    result = system.activate_once(run_id)
-
-    [writer] = done
-    assert not writer.errors
-    assert len(conflicts) == 1 and versions == [versions[0], versions[0] + 1]
-    # 提示词不改变激活的依据：重新校验以后提案仍然有效，接纳
-    assert result.phase == "ENGINEERING" and result.product_spec is not None
-    assert not _events(system, run_id, EventType.PROPOSAL_REJECTED)
-    types = [event.type for event in system.store.list_events(run_id)]
-    assert types.index(EventType.DEPARTMENT_PROMPT_UPDATED) < types.index(EventType.PROPOSAL_SUBMITTED)
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
-
-
 def test_a_cancel_after_validation_leaves_no_proposal_record(tmp_path, monkeypatch):
     system, run_id = _system(tmp_path, product_spec())
     versions, done, conflicts = _write_after_validation(monkeypatch, system, lambda: system.cancel(run_id))

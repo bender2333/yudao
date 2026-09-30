@@ -23,26 +23,6 @@
     "command_versions": {},
     "context_window": 32000,
     "definitions_version": "<definitions>",
-    "department_prompts": {
-     "engineering": {
-      "department": "engineering",
-      "prompt_ref": "<art#1>",
-      "text": "<shared#1>",
-      "version": 1
-     },
-     "product": {
-      "department": "product",
-      "prompt_ref": "<art#2>",
-      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-      "version": 1
-     },
-     "quality": {
-      "department": "quality",
-      "prompt_ref": "<art#3>",
-      "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-      "version": 1
-     }
-    },
     "git_version": {
      "commit": "<git#1>",
      "parent_commit": null,
@@ -57,14 +37,14 @@
       "tree": "<git#2>"
      },
      "id": "<input#1>",
-     "input_ref": "<art#4>",
-     "intend_ref": "<art#4>",
+     "input_ref": "<art#1>",
+     "intend_ref": "<art#1>",
      "kind": "text",
      "text": "build an echo CLI",
      "version": 1
     },
     "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#4>",
+    "intend_ref": "<art#1>",
     "max_cycles": 999999,
     "project_context_ref": null,
     "project_id": null,
@@ -130,7 +110,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -158,10 +138,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#5>",
+    "input_ref": "<art#2>",
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -241,7 +221,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -316,9 +296,9 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#6>",
+    "parts_ref": "<art#3>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -326,7 +306,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#7>",
+    "request_ref": "<art#4>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -386,7 +366,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -441,10 +421,10 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#8>",
+    "message_ref": "<art#5>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -503,7 +483,7 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -570,7 +550,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -638,7 +618,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -695,9 +675,9 @@
     "model_id": "fake-model",
     "name": "submit_product_spec",
     "ok": true,
-    "output_ref": "<art#9>",
+    "output_ref": "<art#6>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -796,7 +776,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": null
    }
   },
@@ -825,7 +805,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -853,10 +833,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#10>",
+    "input_ref": "<art#7>",
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -936,7 +916,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -1017,9 +997,9 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#11>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1027,7 +1007,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#12>",
+    "request_ref": "<art#9>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -1087,7 +1067,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1142,10 +1122,10 @@
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#13>",
+    "message_ref": "<art#10>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1204,7 +1184,7 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1271,7 +1251,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1353,7 +1333,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "submit_product_spec",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -1424,9 +1404,9 @@
     "model_id": "fake-model",
     "name": "submit_product_spec",
     "ok": true,
-    "output_ref": "<art#14>",
+    "output_ref": "<art#11>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1559,7 +1539,7 @@
      "tree": "<git#4>"
     },
     "input_version": 1,
-    "prd_ref": "<art#15>",
+    "prd_ref": "<art#12>",
     "product_spec_hash": "<sha256#26>",
     "request_id": null,
     "revision": 1
@@ -1608,7 +1588,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": null
    }
   },
@@ -1637,7 +1617,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -1665,10 +1645,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#16>",
+    "input_ref": "<art#13>",
     "input_version": 1,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -1748,7 +1728,7 @@
       "digest": "<sha256#34>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#35>",
@@ -1829,9 +1809,9 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#17>",
+    "parts_ref": "<art#14>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1839,7 +1819,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#18>",
+    "request_ref": "<art#15>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -1899,7 +1879,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1954,10 +1934,10 @@
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#19>",
+    "message_ref": "<art#16>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2016,7 +1996,7 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2083,7 +2063,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2160,7 +2140,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "submit_plan",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -2218,7 +2198,7 @@
     "id": "call-<act#3>-1-1",
     "input_item": {
      "call_id": "call-<act#3>-1-1",
-     "output": "<shared#2>",
+     "output": "<shared#1>",
      "type": "function_call_output"
     },
     "input_version": 1,
@@ -2226,9 +2206,9 @@
     "model_id": "fake-model",
     "name": "submit_plan",
     "ok": true,
-    "output_ref": "<art#20>",
+    "output_ref": "<art#17>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2308,7 +2288,7 @@
     "kind": "engineering_plan",
     "objective": "Implement and verify the current echo CLI requirements",
     "parent_hash": null,
-    "plan_ref": "<art#21>",
+    "plan_ref": "<art#18>",
     "reason": "",
     "refactoring": [],
     "request_id": null,
@@ -2350,7 +2330,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": null
    }
   },
@@ -2379,7 +2359,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -2407,10 +2387,10 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#22>",
+    "input_ref": "<art#19>",
     "input_version": 1,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -2490,7 +2470,7 @@
       "digest": "<sha256#34>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#35>",
@@ -2577,9 +2557,9 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#23>",
+    "parts_ref": "<art#20>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2587,7 +2567,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#24>",
+    "request_ref": "<art#21>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -2647,7 +2627,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2702,10 +2682,10 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#25>",
+    "message_ref": "<art#22>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2759,10 +2739,10 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#26>",
+    "message_ref": "<art#23>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2816,10 +2796,10 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 3,
-    "message_ref": "<art#27>",
+    "message_ref": "<art#24>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2878,7 +2858,7 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -2945,7 +2925,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3008,7 +2988,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "name": "write_file",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -3060,9 +3040,9 @@
     "model_id": "fake-model",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#28>",
+    "output_ref": "<art#25>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3118,7 +3098,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "name": "run_check",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -3175,9 +3155,9 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#29>",
+    "output_ref": "<art#26>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3234,7 +3214,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "name": "submit_delivery",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -3292,9 +3272,9 @@
     "model_id": "fake-model",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#30>",
+    "output_ref": "<art#27>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3337,7 +3317,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#31>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -3397,7 +3377,7 @@
     "revision": 1,
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#32>"
+    "tree_ref": "<art#29>"
    }
   },
   {
@@ -3464,7 +3444,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": null
    }
   },
@@ -3493,7 +3473,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -3521,10 +3501,10 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#34>",
+    "input_ref": "<art#31>",
     "input_version": 1,
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -3587,16 +3567,16 @@
     ],
     "guidance_ids": [],
     "guidance_only": false,
-    "injected": "<shared#3>",
+    "injected": "<shared#2>",
     "input_token_estimate": 4657,
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#35>",
+    "parts_ref": "<art#32>",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3604,7 +3584,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#36>",
+    "request_ref": "<art#33>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -3664,7 +3644,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3719,10 +3699,10 @@
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#37>",
+    "message_ref": "<art#34>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3776,10 +3756,10 @@
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#38>",
+    "message_ref": "<art#35>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3838,7 +3818,7 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3905,7 +3885,7 @@
     "logical_call_id": "<act#5>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -3973,7 +3953,7 @@
     "logical_call_id": "<act#5>:root-1:work",
     "name": "run_check",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -4030,9 +4010,9 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#39>",
+    "output_ref": "<art#36>",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -4087,7 +4067,7 @@
     "logical_call_id": "<act#5>:root-1:work",
     "name": "submit_review",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -4143,9 +4123,9 @@
     "model_id": "fake-model",
     "name": "submit_review",
     "ok": true,
-    "output_ref": "<art#40>",
+    "output_ref": "<art#37>",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -4188,7 +4168,7 @@
      "rationale",
      "verdict"
     ],
-    "transcript_ref": "<art#41>"
+    "transcript_ref": "<art#38>"
    }
   },
   {
@@ -4230,7 +4210,7 @@
     "effective_contract_hash": "<sha256#27>",
     "engineering_plan_hash": "<sha256#44>",
     "evidence_refs": [
-     "<art#42>"
+     "<art#39>"
     ],
     "git_version": {
      "commit": "<git#9>",
@@ -4311,7 +4291,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": "released"
    }
   }
@@ -4363,7 +4343,7 @@
    "run_id": "<run#1>",
    "status": "active",
    "summary": "implemented echo CLI",
-   "tree_ref": "<art#32>"
+   "tree_ref": "<art#29>"
   },
   "delivery_specs": [
    {
@@ -4401,7 +4381,7 @@
     "run_id": "<run#1>",
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#32>"
+    "tree_ref": "<art#29>"
    }
   ],
   "department_call_targets": {
@@ -4470,35 +4450,12 @@
    }
   },
   "department_guidance": [],
-  "department_prompts": {
-   "engineering": {
-    "created_event_id": "<evt#1>",
-    "department": "engineering",
-    "prompt_ref": "<art#1>",
-    "text": "<shared#1>",
-    "version": 1
-   },
-   "product": {
-    "created_event_id": "<evt#1>",
-    "department": "product",
-    "prompt_ref": "<art#2>",
-    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   },
-   "quality": {
-    "created_event_id": "<evt#1>",
-    "department": "quality",
-    "prompt_ref": "<art#3>",
-    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   }
-  },
   "effective_contract": {
    "content_hash": "<sha256#27>",
    "created_event_id": "<evt#26>",
    "decision_hashes": [],
    "input_version": 1,
-   "prd_ref": "<art#15>",
+   "prd_ref": "<art#12>",
    "product_spec_hash": "<sha256#26>",
    "revision": 1
   },
@@ -4508,7 +4465,7 @@
     "created_event_id": "<evt#26>",
     "decision_hashes": [],
     "input_version": 1,
-    "prd_ref": "<art#15>",
+    "prd_ref": "<art#12>",
     "product_spec_hash": "<sha256#26>",
     "revision": 1
    }
@@ -4522,7 +4479,7 @@
    "id": "<plan#1>",
    "objective": "Implement and verify the current echo CLI requirements",
    "parent_hash": null,
-   "plan_ref": "<art#21>",
+   "plan_ref": "<art#18>",
    "reason": "",
    "refactoring": [],
    "revision": 1,
@@ -4550,7 +4507,7 @@
     "id": "<plan#1>",
     "objective": "Implement and verify the current echo CLI requirements",
     "parent_hash": null,
-    "plan_ref": "<art#21>",
+    "plan_ref": "<art#18>",
     "reason": "",
     "refactoring": [],
     "revision": 1,
@@ -4592,7 +4549,7 @@
     ],
     "kind": "delivery",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#32>"
+    "tree_ref": "<art#29>"
    },
    {
     "checks": [
@@ -4665,15 +4622,15 @@
     "byte_start": 0,
     "created_event_id": "<evt#1>",
     "id": "<input#1>",
-    "input_ref": "<art#4>",
-    "intend_ref": "<art#4>",
+    "input_ref": "<art#1>",
+    "intend_ref": "<art#1>",
     "kind": "text",
     "run_id": "<run#1>",
     "text": "build an echo CLI",
     "version": 1
    }
   ],
-  "intend_ref": "<art#4>",
+  "intend_ref": "<art#1>",
   "last_activations": {
    "engineering": "<act#4>",
    "product": "<act#2>",
@@ -4701,7 +4658,7 @@
    "effective_contract_hash": "<sha256#27>",
    "engineering_plan_hash": "<sha256#44>",
    "evidence_refs": [
-    "<art#42>"
+    "<art#39>"
    ],
    "id": "<qa#1>",
    "issuer": "quality",
@@ -4762,7 +4719,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -4835,12 +4792,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#6>",
+    "parts_ref": "<art#3>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#7>",
+    "request_ref": "<art#4>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#5>",
     "step_id": 1,
@@ -4893,7 +4850,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -4972,12 +4929,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#11>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#12>",
+    "request_ref": "<art#9>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#17>",
     "step_id": 1,
@@ -5030,7 +4987,7 @@
       "digest": "<sha256#34>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#35>",
@@ -5109,12 +5066,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#17>",
+    "parts_ref": "<art#14>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#18>",
+    "request_ref": "<art#15>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#31>",
     "step_id": 1,
@@ -5167,7 +5124,7 @@
       "digest": "<sha256#34>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#35>",
@@ -5252,12 +5209,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#23>",
+    "parts_ref": "<art#20>",
     "prompt_hash": "<sha256#29>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#24>",
+    "request_ref": "<art#21>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#43>",
     "step_id": 1,
@@ -5293,17 +5250,17 @@
     ],
     "guidance_ids": [],
     "guidance_only": false,
-    "injected": "<shared#3>",
+    "injected": "<shared#2>",
     "input_token_estimate": 4657,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#35>",
+    "parts_ref": "<art#32>",
     "prompt_hash": "<sha256#57>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#36>",
+    "request_ref": "<art#33>",
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#63>",
     "step_id": 1,
@@ -5343,6 +5300,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -5396,6 +5354,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -5449,6 +5408,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -5502,6 +5462,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -5555,6 +5516,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -5656,29 +5618,6 @@
   "project_context_ref": null,
   "project_id": null,
   "prompt_config_versions": {},
-  "prompt_versions": [
-   {
-    "created_event_id": "<evt#1>",
-    "department": "engineering",
-    "prompt_ref": "<art#1>",
-    "text": "<shared#1>",
-    "version": 1
-   },
-   {
-    "created_event_id": "<evt#1>",
-    "department": "product",
-    "prompt_ref": "<art#2>",
-    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   },
-   {
-    "created_event_id": "<evt#1>",
-    "department": "quality",
-    "prompt_ref": "<art#3>",
-    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   }
-  ],
   "provider": "fake",
   "registered_commands": {},
   "rejections": [
@@ -5723,7 +5662,7 @@
     "effective_contract_hash": "<sha256#27>",
     "engineering_plan_hash": "<sha256#44>",
     "evidence_refs": [
-     "<art#42>"
+     "<art#39>"
     ],
     "id": "<qa#1>",
     "issuer": "quality",
@@ -5780,34 +5719,19 @@
  },
  "artifacts": {
   "<art#1>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "<shared#1>"
-  },
-  "<art#2>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。"
-  },
-  "<art#3>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。"
-  },
-  "<art#4>": {
    "kind": "user_input",
    "media_type": "text/plain; charset=utf-8",
    "content": "build an echo CLI"
   },
-  "<art#5>": {
+  "<art#2>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": {
-    "content": "<shared#4>",
+    "content": "<shared#3>",
     "role": "user"
    }
   },
-  "<art#6>": {
+  "<art#3>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -5827,7 +5751,7 @@
      "digest": "<sha256#9>",
      "source": "department_rules",
      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-     "version": "1"
+     "version": "0"
     },
     {
      "digest": "<sha256#10>",
@@ -5853,11 +5777,11 @@
      "text": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
      "version": null
     },
-    "<shared#5>",
+    "<shared#4>",
     {
      "digest": "<sha256#15>",
      "source": "binding_refs",
-     "text": "<shared#7>",
+     "text": "<shared#6>",
      "version": null
     },
     {
@@ -5869,7 +5793,7 @@
     {
      "digest": "<sha256#17>",
      "source": "pending_inputs",
-     "text": "<shared#8>",
+     "text": "<shared#7>",
      "version": "1"
     },
     {
@@ -5884,10 +5808,10 @@
      "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":null,\\\"department\\\":\\\"product\\\",\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"形成并提交当前产品要求。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":0,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"product\\\",\\\"effective_contract_hash\\\":null,\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":null,\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"product_spec_hash\\\":null,\\\"product_spec_id\\\":null,\\\"product_spec_revision\\\":null,\\\"request_id\\\":null}\\n\\n[pending_inputs]\\n[{\\\"byte_end\\\":17,\\\"byte_start\\\":0,\\\"created_event_id\\\":\\\"<evt#1>\\\",\\\"id\\\":\\\"<input#1>\\\",\\\"input_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"user_input\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"intend_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"intend\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"kind\\\":\\\"text\\\",\\\"run_id\\\":\\\"<run#1>\\\",\\\"text\\\":\\\"build an echo CLI\\\",\\\"version\\\":1}]\\n\\n[causal_chain]\\n[{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"}]\",\"role\":\"user\"}]",
      "version": "product"
     },
-    "<shared#9>"
+    "<shared#8>"
    ]
   },
-  "<art#7>": {
+  "<art#4>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -5897,15 +5821,15 @@
       "role": "developer"
      },
      {
-      "content": "<shared#4>",
+      "content": "<shared#3>",
       "role": "user"
      }
     ],
     "max_output_tokens": 4800,
-    "tools": "<shared#11>"
+    "tools": "<shared#10>"
    }
   },
-  "<art#8>": {
+  "<art#5>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -5916,7 +5840,7 @@
     "type": "function_call"
    }
   },
-  "<art#9>": {
+  "<art#6>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -5930,15 +5854,15 @@
     ]
    }
   },
-  "<art#10>": {
+  "<art#7>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": {
-    "content": "<shared#16>",
+    "content": "<shared#15>",
     "role": "user"
    }
   },
-  "<art#11>": {
+  "<art#8>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -5958,7 +5882,7 @@
      "digest": "<sha256#9>",
      "source": "department_rules",
      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-     "version": "1"
+     "version": "0"
     },
     {
      "digest": "<sha256#10>",
@@ -5984,11 +5908,11 @@
      "text": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
      "version": null
     },
-    "<shared#5>",
+    "<shared#4>",
     {
      "digest": "<sha256#15>",
      "source": "binding_refs",
-     "text": "<shared#7>",
+     "text": "<shared#6>",
      "version": null
     },
     {
@@ -6000,7 +5924,7 @@
     {
      "digest": "<sha256#17>",
      "source": "pending_inputs",
-     "text": "<shared#8>",
+     "text": "<shared#7>",
      "version": "1"
     },
     {
@@ -6021,10 +5945,10 @@
      "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":null,\\\"department\\\":\\\"product\\\",\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"形成并提交当前产品要求。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":0,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"product\\\",\\\"effective_contract_hash\\\":null,\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":null,\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"product_spec_hash\\\":null,\\\"product_spec_id\\\":null,\\\"product_spec_revision\\\":null,\\\"request_id\\\":null}\\n\\n[pending_inputs]\\n[{\\\"byte_end\\\":17,\\\"byte_start\\\":0,\\\"created_event_id\\\":\\\"<evt#1>\\\",\\\"id\\\":\\\"<input#1>\\\",\\\"input_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"user_input\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"intend_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"intend\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"kind\\\":\\\"text\\\",\\\"run_id\\\":\\\"<run#1>\\\",\\\"text\\\":\\\"build an echo CLI\\\",\\\"version\\\":1}]\\n\\n[causal_chain]\\n[{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"}]\",\"role\":\"user\"},{\"arguments\":\"{\\\"acceptance_criteria\\\":[\\\"prints it\\\"],\\\"goal\\\":\\\"\\\",\\\"requirements\\\":[\\\"print the argument\\\"]}\",\"call_id\":\"call-<act#1>-1-1\",\"id\":\"call-<act#1>-1-1\",\"name\":\"submit_product_spec\",\"type\":\"function_call\"},{\"call_id\":\"call-<act#1>-1-1\",\"output\":\"{\\\"error\\\":null,\\\"ok\\\":true,\\\"output\\\":{\\\"acceptance_criteria\\\":[\\\"prints it\\\"],\\\"goal\\\":\\\"\\\",\\\"kind\\\":\\\"product_spec\\\",\\\"requirements\\\":[\\\"print the argument\\\"]}}\",\"type\":\"function_call_output\"},{\"content\":\"[current_work]\\n{\\\"current_goal\\\":null,\\\"department\\\":\\\"product\\\",\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"形成并提交当前产品要求。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":0,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"product\\\",\\\"effective_contract_hash\\\":null,\\\"effective_decision_count\\\":0,\\\"engineering_plan_hash\\\":null,\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"product_spec_hash\\\":null,\\\"product_spec_id\\\":null,\\\"product_spec_revision\\\":null,\\\"request_id\\\":null}\\n\\n[pending_inputs]\\n[{\\\"byte_end\\\":17,\\\"byte_start\\\":0,\\\"created_event_id\\\":\\\"<evt#1>\\\",\\\"id\\\":\\\"<input#1>\\\",\\\"input_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"user_input\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"intend_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"intend\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"kind\\\":\\\"text\\\",\\\"run_id\\\":\\\"<run#1>\\\",\\\"text\\\":\\\"build an echo CLI\\\",\\\"version\\\":1}]\\n\\n[validation_feedback]\\n{\\\"department\\\":\\\"product\\\",\\\"errors\\\":[{\\\"field\\\":\\\"goal\\\",\\\"message\\\":\\\"goal must be a non-empty string\\\"}],\\\"event_id\\\":\\\"<evt#13>\\\",\\\"phase\\\":\\\"PRODUCT_SPEC\\\"}\\n\\n[causal_chain]\\n[{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"}]\",\"role\":\"user\"}]",
      "version": "product"
     },
-    "<shared#9>"
+    "<shared#8>"
    ]
   },
-  "<art#12>": {
+  "<art#9>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6034,7 +5958,7 @@
       "role": "developer"
      },
      {
-      "content": "<shared#4>",
+      "content": "<shared#3>",
       "role": "user"
      },
      {
@@ -6050,15 +5974,15 @@
       "type": "function_call_output"
      },
      {
-      "content": "<shared#16>",
+      "content": "<shared#15>",
       "role": "user"
      }
     ],
     "max_output_tokens": 4800,
-    "tools": "<shared#11>"
+    "tools": "<shared#10>"
    }
   },
-  "<art#13>": {
+  "<art#10>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6069,7 +5993,7 @@
     "type": "function_call"
    }
   },
-  "<art#14>": {
+  "<art#11>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6097,17 +6021,17 @@
     ]
    }
   },
-  "<art#15>": {
+  "<art#12>": {
    "kind": "prd",
    "media_type": "text/markdown",
    "content": "# PRD\n\nEffective contract: <sha256#27>\nProductSpec: <sha256#26>\nAccepted user input through version: 1\n\n## Goal\n\nbuild an echo CLI\n\n## Requirements\n\n- print the given argument to stdout\n\n## Boundaries\n\n- do not read files\n\n## Constraints and recorded defaults\n\n- single file implementation\n\n## Acceptance Criteria\n\n- running the program with a word prints that word\n\n## Fatal Conditions\n\n- non-zero exit on valid input\n\n## Non-goals\n\n- network access\n\n## Effective Product Decisions\n\nNone.\n"
   },
-  "<art#16>": {
+  "<art#13>": {
    "kind": "department_input",
    "media_type": "application/json",
-   "content": "<shared#17>"
+   "content": "<shared#16>"
   },
-  "<art#17>": {
+  "<art#14>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6126,8 +6050,8 @@
     {
      "digest": "<sha256#34>",
      "source": "department_rules",
-     "text": "<shared#1>",
-     "version": "1"
+     "text": "<shared#18>",
+     "version": "0"
     },
     {
      "digest": "<sha256#35>",
@@ -6193,7 +6117,7 @@
     "<shared#22>"
    ]
   },
-  "<art#18>": {
+  "<art#15>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6202,13 +6126,13 @@
       "content": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[department_rules]\n你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"delivery_spec\":{\"bind\":[\"current_contract.content_hash\",\"current_engineering_plan.content_hash\",\"workspace files must exist\",\"run_check receipts from this activation on the current workspace\"],\"optional\":[\"known_risks\"],\"required\":[\"kind=delivery_spec\",\"summary\",\"files\",\"check_names\"],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"engineering_plan\":{\"assumptions\":[{\"basis\":\"project convention, standard, or maintained component\",\"decision\":\"professional default\"}],\"bind\":[\"current_contract.content_hash (bound by the host when the proposal is accepted)\"],\"optional\":[\"refactoring\",\"assumptions\",\"reason\"],\"required\":[\"kind=engineering_plan\",\"objective\",\"scope\",\"tasks\"],\"scope\":\"relative files, directories ending with /, or . for the full public workspace\",\"tasks\":[{\"outputs\":[\"verifiable output\"],\"title\":\"ordered task\",\"verification\":\"how to verify\"}],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]}},\"notes\":[\"先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。\",\"已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。\",\"check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。\"],\"submit_tools\":[\"submit_plan\",\"submit_delivery\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#27>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#26>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"run_command\",\"submit_request\",\"submit_plan\",\"submit_delivery\"]\n\n[current_contract]\n{\"content_hash\":\"<sha256#27>\",\"created_event_id\":\"<evt#26>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#28>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#28>\"},\"product_spec_hash\":\"<sha256#26>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#26>\",\"created_event_id\":\"<evt#25>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#26>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
       "role": "developer"
      },
-     "<shared#17>"
+     "<shared#16>"
     ],
     "max_output_tokens": 4800,
     "tools": "<shared#24>"
    }
   },
-  "<art#19>": {
+  "<art#16>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6219,7 +6143,7 @@
     "type": "function_call"
    }
   },
-  "<art#20>": {
+  "<art#17>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6242,17 +6166,17 @@
     ]
    }
   },
-  "<art#21>": {
+  "<art#18>": {
    "kind": "engineering_plan",
    "media_type": "text/markdown",
    "content": "# Engineering Plan\n\nPlan: <sha256#44>\nEffective contract: <sha256#27>\n\n## Objective\n\nImplement and verify the current echo CLI requirements\n\n## Change Scope\n\n- src/\n\n## Ordered Tasks\n\n### 1. Implement the current contract\n\nOutputs:\n- src/echo.py\n\nVerification: Run the CLI through host checks against the current requirements\n\n## Necessary Refactoring\n\nNone.\n\n## Defaults and Basis\n\nNone.\n"
   },
-  "<art#22>": {
+  "<art#19>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#30>"
   },
-  "<art#23>": {
+  "<art#20>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6271,8 +6195,8 @@
     {
      "digest": "<sha256#34>",
      "source": "department_rules",
-     "text": "<shared#1>",
-     "version": "1"
+     "text": "<shared#18>",
+     "version": "0"
     },
     {
      "digest": "<sha256#35>",
@@ -6344,7 +6268,7 @@
     "<shared#22>"
    ]
   },
-  "<art#24>": {
+  "<art#21>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6353,7 +6277,7 @@
       "content": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。\"}\n\n[department_rules]\n你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"delivery_spec\":{\"bind\":[\"current_contract.content_hash\",\"current_engineering_plan.content_hash\",\"workspace files must exist\",\"run_check receipts from this activation on the current workspace\"],\"optional\":[\"known_risks\"],\"required\":[\"kind=delivery_spec\",\"summary\",\"files\",\"check_names\"],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"engineering_plan\":{\"assumptions\":[{\"basis\":\"project convention, standard, or maintained component\",\"decision\":\"professional default\"}],\"bind\":[\"current_contract.content_hash (bound by the host when the proposal is accepted)\"],\"optional\":[\"refactoring\",\"assumptions\",\"reason\"],\"required\":[\"kind=engineering_plan\",\"objective\",\"scope\",\"tasks\"],\"scope\":\"relative files, directories ending with /, or . for the full public workspace\",\"tasks\":[{\"outputs\":[\"verifiable output\"],\"title\":\"ordered task\",\"verification\":\"how to verify\"}],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]}},\"notes\":[\"先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。\",\"已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。\",\"check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。\"],\"submit_tools\":[\"submit_plan\",\"submit_delivery\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#27>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#44>\",\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#26>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"run_command\",\"submit_request\",\"submit_plan\",\"submit_delivery\"]\n\n[current_contract]\n{\"content_hash\":\"<sha256#27>\",\"created_event_id\":\"<evt#26>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#28>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#28>\"},\"product_spec_hash\":\"<sha256#26>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#44>\",\"created_event_id\":\"<evt#39>\",\"effective_contract_hash\":\"<sha256#27>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#45>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#45>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#26>\",\"created_event_id\":\"<evt#25>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#26>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
       "role": "developer"
      },
-     "<shared#17>",
+     "<shared#16>",
      {
       "arguments": "{\"assumptions\":[],\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}",
       "call_id": "call-<act#3>-1-1",
@@ -6363,7 +6287,7 @@
      },
      {
       "call_id": "call-<act#3>-1-1",
-      "output": "<shared#2>",
+      "output": "<shared#1>",
       "type": "function_call_output"
      },
      "<shared#30>"
@@ -6372,7 +6296,7 @@
     "tools": "<shared#24>"
    }
   },
-  "<art#25>": {
+  "<art#22>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6383,7 +6307,7 @@
     "type": "function_call"
    }
   },
-  "<art#26>": {
+  "<art#23>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6394,7 +6318,7 @@
     "type": "function_call"
    }
   },
-  "<art#27>": {
+  "<art#24>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6405,12 +6329,12 @@
     "type": "function_call"
    }
   },
-  "<art#28>": {
+  "<art#25>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#29>": {
+  "<art#26>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6427,7 +6351,7 @@
     "tree_changed": false
    }
   },
-  "<art#30>": {
+  "<art#27>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6442,18 +6366,18 @@
     "summary": "implemented echo CLI"
    }
   },
-  "<art#31>": {
+  "<art#28>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n\n"
   },
-  "<art#32>": {
+  "<art#29>": {
    "kind": "tree_manifest",
    "media_type": "application/json",
    "content": {
     "blobs": [
      {
-      "artifact": "<art#33>",
+      "artifact": "<art#30>",
       "path": "src/echo.py"
      }
     ],
@@ -6474,17 +6398,17 @@
     "tree_digest": "<sha256#53>"
    }
   },
-  "<art#33>": {
+  "<art#30>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
    "content": "import sys\r\nprint(sys.argv[1])\r\n"
   },
-  "<art#34>": {
+  "<art#31>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#33>"
   },
-  "<art#35>": {
+  "<art#32>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6504,7 +6428,7 @@
      "digest": "<sha256#62>",
      "source": "department_rules",
      "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-     "version": "1"
+     "version": "0"
     },
     {
      "digest": "<sha256#35>",
@@ -6592,7 +6516,7 @@
     }
    ]
   },
-  "<art#36>": {
+  "<art#33>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6606,7 +6530,7 @@
     "max_output_tokens": 4800,
     "tools": [
      {
-      "description": "<shared#12>",
+      "description": "<shared#11>",
       "name": "read_file",
       "parameters": {
        "additionalProperties": false,
@@ -6863,7 +6787,7 @@
     ]
    }
   },
-  "<art#37>": {
+  "<art#34>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6874,7 +6798,7 @@
     "type": "function_call"
    }
   },
-  "<art#38>": {
+  "<art#35>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6885,7 +6809,7 @@
     "type": "function_call"
    }
   },
-  "<art#39>": {
+  "<art#36>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6902,7 +6826,7 @@
     "tree_changed": false
    }
   },
-  "<art#40>": {
+  "<art#37>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6915,21 +6839,20 @@
     "verdict": "release"
    }
   },
-  "<art#41>": {
+  "<art#38>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n"
   },
-  "<art#42>": {
+  "<art#39>": {
    "kind": "qa_evidence",
    "media_type": "text/plain",
    "content": "checks passed on the current snapshot"
   }
  },
  "shared": {
-  "<shared#1>": "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。",
-  "<shared#2>": "{\"error\":null,\"ok\":true,\"output\":{\"assumptions\":[],\"kind\":\"engineering_plan\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}}",
-  "<shared#3>": [
+  "<shared#1>": "{\"error\":null,\"ok\":true,\"output\":{\"assumptions\":[],\"kind\":\"engineering_plan\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}}",
+  "<shared#2>": [
    {
     "digest": "<sha256#7>",
     "source": "intend",
@@ -6946,7 +6869,7 @@
     "digest": "<sha256#62>",
     "source": "department_rules",
     "tokens": 72,
-    "version": "1"
+    "version": "0"
    },
    {
     "digest": "<sha256#35>",
@@ -7033,26 +6956,26 @@
     "version": "quality"
    }
   ],
-  "<shared#4>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-  "<shared#5>": {
+  "<shared#3>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
+  "<shared#4>": {
    "digest": "<sha256#14>",
    "source": "proposal_contract",
-   "text": "<shared#6>",
+   "text": "<shared#5>",
    "version": "product"
   },
-  "<shared#6>": "{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}",
-  "<shared#7>": "{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}",
-  "<shared#8>": "[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]",
-  "<shared#9>": {
+  "<shared#5>": "{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}",
+  "<shared#6>": "{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}",
+  "<shared#7>": "[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]",
+  "<shared#8>": {
    "digest": "<sha256#20>",
    "source": "tool_schemas",
-   "text": "<shared#10>",
+   "text": "<shared#9>",
    "version": "product"
   },
-  "<shared#10>": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.\",\"name\":\"submit_product_spec\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"acceptance_criteria\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"boundaries\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"change_record\":{\"additionalProperties\":false,\"description\":\"Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.\",\"properties\":{\"changed\":{\"description\":\"Requirements added or changed in this revision\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"rationale\":{\"minLength\":1,\"type\":\"string\"},\"retained\":{\"description\":\"Requirements explicitly preserved\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"retired\":{\"description\":\"Requirements explicitly removed\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"changed\",\"retained\",\"retired\",\"rationale\"],\"type\":\"object\"},\"constraints\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"decision_changes\":{\"description\":\"When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.\",\"items\":{\"additionalProperties\":false,\"properties\":{\"decision_hash\":{\"type\":\"string\"},\"disposition\":{\"enum\":[\"retain\",\"integrate\",\"retire\"],\"type\":\"string\"},\"rationale\":{\"type\":\"string\"}},\"required\":[\"decision_hash\",\"disposition\",\"rationale\"],\"type\":\"object\"},\"type\":\"array\"},\"fatal_conditions\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"goal\":{\"type\":\"string\"},\"non_goals\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"requirements\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"goal\",\"requirements\",\"acceptance_criteria\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
-  "<shared#11>": [
+  "<shared#9>": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.\",\"name\":\"submit_product_spec\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"acceptance_criteria\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"boundaries\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"change_record\":{\"additionalProperties\":false,\"description\":\"Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.\",\"properties\":{\"changed\":{\"description\":\"Requirements added or changed in this revision\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"rationale\":{\"minLength\":1,\"type\":\"string\"},\"retained\":{\"description\":\"Requirements explicitly preserved\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"retired\":{\"description\":\"Requirements explicitly removed\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"changed\",\"retained\",\"retired\",\"rationale\"],\"type\":\"object\"},\"constraints\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"decision_changes\":{\"description\":\"When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.\",\"items\":{\"additionalProperties\":false,\"properties\":{\"decision_hash\":{\"type\":\"string\"},\"disposition\":{\"enum\":[\"retain\",\"integrate\",\"retire\"],\"type\":\"string\"},\"rationale\":{\"type\":\"string\"}},\"required\":[\"decision_hash\",\"disposition\",\"rationale\"],\"type\":\"object\"},\"type\":\"array\"},\"fatal_conditions\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"goal\":{\"type\":\"string\"},\"non_goals\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"requirements\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"goal\",\"requirements\",\"acceptance_criteria\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
+  "<shared#10>": [
    {
-    "description": "<shared#12>",
+    "description": "<shared#11>",
     "name": "read_file",
     "parameters": {
      "additionalProperties": false,
@@ -7191,7 +7114,7 @@
     "strict": false,
     "type": "function"
    },
-   "<shared#13>",
+   "<shared#12>",
    {
     "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
     "name": "submit_request",
@@ -7250,17 +7173,17 @@
     "type": "function"
    }
   ],
-  "<shared#12>": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
-  "<shared#13>": {
+  "<shared#11>": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
+  "<shared#12>": {
    "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.",
    "name": "submit_product_spec",
-   "parameters": "<shared#14>",
+   "parameters": "<shared#13>",
    "strict": false,
    "type": "function"
   },
-  "<shared#14>": {
+  "<shared#13>": {
    "additionalProperties": false,
-   "properties": "<shared#15>",
+   "properties": "<shared#14>",
    "required": [
     "goal",
     "requirements",
@@ -7268,7 +7191,7 @@
    ],
    "type": "object"
   },
-  "<shared#15>": {
+  "<shared#14>": {
    "acceptance_criteria": {
     "description": "Must contain at least one item",
     "items": {
@@ -7382,12 +7305,13 @@
     "type": "array"
    }
   },
-  "<shared#16>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[validation_feedback]\n{\"department\":\"product\",\"errors\":[{\"field\":\"goal\",\"message\":\"goal must be a non-empty string\"}],\"event_id\":\"<evt#13>\",\"phase\":\"PRODUCT_SPEC\"}\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-  "<shared#17>": {
-   "content": "<shared#18>",
+  "<shared#15>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[validation_feedback]\n{\"department\":\"product\",\"errors\":[{\"field\":\"goal\",\"message\":\"goal must be a non-empty string\"}],\"event_id\":\"<evt#13>\",\"phase\":\"PRODUCT_SPEC\"}\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
+  "<shared#16>": {
+   "content": "<shared#17>",
    "role": "user"
   },
-  "<shared#18>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#27>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#26>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#27>\",\"created_event_id\":\"<evt#26>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#28>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#28>\"},\"product_spec_hash\":\"<sha256#26>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#26>\",\"created_event_id\":\"<evt#25>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#26>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
+  "<shared#17>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#27>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#26>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#27>\",\"created_event_id\":\"<evt#26>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#28>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#28>\"},\"product_spec_hash\":\"<sha256#26>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#26>\",\"created_event_id\":\"<evt#25>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#26>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
+  "<shared#18>": "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。",
   "<shared#19>": {
    "digest": "<sha256#36>",
    "source": "proposal_contract",
@@ -7405,7 +7329,7 @@
   "<shared#23>": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.\",\"name\":\"write_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"content\":{\"description\":\"Full file contents\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.\",\"name\":\"edit_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"end_line\":{\"description\":\"Last line to replace, inclusive\",\"type\":\"integer\"},\"expected_digest\":{\"description\":\"File content_hash observed when the span was read; omit to skip the digest check\",\"type\":[\"string\",\"null\"]},\"expected_text\":{\"description\":\"Exact original lines previously read, joined by newline without a trailing newline\",\"type\":\"string\"},\"new_text\":{\"description\":\"Replacement text for the span, lines joined by newline\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to replace, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\",\"end_line\",\"expected_text\",\"new_text\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"delete_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"path\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"move_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"destination\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"},\"source\":{\"type\":\"string\"}},\"required\":[\"source\",\"destination\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read. run_command results are action receipts and cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.\",\"name\":\"run_command\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"args\":{\"description\":\"Extra arguments; every item must be in the registered allowlist\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Registered command name frozen for this run\",\"type\":\"string\"}},\"required\":[\"name\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.\",\"name\":\"submit_plan\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"assumptions\":{\"description\":\"Professional defaults and their basis; do not present defaults as user statements\",\"items\":{\"additionalProperties\":false,\"properties\":{\"basis\":{\"type\":\"string\"},\"decision\":{\"type\":\"string\"}},\"required\":[\"decision\",\"basis\"],\"type\":\"object\"},\"type\":\"array\"},\"objective\":{\"type\":\"string\"},\"reason\":{\"description\":\"Reason for adjusting an existing plan; may be empty for the first plan\",\"type\":\"string\"},\"refactoring\":{\"description\":\"Necessary structural changes, or an empty list\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"scope\":{\"description\":\"Relative files or directories ending with /; . means the entire public workspace\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"tasks\":{\"description\":\"Non-empty tasks in execution order\",\"items\":{\"additionalProperties\":false,\"properties\":{\"outputs\":{\"description\":\"Observable outputs of this task\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"title\":{\"type\":\"string\"},\"verification\":{\"description\":\"How to verify these outputs\",\"type\":\"string\"}},\"required\":[\"title\",\"outputs\",\"verification\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"objective\",\"scope\",\"tasks\",\"refactoring\",\"assumptions\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. run_command results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.\",\"name\":\"submit_delivery\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"check_names\":{\"description\":\"Names passed to run_check in this activation on the current workspace; run_command results do not count\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"files\":{\"description\":\"Workspace-relative files included in the delivery\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"known_risks\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"summary\",\"files\",\"check_names\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
   "<shared#24>": [
    {
-    "description": "<shared#12>",
+    "description": "<shared#11>",
     "name": "read_file",
     "parameters": {
      "additionalProperties": false,

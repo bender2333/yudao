@@ -102,13 +102,6 @@ class InputRecord(Payload):
     base_version: int | None = None
 
 
-class PromptRecord(Payload):
-    department: Department
-    version: int
-    text: str
-    prompt_ref: ArtifactRef
-
-
 class FrozenCommand(Payload):
     # 事项创建时冻结的登记命令
     argv: list[str]
@@ -241,7 +234,6 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 class RunCreatedPayload(Payload):
     task: str
     initial_input: InputRecord
-    department_prompts: dict[Department, PromptRecord]
     intend_ref: ArtifactRef
     git_version: GitVersion
     intend_path: str
@@ -272,10 +264,6 @@ class UserInputReceivedPayload(InputRecord):
 
 class ProductInputAssignedPayload(Payload):
     through_version: int
-
-
-class DepartmentPromptUpdatedPayload(PromptRecord):
-    pass
 
 
 class DepartmentGuidanceReceivedPayload(Payload):
@@ -955,8 +943,16 @@ class AdoptionHeldPayload(Payload):
     current_adoption_id: str | None
 
 
-class DepartmentPromptConfiguredPayload(PromptRecord):
+class DepartmentSettingsConfiguredPayload(Payload):
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本
+    department: Department
+    version: int
     base_version: int
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    department_prompt: str | None = None
+    department_prompt_ref: ArtifactRef | None = None
 
 
 class CommandConfiguredPayload(Payload):
@@ -1050,7 +1046,6 @@ PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
     EventType.USER_INPUT_RECEIVED: UserInputReceivedPayload,
     EventType.PRODUCT_INPUT_ASSIGNED: ProductInputAssignedPayload,
-    EventType.DEPARTMENT_PROMPT_UPDATED: DepartmentPromptUpdatedPayload,
     EventType.DEPARTMENT_GUIDANCE_RECEIVED: DepartmentGuidanceReceivedPayload,
     EventType.DEPARTMENT_GUIDANCE_APPLIED: DepartmentGuidanceAppliedPayload,
     EventType.DEPARTMENT_GUIDANCE_RESPONDED: DepartmentGuidanceRespondedPayload,
@@ -1100,7 +1095,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.WORK_ITEM_START_FAILED: WorkItemStartFailedPayload,
     ProjectEventType.DELIVERABLE_ADOPTED: DeliverableAdoptedPayload,
     ProjectEventType.ADOPTION_HELD: AdoptionHeldPayload,
-    ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED: DepartmentPromptConfiguredPayload,
+    ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED: DepartmentSettingsConfiguredPayload,
     ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,

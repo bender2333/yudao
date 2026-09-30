@@ -487,7 +487,7 @@ def test_text_cancel_reports_stopped_when_git_input_save_fails(data_dir, monkeyp
             assert "执行已取消" in result["error"] and "未形成正式 Git 版本" in result["error"]
             # 取消已经生效：运行不再接受任何修改
             with pytest.raises(RunTerminalError):
-                system.update_prompt(run_id, "product", "The run is already cancelled")
+                system.add_guidance(run_id, "product", "The run is already cancelled")
             assert adapter.cancelled == {adapter.invocations[0].attempt_id}
             current = system.project(run_id)
             assert current.input_version == before.input_version and current.git_version == before.git_version

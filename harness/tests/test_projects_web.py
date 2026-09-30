@@ -131,7 +131,7 @@ def test_project_registration_listing_and_state_commands(data_dir):
         assert detail["goal"] == GOAL and detail["work_items"] == [] and detail["current_adoption"] is None
         assert set(detail["overview"]) == {"goal", "current_adoption", "pending", "recent"}
         assert detail["overview"]["recent"][0]["type"] == ProjectEventType.PROJECT_RENAMED
-        assert {config["version"] for config in detail["prompt_configs"].values()} == {0}
+        assert {config["version"] for config in detail["department_settings"].values()} == {0}
         _post(host, port, f"/api/projects/{second}/archive")
         assert [row["name"] for row in get_json(host, port, "/api/projects")["projects"]] == ["改名后"]
         archived_rows = get_json(host, port, "/api/projects?archived=1")["projects"]
@@ -217,7 +217,8 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         prompt = get_json(host, port, f"/api/projects/{project_id}/prompts/quality")
         quality_prompt = DEFINITIONS.role("quality").prompt
         assert prompt == {"department": "quality", "text": quality_prompt, "default_text": quality_prompt,
-                          "version": 0, "updated_at": None, "source": "default"}
+                          "prompt_configured": False, "provider_id": None, "model_id": None,
+                          "requested_tier": None, "version": 0, "updated_at": None, "source": "default"}
 
         # GET /api/runs 仍列出项目 run 与 bare run；POST /api/runs 已删除。
         status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare run"})
@@ -274,9 +275,9 @@ def test_two_projects_are_isolated_over_http(data_dir):
             assert foreign not in raw_a
         view_a = json.loads(raw_a)
         assert view_a["work_items"][0]["status"] == "adopted" and view_a["materials"] == []
-        assert view_a["prompt_configs"]["quality"]["source"] == "default"
+        assert view_a["department_settings"]["quality"]["source"] == "default"
         view_b = get_json(host, port, f"/api/projects/{project_b}")
-        assert view_b["prompt_configs"]["quality"]["version"] == 1 and len(view_b["materials"]) == 1
+        assert view_b["department_settings"]["quality"]["version"] == 1 and len(view_b["materials"]) == 1
         for foreign in (project_a, created_a["work_item_id"], created_a["run_id"]):
             assert foreign not in json.dumps(view_b)
 
@@ -357,11 +358,11 @@ def test_prompt_config_endpoints(data_dir):
         department = get_json(host, port, f"/api/projects/{project_id}/departments/engineering")
         assert department["prompt_config"] == {"version": 2, "source": "configured"} and department["items"] == []
         detail = get_json(host, port, f"/api/projects/{project_id}")
-        assert [entry["version"] for entry in detail["prompt_config_history"]] == [1, 2]
-        # 新事项固化 v2。
+        assert [entry["version"] for entry in detail["department_setting_history"]] == [1, 2]
+        # 新事项记下项目部门设置的版本；部门 Prompt 不在 run 内留副本。
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "v2 期间的事项"}, 201)
         run = system.project(created["run_id"])
-        assert run.department_prompts["engineering"].text == "工程 v2" and run.prompt_config_versions["engineering"] == 2
+        assert run.prompt_config_versions["engineering"] == 2
         _wait_work_item(host, port, project_id, created["work_item_id"])
 
 

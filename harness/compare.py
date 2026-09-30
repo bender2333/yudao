@@ -16,6 +16,7 @@ from .models import EventType, ProjectEventType
 from .proposals import delivery_turn, engineering_plan, product_spec, review_turn
 from .public_tree import materialize_tree
 from .providers import ProviderFacade
+from .providers.selection import ModelSelection
 from .runtime import LoopSystem
 from .smoke import summarize_run
 from .tree_archive import load_tree
@@ -130,7 +131,8 @@ def run_a4_comparison(system: LoopSystem, out_dir: str | Path) -> dict[str, Any]
     out.mkdir(parents=True, exist_ok=True)
     baseline_id = system.projects.register(BASELINE_NAME, COMPARISON_GOAL)
     candidate_id = system.projects.register(CANDIDATE_NAME, COMPARISON_GOAL)
-    system.projects.configure_prompt(candidate_id, "engineering", candidate_engineering_prompt(), 0)
+    system.projects.configure_department_settings(
+        candidate_id, "engineering", ModelSelection(department_prompt=candidate_engineering_prompt()), 0)
     project_ids = {"baseline": baseline_id, "candidate": candidate_id}
     trials: list[dict[str, Any]] = []
     task_rows: list[dict[str, Any]] = []
@@ -210,8 +212,9 @@ def _run_work_item(system: LoopSystem, project_id: str, group: str, task: dict[s
     if projection is not None:
         summary = summarize_run(system, run_id, scenario=f"{group}:{task['key']}")
     engineering_text = ""
-    if projection is not None and "engineering" in projection.department_prompts:
-        engineering_text = projection.department_prompts["engineering"].text
+    if projection is not None and projection.project_id is not None:
+        engineering_text = system.projects.read_department_setting(
+            projection.project_id, "engineering")["text"]
     return {
         "group": group,
         "task_key": task["key"],
@@ -376,13 +379,13 @@ def _project_facts(system: LoopSystem, project_id: str, name: str) -> dict[str, 
     return {
         "project_id": project_id,
         "name": name,
-        "prompt_configs": {
+        "department_settings": {
             department: {
                 "version": config.version,
                 "source": config.source,
                 "has_candidate_addendum": all(paragraph in config.text for paragraph in CANDIDATE_PARAGRAPHS),
             }
-            for department, config in project.prompt_configs.items()
+            for department, config in project.department_settings.items()
         },
     }
 
@@ -446,7 +449,7 @@ def _markdown(report: dict[str, Any]) -> str:
         lines.append("")
         lines.append(f"- project_id：`{facts.get('project_id')}`")
         lines.append(f"- 名称：`{facts.get('name')}`")
-        for department, config in (facts.get("prompt_configs") or {}).items():
+        for department, config in (facts.get("department_settings") or {}).items():
             lines.append(
                 f"- {department} 配置 version={config.get('version')} source={config.get('source')} "
                 f"候选段落={config.get('has_candidate_addendum')}"

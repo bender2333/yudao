@@ -69,7 +69,8 @@ class ContextAssembler:
                 not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool)
                 or max_output_tokens < 1):
             raise ValueError("max_output_tokens must be a positive integer")
-        prompt = projection.department_prompts[department] if prompt is None else prompt
+        if prompt is None:
+            raise ValueError("a department prompt is required to assemble a request")
         if prompt.department != department:
             raise ValueError("the prompt must belong to the activated department")
         guidance_items = list(guidance or [])

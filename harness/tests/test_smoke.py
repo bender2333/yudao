@@ -227,26 +227,24 @@ def test_model_input_audit_rejects_changed_received_original(collaboration_run, 
     assert any("input bytes or range" in note for note in audit["notes"])
 
 
-def test_model_input_audit_uses_activation_prompt_after_inflight_edit(tmp_path):
+def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
+    # 部门 Prompt 来自项目部门设置（run 内没有副本）：装配的请求正文用项目设置中的 Prompt，
+    # 审计从项目部门设置取出同一个 Prompt 复核
     from harness.adapters.fake import FakeAdapter
-    from harness.providers.call import ModelResponse
+    from harness.providers.selection import ModelSelection
     from harness.runtime import LoopSystem
+    from harness.tests.helpers import happy_script
 
-    def update(request):
-        system.update_prompt(request.run_id, "engineering", "  NEW_ENGINEERING_PROMPT\r\n")
-        return ModelResponse(output=[{
-            "id": "inspect", "call_id": "inspect", "type": "function_call", "name": "list_files",
-            "arguments": "{}",
-        }])
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), update, plan_turn(), collaboration_request()]))
-    run_id = system.create_run("echo")
-    for _ in range(3):
-        system.activate_once(run_id)
-    first, second, third = system.test_adapter.invocations[1:]
-    versions = [recorded_context(system, request).manifest.prompt_version for request in (first, second, third)]
-    assert first.activation_id == second.activation_id and versions[:2] == [1, 1]
-    assert third.activation_id != first.activation_id and versions[2] == 2
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([*happy_script()]))
+    project_id = system.projects.register("Audit", "目标")
+    prompt = "  NEW_ENGINEERING_PROMPT\r\n"
+    system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt=prompt), 0)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
+    system.run_until_stop(run_id)
+    versions = [recorded_context(system, request).manifest.prompt_version
+                for request in system.test_adapter.invocations if request.department == "engineering"]
+    assert versions and set(versions) == {1}
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit
 

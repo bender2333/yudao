@@ -24,9 +24,10 @@ from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
 from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
-from .models import (ArtifactRef, EventType, RunProjection, canonical_hash, department_for_phase, estimate_tokens,
-                     json_dumps)
-from .projection import apply_event, project_run
+from .models import (ArtifactRef, DepartmentPrompt, EventType, RunProjection, canonical_hash, department_for_phase,
+                     estimate_tokens, hash_bytes, json_dumps)
+from .projection import apply_event, project_run, saved_project
+from .projects import _default_settings
 from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
@@ -507,6 +508,28 @@ def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
     return snapshot
 
 
+def _project_prompt(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> DepartmentPrompt:
+    # 重新装配请求需要这次激活采用的部门 Prompt：从该 run 所属项目当前的部门设置读取（run 内没有副本），
+    # 不属于项目的运行使用内置默认 Prompt
+    projection = project_run(store, run_id)
+    text = DEFINITIONS.role(department).prompt
+    version = 0
+    ref = None
+    if projection.project_id is not None:
+        state = saved_project(store, projection.project_id)
+        if state is not None:
+            _default_settings(state)
+            setting = state.department_settings.get(department)
+            if setting is not None:
+                version = setting.version
+                text = setting.text
+                ref = None if setting.prompt_ref is None else ArtifactRef(**setting.prompt_ref)
+    if ref is None:
+        # 内置默认 Prompt（版本 0）每次激活写 run 作用域工件，内容哈希只由文本决定
+        ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
+    return DepartmentPrompt(department=department, version=version, text=text, prompt_ref=ref,
+                            created_event_id="")
+
 def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
     # 逐条核对事件的绑定与顺序；每个请求由上下文装配（P）按它之前的事件重新装配，与记录下来的请求比较
     notes: list[str] = []
@@ -529,7 +552,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     replies_without_tool_call: dict[str, int] = {}
     intend_bytes = b""
     received_version = 0
-    prompt_versions: dict[str, int] = {}
     current_work = RunProjection()
     assembly = ContextAssembly(artifacts)
     events = store.list_events(run_id)
@@ -552,33 +574,22 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             "engineering_plan_hash": current_plan_hash(current_work),
             "request_id": None if current_work.pending_request is None else current_work.pending_request.id,
         }
-        if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED}:
+        if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED}:
             try:
-                if event.type != EventType.DEPARTMENT_PROMPT_UPDATED:
-                    item = payload["initial_input"] if event.type == EventType.RUN_CREATED else payload
-                    if not isinstance(item["text"], str) or item["version"] != received_version + 1:
-                        raise ValueError("input version or original text is invalid")
-                    raw = item["text"].encode("utf-8")
-                    if (artifacts.get_for_run(run_id, ArtifactRef(**item["input_ref"])) != raw
-                            or item["byte_start"] != len(intend_bytes)
-                            or item["byte_end"] != len(intend_bytes) + len(raw)):
-                        raise ValueError("input bytes or range differ from their recorded original")
-                    intend_bytes += raw
-                    received_version += 1
-                    if artifacts.get_for_run(run_id, ArtifactRef(**item["intend_ref"])) != intend_bytes:
-                        raise ValueError("intend artifact is not the exact concatenation of received inputs")
-                    if current_work.task.encode("utf-8") != intend_bytes:
-                        raise ValueError("projected intend differs from received input originals")
-                updates = payload["department_prompts"].values() if event.type == EventType.RUN_CREATED else (
-                    [payload] if event.type == EventType.DEPARTMENT_PROMPT_UPDATED else []
-                )
-                for item in updates:
-                    department = item["department"]
-                    if item["version"] != prompt_versions.get(department, 0) + 1:
-                        raise ValueError("prompt version is not sequential")
-                    if artifacts.get_for_run(run_id, ArtifactRef(**item["prompt_ref"])) != item["text"].encode("utf-8"):
-                        raise ValueError("prompt differs from its recorded original")
-                    prompt_versions[department] = item["version"]
+                item = payload["initial_input"] if event.type == EventType.RUN_CREATED else payload
+                if not isinstance(item["text"], str) or item["version"] != received_version + 1:
+                    raise ValueError("input version or original text is invalid")
+                raw = item["text"].encode("utf-8")
+                if (artifacts.get_for_run(run_id, ArtifactRef(**item["input_ref"])) != raw
+                        or item["byte_start"] != len(intend_bytes)
+                        or item["byte_end"] != len(intend_bytes) + len(raw)):
+                    raise ValueError("input bytes or range differ from their recorded original")
+                intend_bytes += raw
+                received_version += 1
+                if artifacts.get_for_run(run_id, ArtifactRef(**item["intend_ref"])) != intend_bytes:
+                    raise ValueError("intend artifact is not the exact concatenation of received inputs")
+                if current_work.task.encode("utf-8") != intend_bytes:
+                    raise ValueError("projected intend differs from received input originals")
             except (KeyError, TypeError, ValueError, OSError) as exc:
                 notes.append(f"event {event.stream_version}: {exc}")
             continue
@@ -586,12 +597,13 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if not activation or activation in activations:
                 notes.append(f"event {event.stream_version}: missing or duplicate department activation")
             else:
+                # 部门 Prompt 来自项目部门设置，run 内没有副本；激活事件记录这次采用的版本与摘要
                 activations[activation] = (event.department, event.session_id, event.event_id)
-                prompt = current_work.department_prompts[event.department]
-                activation_prompts[activation] = prompt
+                activation_prompts[activation] = _project_prompt(store, artifacts, run_id, event.department)
                 activation_intends[activation] = current_work.task
                 basis = {**work_basis, "input_version": current_work.input_version,
-                         "prompt_version": prompt.version, "prompt_hash": prompt.prompt_ref.content_hash}
+                         "prompt_version": payload.get("prompt_version"),
+                         "prompt_hash": payload.get("prompt_hash")}
                 activation_bases[activation] = basis
                 guidance_only = _expected_guidance_only(current_work, event.department)
                 activation_guidance_only[activation] = guidance_only

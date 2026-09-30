@@ -34,6 +34,13 @@ from .presets import (
 )
 from .resolve import CallTargetResolution, FrozenTarget, ResolveSnapshot, resolve_snapshot
 from .responses import ProviderConnections, ResponsesConfig, check_availability
+from .selection import (
+    DEPARTMENT_DEFAULT_SOURCE,
+    PROJECT_DEPARTMENT_SETTING_SOURCE,
+    ModelSelection,
+    SelectionResolution,
+    merge_selection,
+)
 from .store import ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
 from .tls import ssl_context
 
@@ -66,6 +73,11 @@ __all__ = [
     "ResolveSnapshot",
     "resolve_snapshot",
     "CallTargetResolution",
+    "ModelSelection",
+    "SelectionResolution",
+    "merge_selection",
+    "DEPARTMENT_DEFAULT_SOURCE",
+    "PROJECT_DEPARTMENT_SETTING_SOURCE",
     "ProviderInput",
     "ProviderMessage",
     "ToolSpec",

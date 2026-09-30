@@ -20,7 +20,6 @@ RUN_EVENT_TYPES = frozenset({
     "run_created",
     "user_input_received",
     "product_input_assigned",
-    "department_prompt_updated",
     "department_guidance_received",
     "department_guidance_applied",
     "department_guidance_responded",

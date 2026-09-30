@@ -57,8 +57,6 @@ def test_new_input_and_requirement_diff_form_one_accepted_history_through_redeli
         before = system.activate_once(run_id)
     old_spec_event = system.store.get_event(before.product_spec.created_event_id)
     old_code = system.git_versions.read_file(run_id, before.git_version, "code/src/echo.py")
-    system.update_prompt(run_id, "quality", "Inspect the current requirement carefully")
-    assert system.project(run_id).git_version == before.git_version
     system.workspace(run_id).write_file("src/echo.py", "unfinished engineering change")
     received = system.add_input(run_id, "Print uppercase now")
     assert system.git_versions.read_file(run_id, received.git_version, "intend.md") == b"  build echo\r\nPrint uppercase now"
@@ -311,7 +309,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
         assert caught.value.cancellation_recorded == (failure != "cancellation_event")
         # 取消已经生效：运行不再接受任何修改
         with pytest.raises(RunTerminalError):
-            system.update_prompt(run_id, "product", "The run is already cancelled")
+            system.add_guidance(run_id, "product", "The run is already cancelled")
         assert system.test_adapter.cancelled == {system.test_adapter.invocations[0].attempt_id}
         current = system.project(run_id)
         assert current.git_version == before.git_version and current.input_version == before.input_version
@@ -333,7 +331,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
     with pytest.raises(RunTerminalError):
         system.add_input(run_id, "Do not resume stopped work")
     with pytest.raises(RunTerminalError):
-        system.update_prompt(run_id, "product", "Do not resume stopped work")
+        system.add_guidance(run_id, "product", "Do not resume stopped work")
 
 
 @pytest.mark.parametrize("git_fails", [False, True])

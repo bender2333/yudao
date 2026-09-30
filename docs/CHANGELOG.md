@@ -294,3 +294,4 @@ claude-opus-5-5 / 2026-09-30 22:18 / 新增 docs/research/computer-use-without-c
 claude-opus-5-5 / 2026-09-30 22:46 / docs/design/execution-environment.md 第 10 节场景 1 增加可执行标记在开发板上的核对；docs/design/browser-and-computer-use.md 第 17 节截图证据与请求中的截图由 #149 实现，#148、#149 的中断验收在本机进程上进行，#155 增加 #143 的阻塞；docs/stage-3-plan.md 关键路径写明 #155 另外依赖 #143 / 同步工单时发现：可执行标记没有工单在 Linux 上验证，#148 没有截图的来源，#149 的远程验收依赖 3.2C 的远程部分
 claude-opus-5-5 / 2026-10-01 01:15 / docs/architecture-issues.md 为 #202 登记的执行槽位占用问题追加处理结论 / 架构师处理执行者登记的架构问题
 claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置
+claude-opus-5 / 2026-10-01 / docs/architecture-issues.md 增加两条：#89 登记事项内没有部门 Prompt 副本与按事件重新装配请求的审计的冲突，以及项目事件种类改名与 ADR-0019 的边界 / #89 执行中发现，供架构师处置

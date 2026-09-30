@@ -498,6 +498,7 @@ class DepartmentPromptState(Contract):
     source: str
     used_version: int | None
     used_event_id: str | None
+    prompt_configured: bool = False
 
 
 class GuidanceRecord(Contract):
@@ -519,6 +520,7 @@ class DepartmentWorkspaceResult(Contract):
     phase: str | None
     active: bool
     prompt: DepartmentPromptState
+    setting: DepartmentSetting
     guidance: list[GuidanceRecord]
     messages: list[dict[str, Any]]
     context: dict[str, Any]
@@ -533,8 +535,8 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     state = _project(application, request.project_id, include_history=False)
     item = None if request.work_item is None else _work_item(state, request.work_item)
     run = None if item is None else _optional_run(application, item.run_id)
-    configured = state.prompt_configs[request.department]
-    used = None if run is None else run.department_prompts.get(request.department)
+    configured = state.department_settings[request.department]
+    used_version = _last_used_prompt_version(run, request.department)
     guidance = [
         GuidanceRecord(
             guidance_id=value.id, version=value.version, text=value.text, status=value.status,
@@ -559,9 +561,15 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             prompt=DepartmentPromptState(
                 department=request.department, configured_version=configured.version,
                 configured_text=configured.text, source=configured.source,
-                used_version=None if used is None else used.version,
-                used_event_id=None if used is None else used.created_event_id,
+                prompt_configured=configured.configured_prompt,
+                used_version=used_version,
+                used_event_id=None if configured.event_id is None else configured.event_id,
             ),
+            setting=DepartmentSetting(
+                department=request.department, version=configured.version, text=configured.text,
+                source=configured.source, provider_id=configured.provider_id,
+                model_id=configured.model_id, requested_tier=configured.requested_tier,
+                prompt_configured=configured.configured_prompt),
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
             provider=None if run is None else run.provider_bindings.get(request.department),
@@ -597,6 +605,16 @@ def _department_messages(application: Application, run_id: str, department: str)
     ]
 
 
+def _last_used_prompt_version(run: Any, department: str) -> int | None:
+    # run 内实际采用的部门 Prompt 版本：该部门最近一次模型请求事件记录的 prompt_version
+    if run is None:
+        return None
+    entry = next((item for item in reversed(run.model_requests) if item.get("department") == department), None)
+    if entry is None:
+        return None
+    version = entry.get("prompt_version")
+    return version if isinstance(version, int) else None
+
 def _last_call(run: Any, department: str) -> dict[str, Any] | None:
     if run is None:
         return None
@@ -607,6 +625,7 @@ def _last_call(run: Any, department: str) -> dict[str, Any] | None:
         key: entry.get(key) for key in (
             "activation_id", "step_id", "attempt", "requested_provider", "requested_model",
             "actual_provider", "actual_model", "requested_protocol", "snapshot_id", "prompt_version",
+            "selection_source", "requested_tier", "sent_tier",
             "input_version", "event_id",
         )
     }
@@ -1078,10 +1097,16 @@ class ProjectSettings(Contract):
 
 
 class DepartmentSetting(Contract):
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以为空（未写入）；
+    # 没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt
     department: str
     version: int
     text: str
     source: str
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    prompt_configured: bool = False
 
 
 class CommandSetting(Contract):
@@ -1120,9 +1145,14 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             project_id=state.project_id, name=state.name, goal=state.goal, version=state.stream_version,
             pinned=state.pinned, archived=state.archived,
             departments={
-                department: DepartmentSetting(department=department, version=state.prompt_configs[department].version,
-                                              text=state.prompt_configs[department].text,
-                                              source=state.prompt_configs[department].source)
+                department: DepartmentSetting(
+                    department=department, version=state.department_settings[department].version,
+                    text=state.department_settings[department].text,
+                    source=state.department_settings[department].source,
+                    provider_id=state.department_settings[department].provider_id,
+                    model_id=state.department_settings[department].model_id,
+                    requested_tier=state.department_settings[department].requested_tier,
+                    prompt_configured=state.department_settings[department].configured_prompt)
                 for department in DEPARTMENTS
             },
             commands={
@@ -1282,7 +1312,7 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
                 ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
-                ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED,
+                ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
                 ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED),
 )
@@ -1322,7 +1352,7 @@ EVENT_DETAIL = QueryDefinition(
 DEPARTMENT_WORKSPACE = QueryDefinition(
     name="department.workspace", request=DepartmentWorkspace, result=DepartmentWorkspaceResult,
     handle=_department_workspace,
-    changed_by=(EventType.DEPARTMENT_PROMPT_UPDATED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+    changed_by=(EventType.DEPARTMENT_GUIDANCE_RECEIVED,
                 EventType.DEPARTMENT_GUIDANCE_APPLIED, EventType.DEPARTMENT_GUIDANCE_RESPONDED,
                 EventType.DEPARTMENT_ACTIVATED, EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE,
                 EventType.CONTEXT_ASSEMBLED, EventType.COMPACTION_RECORDED, EventType.USER_INPUT_RECEIVED,
@@ -1367,7 +1397,7 @@ RUN_ATTEMPT = QueryDefinition(
 PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-                ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
+                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
                 ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
 )
 

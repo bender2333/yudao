@@ -11,12 +11,14 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.event_store import project_stream
-from harness.models import DEPARTMENTS, ArtifactRef, EventType, ProjectEventType, json_dumps
+from harness.department_prompts import save_department_prompt
+from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, json_dumps
 from harness.write_path import NewProjectEvent
+from harness.providers.selection import ModelSelection
 from harness.projects import (
+    DepartmentSettingConflict,
     ProjectArchivedError,
     ProjectNotFoundError,
-    PromptConfigConflict,
     WorkItemInProgressError,
     project_context_text,
     project_projection,
@@ -214,7 +216,8 @@ def test_projects_do_not_see_each_other(data_dir):
     system.run_until_stop(run_b)
     system.projects.settle(run_a)
     system.projects.settle(run_b)
-    system.projects.configure_prompt(project_b, "quality", "只属于 B 的质检 Prompt", 0)
+    system.projects.configure_department_settings(
+        project_b, "quality", ModelSelection(department_prompt="只属于 B 的质检 Prompt"), 0)
     system.projects.record_material(project_b, "只属于 B 的材料", department="product")
     view_a = json_dumps(system.projects.projection(project_a).to_dict())
     view_b = json_dumps(system.projects.projection(project_b).to_dict())
@@ -222,7 +225,7 @@ def test_projects_do_not_see_each_other(data_dir):
         assert foreign not in view_a
     for foreign in (project_a, work_item_a, run_a):
         assert foreign not in view_b
-    assert system.projects.projection(project_a).prompt_configs["quality"].source == "default"
+    assert system.projects.projection(project_a).department_settings["quality"].source == "default"
     assert system.projects.projection(project_a).materials == []
     assert [item.name for item in system.projects.list_projects()] == ["B", "A"]
     system.projects.pin(project_a, True)
@@ -237,7 +240,8 @@ def test_projects_do_not_see_each_other(data_dir):
 def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, capsys):
     system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
     project_id = system.projects.register("Replay", GOAL)
-    system.projects.configure_prompt(project_id, "engineering", "工程 Prompt v1", 0)
+    system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt="工程 Prompt v1"), 0)
     system.projects.record_material(project_id, "一条原文材料", department=None)
     _work_item_1, run_1 = system.projects.start_work_item(project_id, "第一步")
     system.run_until_stop(run_1)
@@ -272,14 +276,13 @@ def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, ca
 def _ownership(project_id="proj_x", work_item_id="wi_x"):
     return {
         "project_id": project_id, "work_item_id": work_item_id, "project_context": "项目：X",
-        "department_prompts": {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS},
         "prompt_config_versions": {department: 0 for department in DEPARTMENTS},
     }
 
 
 def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
     system = _system(data_dir, happy_script())
-    for missing in ("project_id", "work_item_id", "project_context", "department_prompts", "prompt_config_versions"):
+    for missing in ("project_id", "work_item_id", "project_context", "prompt_config_versions"):
         kwargs = _ownership()
         kwargs.pop(missing)
         with pytest.raises(ValueError, match="given together"):
@@ -288,7 +291,7 @@ def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
     with pytest.raises(ValueError, match="require project ownership"):
         system.create_run("bare with baseline", baseline={"adoption_id": "a"}, initial_tree=capture_public_tree(tmp_path / "empty"))
     with pytest.raises(ValueError, match="cover exactly"):
-        system.create_run("bad prompts", **{**_ownership(), "department_prompts": {"product": "p"}})
+        system.create_run("bad versions", **{**_ownership(), "prompt_config_versions": {"product": 0}})
     assert system.store.list_run_ids() == []
     # bare run 仍然允许：空目录 digest，没有 project 部件。
     run_id = system.create_run("bare")
@@ -296,7 +299,11 @@ def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
     assert run.project_id is None and run.work_item_id is None and run.baseline is None
     assert run.project_context_ref is None and run.prompt_config_versions == {}
     assert run.workspace_digest == capture_public_tree(system.workspace(run_id).root).digest
-    assembled = ContextAssembler().assemble(run, department="product", session_id="s", activation_id="a")
+    prompt = DepartmentPrompt("product", 0, DEFINITIONS.role("product").prompt,
+                              save_department_prompt(system.artifacts, run_id, "product",
+                                                     DEFINITIONS.role("product").prompt), "")
+    assembled = ContextAssembler(system.artifacts).assemble(
+        run, department="product", session_id="s", activation_id="a", prompt=prompt)
     assert "project" not in [part.source for part in assembled.parts]
 
 
@@ -430,33 +437,42 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
 # §13.8 部门 Prompt 项目配置
 
 
-def test_prompt_configuration_versions_conflicts_and_freezing(data_dir):
+def test_department_prompt_configuration_versions_conflicts_and_effect_timing(data_dir):
+    # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改从该部门的下一次模型请求起生效
     adapter = FakeAdapter([*_release_script("A"), *_release_script("B", files=_v2_files())])
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("Prompts", GOAL)
-    default = system.projects.read_prompt(project_id, "engineering")
+    default = system.projects.read_department_setting(project_id, "engineering")
     default_text = DEFINITIONS.role("engineering").prompt
     assert default == {"department": "engineering", "text": default_text,
-                       "default_text": default_text, "version": 0, "updated_at": None, "source": "default"}
+                       "default_text": default_text, "prompt_configured": False, "provider_id": None,
+                       "model_id": None, "requested_tier": None, "version": 0, "updated_at": None,
+                       "source": "default"}
     v1 = "工程 Prompt v1：先写计划再写代码。"
-    saved = system.projects.configure_prompt(project_id, "engineering", v1, 0)
+    saved = system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt=v1), 0)
     assert (saved["version"], saved["source"], saved["unchanged"], saved["text"]) == (1, "configured", False, v1)
     assert saved["updated_at"] is not None and saved["default_text"] == default_text
-    again = system.projects.configure_prompt(project_id, "engineering", v1, 1)
+    assert saved["prompt_configured"] is True
+    again = system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt=v1), 1)
     assert (again["version"], again["unchanged"]) == (1, True)
     with pytest.raises(ValueError):
-        system.projects.configure_prompt(project_id, "engineering", "   \n", 1)
-    with pytest.raises(PromptConfigConflict) as conflict:
-        system.projects.configure_prompt(project_id, "engineering", "过期编辑", 0)
+        system.projects.configure_department_settings(
+            project_id, "engineering", ModelSelection(department_prompt="   \n"), 1)
+    with pytest.raises(DepartmentSettingConflict) as conflict:
+        system.projects.configure_department_settings(
+            project_id, "engineering", ModelSelection(department_prompt="过期编辑"), 0)
     assert conflict.value.current["version"] == 1 and conflict.value.current["text"] == v1
     with pytest.raises(ValueError):
-        system.projects.configure_prompt(project_id, "finance", v1, 1)
-    assert len(_project_events(system, project_id, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED)) == 1
+        system.projects.configure_department_settings(
+            project_id, "finance", ModelSelection(department_prompt=v1), 1)
+    assert len(_project_events(system, project_id, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED)) == 1
 
     _work_item_a, run_a = system.projects.start_work_item(project_id, "v1 期间的事项")
     run = system.project(run_a)
-    assert run.department_prompts["engineering"].text == v1 and run.department_prompts["engineering"].version == 1
-    assert run.department_prompts["product"].text == DEFINITIONS.role("product").prompt
+    # run 内没有部门 Prompt 的副本，只记项目部门设置的版本
+    assert not hasattr(run, "department_prompts")
     assert run.prompt_config_versions == {"product": 0, "engineering": 1, "quality": 0}
     assert system.run_until_stop(run_a).phase == "DONE"
     system.projects.settle(run_a)
@@ -465,24 +481,23 @@ def test_prompt_configuration_versions_conflicts_and_freezing(data_dir):
     assert requests_a and all(v1 in request["input"][0]["content"] for request in requests_a)
 
     v2 = "工程 Prompt v2：保留重复行改为只保留首次出现。"
-    saved = system.projects.configure_prompt(project_id, "engineering", v2, 1)
+    saved = system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt=v2), 1)
     assert saved["version"] == 2
     project = system.projects.projection(project_id)
-    assert [item.version for item in project.prompt_config_history] == [1, 2]
-    assert project.prompt_configs["engineering"].text == v2 and project.prompt_configs["product"].version == 0
+    assert [item.version for item in project.department_setting_history] == [1, 2]
+    assert project.department_settings["engineering"].text == v2 and project.department_settings["product"].version == 0
     _work_item_b, run_b = system.projects.start_work_item(project_id, "v2 期间的事项")
     run = system.project(run_b)
-    assert run.department_prompts["engineering"].text == v2 and run.department_prompts["engineering"].version == 1
     assert run.prompt_config_versions["engineering"] == 2
     assert system.run_until_stop(run_b).phase == "DONE"
     engineering_b = [request for request in adapter.invocations if request.department == "engineering"][-1]
     assert v2 in engineering_b.input_items[0]["content"] and v1 not in engineering_b.input_items[0]["content"]
-    # v1 期间创建的 run 请求正文不变；run 内 update_prompt 不改项目配置。
+    # 已经结束的 run 的请求正文不变；项目部门设置只随新请求生效
     later_a = [json.loads(system.artifacts.get_for_run(run_a, ArtifactRef(**manifest.request_ref)))
                for manifest in system.project(run_a).manifests if manifest.department == "engineering"]
     assert later_a == requests_a
-    assert system.project(run_a).department_prompts["engineering"].text == v1
-    assert system.projects.read_prompt(project_id, "engineering")["version"] == 2
+    assert system.projects.read_department_setting(project_id, "engineering")["version"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +514,8 @@ def test_archived_project_rejects_writes_until_restored(data_dir):
     with pytest.raises(ProjectArchivedError):
         system.projects.start_work_item(project_id, "归档后的事项")
     with pytest.raises(ProjectArchivedError):
-        system.projects.configure_prompt(project_id, "product", "新 Prompt", 0)
+        system.projects.configure_department_settings(
+            project_id, "product", ModelSelection(department_prompt="新 Prompt"), 0)
     with pytest.raises(ProjectArchivedError):
         system.projects.record_material(project_id, "归档后的材料")
     with pytest.raises(ProjectArchivedError):
@@ -781,7 +797,7 @@ def test_register_validates_and_stores_goal_artifact(data_dir):
     assert project.goal_ref["media_type"] == "text/markdown"
     assert system.artifacts.get_for_run(project_id, ArtifactRef(**project.goal_ref)).decode("utf-8") == GOAL
     assert project.created_at == project.updated_at and project.stream_version == 1
-    assert {department: config.version for department, config in project.prompt_configs.items()} == {
+    assert {department: config.version for department, config in project.department_settings.items()} == {
         "product": 0, "engineering": 0, "quality": 0,
     }
     with pytest.raises(ProjectNotFoundError):

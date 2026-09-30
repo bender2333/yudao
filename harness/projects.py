@@ -18,13 +18,13 @@ from .models import (
     Adoption,
     ArtifactRef,
     DEPARTMENTS,
+    DepartmentSetting,
     Event,
     EventType,
     HeldCandidate,
     ProjectEvent,
     ProjectEventType,
     ProjectProjection,
-    PromptConfig,
     RegisteredCommand,
     RunProjection,
     SourceDirectory,
@@ -34,6 +34,7 @@ from .models import (
     new_id,
 )
 from .projection import RunNotFoundError, project_run, saved_project
+from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
@@ -58,10 +59,10 @@ class WorkItemInProgressError(ValueError):
     """有进行中事项时不能归档或记录材料。"""
 
 
-class PromptConfigConflict(Exception):
-    """所编辑的配置版本已过期；`current` 是项目当前配置的读取体。"""
+class DepartmentSettingConflict(Exception):
+    """所编辑的项目部门设置版本已过期；`current` 是项目当前设置的读取体。"""
     def __init__(self, current: dict[str, Any]) -> None:
-        super().__init__("department prompt configuration changed since base_version")
+        super().__init__("department setting changed since base_version")
         self.current = current
 
 
@@ -92,7 +93,7 @@ def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: 
 def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
-    _default_prompts(state)
+    _default_settings(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
@@ -101,10 +102,10 @@ def _compose(store: EventStore, state: ProjectProjection, *, include_history: bo
     return state
 
 
-def _default_prompts(state: ProjectProjection) -> ProjectProjection:
-    # 没有配置过的部门使用默认 Prompt
+def _default_settings(state: ProjectProjection) -> ProjectProjection:
+    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认
     for department in DEPARTMENTS:
-        state.prompt_configs.setdefault(department, PromptConfig(
+        state.department_settings.setdefault(department, DepartmentSetting(
             department=department, version=0, text=DEFINITIONS.role(department).prompt, source="default",
         ))
     return state
@@ -211,7 +212,7 @@ def _project_event_summary(event: ProjectEvent) -> str:
     payload = event.payload
     return str(
         payload.get("title") or payload.get("summary") or payload.get("name") or payload.get("reason")
-        or payload.get("error") or (payload.get("department") if event.type == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED else None)
+        or payload.get("error") or (payload.get("department") if event.type == ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED else None)
         or event.type
     )
 
@@ -318,10 +319,21 @@ class ProjectService:
         projects.sort(key=lambda item: not item.pinned)
         return projects
 
-    def read_prompt(self, project_id: str, department: str) -> dict[str, Any]:
+    def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        return _prompt_view(self.projection(project_id).prompt_configs[department])
+        return _setting_view(self.projection(project_id).department_settings[department])
+
+    def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
+        # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
+        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理
+        if department not in DEPARTMENTS:
+            return None
+        state = saved_project(self.store, project_id)
+        if state is None:
+            return None
+        _default_settings(state)
+        return state.department_settings.get(department)
 
     def read_commands(self, project_id: str) -> list[dict[str, Any]]:
         return [_command_view(config) for _, config in sorted(self.projection(project_id).commands.items())]
@@ -400,7 +412,7 @@ class ProjectService:
 
         def create(transaction: Transaction) -> _NewWorkItem:
             # 事项的基线、Prompt 与登记命令取自事务中的项目投影
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             baseline = None
             initial_tree = None
             source_run = None
@@ -442,7 +454,7 @@ class ProjectService:
         tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
 
         def create(transaction: Transaction) -> _NewWorkItem:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             return self._work_item_created(
                 transaction, project, text, title=title, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
@@ -459,8 +471,9 @@ class ProjectService:
                            priority: str = PRIORITY_USER) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
-        department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
-        prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
+        # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
+        prompt_config_versions = {department: project.department_settings[department].version
+                                  for department in DEPARTMENTS}
         # 登记命令在事项创建时冻结：之后项目再改注册表，不影响已创建事项的执行依据
         frozen_commands = {name: config.frozen() for name, config in project.commands.items()}
         command_versions = {name: config.version for name, config in project.commands.items()}
@@ -483,7 +496,7 @@ class ProjectService:
                 max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 project_id=project.project_id, work_item_id=work_item_id, baseline=baseline,
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
-                department_prompts=department_prompts, prompt_config_versions=prompt_config_versions,
+                prompt_config_versions=prompt_config_versions,
                 registered_commands=frozen_commands, command_versions=command_versions,
             ),
         )
@@ -521,7 +534,7 @@ class ProjectService:
             return None
 
         def restart(transaction: Transaction) -> _NewWorkItem | None:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, run.project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, run.project_id)))
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
@@ -571,7 +584,7 @@ class ProjectService:
         work_item_id, run_id = new_id("wi"), new_id("run")
 
         def queue(transaction: Transaction) -> str:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             source_run = None
             baseline, initial_tree = None, None
             adoption = project.current_adoption
@@ -661,30 +674,41 @@ class ProjectService:
 
     # 部门 Prompt 项目配置
 
-    def configure_prompt(self, project_id: str, department: str, text: str, base_version: int, *,
-                         command: Command | None = None) -> dict[str, Any]:
+    def configure_department_settings(self, project_id: str, department: str, selection: ModelSelection,
+                                      base_version: int, *, command: Command | None = None) -> dict[str, Any]:
+        # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本。
+        # 并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）。选择「跟随部门默认」清除本项目的模型选择，
+        # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError("prompt text must be a non-empty string")
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
+        if selection.department_prompt is not None and not selection.department_prompt.strip():
+            raise ValueError("department prompt must be a non-empty string when given")
 
         def configure(transaction: Transaction) -> dict[str, Any] | None:
-            current = _default_prompts(deepcopy(self._writable_in(transaction, project_id))).prompt_configs[department]
+            current = _default_settings(
+                deepcopy(self._writable_in(transaction, project_id))).department_settings[department]
             if base_version != current.version:
-                raise PromptConfigConflict(_prompt_view(current))
-            if text == current.text:
-                return {**_prompt_view(current), "unchanged": True}
-            ref = save_department_prompt(self.artifacts, project_id, department, text)
-            transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
-                "department": department, "version": current.version + 1, "text": text,
-                "prompt_ref": asdict(ref), "base_version": base_version,
-            }, actor="user:local"))
+                raise DepartmentSettingConflict(_setting_view(current))
+            unchanged = (current.provider_id == selection.provider_id
+                         and current.model_id == selection.model_id
+                         and current.requested_tier == selection.requested_tier
+                         and _current_prompt(current) == selection.department_prompt)
+            if unchanged:
+                return {**_setting_view(current), "unchanged": True}
+            payload = selection.event_payload()
+            if selection.department_prompt is not None:
+                ref = save_department_prompt(self.artifacts, project_id, department, selection.department_prompt)
+                payload["department_prompt_ref"] = asdict(ref)
+            payload.update({"department": department, "version": current.version + 1,
+                            "base_version": base_version})
+            transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, payload,
+                                              actor="user:local"))
             return None
 
         unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
-        return unchanged or {**self.read_prompt(project_id, department), "unchanged": False}
+        return unchanged or {**self.read_department_setting(project_id, department), "unchanged": False}
 
     # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
 
@@ -804,14 +828,22 @@ def _require_title(title: str | None) -> None:
         raise ValueError("title must be a non-empty string when given")
 
 
-def _prompt_view(config: PromptConfig) -> dict[str, Any]:
+def _current_prompt(setting: DepartmentSetting) -> str | None:
+    # 项目部门设置中写入的部门 Prompt；没有写入时为 None，读取模型补成内置默认 Prompt
+    return setting.text if setting.configured_prompt else None
+
+def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
     return {
-        "department": config.department,
-        "text": config.text,
-        "default_text": DEFINITIONS.role(config.department).prompt,
-        "version": config.version,
-        "updated_at": config.updated_at,
-        "source": config.source,
+        "department": setting.department,
+        "text": setting.text,
+        "default_text": DEFINITIONS.role(setting.department).prompt,
+        "prompt_configured": setting.configured_prompt,
+        "provider_id": setting.provider_id,
+        "model_id": setting.model_id,
+        "requested_tier": setting.requested_tier,
+        "version": setting.version,
+        "updated_at": setting.updated_at,
+        "source": setting.source,
     }
 
 

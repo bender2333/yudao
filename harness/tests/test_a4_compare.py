@@ -47,10 +47,11 @@ def test_candidate_engineering_initial_prompt_contains_protocol_paragraphs(compa
     candidate_runs = {trial["run_id"] for trial in report["trials"] if trial["group"] == "candidate"}
     baseline_runs = {trial["run_id"] for trial in report["trials"] if trial["group"] == "baseline"}
     for trial in report["trials"]:
-        projection = system.project(trial["run_id"])
-        engineering = projection.department_prompts["engineering"].text
-        product = projection.department_prompts["product"].text
-        quality = projection.department_prompts["quality"].text
+        # 部门 Prompt 来自项目部门设置（run 内没有副本）
+        project_id = system.project(trial["run_id"]).project_id
+        engineering = system.projects.read_department_setting(project_id, "engineering")["text"]
+        product = system.projects.read_department_setting(project_id, "product")["text"]
+        quality = system.projects.read_department_setting(project_id, "quality")["text"]
         if trial["group"] == "candidate":
             assert all(paragraph in engineering for paragraph in CANDIDATE_PARAGRAPHS)
             assert trial["engineering_prompt_has_candidate_addendum"] is True
@@ -81,15 +82,15 @@ def test_candidate_engineering_initial_prompt_contains_protocol_paragraphs(compa
 def test_baseline_requests_unaffected_after_candidate_v1(comparison):
     system, report, _out = comparison
     projects = report["projects"]
-    assert projects["baseline"]["prompt_configs"]["engineering"]["version"] == 0
-    assert projects["candidate"]["prompt_configs"]["engineering"]["version"] == 1
-    assert projects["candidate"]["prompt_configs"]["engineering"]["has_candidate_addendum"] is True
-    assert projects["baseline"]["prompt_configs"]["engineering"]["has_candidate_addendum"] is False
-    assert projects["candidate"]["prompt_configs"]["product"]["version"] == 0
-    assert projects["candidate"]["prompt_configs"]["quality"]["version"] == 0
+    assert projects["baseline"]["department_settings"]["engineering"]["version"] == 0
+    assert projects["candidate"]["department_settings"]["engineering"]["version"] == 1
+    assert projects["candidate"]["department_settings"]["engineering"]["has_candidate_addendum"] is True
+    assert projects["baseline"]["department_settings"]["engineering"]["has_candidate_addendum"] is False
+    assert projects["candidate"]["department_settings"]["product"]["version"] == 0
+    assert projects["candidate"]["department_settings"]["quality"]["version"] == 0
 
     baseline_id = projects["baseline"]["project_id"]
-    current = system.projects.read_prompt(baseline_id, "engineering")
+    current = system.projects.read_department_setting(baseline_id, "engineering")
     assert current["version"] == 0 and current["text"] == DEFINITIONS.role("engineering").prompt
     for trial in report["trials"]:
         if trial["group"] != "baseline":
