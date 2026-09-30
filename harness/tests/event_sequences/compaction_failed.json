@@ -65,7 +65,9 @@
     },
     "intend_path": "materials/<run#1>/intend.md",
     "intend_ref": "<art#4>",
+    "kind": "change",
     "max_cycles": 999999,
+    "overview_ref": null,
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -1807,6 +1809,8 @@
   "actual_provider": "fake",
   "adapter": "fake",
   "baseline": null,
+  "baseline_review": null,
+  "baseline_reviews": [],
   "command_versions": {},
   "compactions": [],
   "context_window": 6000,
@@ -1897,6 +1901,7 @@
    }
   ],
   "intend_ref": "<art#4>",
+  "kind": "change",
   "last_activations": {
    "product": "<act#1>"
   },
@@ -2466,6 +2471,7 @@
    }
   ],
   "outcome": "failed",
+  "overview_ref": null,
   "pending_feedback": {},
   "pending_request": null,
   "phase": "FAILED",
@@ -2537,6 +2543,8 @@
   "snapshot": null,
   "stop_reason": "compaction_failed",
   "stream_version": 28,
+  "structure": null,
+  "structures": [],
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 1,
