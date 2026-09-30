@@ -1,25 +1,48 @@
-"""Capture and reproduce a complete public workspace without following links."""
+"""Capture and reproduce a complete public workspace without following links.
+
+The public tree holds every workspace entry except the host-private paths and the
+paths the project's ignore rules (its .gitignore files and Git exclude files)
+exclude. The ignore rules are decided by the Git command line; see
+`_ignored_paths`. Entries the public tree cannot represent (links, reparse
+points, hard links, special files) raise `UnrepresentableWorkspace` naming only
+the workspace-relative path.
+"""
 
 from __future__ import annotations
 
 import os
 import re
+import shutil
 import stat
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Any
+from typing import Any, Iterable, Sequence
 
 from .models import canonical_hash, hash_bytes
-
 
 TREE_FORMAT = "yudao-public-tree-v1"
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3]|conin\$|conout\$)", re.IGNORECASE)
-
+# 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
+IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
+_GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 class TreeError(ValueError):
     """A tree is incomplete, changed, or cannot be represented without ambiguity."""
 
+class UnrepresentableWorkspace(TreeError):
+    """The workspace holds entries the public tree cannot represent.
+
+    `findings` 是（工作区内相对路径，原因）的序列；说明文字只出现相对路径。
+    """
+
+    def __init__(self, findings: Sequence[tuple[str, str]]) -> None:
+        self.paths = tuple(relative for relative, _reason in findings)
+        self.reasons = tuple(reason for _relative, reason in findings)
+        super().__init__(
+            "; ".join([*self.reasons, "Add these paths to the project's ignore rules or delete them."])
+        )
 
 @dataclass(frozen=True)
 class CapturedFile:
@@ -30,7 +53,6 @@ class CapturedFile:
         validate_public_path(self.path)
         if not isinstance(self.data, bytes):
             raise TreeError("Captured file data must be bytes")
-
 
 @dataclass(frozen=True)
 class CapturedTree:
@@ -56,11 +78,9 @@ class CapturedTree:
     def digest(self) -> str:
         return canonical_hash(self.manifest)
 
-
 def is_private_path(relative: str) -> bool:
     parts = relative.replace("\\", "/").casefold().split("/")
     return parts[0] == ".checks" or ".git" in parts
-
 
 def validate_public_path(relative: str) -> None:
     """Accept an unambiguous portable relative path, never silently normalize it."""
@@ -79,7 +99,6 @@ def validate_public_path(relative: str) -> None:
             raise TreeError(f"Public path is not valid UTF-8: {relative!r}") from exc
     if is_private_path(relative):
         raise TreeError(f"Host-private path is not part of a public tree: {relative!r}")
-
 
 def validate_manifest(manifest: dict[str, Any]) -> None:
     """Check the complete directory and file set before any destination is written."""
@@ -115,16 +134,60 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if parent != PurePosixPath(".") and str(parent) not in directory_set:
             raise TreeError(f"Public tree entry has no declared parent directory: {relative}")
 
+def ignore_probe_directory(root: str | Path) -> Path:
+    """The probe Git directory for one workspace root: outside the workspace itself."""
+    base = _absolute_path(root)
+    probe = base.parent / (base.name + IGNORE_PROBE_DIR)
+    if not _GIT_DIR_NAME.fullmatch(probe.name):
+        raise TreeError(f"Ignore probe directory is not a plain name: {probe.name!r}")
+    return probe
 
-def capture_public_tree(root: str | Path) -> CapturedTree:
-    """Capture stable local bytes; filesystem changes during collection are errors."""
+def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> frozenset[str]:
+    """The relatives the project's ignore rules exclude, decided by the Git command line.
+
+    The probe repository belongs to the workspace root and lives beside it, so the
+    enclosing repository's rules (for example an outer .gitignore) do not leak in.
+    Returns the paths Git echoes back; exit code 1 with no output means nothing is
+    ignored.
+    """
+    if not relatives:
+        return frozenset()
+    base = _absolute_path(root)
+    probe = ignore_probe_directory(base)
+    if not os.path.exists(probe / "HEAD"):
+        probe.mkdir(parents=True, exist_ok=True)
+        _git_probe(probe, base, "init", "--quiet", "--template=")
+    environment = _git_environment()
+    output = _git_probe(
+        probe, base, "check-ignore", "--no-index", "--stdin", "-z",
+        data="\0".join(relatives).encode("utf-8") + b"\0", environment=environment,
+    )
+    return frozenset(item for item in output.decode("utf-8", errors="strict").split("\0") if item)
+
+def unrepresentable_reason(observed: os.stat_result, relative: str) -> str | None:
+    """Why a workspace entry cannot enter the public tree, naming the relative path only."""
+    reparse = getattr(observed, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    if stat.S_ISLNK(observed.st_mode) or reparse:
+        return f"Links and reparse points are not supported: {relative}"
+    if not (stat.S_ISDIR(observed.st_mode) or stat.S_ISREG(observed.st_mode)):
+        return f"Only regular files and directories are supported: {relative}"
+    if stat.S_ISREG(observed.st_mode) and observed.st_nlink != 1:
+        return f"Hard-linked files are not supported: {relative}"
+    return None
+
+def capture_public_tree(root: str | Path, respect_ignore_rules: bool = False) -> CapturedTree:
+    """Capture stable local bytes; filesystem changes during collection are errors.
+
+    respect_ignore_rules 打开时（run 工作区的读取），被项目忽略规则排除的路径不进入公开树，
+    规则由 Git 命令行判断；其余读取（封存、恢复、核对）不执行命令，也不应用忽略规则。
+    """
     base = _checked_directory(root)
-    before = _scan(base)
+    before = _scan(base, respect_ignore_rules=respect_ignore_rules)
     files = []
     for relative, observed in before.items():
         if relative and stat.S_ISREG(observed.st_mode):
-            files.append(CapturedFile(relative, _read_stable_file(base / relative, observed)))
-    after = _scan(base)
+            files.append(CapturedFile(relative, _read_stable_file(base / relative, observed, relative)))
+    after = _scan(base, respect_ignore_rules=respect_ignore_rules)
     if {path: _identity(value) for path, value in before.items()} != {
         path: _identity(value) for path, value in after.items()
     }:
@@ -134,27 +197,27 @@ def capture_public_tree(root: str | Path) -> CapturedTree:
         files=tuple(sorted(files, key=lambda item: item.path)),
     )
 
-
 def verify_public_tree(root: str | Path, manifest: dict[str, Any]) -> None:
     validate_manifest(manifest)
     if capture_public_tree(root).manifest != manifest:
         raise TreeError("Public tree does not match the complete recorded manifest")
 
-
 def resolve_public_path(root: str | Path, relative: str) -> Path:
     """Resolve a public name while checking existing ancestors without following links."""
     validate_public_path(relative)
     target = _absolute_path(root) / relative
+    # 检查到无法表示的条目时说明文字写工作区内的相对路径；root 自身不经过这个循环
     for path in [*reversed(target.parents), target]:
         try:
             observed = path.lstat()
         except FileNotFoundError:
             break
-        _check_kind(path, observed)
+        depth = len(path.parents) - len(target.parents)
+        named = relative if path == target else (relative.split("/")[0] if depth == 1 else "/".join(relative.split("/")[:depth]))
+        _check_kind(path, observed, named)
         if path != target and not stat.S_ISDIR(observed.st_mode):
-            raise TreeError(f"Public path ancestor is not a directory: {path}")
+            raise TreeError(f"Public path ancestor is not a directory: {named}")
     return target
-
 
 def materialize_tree(tree: CapturedTree, new_directory: str | Path) -> Path:
     """Write already-validated bytes only into a new directory, then verify its tree."""
@@ -176,7 +239,6 @@ def materialize_tree(tree: CapturedTree, new_directory: str | Path) -> Path:
     verify_public_tree(target, tree.manifest)
     return target
 
-
 def _absolute_path(path: str | Path) -> Path:
     supplied = Path(path)
     if ".." in supplied.parts:
@@ -185,7 +247,6 @@ def _absolute_path(path: str | Path) -> Path:
         if part != supplied.anchor:
             validate_public_path("root/" + part)
     return supplied.absolute()
-
 
 def _checked_directory(root: str | Path) -> Path:
     base = _absolute_path(root)
@@ -196,60 +257,71 @@ def _checked_directory(root: str | Path) -> Path:
             raise TreeError(f"Tree root or ancestor is not a directory: {path}")
     return base
 
-
-def _check_kind(path: Path, observed: os.stat_result) -> None:
+def _check_kind(path: Path, observed: os.stat_result, relative: str | None = None) -> None:
+    # relative 给出时（扫描与解析中）说明文字只写工作区内的相对路径；树根本身的检查保留主机路径
     reparse = getattr(observed, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     if stat.S_ISLNK(observed.st_mode) or reparse:
-        raise TreeError(f"Links and reparse points are not supported: {path}")
+        raise TreeError(f"Links and reparse points are not supported: {relative if relative is not None else path}")
     if not (stat.S_ISDIR(observed.st_mode) or stat.S_ISREG(observed.st_mode)):
-        raise TreeError(f"Only regular files and directories are supported: {path}")
+        raise TreeError(f"Only regular files and directories are supported: {relative if relative is not None else path}")
     if stat.S_ISREG(observed.st_mode) and observed.st_nlink != 1:
-        raise TreeError(f"Hard-linked files are not supported: {path}")
+        raise TreeError(f"Hard-linked files are not supported: {relative if relative is not None else path}")
 
-
-def _scan(base: Path) -> dict[str, os.stat_result]:
+def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.stat_result]:
     _checked_directory(base)
-    found = {}
-    pending = [(base, "")]
+    found: dict[str, os.stat_result] = {}
+    # 无法表示的条目按遇到顺序收集（相对路径与原因），扫描完成后再报错
+    findings: list[tuple[str, str]] = []
+    pending: list[tuple[Path, str]] = [(base, "")]
     while pending:
         directory, relative_directory = pending.pop()
         observed = directory.lstat()
         _check_kind(directory, observed)
         if not stat.S_ISDIR(observed.st_mode):
             raise TreeError(f"Directory changed during capture: {directory}")
-        found[relative_directory] = observed
-        with os.scandir(directory) as entries:
-            for entry in entries:
+        if relative_directory:
+            found[relative_directory] = observed
+        entries: list[tuple[str, Path, os.stat_result]] = []
+        with os.scandir(directory) as scanning:
+            for entry in scanning:
                 relative = f"{relative_directory}/{entry.name}" if relative_directory else entry.name
                 if is_private_path(relative):
                     continue
                 validate_public_path(relative)
                 path = directory / entry.name
                 # Windows DirEntry.stat omits file identity and link count.
-                observed = path.lstat()
-                _check_kind(path, observed)
-                if stat.S_ISDIR(observed.st_mode):
-                    pending.append((path, relative))
-                else:
-                    found[relative] = observed
+                entries.append((relative, path, path.lstat()))
+        ignored = (excluded_by_ignore_rules(base, [relative for relative, _path, _observed in entries])
+                   if respect_ignore_rules else frozenset())
+        for relative, path, entry_observed in entries:
+            if relative in ignored:
+                continue
+            reason = unrepresentable_reason(entry_observed, relative)
+            if reason is not None:
+                findings.append((relative, reason))
+                continue
+            if stat.S_ISDIR(entry_observed.st_mode):
+                pending.append((path, relative))
+            else:
+                found[relative] = entry_observed
+    if findings:
+        raise UnrepresentableWorkspace(findings)
     return found
 
-
-def _read_stable_file(path: Path, expected: os.stat_result) -> bytes:
+def _read_stable_file(path: Path, expected: os.stat_result, relative: str) -> bytes:
     with path.open("rb") as handle:
         opened = os.fstat(handle.fileno())
-        _check_kind(path, opened)
+        _check_kind(path, opened, relative)
         # Windows path stat and fstat disagree on the meaning of st_ctime.
         if _identity(opened, change_time=False) != _identity(expected, change_time=False):
-            raise TreeError(f"File changed before it could be captured: {path}")
+            raise TreeError(f"File changed before it could be captured: {relative}")
         raw = handle.read()
         closed = os.fstat(handle.fileno())
     current = path.lstat()
-    _check_kind(path, current)
+    _check_kind(path, current, relative)
     if _identity(closed) != _identity(opened) or _identity(current) != _identity(expected) or len(raw) != expected.st_size:
-        raise TreeError(f"File changed while it was being captured: {path}")
+        raise TreeError(f"File changed while it was being captured: {relative}")
     return raw
-
 
 def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[int, ...]:
     fields = (
@@ -257,3 +329,38 @@ def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[in
         observed.st_size, observed.st_mtime_ns,
     )
     return (*fields, observed.st_ctime_ns) if change_time else fields
+
+def _git_environment() -> dict[str, str]:
+    # 探测用的 Git 环境与 git_versions 相同的隔离：系统与全局配置不进入判定
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_ATTR_NOSYSTEM": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.excludesFile", "GIT_CONFIG_VALUE_0": os.devnull,
+    })
+    return environment
+
+def _git_probe(probe: Path, work_tree: Path, *arguments: str, data: bytes | None = None,
+               environment: dict[str, str] | None = None) -> bytes:
+    executable = shutil.which("git")
+    if executable is None:
+        raise TreeError("Git executable is unavailable; the project's ignore rules cannot be decided")
+    command = [
+        executable, "--no-pager", f"--git-dir={probe}", f"--work-tree={work_tree}",
+        "-c", "core.quotePath=false", *arguments,
+    ]
+    completed = subprocess.run(command, input=data, capture_output=True, shell=False,
+                               env=environment if environment is not None else _git_environment(), check=False)
+    if completed.returncode not in (0, 1):
+        raise TreeError(
+            "git check-ignore failed with exit code "
+            f"{completed.returncode}: {completed.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    return completed.stdout
+
+__all__ = [
+    "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
+    "capture_public_tree", "excluded_by_ignore_rules", "ignore_probe_directory",
+    "is_private_path", "materialize_tree", "resolve_public_path", "unrepresentable_reason",
+    "validate_manifest", "validate_public_path", "verify_public_tree",
+]

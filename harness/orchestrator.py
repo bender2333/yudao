@@ -48,7 +48,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree
+from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
@@ -891,6 +891,10 @@ class Orchestrator:
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
             result = await activation.driver.result()
+        except UnrepresentableWorkspace as exc:
+            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停
+            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version)
+            return
         except Exception as exc:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
@@ -925,6 +929,9 @@ class Orchestrator:
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
                 model=submission.response.model,
             )
+        except UnrepresentableWorkspace as exc:
+            # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
+            self._end_run(activation, "workspace_unrepresentable", str(exc), None)
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
 
@@ -1250,10 +1257,11 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入。
+        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径
         outcome = DEFINITIONS.stop_reason(reason).outcome
         if outcome == "paused":
-            self._pause(transaction, reason)
+            self._pause(transaction, reason, message)
         elif outcome == "failed":
             self._fail(transaction, reason, message)
         else:
@@ -1271,7 +1279,7 @@ class Orchestrator:
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
-    def _pause(self, transaction: Transaction, reason: str) -> None:
+    def _pause(self, transaction: Transaction, reason: str, message: str | None = None) -> None:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
             return
@@ -1282,10 +1290,12 @@ class Orchestrator:
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, role=department,
             state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
+            error=message,
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
                 "human_action": DEFINITIONS.stop_reason(reason).human_action,
+                **({"message": message} if message else {}),
                 "paused_at_phase": projection.phase,
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,

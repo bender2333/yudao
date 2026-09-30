@@ -803,8 +803,10 @@ class RunDonePayload(Payload):
 
 
 class RunPausedPayload(Payload):
+    # message 在停止说明与通用人工处理说明不同时出现（例如 workspace_unrepresentable 列出相对路径）
     stop_reason: PausedReason
     human_action: str
+    message: str | None = None
     paused_at_phase: Phase
     cycle_count: int
     max_cycles: int
