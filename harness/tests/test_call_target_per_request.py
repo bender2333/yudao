@@ -216,7 +216,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         # 下一次逻辑调用（engineering）按新的部门默认解析
         system.activate_once(run_id)
         assert [item["model"] for item in capture_b.requests] == ["m-b-target"]
-        attempts = [(event.role, event.payload["provider_config_id"])
+        attempts = [(event.department, event.payload["provider_config_id"])
                     for event in system.store.list_events(run_id)
                     if event.type == EventType.MODEL_REQUESTED]
         assert attempts == [("product", "provider-a"), ("product", "provider-a"), ("engineering", "provider-b")]

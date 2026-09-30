@@ -58,7 +58,7 @@ def test_text_only_reply_appends_user_message_to_history_and_events(tmp_path):
     assert second.input_items[-1] == appended
 
     [event] = _events(system, run_id, EventType.TOOL_CALL_REQUIRED)
-    assert event.role == "product"
+    assert event.department == "product"
     assert event.payload["activation_id"] == first.activation_id and event.payload["step_id"] == first.step_id
     assert event.payload["count"] == 1 and event.payload["limit"] == LIMIT
     stored = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["input_ref"])))

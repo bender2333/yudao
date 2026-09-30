@@ -15,10 +15,10 @@ def _application(tmp_path) -> Application:
     return Application(system)
 
 def _record(application: Application, project_id: str, index: int) -> None:
-    # 用真实的写入口追加一条项目事件
+    # 用真实的写入口追加一条项目事件（提出者是用户）
     application.system.writes.append(
         project_stream(project_id),
-        NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": f"project {index}"}),
+        NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": f"project {index}"}, actor="user:local"),
     )
 
 def _collect(stream, limit: int, timeout: float = 5.0):

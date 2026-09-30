@@ -941,7 +941,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
     assert [item["attempt"] for item in engineering_requests] == [1, 2, 1]
     assert engineering_requests[1]["retry_of_step_id"] == engineering_requests[0]["step_id"]
     scheduled = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_RETRY_SCHEDULED]
-    assert [(event.role, event.payload["provider_config_id"]) for event in scheduled] == [("engineering", "provider-e")]
+    assert [(event.department, event.payload["provider_config_id"]) for event in scheduled] == [("engineering", "provider-e")]
     assert [item["purpose"] for item in requests if item["department"] == "quality"] == ["work"]
 
     # 模型输出按统一输出项记录，跨激活回放的历史里只有真实的消息、工具调用与结果

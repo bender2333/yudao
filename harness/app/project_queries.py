@@ -454,7 +454,7 @@ def _compaction_sources(application: Application, event: Any) -> list[dict[str, 
     seen: set[str] = set()
     for ref in event.payload["source_refs"]:
         source = store.get_event(ref["event_id"])
-        if (source is None or source.run_id != event.run_id or source.role != event.role
+        if (source is None or source.run_id != event.run_id or source.department != event.department
                 or source.stream_version != ref["seq"]
                 or source.payload.get("activation_id") != ref["activation_id"]
                 or source.payload.get("step_id") != ref["step_id"]):
@@ -465,7 +465,7 @@ def _compaction_sources(application: Application, event: Any) -> list[dict[str, 
     prior = event.payload.get("previous_compaction_event_id")
     if prior:
         source = store.get_event(prior)
-        if (source is None or source.run_id != event.run_id or source.role != event.role
+        if (source is None or source.run_id != event.run_id or source.department != event.department
                 or source.type != EventType.COMPACTION_RECORDED):
             raise ValueError("previous compaction does not match its department")
         sources.insert(0, source.to_dict())
@@ -688,7 +688,7 @@ def _action_view(event: Any, action_id: str, started_event: Any, *, completed: b
     started_payload = {} if started_event is None else started_event.payload
     if not completed:
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or ""), department=event.role,
+            action_id=action_id, tool=str(payload.get("name") or ""), department=event.department,
             status="running", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at=event.created_at, receipt=None,
@@ -696,7 +696,7 @@ def _action_view(event: Any, action_id: str, started_event: Any, *, completed: b
     ok = bool(payload.get("ok"))
     return ActionView(
         action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
-        department=event.role, status="completed" if ok else "failed",
+        department=event.department, status="completed" if ok else "failed",
         activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
         input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
         created_at=event.created_at,

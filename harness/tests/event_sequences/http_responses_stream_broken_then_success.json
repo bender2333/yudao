@@ -5,7 +5,8 @@
   {
    "event": "<evt#1>",
    "type": "run_created",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -85,7 +86,8 @@
   {
    "event": "<evt#2>",
    "type": "transition",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -105,7 +107,8 @@
   {
    "event": "<evt#3>",
    "type": "department_activated",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -134,7 +137,8 @@
   {
    "event": "<evt#4>",
    "type": "department_input",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -164,7 +168,8 @@
   {
    "event": "<evt#5>",
    "type": "context_assembled",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -338,7 +343,8 @@
   {
    "event": "<evt#6>",
    "type": "model_requested",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -394,7 +400,8 @@
   {
    "event": "<evt#7>",
    "type": "model_request_serialized",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -449,7 +456,8 @@
   {
    "event": "<evt#8>",
    "type": "model_stream_progress",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -488,7 +496,8 @@
   {
    "event": "<evt#9>",
    "type": "model_stream_progress",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -527,7 +536,8 @@
   {
    "event": "<evt#10>",
    "type": "model_message",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -579,7 +589,8 @@
   {
    "event": "<evt#11>",
    "type": "model_attempt_failed",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -664,7 +675,8 @@
   {
    "event": "<evt#12>",
    "type": "model_retry_scheduled",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -720,7 +732,8 @@
   {
    "event": "<evt#13>",
    "type": "context_assembled",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -894,7 +907,8 @@
   {
    "event": "<evt#14>",
    "type": "model_requested",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -950,7 +964,8 @@
   {
    "event": "<evt#15>",
    "type": "model_request_serialized",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1005,7 +1020,8 @@
   {
    "event": "<evt#16>",
    "type": "model_stream_progress",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1044,7 +1060,8 @@
   {
    "event": "<evt#17>",
    "type": "model_stream_progress",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1083,7 +1100,8 @@
   {
    "event": "<evt#18>",
    "type": "model_message",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1135,7 +1153,8 @@
   {
    "event": "<evt#19>",
    "type": "model_stream_progress",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1174,7 +1193,8 @@
   {
    "event": "<evt#20>",
    "type": "tool_called",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1230,7 +1250,8 @@
   {
    "event": "<evt#21>",
    "type": "model_attempt_finished",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1313,7 +1334,8 @@
   {
    "event": "<evt#22>",
    "type": "tool_started",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1370,7 +1392,8 @@
   {
    "event": "<evt#23>",
    "type": "tool_called",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1450,7 +1473,8 @@
   {
    "event": "<evt#24>",
    "type": "proposal_submitted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1483,7 +1507,8 @@
   {
    "event": "<evt#25>",
    "type": "spec_accepted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1537,7 +1562,8 @@
   {
    "event": "<evt#26>",
    "type": "contract_accepted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -1569,7 +1595,8 @@
   {
    "event": "<evt#27>",
    "type": "transition",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "PRODUCT_SPEC",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#3>",
@@ -1589,7 +1616,8 @@
   {
    "event": "<evt#28>",
    "type": "activation_finished",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#3>",

@@ -607,7 +607,7 @@
       return { status: "待处理", tone: "waiting" };
     }
     if (board.active_department === key) return { status: phaseLabel(phase), tone: "active" };
-    const latest = (data.events || []).filter(event => event.role === key).at(-1);
+    const latest = (data.events || []).filter(event => event.department === key).at(-1);
     if (latest?.type === "collaboration_requested") return { status: "已发起协作", tone: "active" };
     if (latest?.type === "collaboration_responded") return { status: "已回应", tone: "done" };
     if (latest?.type === "proposal_rejected") return { status: "需要处理", tone: "issue" };

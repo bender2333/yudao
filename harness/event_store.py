@@ -540,7 +540,7 @@ def _end_position(connection: sqlite3.Connection) -> int:
 
 def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent | CatalogEvent) -> int:
     if isinstance(event, Event):
-        run_columns = (event.role, event.parent_event_id, event.state_before, event.state_after,
+        run_columns = (None, event.parent_event_id, event.state_before, event.state_after,
                        json_dumps(event.artifact_hashes), event.session_id, event.provider, event.model,
                        event.context_digest, event.stop_reason, event.error)
     else:

@@ -300,7 +300,8 @@ def test_startup_fails_when_a_definition_is_invalid(tmp_path, change, expected):
 
 
 def _terminal(event_type: str, stop_reason: str | None) -> NewEvent:
-    return NewEvent(event_type, role="product", state_before="PRODUCT_SPEC", state_after="FAILED",
+    return NewEvent(event_type, actor="system", department="product", state_before="PRODUCT_SPEC",
+                    state_after="FAILED",
                     stop_reason=stop_reason, payload={"stop_reason": stop_reason})
 
 
@@ -320,13 +321,15 @@ def test_stop_reasons_outside_the_definitions_cannot_be_written(tmp_path):
     with pytest.raises(ValueError, match="cannot be recorded on transition"):
         system.writes.append(run_stream(run_id), _terminal(EventType.TRANSITION, "cancelled"))
     # 结束事件的终态与载荷中的停止原因都要与事件的停止原因一致
-    paused = NewEvent(EventType.RUN_PAUSED, role="product", state_before="PRODUCT_SPEC", state_after="FAILED",
+    paused = NewEvent(EventType.RUN_PAUSED, actor="system", department="product", state_before="PRODUCT_SPEC",
+                      state_after="FAILED",
                       stop_reason="max_cycles", payload={"stop_reason": "max_cycles"})
     with pytest.raises(ValueError, match="must end in PAUSED"):
         system.writes.append(run_stream(run_id), paused)
     with pytest.raises(ValueError, match="same stop reason in its payload"):
         system.writes.append(run_stream(run_id), NewEvent(
-            EventType.RUN_FAILED, role="product", state_before="PRODUCT_SPEC", state_after="FAILED",
+            EventType.RUN_FAILED, actor="system", department="product", state_before="PRODUCT_SPEC",
+            state_after="FAILED",
             stop_reason="cancelled", payload={"stop_reason": "made_up_reason"}))
     assert system.store.list_events(run_id) == before
     system.close()
