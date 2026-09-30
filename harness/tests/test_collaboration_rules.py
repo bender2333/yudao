@@ -163,7 +163,7 @@ def test_inspection_requires_real_event_id_and_matched_tool_pair():
 
 
 @pytest.mark.parametrize("field,value", [
-    ("run_id", "another-run"), ("role", "product"), ("request_id", "another-request"),
+    ("run_id", "another-run"), ("department", "product"), ("request_id", "another-request"),
     ("activation_id", "another-activation"), ("step_id", 2), ("id", "another-call"),
     ("name", "list_files"), ("stream_version", 0),
 ])
@@ -171,7 +171,7 @@ def test_results_cannot_be_borrowed_or_mismatched(field, value):
     projection = work()
     _, events = pending(projection, action="inspect")
     called = tool_events(events, "read_file", output="source")
-    if field in {"run_id", "role", "stream_version"}:
+    if field in {"run_id", "department", "stream_version"}:
         setattr(called, field, value)
     else:
         called.payload[field] = value

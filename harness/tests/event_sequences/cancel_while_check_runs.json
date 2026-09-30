@@ -2547,6 +2547,7 @@
   "context_window": 32000,
   "cost": 0.0,
   "cycle_count": 3,
+  "definitions_version": "<definitions>",
   "delivery_spec": null,
   "delivery_specs": [],
   "department_call_targets": {

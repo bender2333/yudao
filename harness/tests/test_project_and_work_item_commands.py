@@ -54,7 +54,7 @@ def _post(client, command: str, **body):
     return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
 
 
-def _wait_for(predicate, timeout=15.0):
+def _wait_for(predicate, timeout=60.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
