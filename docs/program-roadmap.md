@@ -56,7 +56,7 @@ flowchart LR
 10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 与 3.2C。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 在容器的虚拟屏幕中通过截图、点击与输入操作桌面程序。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时不提供 computer use，浏览器只给可访问性结构。安全按普通浏览器 MCP 的默认做法，暂不另加限制。评测场景 1 的 Yudao 一侧依赖本项。
 11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。
 12. **D24 模型管理**（[#83](https://github.com/bender2333/yudao/issues/83)，[模型管理设计说明](design/model-management.md)）：依赖 #45 与应用层的目录命令（#77）。统一的模型目录与准入、模型能力表、推理档位、每个项目单独选择各部门的模型、部门的建议能力提醒；#96 用真实 Provider 验收三种协议。评测时给质检换用视觉模型、3.2D 的建议能力提醒都依赖本项。增加服务方案按预置表与自定义连接进行（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)），不另设工作包。
-13. **3.9 组合验收与对照实验**：在经 3.8 接入的真实外部项目上对 Stage 3 的各项能力逐项给出结论；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。所有工作包父工单关闭以后进行。
+13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器与 computer use 的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）。所有工作包父工单关闭以后进行。
 
 Stage 3 的工单按四个试用里程碑推进，每个里程碑完成以后由用户试用与核对（[Stage 3 计划](stage-3-plan.md)第 9 节）：M1 桌面客户端与模型管理；M2 中断后自动继续、接入已有项目；M3 隔离执行、外部工具、多项目并行；M4 质检操作交付与收尾。
 
