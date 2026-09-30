@@ -291,3 +291,9 @@ muse-spark-1.3-contributor-free / 2026-09-30 18:00 / 审查者：#75 第 2 轮�
 四、回答路径：decision.answer 接受以后，选择「按当前实际状态继续」写一条 action_verified 核实记录（新增事件种类，进入部门历史），选择「停止事项」结束 run，选择「重新执行」不写核实记录、由步骤驱动补执行；回答已经记录，重放使用记录的回答。
 五、run.actions：动作状态区分运行中（所属激活仍未结束）与结果未知，返回动作前后的快照引用；结果为 tool_called/tool_skipped/action_verified 的动作给出状态与回执。
 六、自测：新增 harness/tests/test_issue_17_action_recovery.py 共 9 项，覆盖三个窄场景（写入效果已落盘不盲目重做、接管时不并发改工作区、采纳结算跨恢复幂等）加上重复执行选项、动作请求阻塞、回答解除阻塞与核实记录、run.actions。事件序列基准因新增 before_snapshot_ref/after_snapshot_ref 字段重新生成；OpenAPI 快照因新增 ActionVerifiedPayload 与字段重新生成。
+
+my-provider/ag/gemini-3.8-flash-high / 2026-10-01 02:45 / 审查者：开始审查工单 #17 第 1 轮交付。第一阶段进行规范检查：核对 worktree 路径、分支名称、标签状态与 DELIVERY 评论完整性。第二阶段内容核对：检查 git commit、git diff、架构规则遵守情况与各条验收标准。第三阶段执行自动化测试并核对登记表。
+
+my-provider/ag/gemini-3.8-flash-high / 2026-10-01 03:30 / 审查者：工单 #17 审查通过。规范核对：工作树路径为 C:\project\yudao-worktrees\issue-17，分支为 issue-17，工单标签为 needs-review，DELIVERY 第 1 轮评论包含改动清单、测试命令与结尾计数、逐条验收核对。内容核对：动作前后快照存放在任务独立对象区域，不建立 Git 提交、不改动分支索引；三类动作各有明确处置，未知动作发出决定请求并阻塞激活；部分执行的模型响应仅补执行剩余合法动作，不整批重新发送也不重新调用模型；接管时不并发修改工作区；采纳结算跨恢复幂等；可重复动作提供重新执行选项，不可重复动作仅提供继续与停止选项；decision.answer 回答正常解除阻塞并生成核实记录；run.actions 正确返回状态与前后快照；代码无假实现、无多余向后兼容层。测试验证（单进程，未添加 -n 参数）：test_layers 与 test_openapi_snapshot 2 项通过；-m "unit or module" 收集 0 项（1504 deselected，登记表未合入，按回退规则处理）；test_issue_17_action_recovery 9 项通过；test_issue_16_recovery 12 项通过；test_decisions 等决策三文件 14 项通过；test_project_queries 23 项通过；test_engine 与 test_interaction_engine 34 项通过；test_event_sequence 44 项通过；前端测试 43 项通过；OpenAPI 类型生成与检查通过。均为 0 项失败。结论 REVIEW: PASS。
+
+
