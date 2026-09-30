@@ -8759,6 +8759,338 @@
         "title": "Baseline",
         "type": "object"
       },
+      "BaselineConclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "read_only",
+              "existing_defect",
+              "unsupported"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement",
+          "status",
+          "evidence"
+        ],
+        "title": "BaselineConclusion",
+        "type": "object"
+      },
+      "BaselineOmission": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "location"
+        ],
+        "title": "BaselineOmission",
+        "type": "object"
+      },
+      "BaselineOtherFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "reason"
+        ],
+        "title": "BaselineOtherFailure",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "baseline_review_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "BaselineReviewAcceptedEvent",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "verdict": {
+            "enum": [
+              "consistent",
+              "rework_product"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          },
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineConclusion"
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOmission"
+            },
+            "title": "Omissions",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckReceipt"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "other_failures": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOtherFailure"
+            },
+            "title": "Other Failures",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "structure_hash": {
+            "title": "Structure Hash",
+            "type": "string"
+          },
+          "code_snapshot_hash": {
+            "title": "Code Snapshot Hash",
+            "type": "string"
+          },
+          "kind": {
+            "const": "baseline_review",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "quality",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "verdict",
+          "conclusions",
+          "omissions",
+          "checks",
+          "other_failures",
+          "product_spec_hash",
+          "structure_hash",
+          "code_snapshot_hash",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "request_id",
+          "git_version"
+        ],
+        "title": "BaselineReviewAcceptedPayload",
+        "type": "object"
+      },
       "CatalogCandidatesCollectedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -12610,6 +12942,7 @@
           "reason": {
             "enum": [
               "released",
+              "baseline_verified",
               "max_cycles",
               "model_steps_exhausted",
               "no_tool_call",
@@ -21056,6 +21389,11 @@
             "title": "Task",
             "type": "string"
           },
+          "kind": {
+            "default": "change",
+            "title": "Kind",
+            "type": "string"
+          },
           "initial_input": {
             "$ref": "#/components/schemas/InputRecord"
           },
@@ -21158,6 +21496,17 @@
                 "type": "null"
               }
             ]
+          },
+          "overview_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "workspace_digest": {
             "title": "Workspace Digest",
@@ -21380,7 +21729,10 @@
         "additionalProperties": false,
         "properties": {
           "stop_reason": {
-            "const": "released",
+            "enum": [
+              "released",
+              "baseline_verified"
+            ],
             "title": "Stop Reason",
             "type": "string"
           }
@@ -22905,6 +23257,374 @@
           "request_id"
         ],
         "title": "SpecSupersededPayload",
+        "type": "object"
+      },
+      "StructureAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "structure_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/StructureAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "StructureAcceptedEvent",
+        "type": "object"
+      },
+      "StructureAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "overall": {
+            "title": "Overall",
+            "type": "string"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/StructureModule"
+            },
+            "title": "Modules",
+            "type": "array"
+          },
+          "entry_points": {
+            "items": {
+              "$ref": "#/components/schemas/StructureEntryPoint"
+            },
+            "title": "Entry Points",
+            "type": "array"
+          },
+          "build_and_test": {
+            "items": {
+              "$ref": "#/components/schemas/StructureBuildItem"
+            },
+            "title": "Build And Test",
+            "type": "array"
+          },
+          "requirement_locations": {
+            "items": {
+              "$ref": "#/components/schemas/StructureRequirementLocation"
+            },
+            "title": "Requirement Locations",
+            "type": "array"
+          },
+          "conventions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conventions",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "code_tree_digest": {
+            "title": "Code Tree Digest",
+            "type": "string"
+          },
+          "kind": {
+            "const": "structure",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "engineering",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "structure_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "overall",
+          "modules",
+          "entry_points",
+          "build_and_test",
+          "requirement_locations",
+          "conventions",
+          "product_spec_hash",
+          "code_tree_digest",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "structure_ref",
+          "request_id",
+          "git_version"
+        ],
+        "title": "StructureAcceptedPayload",
+        "type": "object"
+      },
+      "StructureBuildItem": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Argv",
+            "type": "array"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/CheckReceipt"
+          }
+        },
+        "required": [
+          "name",
+          "argv",
+          "purpose",
+          "receipt"
+        ],
+        "title": "StructureBuildItem",
+        "type": "object"
+      },
+      "StructureEntryPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "program",
+              "command_line",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "how_to_run": {
+            "title": "How To Run",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "how_to_run"
+        ],
+        "title": "StructureEntryPoint",
+        "type": "object"
+      },
+      "StructureModule": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "responsibility": {
+            "title": "Responsibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "responsibility"
+        ],
+        "title": "StructureModule",
+        "type": "object"
+      },
+      "StructureRequirementLocation": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirement",
+          "locations"
+        ],
+        "title": "StructureRequirementLocation",
         "type": "object"
       },
       "ToolCallRequiredEvent": {
@@ -25787,6 +26507,7 @@
           "mapping": {
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
+            "baseline_review_accepted": "#/components/schemas/BaselineReviewAcceptedEvent",
             "catalog_candidates_collected": "#/components/schemas/CatalogCandidatesCollectedEvent",
             "catalog_revised": "#/components/schemas/CatalogRevisedEvent",
             "catalog_test_finished": "#/components/schemas/CatalogTestFinishedEvent",
@@ -25840,6 +26561,7 @@
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
             "spec_accepted": "#/components/schemas/SpecAcceptedEvent",
             "spec_superseded": "#/components/schemas/SpecSupersededEvent",
+            "structure_accepted": "#/components/schemas/StructureAcceptedEvent",
             "tool_call_required": "#/components/schemas/ToolCallRequiredEvent",
             "tool_called": "#/components/schemas/ToolCalledEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
@@ -25956,6 +26678,12 @@
           },
           {
             "$ref": "#/components/schemas/QaSubmittedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StructureAcceptedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedEvent"
           },
           {
             "$ref": "#/components/schemas/LessonCandidateRecordedEvent"

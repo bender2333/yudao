@@ -65,7 +65,9 @@
     },
     "intend_path": "materials/<run#1>/intend.md",
     "intend_ref": "<art#4>",
+    "kind": "change",
     "max_cycles": 999999,
+    "overview_ref": null,
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -4841,6 +4843,8 @@
   "actual_provider": "fake",
   "adapter": "fake",
   "baseline": null,
+  "baseline_review": null,
+  "baseline_reviews": [],
   "command_versions": {},
   "compactions": [],
   "context_window": 32000,
@@ -5193,6 +5197,7 @@
    }
   ],
   "intend_ref": "<art#4>",
+  "kind": "change",
   "last_activations": {
    "engineering": "<act#5>",
    "product": "<act#3>",
@@ -6108,6 +6113,7 @@
    }
   ],
   "outcome": "done",
+  "overview_ref": null,
   "pending_feedback": {},
   "pending_request": null,
   "phase": "DONE",
@@ -6324,6 +6330,8 @@
   "snapshot": null,
   "stop_reason": "released",
   "stream_version": 89,
+  "structure": null,
+  "structures": [],
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 9,

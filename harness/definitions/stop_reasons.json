@@ -3,6 +3,10 @@
     "outcome": "done",
     "human_action": null
   },
+  "baseline_verified": {
+    "outcome": "done",
+    "human_action": null
+  },
   "max_cycles": {
     "outcome": "paused",
     "human_action": "循环次数已达上限。检查最后一次部门输出与事件后，提高 max_cycles 并新建 run，或在当前阶段人工介入。"
