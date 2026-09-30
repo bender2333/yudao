@@ -1,6 +1,7 @@
-# 动作核实与恢复（工单 #17，恢复契约第 4 节）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
+# 动作核实与恢复（工单 #17、#18，恢复契约第 1、4 节）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
 # tool_started 在工具许可允许以后、执行之前写入，tool_called/tool_skipped 在执行以后写入。根据这两类事件、
 # 以及保存的模型响应中尚未得到处置的工具调用，把每个动作分成三类：未发送、已完成、结果未知。
+# 恢复观察状态（工单 #18）由 run 的事实与未回答的决定请求得出，不读取时钟、不调用模型。
 
 from __future__ import annotations
 
@@ -9,12 +10,22 @@ from typing import Any
 
 from .decisions import UNKNOWN_ACTION
 from .definitions import DEFINITIONS
-from .models import Event, EventType
+from .models import DecisionRequest, Event, EventType
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
 # 交给用户；还有一类是没有发出任何事件的调用，由步骤驱动按保存的模型响应补执行，见 engine 的补执行。
 ACTION_COMPLETED = "completed"
 ACTION_UNKNOWN = "unknown"
+
+# 恢复观察状态（工单 #18，v8 设计说明第 7.2 节）：运行中、中断、待核实、待恢复、已终止。
+OBSERVATION_RUNNING = "running"
+OBSERVATION_INTERRUPTED = "interrupted"
+OBSERVATION_PENDING_VERIFICATION = "pending_verification"
+OBSERVATION_WAITING_RESUME = "waiting_resume"
+OBSERVATION_TERMINATED = "terminated"
+
+# 运行级待恢复的决定种类（工单 #16、#18）：模型引用无法使用与定义版本不同，都要用户先回答再继续
+RESUME_KINDS = frozenset({"model_unavailable", "definitions_changed"})
 
 def action_identity(event: Event) -> tuple[str, int | None, str]:
     # 动作的身份：激活、步骤与模型给出的调用编号。tool_started 与 tool_called 由同一次工具调用写入，
@@ -97,3 +108,59 @@ def build_unknown_action_request(*, action_id: str, tool: str, action_kind: str,
         "action_kind": action_kind,
         "repeatable": _repeatable(tool),
     }
+
+# ---------------------------------------------------------------------------
+# 恢复观察状态（工单 #18）
+
+def unresolved_unknown_actions(events: Sequence[Event],
+                               decisions: Iterable[DecisionRequest]) -> dict[tuple[str, int | None, str], dict[str, Any]]:
+    # 还没有得到处置的结果未知动作：有 tool_started 且既没有结果、也不在已经被回答的核实请求覆盖范围内。
+    # 已经发出、仍等待回答的核实请求由调用方从决定请求中读取
+    resolved = resolved_by_decision(events, decisions)
+    return {identity: info for identity, info in classify_actions(events).items()
+            if info["status"] == ACTION_UNKNOWN and identity not in resolved}
+
+def open_decisions(decisions: Iterable[DecisionRequest], *, kind: str | None = None) -> list[DecisionRequest]:
+    # 未回答的决定请求；给出种类时只取该种类
+    return [decision for decision in decisions
+            if decision.status == "open" and (kind is None or decision.kind == kind)]
+
+def open_resume_decisions(decisions: Iterable[DecisionRequest]) -> list[DecisionRequest]:
+    # 未回答、阻塞整个 run 的待恢复请求：模型引用无法使用或定义版本不同，回答以前 run 不推进
+    return [decision for decision in decisions
+            if decision.status == "open" and decision.blocks == "run" and decision.kind in RESUME_KINDS]
+
+def _live_activation(events: Sequence[Event]) -> bool:
+    # 这次过程里仍有一次激活没有结束：DEPARTMENT_ACTIVATED 开启，ACTIVATION_FINISHED 结束。
+    # 有未结束的激活表示进程正在执行这个 run；没有表示进程在步骤之间退出（中断）
+    open_activations: set[str] = set()
+    for event in events:
+        payload = event.payload or {}
+        activation_id = payload.get("activation_id")
+        if not activation_id:
+            continue
+        if event.type == EventType.DEPARTMENT_ACTIVATED:
+            open_activations.add(str(activation_id))
+        elif event.type == EventType.ACTIVATION_FINISHED:
+            open_activations.discard(str(activation_id))
+    return bool(open_activations)
+
+def observation_state(events: Sequence[Event], decisions: Iterable[DecisionRequest], *,
+                      terminal: bool) -> str:
+    # 一个 run 的恢复观察状态（v8 设计说明第 7.2 节）：已终止、待恢复、待核实、运行中、中断。
+    # 判据只取持久事件、决定请求与投影中的终态，不读时钟，不调用模型：
+    # - 已终止：run 已经结束（完成、暂停、失败）；由调用方从投影的 phase 给出；
+    # - 待恢复：有未回答、阻塞整个 run 的待恢复请求（模型引用无法使用或定义版本不同）；
+    # - 待核实：有结果未知的动作（有 tool_started、没有结果或核实记录）；
+    # - 运行中：进程正在执行（有一次没有结束的激活）；
+    # - 中断：其余情况，进程在步骤之间退出，等待启动时自动继续
+    decision_list = list(decisions)
+    if terminal:
+        return OBSERVATION_TERMINATED
+    if open_resume_decisions(decision_list):
+        return OBSERVATION_WAITING_RESUME
+    if unresolved_unknown_actions(events, decision_list):
+        return OBSERVATION_PENDING_VERIFICATION
+    if _live_activation(events):
+        return OBSERVATION_RUNNING
+    return OBSERVATION_INTERRUPTED
