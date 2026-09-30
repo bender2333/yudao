@@ -10,9 +10,10 @@ def pytest_addoption(parser):
     # 只在合同有意改变时使用：重写 OpenAPI 快照，提交前用 git diff 核对变化
     parser.addoption("--write-openapi-snapshot", action="store_true", default=False,
                      help="write harness/tests/openapi/openapi.json from the running service instead of comparing")
-    # 只在项目流的事件种类或字段有意改变时使用：重写项目流字段清单，并在 added_defaults 写明缺省含义
+    # 只在项目流新增事件种类或新增字段时使用：把新的种类与字段写入清单并在 added_defaults 写明缺省含义；
+    # 删除种类、删除字段或改变字段类型时拒绝写入；清单文件缺失时不重建，从 git 历史恢复
     parser.addoption("--write-project-stream-fields", action="store_true", default=False,
-                     help="write harness/tests/project_stream_fields.json from the contract types")
+                     help="add newly declared project-stream kinds and fields to harness/tests/project_stream_fields.json")
 
 
 @pytest.fixture

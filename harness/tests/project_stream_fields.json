@@ -179,5 +179,5 @@
       "work_item_id": "string"
     }
   },
-  "note": "项目流字段清单（ADR-0019）：删除种类、删除字段或改变字段类型时测试失败；baseline 之后新增的字段写明旧事件中的缺省含义。本文件连同 baseline 与 added_defaults 一起提交在仓库里：baseline 一旦抬高就无法区分哪些字段是新增的，删除本文件再用重写选项重建会把当时的全部字段洗进 baseline 并清空 added_defaults，丢掉缺省含义的记录。文件丢失时从 git 恢复，不要用重写选项重建。"
+  "note": "项目流字段清单（ADR-0019）：删除种类、删除字段或改变字段类型时测试失败；baseline 之后新增的字段写明旧事件中的缺省含义。本文件连同 baseline 与 added_defaults 一起提交在仓库里，baseline 是只读的：写入选项 --write-project-stream-fields 只把新增的事件种类与新增的字段并入 fields，遇到删除种类、删除字段或改变字段类型时拒绝写入并写明是哪个种类、哪个字段以及变化，没有整份重建的路径（重建会把当时的全部字段洗进 baseline 并清空 added_defaults，丢掉缺省含义的记录）。文件丢失时从 git 历史恢复。"
 }

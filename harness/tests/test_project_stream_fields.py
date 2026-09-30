@@ -1,9 +1,12 @@
 # 项目流字段清单（ADR-0019，工单 #126）：项目流事件种类与字段的登记由清单与合同类型共同核对。
 # 删除事件种类、删除字段或改变字段类型时测试失败；增加种类或字段时通过，但必须写明旧事件中的缺省含义。
+# 写入路径（--write-project-stream-fields）只允许添加新的种类与字段，删除与改类型一律拒绝，清单缺失时提示从 git 恢复。
 
 import pytest
 
-from harness.tests.project_stream_fields import live_fields, load_manifest, write_manifest
+from harness.tests import project_stream_fields
+from harness.tests.project_stream_fields import (
+    MANIFEST, ManifestWriteRejected, apply_rewrite, live_fields, load_manifest)
 
 def _manifest_documents():
     document = load_manifest()
@@ -38,9 +41,9 @@ def test_the_manifest_is_up_to_date_with_the_contract():
             if name not in fields.get(kind, {}):
                 additions.setdefault(kind, {})[name] = declared
     assert not additions, (
-        "合同类型中出现了清单没有登记的字段，用 "
-        "python -m pytest harness/tests/test_project_stream_fields.py --write-project-stream-fields 重写清单，"
-        f"并在 added_defaults 中写明缺省含义：{additions}"
+        "合同类型中出现了清单没有登记的新种类或新字段，用 "
+        "python -m pytest harness/tests/test_project_stream_fields.py --write-project-stream-fields 写入清单，"
+        f"并在 added_defaults 中写明新字段在旧事件中的缺省含义：{additions}"
     )
 
 def test_a_field_added_after_the_baseline_states_its_meaning_in_older_events():
@@ -55,19 +58,98 @@ def test_a_field_added_after_the_baseline_states_its_meaning_in_older_events():
                 missing.setdefault(kind, []).append(name)
     assert not missing, f"新增的字段没有写明它在旧事件中的缺省含义：{missing}"
 
-def test_writing_the_manifest_refreshes_fields_and_freezes_the_baseline(request):
-    # 重写选项：只在清单有意改变时使用，清单还没有建立时用它建立第一份清单。
-    # fields 随合同类型刷新；baseline 只在第一次写入时确定，以后保持不动，这样之后新增的字段
-    # 都要在 added_defaults 中写明缺省含义；已经写下的缺省含义一并保留。
-    # 不要用这个选项重建丢失的清单：重建会把当时的全部字段洗进 baseline 并清空 added_defaults，
-    # 丢掉缺省含义的记录（实测 priority 会被洗进基线）。清单丢失时从 git 恢复。
-    if not request.config.getoption("--write-project-stream-fields"):
-        pytest.skip("pass --write-project-stream-fields to rewrite the manifest")
+def _doctored_live(registered: dict, drop_kinds=(), drop_fields=(), retypes=(), additions=()):
+    # 以已登记的字段为基础造出合同类型：删掉种类、删掉字段、改掉类型或增加种类与字段，
+    # 用来核对写入路径只接受添加
+    live = {kind: dict(fields) for kind, fields in registered.items()}
+    for kind in drop_kinds:
+        live.pop(kind)
+    for kind, name in drop_fields:
+        live[kind].pop(name)
+    for kind, name, declared in retypes:
+        live[kind][name] = declared
+    for kind, name, declared in additions:
+        live.setdefault(kind, {})[name] = declared
+    return live
+
+@pytest.fixture
+def scratch_manifest(tmp_path, monkeypatch):
+    # 写入类的测试都在临时目录的清单副本上进行，仓库里提交的那一份不会被改动。
+    # 默认内容是当前提交的清单，因此写入路径面对的是与合同类型一致的清单
+    path = tmp_path / "project_stream_fields.json"
+    path.write_text(MANIFEST.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(project_stream_fields, "MANIFEST", path)
+    return path
+
+def test_writing_rejects_a_removed_event_kind(scratch_manifest, monkeypatch):
+    # 合同类型里删掉一个项目流事件种类：写入被拒绝，写明是哪个种类，清单不变
+    registered = load_manifest()["fields"]
+    before = scratch_manifest.read_text(encoding="utf-8")
+    removed = "material_recorded"
+    monkeypatch.setattr(project_stream_fields, "live_fields",
+                        lambda: _doctored_live(registered, drop_kinds=(removed,)))
+    with pytest.raises(ManifestWriteRejected) as caught:
+        apply_rewrite()
+    assert "删除事件种类" in str(caught.value)
+    assert removed in str(caught.value)
+    assert scratch_manifest.read_text(encoding="utf-8") == before
+
+def test_writing_rejects_a_removed_field(scratch_manifest, monkeypatch):
+    # 合同类型里删掉一个已登记的字段：写入被拒绝，写明种类与字段名，清单不变
+    registered = load_manifest()["fields"]
+    before = scratch_manifest.read_text(encoding="utf-8")
+    monkeypatch.setattr(project_stream_fields, "live_fields",
+                        lambda: _doctored_live(registered, drop_fields=(("project_renamed", "name"),)))
+    with pytest.raises(ManifestWriteRejected) as caught:
+        apply_rewrite()
+    assert "删除字段" in str(caught.value)
+    assert "project_renamed.name" in str(caught.value)
+    assert scratch_manifest.read_text(encoding="utf-8") == before
+
+def test_writing_rejects_a_changed_field_type(scratch_manifest, monkeypatch):
+    # 合同类型里改掉一个已登记字段的类型：写入被拒绝，写明原来的类型与新的类型
+    registered = load_manifest()["fields"]
+    before = scratch_manifest.read_text(encoding="utf-8")
+    monkeypatch.setattr(project_stream_fields, "live_fields",
+                        lambda: _doctored_live(registered,
+                                               retypes=(("project_pinned", "pinned", "string"),)))
+    with pytest.raises(ManifestWriteRejected) as caught:
+        apply_rewrite()
+    assert "改变字段类型" in str(caught.value)
+    assert "project_pinned.pinned: boolean -> string" in str(caught.value)
+    assert scratch_manifest.read_text(encoding="utf-8") == before
+
+def test_writing_adds_a_new_kind_and_a_new_field_and_keeps_the_baseline(scratch_manifest, monkeypatch):
+    # 写入路径接受添加：新的种类与新的字段进入 fields；baseline 与 added_defaults 原样不动，
+    # 新字段在旧事件中的缺省含义由改动者另行写明，写入路径不代填
     document = load_manifest()
-    document["fields"] = live_fields()
-    # 清单还没有建立时（load_manifest 给出空骨架）baseline 也是空的，这时以当前字段集合作为基线
-    if not document.get("baseline"):
-        document["baseline"] = live_fields()
-    document.setdefault("added_defaults", {})
-    write_manifest(document)
-    assert live_fields() == load_manifest()["fields"]
+    added_kind, added_field = "fault_recorded", "fault_id"
+    live = _doctored_live(document["fields"], additions=(
+        (added_kind, added_field, "string"), (added_kind, "severity", "enum string"),
+        ("project_renamed", "renamed_at", "string")))
+    monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
+    apply_rewrite()
+    written = load_manifest()
+    assert written["fields"] == live
+    assert written["fields"][added_kind] == {added_field: "string", "severity": "enum string"}
+    assert written["baseline"] == document["baseline"]
+    assert written["added_defaults"] == document["added_defaults"]
+    assert written["note"] == document["note"]
+
+def test_writing_a_missing_manifest_reports_recovery_from_git(tmp_path, monkeypatch):
+    # 清单文件缺失：写入路径报错并说明从 git 历史恢复，不新建清单
+    missing = tmp_path / "project_stream_fields.json"
+    monkeypatch.setattr(project_stream_fields, "MANIFEST", missing)
+    with pytest.raises(FileNotFoundError) as caught:
+        apply_rewrite()
+    assert "从 git 历史恢复" in str(caught.value)
+    assert not missing.exists()
+
+def test_writing_the_committed_manifest_is_a_no_op(request):
+    # 清单已与合同类型一致，写入路径（--write-project-stream-fields）落回同一份内容：
+    # 字节不变，baseline 与 added_defaults 都不动
+    if not request.config.getoption("--write-project-stream-fields"):
+        pytest.skip("pass --write-project-stream-fields to exercise the writing path on the committed manifest")
+    before = MANIFEST.read_text(encoding="utf-8")
+    apply_rewrite()
+    assert MANIFEST.read_text(encoding="utf-8") == before
