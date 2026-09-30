@@ -1367,6 +1367,29 @@ test("binding exposes the request tier from the model declaration and saves it",
   assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1", requested_tier: "low" } });
 });
 
+test("binding keeps a saved tier that the current model does not declare", async () => {
+  // 保存时只核对请求档位属于档位全集（#87）：部门默认换成支持档位不含原请求档位的模型以后，
+  // 下拉保留这一项并写明按模型限制，保存时原档位照旧提交
+  const models = [catalogModel("m1", "luna", { reasoning_levels: ["low"], default_reasoning_level: "low", reasoning_mode: "effort" })];
+  const admissions = [catalogAdmission("m1")];
+  const bindings = { product: { provider_id: "p1", model_id: "m1", requested_tier: "high" } };
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings }),
+    "/api/department-bindings": () => ({ bindings }),
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const tierSelect = root.querySelector("[data-pc-binding-tier='product']");
+  assert.deepEqual(tierSelect._options.map(option => option.attrs.value), ["", "low", "high"]);
+  assert.ok("selected" in tierSelect._options[2].attrs);
+  assert.match(root.innerHTML, /超出当前模型支持档位，按模型限制/);
+  await root.querySelector("[data-pc-form='bindings']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => url === "/api/department-bindings" && options.method === "PUT");
+  assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1", requested_tier: "high" } });
+});
+
 test("binding tier select is disabled when the model declares no reasoning levels", async () => {
   const models = [catalogModel("m1", "luna")];
   const admissions = [catalogAdmission("m1")];

@@ -213,23 +213,70 @@ def test_changing_reasoning_mode_invalidates_admission_but_levels_do_not():
     assert admission["admitted"] is True
     assert admission["stale"] is False
 
-def test_department_default_requested_tier_must_be_a_supported_level():
-    # 部门默认保存的请求档位必须属于所选定义的支持档位（#87）
+def test_department_default_requested_tier_must_be_a_known_level():
+    # 部门默认保存的请求档位只核对它属于档位全集（#87）：不属于全集时指出字段位置，
+    # 超出所选模型支持档位的档位保存被接受，由每次请求按新模型限制
     document = _document()
     document["models"][0]["reasoning_levels"] = ["low", "medium"]
     document["models"][0]["default_reasoning_level"] = "low"
     document["models"][0]["reasoning_mode"] = "effort"
-    document["bindings"]["product"]["requested_tier"] = "high"
+    document["bindings"]["product"]["requested_tier"] = "extreme"
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "bindings.product.requested_tier" for issue in caught.value.issues)
 
-    document["bindings"]["product"]["requested_tier"] = "medium"
+    document["bindings"]["product"]["requested_tier"] = "high"
     facade = ProviderFacade()
     facade.store_document(document)
     facade.set_credential_override("credential-a", "secret-a")
-    assert facade.resolve_department_default("product").public["requested_tier"] == "medium"
+    assert facade.resolve_department_default("product").public["requested_tier"] == "high"
+
+def test_swapping_to_a_model_with_other_levels_keeps_the_saved_tier_and_limits_the_request():
+    # 运行中把部门默认换成支持档位不同的模型：保存被接受，原请求档位保留；
+    # 下一次解析按新模型的支持档位限制，公开部分同时给出请求档位与实际发送的档位（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["medium", "high"]
+    document["models"][0]["default_reasoning_level"] = "medium"
+    document["models"][0]["reasoning_mode"] = "effort"
+    document["models"][1]["reasoning_levels"] = ["low"]
+    document["models"][1]["default_reasoning_level"] = "low"
+    document["models"][1]["reasoning_mode"] = "effort"
+    document["bindings"]["product"]["requested_tier"] = "high"
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    facade.set_credential_override("credential-b", "secret-b")
+    admit_bound_models(facade, document)
+    assert facade.resolve_department_default("product").public["sent_tier"] == "high"
+
+    document["bindings"]["product"] = {"provider_id": "provider-b", "model_id": "model-b",
+                                       "requested_tier": "high"}
+    facade.store_document(document)
+    assert facade.get_bindings()["product"]["requested_tier"] == "high"
+    public = facade.resolve_department_default("product").public
+    assert public["requested_tier"] == "high"
+    assert public["sent_tier"] == "low"
+
+def test_narrowing_supported_levels_keeps_a_referencing_binding_accepted():
+    # 收窄某个模型的支持档位：仍有部门默认引用它、请求档位落在被移除的档位上时，
+    # 这次目录修改仍被接受，下一次请求按收窄后的支持档位限制（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium", "high"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    document["bindings"]["product"]["requested_tier"] = "high"
+    document["bindings"]["quality"]["requested_tier"] = "high"
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    facade.store_document(document)
+    assert facade.get_bindings()["product"]["requested_tier"] == "high"
+    public = facade.resolve_department_default("product").public
+    assert public["requested_tier"] == "high"
+    assert public["sent_tier"] == "medium"
 
 def test_provider_config_requires_a_protocol():
     # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
