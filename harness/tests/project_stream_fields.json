@@ -1,0 +1,183 @@
+{
+  "added_defaults": {
+    "work_item_created": {
+      "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
+    }
+  },
+  "baseline": {
+    "adoption_held": {
+      "code_tree_digest": "string",
+      "current_adoption_id": "string?",
+      "delivery_event_id": "string",
+      "expected_adoption_id": "string?",
+      "reason": "const string",
+      "run_id": "string",
+      "work_item_id": "string"
+    },
+    "command_configured": {
+      "args": "array[string]",
+      "argv": "array[string]",
+      "base_version": "integer",
+      "name": "string",
+      "output_limit": "integer",
+      "timeout_sec": "integer",
+      "version": "integer"
+    },
+    "deliverable_adopted": {
+      "adoption_id": "string",
+      "check_names": "array[string]",
+      "code_tree_digest": "string",
+      "delivery_event_id": "string",
+      "files": "array[string]",
+      "known_risks": "array[string]",
+      "previous_adoption_id": "string?",
+      "qa_event_id": "string",
+      "run_id": "string",
+      "summary": "string",
+      "tree_ref": "object",
+      "work_item_id": "string"
+    },
+    "department_prompt_configured": {
+      "base_version": "integer",
+      "department": "enum string",
+      "prompt_ref": "object",
+      "text": "string",
+      "version": "integer"
+    },
+    "material_recorded": {
+      "department": "enum string?",
+      "material_id": "string",
+      "material_ref": "object",
+      "text": "string"
+    },
+    "project_archived": {},
+    "project_pinned": {
+      "pinned": "boolean"
+    },
+    "project_registered": {
+      "goal": "string",
+      "goal_ref": "object",
+      "name": "string",
+      "source": "const string"
+    },
+    "project_renamed": {
+      "name": "string"
+    },
+    "project_restored": {},
+    "source_directory_configured": {
+      "base_version": "integer",
+      "name": "string",
+      "path": "string",
+      "version": "integer"
+    },
+    "work_item_created": {
+      "baseline": "object?",
+      "command_versions": "object",
+      "context_window": "integer",
+      "definitions_version": "string",
+      "max_cycles": "integer",
+      "project_context_ref": "object",
+      "prompt_config_versions": "object",
+      "run_id": "string",
+      "run_time_limit_sec": "integer",
+      "snapshot": "object?",
+      "text": "string",
+      "title": "string",
+      "work_item_id": "string"
+    },
+    "work_item_start_failed": {
+      "error": "string",
+      "run_id": "string",
+      "work_item_id": "string"
+    }
+  },
+  "fields": {
+    "adoption_held": {
+      "code_tree_digest": "string",
+      "current_adoption_id": "string?",
+      "delivery_event_id": "string",
+      "expected_adoption_id": "string?",
+      "reason": "const string",
+      "run_id": "string",
+      "work_item_id": "string"
+    },
+    "command_configured": {
+      "args": "array[string]",
+      "argv": "array[string]",
+      "base_version": "integer",
+      "name": "string",
+      "output_limit": "integer",
+      "timeout_sec": "integer",
+      "version": "integer"
+    },
+    "deliverable_adopted": {
+      "adoption_id": "string",
+      "check_names": "array[string]",
+      "code_tree_digest": "string",
+      "delivery_event_id": "string",
+      "files": "array[string]",
+      "known_risks": "array[string]",
+      "previous_adoption_id": "string?",
+      "qa_event_id": "string",
+      "run_id": "string",
+      "summary": "string",
+      "tree_ref": "object",
+      "work_item_id": "string"
+    },
+    "department_prompt_configured": {
+      "base_version": "integer",
+      "department": "enum string",
+      "prompt_ref": "object",
+      "text": "string",
+      "version": "integer"
+    },
+    "material_recorded": {
+      "department": "enum string?",
+      "material_id": "string",
+      "material_ref": "object",
+      "text": "string"
+    },
+    "project_archived": {},
+    "project_pinned": {
+      "pinned": "boolean"
+    },
+    "project_registered": {
+      "goal": "string",
+      "goal_ref": "object",
+      "name": "string",
+      "source": "const string"
+    },
+    "project_renamed": {
+      "name": "string"
+    },
+    "project_restored": {},
+    "source_directory_configured": {
+      "base_version": "integer",
+      "name": "string",
+      "path": "string",
+      "version": "integer"
+    },
+    "work_item_created": {
+      "baseline": "object?",
+      "command_versions": "object",
+      "context_window": "integer",
+      "definitions_version": "string",
+      "max_cycles": "integer",
+      "priority": "string",
+      "project_context_ref": "object",
+      "prompt_config_versions": "object",
+      "run_id": "string",
+      "run_time_limit_sec": "integer",
+      "snapshot": "object?",
+      "text": "string",
+      "title": "string",
+      "work_item_id": "string"
+    },
+    "work_item_start_failed": {
+      "error": "string",
+      "run_id": "string",
+      "work_item_id": "string"
+    }
+  },
+  "note": "项目流字段清单（ADR-0019）：删除种类、删除字段或改变字段类型时测试失败；baseline 之后新增的字段写明旧事件中的缺省含义。本文件连同 baseline 与 added_defaults 一起提交在仓库里，baseline 是只读的：写入选项 --write-project-stream-fields 只把新增的事件种类与新增的字段并入 fields，遇到删除种类、删除字段或改变字段类型时拒绝写入并写明是哪个种类、哪个字段以及变化，没有整份重建的路径（重建会把当时的全部字段洗进 baseline 并清空 added_defaults，丢掉缺省含义的记录）。文件丢失时从 git 历史恢复。"
+}

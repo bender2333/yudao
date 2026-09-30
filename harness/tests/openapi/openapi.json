@@ -1280,6 +1280,108 @@
         }
       }
     },
+    "/api/commands/runtime.start_drain": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "runtime.start_drain",
+        "operationId": "command_runtime_start_drain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeStartDrain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/runtime.force_upgrade": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "runtime.force_upgrade",
+        "operationId": "command_runtime_force_upgrade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeForceUpgrade"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -4899,6 +5001,40 @@
         ],
         "title": "DocumentModelInput"
       },
+      "DrainStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "draining",
+              "ready"
+            ],
+            "title": "State"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "running_runs": {
+            "type": "integer",
+            "title": "Running Runs"
+          },
+          "queued_work_items": {
+            "type": "integer",
+            "title": "Queued Work Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "version",
+          "running_runs",
+          "queued_work_items"
+        ],
+        "title": "DrainStatus"
+      },
       "EventDetailResult": {
         "properties": {
           "event": {
@@ -6243,6 +6379,58 @@
         ],
         "title": "RunExportResult"
       },
+      "RuntimeForceUpgrade": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id"
+        ],
+        "title": "RuntimeForceUpgrade"
+      },
+      "RuntimeStartDrain": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id"
+        ],
+        "title": "RuntimeStartDrain"
+      },
       "Snapshot_CatalogDocument_": {
         "properties": {
           "position": {
@@ -6684,6 +6872,9 @@
           },
           "catalog": {
             "$ref": "#/components/schemas/CatalogState"
+          },
+          "drain": {
+            "$ref": "#/components/schemas/DrainStatus"
           }
         },
         "additionalProperties": false,
@@ -6693,7 +6884,8 @@
           "boot_id",
           "started_at",
           "provider",
-          "catalog"
+          "catalog",
+          "drain"
         ],
         "title": "SystemStatus"
       },
@@ -11837,7 +12029,8 @@
               "retry_after_too_long",
               "context_overflow",
               "compaction_failed",
-              "host_commit_error"
+              "host_commit_error",
+              "run_event_version_changed"
             ],
             "title": "Reason",
             "type": "string"
@@ -20225,6 +20418,10 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "run_event_version": {
+            "title": "Run Event Version",
+            "type": "integer"
           }
         },
         "required": [
@@ -20249,7 +20446,8 @@
           "prompt_config_versions",
           "registered_commands",
           "command_versions",
-          "definitions_version"
+          "definitions_version",
+          "run_event_version"
         ],
         "title": "RunCreatedPayload",
         "type": "object"
@@ -20559,7 +20757,8 @@
               "retry_after_too_long",
               "context_overflow",
               "compaction_failed",
-              "host_commit_error"
+              "host_commit_error",
+              "run_event_version_changed"
             ],
             "title": "Stop Reason",
             "type": "string"
@@ -20792,6 +20991,331 @@
           "token_used"
         ],
         "title": "RunPausedPayload",
+        "type": "object"
+      },
+      "RuntimeDrainStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "runtime_drain_started",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RuntimeDrainStartedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RuntimeDrainStartedEvent",
+        "type": "object"
+      },
+      "RuntimeDrainStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "running_runs": {
+            "title": "Running Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "running_runs"
+        ],
+        "title": "RuntimeDrainStartedPayload",
+        "type": "object"
+      },
+      "RuntimeForceUpgradeRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "runtime_force_upgrade_requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RuntimeForceUpgradeRequestedEvent",
+        "type": "object"
+      },
+      "RuntimeForceUpgradeRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "stopped_runs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stopped Runs",
+            "type": "array"
+          },
+          "restarted_work_items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Restarted Work Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "version",
+          "stopped_runs",
+          "restarted_work_items"
+        ],
+        "title": "RuntimeForceUpgradeRequestedPayload",
         "type": "object"
       },
       "SourceDirectoryConfiguredEvent": {
@@ -23945,6 +24469,11 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "priority": {
+            "default": "user",
+            "title": "Priority",
+            "type": "string"
           }
         },
         "required": [
@@ -24241,6 +24770,8 @@
             "run_done": "#/components/schemas/RunDoneEvent",
             "run_failed": "#/components/schemas/RunFailedEvent",
             "run_paused": "#/components/schemas/RunPausedEvent",
+            "runtime_drain_started": "#/components/schemas/RuntimeDrainStartedEvent",
+            "runtime_force_upgrade_requested": "#/components/schemas/RuntimeForceUpgradeRequestedEvent",
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
             "spec_accepted": "#/components/schemas/SpecAcceptedEvent",
             "spec_superseded": "#/components/schemas/SpecSupersededEvent",
@@ -24435,6 +24966,12 @@
           },
           {
             "$ref": "#/components/schemas/CredentialChangedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuntimeDrainStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedEvent"
           }
         ]
       },
