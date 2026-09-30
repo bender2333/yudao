@@ -134,7 +134,7 @@ Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](
    - Stage 3 末手动检查（#173）的方法随之确定。
    - 已知的工具事实见[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)第 1.4 节。
 4. **3.2B 网络与 MCP**：用 grill 讨论。
-5. **M1 试用时桌面客户端的打包与安装**：用 grill 讨论。
+5. **M1 试用时桌面客户端的打包与安装**：2026-10-01 已确定，见[决策记录](../decision.md)同日「桌面客户端的打包、安装与发布」一条、[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)与[设计说明](../design/client-packaging-and-release.md)。遗留一项：局域网访问方式怎样启用（给开发板提供安装包要求 Yudao 服务以局域网访问方式运行，而客户端自动启动的服务默认是本机访问方式），M3 试用之前确定。
 
 以后阶段的讨论：
 
