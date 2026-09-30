@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -94,10 +95,15 @@ class _ChannelText:
 
 @dataclass
 class DeltaPump:
-    # 应用层的一侧：订阅通道，按 100 毫秒合并一次，交给转发函数；同时保存每个进行中调用尝试已收到的文字
+    # 应用层的一侧：订阅通道，按 100 毫秒合并一次，交给转发函数；同时保存每个进行中调用尝试已收到的文字。
+    # 片段分发给全部登记的连接（第 5.6 节：发给带 live=1、范围匹配的连接）：每个连接一份待发队列，
+    # 先到的连接取走片段不影响其他连接；位置不连续的片段在合并时按缓冲丢弃，各连接收到同一份结果
     channel: DeltaChannel
     buffers: DeltaBuffers = field(default_factory=DeltaBuffers)
     _pending: list[DeltaFragment] = field(default_factory=list)
+    # 进行中调用尝试已接受的片段，按尝试编号保存：后建立的连接订阅时种子进它的队列（第 5.6 节）
+    _fragments: dict[str, list[DeltaFragment]] = field(default_factory=dict)
+    _queues: list[deque[DeltaFragment]] = field(default_factory=list)
     _unsubscribe: Callable[[], None] | None = None
 
     def start(self) -> None:
@@ -109,20 +115,46 @@ class DeltaPump:
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
+        self._queues.clear()
+        self._fragments.clear()
+
+    def subscribe(self) -> deque[DeltaFragment]:
+        # 一个 live 连接登记自己的待发队列，交出它；取消订阅用 unsubscribe(队列)。
+        # 进行中调用尝试已接受的片段先种子进这个队列：订阅在片段之后建立的连接同样收到全部片段
+        events: deque[DeltaFragment] = deque()
+        for fragments in self._fragments.values():
+            events.extend(fragments)
+        self._queues.append(events)
+        return events
+
+    def unsubscribe(self, events: deque[DeltaFragment]) -> Callable[[], None]:
+        # 取消一个连接的订阅：从分发清单移除队列；连接结束时调用
+        def cancel() -> None:
+            try:
+                self._queues.remove(events)
+            except ValueError:
+                pass
+        return cancel
 
     def _receive(self, item: DeltaFragment | AttemptClosed) -> None:
         if isinstance(item, DeltaFragment):
             self._pending.append(item)
         else:
             self.buffers.release(item.attempt_id)
+            self._fragments.pop(item.attempt_id, None)
 
     def drain(self) -> list[DeltaFragment]:
-        # 取出这一周期收到的片段：按调用尝试与通道累计，位置不连续的片段丢弃
+        # 取出这一周期收到的片段：按调用尝试与通道累计，位置不连续的片段丢弃；
+        # 被接受的片段进入每个登记连接的待发队列，并按调用尝试保留（供后来订阅的连接补齐）
         pending, self._pending = self._pending, []
         accepted: list[DeltaFragment] = []
         for fragment in pending:
             if self.buffers.absorb(fragment):
                 accepted.append(fragment)
+        for fragment in accepted:
+            self._fragments.setdefault(fragment.scope.attempt_id, []).append(fragment)
+        for events in self._queues:
+            events.extend(accepted)
         return accepted
 
     def live_text(self, attempt_id: str) -> dict[str, str]:

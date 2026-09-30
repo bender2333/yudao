@@ -20,9 +20,11 @@ STARTUP_TIMEOUT_SEC = 30
 @contextmanager
 def running_api(open_application: Callable[[], Application], *,
                 registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
-                host: str = "127.0.0.1", connect: str | None = None) -> Iterator[httpx.Client]:
-    server = uvicorn.Server(uvicorn.Config(create_app(open_application, registry=registry, access=access),
-                                           host=host, port=0, log_level="warning", lifespan="on"))
+                host: str = "127.0.0.1", connect: str | None = None,
+                keepalive_sec: float = 15.0) -> Iterator[httpx.Client]:
+    server = uvicorn.Server(uvicorn.Config(
+        create_app(open_application, registry=registry, access=access, keepalive_sec=keepalive_sec),
+        host=host, port=0, log_level="warning", lifespan="on"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC

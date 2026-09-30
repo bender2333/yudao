@@ -100,6 +100,9 @@ class EventStream:
         self._previous = self._after
         self._scanned = self._after
         self._skipped = 0
+        # 本连接在片段泵上的待发队列（第 5.6 节）：连接建立时登记，连接结束时取消
+        self._delta_queue: deque[DeltaFragment] | None = None
+        self._unsubscribe_deltas: Callable[[], None] | None = None
 
     def matches(self, event: StoredEvent) -> bool:
         # 一条事件是否在范围内（第 5.3 节）：省略的范围不限制，给出的范围取并集；
@@ -121,11 +124,19 @@ class EventStream:
             return
         subscriber = _Subscriber(self._queue_limit)
         unsubscribe = store.subscribe(lambda events: _collect(subscriber, events))
+        if self._live and self._pump is not None:
+            # 本连接的片段待发队列；取消函数在连接结束时调用（finally）
+            self._delta_queue = self._pump.subscribe()
+            self._unsubscribe_deltas = self._pump.unsubscribe(self._delta_queue)
         try:
             async for message in self._backfill(subscriber):
                 yield message
         finally:
             unsubscribe()
+            if self._unsubscribe_deltas is not None:
+                self._unsubscribe_deltas()
+                self._unsubscribe_deltas = None
+                self._delta_queue = None
 
     async def _backfill(self, subscriber: _Subscriber) -> AsyncIterator[StreamMessage]:
         store = self._store
@@ -206,10 +217,14 @@ class EventStream:
         return _EVENT_OBJECT.validate_python({**fields, "type": event.type, "payload": event.payload})
 
     def _drain_deltas(self) -> list[StreamDelta]:
-        if not self._live or self._pump is None:
+        # 这一合并周期里本连接的片段：先驱动一次泵的合并周期（把被接受的片段分发进每个登记的待发队列，
+        # 各连接再从自己的队列弹出），先到的连接取走不影响其他连接（第 5.6 节）
+        if not self._live or self._pump is None or self._delta_queue is None:
             return []
+        self._pump.drain()
         messages: list[StreamDelta] = []
-        for fragment in self._pump.drain():
+        while self._delta_queue:
+            fragment = self._delta_queue.popleft()
             if not self._in_delta_scope(fragment):
                 continue
             delta = OutputDelta(

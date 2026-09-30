@@ -287,6 +287,58 @@ def test_plain_connection_does_not_receive_deltas(data_dir):
     assert all(name != "delta" for name, _, _ in frames)
     assert frames[0][2]["type"] == EventType.MODEL_STREAM_PROGRESS
 
+def test_two_live_connections_each_receive_the_full_fragments(data_dir):
+    # 两个带 live=1 的连接同时订阅：各自收到完整的片段（第 5.6 节发给每个范围匹配的 live 连接），
+    # 一个连接先读取不影响另一个连接收到的片段
+    adapter = _BlockingDeltas()
+    opened = _Opened(data_dir, adapter=adapter)
+    with running_api(opened) as client:
+        project_id = _create_project(client)
+        assert client.post("/api/commands/work_item.create",
+                           json={"command_id": str(uuid.uuid4()), "project_id": project_id,
+                                 "title": "跑一次", "text": "让模型输出文字"}).status_code == 200
+        assert _wait_for(adapter.streamed)
+        # 两个连接先后建立：后建立的连接同样收到全部片段，不因泵的片段已被先到的连接取走而缺失
+        first_frames = _read_deltas(client, "/api/events?live=true", count=3)
+        second_frames = _read_deltas(client, "/api/events?live=true", count=3)
+        first_deltas = [data for name, _, data in first_frames if name == "delta"]
+        second_deltas = [data for name, _, data in second_frames if name == "delta"]
+        adapter.release.set()
+
+    assert [data["offset"] for data in first_deltas] == [0, 3, 6]
+    assert [data["offset"] for data in second_deltas] == [0, 3, 6]
+    assert "".join(data["text"] for data in first_deltas) == "第一段第二段第三段"
+    assert "".join(data["text"] for data in second_deltas) == "第一段第二段第三段"
+
+def test_keepalive_comment_is_sent_when_the_stream_is_idle(data_dir):
+    # 空闲超过保活间隔时连接收到一条 SSE 注释（第 5.4 节第 5 项）；注释没有 id，不改变续传位置
+    opened = _Opened(data_dir)
+    with running_api(opened, keepalive_sec=0.2) as client:
+        project_id = _create_project(client)
+        _record(client, project_id, 1)
+        end = opened.applications[0].system.store.end_position()
+        # 从日志末尾订阅：历史为空、范围内也没有新事件，连接进入空闲等待
+        with client.stream("GET", f"/api/events?after={end}", timeout=10) as response:
+            assert response.status_code == 200
+            lines = []
+            for line in response.iter_lines():
+                lines.append(line)
+                if line.startswith(":") and "keep-alive" in line:
+                    break
+    assert any(line.startswith(":") and "keep-alive" in line for line in lines)
+
+def test_last_event_id_that_is_not_a_number_resyncs(data_dir):
+    # Last-Event-ID 不是非负整数：按位置未知处理，发送 resync 并关闭连接，不使连接异常
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        project_id = _create_project(client)
+        _record(client, project_id, 1)
+        frames = _read_stream(client, "/api/events?after=0", limit=1,
+                              headers={"Last-Event-ID": "not-a-position"})
+
+    assert frames[0][0] == "resync"
+    assert frames[0][2]["reason"] == "position_unknown"
+
 def test_capabilities_list_the_stream_capability(data_dir):
     with running_api(_Opened(data_dir)) as client:
         stream = client.get("/api/capabilities").json()["stream"]
