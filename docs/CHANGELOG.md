@@ -279,3 +279,4 @@ claude-opus-5-5 / 2026-09-30 15:21 / docs/stage-3-plan.md 第 3 节评测工作�
 claude-opus-5-5 / 2026-09-30 15:48 / docs/design/evaluation-scenarios.md 第 3 节模型一行、第 4.3 节与第 9 节写明评测使用的模型与模型服务的环境变量；docs/requirements/comparison-experiment.md 增加用户原话、已确认的模型一条与实现状态；docs/decision.md 新增「评测使用的模型」 / 用户提供模型服务并指定被测模型 DeepSeek V4.1 Flash、界面智能体 gh/gemini-3.8-flash、裁判 cc/claude-sonnet-5-5，三者经核对都能读图
 claude-opus-5-5 / 2026-09-30 16:02 / docs/design/evaluation-scenarios.md 第 4.3 节、docs/requirements/comparison-experiment.md（原话与已确认的模型一条）、docs/decision.md「评测使用的模型」中的裁判改为 qdcn/qmodel_38max / 用户指定裁判改用 qdcn/qmodel_38max，经核对能读图
 claude-opus-5-5 / 2026-09-30 16:54 / docs/architecture-issues.md 中 #16 定义版本决定请求一条写入处理：写在 run 流，种类 definitions_changed，阻塞范围为 run / #16 审查通过并合并
+claude-opus-5-5 / 2026-09-30 17:47 / docs/architecture-issues.md 中 #75 两条写入处理：按角色筛选的索引与 read() 条件由 Stage 5 实施（#50 评论）；事件对象中历史事件的空提出者表示「写入时没有声明」，作为 actor 的缺省含义 / #75 审查通过并合并
