@@ -1382,6 +1382,57 @@
         }
       }
     },
+    "/api/commands/home.mark_seen": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "home.mark_seen",
+        "operationId": "command_home_mark_seen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkSeen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -1389,6 +1440,24 @@
         ],
         "summary": "system.status",
         "operationId": "query_system_status",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1396,6 +1465,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot_SystemStatus_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1453,6 +1532,22 @@
         "summary": "decisions.list",
         "operationId": "query_decisions_list",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "project_id",
             "in": "query",
@@ -1551,6 +1646,22 @@
         "summary": "projects.list",
         "operationId": "query_projects_list",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "include_archived",
             "in": "query",
@@ -1652,6 +1763,22 @@
         "summary": "project.loop",
         "operationId": "query_project_loop",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "project_id",
             "in": "query",
@@ -2670,6 +2797,70 @@
         }
       }
     },
+    "/api/queries/home.away_report": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "home.away_report",
+        "operationId": "query_home_away_report",
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "since_seen",
+                "24h",
+                "7d"
+              ],
+              "type": "string",
+              "default": "since_seen",
+              "title": "Range"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_AwayReport_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -3492,6 +3683,96 @@
         ],
         "title": "AttemptView"
       },
+      "AwayRange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "since_seen",
+              "24h",
+              "7d"
+            ],
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "from_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From At"
+          },
+          "from_position": {
+            "type": "integer",
+            "title": "From Position"
+          },
+          "to_position": {
+            "type": "integer",
+            "title": "To Position"
+          },
+          "to_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "from_at",
+          "from_position",
+          "to_position",
+          "to_at"
+        ],
+        "title": "AwayRange"
+      },
+      "AwayReport": {
+        "properties": {
+          "last_seen": {
+            "$ref": "#/components/schemas/LastSeen"
+          },
+          "range": {
+            "$ref": "#/components/schemas/AwayRange"
+          },
+          "ranges": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Ranges"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/ReportItem"
+            },
+            "type": "array",
+            "title": "Summary"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ReportFact"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "last_seen",
+          "range",
+          "ranges",
+          "summary",
+          "facts"
+        ],
+        "title": "AwayReport"
+      },
       "BindingInput": {
         "properties": {
           "provider_id": {
@@ -3512,6 +3793,32 @@
           "model_id"
         ],
         "title": "BindingInput"
+      },
+      "BlockedObjects": {
+        "properties": {
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "queued_after": {
+            "type": "integer",
+            "title": "Queued After"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_item_id",
+          "queued_after"
+        ],
+        "title": "BlockedObjects"
       },
       "CallTarget": {
         "properties": {
@@ -4922,6 +5229,16 @@
             "format": "date-time",
             "title": "Requested At"
           },
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockedObjects"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "request": {
             "$ref": "#/components/schemas/ModelUnavailableRequested"
           },
@@ -4948,6 +5265,7 @@
           "version",
           "status",
           "requested_at",
+          "blocked",
           "request",
           "answer"
         ],
@@ -5249,6 +5567,10 @@
             "type": "string",
             "title": "Version"
           },
+          "api_version": {
+            "type": "integer",
+            "title": "Api Version"
+          },
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
@@ -5268,6 +5590,7 @@
           "log_id",
           "boot_id",
           "version",
+          "api_version",
           "contract_digest",
           "access"
         ],
@@ -5609,6 +5932,32 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HomeStatus": {
+        "properties": {
+          "waiting_decisions": {
+            "type": "integer",
+            "title": "Waiting Decisions"
+          },
+          "disk_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Free Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "waiting_decisions",
+          "disk_free_bytes"
+        ],
+        "title": "HomeStatus"
+      },
       "InputView": {
         "properties": {
           "input_id": {
@@ -5665,6 +6014,40 @@
         ],
         "title": "InputView"
       },
+      "LastSeen": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at",
+          "position"
+        ],
+        "title": "LastSeen"
+      },
       "LiveAttempt": {
         "properties": {
           "attempt_id": {
@@ -5691,6 +6074,38 @@
           "channels"
         ],
         "title": "LiveAttempt"
+      },
+      "MarkSeen": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position"
+        ],
+        "title": "MarkSeen"
       },
       "MaterialRecord": {
         "properties": {
@@ -6473,6 +6888,11 @@
             },
             "type": "array",
             "title": "Changed By"
+          },
+          "replayable": {
+            "type": "boolean",
+            "title": "Replayable",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -6565,6 +6985,108 @@
           "differences"
         ],
         "title": "ReplayCheckResult"
+      },
+      "ReportFact": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "at",
+          "type",
+          "label",
+          "project_id",
+          "work_item_id"
+        ],
+        "title": "ReportFact"
+      },
+      "ReportItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "refs": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Refs"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit",
+          "refs"
+        ],
+        "title": "ReportItem"
       },
       "ReviewEntry": {
         "properties": {
@@ -6793,6 +7315,24 @@
           "command_id"
         ],
         "title": "RuntimeStartDrain"
+      },
+      "Snapshot_AwayReport_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AwayReport"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[AwayReport]"
       },
       "Snapshot_CatalogDocument_": {
         "properties": {
@@ -7278,6 +7818,9 @@
           },
           "drain": {
             "$ref": "#/components/schemas/DrainStatus"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeStatus"
           }
         },
         "additionalProperties": false,
@@ -7288,7 +7831,8 @@
           "started_at",
           "provider",
           "catalog",
-          "drain"
+          "drain",
+          "home"
         ],
         "title": "SystemStatus"
       },
@@ -14513,6 +15057,158 @@
           "tree"
         ],
         "title": "GitVersion",
+        "type": "object"
+      },
+      "HomeSeenEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "home_seen",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HomeSeenPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "HomeSeenEvent",
+        "type": "object"
+      },
+      "HomeSeenPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position"
+        ],
+        "title": "HomeSeenPayload",
         "type": "object"
       },
       "InputRecord": {
@@ -25331,6 +26027,7 @@
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
             "department_prompt_updated": "#/components/schemas/DepartmentPromptUpdatedEvent",
+            "home_seen": "#/components/schemas/HomeSeenEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
             "model_attempt_failed": "#/components/schemas/ModelAttemptFailedEvent",
@@ -25561,6 +26258,9 @@
           },
           {
             "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/HomeSeenEvent"
           }
         ]
       },

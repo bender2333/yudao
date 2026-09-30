@@ -18,7 +18,7 @@ from ..models import (
 )
 from ..observability import ObservabilityQuery
 from ..projection import (
-    RunNotFoundError, project_run, replay_decisions, replay_project, load_decisions, saved_project,
+    RunNotFoundError, project_run, replay_decisions, replay_project, replay_run, load_decisions, saved_project,
 )
 from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
@@ -27,6 +27,7 @@ from .contracts import Contract, Snapshot, Text
 from .payloads import Department
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition
+from .replay import ReplayRequest, check_position
 
 if TYPE_CHECKING:
     from .application import Application
@@ -73,7 +74,8 @@ class InputView(Contract):
 # projects.list
 
 
-class ProjectsList(Contract):
+class ProjectsList(ReplayRequest):
+    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的快照
     include_archived: bool = False
 
 
@@ -100,9 +102,10 @@ class ProjectList(Contract):
 
 def _projects_list(application: Application, request: ProjectsList) -> Snapshot[ProjectList]:
     store = application.system.store
+    through = check_position(application, request.at)
     rows: list[ProjectRow] = []
-    for project_id in store.list_project_ids():
-        state = _project(application, project_id)
+    for project_id in store.list_project_ids(through=through):
+        state = _project(application, project_id, through=through)
         if state.archived and not request.include_archived:
             continue
         rows.append(ProjectRow(
@@ -113,7 +116,7 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             active_work_item_id=state.active_work_item_id,
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
         ))
-    return Snapshot[ProjectList](position=store.end_position(), data=ProjectList(projects=rows))
+    return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +215,8 @@ def _adoption(item: Any) -> AdoptionView | None:
 # project.loop
 
 
-class ProjectLoop(Contract):
+class ProjectLoop(ReplayRequest):
+    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的快照
     project_id: str
     work_item: str | None = None
 
@@ -243,34 +247,40 @@ class ProjectLoopResult(Contract):
 
 def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[ProjectLoopResult]:
     store = application.system.store
-    state = _project(application, request.project_id, include_history=False)
+    through = check_position(application, request.at)
+    state = _project(application, request.project_id, include_history=False, through=through)
     if request.work_item is not None:
         _work_item(state, request.work_item)
+    at_time = None if through is None else store.created_at_at(through)
     rows: list[WorkItemLoop] = []
     for index, item in enumerate(state.work_items):
         if request.work_item is not None and item.work_item_id != request.work_item:
             continue
-        run = _optional_run(application, item.run_id)
-        bounds = store.run_time_bounds(item.run_id)
+        run = _optional_run(application, item.run_id, through=through)
+        bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
             work_item_id=item.work_item_id, sign=item.title, color_index=index + 1, status=item.status,
             department=item.department, phase=item.phase, round=item.cycle_count,
             started_at=None if bounds is None else bounds[0],
-            elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run),
+            elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
             run_id=item.run_id, adoption_id=item.adoption_id, version=item.stream_version,
         ))
     return Snapshot[ProjectLoopResult](
-        position=store.end_position(),
+        position=_snapshot_position(store, through),
         data=ProjectLoopResult(project_id=state.project_id, work_items=rows,
                                adoptions=[_adoption(item) for item in state.adoptions]),
     )
 
 
-def _elapsed_seconds(bounds: tuple[str, str], *, terminal: Any) -> int:
-    # 已用时间：进行中的 run 到当前时刻，终态的 run 到最后一条事件
+def _elapsed_seconds(bounds: tuple[str, str], *, terminal: Any, now: str | None = None) -> int:
+    # 已用时间：进行中的 run 到「现在」，终态的 run 到最后一条事件。
+    # 按位置读取（now 给出该位置的事件时间）时进行中的 run 也到那个时间为止（设计说明第 4.1 节）
     started = datetime.fromisoformat(bounds[0])
-    stopped = datetime.fromisoformat(bounds[1]) if terminal is not None else datetime.now(timezone.utc)
+    if terminal is not None:
+        stopped = datetime.fromisoformat(bounds[1])
+    else:
+        stopped = datetime.fromisoformat(now) if now is not None else datetime.now(timezone.utc)
     return max(0, int((stopped - started).total_seconds()))
 
 
@@ -1242,11 +1252,17 @@ def _read_models(application: Application) -> ReadModels:
     return application.read_models
 
 
-def _project(application: Application, project_id: str, *, include_history: bool = False):
+def _snapshot_position(store: Any, through: int | None) -> int:
+    # 快照的位置：回放时等于 at，否则是日志末尾
+    return store.end_position() if through is None else through
+
+
+def _project(application: Application, project_id: str, *, include_history: bool = False,
+             through: int | None = None):
     store = application.system.store
     try:
         return project_projection(store, application.system.artifacts, project_id,
-                                  include_history=include_history)
+                                  include_history=include_history, through=through)
     except ProjectNotFoundError:
         raise NotFound(f"project not found: {project_id}") from None
 
@@ -1258,16 +1274,18 @@ def _work_item(state: Any, work_item_id: str) -> Any:
     return item
 
 
-def _run(application: Application, run_id: str) -> Any:
+def _run(application: Application, run_id: str, *, through: int | None = None) -> Any:
     try:
-        return project_run(application.system.store, run_id)
+        return project_run(application.system.store, run_id) if through is None else \
+            replay_run(application.system.store, run_id, through=through)
     except RunNotFoundError:
         raise NotFound(f"run not found: {run_id}") from None
 
 
-def _optional_run(application: Application, run_id: str) -> Any:
+def _optional_run(application: Application, run_id: str, *, through: int | None = None) -> Any:
     try:
-        return project_run(application.system.store, run_id)
+        return project_run(application.system.store, run_id) if through is None else \
+            replay_run(application.system.store, run_id, through=through)
     except RunNotFoundError:
         return None
 
@@ -1278,6 +1296,7 @@ def _optional_run(application: Application, run_id: str) -> Any:
 
 PROJECTS_LIST = QueryDefinition(
     name="projects.list", request=ProjectsList, result=ProjectList, handle=_projects_list,
+    replayable=True,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
                 ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
                 ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
@@ -1299,6 +1318,7 @@ PROJECT_OVERVIEW = QueryDefinition(
 
 PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
+    replayable=True,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
                 EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.COLLABORATION_REQUESTED),

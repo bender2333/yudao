@@ -24,6 +24,7 @@ from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, Out
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
+from ..app.replay import ReplayOutOfRange
 from .access import CLIENT_ORIGINS, AccessMiddleware
 
 _COMPONENTS = "#/components/schemas/{model}"
@@ -103,6 +104,9 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
             return _application(request).query(definition.name, params)
         except NotFound as exc:
             return JSONResponse(status_code=404, content={"error": str(exc)})
+        except ReplayOutOfRange as exc:
+            # at 大于日志末尾：按位置读取的合同拒绝（设计说明第 4.1 节）
+            return JSONResponse(status_code=422, content={"error": str(exc)})
 
     parameters = () if definition.request is None else (("params", Annotated[definition.request, Query()]),)
     endpoint.__signature__ = _signature(*parameters)

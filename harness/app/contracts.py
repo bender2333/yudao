@@ -139,12 +139,18 @@ class OutputDelta(Contract):
 AccessMode = Literal["local", "lan"]
 
 
+# 接口版本（第 6.1 节）：删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、
+# 事件种类或字段时不变。客户端在构建时记录生成类型所用的接口版本，与它核对
+API_VERSION = 1
+
+
 class Deployment(Contract):
-    # 日志身份在换数据目录时改变，本次启动的身份在服务重启时改变；合同摘要是 OpenAPI 文档的摘要；
-    # 访问方式由启动设置给出（第 6.2 节）
+    # 日志身份在换数据目录时改变，本次启动的身份在服务重启时改变；服务版本是发布版本号，接口版本
+    # 由客户端构建时的接口版本核对；合同摘要是 OpenAPI 文档的摘要；访问方式由启动设置给出（第 6.2 节）
     log_id: str
     boot_id: str
     version: str
+    api_version: int
     contract_digest: str
     access: AccessMode
 
@@ -152,6 +158,8 @@ class Deployment(Contract):
 class QueryCapability(Contract):
     name: str
     changed_by: list[str]
+    # 是否接受第 4.1 节的 at（按位置读取，回放）；由注册表的 replayable 给出
+    replayable: bool = False
 
 
 class CommandCapability(Contract):

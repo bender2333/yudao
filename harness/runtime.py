@@ -14,7 +14,7 @@ from .event_store import EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
-from .projection import RunNotFoundError, RunProjection, project_run
+from .projection import RunNotFoundError, RunProjection, load_projection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .streams import (
@@ -220,6 +220,31 @@ class LoopSystem:
             return revision
 
         return self.writes.transact(catalog_stream(), decide)
+
+    def mark_seen(self, position: int, *, command: Command | None = None) -> int:
+        # 把用户查看过的全局位置更新为 position（工单 #127），写入目录流。控制主机上只有一个位置，
+        # 上一次的查看位置由这次写入取代；位置必须在日志范围内（0 到日志末尾）
+        end = self.store.end_position()
+        if position < 0 or position > end:
+            raise ValueError(f"seen position {position} is outside the log (end {end})")
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(CatalogEventType.HOME_SEEN, {"position": position},
+                                               actor="user:local"))
+
+        self.writes.transact(catalog_stream(), decide, command=command)
+        return position
+
+    @property
+    def home_seen(self) -> tuple[int, str] | None:
+        # 用户查看过的全局位置与它的写入时间；从未查看过时为空
+        saved = self.store.projection(catalog_stream())
+        if saved is None:
+            return None
+        state = load_projection(saved, catalog_stream())
+        if state.last_seen_position is None:
+            return None
+        return state.last_seen_position, state.last_seen_at
 
     @property
     def provider_config_path(self) -> Path | None:

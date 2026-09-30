@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from ..artifacts import ArtifactStore
 from ..decisions import DECISION_KINDS
 from ..deltas import DeltaPump
-from ..event_store import EventStore
+from ..event_store import EventStore, catalog_stream
 from ..git_versions import GitVersionStore
 from ..models import new_id, utc_now
 from ..runtime import LoopSystem
@@ -33,10 +33,11 @@ from .catalog_commands import (
 )
 from .catalog_queries import CATALOG_DOCUMENT_QUERY, CATALOG_QUERY
 from .commands import execute
-from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
+from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .event_stream import EventScope, EventStream
+from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
 from .project_commands import PROJECT_CREATE
 from .project_and_work_item_commands import (
     COMMAND_REGISTRATION_SAVE,
@@ -81,6 +82,19 @@ class ReadOnlyCore:
         raise ReadOnlyError("provider status is not available in a read-only open")
 
     @property
+    def home_seen(self) -> tuple[int, str] | None:
+        # 用户查看过的全局位置与它的写入时间（工单 #127）；从未查看过时为空。
+        # 从目录流保存的投影读取，只读打开也可以读取
+        saved = self.store.projection(catalog_stream())
+        if saved is None:
+            return None
+        from .projection import load_projection
+        state = load_projection(saved, catalog_stream())
+        if state.last_seen_position is None:
+            return None
+        return state.last_seen_position, state.last_seen_at
+
+    @property
     def facade(self) -> Any:
         raise ReadOnlyError("the provider catalog is not available in a read-only open")
 
@@ -93,9 +107,9 @@ DEFAULT_REGISTRY = Registry(
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,
               CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT, CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
-              CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE],
+              CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY,
-             CATALOG_DOCUMENT_QUERY],
+             CATALOG_DOCUMENT_QUERY, HOME_AWAY_REPORT],
     decisions=tuple(DECISION_KINDS))
 
 
@@ -168,7 +182,7 @@ class Application:
     def capabilities(self, contract_digest: str, *, access: AccessMode) -> Capabilities:
         return self.registry.capabilities(Deployment(
             log_id=self.system.store.log_id, boot_id=self.boot_id, version=self.version,
-            contract_digest=contract_digest, access=access,
+            api_version=API_VERSION, contract_digest=contract_digest, access=access,
         ))
 
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
@@ -182,3 +196,8 @@ class Application:
         if self.deltas is None:
             return {}
         return self.deltas.live_text(attempt_id)
+
+    def home_seen(self) -> tuple[int, str] | None:
+        # 用户查看过的全局位置与它的写入时间（工单 #127）；从未查看过时为空。
+        # 保存在目录流（部署流）中，可写与只读打开都从投影读取
+        return self.system.home_seen

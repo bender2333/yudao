@@ -33,7 +33,7 @@ from .models import (
     department_for_phase,
     new_id,
 )
-from .projection import RunNotFoundError, project_run, saved_project
+from .projection import RunNotFoundError, project_run, replay_project, replay_run, saved_project
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
@@ -80,23 +80,26 @@ class SourceDirectoryConflict(Exception):
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
-                       include_history: bool = True) -> ProjectProjection:
+                       include_history: bool = True, through: int | None = None) -> ProjectProjection:
     # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
-    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们
-    state = saved_project(store, project_id)
+    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们。
+    # through 给出全局位置的上界时按位置读取：项目与所属 run 的投影都从事件重放到该位置（工单 #127）
+    state = saved_project(store, project_id) if through is None else replay_project(store, project_id, through=through)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state, include_history=include_history)
+    return _compose(store, state, include_history=include_history, through=through)
 
 
-def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True) -> ProjectProjection:
+def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True,
+             through: int | None = None) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
     _default_prompts(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
-        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history)
+        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history,
+                          through=through)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
 
@@ -111,9 +114,10 @@ def _default_prompts(state: ProjectProjection) -> ProjectProjection:
 
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
-                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True) -> None:
+                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
+                      through: int | None = None) -> None:
     try:
-        run = project_run(store, item.run_id)
+        run = project_run(store, item.run_id) if through is None else replay_run(store, item.run_id, through=through)
     except RunNotFoundError:
         item.status = "not_started"
         return
@@ -137,7 +141,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     else:
         item.status = "in_progress"
     if include_history:
-        events = store.list_events(item.run_id)
+        events = store.list_events(item.run_id, through_position=through)
         handoffs = work_item_handoffs(events)
         item.last_handoff = handoffs[-1] if handoffs else None
         item.rework = [
