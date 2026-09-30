@@ -231,9 +231,12 @@ class LoopSystem:
 
     @classmethod
     def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter, *,
-                    step_limits: StepLimits = StepLimits()) -> "LoopSystem":
-        # 显式提供的确定性适配器只用于确定性测试
-        return cls(data_dir, test_adapter=adapter, step_limits=step_limits)
+                    step_limits: StepLimits = StepLimits(),
+                    resume_on_startup: bool = True) -> "LoopSystem":
+        # 显式提供的确定性适配器只用于确定性测试。resume_on_startup=False 用于测试自己控制激活的时机，
+        # 打开数据目录时不自动继续未结束的 run（工单 #16）
+        return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
+                   resume_on_startup=resume_on_startup)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态
