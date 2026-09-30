@@ -4031,6 +4031,7 @@
   "context_window": 32000,
   "cost": 0.0,
   "cycle_count": 5,
+  "definitions_version": "<definitions>",
   "delivery_spec": {
    "check_names": [
     "smoke"
@@ -6440,7 +6441,7 @@
       {
        "content_hash": "<sha256#54>",
        "path": "src/echo.py",
-       "size": 32
+       "size": 30
       }
      ],
      "format": "yudao-public-tree-v1"
@@ -6451,7 +6452,7 @@
   "<art#30>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
-   "content": "import sys\r\nprint(sys.argv[1])\r\n"
+   "content": "import sys\nprint(sys.argv[1])\n"
   },
   "<art#31>": {
    "kind": "department_input",
