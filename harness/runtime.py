@@ -60,7 +60,11 @@ class LoopSystem:
         if test_adapter is not None:
             test_adapter_factory = lambda _department: test_adapter
         self.test_adapter = test_adapter
-        self.facade = facade if facade is not None else ProviderFacade()
+        # 测试或演示方式启动的系统以 test 方式读取目录：fake 连接只在测试与演示下可用（工单 #86）。
+        # 判据是生效的确定性适配器工厂：提供单个适配器时上面已把它换成工厂，
+        # 只提供工厂的调用同样由它驱动的运行写入 fake 连接，也要按 test 方式读取
+        startup_mode = "test" if test_adapter_factory is not None else "normal"
+        self.facade = facade if facade is not None else ProviderFacade(startup_mode=startup_mode)
         if provider_config_path is not None or dotenv_path is not None:
             config = None if provider_config_path is None else Path(provider_config_path)
             dotenv = None if dotenv_path is None else Path(dotenv_path)

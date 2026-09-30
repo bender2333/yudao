@@ -3516,6 +3516,13 @@
             "type": "array",
             "title": "Models"
           },
+          "admissions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAdmission"
+            },
+            "type": "array",
+            "title": "Admissions"
+          },
           "bindings": {
             "additionalProperties": {
               "$ref": "#/components/schemas/CatalogBinding"
@@ -3533,9 +3540,111 @@
           "presets",
           "providers",
           "models",
+          "admissions",
           "bindings"
         ],
         "title": "Catalog"
+      },
+      "CatalogAdmission": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "admitted": {
+            "type": "boolean",
+            "title": "Admitted"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "admitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted At"
+          },
+          "admitted_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted Model"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider_id",
+          "protocol",
+          "admitted",
+          "stale",
+          "admitted_at",
+          "admitted_model",
+          "base_url",
+          "credential_ref",
+          "model"
+        ],
+        "title": "CatalogAdmission"
       },
       "CatalogBinding": {
         "properties": {
@@ -3899,43 +4008,6 @@
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call"
-          },
-          "admitted_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted At"
-          },
-          "admitted_revision": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Revision"
-          },
-          "admitted_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admitted Model"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale"
           }
         },
         "additionalProperties": false,
@@ -3947,11 +4019,7 @@
           "context_window",
           "max_output_tokens",
           "capability_source",
-          "accepts_required_tool_call",
-          "admitted_at",
-          "admitted_revision",
-          "admitted_model",
-          "stale"
+          "accepts_required_tool_call"
         ],
         "title": "CatalogModel"
       },
@@ -4980,6 +5048,11 @@
             "title": "Capability Source",
             "default": ""
           },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
+          },
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call",
@@ -5407,6 +5480,11 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "capacity_confirmed": {
+            "type": "boolean",
+            "title": "Capacity Confirmed",
+            "default": false
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -20952,6 +21030,18 @@
           "human_action": {
             "title": "Human Action",
             "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
           },
           "paused_at_phase": {
             "enum": [

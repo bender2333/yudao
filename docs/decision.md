@@ -282,3 +282,26 @@
 - 用户随后指出「目标层只由用户修改」本身也有讨好用户、免责声明的嫌疑；架构师提出的第一版修法（原始意图生效前必须经过挑战和澄清）又被用户指出仍是变相的追责机制，会让 Yudao 做不到长期运行。
 - 决定见 [ADR-0020](adr/0020-block-only-when-no-downstream-check.md)：权威拓扑属于 [ADR-0014](adr/0014-versioned-definitions.md) 的组织定义，只随用户批准的新版本改变，不是独立于组织定义之外的常量；目标、约束、验收标准的来源只能是用户的意图，产品部门的解释立即生效，不必逐项等待批准；要不要阻塞等待用户，看下游有没有独立的核验能够挡住错误的判断——有核验兜底的不阻塞，继续做、留痕、事后可改；没有核验能挡住的地方（读法互相矛盾、或者变更会影响谁在信任链末端），才真正走用户决定这条合同。
 - 修改文件：`docs/design/architecture/core-and-materials.md`（第 2、3 节）、`docs/adr/0014-versioned-definitions.md`（理由部分的措辞）、新增 `docs/adr/0020-block-only-when-no-downstream-check.md`。
+
+## 2026-09-30 - Stage 3 按四个试用里程碑推进，正式客户端的像素画面按 v9 结构实现
+
+- 用户要求 Stage 3 有自己能试用和核对的里程碑。决定分四个：M1 桌面客户端与模型管理；M2 中断后自动继续、接入已有项目；M3 隔离执行、外部工具、多项目并行；M4 质检操作交付与收尾；评测工具与 OpenCode 基础分属于 M2。每个里程碑用 GitHub Milestone 表示，有一张 `ready-for-human` 的试用工单（#183 至 #186）；工单全部关闭、集成层通过、架构师用真实模型按试用指南走一遍以后交给用户试用，问题经 `/qa` 反馈，修复排在队列最前面，试用期间不暂停下一个里程碑（[Stage 3 计划](stage-3-plan.md)第 9 节，`CLAUDE.md`「工作流程」第 7 步）。
+- 正式客户端的像素画面：按 2026-09-29 的方向，原型 v9 是结构与行为的参照，按 ADR-0015 的 PixiJS 8、XState 5、GSAP 实现；世界与系统写成不依赖渲染的 TypeScript 模块，角色与管道由 XState 状态机驱动；与原型的核对比较行为与状态，不比较像素。决定见 [ADR-0021](adr/0021-client-pixel-view-follows-v9-structure.md)。
+- 界面按原型 v9 拆成工单：#80 项目页面（不含决定卡片）；#175 首页页面与决定卡片；像素画面六张（#176 基础、#82 世界与项目楼层、#177 部门房间、#179 大厅的决定板、#178 首页的楼、#180 时间轴与回放）；3.1 的界面 #181、3.4A 的界面 #182；3.2B 的界面在 3.2C 进行到 #142 时细化原型 v8 第 9.4 节以后建立；旧 Web 控制台（#78）在 M1 删除。原型代码冻结，v8、v9 的设计说明继续作为依据，没有工单引用时再归档。
+- 工作包父工单之间只保留 #121←#119 与 #100 的阻塞，3.2B、3.2D、3.8 的依赖写在子工单之间，不等待树莓派上的真实验收。
+- 修改文件：`CLAUDE.md`（工作流程第 6、7 步，自主推进第 1、4 步）、`AGENTS.md`（代码位置）、新增 `docs/adr/0021-client-pixel-view-follows-v9-structure.md`、`docs/stage-3-plan.md`、`docs/program-roadmap.md`、`docs/requirements/README.md`、`docs/design/README.md`。
+
+## 2026-09-30 - 评测场景设计审阅：各部分所属的里程碑、版本回归的时机、超时的评分
+
+- 用户逐项审阅评测场景设计，其余内容按 2026-09-28 确认的写法保留。
+- 所属里程碑：场景材料、评分器、OpenCode 运行器与基础分属于 M2；Yudao 运行器、过程检查点、版本比较与场景 2、3 的 Yudao 一侧属于 M3（工程与质检的命令在场景镜像派生的本机容器中执行，依赖 3.2C 的 #131、#142；场景 2 另外依赖 3.8）；场景 1 的 Yudao 一侧与 3.9 的对照属于 M4。
+- 版本回归：每个里程碑交给用户试用之前运行一次，与集成层批量运行放在一起，运行当时已经具备条件的场景，每个场景 3 次；工作包父工单与真实验收工单的验收中删去版本回归的条目。
+- 超时：运行器在 90 分钟时结束运行；OpenCode 按结束时的目录评分；Yudao 按最后一次封存的交付评分并写明质检是否已经放行，没有提交过交付的全部检查记为「没有做」。
+- 修改文件：`docs/design/evaluation-scenarios.md`（开头状态、第 1、3、10 节）、`docs/requirements/comparison-experiment.md`、`docs/design/browser-and-computer-use.md`（第 14 节场景 7）、`docs/design/existing-project-onboarding.md`（第 10 节第 12 项与工单表）、`docs/design/execution-environment.md`（第 10 节末段）、`docs/stage-3-plan.md`（第 3、7、9 节）、`docs/program-roadmap.md`、两份索引；工单 #9、#83、#119 至 #124、#139、#145、#155、#185。
+
+## 2026-09-30 - 评测使用的模型
+
+- 用户提供自己的模型服务（OpenAI 兼容接口），地址与 Key 保存在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志。
+- 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `qdcn/qmodel_38max`。
+- 核对的事实：三个模型都能读出网页截图中的文字；这个服务的 `ag`、`gh`、`cc`、`cbcn` 线路只返回流式回复，评测工具与 Yudao 的 Provider 按流式请求；`gemini/` 线路上游返回 401（服务账号已停用），`ag/claude-sonnet-4-6` 线路不传图片。
+- 修改文件：`docs/design/evaluation-scenarios.md`（第 3、4.3、9 节）、`docs/requirements/comparison-experiment.md`。

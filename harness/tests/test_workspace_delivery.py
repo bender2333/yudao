@@ -99,8 +99,8 @@ def test_workspace_snapshot_and_copy_derive_from_one_capture(tmp_path, monkeypat
     original_capture = workspaces.capture_public_tree
     calls = []
 
-    def change_after_capture(root):
-        captured = original_capture(root)
+    def change_after_capture(root, *args, **kwargs):
+        captured = original_capture(root, *args, **kwargs)
         calls.append(captured)
         (workspace.root / "file.txt").write_bytes(b"later bytes")
         (workspace.root / "later.txt").write_bytes(b"later file")

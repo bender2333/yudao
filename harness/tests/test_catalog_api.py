@@ -24,14 +24,16 @@ def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
 
 
 def _model(model_id="m1", *, model="model-x"):
-    # 连接保存用的模型访问定义：所属连接由命令参数给出，协议取自连接
-    return {"id": model_id, "model": model,
+    # 连接保存用的模型访问定义：所属连接由命令参数给出，协议取自连接；
+    # 每一行带容量确认（工单 #86）
+    return {"id": model_id, "model": model, "capacity_confirmed": True,
             "context_window": 32000, "max_output_tokens": 2048}
 
 
 def _document_model(provider_id, model_id="m1"):
-    # 目录文档中的定义自己带上所属连接
-    return {**_model(model_id), "provider_id": provider_id}
+    # 目录文档中的定义自己带上所属连接；文档不带逐行容量确认标记（工单 #86）
+    return {key: value for key, value in {**_model(model_id), "provider_id": provider_id}.items()
+            if key != "capacity_confirmed"}
 
 
 def _document(*, provider_id="p1", model_id="m1", base_url=UPSTREAM_BASE, models_url="", bindings=None):
@@ -179,6 +181,8 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
     opened = _Opened(tmp_path)
     with running_api(opened) as client:
         current = _catalog(client)["revision"]
+        # 保存部门默认要求所选定义已准入（工单 #86）：先经模块接口记录模型测试通过的事实
+        opened.application.system.facade.record_admission("p1", "m1", admitted_model="model-x")
         bindings = {department: {"provider_id": "p1", "model_id": "m1"} for department in DEPARTMENTS}
         defaults = _command(client, "catalog.department_defaults.save", base_version=current, bindings=bindings)
         assert defaults.status_code == 200, defaults.text
@@ -222,8 +226,9 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                 assert finished.payload["ok"] is True and finished.payload["admitted"] is True
                 assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
                 assert finished.payload["base_revision"] == current
-                admitted = _catalog(client)["models"][0]
-                assert admitted["admitted_at"] is not None
+                admitted = next(item for item in _catalog(client)["admissions"]
+                                if item["model_id"] == "m1")
+                assert admitted["admitted"] is True and admitted["admitted_at"] is not None
 
                 # 连接测试不改变准入
                 before_connection = _catalog(client)
@@ -235,7 +240,8 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                                          description="catalog_test_finished (connection)")
                 assert connection.payload["ok"] is True and connection.payload["admitted"] is None
                 assert connection.payload["base_revision"] == before_connection["revision"]
-                assert _catalog(client)["models"][0]["admitted_at"] == admitted["admitted_at"]
+                assert next(item for item in _catalog(client)["admissions"]
+                            if item["model_id"] == "m1")["admitted_at"] == admitted["admitted_at"]
                 _assert_no_secret(client, opened)
         finally:
             server.shutdown()

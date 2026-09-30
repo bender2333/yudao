@@ -11,6 +11,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
 from harness.models import EventType, json_dumps
+from harness.public_tree import UnrepresentableWorkspace
 from harness.proposals import delivery_turn, plan_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -237,9 +238,9 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
     except OSError:
         pytest.skip("hard links are not available")
     workspace.write_file("poke.py", "from pathlib import Path\nPath('target.txt').write_text('HACKED')\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
-    assert result.ok is False
-    assert "hard-linked" in result.error.lower()
+    # 工作区已有公开树无法表示的条目：检查不开始，由步骤驱动以 workspace_unrepresentable 暂停运行
+    with pytest.raises(UnrepresentableWorkspace, match="Hard-linked files are not supported: target.txt"):
+        perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
     assert workspace.receipts() == []
     assert outside.read_text(encoding="utf-8") == "EXTERNAL"
     assert target.read_text(encoding="utf-8") != "HACKED"
