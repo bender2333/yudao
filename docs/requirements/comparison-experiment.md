@@ -46,6 +46,12 @@
 
 > 被测试使用deepseek 4.1 flash，界面使用gh/genimi-3.8-flash,裁判使用cc/claude-sonnet-5-5
 
+> cbcn/deepseek-v4.1-flash 被测用这个
+
+> 评测使用qdcn/qmodel_38max
+
+最后一句随后确认用作裁判。
+
 ## 已确认
 
 - 对照对象是单独运行的 OpenCode。Yudao（产品、工程、质检三部门）与 OpenCode 使用同一个模型；模型由用户提供，具有视觉能力。
@@ -58,7 +64,7 @@
 - 评测作为 Stage 3 的评测工作线，与界面工作线和后端工单并行进行，不要求排在其他工作之前；Stage 3 结束之前必须完成，没有完成时 Stage 3 不能关闭。
 - 质检部门具备浏览器与 computer use 工具，从 PRD 生成测试并操作交付的界面；两个工具由 3.2D 提供（[D34](browser-and-computer-use.md)），场景 1 的 Yudao 一侧依赖 3.2D。评测使用的模型具有视觉能力，质检使用这个模型时两个工具都可以使用。
 - 实验结果决定 Stage 5 中语义系统、部门内多角色等工作的先后。部门内多角色的对照（[D26](department-roles.md)）使用同一组场景。
-- 评测使用的模型（2026-09-30）：被测模型为 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），界面智能体为 `gh/gemini-3.8-flash`，裁判为 `cc/claude-sonnet-5-5`；三者经用户的模型服务调用（OpenAI 兼容接口，只返回流式回复），地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中。三者都经核对能读出网页截图中的文字。
+- 评测使用的模型（2026-09-30）：被测模型为 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），界面智能体为 `gh/gemini-3.8-flash`，裁判为 `qdcn/qmodel_38max`；三者经用户的模型服务调用（OpenAI 兼容接口，只返回流式回复），地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中。三者都经核对能读出网页截图中的文字。
 
 ## 实现状态
 

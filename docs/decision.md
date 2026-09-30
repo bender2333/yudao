@@ -302,6 +302,6 @@
 ## 2026-09-30 - 评测使用的模型
 
 - 用户提供自己的模型服务（OpenAI 兼容接口），地址与 Key 保存在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志。
-- 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `cc/claude-sonnet-5-5`。
+- 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `qdcn/qmodel_38max`。
 - 核对的事实：三个模型都能读出网页截图中的文字；这个服务的 `ag`、`gh`、`cc`、`cbcn` 线路只返回流式回复，评测工具与 Yudao 的 Provider 按流式请求；`gemini/` 线路上游返回 401（服务账号已停用），`ag/claude-sonnet-4-6` 线路不传图片。
 - 修改文件：`docs/design/evaluation-scenarios.md`（第 3、4.3、9 节）、`docs/requirements/comparison-experiment.md`。
