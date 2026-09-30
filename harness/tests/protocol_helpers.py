@@ -261,7 +261,8 @@ def responses_responder(body: dict):
 
 
 def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
-                model: str = "target-model") -> ProviderFacade:
+                model: str = "target-model",
+                accepts_required_tool_call: bool = True) -> ProviderFacade:
     facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
     facade.store_document({
         "providers": [{
@@ -271,6 +272,7 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
         "models": [{
             "id": "m-go", "provider_id": "go", "model": model,
             "context_window": 32000, "max_output_tokens": 2048,
+            "accepts_required_tool_call": accepts_required_tool_call,
             "capability_source": "preset-v1",
         }],
         "bindings": {},
@@ -327,14 +329,16 @@ def bound_adapter(facade: ProviderFacade, *, provider_id: str = "go", model_id: 
 
 
 def provider_system(data_dir: Path, base: str, protocol: str, *, timeout_sec: float = 20.0,
-                    step_limits: StepLimits = StepLimits()) -> tuple[LoopSystem, str]:
+                    step_limits: StepLimits = StepLimits(),
+                    accepts_required_tool_call: bool = True) -> tuple[LoopSystem, str]:
     # 经真实 Provider 模块的系统：三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
     facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
     facade.store_document({
         "providers": [{"id": "local", "name": "Local", "protocol": protocol, "base_url": base + "/v1",
                        "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
         "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model",
-                    "context_window": 32000, "max_output_tokens": 2048}],
+                    "context_window": 32000, "max_output_tokens": 2048,
+                    "accepts_required_tool_call": accepts_required_tool_call}],
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
     })
     facade.record_admission("local", "m-local", admitted_model="scenario-model")

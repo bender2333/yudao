@@ -64,6 +64,8 @@ class ModelDefinition:
     context_window: int | None
     max_output_tokens: int
     capability_source: str = ""
+    # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
+    accepts_required_tool_call: bool = True
     admitted_at: str | None = None
     admitted_revision: int | None = None
     admitted_model: str | None = None
@@ -90,6 +92,7 @@ class ModelDefinition:
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
+            "accepts_required_tool_call": self.accepts_required_tool_call,
             "admitted_at": self.admitted_at,
             "admitted_revision": self.admitted_revision,
             "admitted_model": self.admitted_model,
@@ -228,6 +231,7 @@ class ProviderStore:
             id=current.id, provider_id=current.provider_id, model=current.model,
             context_window=current.context_window,
             max_output_tokens=current.max_output_tokens, capability_source=current.capability_source,
+            accepts_required_tool_call=current.accepts_required_tool_call,
             admitted_at=_utc_now(), admitted_revision=self.revision,
             admitted_model=(admitted_model or current.model),
         )
@@ -323,6 +327,8 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.max_output_tokens", "不能超过 context_window"))
             if not isinstance(model.capability_source, str):
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
+            if not isinstance(model.accepts_required_tool_call, bool):
+                issues.append(ValidationIssue(f"{location}.accepts_required_tool_call", "必须为 true 或 false"))
         if issues:
             raise CatalogValidationError(issues)
 
@@ -382,7 +388,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         return None, [ValidationIssue(location, "应为对象")]
     allowed = {
         "id", "provider_id", "model", "context_window", "max_output_tokens",
-        "capability_source", "admitted_at", "admitted_revision", "admitted_model",
+        "capability_source", "accepts_required_tool_call", "admitted_at", "admitted_revision", "admitted_model",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
     if "protocol" in raw:
@@ -398,6 +404,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
         context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
+        accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
         admitted_at=raw.get("admitted_at"), admitted_revision=raw.get("admitted_revision"),
         admitted_model=raw.get("admitted_model"),
     ), issues

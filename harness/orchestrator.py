@@ -865,6 +865,7 @@ class Orchestrator:
             "context_window": None,
             "configured_max_output_tokens": None,
             "selection_source": None,
+            "accepts_required_tool_call": None,
             "requested_tier": None,
             "sent_tier": None,
         }
