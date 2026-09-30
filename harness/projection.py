@@ -250,7 +250,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.CONTRACT_ACCEPTED,
     } and payload.get("name") != "provider_usage":
         state.request_results.append({"event_id": event.event_id, "type": etype, "request_id": payload["request_id"],
-                                      "role": event.role, "name": payload.get("name"), "ok": payload.get("ok"),
+                                      "department": event.department, "name": payload.get("name"),
+                                      "ok": payload.get("ok"),
                                       "content_hash": payload.get("content_hash")})
     if event.provider and etype not in {
             EventType.DEPARTMENT_ACTIVATED,
@@ -362,14 +363,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
         state.cycle_count += 1
-        state.active_department = event.role
-        session = state.sessions.get(event.role or "")
+        state.active_department = event.department
+        session = state.sessions.get(event.department or "")
         if session:
             session.activations += 1
             session.status = "active"
         activation_id = payload.get("activation_id")
-        if event.role and activation_id:
-            state.last_activations[event.role] = str(activation_id)
+        if event.department and activation_id:
+            state.last_activations[event.department] = str(activation_id)
         incoming = payload.get("yielded_work")
         if incoming:
             if state.yielded_work is None:
@@ -396,7 +397,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.COMPACTION_RECORDED:
-        state.compactions.append({**payload, "source_event_id": event.event_id, "department": event.role})
+        state.compactions.append({**payload, "source_event_id": event.event_id, "department": event.department})
         _bind_actual_model(state, event)
         return
 
@@ -408,8 +409,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.actual_provider = None
         state.actual_model = None
         state.model = None
-        if event.role:
-            state.department_call_targets[event.role] = {
+        if event.department:
+            state.department_call_targets[event.department] = {
                 key: payload.get(key)
                 for key in ("provider_config_id", "model_id", "provider_name", "protocol", "base_url",
                             "requested_provider", "requested_protocol", "requested_model",
@@ -420,7 +421,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.model_requests.append({
             "event_id": event.event_id,
             "seq": event.stream_version,
-            "department": event.role,
+            "department": event.department,
             "activation_id": payload.get("activation_id"),
             "step_id": payload.get("step_id"),
             "attempt": payload.get("attempt"),
@@ -498,21 +499,21 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.ACTIVATION_FINISHED:
         state.latency_ms += int(payload.get("latency_ms", 0))
-        session = state.sessions.get(event.role or "")
+        session = state.sessions.get(event.department or "")
         if session:
             session.status = "closed" if state.phase in TERMINAL_PHASES else "idle"
         return
 
     if etype == EventType.PROPOSAL_REJECTED:
         item = {
-            "department": event.role,
+            "department": event.department,
             "errors": payload.get("errors", []),
             "event_id": event.event_id,
             "phase": event.state_after,
         }
         state.rejections.append(item)
-        if event.role:
-            state.pending_feedback[event.role] = item
+        if event.department:
+            state.pending_feedback[event.department] = item
         return
 
     if etype == EventType.LESSON_CANDIDATE_RECORDED:
@@ -527,7 +528,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.SPEC_ACCEPTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         spec = _product_spec_from_payload(payload, event)
         for existing in state.product_specs:
             if existing.status == "active":
@@ -563,7 +564,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.PLAN_ACCEPTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         _supersede_plans(state)
         _supersede_active_deliveries(state, "engineering_plan_changed")
         plan = EngineeringPlan(
@@ -579,7 +580,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.COLLABORATION_REQUESTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         request = CollaborationRequest(
             id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
             requester=payload["requester"], recipient=payload["recipient"], request_type=payload["request_type"],
@@ -593,7 +594,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         if etype == EventType.COLLABORATION_RESPONDED:
             state.responses.append(CollaborationResponse(
                 id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
@@ -610,7 +611,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.PRODUCT_DECISION_ACCEPTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         state.product_decisions.append(ProductDecision(
             id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
             product_spec_hash=payload["product_spec_hash"], statement=payload["statement"],
@@ -620,7 +621,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.DELIVERY_ACCEPTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         _supersede_active_deliveries(state, "replaced")
         delivery = _delivery_from_payload(payload, event)
         state.delivery_specs.append(delivery)
@@ -638,7 +639,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.QA_SUBMITTED:
-        _clear_feedback(state, event.role)
+        _clear_feedback(state, event.department)
         review = _review_from_payload(payload, event)
         state.reviews.append(review)
         state.last_review = review

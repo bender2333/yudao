@@ -483,8 +483,8 @@ def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):
     assert adapter.invocations[-1].department == "engineering"
     activated = [event for event in system.store.list_events(run_id)
                  if event.type == EventType.DEPARTMENT_ACTIVATED]
-    assert activated[-1].role == "engineering"
-    assert not any(event.role == "quality" for event in activated)
+    assert activated[-1].department == "engineering"
+    assert not any(event.department == "quality" for event in activated)
     assert result.department_guidance[0].department == "quality"
     assert result.department_guidance[0].status == "received"
     assert result.pending_request is None
@@ -655,7 +655,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     old_check_id = next(
         event.event_id for event in system.store.list_events(run_id)
         if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_check"
-        and event.payload.get("ok") and event.role == "engineering"
+        and event.payload.get("ok") and event.department == "engineering"
     )
     cited = old_delivery_id if kind == "delivery" else old_check_id
 

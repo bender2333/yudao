@@ -20,9 +20,10 @@ from harness.models import ArtifactRef, EventType
 #   shared     在上面各处重复出现的长文字与大段结构，每份一项，键是 <shared#N>
 #
 # 规整规则（只去掉随运行变化的部分，其余字段原样保留）：
-# 1. 每条事件保留种类、部门（role）、状态迁移（state_before/state_after）、停止原因、错误与载荷中的全部字段；
-#    去掉事件编号（event_id）、事件在日志中的全局位置、所属的流与流内版本（position、stream、stream_version）、
-#    日志为范围读取保存的列（project_id、work_item_id、department）、写入方的执行权编号（epoch）、run_id 与创建时间。
+# 1. 每条事件保留种类、提出者（actor）、部门（department）、状态迁移（state_before/state_after）、停止原因、
+#    错误与载荷中的全部字段；去掉事件编号（event_id）、事件在日志中的全局位置、所属的流与流内版本
+#    （position、stream、stream_version）、日志为范围读取保存的列（project_id、work_item_id）、
+#    写入方的执行权编号（epoch）、run_id 与创建时间。role 在 Stage 5 之前为空，不进入基准。
 #    引用其他事件的字段（parent_event_id、载荷与工件中的事件编号）换成被引用事件的位置 <evt#N>。
 #    投影的 stream_version 是 run 流的事件数，与运行时刻无关，原样保留。
 # 2. 其他随机生成的编号（act_、request_、spec_、ses_pro_ 等前缀加 16 位十六进制）按首次出现的顺序编为 <前缀#N>；
@@ -52,8 +53,8 @@ _ARTIFACT_PATH_DIGEST = re.compile(r"(?<![0-9a-f])[0-9a-f]{2}/([0-9a-f]{64})(?![
 _BARE_DIGEST = re.compile(r"(?<![0-9a-f])([0-9a-f]{64})(?![0-9a-f])")
 _GIT_SHA = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
 _ARTIFACT_KEYS = frozenset({"kind", "content_hash", "path", "media_type"})
-_EVENT_FIELDS = ("type", "role", "state_before", "state_after", "parent_event_id", "session_id", "provider",
-                 "model", "context_digest", "stop_reason", "error", "artifact_hashes", "payload")
+_EVENT_FIELDS = ("type", "actor", "department", "state_before", "state_after", "parent_event_id", "session_id",
+                 "provider", "model", "context_digest", "stop_reason", "error", "artifact_hashes", "payload")
 _SHARED_TEXT = 300
 _SHARED_STRUCTURE = 1500
 

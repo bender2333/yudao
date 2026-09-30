@@ -5,7 +5,8 @@
   {
    "event": "<evt#1>",
    "type": "run_created",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -86,7 +87,8 @@
   {
    "event": "<evt#2>",
    "type": "transition",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -106,7 +108,8 @@
   {
    "event": "<evt#3>",
    "type": "department_activated",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -135,7 +138,8 @@
   {
    "event": "<evt#4>",
    "type": "department_input",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -165,7 +169,8 @@
   {
    "event": "<evt#5>",
    "type": "context_assembled",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -340,7 +345,8 @@
   {
    "event": "<evt#6>",
    "type": "model_requested",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -398,7 +404,8 @@
   {
    "event": "<evt#7>",
    "type": "model_message",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -451,7 +458,8 @@
   {
    "event": "<evt#8>",
    "type": "tool_called",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -508,7 +516,8 @@
   {
    "event": "<evt#9>",
    "type": "model_attempt_finished",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -578,7 +587,8 @@
   {
    "event": "<evt#10>",
    "type": "tool_skipped",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -635,7 +645,8 @@
   {
    "event": "<evt#11>",
    "type": "run_failed",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "FAILED",
    "parent_event_id": null,
@@ -655,7 +666,8 @@
   {
    "event": "<evt#12>",
    "type": "lesson_candidate_recorded",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "FAILED",
    "state_after": "FAILED",
    "parent_event_id": "<evt#11>",
@@ -686,7 +698,8 @@
   {
    "event": "<evt#13>",
    "type": "activation_finished",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "FAILED",
    "state_after": "FAILED",
    "parent_event_id": "<evt#3>",

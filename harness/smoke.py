@@ -239,7 +239,7 @@ def _tool_events(store: EventStore, run_id: str) -> list[dict[str, Any]]:
             continue
         items.append(
             {
-                "department": event.role,
+                "department": event.department,
                 "name": payload.get("name"),
                 "ok": payload.get("ok"),
                 "exit_code": payload.get("exit_code"),
@@ -279,16 +279,16 @@ def _collaboration_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
         response = responses.get(request.id)
         result = events.get(response.created_event_id) if response else None
         if (source is None or source.type != EventType.COLLABORATION_REQUESTED
-                or source.role != request.requester or source.run_id != run_id
+                or source.department != request.requester or source.run_id != run_id
                 or response is None or result is None or result.type != EventType.COLLABORATION_RESPONDED
-                or result.role != request.recipient or result.run_id != run_id
+                or result.department != request.recipient or result.run_id != run_id
                 or result.stream_version <= source.stream_version
                 or result.payload.get("request_id") != request.id):
             notes.append(f"request {request.id}: missing or unrelated recipient response")
             continue
         directions.append(f"{request.requester}->{request.recipient}")
         results = [events.get(event_id) for event_id in response.result_event_ids]
-        if any(event is None or event.run_id != run_id or event.role != request.recipient
+        if any(event is None or event.run_id != run_id or event.department != request.recipient
                or event.payload.get("request_id") != request.id
                or not source.stream_version < event.stream_version < result.stream_version
                for event in results):
@@ -434,7 +434,7 @@ def _audit_compaction_input(request: dict[str, Any], records: list[dict[str, Any
 def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[str, Any],
                              previous: dict[str, Any] | None) -> dict[str, Any]:
     payload = event.payload
-    if payload.get("run_id") != event.run_id or payload.get("department") != event.role:
+    if payload.get("run_id") != event.run_id or payload.get("department") != event.department:
         raise ValueError("summary is not bound to its task and department")
     if payload.get("previous_compaction_event_id") != (previous or {}).get("event_id"):
         raise ValueError("summary does not extend the previous department checkpoint")
@@ -586,16 +586,16 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if not activation or activation in activations:
                 notes.append(f"event {event.stream_version}: missing or duplicate department activation")
             else:
-                activations[activation] = (event.role, event.session_id, event.event_id)
-                prompt = current_work.department_prompts[event.role]
+                activations[activation] = (event.department, event.session_id, event.event_id)
+                prompt = current_work.department_prompts[event.department]
                 activation_prompts[activation] = prompt
                 activation_intends[activation] = current_work.task
                 basis = {**work_basis, "input_version": current_work.input_version,
                          "prompt_version": prompt.version, "prompt_hash": prompt.prompt_ref.content_hash}
                 activation_bases[activation] = basis
-                guidance_only = _expected_guidance_only(current_work, event.role)
+                guidance_only = _expected_guidance_only(current_work, event.department)
                 activation_guidance_only[activation] = guidance_only
-                expected_guidance = {"guidance_ids": [item.id for item in pending_guidance(current_work, event.role)],
+                expected_guidance = {"guidance_ids": [item.id for item in pending_guidance(current_work, event.department)],
                                      "guidance_only": guidance_only}
                 for field, value in {**basis, **expected_guidance}.items():
                     if field not in payload or payload[field] != value:
@@ -607,9 +607,9 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                               EventType.TOOL_CALL_REQUIRED, *RETRY_EVENTS}:
             continue
         try:
-            if not activation or not event.role or not event.session_id:
+            if not activation or not event.department or not event.session_id:
                 raise ValueError("missing activation/department/session binding")
-            binding = (event.role, event.session_id, event.parent_event_id)
+            binding = (event.department, event.session_id, event.parent_event_id)
             if activations.get(activation) != binding:
                 raise ValueError("input or output does not match its department activation")
             basis = activation_bases[activation]
@@ -685,7 +685,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     value = basis[field]
                     if field not in payload or payload[field] != value or work_basis[field] != value:
                         raise ValueError(f"{field} does not match the activation and current work")
-            checkpoint_key = (event.role, basis["effective_contract_hash"], basis["engineering_plan_hash"],
+            checkpoint_key = (event.department, basis["effective_contract_hash"], basis["engineering_plan_hash"],
                               basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
             # 按记录下来的事件由 P 重新装配：调用目标取这次请求事件记录的解析结果，
             # 部门身份、提示词与只能回应指导按激活时的记录，guidance_results 使用装配时已有的事件与记录下来的工作区快照。
@@ -707,7 +707,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 configured_output_limit = recorded.payload.get("configured_max_output_tokens")
             limits = model_limits(target_window, configured_output_limit)
             frame = StepFrame(
-                department=event.role, session_id=event.session_id, activation_id=activation,
+                department=event.department, session_id=event.session_id, activation_id=activation,
                 prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
                 effective_contract_hash=basis["effective_contract_hash"],
                 engineering_plan_hash=basis["engineering_plan_hash"], input_version=basis["input_version"],
@@ -724,7 +724,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if item != pinned.department_input:
                     raise ValueError("department input differs from the current allowed work materials")
             elif event.type == EventType.CONTEXT_ASSEMBLED:
-                if (payload.get("department") != event.role or payload.get("session_id") != event.session_id
+                if (payload.get("department") != event.department or payload.get("session_id") != event.session_id
                         or payload.get("run_id") != run_id):
                     raise ValueError("manifest run/department/session does not match its event")
                 step = payload.get("step_id")
@@ -787,7 +787,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     raise ValueError("model input does not carry the verbatim task followed by current work")
                 if items[pinned_index] != pinned.context.input_items[0]:
                     raise ValueError("pinned developer input differs from current allowed materials")
-                records = assembly.department_history(before, event.role)
+                records = assembly.department_history(before, event.department)
                 expected = assembly.request(pinned, records)
                 manifest = expected.context.manifest
                 if payload.get("compaction_event_id") != manifest.compaction_event_id:
@@ -812,7 +812,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    offered = set(offered_tools(current_work, event.role, guidance_only=frame.guidance_only))
+                    offered = set(offered_tools(current_work, event.department, guidance_only=frame.guidance_only))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")
                     if schemas != expected.context.tools:
@@ -969,7 +969,7 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
                 if not payload.get("activation_id") or output.get("activation_id") != payload.get("activation_id"):
                     notes.append(f"check event {event.stream_version}: receipt activation does not match its execution")
                     continue
-                executions.append((event.role, output))
+                executions.append((event.department, output))
         except (KeyError, TypeError, ValueError, OSError) as exc:
             notes.append(f"check event {event.stream_version}: {exc}")
     for receipt in receipts:

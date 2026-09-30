@@ -59,6 +59,9 @@ class ModelRequest:
     attempt_id: str | None = None
     logical_call_id: str | None = None
     context_event_id: str | None = None
+    # 这次调用所属的项目与事项：取自准备请求时的运行状态，供输出片段的范围使用（设计说明第 5.6 节）
+    project_id: str | None = None
+    work_item_id: str | None = None
     # 这次逻辑调用解析出的调用目标（公开部分，不含密钥）：只进入记录，适配器不读它
     call_target: dict[str, Any] | None = None
     attempt_started_at: str | None = None

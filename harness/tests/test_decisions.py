@@ -60,7 +60,7 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
     [failed] = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     [requested] = [event for event in events if event.type == EventType.DECISION_REQUESTED]
     assert failed.payload["reason"] == "provider_unavailable" and failed.payload["will_retry"] is False
-    assert (requested.actor, requested.command_id, requested.role) == ("system", None, "engineering")
+    assert (requested.actor, requested.command_id, requested.department) == ("system", None, "engineering")
     assert decision.decision_id == requested.event_id and decision.run_id == run_id
     request = decision.request
     assert (request["kind"], request["blocks"], request["department"], request["reason"], request["message"]) == (
@@ -154,7 +154,7 @@ def test_a_decision_request_blocking_the_run_stops_a_running_activation_at_its_n
 
     def reply_after_the_request(_call):
         system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
-            EventType.DECISION_REQUESTED, actor="system", role="product",
+            EventType.DECISION_REQUESTED, actor="system", department="product",
             state_before=transaction.projection.phase, state_after=transaction.projection.phase, payload={
                 "kind": "model_unavailable", "blocks": "run",
                 "options": [{"id": "continue", "label": "继续执行"}, {"id": "stop", "label": "停止事项"}],

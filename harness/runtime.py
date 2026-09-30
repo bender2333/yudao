@@ -7,6 +7,7 @@ from typing import Any
 
 from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
+from .deltas import DeltaChannel
 from .engine import StepLimits
 from .environment import LocalEnvironment
 from .event_store import EventStore, catalog_stream
@@ -49,6 +50,8 @@ class LoopSystem:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
+        # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（设计说明第 5.6 节）
+        self.deltas = DeltaChannel()
         # 唯一的写入口；保存的投影缺失的流（例如投影被删除）在启动时由重放补建
         self.writes = WritePath(self.store)
         self.writes.rebuild_missing()
@@ -83,6 +86,7 @@ class LoopSystem:
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
             test_model=(getattr(test_adapter, "model", "fake-script") if test_adapter is not None else "fake-script"),
             step_limits=step_limits,
+            deltas=self.deltas,
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)

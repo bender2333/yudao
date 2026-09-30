@@ -1,5 +1,5 @@
 from harness.adapters.fake import FakeAdapter
-from harness.models import DEPARTMENTS, Event, EventType, ProjectEvent
+from harness.models import DEPARTMENTS, Event, EventType, ProjectEvent, ProjectEventType
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 
@@ -29,8 +29,7 @@ def _membership(system, event):
         return event.project_id, payload.get("work_item_id"), payload.get("run_id"), payload.get("department")
     created = system.store.list_events(event.run_id)[0]
     assert created.type == EventType.RUN_CREATED
-    department = event.role if event.role in DEPARTMENTS else None
-    return created.payload["project_id"], created.payload["work_item_id"], event.run_id, department
+    return created.payload["project_id"], created.payload["work_item_id"], event.run_id, event.department
 
 
 def _matches(system, event, *, projects=(), work_items=(), runs=(), departments=(), types=()):
@@ -99,3 +98,49 @@ def test_cross_project_reads_follow_the_order_of_writing(data_dir):
     ]
     assert [event.stream_version for event in events] == [1, 1, 2, 2]
     assert [event.position for event in events] == sorted(event.position for event in events)
+
+def test_every_event_declares_its_actor_and_the_department_lives_in_the_department_column(data_dir):
+    # 提出者由写入方声明（设计第 5.2 节）：命令写入的事件为命令的提出者、角色任务中的记录与提案为
+    # department:<部门>、流程编排与控制核心自己的判断为 system；role 列为空，部门只在 department 列
+    user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED,
+                   EventType.DEPARTMENT_GUIDANCE_RECEIVED}
+    system_events = {EventType.RUN_CREATED, EventType.TRANSITION, EventType.DEPARTMENT_ACTIVATED,
+                     EventType.ACTIVATION_FINISHED, EventType.PRODUCT_INPUT_ASSIGNED,
+                     EventType.COLLABORATION_CLOSED, EventType.RUN_DONE, EventType.RUN_PAUSED,
+                     EventType.RUN_FAILED, EventType.DECISION_REQUESTED}
+    system_projects = {ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
+                       ProjectEventType.WORK_ITEM_START_FAILED}
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
+    project_id = system.projects.register("项目", "工具")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "事项")
+    system.add_input(run_id, "补充一句要求")  # 用户输入：提出者为 user:local
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    events = system.store.read(limit=100_000)
+    assert events
+    # 每条事件都有提出者
+    assert all(event.actor for event in events)
+    # run 事件的角色列为空，部门写在 department 列
+    assert all(event.role is None for event in events if isinstance(event, Event))
+    seen_user = seen_system = seen_department = False
+    for event in events:
+        if isinstance(event, ProjectEvent):
+            # 项目事件：由命令写入的为命令的提出者，结算等由流程编排自己的判断为 system
+            expected = "system" if event.type in system_projects else "user:local"
+            assert event.actor == expected, event.type
+            continue
+        if event.type in user_events:
+            assert event.actor == "user:local", event.type
+            seen_user = True
+        elif event.type in system_events:
+            # 流程编排与控制核心自己的判断：激活的开始与结束、交接、停止、结算
+            assert event.actor == "system", event.type
+            seen_system = True
+        else:
+            # 角色任务中的记录与提案：部门提出，部门在 department 列
+            assert event.department is not None, event.type
+            assert event.actor == f"department:{event.department}", event.type
+            seen_department = True
+    assert seen_user and seen_system and seen_department
+    # 部门列覆盖三个部门，说明部门没有被搬进角色列
+    assert {event.department for event in events if isinstance(event, Event) and event.department} == set(DEPARTMENTS)

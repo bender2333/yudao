@@ -174,7 +174,7 @@ def _retry_record(event: Event, *, status: str, base: dict[str, Any] | None = No
     previous = base or {}
     return {
         "status": status,
-        "department": event.role or previous.get("department"),
+        "department": event.department or previous.get("department"),
         "activation_id": payload.get("activation_id", previous.get("activation_id")),
         "step_id": payload.get("step_id", previous.get("step_id")),
         "attempt": payload.get("attempt", previous.get("attempt")),
@@ -260,7 +260,7 @@ def event_card(event: Event) -> dict[str, Any]:
         "position": event.position,
         "seq": event.stream_version,
         "type": event.type,
-        "role": event.role,
+        "department": event.department,
         "state_before": event.state_before,
         "state_after": event.state_after,
         "stop_reason": event.stop_reason,
@@ -330,7 +330,7 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
             "current": _plain(projection.department_prompts),
             "versions": _plain(projection.prompt_versions),
             "activations": [
-                {"event_id": event.event_id, "department": event.role, **event.payload}
+                {"event_id": event.event_id, "department": event.department, **event.payload}
                 for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
             ],
         },

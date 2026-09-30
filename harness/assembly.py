@@ -113,11 +113,11 @@ class ContextAssembly:
         failed_steps = {
             (event.payload.get("activation_id"), event.payload.get("step_id"))
             for event in events
-            if event.type == EventType.MODEL_ATTEMPT_FAILED and event.role == department
+            if event.type == EventType.MODEL_ATTEMPT_FAILED and event.department == department
         }
         records: list[dict[str, Any]] = []
         for event in events:
-            if event.role != department:
+            if event.department != department:
                 continue
             if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED}:
                 if event.payload.get("purpose") == "compaction":

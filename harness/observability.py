@@ -98,7 +98,7 @@ class ObservabilityQuery:
             context_event = next(
                 (event for event in events
                  if event.type == EventType.CONTEXT_ASSEMBLED
-                 and _attempt_id_for(event.payload, event.role) == attempt_id),
+                 and _attempt_id_for(event.payload, event.department) == attempt_id),
                 None,
             )
         lifecycle_events = [
@@ -327,7 +327,7 @@ class ObservabilityQuery:
         handovers = []
         for event in events:
             payload = event.payload or {}
-            role = event.role
+            role = event.department
             if event.type in {
                 EventType.USER_INPUT_RECEIVED,
                 EventType.DEPARTMENT_INPUT,
@@ -457,7 +457,7 @@ class ObservabilityQuery:
 
         adopted_activation = next(
             (event for event in reversed(events)
-             if event.type == EventType.DEPARTMENT_ACTIVATED and event.role == department),
+             if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == department),
             None,
         )
         latest_prompt = projection.department_prompts.get(department)
@@ -809,27 +809,27 @@ class AttemptFold:
         if event.type == EventType.DEPARTMENT_ACTIVATED and payload.get("activation_id"):
             self.activation_rounds[str(payload["activation_id"])] = payload.get("cycle")
         elif event.type == EventType.CONTEXT_ASSEMBLED and payload.get("purpose") in {"work", "compaction"}:
-            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record = self._record(_attempt_id_for(payload, event.department), event, payload)
             _merge_context(record, event, payload)
         elif event.type == EventType.MODEL_REQUESTED:
-            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record = self._record(_attempt_id_for(payload, event.department), event, payload)
             _merge_started(record, event, payload)
         elif event.type == EventType.MODEL_REQUEST_SERIALIZED:
-            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record = self._record(_attempt_id_for(payload, event.department), event, payload)
             record["sdk_request_ref"] = payload.get("request_ref")
             record["request_serialized_event_id"] = event.event_id
             record["request_digest"] = payload.get("request_digest")
         elif event.type in {EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED}:
-            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record = self._record(_attempt_id_for(payload, event.department), event, payload)
             _merge_finished(record, event, payload)
         elif event.type == EventType.MODEL_RETRY_SCHEDULED:
-            record = self._record(_attempt_id_for(payload, event.role), event, payload)
+            record = self._record(_attempt_id_for(payload, event.department), event, payload)
             record["retry_scheduled_event_id"] = event.event_id
             record["retry_delay_sec"] = payload.get("delay_sec")
         elif event.type == EventType.MODEL_MESSAGE:
-            self.output_item_counts[_attempt_id_for(payload, event.role)] += 1
+            self.output_item_counts[_attempt_id_for(payload, event.department)] += 1
         elif event.type == STREAM_PROGRESS_EVENT:
-            attempt_id = _attempt_id_for(payload, event.role)
+            attempt_id = _attempt_id_for(payload, event.department)
             stage = payload.get("stage")
             if stage in {"output", "output_item_done"} or payload.get("first_output_at"):
                 self.progress_attempts.add(attempt_id)
@@ -964,7 +964,7 @@ def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict
         "step": payload.get("step_id"),
         "attempt": payload.get("attempt", 1),
         "root_step_id": root,
-        "department": event.role or payload.get("department"),
+        "department": event.department or payload.get("department"),
         "purpose": purpose,
         "prompt_version": payload.get("prompt_version"),
         "requested_provider": payload.get("requested_provider"),
@@ -1087,7 +1087,7 @@ def _event_detail(event: Event) -> dict[str, Any]:
         "event_id": event.event_id,
         "seq": event.stream_version,
         "type": event.type,
-        "role": event.role,
+        "department": event.department,
         "created_at": event.created_at,
         "payload": event.payload,
         "artifact_hashes": event.artifact_hashes,
@@ -1248,7 +1248,7 @@ def _handover_title(event: Event) -> str:
     if event.type == EventType.TRANSITION:
         return payload.get("route") or f"{event.state_before} -> {event.state_after}"
     if event.type == EventType.COLLABORATION_REQUESTED:
-        return f"{payload.get('requester') or event.role or '未知'} -> {payload.get('recipient') or '未知'}"
+        return f"{payload.get('requester') or event.department or '未知'} -> {payload.get('recipient') or '未知'}"
     if event.type == EventType.COLLABORATION_RESPONDED:
         return f"协作回应 · {payload.get('request_id') or '未知请求'}"
     if event.type == EventType.COLLABORATION_CLOSED:

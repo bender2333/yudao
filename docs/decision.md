@@ -305,3 +305,59 @@
 - 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `qdcn/qmodel_38max`。
 - 核对的事实：三个模型都能读出网页截图中的文字；这个服务的 `ag`、`gh`、`cc`、`cbcn` 线路只返回流式回复，评测工具与 Yudao 的 Provider 按流式请求；`gemini/` 线路上游返回 401（服务账号已停用），`ag/claude-sonnet-4-6` 线路不传图片。
 - 修改文件：`docs/design/evaluation-scenarios.md`（第 3、4.3、9 节）、`docs/requirements/comparison-experiment.md`。
+- 裁判 `qdcn/qmodel_38max` 是 Qwen3.8 Max，能看图。用户原话：「qdcn/qmodel_38max 是qwen3.8max，这个应该是能够正常支持图像的。」
+
+## 2026-09-30 - 真实 Provider 验收使用 9router；长期目标可以修改；暂停的 run 可以继续；#155 的文本模型
+
+- 背景：核查 Stage 3 需要用户澄清与确认的事项，架构师列出十项并附建议。
+- 用户原话：
+  - 「真实 Provider 验收都使用我们的9router，首选ag内的claude opus4.6吧」
+  - 「3.2B 网络取回与 MCP 的需求。等会使用grill一起讨论。项目的长期目标能修改，暂停的 run 能不能继续采纳建议。#155 需要一个只能输入文本的模型，去9router找一个模型，同意ag/gpt-oss-120b,M1 试用时客户端怎样安装? 这部分需要单独grill讨论，涉及到打包和安装。」
+- 决策：
+  - #96 用 9router 验收三种协议，地址与 Key 沿用用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`。首选 `ag/claude-opus-4-6-thinking`；推理内容的核对与回放用 `cbcn/deepseek-v4.1-flash`。
+  - #155 场景 3 只有文本输入的模型为 `ag/gpt-oss-120b-medium`。
+  - 项目的长期目标可以修改：修改写成项目流中的事件；之后开始的事项使用新目标，进行中的事项使用开始时的目标。
+  - 因为模型连续 4 次回复不调用工具（`no_tool_call`）或者工作区出现无法表示的条目（`workspace_unrepresentable`）而暂停的 run，发出决定请求，选项为「处理以后继续执行」与「停止事项」；继续时从原来的位置开始，已用的次数与时间不重新计算；前一种情况可以先更换部门的模型，从下一次请求起生效。
+  - 3.2B 网络取回与 MCP 的需求、M1 试用时客户端的打包与安装，各自单独用 grill 讨论。
+- 核对的事实：9router 的同一个地址提供三种协议。`ag/claude-opus-4-6-thinking` 三种协议都能正常回复，Messages 的工具往返完成，三种协议都不返回推理内容；`cbcn/deepseek-v4.1-flash` 三种协议都返回推理内容。ag 线路不把图片交给模型：带图与不带图的输入 token 数相同。
+- 影响：#96、#155 的正文已按此更新。长期目标的修改由 #203（M1）实施，#80 的设置页被它阻塞；暂停以后继续由 #204（M2）实施。修改内容经用户确认，修改文件：`docs/design/app-and-interface.md`（第 3.2 节项目命令、第 3.3 节决定表、第 10 节第 12 项）、`docs/design/architecture/overall-architecture.md`（第 7.4、11 节）、`docs/requirements/execution-limits.md`（D09）、`CONTEXT.md`（决定请求）、`docs/requirements/README.md`、`docs/stage-3-plan.md`（第 3、9 节）。第 7.4 节与第 3.3 节同时补上 #16 已经实现的定义版本决定请求。
+
+## 2026-09-30 - 远程执行验收使用的开发板是 Orange Pi AIpro
+
+- 用户原话：「C:\Users\BA_H3C_Pad\Documents\Obsidian Vault\Obsidian\项目研究\Board\AIPRO，这里记录了我们的板子，不是树莓派是aiPRO.」
+- 开发板：Orange Pi AIpro（8T），昇腾 310B4，4 核 64 位 ARM（aarch64），8 GB 内存，128 GB SATA SSD（数据盘约 56 GB 可用），Ubuntu 22.04.5 LTS，系统自带 Python 3.10.12，有 systemd，经 WiFi 接入局域网。
+- 核对的事实：开发板与控制主机在同一个网段，SSH 端口可以连通；控制主机的 SSH 密钥还没有加到开发板上。
+- 决策：3.2C 远程执行代理的真实验收（#145）在这块开发板上进行，开发板已经到位。
+- 执行代理的安装包由控制主机提供：控制主机的接口提供它正在运行的版本的安装包（wheel），远程机器从控制主机下载安装，不需要 GitHub 凭据，版本总是与控制主机一致；安装时用 uv 指定 Python 3.12；升级命令使用 `uv tool install --reinstall`，因为安装包的地址不变时 uv 会使用缓存。
+- 影响：修改内容经用户确认。计划、路线图、D29、执行环境服务设计说明、ADR-0018、总体架构、CONTEXT.md、需求概览等处，指验收设备的「树莓派」改为这块开发板，作为一类设备举例的地方保留；Stage 3 计划第 1 节写明代码在本机容器中隔离运行，在登记的电脑与开发板上直接在登记的目录中运行；应用层与接口层设计说明增加查询 `agent.package`。#144 在开发板上验收执行代理的系统服务，#145 在开发板上执行第 10 节的场景；#9、#120、#142、#144、#145、#172、#185 与里程碑 M3 的说明同步修改。控制主机的公钥已经加到开发板的 `HwHiAiUser` 与 `root` 账户（下一条）。
+
+## 2026-09-30 - 3.9 使用 openai-agents-python；模型服务不限流；开发板的登录
+
+- 用户原话：「请自行添加key,这是内网，不用考虑安全。 3.9 组合验收用推荐的。模型服务的并发、每分钟限制和每日次数 不限制，wsl已经好了，docker 不需要了。omp 切换了模型」
+- 决策：
+  - 3.9 组合验收在 3.8 接入的 openai-agents-python（FeatBench 842 的基准提交）上进行；这个项目没有界面，浏览器与 computer use 的结论引用 3.2D 的真实验收（#155）。
+  - 9router 不限制并发、每分钟请求数与每日次数，评测的运行方式不受模型服务的限制。
+  - 架构师把控制主机的公钥加到开发板的 `HwHiAiUser` 与 `root` 账户；开发板在内网，用户说明不考虑安全。
+  - omp 已经更换模型。
+- 核对的事实：开发板上没有 uv，有 git 与 curl；`HwHiAiUser` 使用 sudo 需要口令，需要管理员权限的操作用 `root` 执行；开发板能访问 PyPI 与清华镜像，访问 GitHub 较慢。控制主机上 WSL 已经安装，还没有安装发行版。
+- 修改文件：`docs/stage-3-plan.md`（第 3 节 3.9 一行）、`docs/program-roadmap.md`（第 13 项）、`docs/requirements/stage-requirements-overview.md`（3.9 一行）；工单 #100、#144、#145。
+
+## 2026-09-30 - 不使用容器
+
+- 背景：WSL 已经安装。架构师问「docker 不需要了」是指不装 Docker Desktop、在 WSL 里安装 Docker Engine，还是完全不用容器。
+- 用户原话：「wsl已经好了，docker 不需要了」；随后在提问中选择「完全不用容器」。
+- 决策：Yudao 不使用容器（Docker）。
+- 影响：
+  - 依赖容器的设计要重新确定，内容经用户讨论决定：3.2C 的本机容器（ADR-0018、执行环境服务设计说明）、评测的场景镜像（评测场景设计）、3.2D 的试用镜像与虚拟屏幕（浏览器与 computer use 设计说明）、来源不明的仓库在哪里建档（接入已有项目设计说明）。
+  - 依赖容器的工单改为 needs-triage，暂停派发：#131、#142、#145、#148、#149、#150、#155、#188、#189、#190、#191、#192、#195、#196、#197（#9 的评论）。
+- 方向（同日，用户在提问中选择「WSL 作为一台登记的机器」）：
+  - 在控制主机的 WSL 里安装 Ubuntu，运行与开发板相同的执行代理，控制主机经本机端口调用；执行代理的合同不变。
+  - 评测的环境、质检的浏览器与虚拟屏幕都放在 WSL 里。
+  - 执行位置为本机进程、WSL 与开发板。
+  - 原来由容器承担的事情，这样安排：
+    - 隔离不可信的代码：不再作为目标；
+    - Linux 环境、无界面浏览器与虚拟屏幕：由 WSL 提供；
+    - 每个 run 干净的状态：由执行代理为每个 run 在登记的目录下建立工作区；
+    - 按项目固定的运行环境：由每个 run 在工作区里建立。
+  - 具体设计逐项讨论以后，写进新的 ADR 与相关设计说明。
+- 核对的事实：WSL 3.0.1.0，带 WSLg，支持 systemd；可以安装的发行版有 Ubuntu 22.04、24.04、26.04 LTS；还没有 `.wslconfig`。

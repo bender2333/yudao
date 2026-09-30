@@ -5,7 +5,8 @@
   {
    "event": "<evt#1>",
    "type": "run_created",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -86,7 +87,8 @@
   {
    "event": "<evt#2>",
    "type": "transition",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "CREATED",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -106,7 +108,8 @@
   {
    "event": "<evt#3>",
    "type": "department_activated",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
@@ -135,7 +138,8 @@
   {
    "event": "<evt#4>",
    "type": "department_input",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -165,7 +169,8 @@
   {
    "event": "<evt#5>",
    "type": "context_assembled",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -340,7 +345,8 @@
   {
    "event": "<evt#6>",
    "type": "model_requested",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -398,7 +404,8 @@
   {
    "event": "<evt#7>",
    "type": "model_message",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -451,7 +458,8 @@
   {
    "event": "<evt#8>",
    "type": "tool_called",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -508,7 +516,8 @@
   {
    "event": "<evt#9>",
    "type": "model_attempt_finished",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -578,7 +587,8 @@
   {
    "event": "<evt#10>",
    "type": "tool_started",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -635,7 +645,8 @@
   {
    "event": "<evt#11>",
    "type": "tool_called",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -716,7 +727,8 @@
   {
    "event": "<evt#12>",
    "type": "proposal_submitted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -749,7 +761,8 @@
   {
    "event": "<evt#13>",
    "type": "spec_accepted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -803,7 +816,8 @@
   {
    "event": "<evt#14>",
    "type": "contract_accepted",
-   "role": "product",
+   "actor": "department:product",
+   "department": "product",
    "state_before": "PRODUCT_SPEC",
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
@@ -835,7 +849,8 @@
   {
    "event": "<evt#15>",
    "type": "transition",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "PRODUCT_SPEC",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#3>",
@@ -855,7 +870,8 @@
   {
    "event": "<evt#16>",
    "type": "activation_finished",
-   "role": "product",
+   "actor": "system",
+   "department": "product",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#3>",
@@ -880,7 +896,8 @@
   {
    "event": "<evt#17>",
    "type": "department_guidance_received",
-   "role": "user",
+   "actor": "user:local",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": null,
@@ -905,7 +922,8 @@
   {
    "event": "<evt#18>",
    "type": "department_activated",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": null,
@@ -936,7 +954,8 @@
   {
    "event": "<evt#19>",
    "type": "department_input",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -968,7 +987,8 @@
   {
    "event": "<evt#20>",
    "type": "context_assembled",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1060,7 +1080,8 @@
   {
    "event": "<evt#21>",
    "type": "department_guidance_applied",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1083,7 +1104,8 @@
   {
    "event": "<evt#22>",
    "type": "model_requested",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1143,7 +1165,8 @@
   {
    "event": "<evt#23>",
    "type": "model_message",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1198,7 +1221,8 @@
   {
    "event": "<evt#24>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1257,7 +1281,8 @@
   {
    "event": "<evt#25>",
    "type": "model_attempt_finished",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1329,7 +1354,8 @@
   {
    "event": "<evt#26>",
    "type": "tool_started",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1371,7 +1397,8 @@
   {
    "event": "<evt#27>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1437,7 +1464,8 @@
   {
    "event": "<evt#28>",
    "type": "proposal_submitted",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1465,7 +1493,8 @@
   {
    "event": "<evt#29>",
    "type": "department_guidance_responded",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1494,7 +1523,8 @@
   {
    "event": "<evt#30>",
    "type": "activation_finished",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#18>",
@@ -1521,7 +1551,8 @@
   {
    "event": "<evt#31>",
    "type": "department_activated",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": null,
@@ -1550,7 +1581,8 @@
   {
    "event": "<evt#32>",
    "type": "department_input",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1580,7 +1612,8 @@
   {
    "event": "<evt#33>",
    "type": "context_assembled",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1761,7 +1794,8 @@
   {
    "event": "<evt#34>",
    "type": "model_requested",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1819,7 +1853,8 @@
   {
    "event": "<evt#35>",
    "type": "model_message",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1872,7 +1907,8 @@
   {
    "event": "<evt#36>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1929,7 +1965,8 @@
   {
    "event": "<evt#37>",
    "type": "model_attempt_finished",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -1999,7 +2036,8 @@
   {
    "event": "<evt#38>",
    "type": "tool_started",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -2051,7 +2089,8 @@
   {
    "event": "<evt#39>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -2127,7 +2166,8 @@
   {
    "event": "<evt#40>",
    "type": "proposal_submitted",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -2157,7 +2197,8 @@
   {
    "event": "<evt#41>",
    "type": "plan_accepted",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -2208,7 +2249,8 @@
   {
    "event": "<evt#42>",
    "type": "activation_finished",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#31>",
@@ -2233,7 +2275,8 @@
   {
    "event": "<evt#43>",
    "type": "department_activated",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": null,
@@ -2262,7 +2305,8 @@
   {
    "event": "<evt#44>",
    "type": "department_input",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2292,7 +2336,8 @@
   {
    "event": "<evt#45>",
    "type": "context_assembled",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2479,7 +2524,8 @@
   {
    "event": "<evt#46>",
    "type": "model_requested",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2537,7 +2583,8 @@
   {
    "event": "<evt#47>",
    "type": "model_message",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2590,7 +2637,8 @@
   {
    "event": "<evt#48>",
    "type": "model_message",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2643,7 +2691,8 @@
   {
    "event": "<evt#49>",
    "type": "model_message",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2696,7 +2745,8 @@
   {
    "event": "<evt#50>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2753,7 +2803,8 @@
   {
    "event": "<evt#51>",
    "type": "model_attempt_finished",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2823,7 +2874,8 @@
   {
    "event": "<evt#52>",
    "type": "tool_started",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2861,7 +2913,8 @@
   {
    "event": "<evt#53>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2923,7 +2976,8 @@
   {
    "event": "<evt#54>",
    "type": "tool_started",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -2966,7 +3020,8 @@
   {
    "event": "<evt#55>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -3033,7 +3088,8 @@
   {
    "event": "<evt#56>",
    "type": "tool_started",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -3077,7 +3133,8 @@
   {
    "event": "<evt#57>",
    "type": "tool_called",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -3145,7 +3202,8 @@
   {
    "event": "<evt#58>",
    "type": "proposal_submitted",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -3173,7 +3231,8 @@
   {
    "event": "<evt#59>",
    "type": "delivery_accepted",
-   "role": "engineering",
+   "actor": "department:engineering",
+   "department": "engineering",
    "state_before": "ENGINEERING",
    "state_after": "ENGINEERING",
    "parent_event_id": "<evt#43>",
@@ -3232,7 +3291,8 @@
   {
    "event": "<evt#60>",
    "type": "transition",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "ENGINEERING",
    "state_after": "DELIVERY",
    "parent_event_id": "<evt#43>",
@@ -3252,7 +3312,8 @@
   {
    "event": "<evt#61>",
    "type": "transition",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "DELIVERY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#43>",
@@ -3272,7 +3333,8 @@
   {
    "event": "<evt#62>",
    "type": "activation_finished",
-   "role": "engineering",
+   "actor": "system",
+   "department": "engineering",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#43>",
@@ -3297,7 +3359,8 @@
   {
    "event": "<evt#63>",
    "type": "department_activated",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": null,
@@ -3326,7 +3389,8 @@
   {
    "event": "<evt#64>",
    "type": "department_input",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3356,7 +3420,8 @@
   {
    "event": "<evt#65>",
    "type": "context_assembled",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3446,7 +3511,8 @@
   {
    "event": "<evt#66>",
    "type": "model_requested",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3504,7 +3570,8 @@
   {
    "event": "<evt#67>",
    "type": "model_message",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3557,7 +3624,8 @@
   {
    "event": "<evt#68>",
    "type": "model_message",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3610,7 +3678,8 @@
   {
    "event": "<evt#69>",
    "type": "tool_called",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3667,7 +3736,8 @@
   {
    "event": "<evt#70>",
    "type": "model_attempt_finished",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3737,7 +3807,8 @@
   {
    "event": "<evt#71>",
    "type": "tool_started",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3780,7 +3851,8 @@
   {
    "event": "<evt#72>",
    "type": "tool_called",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3847,7 +3919,8 @@
   {
    "event": "<evt#73>",
    "type": "tool_started",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3889,7 +3962,8 @@
   {
    "event": "<evt#74>",
    "type": "tool_called",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3955,7 +4029,8 @@
   {
    "event": "<evt#75>",
    "type": "proposal_submitted",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -3983,7 +4058,8 @@
   {
    "event": "<evt#76>",
    "type": "qa_submitted",
-   "role": "quality",
+   "actor": "department:quality",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "QUALITY",
    "parent_event_id": "<evt#63>",
@@ -4040,7 +4116,8 @@
   {
    "event": "<evt#77>",
    "type": "transition",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "DONE",
    "parent_event_id": "<evt#63>",
@@ -4060,7 +4137,8 @@
   {
    "event": "<evt#78>",
    "type": "run_done",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "QUALITY",
    "state_after": "DONE",
    "parent_event_id": "<evt#63>",
@@ -4078,7 +4156,8 @@
   {
    "event": "<evt#79>",
    "type": "activation_finished",
-   "role": "quality",
+   "actor": "system",
+   "department": "quality",
    "state_before": "DONE",
    "state_after": "DONE",
    "parent_event_id": "<evt#63>",

@@ -13,7 +13,7 @@ from ..event_store import Command
 from ..models import Event, ProjectEvent
 from .contracts import (
     EVENT_TYPES, REJECTION_REASONS, Capabilities, CommandCapability, CommandRequest, Deployment,
-    OverlayCapability, QueryCapability, RejectionReason, Snapshot,
+    OverlayCapability, QueryCapability, RejectionReason, Snapshot, StreamCapability,
 )
 
 if TYPE_CHECKING:
@@ -84,6 +84,9 @@ class Registry:
         # 命令可能返回的全部拒绝原因：自己声明的原因，加上每个命令都可能返回的命令身份重复使用
         return (*self.commands[name].reasons, "command_id_reused")
 
+    # 事件流的片段能力（第 6.1 节）：提供模型输出片段，连接可以按这些范围参数筛选
+    stream = StreamCapability(deltas=True, scopes=["project", "work_item", "run", "department", "role", "type"])
+
     def capabilities(self, deployment: Deployment) -> Capabilities:
         return Capabilities(
             deployment=deployment,
@@ -96,4 +99,5 @@ class Registry:
                 for item in self.overlays
                 if set(item.queries) <= set(self.queries)
             ],
+            stream=self.stream,
         )

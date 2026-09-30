@@ -1148,7 +1148,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 seen = set()
                 for ref in event.payload["source_refs"]:
                     source = store.get_event(ref["event_id"])
-                    if (source is None or source.run_id != run_id or source.role != event.role
+                    if (source is None or source.run_id != run_id or source.department != event.department
                             or source.stream_version != ref["seq"]
                             or source.payload.get("activation_id") != ref["activation_id"]
                             or source.payload.get("step_id") != ref["step_id"]):
@@ -1159,7 +1159,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 prior = event.payload.get("previous_compaction_event_id")
                 if prior:
                     source = store.get_event(prior)
-                    if source is None or source.run_id != run_id or source.role != event.role or source.type != "compaction_recorded":
+                    if source is None or source.run_id != run_id or source.department != event.department or source.type != "compaction_recorded":
                         raise ValueError("previous compaction does not match its department")
                     sources.insert(0, event_card(source))
                 detail["source_events"] = sources
