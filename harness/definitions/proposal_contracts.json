@@ -27,7 +27,7 @@
       ]
     },
     "engineering": {
-      "submit_tools": ["submit_plan", "submit_delivery"],
+      "submit_tools": ["submit_plan", "submit_delivery", "submit_structure"],
       "kinds": {
         "engineering_plan": {
           "when": ["ENGINEERING", "REWORK_ENGINEERING"],
@@ -48,6 +48,21 @@
             "workspace files must exist",
             "run_check receipts from this activation on the current workspace"
           ]
+        },
+        "structure": {
+          "when": ["ENGINEERING"],
+          "work_item": "onboarding",
+          "required": ["kind=structure", "overall", "modules", "entry_points", "build_and_test", "requirement_locations"],
+          "optional": ["conventions"],
+          "modules": [{"path": "workspace-relative file or directory", "responsibility": "what it is responsible for"}],
+          "entry_points": [{"kind": "program|command_line|service", "path": "workspace-relative file", "how_to_run": "the command that starts it"}],
+          "build_and_test": [{"name": "name passed to run_check", "argv": ["the", "argv"], "purpose": "what it builds or tests"}],
+          "requirement_locations": [{"requirement": "an initial PRD requirement", "locations": ["main files or directories"]}],
+          "bind": [
+            "current_product_spec.content_hash",
+            "run_check receipts from this activation bound to the current snapshot, one per build_and_test entry",
+            "workspace tree digest must equal the snapshot tree digest"
+          ]
         }
       },
       "notes": [
@@ -57,7 +72,7 @@
       ]
     },
     "quality": {
-      "submit_tools": ["submit_review"],
+      "submit_tools": ["submit_review", "submit_baseline_review"],
       "kinds": {
         "qa_review": {
           "when": ["QUALITY"],
@@ -70,6 +85,26 @@
             "current_delivery_spec.content_hash",
             "current code snapshot",
             "quality host check receipts; engineering receipts are rejected"
+          ]
+        },
+        "baseline_review": {
+          "when": ["QUALITY"],
+          "work_item": "onboarding",
+          "required": ["kind=baseline_review", "verdict", "conclusions", "checks"],
+          "optional": ["omissions", "other_failures"],
+          "conclusions": [{"requirement": "an initial PRD requirement", "status": "verified|read_only|existing_defect|unsupported", "evidence": "a passing check name, a location, or the failing check name"}],
+          "omissions": [{"capability": "an outward-facing capability missing from the initial PRD", "location": "where it lives"}],
+          "other_failures": [{"check": "the failing check name", "reason": "why it fails"}],
+          "verdict": ["consistent", "rework_product"],
+          "verdict_rules": {
+            "consistent": "no unsupported conclusion, no omission, and every check with a non-zero exit status is referenced by an existing_defect conclusion or explained in other_failures",
+            "rework_product": "at least one unsupported conclusion or one omission"
+          },
+          "bind": [
+            "current_product_spec.content_hash",
+            "one conclusion per requirement of the current initial PRD, no more and no less",
+            "at least one run_check receipt from this activation bound to the current snapshot and the current ProductSpec",
+            "workspace tree digest must equal the snapshot tree digest"
           ]
         }
       },

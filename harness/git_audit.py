@@ -142,3 +142,8 @@ def _apply_materials(files: dict[str, bytes], artifacts: ArtifactStore,
         files["specs/delivery-tree.json"] = _json_bytes(tree.manifest)
     elif kind == EventType.QA_SUBMITTED:
         files["specs/qa.json"] = _json_bytes(payload)
+    elif kind == EventType.STRUCTURE_ACCEPTED:
+        files["specs/structure.json"] = _json_bytes(payload)
+        files["STRUCTURE.md"] = artifacts.get_for_run(run_id, ArtifactRef(**payload["structure_ref"]))
+    elif kind == EventType.BASELINE_REVIEW_ACCEPTED:
+        files["specs/baseline.json"] = _json_bytes(payload)

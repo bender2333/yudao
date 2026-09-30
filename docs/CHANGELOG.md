@@ -285,3 +285,4 @@ claude-opus-5-5 / 2026-09-30 18:58 / 长期目标可以修改：docs/design/app-
 claude-opus-5-5 / 2026-09-30 19:10 / docs/stage-3-plan.md 第 3 节 3.9 一行、docs/program-roadmap.md 第 13 项、docs/requirements/stage-requirements-overview.md 3.9 一行写明组合验收使用 openai-agents-python，浏览器与 computer use 的结论引用 #155；docs/decision.md 新增「3.9 使用 openai-agents-python；模型服务不限流；开发板的登录」 / 用户采纳 3.9 的推荐，说明模型服务不限流，开发板的公钥由架构师添加
 claude-opus-5-5 / 2026-09-30 19:25 / docs/decision.md 新增「不使用容器」，写明需要重新确定的设计与暂停派发的 15 张工单 / 用户决定完全不用容器
 claude-opus-5-5 / 2026-09-30 19:40 / docs/decision.md「不使用容器」一条补充方向：WSL 作为一台登记的机器，以及 WSL 的核对结果 / 用户选择用 WSL 代替本机容器
+qwen3.8 / 2026-09-30 23:30 / docs/architecture-issues.md 登记 #134 发现的一处 main 上的缺陷：#16（PR #200）合并时带回两处 `NewEvent(..., role=...)` 的旧写法，与 #75 删除 `NewEvent.role` 的改动冲突，`test_engine.py` 的恢复用例在干净 main 上即失败，修复已在未合并的 `issue-202`（`db1bdbf1`） / 交付 #134 时核对该失败不是本工单引入，需要架构师合并 #202 或等价修改

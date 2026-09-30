@@ -236,6 +236,8 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 
 class RunCreatedPayload(Payload):
     task: str
+    # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     initial_input: InputRecord
     department_prompts: dict[Department, PromptRecord]
     intend_ref: ArtifactRef
@@ -251,6 +253,8 @@ class RunCreatedPayload(Payload):
     work_item_id: str | None
     baseline: Baseline | None
     snapshot: CodeSnapshot | None
+    # 建档事项的仓库概况工件引用；普通事项没有概况
+    overview_ref: ArtifactRef | None = None
     workspace_digest: str
     project_context_ref: ArtifactRef | None
     prompt_config_versions: dict[Department, int]
@@ -761,6 +765,89 @@ class QaSubmittedPayload(Payload):
     git_version: GitVersion
 
 
+class StructureModule(Payload):
+    # 现有结构说明中的一个模块
+    path: str
+    responsibility: str
+
+
+class StructureEntryPoint(Payload):
+    kind: Literal["program", "command_line", "service"]
+    path: str
+    how_to_run: str
+
+
+class StructureBuildItem(Payload):
+    # 构建与测试的一条命令，带本次激活中绑定当前快照的执行回执
+    name: str
+    argv: list[str]
+    purpose: str
+    receipt: CheckReceipt
+
+
+class StructureRequirementLocation(Payload):
+    requirement: str
+    locations: list[str]
+
+
+class StructureAcceptedPayload(Payload):
+    overall: str
+    modules: list[StructureModule]
+    entry_points: list[StructureEntryPoint]
+    build_and_test: list[StructureBuildItem]
+    requirement_locations: list[StructureRequirementLocation]
+    conventions: list[str]
+    product_spec_hash: str
+    code_tree_digest: str
+    kind: Literal["structure"]
+    issuer: Literal["engineering"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    structure_ref: ArtifactRef
+    request_id: str | None
+    git_version: GitVersion
+
+
+class BaselineConclusion(Payload):
+    # 基线核验中对一条初始 PRD 要求的结论
+    requirement: str
+    status: Literal["verified", "read_only", "existing_defect", "unsupported"]
+    evidence: str
+
+
+class BaselineOmission(Payload):
+    capability: str
+    location: str
+
+
+class BaselineOtherFailure(Payload):
+    check: str
+    reason: str
+
+
+class BaselineReviewAcceptedPayload(Payload):
+    verdict: Literal["consistent", "rework_product"]
+    conclusions: list[BaselineConclusion]
+    omissions: list[BaselineOmission]
+    checks: list[CheckReceipt]
+    other_failures: list[BaselineOtherFailure]
+    product_spec_hash: str
+    structure_hash: str
+    code_snapshot_hash: str
+    kind: Literal["baseline_review"]
+    issuer: Literal["quality"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    request_id: str | None
+    git_version: GitVersion
+
+
 class ReviewObservation(Payload):
     # 教训候选来自质检退回
     verdict: str
@@ -1078,6 +1165,8 @@ PAYLOADS: dict[str, Any] = {
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,
+    EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
+    EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
     EventType.TRANSITION: TransitionPayload,
     EventType.RUN_DONE: RunDonePayload,
