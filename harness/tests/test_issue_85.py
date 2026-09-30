@@ -284,7 +284,8 @@ def test_connection_test_keeps_admission_unchanged(tmp_path):
         opened = _Opened(tmp_path, _document(models_url=models_url))
         with running_api(opened) as client:
             before = _catalog(client)
-            assert before["models"][0]["admitted_at"] is None
+            # 准入记录与目录分开返回（工单 #86）：连接测试前后都没有准入记录
+            assert before["admissions"] == []
             tested = _command(client, "catalog.connection.test", base_version=before["revision"], provider_id="p1")
             assert tested.status_code == 200, tested.text
             [event] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
@@ -292,7 +293,7 @@ def test_connection_test_keeps_admission_unchanged(tmp_path):
             assert event.payload["ok"] is True
             after = _catalog(client)
             assert after["revision"] == before["revision"]
-            assert after["models"][0]["admitted_at"] is None
+            assert after["admissions"] == []
             _assert_no_secret(client, opened)
 
 

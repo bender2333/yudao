@@ -92,7 +92,8 @@ def test_model_definition_declares_whether_it_accepts_a_required_tool_call():
     facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
     facade.store_document(document)
     admit_bound_models(facade, document)
-    admitted_at = facade.providers_view()["models"][0]["admitted_at"]
+    admitted_at = next(item["admitted_at"] for item in facade.model_admissions()
+                       if item["model_id"] == "model-a")
     assert admitted_at is not None
     assert facade.resolve_departments().target("product").accepts_required_tool_call is False
 
@@ -100,7 +101,8 @@ def test_model_definition_declares_whether_it_accepts_a_required_tool_call():
     reloaded.store_document(facade.to_document())
     view = reloaded.providers_view()
     assert view["models"][0]["accepts_required_tool_call"] is False
-    assert view["models"][0]["admitted_at"] == admitted_at
+    # 准入记录与目录分开保存（#86），不随目录文档重新读出
+    assert reloaded.model_admissions() == []
 
     bad = _document()
     bad["models"][0]["accepts_required_tool_call"] = "yes"
@@ -123,11 +125,12 @@ def test_providers_view_model_dict_carries_capability_source_and_tool_call_decla
     assert model["accepts_required_tool_call"] is False
 
     admit_bound_models(facade, document)
-    admitted = facade.providers_view()["models"][0]
-    assert admitted["admitted_at"] is not None
-    assert admitted["capability_source"] == "preset-v1"
-    assert admitted["accepts_required_tool_call"] is False
-    assert admitted["admitted_model"] == "model-a"
+    model = facade.providers_view()["models"][0]
+    assert model["capability_source"] == "preset-v1"
+    assert model["accepts_required_tool_call"] is False
+    admission = next(item for item in facade.model_admissions() if item["model_id"] == "model-a")
+    assert admission["admitted_at"] is not None
+    assert admission["admitted_model"] == "model-a"
 
 
 def test_provider_config_requires_a_protocol():
@@ -206,6 +209,7 @@ def test_dangling_binding_references_are_rejected():
     facade.store_document(_document(bindings={
         "product": {"provider_id": "provider-a", "model_id": "model-a"},
     }))
+    admit_bound_models(facade)
     with pytest.raises(CatalogValidationError):
         facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "missing-model"}})
     facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "model-a"}})

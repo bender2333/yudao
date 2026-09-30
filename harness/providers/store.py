@@ -56,6 +56,8 @@ class ProviderDefinition:
 
 
 # 模型访问定义：某份 Provider 配置下的一个模型访问定义，不声明协议（协议取自所属连接，ADR-0004）
+# 容量是声明值：窗口可以未知（None），未知时只作候选，不可用于任务；输出上限必须有值。
+# 准入记录不属于目录定义（工单 #86），保存在 ProviderFacade 的独立记录中
 @dataclass(frozen=True)
 class ModelDefinition:
     id: str
@@ -66,23 +68,11 @@ class ModelDefinition:
     capability_source: str = ""
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
-    admitted_at: str | None = None
-    admitted_revision: int | None = None
-    admitted_model: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("id", "provider_id", "model", "capability_source"):
             value = getattr(self, name)
             object.__setattr__(self, name, value.strip() if isinstance(value, str) else value)
-        value = self.admitted_model
-        if isinstance(value, str):
-            normalized = value.strip()
-            object.__setattr__(self, "admitted_model", normalized or None)
-
-    @property
-    def admitted(self) -> bool:
-        # 准入是一次真实模型测试通过的事实，不是默认状态
-        return self.admitted_at is not None
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -93,10 +83,86 @@ class ModelDefinition:
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
-            "admitted_at": self.admitted_at,
-            "admitted_revision": self.admitted_revision,
-            "admitted_model": self.admitted_model,
         }
+
+
+# 准入记录：一次模型测试通过时写入的事实，与目录分开保存（工单 #86）。
+# 后四个字段是测试时的受影响字段快照：地址、凭据引用、协议取自所属连接，上游模型 ID 取自定义；
+# 有效性逐项比较，改连接字段则整条连接的定义全部回候选，改上游模型 ID 只影响该条定义
+@dataclass(frozen=True)
+class AdmissionRecord:
+    model_id: str
+    provider_id: str
+    admitted_at: str
+    admitted_model: str
+    protocol: str
+    base_url: str
+    credential_ref: str
+    model: str
+
+    def public_dict(self) -> dict[str, Any]:
+        return {
+            "model_id": self.model_id,
+            "provider_id": self.provider_id,
+            "admitted_at": self.admitted_at,
+            "admitted_model": self.admitted_model,
+            "protocol": self.protocol,
+            "base_url": self.base_url,
+            "credential_ref": self.credential_ref,
+            "model": self.model,
+        }
+
+
+def admission_is_current(record: AdmissionRecord, model: ModelDefinition,
+                         provider: ProviderDefinition) -> bool:
+    # 按受影响字段逐项比较：名称、超时、models_url 与容量不在比较之列，
+    # 换同一引用下的 Key 不改动引用字段，因此都不影响准入有效性
+    return (record.base_url == provider.base_url
+            and record.credential_ref == provider.credential_ref
+            and record.protocol == provider.protocol
+            and record.model == model.model)
+
+
+def _parse_admission_document(raw: Any) -> dict[str, AdmissionRecord]:
+    # 独立准入文件的解析：只认文件自身结构，坏内容报错，不做兼容降级
+    if not isinstance(raw, Mapping):
+        raise CatalogValidationError((ValidationIssue("admissions", "应为 JSON 对象"),))
+    unknown = sorted(set(raw) - {"admissions"}, key=str)
+    if unknown:
+        raise CatalogValidationError(tuple(
+            ValidationIssue(f"admissions.{key}", "未知字段") for key in unknown
+        ))
+    items = raw.get("admissions", [])
+    if not isinstance(items, list):
+        raise CatalogValidationError((ValidationIssue("admissions", "应为数组"),))
+    required = {"model_id", "provider_id", "admitted_at", "admitted_model",
+                "protocol", "base_url", "credential_ref", "model"}
+    records: dict[str, AdmissionRecord] = {}
+    issues: list[ValidationIssue] = []
+    for index, item in enumerate(items):
+        location = f"admissions[{index}]"
+        if not isinstance(item, Mapping):
+            issues.append(ValidationIssue(location, "应为对象"))
+            continue
+        missing = sorted(required - set(item), key=str)
+        if missing:
+            issues.append(ValidationIssue(location, "缺少字段：" + ", ".join(missing)))
+            continue
+        extra = sorted(set(item) - required, key=str)
+        if extra:
+            issues.append(ValidationIssue(location, "未知字段：" + ", ".join(extra)))
+            continue
+        values = {key: item[key] for key in required}
+        if any(not isinstance(value, str) for value in values.values()):
+            issues.append(ValidationIssue(location, "字段必须是字符串"))
+            continue
+        if values["model_id"] in records:
+            issues.append(ValidationIssue(f"{location}.model_id", "模型访问定义 ID 重复"))
+            continue
+        records[values["model_id"]] = AdmissionRecord(**values)
+    if issues:
+        raise CatalogValidationError(issues)
+    return records
 
 
 class ProviderStore:
@@ -140,7 +206,7 @@ class ProviderStore:
         return store
 
     def to_dict(self) -> dict[str, Any]:
-        # 只含非敏感部分，候选模型不落盘；revision 让准入修订跨持久化与重启保持可比
+        # 只含非敏感部分；准入记录由 ProviderFacade 单独保存，不随目录落盘
         return {
             "revision": self.revision,
             "providers": [self.providers[key].public_dict() for key in sorted(self.providers)],
@@ -220,33 +286,6 @@ class ProviderStore:
         self.updated_at = _utc_now()
         return self.revision
 
-    def mark_admitted(self, model_id: str, *, admitted_model: str | None) -> int:
-        # 记录一次模型测试通过的事实；准入跟随目录修订（Provider/模型定义），
-        # 部门绑定变化不使已通过的模型测试失效
-        current = self.models.get(model_id)
-        if current is None:
-            raise CatalogValidationError((ValidationIssue("models." + str(model_id), "模型访问定义不存在"),))
-        self.revision += 1
-        admitted = ModelDefinition(
-            id=current.id, provider_id=current.provider_id, model=current.model,
-            context_window=current.context_window,
-            max_output_tokens=current.max_output_tokens, capability_source=current.capability_source,
-            accepts_required_tool_call=current.accepts_required_tool_call,
-            admitted_at=_utc_now(), admitted_revision=self.revision,
-            admitted_model=(admitted_model or current.model),
-        )
-        items = [item for item in self._model_items if item.id != current.id] + [admitted]
-        candidate_items = tuple(items)
-        mapping: dict[str, ModelDefinition] = _index_definitions(candidate_items)
-        old_models, old_items = self.models, self._model_items
-        self.models, self._model_items = MappingProxyType(mapping), candidate_items
-        try:
-            self._validate_definition_shape()
-        except Exception:
-            self.models, self._model_items = old_models, old_items
-            raise
-        self.updated_at = _utc_now()
-        return self.revision
 
     def persist(self, path: str | Path) -> Path:
         # 校验成功后写临时文件再原子替换，落盘成功才返回
@@ -386,13 +425,15 @@ def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None,
 def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
         return None, [ValidationIssue(location, "应为对象")]
+    # protocol 仍是已知字段，但模型访问定义不再声明协议（ADR-0004）：看到它时指出字段位置，
+    # 其余未知字段（含准入字段）按未知字段处理（工单 #86）
     allowed = {
         "id", "provider_id", "model", "context_window", "max_output_tokens",
-        "capability_source", "accepts_required_tool_call", "admitted_at", "admitted_revision", "admitted_model",
+        "capability_source", "accepts_required_tool_call", "protocol",
     }
-    issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
+    issues = [ValidationIssue(f"{location}.{key}", "未知字段")
+              for key in sorted(set(raw) - allowed, key=str)]
     if "protocol" in raw:
-        # 模型访问定义不再声明协议（ADR-0004）：指出字段位置，不迁移
         issues.append(ValidationIssue(
             f"{location}.protocol", "模型访问定义不再声明协议，请在 Provider 配置上声明"))
     required = {"id", "provider_id", "model", "max_output_tokens"}
@@ -405,8 +446,6 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
         accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
-        admitted_at=raw.get("admitted_at"), admitted_revision=raw.get("admitted_revision"),
-        admitted_model=raw.get("admitted_model"),
     ), issues
 
 

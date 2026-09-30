@@ -974,19 +974,29 @@ function catalogModel(id, model, overrides = {}) {
   return {
     id, provider_id: "p1", model,
     context_window: 128000, max_output_tokens: 4096, capability_source: "preset-v1",
-    admitted_at: null, admitted_model: null, admitted_revision: null,
     ...overrides,
   };
 }
 
-function catalogView({ revision = 5, credential = { ref: "K", configured: true, source: "env", has_override: false }, models = [], bindings = {} } = {}) {
+function catalogAdmission(modelId, overrides = {}) {
+  // 准入记录与目录分开返回（工单 #86）
+  return {
+    model_id: modelId, provider_id: "p1", protocol: "responses",
+    admitted: true, stale: false,
+    admitted_at: "2026-09-19T09:00:00Z", admitted_model: modelId,
+    base_url: "https://go.example.com/v1", credential_ref: "K", model: modelId,
+    ...overrides,
+  };
+}
+
+function catalogView({ revision = 5, credential = { ref: "K", configured: true, source: "env", has_override: false }, models = [], admissions = [], bindings = {} } = {}) {
   const provider = {
     id: "p1", name: "Go 连接", protocol: "responses", base_url: "https://go.example.com/v1",
     credential_ref: "K", timeout_sec: 600, preset_id: "", models_url: "",
     credential, credential_configured: credential.configured !== false,
     models,
   };
-  return { revision, providers: [provider], models, bindings };
+  return { revision, providers: [provider], models, admissions, bindings };
 }
 
 test("provider empty state lists presets and prefills the form without auto-saving", async () => {
@@ -1081,15 +1091,20 @@ test("candidate refresh renders candidates and drops the older list on unknown",
   assert.equal(calls.filter(([url]) => String(url).endsWith("/candidates")).length, 2);
 });
 
-test("model rows show admission badges for admitted, unadmitted and stale revisions", async () => {
+test("model rows show admission badges for admitted, unadmitted and stale records", async () => {
   const models = [
-    catalogModel("m-admitted", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna-actual", admitted_revision: 7 }),
+    catalogModel("m-admitted", "luna"),
     catalogModel("m-fresh", "nova", { protocol: "chat_completions", capability_source: "" }),
-    catalogModel("m-stale", "orion", { protocol: "messages", admitted_at: "2026-09-18T09:00:00Z", admitted_model: "orion", admitted_revision: 6 }),
+    catalogModel("m-stale", "orion", { protocol: "messages" }),
+  ];
+  const admissions = [
+    catalogAdmission("m-admitted", { admitted_model: "luna-actual" }),
+    catalogAdmission("m-stale", { stale: true, admitted: false, admitted_at: "2026-09-18T09:00:00Z" }),
   ];
   const { fetchImpl } = providerFetch({
     "/api/provider-presets": { revision: "v1", presets: [] },
-    "/api/providers": catalogView({ revision: 7, models, bindings: { product: { provider_id: "p1", model_id: "m-admitted" } } }),
+    "/api/providers": catalogView({ revision: 7, models, admissions,
+                                    bindings: { product: { provider_id: "p1", model_id: "m-admitted" } } }),
   });
   const config = loadProviderConfig(fetchImpl);
   const root = providerRoot();
@@ -1098,7 +1113,7 @@ test("model rows show admission badges for admitted, unadmitted and stale revisi
   assert.match(html, /class="admission admitted"/);
   assert.match(html, /class="admission unadmitted"/);
   assert.match(html, /class="admission stale"/);
-  assert.match(html, /测试结果不对应当前修订/);
+  assert.match(html, /准入已作废，需重新测试/);
   // 配置、凭据、准入、额度分开呈现，不合并成一个绿点
   assert.match(html, /data-status-strip/);
   assert.match(html, /配置：就绪 · 1\/3 模型已准入/);
@@ -1182,6 +1197,38 @@ test("model test shows inline progress then result and keeps filled fields", asy
   assert.deepEqual(JSON.parse(testCall[1].body), { model_id: "m1", kind: "model" });
 });
 
+test("new model row requires per-row capacity confirmation while an existing row does not", async () => {
+  const models = [catalogModel("m1", "luna")];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": catalogView({ revision: 5, models }),
+    "/api/providers/p1": { revision: 6 },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  // 已有行：表单没有容量确认勾选框，重新提交时不带该标记
+  let modelForm = root.querySelector("[data-pc-form='model']");
+  assert.equal(modelForm._fields.some(field => field.name === "capacity_confirmed"), false);
+  await modelForm.dispatch("submit");
+  let saved = calls.filter(([url, options]) => url === "/api/providers/p1" && options.method === "PUT").pop();
+  assert.equal("capacity_confirmed" in JSON.parse(saved[1].body).models[0], false);
+  // 新行：表单出现容量确认勾选框，提交时带 capacity_confirmed
+  await root.querySelector("[data-pc-action='new-model']").dispatch("click");
+  modelForm = root.querySelector("[data-pc-form='model']");
+  const confirmation = modelForm._fields.find(field => field.name === "capacity_confirmed");
+  assert.ok(confirmation, "新建行应有容量确认勾选框");
+  confirmation.node.checked = true;
+  modelForm._fields.find(field => field.name === "id").node.value = "m2";
+  modelForm._fields.find(field => field.name === "model").node.value = "nova";
+  modelForm._fields.find(field => field.name === "context_window").node.value = "128000";
+  modelForm._fields.find(field => field.name === "max_output_tokens").node.value = "4096";
+  await modelForm.dispatch("submit");
+  saved = calls.filter(([url, options]) => url === "/api/providers/p1" && options.method === "PUT").pop();
+  const submitted = JSON.parse(saved[1].body).models;
+  assert.equal(submitted.find(item => item.id === "m2").capacity_confirmed, true);
+});
+
 test("model test failure keeps the verifiable reason and filled fields", async () => {
   const { fetchImpl } = providerFetch({
     "/api/provider-presets": { revision: "v1", presets: [] },
@@ -1230,13 +1277,11 @@ test("model form edits the required tool call declaration and keeps it for the o
 });
 
 test("binding options mark unadmitted models unavailable with the reason visible", async () => {
-  const models = [
-    catalogModel("m1", "luna", { admitted_at: "2026-09-19T09:00:00Z", admitted_model: "luna", admitted_revision: 5 }),
-    catalogModel("m2", "nova"),
-  ];
+  const models = [catalogModel("m1", "luna"), catalogModel("m2", "nova")];
+  const admissions = [catalogAdmission("m1", { admitted_model: "luna" })];
   const { calls, fetchImpl } = providerFetch({
     "/api/provider-presets": { revision: "v1", presets: [] },
-    "/api/providers": () => catalogView({ revision: 5, models, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
     "/api/department-bindings": { bindings: { product: { provider_id: "p1", model_id: "m1" } } },
   });
   const config = loadProviderConfig(fetchImpl);
