@@ -539,6 +539,10 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 item["model"] = model["model"]
                 item["context_window"] = model["context_window"]
                 item["max_output_tokens"] = model["max_output_tokens"]
+                # 档位选项取自所选模型访问定义的声明（设计说明第 9.1 节）
+                item["reasoning_levels"] = model.get("reasoning_levels", [])
+                item["default_reasoning_level"] = model.get("default_reasoning_level")
+                item["reasoning_mode"] = model.get("reasoning_mode")
             bindings[department] = item
         return {"bindings": bindings}
 

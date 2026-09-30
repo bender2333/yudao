@@ -66,6 +66,8 @@ class CatalogProvider(Contract):
 class CatalogBinding(Contract):
     provider_id: str
     model_id: str
+    # 请求档位（#87）：部门默认保存的可为空档位，实际发送的档位由 Provider 按模型声明限制
+    requested_tier: str | None = None
 
 
 class CatalogPresets(Contract):

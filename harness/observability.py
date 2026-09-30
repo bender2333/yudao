@@ -947,6 +947,9 @@ def _department_provider(binding: dict[str, Any] | None) -> dict[str, Any] | Non
         "max_output_tokens": binding.get("configured_max_output_tokens"),
         "temperature": None,
         "selection_source": binding.get("selection_source"),
+        # 最近一次请求的请求档位与实际发送的档位（设计说明第 9.3 节）
+        "requested_tier": binding.get("requested_tier"),
+        "sent_tier": binding.get("sent_tier"),
     }
 
 

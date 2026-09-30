@@ -549,7 +549,7 @@ class ProviderFacade:
     def resolve_department_default(self, department: str,
                                    requested_tier: str | None = None) -> CallTargetResolution:
         # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认并解析。
-        # 对外的解析入口仍只接收模型访问定义引用与请求档位，不接收部门（#45 架构答复第 4 条）
+        # 调用方没有给出请求档位时使用部门默认里保存的请求档位（#87）
         with self._lock:
             binding = self._bindings.get(str(department))
             if binding is None:
@@ -557,8 +557,9 @@ class ProviderFacade:
                     False, "provider_unavailable", f"部门 {department} 未绑定 Provider 与模型",
                     call_target_public(None, requested_tier),
                 )
+            tier = requested_tier or binding.get("requested_tier")
             resolution, target = _resolve_call_target(
-                self._store, self._credentials, binding.get("model_id"), requested_tier,
+                self._store, self._credentials, binding.get("model_id"), tier,
                 self._admissions,
             )
             if target is None:
@@ -1251,7 +1252,22 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
         if model.provider_id != provider.id:
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
-        bindings[str(department)] = {"provider_id": provider.id, "model_id": model.id}
+        # 请求档位（#87）：可以为空，写入时必须属于所选定义声明的支持档位
+        requested_tier = item.get("requested_tier")
+        if requested_tier is not None and not isinstance(requested_tier, str):
+            issues.append(ValidationIssue(f"{location}.requested_tier", "请求档位必须为字符串"))
+            continue
+        tier = (requested_tier or "").strip()
+        if tier and tier not in model.reasoning_levels:
+            issues.append(ValidationIssue(
+                f"{location}.requested_tier",
+                "请求档位不属于该模型访问定义声明的支持档位" if model.reasoning_levels
+                else "该模型访问定义没有声明推理档位，请求档位应为空"))
+            continue
+        binding = {"provider_id": provider.id, "model_id": model.id}
+        if tier:
+            binding["requested_tier"] = tier
+        bindings[str(department)] = binding
     if issues:
         raise CatalogValidationError(issues)
     return bindings

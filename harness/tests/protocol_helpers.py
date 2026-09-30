@@ -262,8 +262,18 @@ def responses_responder(body: dict):
 
 def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
                 model: str = "target-model",
-                accepts_required_tool_call: bool = True) -> ProviderFacade:
+                accepts_required_tool_call: bool = True,
+                reasoning_levels: list[str] | None = None,
+                default_reasoning_level: str | None = None,
+                reasoning_mode: str = "") -> ProviderFacade:
     facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
+    declaration: dict[str, Any] = {}
+    if reasoning_levels is not None:
+        declaration = {
+            "reasoning_levels": list(reasoning_levels),
+            "default_reasoning_level": default_reasoning_level,
+            "reasoning_mode": reasoning_mode,
+        }
     facade.store_document({
         "providers": [{
             "id": "go", "name": "Go", "protocol": protocol, "base_url": base_url,
@@ -274,14 +284,17 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
             "context_window": 32000, "max_output_tokens": 2048,
             "accepts_required_tool_call": accepts_required_tool_call,
             "capability_source": "preset-v1",
+            **declaration,
         }],
         "bindings": {},
     })
     return facade
 
 
-def bound_target(facade: ProviderFacade) -> FrozenTarget:
-    return facade.resolve_snapshot([{"key": "k", "provider_id": "go", "model_id": "m-go"}]).target("k")
+def bound_target(facade: ProviderFacade, requested_tier: str | None = None) -> FrozenTarget:
+    return facade.resolve_snapshot(
+        [{"key": "k", "provider_id": "go", "model_id": "m-go", "requested_tier": requested_tier}]
+    ).target("k")
 
 
 class HandleAdapter:

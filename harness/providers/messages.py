@@ -23,6 +23,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
+from .reasoning import messages_reasoning_params
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
@@ -348,6 +349,8 @@ def _messages_request_params(invocation: _MessagesInvocation, target: FrozenTarg
         # 要求调用工具时 tool_choice 为 {"type": "any"}；自动时不发送（#102）
         if invocation.provider_input.tool_choice == "required":
             params["tool_choice"] = {"type": "any"}
+    # 推理参数（#87）：adaptive 与 budget 两种方式按档位发送 thinking 与 output_config
+    params.update(messages_reasoning_params(target, invocation.provider_input.max_output_tokens))
     return params
 
 

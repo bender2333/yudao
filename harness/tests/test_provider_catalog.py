@@ -133,6 +133,104 @@ def test_providers_view_model_dict_carries_capability_source_and_tool_call_decla
     assert admission["admitted_model"] == "model-a"
 
 
+def test_reasoning_declaration_round_trips_and_reaches_the_call_target():
+    # 模型访问定义声明支持档位、默认档位与推理参数方式（#87）：随目录保存并重新读出，
+    # 解析出的调用目标带着三项声明
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    facade.store_document(document)
+    view_model = facade.providers_view()["models"][0]
+    assert view_model["reasoning_levels"] == ["low", "medium"]
+    assert view_model["default_reasoning_level"] == "low"
+    assert view_model["reasoning_mode"] == "effort"
+
+    reloaded = ProviderFacade()
+    reloaded.store_document(facade.to_document())
+    model = reloaded.providers_view()["models"][0]
+    assert model["reasoning_levels"] == ["low", "medium"]
+    assert model["default_reasoning_level"] == "low"
+    assert model["reasoning_mode"] == "effort"
+
+def test_reasoning_declaration_default_must_be_a_supported_level():
+    # 默认档位不属于支持档位时拒绝保存，错误指出字段位置（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low"]
+    document["models"][0]["default_reasoning_level"] = "high"
+    document["models"][0]["reasoning_mode"] = "effort"
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(document)
+    assert any(issue.location == "models[0].default_reasoning_level" for issue in caught.value.issues)
+
+def test_reasoning_declaration_mode_must_match_the_connection_protocol():
+    # 推理参数方式与连接协议不相符时拒绝保存，错误指出字段位置（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "adaptive"
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(document)
+    assert any(issue.location == "models[0].reasoning_mode" for issue in caught.value.issues)
+
+def test_reasoning_declaration_requires_all_three_parts():
+    # 三项一起声明：只给支持档位时指出缺默认档位与推理参数方式（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low"]
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(document)
+    locations = {issue.location for issue in caught.value.issues}
+    assert "models[0].default_reasoning_level" in locations
+    assert "models[0].reasoning_mode" in locations
+
+def test_reasoning_declaration_rejects_unknown_levels():
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "ultra"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    with pytest.raises(CatalogValidationError) as caught:
+        ProviderFacade().store_document(document)
+    assert any(issue.location == "models[0].reasoning_levels" for issue in caught.value.issues)
+
+def test_changing_reasoning_mode_invalidates_admission_but_levels_do_not():
+    # 修改推理参数方式使该定义回到候选；修改支持档位与默认档位保持准入（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
+    facade.store_document(document)
+    admit_bound_models(facade, document)
+    assert facade.model_admissions()[0]["admitted"] is True
+
+    kept = _document()
+    kept["models"][0]["reasoning_levels"] = ["low", "medium", "high"]
+    kept["models"][0]["default_reasoning_level"] = "medium"
+    kept["models"][0]["reasoning_mode"] = "effort"
+    facade.store_document(kept)
+    admission = next(item for item in facade.model_admissions() if item["model_id"] == "model-a")
+    assert admission["admitted"] is True
+    assert admission["stale"] is False
+
+def test_department_default_requested_tier_must_be_a_supported_level():
+    # 部门默认保存的请求档位必须属于所选定义的支持档位（#87）
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    document["bindings"]["product"]["requested_tier"] = "high"
+    facade = ProviderFacade()
+    with pytest.raises(CatalogValidationError) as caught:
+        facade.store_document(document)
+    assert any(issue.location == "bindings.product.requested_tier" for issue in caught.value.issues)
+
+    document["bindings"]["product"]["requested_tier"] = "medium"
+    facade = ProviderFacade()
+    facade.store_document(document)
+    facade.set_credential_override("credential-a", "secret-a")
+    assert facade.resolve_department_default("product").public["requested_tier"] == "medium"
+
 def test_provider_config_requires_a_protocol():
     # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
     document = _document()

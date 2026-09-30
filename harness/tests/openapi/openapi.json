@@ -3503,6 +3503,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -3655,6 +3666,35 @@
               }
             ],
             "title": "Sent Tier"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -3675,7 +3715,10 @@
           "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
-          "sent_tier"
+          "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CallTarget"
       },
@@ -3913,6 +3956,17 @@
           "model_id": {
             "type": "string",
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -4266,6 +4320,28 @@
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -4277,7 +4353,10 @@
           "context_window",
           "max_output_tokens",
           "capability_source",
-          "accepts_required_tool_call"
+          "accepts_required_tool_call",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CatalogModel"
       },
@@ -5316,6 +5395,30 @@
             "title": "Accepts Required Tool Call",
             "default": true
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
+          },
           "provider_id": {
             "type": "string",
             "minLength": 1,
@@ -5775,6 +5878,30 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -10703,6 +10830,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -10845,6 +11001,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -11210,6 +11369,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -11455,6 +11643,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -15334,6 +15525,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -15609,6 +15829,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -15932,6 +16155,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16180,6 +16432,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16498,6 +16753,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16651,6 +16935,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16957,6 +17244,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -17108,6 +17424,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -17415,6 +17734,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -17593,6 +17941,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -17904,6 +18255,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -18067,6 +18447,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -22929,6 +23312,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -23091,6 +23503,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -23544,6 +23959,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -23684,6 +24128,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -24463,6 +24910,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -24605,6 +25081,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",

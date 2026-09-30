@@ -29,6 +29,10 @@ REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
     "adaptive": frozenset({"messages"}),
     "budget": frozenset({"messages"}),
 })
+# 预算方式各档位的思考预算，单位 token（设计说明第 7.4 节）
+REASONING_BUDGET_TOKENS: Mapping[str, int] = MappingProxyType({
+    "minimal": 1024, "low": 4096, "medium": 8192, "high": 16384, "xhigh": 32768, "max": 32768,
+})
 
 
 # Provider 配置：一份服务连接，声明一种协议（ADR-0004）；地址保存该协议的请求基址
@@ -508,9 +512,14 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         return None, issues
     levels = raw.get("reasoning_levels", ())
     if isinstance(levels, list) and all(isinstance(item, str) for item in levels):
-        # 支持档位去重后按全集由低到高保存；取值本身由形状校验核对
-        seen = set(levels)
-        levels = tuple(level for level in REASONING_LEVELS if level in seen)
+        # 支持档位去重，已知档位按全集由低到高排列，未知取值保留在末尾供形状校验指出（工单 #87）
+        seen: list[str] = []
+        for level in levels:
+            if level not in seen:
+                seen.append(level)
+        known = [level for level in REASONING_LEVELS if level in seen]
+        unknown = [level for level in seen if level not in REASONING_LEVELS]
+        levels = tuple(known + unknown)
     default_level = raw.get("default_reasoning_level")
     if isinstance(default_level, str):
         default_level = default_level.strip() or None
