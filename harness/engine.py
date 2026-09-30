@@ -197,8 +197,9 @@ class StepDriver:
             self._recorder.close()
 
     def _begin_call(self, requested_tier: str | None = None) -> Stopped | None:
-        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标；给出请求档位时按它解析，
-        # 实际发送的档位由 Provider 按模型声明限制。失败时不发送请求，交回待恢复的停止结果
+        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标。没有给出请求档位时用部门默认
+        # 保存的档位；给出时以它为准（整理请求传「minimal」）。实际发送的档位由 Provider 按模型
+        # 声明限制。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
         if self._facade is None:
             raise ProviderError("model calls require the provider facade", reason="provider_error")
@@ -433,7 +434,8 @@ class StepDriver:
                  replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
-        # 新的逻辑调用先按部门默认保存的请求档位解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
+        # 新的逻辑调用按部门默认解析（Provider 在同一把锁内读取包含请求档位的部门默认，
+        # 并按当前模型声明的支持档位限制）；重试沿用该逻辑调用已经解析的目标与句柄
         scope = self._scope
         if retry_of_step_id is None:
             unavailable = self._begin_call()
