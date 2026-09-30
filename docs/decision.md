@@ -386,3 +386,27 @@
   - 修改的设计说明：执行环境服务、浏览器与 computer use、评测场景、本地通用工具、接入已有项目、总体架构、系统架构原理、应用层与接口层、设计索引。
   - 修改的需求记录与计划：`CONTEXT.md`、D29、D31、D32、D34、D35、需求概览、Stage 3 计划、路线图、当前验收基线。
   - 工单：#131 关闭；#120、#145、#148 修改标题；暂停的工单去掉容器的内容以后恢复派发，#150、#155 继续暂停；#68、#69、#148 的阻塞改为 #128，#151 不再等待 #150，#192 去掉 #140、#142 的阻塞；#192、#194、#195、#198 移到 M2；里程碑 M3 改名为「远程执行、外部工具、多项目并行」。
+
+## 2026-10-01 - 桌面客户端的打包、安装与发布
+
+- 背景：用户 2026-09-30 要求「M1 试用时客户端怎样安装？这部分需要单独 grill 讨论，涉及到打包和安装」。2026-10-01 在 Stage 3 待讨论的专题中选择专题 5，用 grill 讨论三轮，每轮回答「采纳建议」或「采纳推荐」。
+- 决策（[ADR-0023](adr/0023-client-installed-apart-release-is-one-wheel.md)，[设计说明](design/client-packaging-and-release.md)第 10 节）：
+  1. 控制主机上的 Yudao 服务与桌面客户端分开安装：服务用 `uv tool install` 安装成 `yudao` 命令，客户端用 Windows 安装程序，出自同一个发布；客户端只做 Windows x64。
+  2. 退出客户端不停止 Yudao 服务；客户端只在本机的服务没有运行时启动它，启动为独立的后台进程；托盘有「停止 Yudao」，用本机访问方式下的专用请求停止。
+  3. 客户端的版本跟随 Yudao 服务：接口版本不同时显示更新页，从 Yudao 服务一键更新。使用 electron-builder 26 系列与 electron-updater 的 generic 提供方，开启 `allowDowngrade`。
+  4. 一次发布就是一个 wheel，其中包含客户端安装程序、更新清单与执行代理的安装包（约 130 MB）；执行代理的安装包改为发布时构建，不在运行时生成。
+  5. 不签名，列为 TODO，与认证和 TLS 一样在离开局域网或分发给他人之前加入。
+  6. 数据目录默认在用户数据目录（Windows `%LOCALAPPDATA%\Yudao`），Provider 目录文件与 `.env` 在其中；M1 试用从空的数据目录开始，开发时 `.yudao/` 下的数据不迁移。
+  7. 每个试用里程碑交给用户之前发布一次，版本号按里程碑递增（Stage 3 为 0.1.0 至 0.4.0，试用中修好的问题发布修订版本）；发布脚本由执行者编写，架构师在自己的 Windows 电脑上本机构建，打标签并把 wheel 上传到私有仓库的 Release 作为备份；`CLAUDE.md` 工作流程第 7 步加入发布。
+  8. 架构师按试用指南走一遍时使用单独的数据目录、端口与未安装的客户端，不动用户已经安装的那一份。
+  9. 控制主机上运行的程序叫「Yudao 服务」，不再称「后端」。
+- 核对的事实：
+  - 每个数据目录一个服务进程的文件锁（`service.lock`）已经存在。
+  - 命令行的默认数据目录、Provider 目录文件与 `.env` 都是相对于当前目录的 `.yudao/`，安装成独立命令以后改为数据目录内。
+  - 这台电脑上，`curl.exe` 与 `Invoke-WebRequest` 下载的文件没有「来自网络」标记；electron-updater 6.8.9 的代码不读写这个标记，安装与更新的路径都不出现 SmartScreen 警告。调研见 [docs/research/client-packaging-and-update.md](research/client-packaging-and-update.md)。
+  - OpenCode 桌面版从 v1.15.0（2026-05）起只保留 Electron，使用 electron-builder 与 electron-updater。
+- 遗留：局域网访问方式怎样启用（给开发板提供安装包要求 Yudao 服务以局域网访问方式运行，而客户端自动启动的服务默认是本机访问方式），M3 试用之前确定。
+- 影响：
+  - 新增 ADR-0023 与设计说明 `docs/design/client-packaging-and-release.md`，调研 `docs/research/client-packaging-and-update.md`。
+  - 修改的设计说明：应用层与接口层（第 6.1、6.2、8、10 节，`system.status`，`agent.package`）、执行环境服务（第 5.3.2 节）、设计索引；需求记录 D30、需求概览第 6 节、Stage 3 计划第 3、9 节；`CONTEXT.md` 加入「Yudao 服务」「桌面客户端」「发布」；`CLAUDE.md` 工作流程第 7 步。
+  - 工单：新增 M1 的四张工单（Yudao 服务的命令行入口与更新源、客户端的本机服务管理与托盘、安装包与更新页、发布脚本）；#79、#144、#183 修改正文。

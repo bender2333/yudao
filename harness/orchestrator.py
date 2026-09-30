@@ -34,7 +34,7 @@ from .deltas import DeltaChannel
 from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
-from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
+from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
@@ -770,7 +770,12 @@ class Orchestrator:
         # 或有事项正在开始（run 还没有创建）时算作占用执行槽位
         if self._tasks or self._work_item_tasks or self._running or self._active:
             return True
-        return bool(getattr(self.projects, "starting", lambda: False)())
+        if getattr(self.projects, "starting", lambda: False)():
+            return True
+        # 任务表是进程内的瞬时状态：run 停在等待回答的决定请求上时执行任务已经结束、表中不再有它，
+        # 事项却仍是进行中的（回答以后接着执行）。执行槽位是否被占用以事件日志为准：有未结束的 run 就被占用
+        unfinished = classify_startup_runs(self.store)
+        return bool(unfinished.same_version or unfinished.other_version)
 
     def start_work_item(self, run_id: str) -> asyncio.Task[ProjectEvent | None]:
         # 在接口进程的事件循环中把事项的 run 作为任务运行；run 结束以后由流程编排结算（采纳）。

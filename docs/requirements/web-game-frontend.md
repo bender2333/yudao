@@ -27,6 +27,7 @@
 - v6 的「资料与依据」改为按事项只读查看资料。
 - 实现顺序：先写界面与 UI 的技术设计与需求文档，再按技术文档拆分任务、建立工单。
 - 2026-09-26 用户决定（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）：客户端是桌面程序，外壳使用 Electron，界面使用 React 19、TypeScript、Vite、PixiJS 8、XState 5 与 GSAP；后端不提供界面文件，客户端按地址连接本机或远端的部署。接口层使用 FastAPI，OpenAPI 由 pydantic 类型生成：命令带身份与基准版本，返回接受或拒绝；查询返回快照与它对应的全局位置；一条可以按范围筛选的事件流（SSE）带全局位置，断线后按位置补齐，发现缺口时重新同步快照；能力清单列出当前部署提供的查询、命令与覆盖层；从本机以外访问需要认证。界面的端到端测试用 Playwright 启动 Electron 应用。
+- 2026-10-01 用户逐轮采纳推荐（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[桌面客户端的安装、更新与发布设计说明](../design/client-packaging-and-release.md)第 10 节）：桌面客户端与 Yudao 服务分开安装，客户端用 Windows 安装程序（只做 Windows x64），Yudao 服务用 `uv tool install` 安装成 `yudao` 命令，两者出自同一个发布；退出客户端不停止 Yudao 服务，客户端只在本机的服务没有运行时启动它，托盘有「停止 Yudao」；客户端的版本跟随它连接的 Yudao 服务，接口版本不同时显示更新页，从 Yudao 服务一键更新；不签名，列为 TODO；每个试用里程碑交给用户之前发布一次，版本号按里程碑递增（Stage 3 为 0.1.0 至 0.4.0）。
 
 ## 长时间运行以后的界面
 
@@ -74,4 +75,4 @@
 
 ## 实现状态
 
-未实施。原型 v7 已完成（`docs/prototypes/v7/`）；原型 v8 已制作（`docs/prototypes/v8/`），待用户审阅；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)。路线位置：Stage 3 的界面工作线。
+未实施。原型 v7 已完成（`docs/prototypes/v7/`）；原型 v8 已制作（`docs/prototypes/v8/`），待用户审阅；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)，安装、更新与发布见[桌面客户端的安装、更新与发布设计说明](../design/client-packaging-and-release.md)。路线位置：Stage 3 的界面工作线。

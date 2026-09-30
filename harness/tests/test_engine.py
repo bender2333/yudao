@@ -242,7 +242,7 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     system.activate_once(run_id)
     system.activate_once(run_id)
     # A fresh controller restores history from persisted events, not in-memory provider state.
-    reloaded = LoopSystem.for_testing(tmp_path, adapter)
+    reloaded = LoopSystem.for_testing(tmp_path, adapter, resume_on_startup=False)
     result = reloaded.run_until_stop(run_id)
     assert result.phase == "DONE", result.error
     resumed_product = adapter.invocations[2]
