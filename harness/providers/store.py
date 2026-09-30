@@ -66,6 +66,8 @@ class ModelDefinition:
     context_window: int | None
     max_output_tokens: int
     capability_source: str = ""
+    # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
+    accepts_required_tool_call: bool = True
 
     def __post_init__(self) -> None:
         for name in ("id", "provider_id", "model", "capability_source"):
@@ -80,6 +82,7 @@ class ModelDefinition:
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
+            "accepts_required_tool_call": self.accepts_required_tool_call,
         }
 
 
@@ -283,6 +286,7 @@ class ProviderStore:
         self.updated_at = _utc_now()
         return self.revision
 
+
     def persist(self, path: str | Path) -> Path:
         # 校验成功后写临时文件再原子替换，落盘成功才返回
         self._validate_definition_shape()
@@ -362,6 +366,8 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.max_output_tokens", "不能超过 context_window"))
             if not isinstance(model.capability_source, str):
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
+            if not isinstance(model.accepts_required_tool_call, bool):
+                issues.append(ValidationIssue(f"{location}.accepts_required_tool_call", "必须为 true 或 false"))
         if issues:
             raise CatalogValidationError(issues)
 
@@ -423,7 +429,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     # 其余未知字段（含准入字段）按未知字段处理（工单 #86）
     allowed = {
         "id", "provider_id", "model", "context_window", "max_output_tokens",
-        "capability_source", "protocol",
+        "capability_source", "accepts_required_tool_call", "protocol",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
@@ -439,6 +445,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
         context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
+        accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
     ), issues
 
 

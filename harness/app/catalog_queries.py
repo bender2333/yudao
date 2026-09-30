@@ -30,6 +30,7 @@ class CatalogModel(Contract):
     context_window: int | None
     max_output_tokens: int
     capability_source: str
+    accepts_required_tool_call: bool
 
 
 class CatalogAdmission(Contract):

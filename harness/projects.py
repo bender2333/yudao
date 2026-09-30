@@ -37,6 +37,7 @@ from .projection import RunNotFoundError, project_run, saved_project
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
+from .streams import PRIORITY_UPGRADE_RESTART, PRIORITY_USER
 from .tree_archive import load_tree
 
 TITLE_LIMIT = 40
@@ -453,7 +454,8 @@ class ProjectService:
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
                            title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
                            baseline: dict[str, Any] | None, initial_tree: Any, snapshot: dict[str, Any] | None,
-                           source_run: Any, work_item_id: str, run_id: str) -> _NewWorkItem:
+                           source_run: Any, work_item_id: str, run_id: str,
+                           priority: str = PRIORITY_USER) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
@@ -471,6 +473,8 @@ class ProjectService:
             "command_versions": command_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
             "definitions_version": DEFINITIONS.version,
+            # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
+            "priority": priority,
         }))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
@@ -502,6 +506,89 @@ class ProjectService:
         finally:
             self._starting[project_id].discard(token)
         return item.work_item_id, item.run_id
+
+    def restart_work_item_for_upgrade(self, run_id: str, *, command: Command | None = None) -> tuple[str, str] | None:
+        # 因升级重新开始（ADR-0019，工单 #126）：run 事件版本与当前不同的未结束 run 由流程编排记为因升级停止，
+        # 这里在项目流上以项目当前的采纳成果为基线为同一个事项登记新的 run，并记下「因升级重新开始」的优先级。
+        # 没有对应的事项时为空；项目还没有采纳成果时新 run 没有基线
+        try:
+            run = project_run(self.store, run_id)
+        except RunNotFoundError:
+            return None
+        if run.project_id is None or run.work_item_id is None:
+            return None
+
+        def restart(transaction: Transaction) -> _NewWorkItem | None:
+            project = _default_prompts(deepcopy(self._writable_in(transaction, run.project_id)))
+            item = project.work_item_for_run(run_id)
+            if item is None:
+                return None
+            baseline, initial_tree, source_run = None, None, None
+            adoption = project.current_adoption
+            if adoption is not None:
+                source = project_run(self.store, adoption.run_id)
+                if source.project_id != run.project_id:
+                    raise ValueError("source run does not belong to this project")
+                baseline = {
+                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
+                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
+                    "code_tree_digest": adoption.code_tree_digest,
+                }
+                initial_tree = load_tree(self.artifacts, adoption.run_id, ArtifactRef(**adoption.tree_ref))
+                if initial_tree.digest != adoption.code_tree_digest:
+                    raise ValueError("archived tree does not match the adopted deliverable digest")
+                source_run = source
+            return self._work_item_created(
+                transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
+                run_time_limit_sec=item.run_time_limit_sec, context_window=item.context_window,
+                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+                work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
+            )
+
+        created = self.writes.transact(project_stream(run.project_id), restart, command=command)
+        if created is None:
+            return None
+        try:
+            self.orchestrator.create_run(created.text, run_id=created.run_id, **created.run_options)
+        except Exception as exc:
+            self.writes.append(project_stream(run.project_id), NewProjectEvent(
+                ProjectEventType.WORK_ITEM_START_FAILED,
+                {"work_item_id": created.work_item_id, "run_id": created.run_id,
+                 "error": str(exc) or type(exc).__name__},
+            ))
+            raise
+        return created.work_item_id, created.run_id
+
+    def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
+                        command: Command | None = None) -> str:
+        # 排空期间新建的事项（3.1，ADR-0019）：在项目流按通常方式登记事项，但不创建它的 run，也不开始执行。
+        # run 流为空，事项的状态因此是「还没有开始」；它排在队列里等升级完成以后开始（调度由 3.4A 的 #19 实现）
+        _require_text("text", text)
+        _require_title(title)
+        self._writable(project_id)
+        work_item_id, run_id = new_id("wi"), new_id("run")
+
+        def queue(transaction: Transaction) -> str:
+            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            source_run = None
+            baseline, initial_tree = None, None
+            adoption = project.current_adoption
+            if adoption is not None:
+                source_run = project_run(self.store, adoption.run_id)
+                baseline = {
+                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
+                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
+                    "code_tree_digest": adoption.code_tree_digest,
+                }
+            self._work_item_created(
+                transaction, project, text, title=title, max_cycles=DEFINITIONS.limits.max_cycles,
+                run_time_limit_sec=DEFINITIONS.limits.run_time_limit_sec, context_window=32_000,
+                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+                work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
+            )
+            return work_item_id
+
+        return self.writes.transact(project_stream(project_id), queue, command=command)
 
     # 结算
 

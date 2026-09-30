@@ -1,4 +1,5 @@
 import json
+import uuid
 
 import pytest
 
@@ -64,14 +65,14 @@ def test_connection_save_requires_per_row_capacity_confirmation(tmp_path):
     from harness.app.catalog_commands import CatalogConnectionSave
 
     unconfirmed = CatalogConnectionSave.model_validate({
-        "base_version": 1, "provider": _provider(),
+        "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
         "models": [{"id": "m1", "model": "model-x", "context_window": 32000,
                     "max_output_tokens": 2048}],
     })
     assert unconfirmed.models[0].capacity_confirmed is False
 
     confirmed = CatalogConnectionSave.model_validate({
-        "base_version": 1, "provider": _provider(),
+        "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
         "models": [{"id": "m1", "model": "model-x", "context_window": 32000,
                     "max_output_tokens": 2048, "capacity_confirmed": True}],
     })

@@ -70,6 +70,7 @@
     "prompt_config_versions": {},
     "provider": "directory",
     "registered_commands": {},
+    "run_event_version": 1,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -179,6 +180,7 @@
     "<sha256#6>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
@@ -350,6 +352,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
@@ -388,7 +391,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -408,6 +412,7 @@
     "<sha256#21>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
@@ -539,6 +544,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#1>",
     "base_url": "<provider>/v1",
@@ -595,6 +601,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -650,6 +657,7 @@
     "<sha256#23>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -787,6 +795,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "args": {
      "acceptance_criteria": [
@@ -1093,6 +1102,7 @@
     "<sha256#30>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "admitted": true,
     "attempt": 1,
@@ -1270,6 +1280,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
@@ -1308,7 +1319,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -1328,6 +1340,7 @@
     "<sha256#42>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
@@ -1459,6 +1472,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#2>",
     "base_url": "<provider>/v1",
@@ -1515,6 +1529,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -1570,6 +1585,7 @@
     "<sha256#44>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -1702,6 +1718,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "args": {
      "assumptions": [],
@@ -1945,6 +1962,7 @@
     "<sha256#49>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "admitted": true,
     "attempt": 1,
@@ -2128,6 +2146,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
@@ -2166,7 +2185,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -2186,6 +2206,7 @@
     "<sha256#54>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
@@ -2317,6 +2338,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#3>",
     "base_url": "<provider>/v1",
@@ -2373,6 +2395,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -2425,6 +2448,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -2477,6 +2501,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -2532,6 +2557,7 @@
     "<sha256#56>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -2650,6 +2676,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
@@ -2753,6 +2780,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "args": {
      "argv": [
@@ -2862,6 +2890,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "args": {
      "check_names": [
@@ -3143,6 +3172,7 @@
     "<sha256#64>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "admitted": true,
     "attempt": 1,
@@ -3229,6 +3259,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
@@ -3267,7 +3298,8 @@
     "selection_source": "department_default",
     "sent_tier": null,
     "started_at": "<time>",
-    "step_id": 1
+    "step_id": 1,
+    "tool_choice": "auto"
    }
   },
   {
@@ -3287,6 +3319,7 @@
     "<sha256#74>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
@@ -3418,6 +3451,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "accounting": "activation_total_with_charge_delta",
     "activation_id": "<act#4>",
     "base_url": "<provider>/v1",
@@ -3474,6 +3508,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -3526,6 +3561,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "base_url": "<provider>/v1",
@@ -3581,6 +3617,7 @@
     "<sha256#76>"
    ],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -3703,6 +3740,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "args": {
      "argv": [
@@ -3810,6 +3848,7 @@
    "error": null,
    "artifact_hashes": [],
    "payload": {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "args": {
      "checks": [
@@ -4098,6 +4137,7 @@
   ],
   "department_call_targets": {
    "engineering": {
+    "accepts_required_tool_call": true,
     "base_url": "<provider>/v1",
     "configured_max_output_tokens": 2048,
     "context_window": 32000,
@@ -4115,6 +4155,7 @@
     "sent_tier": null
    },
    "product": {
+    "accepts_required_tool_call": true,
     "base_url": "<provider>/v1",
     "configured_max_output_tokens": 2048,
     "context_window": 32000,
@@ -4132,6 +4173,7 @@
     "sent_tier": null
    },
    "quality": {
+    "accepts_required_tool_call": true,
     "base_url": "<provider>/v1",
     "configured_max_output_tokens": 2048,
     "context_window": 32000,
@@ -4858,6 +4900,7 @@
   "model": "scenario-model-actual",
   "model_requests": [
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -4925,6 +4968,7 @@
     }
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#2>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -4992,6 +5036,7 @@
     }
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -5059,6 +5104,7 @@
     }
    },
    {
+    "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
     "actual_model": "scenario-model-actual",
     "actual_provider": "local",
@@ -5271,6 +5317,7 @@
    }
   ],
   "rework_count": 0,
+  "run_event_version": 1,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {
@@ -7209,7 +7256,6 @@
    "stream_options": {
     "include_usage": true
    },
-   "tool_choice": "auto",
    "tools": "<shared#12>"
   },
   "<shared#12>": [
@@ -7946,7 +7992,6 @@
    "stream_options": {
     "include_usage": true
    },
-   "tool_choice": "auto",
    "tools": "<shared#33>"
   },
   "<shared#33>": [
@@ -8459,7 +8504,6 @@
    "stream_options": {
     "include_usage": true
    },
-   "tool_choice": "auto",
    "tools": "<shared#33>"
   },
   "<shared#42>": [
@@ -8508,7 +8552,6 @@
    "stream_options": {
     "include_usage": true
    },
-   "tool_choice": "auto",
    "tools": "<shared#49>"
   },
   "<shared#49>": [

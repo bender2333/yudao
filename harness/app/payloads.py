@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
 from ..models import DEPARTMENTS, PHASES, CatalogEventType, EventType, ProjectEventType
+from ..streams import PRIORITY_USER
 
 Department = Literal[DEPARTMENTS]
 Phase = Literal[PHASES]
@@ -178,6 +179,8 @@ class CallTarget(Payload):
     credential_version: str | None
     context_window: int | None
     configured_max_output_tokens: int | None
+    # 模型访问定义声明的是否接受要求调用工具；模型尚未解析时为空
+    accepts_required_tool_call: bool | None
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
@@ -255,6 +258,8 @@ class RunCreatedPayload(Payload):
     command_versions: dict[str, int]
     # 事项所用定义的版本（全部定义文件内容的摘要）
     definitions_version: str
+    # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
+    run_event_version: int
 
 
 class UserInputReceivedPayload(InputRecord):
@@ -411,6 +416,8 @@ class ModelRequestedPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     purpose: Purpose
     effective_context_window: int
     max_output_tokens: int | None
+    # 是否要求调用工具：最后一次主机提示之后的工作请求为 required；声明不接受时为 auto（#102）
+    tool_choice: Literal["auto", "required"]
     definitions_version: str
 
 
@@ -900,6 +907,8 @@ class WorkItemCreatedPayload(Payload):
     run_time_limit_sec: int
     context_window: int
     definitions_version: str
+    # 事项在队列中的优先级：因升级重新开始的事项排在最前面；旧事件没有这个字段时按用户新要求处理（ADR-0019）
+    priority: str = PRIORITY_USER
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -1011,6 +1020,17 @@ class CredentialChangedPayload(Payload):
     version: int
     persisted: bool
 
+class RuntimeDrainStartedPayload(Payload):
+    # 开始排空：排空状态的版本与开始排空时还没有结束的 run
+    version: int
+    running_runs: int
+
+class RuntimeForceUpgradeRequestedPayload(Payload):
+    # 强制升级：排空状态的版本、因升级停止的 run 与用采纳成果重新开始的事项
+    version: int
+    stopped_runs: list[str]
+    restarted_work_items: list[str]
+
 
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
@@ -1074,4 +1094,6 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
+    CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
+    CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
 }

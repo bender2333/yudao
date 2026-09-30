@@ -10,12 +10,16 @@ from .artifacts import ArtifactStore
 from .engine import StepLimits
 from .environment import LocalEnvironment
 from .event_store import EventStore, catalog_stream
-from .models import CatalogEventType
+from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
-from .projection import RunProjection, project_run
+from .projection import RunNotFoundError, RunProjection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
+from .streams import (
+    DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED, RUN_EVENT_VERSION,
+    STOP_REASON_UPGRADE, DrainState, classify_startup_runs,
+)
 from .replay_check import verify_replay
 from .workspace import Workspace
 
@@ -85,8 +89,85 @@ class LoopSystem:
         self.orchestrator.projects = self.projects
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
+        # 启动时核对 run 事件版本（ADR-0019，工单 #126）：版本相同的未结束 run 交给 #16 自动继续，这里不动它们；
+        # 版本不同（含旧事件没有记录版本）的未结束 run 记为因升级停止，对应的事项用采纳成果重新开始
+        self.startup_runs = classify_startup_runs(self.store)
+        for run_id in self.startup_runs.other_version:
+            self.upgrade_run(run_id)
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
+
+    def upgrade_run(self, run_id: str) -> tuple[str, str] | None:
+        # 按强制升级处理一个未结束的 run：记为因升级停止，再用项目当前的采纳成果为它所属的事项开始新的 run。
+        # 已经结束的 run 不停止；没有对应事项的 run 只停止，不重新开始
+        projection = self.orchestrator.stop_for_upgrade(
+            run_id, reason=f"recorded version differs from {RUN_EVENT_VERSION}")
+        if projection.phase == "FAILED" and projection.stop_reason == STOP_REASON_UPGRADE:
+            return self.projects.restart_work_item_for_upgrade(run_id)
+
+    # 排空与强制升级（应用层与接口层设计说明第 3.2 节「升级」，ADR-0019）
+
+    @property
+    def drain(self) -> DrainState:
+        # 排空状态：未排空、排空中（还有 run 在进行）、已排空可以升级；正在进行的 run 数与期间排队的事项数
+        unfinished = classify_startup_runs(self.store)
+        running = len(unfinished.same_version) + len(unfinished.other_version)
+        version = self._drain_version()
+        if version is None:
+            return DrainState(state=DRAIN_IDLE, version=0, running_runs=running)
+        state = DRAIN_READY if running == 0 else DRAIN_DRAINING
+        return DrainState(state=state, version=version, running_runs=running,
+                          queued_work_items=len(self._queued_work_items()))
+
+    def _drain_version(self) -> int | None:
+        # 目录流中最后一条开始排空的事件给出的排空状态版本；没有开始排空时为空
+        started = [event for event in self.store.stream_events(catalog_stream()) if event.type == DRAIN_STARTED]
+        return None if not started else int(started[-1].payload["version"])
+
+    def _queued_work_items(self) -> list[str]:
+        # 排空期间新建、还没有开始的事项：事项已登记而它的 run 流还没有任何事件
+        queued = []
+        for project_id in self.store.list_project_ids():
+            for item in self.projects.projection(project_id).work_items:
+                try:
+                    project_run(self.store, item.run_id)
+                except RunNotFoundError:
+                    queued.append(item.work_item_id)
+        return queued
+
+    def start_drain(self, *, command: Command | None = None) -> DrainState:
+        # 开始排空：记下这一刻还没有结束的 run 数，之后新建的事项排队不开始
+        version = (self._drain_version() or 0) + 1
+        unfinished = classify_startup_runs(self.store)
+        running = len(unfinished.same_version) + len(unfinished.other_version)
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(
+                DRAIN_STARTED, {"version": version, "running_runs": running}, actor="system"))
+
+        self.writes.transact(catalog_stream(), decide, command=command)
+        return self.drain
+
+    def force_upgrade(self, *, command: Command | None = None) -> DrainState:
+        # 强制升级：正在进行的 run 记为因升级停止，对应的事项用已采纳成果重新开始，
+        # 并记下「因升级重新开始」的优先级；只在排空期间可用，由应用层的命令核对
+        unfinished = classify_startup_runs(self.store)
+        stopped, restarted = [], []
+        for run_id in (*unfinished.same_version, *unfinished.other_version):
+            self.orchestrator.stop_for_upgrade(run_id, reason="force upgrade")
+            stopped.append(run_id)
+            started = self.projects.restart_work_item_for_upgrade(run_id)
+            if started is not None:
+                restarted.append(started[0])
+        version = self._drain_version() or 0
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(
+                FORCE_UPGRADE_REQUESTED,
+                {"version": version, "stopped_runs": stopped, "restarted_work_items": restarted}, actor="system"))
+
+        self.writes.transact(catalog_stream(), decide, command=command)
+        return self.drain
 
     def sync_catalog_revision(self, *, operation: str = "reload") -> int | None:
         # 目录修订号与最后一条 catalog_revised 不同就补写一条；相同或已补写过时什么也不写

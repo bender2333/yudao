@@ -22,6 +22,7 @@ PUBLIC_FIELDS = {
     "credential_version",
     "context_window",
     "configured_max_output_tokens",
+    "accepts_required_tool_call",
     "requested_tier",
     "sent_tier",
 }
@@ -86,6 +87,7 @@ def test_resolved_public_result_has_no_secret():
         "credential_version": "override",
         "context_window": 32000,
         "configured_max_output_tokens": 4096,
+        "accepts_required_tool_call": True,
         "requested_tier": None,
         "sent_tier": None,
     }

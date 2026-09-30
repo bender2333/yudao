@@ -1249,6 +1249,33 @@ test("model test failure keeps the verifiable reason and filled fields", async (
   assert.equal(modelFormAfter._fields.find(field => field.name === "max_output_tokens").node.value, "2048");
 });
 
+test("model form edits the required tool call declaration and keeps it for the other models", async () => {
+  // 模型访问定义声明是否接受要求调用工具（#102）：勾选随表单读取与提交，默认为接受
+  const models = [catalogModel("m1", "luna"), catalogModel("m2", "nova", { accepts_required_tool_call: false })];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { table_version: "v1", presets: [] },
+    "/api/providers": catalogView({ models }),
+    "/api/providers/p1": catalogView({ models }),
+    "/api/department-bindings": { bindings: {} },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const checkbox = () => root.querySelector("[data-pc-form='model']")._fields
+    .find(field => field.name === "accepts_required_tool_call").node;
+  // 默认的模型是接受：勾选框选中
+  assert.equal(checkbox().checked, true);
+  // 打开声明不接受的模型：勾选框取消
+  await root.querySelector("[data-model-id='m2']").dispatch("click");
+  assert.equal(checkbox().checked, false);
+  // 保存：这一条为 false，另一条保持 true
+  await root.querySelector("[data-pc-form='model']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => String(url) === "/api/providers/p1" && options.method === "PUT");
+  const sent = JSON.parse(putCall[1].body).models;
+  assert.equal(sent.find(model => model.id === "m2").accepts_required_tool_call, false);
+  assert.equal(sent.find(model => model.id === "m1").accepts_required_tool_call, true);
+});
+
 test("binding options mark unadmitted models unavailable with the reason visible", async () => {
   const models = [catalogModel("m1", "luna"), catalogModel("m2", "nova")];
   const admissions = [catalogAdmission("m1", { admitted_model: "luna" })];
