@@ -305,3 +305,27 @@
 - 用户指定：被测模型 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），两边相同；界面智能体 `gh/gemini-3.8-flash`；裁判 `qdcn/qmodel_38max`。
 - 核对的事实：三个模型都能读出网页截图中的文字；这个服务的 `ag`、`gh`、`cc`、`cbcn` 线路只返回流式回复，评测工具与 Yudao 的 Provider 按流式请求；`gemini/` 线路上游返回 401（服务账号已停用），`ag/claude-sonnet-4-6` 线路不传图片。
 - 修改文件：`docs/design/evaluation-scenarios.md`（第 3、4.3、9 节）、`docs/requirements/comparison-experiment.md`。
+- 裁判 `qdcn/qmodel_38max` 是 Qwen3.8 Max，能看图。用户原话：「qdcn/qmodel_38max 是qwen3.8max，这个应该是能够正常支持图像的。」
+
+## 2026-09-30 - 真实 Provider 验收使用 9router；长期目标可以修改；暂停的 run 可以继续；#155 的文本模型
+
+- 背景：核查 Stage 3 需要用户澄清与确认的事项，架构师列出十项并附建议。
+- 用户原话：
+  - 「真实 Provider 验收都使用我们的9router，首选ag内的claude opus4.6吧」
+  - 「3.2B 网络取回与 MCP 的需求。等会使用grill一起讨论。项目的长期目标能修改，暂停的 run 能不能继续采纳建议。#155 需要一个只能输入文本的模型，去9router找一个模型，同意ag/gpt-oss-120b,M1 试用时客户端怎样安装? 这部分需要单独grill讨论，涉及到打包和安装。」
+- 决策：
+  - #96 用 9router 验收三种协议，地址与 Key 沿用用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`。首选 `ag/claude-opus-4-6-thinking`；推理内容的核对与回放用 `cbcn/deepseek-v4.1-flash`。
+  - #155 场景 3 只有文本输入的模型为 `ag/gpt-oss-120b-medium`。
+  - 项目的长期目标可以修改：修改写成项目流中的事件；之后开始的事项使用新目标，进行中的事项使用开始时的目标。
+  - 因为模型连续 4 次回复不调用工具（`no_tool_call`）或者工作区出现无法表示的条目（`workspace_unrepresentable`）而暂停的 run，发出决定请求，选项为「处理以后继续执行」与「停止事项」；继续时从原来的位置开始，已用的次数与时间不重新计算；前一种情况可以先更换部门的模型，从下一次请求起生效。
+  - 3.2B 网络取回与 MCP 的需求、M1 试用时客户端的打包与安装，各自单独用 grill 讨论。
+- 核对的事实：9router 的同一个地址提供三种协议。`ag/claude-opus-4-6-thinking` 三种协议都能正常回复，Messages 的工具往返完成，三种协议都不返回推理内容；`cbcn/deepseek-v4.1-flash` 三种协议都返回推理内容。ag 线路不把图片交给模型：带图与不带图的输入 token 数相同。
+- 影响：#96、#155 的正文已按此更新。长期目标与暂停以后继续两项要修改应用层与接口层设计说明、总体架构与 D09，修改内容先经用户确认，然后建立工单。
+
+## 2026-09-30 - 远程执行验收使用的开发板是 Orange Pi AIpro
+
+- 用户原话：「C:\Users\BA_H3C_Pad\Documents\Obsidian Vault\Obsidian\项目研究\Board\AIPRO，这里记录了我们的板子，不是树莓派是aiPRO.」
+- 开发板：Orange Pi AIpro（8T），昇腾 310B4，4 核 64 位 ARM（aarch64），8 GB 内存，128 GB SATA SSD（数据盘约 56 GB 可用），Ubuntu 22.04.5 LTS，系统自带 Python 3.10.12，有 systemd，经 WiFi 接入局域网。
+- 核对的事实：开发板与控制主机在同一个网段，SSH 端口可以连通；控制主机的 SSH 密钥还没有加到开发板上。
+- 决策：3.2C 远程执行代理的真实验收（#145）在这块开发板上进行，开发板已经到位。
+- 影响：计划、路线图、D29、执行环境服务设计说明与相关工单中的「树莓派」改为这块开发板，修改内容先经用户确认。执行代理要求 Python 3.11 以上，而开发板自带 3.10，安装方式随之调整。

@@ -280,3 +280,4 @@ claude-opus-5-5 / 2026-09-30 15:48 / docs/design/evaluation-scenarios.md 第 3 �
 claude-opus-5-5 / 2026-09-30 16:02 / docs/design/evaluation-scenarios.md 第 4.3 节、docs/requirements/comparison-experiment.md（原话与已确认的模型一条）、docs/decision.md「评测使用的模型」中的裁判改为 qdcn/qmodel_38max / 用户指定裁判改用 qdcn/qmodel_38max，经核对能读图
 claude-opus-5-5 / 2026-09-30 16:54 / docs/architecture-issues.md 中 #16 定义版本决定请求一条写入处理：写在 run 流，种类 definitions_changed，阻塞范围为 run / #16 审查通过并合并
 claude-opus-5-5 / 2026-09-30 17:47 / docs/architecture-issues.md 中 #75 两条写入处理：按角色筛选的索引与 read() 条件由 Stage 5 实施（#50 评论）；事件对象中历史事件的空提出者表示「写入时没有声明」，作为 actor 的缺省含义 / #75 审查通过并合并
+claude-opus-5-5 / 2026-09-30 18:31 / docs/decision.md「评测使用的模型」补充裁判是 Qwen3.8 Max；新增「真实 Provider 验收使用 9router；长期目标可以修改；暂停的 run 可以继续；#155 的文本模型」与「远程执行验收使用的开发板是 Orange Pi AIpro」两条 / 记录用户对 Stage 3 待澄清事项的答复与核对的事实
