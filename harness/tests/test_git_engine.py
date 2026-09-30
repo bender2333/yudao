@@ -165,7 +165,8 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     received = system.add_input(run_id, "Print uppercase")
     # 新输入交给产品工作（与激活开始时流程编排写入的事件相同），产品规格的修订才能接纳
     system.writes.append(run_stream(run_id), NewEvent(
-        EventType.PRODUCT_INPUT_ASSIGNED, role="product", state_before=received.phase, state_after="PRODUCT_SPEC",
+        EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
+        state_before=received.phase, state_after="PRODUCT_SPEC",
         payload={"through_version": received.input_version}))
     before = system.project(run_id)
     assert before.product_work_input_version == before.input_version == 2
@@ -233,7 +234,8 @@ def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
     run_id = system.create_run("build echo")
     before = system.project(run_id)
     system.writes.append(run_stream(run_id), NewEvent(
-        EventType.MODEL_MESSAGE, role="product", state_before=before.phase, state_after=before.phase,
+        EventType.MODEL_MESSAGE, actor="department:product", department="product",
+        state_before=before.phase, state_after=before.phase,
         payload={"git_version": {"commit": "unaccepted"}}))
     after = system.project(run_id)
     assert after.git_version == before.git_version and after.git_versions == before.git_versions

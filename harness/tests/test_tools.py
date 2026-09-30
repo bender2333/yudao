@@ -383,7 +383,7 @@ def test_departments_without_write_tools_cannot_change_files(tmp_path, departmen
     for identity, tool in (("write", "write_file"), ("edit", "edit_range"), ("delete", "delete_file"),
                            ("move", "move_file")):
         called = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == identity)
-        assert called.role == department
+        assert called.department == department
         assert not called.payload["ok"] and called.payload["error"] == f"{department} cannot use {tool}"
         assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == identity for event in events)
     assert workspace.read_file("src/echo.py") == before != "x"

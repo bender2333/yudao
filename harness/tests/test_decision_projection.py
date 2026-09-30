@@ -30,7 +30,7 @@ def _plain_replies(count: int = 8):
 
 def _requested(department: str = "product") -> NewEvent:
     return NewEvent(EventType.DECISION_REQUESTED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
-                    actor="system", role=department, payload={
+                    actor="system", department=department, payload={
                         "kind": "model_unavailable", "blocks": "run",
                         "options": [{"id": "continue", "label": "继续执行"}, {"id": "stop", "label": "停止事项"}],
                         "description": f"{department} 部门的模型无法使用：Missing configuration: provider credential",
@@ -41,7 +41,7 @@ def _requested(department: str = "product") -> NewEvent:
 
 def _answered(decision_id: str, option: str = "continue") -> NewEvent:
     return NewEvent(EventType.DECISION_ANSWERED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
-                    parent_event_id=decision_id,
+                    actor="user:local", parent_event_id=decision_id,
                     payload={"decision_id": decision_id, "option": option, "note": None, "base_version": 1})
 
 

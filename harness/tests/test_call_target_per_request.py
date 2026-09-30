@@ -238,7 +238,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         # 下一次逻辑调用（engineering）按新的部门默认解析
         system.activate_once(run_id)
         assert [item["model"] for item in capture_b.requests] == ["m-b-target"]
-        attempts = [(event.role, event.payload["provider_config_id"])
+        attempts = [(event.department, event.payload["provider_config_id"])
                     for event in system.store.list_events(run_id)
                     if event.type == EventType.MODEL_REQUESTED]
         assert attempts == [("product", "provider-a"), ("product", "provider-a"), ("engineering", "provider-b")]
@@ -297,7 +297,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
         assert [item["model"] for item in capture.requests] == ["m-local-target", "m-local-target"]
         plans = [event for event in system.store.list_events(run_id) if event.type == EventType.PLAN_ACCEPTED]
         assert len(plans) == 1
-        assert plans[0].role == "engineering"
+        assert plans[0].department == "engineering" and plans[0].actor == "department:engineering"
         # 待恢复的决定已关闭，已完成的工作与已用限额保留
         assert saved_decisions(system.store, statuses=("open",))[1] == []
     finally:

@@ -34,8 +34,8 @@ def _rebuild_recorded_steps(system, run_id):
         payload = event.payload
         if event.type == EventType.DEPARTMENT_ACTIVATED:
             frames[payload["activation_id"]] = StepFrame(
-                department=event.role, session_id=event.session_id, activation_id=payload["activation_id"],
-                prompt=projection.department_prompts[event.role], guidance_only=payload["guidance_only"],
+                department=event.department, session_id=event.session_id, activation_id=payload["activation_id"],
+                prompt=projection.department_prompts[event.department], guidance_only=payload["guidance_only"],
                 effective_contract_hash=payload["effective_contract_hash"],
                 engineering_plan_hash=payload["engineering_plan_hash"], input_version=payload["input_version"],
             )
@@ -44,7 +44,7 @@ def _rebuild_recorded_steps(system, run_id):
             limits = model_limits(payload["context_window"], payload["configured_max_output_tokens"])
             pinned = assembly.pin(projection, frames[payload["activation_id"]], limits,
                                   step_id=payload["step_id"], events=before, snapshot_hash=payload["snapshot_hash"])
-            step = assembly.request(pinned, assembly.department_history(before, event.role))
+            step = assembly.request(pinned, assembly.department_history(before, event.department))
             assert step.payload == artifact(payload["request_ref"])
             assert step.parts == artifact(payload["parts_ref"])
             assert step.context.manifest.digest == event.context_digest

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ..artifacts import ArtifactStore
 from ..decisions import DECISION_KINDS
+from ..deltas import DeltaPump
 from ..event_store import EventStore
 from ..git_versions import GitVersionStore
 from ..models import new_id, utc_now
@@ -35,6 +36,7 @@ from .commands import execute
 from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
+from .event_stream import EventScope, EventStream
 from .project_commands import PROJECT_CREATE
 from .project_and_work_item_commands import (
     COMMAND_REGISTRATION_SAVE,
@@ -51,7 +53,7 @@ from .project_and_work_item_commands import (
     WORK_ITEM_CREATE,
 )
 from .runtime_commands import RUNTIME_FORCE_UPGRADE, RUNTIME_START_DRAIN
-from .system_queries import SYSTEM_STATUS
+from .system_queries import ATTEMPT_LIVE, SYSTEM_STATUS
 from .project_queries import PROJECT_QUERIES
 from .read_models import ReadModels
 from .registry import Registry
@@ -92,7 +94,8 @@ DEFAULT_REGISTRY = Registry(
               CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT, CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE],
-    queries=[SYSTEM_STATUS, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY, CATALOG_DOCUMENT_QUERY],
+    queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY,
+             CATALOG_DOCUMENT_QUERY],
     decisions=tuple(DECISION_KINDS))
 
 
@@ -107,6 +110,12 @@ class Application:
         # 应用层保存的读取模型：调用尝试表与流转记录。可写打开时保存在数据目录里，只读打开时在内存中重建
         path = None if system.read_only else Path(system.data_dir) / "read-models.sqlite"
         self.read_models = ReadModels(system.store, system.artifacts, path)
+        # 输出片段通道的订阅方（第 5.6 节）：按 100 毫秒合并一次片段，转发给带 live=1 的连接，
+        # 并保存每个进行中调用尝试已收到的文字供 attempt.live 查询。只读打开没有通道，也没有片段。
+        # 订阅在应用层建立时登记：片段在调用进行中持续到达，客户端可能在调用开始以后才连上连接
+        self.deltas: DeltaPump | None = None if system.read_only else DeltaPump(channel=system.deltas)
+        if self.deltas is not None:
+            self.deltas.start()
         # 需要以后以事件出现结果的命令（获取模型列表与两种测试）作为任务运行
         self._tasks: set[asyncio.Task[Any]] = set()
 
@@ -125,6 +134,8 @@ class Application:
         return cls(ReadOnlyCore(data_dir))
 
     def close(self) -> None:
+        if self.deltas is not None:
+            self.deltas.stop()
         self.read_models.close()
         for task in list(self._tasks):
             task.cancel()
@@ -159,3 +170,15 @@ class Application:
             log_id=self.system.store.log_id, boot_id=self.boot_id, version=self.version,
             contract_digest=contract_digest, access=access,
         ))
+
+    def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
+        # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
+        # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
+        return EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
+                           pump=self.deltas, **options)
+
+    def live_attempt(self, attempt_id: str) -> dict[str, str]:
+        # 一个进行中调用尝试各通道已收到的文字（第 5.6 节）；没有进行中的尝试时为空
+        if self.deltas is None:
+            return {}
+        return self.deltas.live_text(attempt_id)

@@ -741,7 +741,7 @@ def test_source_run_from_another_project_cannot_be_baseline(data_dir):
         "code_tree_digest": adoption.code_tree_digest, "summary": adoption.summary,
         "files": list(adoption.files), "check_names": list(adoption.check_names),
         "known_risks": list(adoption.known_risks), "previous_adoption_id": None,
-    }))
+    }, actor="system"))
     assert system.projects.projection(project_b).current_adoption.run_id == run_a
     with pytest.raises(ValueError):
         system.projects.start_work_item(project_b, "偷树")
@@ -759,7 +759,7 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
         "project_context_ref": {"kind": "project_context"},
         "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0},
         "max_cycles": 8, "run_time_limit_sec": 600, "context_window": 32_000,
-    }))
+    }, actor="user:local"))
     forged = system.projects.projection(project_b).work_item("wi_forged")
     assert forged.status == "not_started"
     assert forged.phase is None and forged.department is None
