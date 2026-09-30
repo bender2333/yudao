@@ -143,6 +143,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "project.create", "reasons": ["command_id_reused"]},
         {"name": "project.rename",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
+        {"name": "project.set_goal",
+         "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.pin",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.archive",
