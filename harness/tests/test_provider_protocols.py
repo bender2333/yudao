@@ -200,8 +200,10 @@ def test_model_test_admits_a_chat_model():
     assert result["ok"] is True
     assert result["admitted"] is True
     assert result["protocol"] == "chat_completions"
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
-    assert stored["admitted_revision"] == result["revision"]
+    # 准入记录与目录分开保存（工单 #86）：记录里带协议与实际返回模型
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
+    assert stored["admitted"] is True
+    assert stored["protocol"] == "chat_completions"
 
 
 @pytest.mark.parametrize(("protocol", "responder", "official"), [
@@ -307,9 +309,11 @@ def test_concurrent_model_tests_of_one_model_both_admit():
     assert [results[key]["ok"] for key in ("first", "second")] == [True, True], results
     assert [results[key]["admitted"] for key in ("first", "second")] == [True, True]
     assert len(capture.requests) == 2
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "m-go")
+    # 两次测试都通过，准入记录只有一份且与目录分开保存（工单 #86）
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
     assert stored["admitted_at"] is not None
-    assert stored["admitted_revision"] == max(results[key]["revision"] for key in ("first", "second"))
+    assert stored["admitted"] is True
+    assert len(facade.model_admissions()) == 1
 
 
 def test_anthropic_base_url_does_not_duplicate_v1():

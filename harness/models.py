@@ -79,6 +79,7 @@ class EventType:
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
     RUN_FAILED = "run_failed"
+    RUN_RESUMED = "run_resumed"
     DECISION_REQUESTED = "decision_requested"
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
@@ -107,6 +108,9 @@ class CatalogEventType:
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
     CREDENTIAL_CHANGED = "credential_changed"
+    # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
+    RUNTIME_DRAIN_STARTED = "runtime_drain_started"
+    RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
 
 
 GIT_VERSION_EVENTS = frozenset({
@@ -667,6 +671,10 @@ class RunProjection:
     last_event_id: str | None = None
     # 投影所反映的 run 流版本
     stream_version: int = 0
+    # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
+    run_event_version: int = 0
+    # 创建这个 run 时记录的定义版本（ADR-0014）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
+    definitions_version: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))

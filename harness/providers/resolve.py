@@ -10,9 +10,11 @@ from .presets import preset_header_profile
 from .store import (
     REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
+    AdmissionRecord,
     ModelDefinition,
     ProviderDefinition,
     ProviderStore,
+    admission_is_current,
 )
 
 def limit_reasoning_level(model: ModelDefinition, requested_tier: str | None) -> str | None:
@@ -284,11 +286,13 @@ def resolve_call_target(
     credentials: CredentialChain | None,
     model_id: Any,
     requested_tier: str | None = None,
+    admissions: Mapping[str, AdmissionRecord] | None = None,
 ) -> tuple[CallTargetResolution, FrozenTarget | None]:
     # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不接收部门。
     # 检查定义存在、所属连接存在、协议受支持、窗口已知、准入有效、凭据引用可解析；
-    # fake 只用于确定性测试，不要求准入与凭据。请求档位原样记录，实际发送的档位按
-    # 模型声明限制到支持范围（设计说明第 7.3 节），编码在协议适配器完成
+    # fake 只用于确定性测试，不要求准入与凭据。准入有效性按受影响字段逐项比较（工单 #86）。
+    # 请求档位原样记录，实际发送的档位按模型声明限制到支持范围（设计说明第 7.3 节），
+    # 编码在协议适配器完成
     def unavailable(message: str, public: dict[str, Any]) -> tuple[CallTargetResolution, None]:
         return CallTargetResolution(False, "provider_unavailable", message, public), None
 
@@ -308,8 +312,11 @@ def resolve_call_target(
         return unavailable("模型缺少 context_window，无法用于任务", public)
     material = None
     if provider.protocol != "fake":
-        if not model.admitted:
+        record = None if admissions is None else admissions.get(model.id)
+        if record is None:
             return unavailable(f"模型 {model.id} 尚未通过模型测试准入，请先执行模型测试", public)
+        if not admission_is_current(record, model, provider):
+            return unavailable(f"模型 {model.id} 的准入已作废，请重新执行模型测试", public)
         if not provider.credential_ref:
             return unavailable("Provider 配置没有凭据引用", public)
         material = credentials.resolve(provider.credential_ref) if credentials is not None else None

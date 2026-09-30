@@ -70,6 +70,7 @@
     "prompt_config_versions": {},
     "provider": "fake",
     "registered_commands": {},
+    "run_event_version": 1,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -1580,12 +1581,13 @@
    "model": "fake-script",
    "context_digest": null,
    "stop_reason": "model_steps_exhausted",
-   "error": null,
+   "error": "department reached the model step limit without submitting a proposal",
    "artifact_hashes": [],
    "payload": {
     "cycle_count": 1,
     "human_action": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。",
     "max_cycles": 999999,
+    "message": "department reached the model step limit without submitting a proposal",
     "paused_at_phase": "PRODUCT_SPEC",
     "stop_reason": "model_steps_exhausted",
     "token_used": 0
@@ -1679,7 +1681,7 @@
   "effective_decisions": [],
   "engineering_plan": null,
   "engineering_plans": [],
-  "error": null,
+  "error": "department reached the model step limit without submitting a proposal",
   "evidence": [],
   "git_version": {
    "commit": "<git#1>",
@@ -2322,6 +2324,7 @@
   "responses": [],
   "reviews": [],
   "rework_count": 0,
+  "run_event_version": 1,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {

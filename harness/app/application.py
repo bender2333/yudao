@@ -50,10 +50,11 @@ from .project_and_work_item_commands import (
     WORK_ITEM_CANCEL,
     WORK_ITEM_CREATE,
 )
+from .runtime_commands import RUNTIME_FORCE_UPGRADE, RUNTIME_START_DRAIN
+from .system_queries import SYSTEM_STATUS
 from .project_queries import PROJECT_QUERIES
 from .read_models import ReadModels
 from .registry import Registry
-from .system_queries import SYSTEM_STATUS
 
 
 class ReadOnlyError(RuntimeError):
@@ -90,7 +91,7 @@ DEFAULT_REGISTRY = Registry(
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,
               CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT, CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
-              CREDENTIAL_REMOVE_PERSISTED],
+              CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE],
     queries=[SYSTEM_STATUS, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY, CATALOG_DOCUMENT_QUERY],
     decisions=tuple(DECISION_KINDS))
 

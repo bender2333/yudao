@@ -246,33 +246,31 @@
 
   // —— 准入状态 ——
 
-  function catalogRevision() {
-    // 准入跟随目录修订（Provider 与模型定义），部门绑定变化不使模型测试失效
-    const value = data.catalog_revision ?? data.revision;
-    return value === null || value === undefined || value === "" ? null : Number(value);
+  function admissionOf(modelId) {
+    // 准入记录与目录分开返回（工单 #86）：按模型 ID 在单独的列表中查找
+    return (data.admissions || []).find(item => item.model_id === modelId) || null;
   }
 
   function admissionState(model) {
-    const admittedRevision = model.admitted_revision;
-    if (admittedRevision === null || admittedRevision === undefined || admittedRevision === "") {
-      return { key: "unadmitted", label: "未准入" };
-    }
-    const current = catalogRevision();
-    if (current !== null && !Number.isNaN(current) && Number(admittedRevision) !== current) {
-      return { key: "stale", label: "测试结果不对应当前修订" };
-    }
+    const record = admissionOf(model.id);
+    if (!record) return { key: "unadmitted", label: "未准入" };
+    if (record.stale) return { key: "stale", label: "准入已作废，需重新测试" };
     return { key: "admitted", label: "已准入" };
   }
 
   function applyAdmission(providerId, modelId, result) {
-    // 模型测试在服务端记录准入；本地同步徽章与修订，避免整页重拉覆盖正在编辑的表单
+    // 模型测试在服务端写入准入记录；本地同步徽章，避免整页重拉覆盖正在编辑的表单
     if (result.revision === null || result.revision === undefined) return;
-    const model = allModels().find(item => item.provider_id === providerId && item.id === modelId);
-    if (model) {
-      model.admitted_revision = result.revision;
-      model.admitted_model = result.actual_model || model.model;
-    }
-    data.catalog_revision = result.revision;
+    const record = admissionOf(modelId);
+    const next = {
+      model_id: modelId, provider_id: providerId, protocol: result.protocol || null,
+      admitted: Boolean(result.admitted), stale: false,
+      admitted_at: new Date().toISOString(),
+      admitted_model: result.actual_model || null,
+      base_url: null, credential_ref: null, model: null,
+    };
+    if (record) Object.assign(record, next);
+    else data.admissions = [...(data.admissions || []), next];
   }
 
   // —— 就绪状态条：配置、凭据、准入、额度分开呈现，不合并成一个绿点 ——
@@ -330,7 +328,7 @@
       const admitted = models.filter(model => admissionState(model).key === "admitted").length;
       const stale = models.filter(model => admissionState(model).key === "stale").length;
       const label = admitted
-        ? `准入：${admitted}/${models.length} 已准入${stale ? ` · ${stale} 测试结果不对应当前修订` : ""}`
+        ? `准入：${admitted}/${models.length} 已准入${stale ? ` · ${stale} 准入已作废` : ""}`
         : "准入：候选未准入 · 建访问定义、测试后再绑定";
       chips.push(`<span class="yp-chip ${admitted ? "ok" : "warn"}">${label}</span>`);
     }
@@ -481,11 +479,11 @@
       const value = pairValue(model.provider_id, model.id);
       const base = `${provider ? provider.name : model.provider_id} / ${model.id} · 窗口 ${model.context_window ?? "?"} · 输出 ${model.max_output_tokens ?? "?"}`;
       const admission = admissionState(model);
-      // 未准入或测试结果陈旧时在下拉中标注原因并禁止选择；已准入模型不带原因、可直接选择
+      // 未准入或准入已作废时在下拉中标注原因并禁止选择；已准入模型不带原因、可直接选择
       const suffix = admission.key === "admitted"
         ? ""
         : admission.key === "stale"
-          ? " · 测试结果不对应当前修订，需重新测试"
+          ? " · 准入已作废，需重新测试"
           : " · 未准入，需先通过模型测试";
       const selectedAttr = value === current ? " selected" : "";
       const disabledAttr = admission.key === "admitted" ? "" : " disabled";
@@ -520,15 +518,22 @@
   }
 
   function modelFormMarkup() {
+    // 新增的行必须逐行确认容量：没有勾选时提交会被目录校验拒绝（工单 #86）；
+    // 判据与 saveModel 一致，该 id 不在已有目录里才算新增
+    const isNewRow = !allModels().some(item => item.id === selectedModelId);
+    const capacityConfirmation = isNewRow
+      ? '<label><input name="capacity_confirmed" type="checkbox" required> 已核对这一行的窗口与输出上限</label>'
+      : "";
     const admissionInfo = creatingModel ? "" : (() => {
       const item = allModels().find(model => model.id === selectedModelId);
       if (!item) return "";
-      const admission = admissionState(item);
-      if (admission.key === "admitted") {
-        return `<p class="yp-small">上次测试：实际返回 ${escapeHtml(item.admitted_model || item.model)} · 修订 ${escapeHtml(String(item.admitted_revision ?? "—"))} · 已准入</p>`;
+      const record = admissionOf(item.id);
+      const state = admissionState(item);
+      if (state.key === "admitted") {
+        return `<p class="yp-small">上次测试：实际返回 ${escapeHtml(record.admitted_model || item.model)} · 测试时间 ${escapeHtml(record.admitted_at || "—")} · 已准入</p>`;
       }
-      if (admission.key === "stale") {
-        return `<p class="yp-small warn">上次测试修订 ${escapeHtml(String(item.admitted_revision ?? "—"))} 不对应当前目录修订 ${escapeHtml(String(catalogRevision() ?? "—"))}，需重新测试后才能绑定。</p>`;
+      if (state.key === "stale") {
+        return '<p class="yp-small warn">准入已作废：连接字段或上游模型 ID 在测试之后被修改，需重新测试后才能绑定。</p>';
       }
       return '<p class="yp-small warn">尚未通过模型测试，未准入的模型不能绑定到部门。</p>';
     })();
@@ -539,6 +544,7 @@
       <label>context_window<input name="context_window" type="number" min="1" value="${escapeHtml(modelForm.context_window)}" required></label>
       <label>max_output_tokens<input name="max_output_tokens" type="number" min="1" value="${escapeHtml(modelForm.max_output_tokens)}" required></label>
       <label>能力来源<input name="capability_source" value="${escapeHtml(modelForm.capability_source)}" readonly placeholder="预置提示或手动填写来源"></label>
+      ${capacityConfirmation}
       <label><input name="accepts_required_tool_call" type="checkbox"${modelForm.accepts_required_tool_call ? " checked" : ""}> 是否接受要求调用工具</label>
       <p class="yp-small">默认为接受。不接受时，最后一次主机提示之后的请求不要求调用工具。</p>
       ${admissionInfo}
@@ -797,7 +803,8 @@
   }
 
   function modelDocument(model) {
-    // 提交目录时只带文档字段；admitted_* 是服务端记录的视图字段，不随表单回传；协议取自所属连接
+    // 提交目录时只带文档字段；admitted_* 与容量确认标记属于服务端记录的视图字段与命令字段，
+    // 不随表单回传；协议取自所属连接
     return {
       id: model.id, provider_id: model.provider_id, model: model.model,
       context_window: model.context_window,
@@ -919,6 +926,8 @@
       render();
       return;
     }
+    // 新增行的判据是该 id 不在已有目录里：只编辑已有行时不能要求容量确认（工单 #86）
+    const isNewRow = !allModels().some(item => item.id === selectedModelId);
     const model = {
       id: String(fields.id || "").trim(),
       provider_id: providerId,
@@ -926,6 +935,8 @@
       context_window: Number(fields.context_window),
       max_output_tokens: Number(fields.max_output_tokens),
       capability_source: String(fields.capability_source || "").trim(),
+      // 新增的行必须显式确认容量才能保存；已有行带着容量值提交即视为已确认（工单 #86）
+      capacity_confirmed: isNewRow,
       accepts_required_tool_call: fields.accepts_required_tool_call === "on",
     };
     const provider = (data.providers || []).find(item => item.id === providerId);
@@ -959,7 +970,7 @@
       .map(modelDocument);
     if (!creatingModel) {
       const rest = models.filter(item => item.id !== model.id);
-      rest.push(model);
+      rest.push(isNewRow ? model : modelDocument(model));
       models.length = 0;
       models.push(...rest);
     } else {

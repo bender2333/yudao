@@ -92,7 +92,7 @@ def catalog_system(tmp_path, document=None, *, credentials=None, dotenv=None, **
     config = tmp_path / "providers.json"
     payload = _catalog_document(**kwargs) if document is None else document
     write_document(config, payload)
-    facade = ProviderFacade()
+    facade = ProviderFacade(startup_mode="test")
     dotenv_path = tmp_path / ".env" if dotenv is not None else None
     if dotenv is not None:
         dotenv_path.write_text(dotenv, encoding="utf-8")
@@ -154,6 +154,7 @@ def test_list_create_update_and_bindings_round_trip(tmp_path):
                 "model": "other-script",
                 "context_window": 16000,
                 "max_output_tokens": 2048,
+                "capacity_confirmed": True,
             }],
         }
         status, body = request(host, port, "POST", "/api/providers", created)
@@ -646,16 +647,22 @@ def test_model_test_records_admission_with_revision(tmp_path):
         assert payload["revision"] > before["revision"]
         assert payload["persisted"] is True
         listed = get_json(host, port, "/api/providers")
-        model = next(item for item in listed["models"] if item["id"] == "model-a")
-        assert model["admitted_revision"] == payload["revision"]
-        assert model["admitted_at"]
+        # 准入记录与目录分开返回（工单 #86）：目录定义上没有准入字段
+        record = next(item for item in listed["admissions"] if item["model_id"] == "model-a")
+        assert record["admitted"] is True
+        assert record["admitted_at"]
+        for model in listed["models"]:
+            assert "admitted_at" not in model
+            assert "admitted_revision" not in model
 
-        # 准入结果落盘：独立进程（CLI/smoke）读取同一份配置也应看到准入
-        reloaded = ProviderFacade()
+        # 准入结果落盘：独立进程（CLI/smoke）读取同一份准入文件也应看到准入
+        reloaded = ProviderFacade(startup_mode="test")
+        reloaded.configure_paths(config, None)
         reloaded.load_document(config)
-        stored = next(item for item in reloaded.providers_view()["models"] if item["id"] == "model-a")
-        assert stored["admitted_revision"] == payload["revision"]
-        assert stored["admitted_at"]
+        stored = next(item for item in reloaded.providers_view()["admissions"]
+                      if item["model_id"] == "model-a")
+        assert stored["admitted"] is True
+        assert stored["admitted_at"] == record["admitted_at"]
 
         status, body = request(host, port, "POST", "/api/providers/fake-a/test",
                                {"kind": "model"})

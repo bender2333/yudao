@@ -229,8 +229,11 @@ def test_connection_and_model_tests_on_fake():
     assert model["admitted"] is True
     assert model["protocol"] == "fake"
     assert model["revision"] == facade.revision
-    stored = next(item for item in facade.providers_view()["models"] if item["id"] == "mf")
-    assert stored["admitted_revision"] == facade.revision
+    # 准入记录与目录分开保存（工单 #86）：记录里带测试时间与实际返回的模型
+    stored = next(item for item in facade.model_admissions() if item["model_id"] == "mf")
+    assert stored["admitted"] is True
+    assert stored["admitted_at"]
+    assert stored["protocol"] == "fake"
 
 
 class _LocalResponsesUpstream:

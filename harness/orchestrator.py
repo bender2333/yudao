@@ -26,12 +26,14 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    MODEL_UNAVAILABLE, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision, blocks_run,
+    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision,
+    blocks_run,
 )
 from .environment import LocalEnvironment
 from .event_store import Command, EventStore, StreamVersionConflict, run_stream
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepDriver, StepLimits, Stopped
+from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
@@ -47,7 +49,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree
+from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .sessions import SessionFactory
 from .submissions import SubmissionWriter
@@ -295,6 +297,7 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
+                "run_event_version": RUN_EVENT_VERSION,
             },
         )
         transition = NewEvent(
@@ -586,6 +589,87 @@ class Orchestrator:
         if cancel_error is not None:
             raise cancel_error
         return self.project(run_id)
+    def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
+        # 因升级停止（ADR-0019，工单 #126）：run 事件版本与当前版本不同的未结束 run 记为因升级停止，
+        # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
+        message = f"run event version differs from the current version: {reason}"
+        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
+        return self.project(run_id)
+
+    def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
+        # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约第 5.2 节）：
+        # 先核对事项记录的定义版本，与当前加载的版本不同时发出决定请求交给用户（ADR-0014，总体架构第 7.4 节），
+        # 用户选择「按新版本继续」以前不取得执行权；然后原子取得这个 run 的执行权，记下中断位置与继续的依据，
+        # 再从已提交的状态继续运行到终态。已经结束的 run 不取得执行权、不写事件；
+        # 有未回答、阻塞整个 run 的决定请求（模型引用无法使用或定义版本不同）时不继续，交给用户回答
+        projection = self.project(run_id)
+        if projection.phase in TERMINAL_PHASES:
+            return None
+        if blocks_run(self.writes.read(run_stream(run_id)).decisions.values()):
+            return None
+        if projection.definitions_version != DEFINITIONS.version:
+            self._await_definitions(run_id, projection.definitions_version)
+            return None
+        return self._claim_and_resume(run_id)
+
+    def _await_definitions(self, run_id: str, recorded: str) -> None:
+        # 事项记录的定义版本与当前加载的版本不同（ADR-0014，#48 登记的架构问题的处理）：
+        # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止」；选择写入事件。
+        # 请求只发一次：已经有过一个定义版本不同的请求时不重复
+        def request(transaction: Transaction) -> None:
+            projection = transaction.projection
+            if projection.phase in TERMINAL_PHASES or blocks_run(transaction.decisions.values()):
+                return
+            if any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
+                   for decision in transaction.decisions.values()):
+                return
+            current = DEFINITIONS.version
+            transaction.append(NewEvent(
+                EventType.DECISION_REQUESTED, actor="system", role=projection.active_department,
+                state_before=projection.phase, state_after=projection.phase,
+                payload={
+                    "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
+                    "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
+                    "description": (f"事项使用的定义版本 {recorded or '（未记录）'} 与当前加载的版本 {current} 不同。"
+                                    "按新版本继续以后，后续的模型请求与裁决记录新版本；选择停止事项则运行结束。"),
+                    "facts": [], "department": projection.active_department,
+                    "reason": "definitions_version_changed",
+                    "recorded_definitions_version": recorded, "current_definitions_version": current,
+                },
+            ))
+            transaction.on_commit(lambda: self._wake(run_id))
+
+        self.writes.transact(run_stream(run_id), request)
+
+    def _claim_and_resume(self, run_id: str) -> tuple[int, RunProjection]:
+        # 取得执行权并写入 run_resumed：中断位置与继续的依据取自取得执行权时的投影。
+        # 恢复不写限额与计数字段（激活次数、模型步数、重试与已用运行时间保持中断时的值），
+        # 也不新增部门激活：之后开始的激活由激活本身写入
+        def claim(transaction: Transaction) -> int:
+            projection = transaction.projection
+            previous = self.store.projection(run_stream(run_id))
+            # 执行权编号在写入口以已记录的编号加一确定；另一方先取得时流版本同时改变，
+            # 这里的依据过期，事务因版本不符重新判断，因此这个编号与写入口确定的编号相同
+            transaction.append(NewEvent(
+                EventType.RUN_RESUMED, role=projection.active_department, actor="system",
+                state_before=projection.phase, state_after=projection.phase,
+                parent_event_id=projection.last_event_id,
+                payload={
+                    "basis": {
+                        "interrupted_at_phase": projection.phase,
+                        "interrupted_at_version": projection.stream_version,
+                        "interrupted_at_event_id": projection.last_event_id,
+                        "recorded_run_event_version": projection.run_event_version,
+                        "current_run_event_version": RUN_EVENT_VERSION,
+                    },
+                    "acquired_epoch": (0 if previous is None or previous.epoch is None else previous.epoch) + 1,
+                    "previous_epoch": None if previous is None else previous.epoch,
+                },
+            ))
+            return (0 if previous is None or previous.epoch is None else previous.epoch) + 1
+
+        epoch, _ = self.writes.claim_execution_right(run_stream(run_id), claim)
+        return epoch, self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
         # 取消步骤驱动（正在进行的调用尝试按身份取消），在安全节点等待重试的激活立即醒来；取消调用尝试出错时同样唤醒
@@ -883,6 +967,10 @@ class Orchestrator:
                 nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
             )
             result = await activation.driver.result()
+        except UnrepresentableWorkspace as exc:
+            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停
+            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version)
+            return
         except Exception as exc:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
@@ -917,6 +1005,9 @@ class Orchestrator:
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
                 model=submission.response.model,
             )
+        except UnrepresentableWorkspace as exc:
+            # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
+            self._end_run(activation, "workspace_unrepresentable", str(exc), None)
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
 
@@ -1224,7 +1315,7 @@ class Orchestrator:
                 payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
             ))
             transaction.on_commit(lambda: self._wake(projection.run_id))
-            if decision.kind == MODEL_UNAVAILABLE.name and option == "stop":
+            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
                 self._fail(transaction, "cancelled", "run stopped by the user's decision")
                 return None
             if blocks_run(transaction.decisions.values()):
@@ -1242,10 +1333,11 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入
+        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。放行只由质检的接纳写入。
+        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径
         outcome = DEFINITIONS.stop_reason(reason).outcome
         if outcome == "paused":
-            self._pause(transaction, reason)
+            self._pause(transaction, reason, message)
         elif outcome == "failed":
             self._fail(transaction, reason, message)
         else:
@@ -1263,7 +1355,7 @@ class Orchestrator:
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
-    def _pause(self, transaction: Transaction, reason: str) -> None:
+    def _pause(self, transaction: Transaction, reason: str, message: str | None = None) -> None:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
             return
@@ -1274,10 +1366,12 @@ class Orchestrator:
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, role=department,
             state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
+            error=message,
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
                 "human_action": DEFINITIONS.stop_reason(reason).human_action,
+                **({"message": message} if message else {}),
                 "paused_at_phase": projection.phase,
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,
