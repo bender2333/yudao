@@ -203,6 +203,44 @@ def test_unexplained_failing_check_is_rejected(tmp_path):
     assert result.phase != "DONE"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
+def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
+    # 超时的检查（主机记录的退出状态为 TIMEOUT_EXIT_CODE，124）与失败检查同样处理：
+    # 没有被 existing_defect 引用或写进「其他失败」时被拒绝，被引用时可以以 consistent 结束。
+    # 检查本身在检查副本中运行，真实的 600 秒超时不在单元层重复（test_tools.py 已核对超时的退出状态）。
+    from harness.environment import TIMEOUT_EXIT_CODE
+    from harness.models import CheckReceipt
+    from harness.validation import evaluate_proposal
+
+    system, run_id = _onboarding_run(tmp_path, [_product_turn(), _structure_turn()])
+    system.activate_once(run_id)
+    result = system.activate_once(run_id)
+    assert result.phase == "QUALITY", result.phase
+    projection = system.project(run_id)
+    workspace = system.workspace(run_id)
+    facts = workspace.snapshot().facts
+    spec = projection.product_spec
+    structure = projection.structure
+    receipt = CheckReceipt(name="slow", department="quality", exit_code=TIMEOUT_EXIT_CODE,
+                           summary="check timed out after 600s", snapshot_hash=facts.digest,
+                           product_spec_hash=spec.content_hash, activation_id=projection.last_activations.get("quality"))
+    facts = facts.model_copy(update={"checks": (*facts.checks, receipt)})
+    unexplained = {
+        "kind": "baseline_review", "verdict": "consistent",
+        "conclusions": [{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
+        "omissions": [], "checks": ["slow"], "other_failures": [],
+    }
+    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=unexplained,
+                                 projection=projection, facts=facts)
+    assert not decision.accepted
+    assert any("failing check" in error.message for error in decision.errors)
+    explained = {**unexplained,
+                 "conclusions": [{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "slow"}]}
+    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=explained,
+                                 projection=projection, facts=facts)
+    assert decision.accepted, [error.message for error in decision.errors]
+    assert decision.artifact["checks"][0]["exit_code"] == TIMEOUT_EXIT_CODE
+    assert structure is not None
+
 def test_structure_requires_activation_receipt(tmp_path):
     # build_and_test 的名称没有对应的本次激活 run_check 回执时被拒绝
     system, run_id = _onboarding_run(tmp_path, [
