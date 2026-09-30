@@ -17,6 +17,7 @@ test-results/
 
 # --- tooling / scratch ---
 .tmp/
+evals/scenarios/scenario-3/checks/_work/
 .tmp-codex-test/
 .tmp-omp-profile/
 .tmp-omp-*.log

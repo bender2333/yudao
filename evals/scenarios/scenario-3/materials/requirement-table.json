@@ -1,0 +1,50 @@
+{
+  "scenario": "scenario-3",
+  "title": "PRDBench 44 Beijing Subway Fare Calculation System",
+  "requirements": [
+    {
+      "id": "R1",
+      "name": "Path modes",
+      "description": "Three path query modes: shortest distance, least transfer, comprehensive optimal.",
+      "checks": ["unit_2_3", "unit_9_1", "cmd_2_1", "cmd_3_1a"]
+    },
+    {
+      "id": "R2",
+      "name": "Transfer limit",
+      "description": "Maximum transfer limit is configurable and filters out paths exceeding it; complex transfer stations are handled.",
+      "checks": ["unit_2_4", "unit_5_2", "cmd_5_1a"]
+    },
+    {
+      "id": "R3",
+      "name": "Line preference",
+      "description": "Line preference is configurable and prioritises the preferred line when it exists.",
+      "checks": ["unit_2_4"]
+    },
+    {
+      "id": "R4",
+      "name": "Fare calculation",
+      "description": "Fare tiers, boundary handling and the extended rule over 32 km.",
+      "checks": ["unit_2_2", "unit_6_1", "unit_6_2"]
+    },
+    {
+      "id": "R5",
+      "name": "Travel time",
+      "description": "Estimated travel time from distance and transfer count.",
+      "checks": ["unit_12_1"]
+    },
+    {
+      "id": "R6",
+      "name": "Export",
+      "description": "Text and JSON export with the agreed layout and fields.",
+      "checks": ["file_11_1", "file_11_2"]
+    },
+    {
+      "id": "R7",
+      "name": "CLI query",
+      "description": "Startup, input reception, continuous query, input validation, invalid station detection, data coverage and data management through the CLI.",
+      "checks": ["cmd_0_1", "cmd_1_1", "cmd_4_1", "cmd_4_2", "cmd_7_1", "cmd_8_1", "unit_8_2", "unit_10_1", "unit_10_2"]
+    }
+  ],
+  "check_count": 23,
+  "check_types": {"unit": 11, "command": 10, "file_comparison": 2}
+}
