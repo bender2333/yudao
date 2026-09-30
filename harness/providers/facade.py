@@ -624,6 +624,7 @@ class ProviderFacade:
                 base_url=provider.base_url,
                 credential_ref=provider.credential_ref,
                 model=model.model,
+                reasoning_mode=model.reasoning_mode,
             )
             self._admissions[model.id] = record
             self._publish()

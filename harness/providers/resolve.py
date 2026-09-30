@@ -123,7 +123,7 @@ def resolve_snapshot(
     issues: list[ValidationIssue] = []
     targets: dict[str, FrozenTarget] = {}
     seen: set[str] = set()
-    for key, provider_id, model_id in normalized:
+    for key, provider_id, model_id, requested_tier in normalized:
         location = f"selections.{key}"
         if key in seen:
             issues.append(ValidationIssue(location, "选择键重复"))
@@ -172,7 +172,7 @@ def resolve_snapshot(
             reasoning_levels=model.reasoning_levels,
             default_reasoning_level=model.default_reasoning_level,
             reasoning_mode=model.reasoning_mode,
-            sent_tier=limit_reasoning_level(model, item.get("requested_tier")),
+            sent_tier=limit_reasoning_level(model, requested_tier),
             header_profile=preset_header_profile(provider.preset_id),
             preset_id=provider.preset_id,
             revision=store.revision,
@@ -186,27 +186,29 @@ def resolve_snapshot(
 
 def _normalize_selections(
     selections: Sequence[Mapping[str, Any]] | Mapping[str, Mapping[str, Any]],
-) -> list[tuple[str, Any, Any]]:
-    # 同时接受列表与映射，键为任意选择名
-    normalized: list[tuple[str, Any, Any]] = []
+) -> list[tuple[str, Any, Any, Any]]:
+    # 同时接受列表与映射，键为任意选择名；选择可以带请求档位（#87）
+    normalized: list[tuple[str, Any, Any, Any]] = []
     if isinstance(selections, Mapping):
         for key, item in selections.items():
             if not isinstance(item, Mapping):
-                normalized.append((str(key), None, None))
+                normalized.append((str(key), None, None, None))
                 continue
             provider_id = item.get("provider_id", item.get("providerId"))
             model_id = item.get("model_id", item.get("modelId"))
+            requested_tier = item.get("requested_tier", item.get("requestedTier"))
             explicit_key = item.get("key", item.get("target_key", key))
-            normalized.append((str(explicit_key), provider_id, model_id))
+            normalized.append((str(explicit_key), provider_id, model_id, requested_tier))
         return normalized
     for index, item in enumerate(selections):
         if not isinstance(item, Mapping):
-            normalized.append((f"selections[{index}]", None, None))
+            normalized.append((f"selections[{index}]", None, None, None))
             continue
         key = item.get("key", item.get("target_key", item.get("department", f"selections[{index}]")))
         provider_id = item.get("provider_id", item.get("providerId"))
         model_id = item.get("model_id", item.get("modelId"))
-        normalized.append((str(key), provider_id, model_id))
+        requested_tier = item.get("requested_tier", item.get("requestedTier"))
+        normalized.append((str(key), provider_id, model_id, requested_tier))
     return normalized
 
 

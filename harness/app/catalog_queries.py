@@ -31,6 +31,9 @@ class CatalogModel(Contract):
     max_output_tokens: int
     capability_source: str
     accepts_required_tool_call: bool
+    reasoning_levels: list[str]
+    default_reasoning_level: str | None
+    reasoning_mode: str
 
 
 class CatalogAdmission(Contract):

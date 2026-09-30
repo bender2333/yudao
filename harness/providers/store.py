@@ -106,8 +106,8 @@ class ModelDefinition:
 
 
 # 准入记录：一次模型测试通过时写入的事实，与目录分开保存（工单 #86）。
-# 后四个字段是测试时的受影响字段快照：地址、凭据引用、协议取自所属连接，上游模型 ID 取自定义；
-# 有效性逐项比较，改连接字段则整条连接的定义全部回候选，改上游模型 ID 只影响该条定义
+# 地址、凭据引用、协议取自所属连接，上游模型 ID 与推理参数方式取自定义，是测试时的受影响字段快照；
+# 有效性逐项比较，改连接字段则整条连接的定义全部回候选，改上游模型 ID 或推理参数方式只影响该条定义
 @dataclass(frozen=True)
 class AdmissionRecord:
     model_id: str
@@ -118,6 +118,7 @@ class AdmissionRecord:
     base_url: str
     credential_ref: str
     model: str
+    reasoning_mode: str = ""
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -129,17 +130,20 @@ class AdmissionRecord:
             "base_url": self.base_url,
             "credential_ref": self.credential_ref,
             "model": self.model,
+            "reasoning_mode": self.reasoning_mode,
         }
 
 
 def admission_is_current(record: AdmissionRecord, model: ModelDefinition,
                          provider: ProviderDefinition) -> bool:
     # 按受影响字段逐项比较：名称、超时、models_url 与容量不在比较之列，
-    # 换同一引用下的 Key 不改动引用字段，因此都不影响准入有效性
+    # 换同一引用下的 Key 不改动引用字段，因此都不影响准入有效性；
+    # 推理参数方式参与比较（工单 #87），支持档位与默认档位不参与（修改后准入保持）
     return (record.base_url == provider.base_url
             and record.credential_ref == provider.credential_ref
             and record.protocol == provider.protocol
-            and record.model == model.model)
+            and record.model == model.model
+            and record.reasoning_mode == (model.reasoning_mode or ""))
 
 
 def _parse_admission_document(raw: Any) -> dict[str, AdmissionRecord]:
@@ -155,7 +159,7 @@ def _parse_admission_document(raw: Any) -> dict[str, AdmissionRecord]:
     if not isinstance(items, list):
         raise CatalogValidationError((ValidationIssue("admissions", "应为数组"),))
     required = {"model_id", "provider_id", "admitted_at", "admitted_model",
-                "protocol", "base_url", "credential_ref", "model"}
+                "protocol", "base_url", "credential_ref", "model", "reasoning_mode"}
     records: dict[str, AdmissionRecord] = {}
     issues: list[ValidationIssue] = []
     for index, item in enumerate(items):
@@ -425,7 +429,8 @@ def _validate_reasoning_declaration(model: ModelDefinition, location: str,
         issues.append(ValidationIssue(f"{location}.reasoning_mode", "推理参数方式不受支持"))
         return
     provider = provider_by_id.get(model.provider_id)
-    if provider is not None and provider.protocol and provider.protocol not in REASONING_MODE_PROTOCOLS[model.reasoning_mode]:
+    if provider is not None and provider.protocol not in ("", "fake") \
+            and provider.protocol not in REASONING_MODE_PROTOCOLS[model.reasoning_mode]:
         issues.append(ValidationIssue(
             f"{location}.reasoning_mode",
             f"推理参数方式 {model.reasoning_mode} 与连接协议 {provider.protocol} 不相符"))

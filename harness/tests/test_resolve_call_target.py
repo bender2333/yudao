@@ -23,6 +23,9 @@ PUBLIC_FIELDS = {
     "context_window",
     "configured_max_output_tokens",
     "accepts_required_tool_call",
+    "reasoning_levels",
+    "default_reasoning_level",
+    "reasoning_mode",
     "requested_tier",
     "sent_tier",
 }
@@ -88,13 +91,16 @@ def test_resolved_public_result_has_no_secret():
         "context_window": 32000,
         "configured_max_output_tokens": 4096,
         "accepts_required_tool_call": True,
+        "reasoning_levels": [],
+        "default_reasoning_level": None,
+        "reasoning_mode": None,
         "requested_tier": None,
         "sent_tier": None,
     }
     rendered = json.dumps(dict(resolved.public), ensure_ascii=False)
     assert SECRET not in rendered and SECRET not in repr(resolved)
     assert "api_key" not in resolved.public and not hasattr(resolved, "api_key")
-    assert "reasoning" not in rendered and "reasoning_effort" not in rendered
+    assert "effort" not in rendered and "budget_tokens" not in rendered
 
     released = facade.release_call_handle(resolved.handle_id)
     assert dict(released) == dict(resolved.public)
@@ -177,7 +183,25 @@ def test_fake_protocol_needs_neither_admission_nor_credential():
     assert dict(released) == dict(resolved.public)
 
 
-def test_requested_tier_is_recorded_without_limiting_or_encoding():
+def test_requested_tier_is_limited_to_supported_levels():
+    # 工单 #87：实际发送的档位按模型声明限制到支持范围（设计说明第 7.3 节）
+    document = _responses_document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    facade = _facade(document, **{"credential-a": SECRET})
+    facade.record_admission("provider-a", "model-a", admitted_model="upstream-a")
+
+    for requested, expected in (("high", "medium"), ("minimal", "low"), (None, "low"),
+                                ("", "low"), ("medium", "medium"), ("low", "low")):
+        resolved = facade.resolve_call_target("model-a", requested)
+        assert resolved.available is True, resolved.message
+        assert resolved.public["requested_tier"] == requested
+        assert resolved.public["sent_tier"] == expected, (requested, resolved.public["sent_tier"])
+        facade.release_call_handle(resolved.handle_id)
+
+def test_sent_tier_is_none_without_a_declaration():
+    # 没有声明推理档位的模型不发送推理参数：sent_tier 为空
     facade = _facade(_responses_document(), **{"credential-a": SECRET})
     facade.record_admission("provider-a", "model-a", admitted_model="upstream-a")
 
@@ -186,6 +210,5 @@ def test_requested_tier_is_recorded_without_limiting_or_encoding():
     assert resolved.available is True
     assert resolved.public["requested_tier"] == "high"
     assert resolved.public["sent_tier"] is None
-    rendered = json.dumps(dict(resolved.public), ensure_ascii=False)
-    assert "reasoning" not in rendered and "effort" not in rendered
+    assert resolved.public["reasoning_levels"] == []
     facade.release_call_handle(resolved.handle_id)
