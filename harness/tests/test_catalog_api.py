@@ -209,6 +209,54 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
         _assert_no_secret(client, opened)
 
 
+def test_department_defaults_carry_the_requested_tier(tmp_path):
+    # 部门默认保存可为空的请求档位（设计说明第 5.1 节，工单 #87）：请求档位必须属于所选定义的支持档位，
+    # 保存后查询把它交回；不属于支持档位时整份拒绝并指出字段位置
+    document = _document()
+    document["models"][0]["reasoning_levels"] = ["low", "medium"]
+    document["models"][0]["default_reasoning_level"] = "low"
+    document["models"][0]["reasoning_mode"] = "effort"
+    opened = _Opened(tmp_path, document)
+    with running_api(opened) as client:
+        current = _catalog(client)["revision"]
+        opened.application.system.facade.record_admission("p1", "m1", admitted_model="model-x")
+
+        bindings = {department: {"provider_id": "p1", "model_id": "m1", "requested_tier": "medium"}
+                    for department in DEPARTMENTS}
+        saved = _command(client, "catalog.department_defaults.save", base_version=current, bindings=bindings)
+        assert saved.status_code == 200, saved.text
+        catalog = _catalog(client)
+        assert catalog["bindings"]["product"]["requested_tier"] == "medium"
+        assert catalog["models"][0]["reasoning_levels"] == ["low", "medium"]
+        assert catalog["models"][0]["default_reasoning_level"] == "low"
+        assert catalog["models"][0]["reasoning_mode"] == "effort"
+
+        rejected = _command(client, "catalog.department_defaults.save", base_version=catalog["revision"],
+                            bindings={department: {"provider_id": "p1", "model_id": "m1",
+                                                   "requested_tier": "high"}
+                                      for department in DEPARTMENTS})
+        assert rejected.status_code >= 400
+        assert "bindings.product.requested_tier" in rejected.text
+
+def test_connection_save_accepts_the_reasoning_declaration(tmp_path):
+    # 连接保存带模型访问定义时可写入推理档位声明（工单 #87）；默认档位不属于支持档位时拒绝
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        current = _catalog(client)["revision"]
+        model = {**_model("m1"), "reasoning_levels": ["low", "medium"],
+                 "default_reasoning_level": "low", "reasoning_mode": "effort"}
+        saved = _command(client, "catalog.connection.save", base_version=current,
+                         provider=_provider("p1"), models=[model])
+        assert saved.status_code == 200, saved.text
+        assert _catalog(client)["models"][0]["reasoning_mode"] == "effort"
+
+        bad = {**_model("m1"), "reasoning_levels": ["low"], "default_reasoning_level": "high",
+               "reasoning_mode": "effort"}
+        rejected = _command(client, "catalog.connection.save", base_version=_catalog(client)["revision"],
+                            provider=_provider("p1"), models=[bad])
+        assert rejected.status_code >= 400
+        assert "default_reasoning_level" in rejected.text
+
 def test_model_test_admits_and_connection_test_does_not(tmp_path):
     server, _capture, base = serve(responses_responder)
     # 连接测试读取模型列表地址：该连接没有地址时不提供连接测试，这里给出一份真实的上游

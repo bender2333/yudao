@@ -293,3 +293,4 @@ claude-opus-5-5 / 2026-09-30 22:18 / CONTEXT.md、D29、D31、D32、D35、需求
 claude-opus-5-5 / 2026-09-30 22:18 / 新增 docs/research/computer-use-without-containers.md（14 个项目的屏幕来源、在同一台电脑上不打扰用户的做法、Windows 11 家庭版的限制、开发板上直接运行 Xvfb 的软件包与占用、Windows 的 UI Automation），docs/research/README.md 加入索引；需求概览第 6 节第 2 项写明调研已完成，并加入启动方式怎样适应不同系统的待讨论项 / 用户同意 computer use 的调研在后台进行；质检的检查位置可能与工程的系统不同
 claude-opus-5-5 / 2026-09-30 22:46 / docs/design/execution-environment.md 第 10 节场景 1 增加可执行标记在开发板上的核对；docs/design/browser-and-computer-use.md 第 17 节截图证据与请求中的截图由 #149 实现，#148、#149 的中断验收在本机进程上进行，#155 增加 #143 的阻塞；docs/stage-3-plan.md 关键路径写明 #155 另外依赖 #143 / 同步工单时发现：可执行标记没有工单在 Linux 上验证，#148 没有截图的来源，#149 的远程验收依赖 3.2C 的远程部分
 claude-opus-5-5 / 2026-10-01 01:15 / docs/architecture-issues.md 为 #202 登记的执行槽位占用问题追加处理结论 / 架构师处理执行者登记的架构问题
+claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置

@@ -7,6 +7,20 @@
     ["quality", "质检"],
   ];
 
+  // 推理档位全集，由低到高排列（ADR-0006）；模型访问定义声明其中的一个子集
+  const REASONING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"];
+  // 推理参数方式与它相符的协议（设计说明第 7.4 节）
+  const REASONING_MODES = [
+    ["effort", "effort（Responses / Chat Completions）"],
+    ["adaptive", "adaptive（Anthropic Messages）"],
+    ["budget", "budget（Anthropic Messages）"],
+  ];
+  const REASONING_MODE_PROTOCOLS = {
+    effort: ["responses", "chat_completions"],
+    adaptive: ["messages"],
+    budget: ["messages"],
+  };
+
   const PROTOCOLS = [
     ["responses", "responses"],
     ["chat_completions", "chat_completions"],
@@ -25,6 +39,7 @@
     id: "", provider_id: "", model: "",
     context_window: "", max_output_tokens: "", capability_source: "",
     accepts_required_tool_call: true,
+    reasoning_levels: [], default_reasoning_level: "", reasoning_mode: "",
   });
 
   let root = null;
@@ -38,6 +53,7 @@
   let providerForm = emptyProvider();
   let modelForm = emptyModel();
   let bindingForm = { product: "", engineering: "", quality: "" };
+  let bindingTierForm = { product: "", engineering: "", quality: "" };
   let credentialForm = { ref: "", secret: "", persist: false };
   let creatingProvider = true;
   let creatingModel = true;
@@ -116,6 +132,28 @@
       engineering: pairValue(bindings.engineering?.provider_id, bindings.engineering?.model_id),
       quality: pairValue(bindings.quality?.provider_id, bindings.quality?.model_id),
     };
+    bindingTierForm = {
+      product: String(bindings.product?.requested_tier ?? ""),
+      engineering: String(bindings.engineering?.requested_tier ?? ""),
+      quality: String(bindings.quality?.requested_tier ?? ""),
+    };
+  }
+
+  function boundModel(departmentPair) {
+    // 部门绑定所选的模型访问定义；档位选项取自这条定义的声明（设计说明第 9.1 节）
+    if (!departmentPair) return null;
+    const [, modelId] = String(departmentPair).split("/");
+    return allModels().find(model => model.id === modelId) || null;
+  }
+
+  function tierOptions(model, current) {
+    const levels = (model && model.reasoning_levels) || [];
+    const options = ['<option value="">跟随默认档位</option>'];
+    for (const level of levels) {
+      const label = level === (model && model.default_reasoning_level) ? `${level}（默认）` : level;
+      options.push(`<option value="${escapeHtml(level)}"${level === current ? " selected" : ""}>${escapeHtml(label)}</option>`);
+    }
+    return options.join("");
   }
 
   function selectProvider(id, { asNew = false } = {}) {
@@ -141,6 +179,9 @@
       context_window: item.context_window ?? "", max_output_tokens: item.max_output_tokens ?? "",
       capability_source: item.capability_source || "",
       accepts_required_tool_call: item.accepts_required_tool_call !== false,
+      reasoning_levels: Array.isArray(item.reasoning_levels) ? [...item.reasoning_levels] : [],
+      default_reasoning_level: item.default_reasoning_level || "",
+      reasoning_mode: item.reasoning_mode || "",
     } : { ...emptyModel(), provider_id: providerId || "" };
   }
 
@@ -374,6 +415,7 @@
       context_window: "", max_output_tokens: "",
       capability_source: candidate.capability_source || "",
       accepts_required_tool_call: candidate.accepts_required_tool_call !== false,
+      reasoning_levels: [], default_reasoning_level: "", reasoning_mode: "",
     };
     setMessage(`已填入候选 ${candidate.id}：按需填写容量后保存，再执行模型测试`, "");
     render();
@@ -517,6 +559,32 @@
     </form>`;
   }
 
+  function reasoningLevelsMarkup() {
+    // 支持档位：多选；默认档位：属于支持档位的单选；推理参数方式：与连接协议相符
+    const providers = data.providers || [];
+    const provider = providers.find(item => item.id === (modelForm.provider_id || selectedProviderId));
+    const protocol = provider ? provider.protocol : "";
+    const selected = new Set(modelForm.reasoning_levels || []);
+    const levels = REASONING_LEVELS.map(level => `<label class="yp-tier-check"><input type="checkbox" name="reasoning_levels" value="${escapeHtml(level)}" data-pc-reasoning-level${selected.has(level) ? " checked" : ""}> ${escapeHtml(level)}</label>`).join("");
+    const defaultOptions = ['<option value="">未选择</option>'].concat(
+      REASONING_LEVELS.filter(level => selected.has(level)).map(level =>
+        `<option value="${escapeHtml(level)}"${level === modelForm.default_reasoning_level ? " selected" : ""}>${escapeHtml(level)}</option>`),
+    ).join("");
+    const modeOptions = ['<option value="">未声明</option>'].concat(
+      REASONING_MODES.map(([value, label]) => {
+        const compatible = !protocol || (REASONING_MODE_PROTOCOLS[value] || []).includes(protocol);
+        return `<option value="${escapeHtml(value)}"${value === modelForm.reasoning_mode ? " selected" : ""}${compatible ? "" : " disabled"}>${escapeHtml(label)}</option>`;
+      }),
+    ).join("");
+    return `<fieldset class="yp-reasoning-declaration" data-pc-reasoning-declaration>
+      <legend>推理档位声明</legend>
+      <p class="yp-small">三项一起声明；整体留空时该模型的请求不带推理参数。默认档位必须属于支持档位，推理参数方式必须与连接协议相符（设计说明第 7.1、7.4 节）。</p>
+      <div class="yp-tier-grid">${levels}</div>
+      <label>默认档位<select name="default_reasoning_level">${defaultOptions}</select></label>
+      <label>推理参数方式<select name="reasoning_mode">${modeOptions}</select></label>
+    </fieldset>`;
+  }
+
   function modelFormMarkup() {
     // 新增的行必须逐行确认容量：没有勾选时提交会被目录校验拒绝（工单 #86）；
     // 判据与 saveModel 一致，该 id 不在已有目录里才算新增
@@ -539,7 +607,7 @@
     })();
     return `<form class="yp-provider-form" data-pc-form="model">
       <label>ID<input name="id" value="${escapeHtml(modelForm.id)}" required data-pc-field="model-id"></label>
-      <label>所属 Provider<select name="provider_id">${providerOptions()}</select></label>
+      <label>所属 Provider<select name="provider_id" data-pc-model-provider>${providerOptions()}</select></label>
       <label>模型名<input name="model" value="${escapeHtml(modelForm.model)}" required></label>
       <label>context_window<input name="context_window" type="number" min="1" value="${escapeHtml(modelForm.context_window)}" required></label>
       <label>max_output_tokens<input name="max_output_tokens" type="number" min="1" value="${escapeHtml(modelForm.max_output_tokens)}" required></label>
@@ -547,6 +615,7 @@
       ${capacityConfirmation}
       <label><input name="accepts_required_tool_call" type="checkbox"${modelForm.accepts_required_tool_call ? " checked" : ""}> 是否接受要求调用工具</label>
       <p class="yp-small">默认为接受。不接受时，最后一次主机提示之后的请求不要求调用工具。</p>
+      ${reasoningLevelsMarkup()}
       ${admissionInfo}
       <div class="yp-heading-actions">
         <button class="yp-btn" type="button" data-pc-action="new-model">新建模型</button>
@@ -595,8 +664,18 @@
     return `<section class="yp-section">
       <h2>三部门绑定</h2>
       <form class="yp-provider-form yp-provider-bindings" data-pc-form="bindings">
-        ${DEPARTMENTS.map(([id, label], index) => `<label>${label}<select name="${id}"${index === 0 ? ' data-pc-field="binding-product"' : ""}>${pairOptions(bindingForm[id])}</select></label>`).join("")}
+        ${DEPARTMENTS.map(([id, label], index) => {
+          const model = boundModel(bindingForm[id]);
+          const levels = (model && model.reasoning_levels) || [];
+          const undeclared = !!bindingForm[id] && !levels.length;
+          return `<div class="yp-binding-row">
+            <label>${label}<select name="${id}" data-pc-binding-pair="${id}"${index === 0 ? ' data-pc-field="binding-product"' : ""}>${pairOptions(bindingForm[id])}</select></label>
+            <label>推理档位<select name="${id}_tier" data-pc-binding-tier="${id}"${levels.length ? "" : " disabled"}>${tierOptions(model, bindingTierForm[id])}</select></label>
+            ${undeclared ? `<p class="yp-small" data-pc-tier-hint="${id}">该模型未声明推理档位，请求不带推理参数。</p>` : ""}
+          </div>`;
+        }).join("")}
         <p class="yp-small">未准入的模型不能绑定到部门，下拉列表中已标注原因。缺任一部门时创建事项会指出该部门。在途事项仍用创建时的快照。</p>
+        <p class="yp-small">请求档位可以为空，留空时使用所选模型的默认档位；实际发送的档位由模型声明的支持档位限制，只会在声明范围内取不高于请求档位的最高档位。</p>
         <div class="yp-heading-actions"><button class="yp-btn primary" type="submit">保存绑定</button></div>
       </form>
     </section>`;
@@ -733,7 +812,18 @@
     });
     root.querySelector("[data-pc-form='provider']")?.addEventListener("submit", saveProvider);
     root.querySelector("[data-pc-form='model']")?.addEventListener("submit", saveModel);
+    // 支持档位与所属连接的协议变化时重建默认档位与参数方式的可选项（设计说明第 7.1、7.4 节）
+    root.querySelectorAll("[data-pc-reasoning-level]").forEach(node => {
+      node.addEventListener("change", () => { syncFormsFromDom(); render(); });
+    });
+    root.querySelector("[data-pc-model-provider]")?.addEventListener("change", () => {
+      syncFormsFromDom(); render();
+    });
     root.querySelector("[data-pc-form='bindings']")?.addEventListener("submit", saveBindings);
+    // 换绑定的模型后请求档位的可选项随所选模型的声明变化（设计说明第 9.1 节）
+    root.querySelectorAll("[data-pc-binding-pair]").forEach(node => {
+      node.addEventListener("change", () => { syncFormsFromDom(); render(); });
+    });
     root.querySelector("[data-pc-form='credential']")?.addEventListener("submit", saveCredential);
     root.querySelector("[data-pc-field='preset-select']")?.addEventListener("change", event => {
       syncFormsFromDom();
@@ -810,6 +900,9 @@
       context_window: model.context_window,
       max_output_tokens: model.max_output_tokens, capability_source: model.capability_source || "",
       accepts_required_tool_call: model.accepts_required_tool_call !== false,
+      reasoning_levels: model.reasoning_levels || [],
+      default_reasoning_level: model.default_reasoning_level || null,
+      reasoning_mode: model.reasoning_mode || "",
     };
   }
 
@@ -840,12 +933,24 @@
         max_output_tokens: String(fields.max_output_tokens ?? ""),
         capability_source: String(fields.capability_source ?? ""),
         accepts_required_tool_call: fields.accepts_required_tool_call === "on",
+        reasoning_levels: new FormData(modelNode).getAll("reasoning_levels").map(String),
+        default_reasoning_level: String(fields.default_reasoning_level ?? ""),
+        reasoning_mode: String(fields.reasoning_mode ?? ""),
       };
     }
     const credentialNode = root?.querySelector("[data-pc-form='credential']");
     if (credentialNode) {
       const fields = formObject(credentialNode);
       credentialForm = { ref: String(fields.ref ?? ""), secret: "", persist: fields.persist === "on" };
+    }
+    const bindingsNode = root?.querySelector("[data-pc-form='bindings']");
+    if (bindingsNode) {
+      // 部门绑定与请求档位一起读回，换模型重新渲染时不丢掉已选的档位
+      const fields = formObject(bindingsNode);
+      for (const [department] of DEPARTMENTS) {
+        bindingForm[department] = String(fields[department] ?? "");
+        bindingTierForm[department] = String(fields[`${department}_tier`] ?? "");
+      }
     }
   }
 
@@ -928,6 +1033,7 @@
     }
     // 新增行的判据是该 id 不在已有目录里：只编辑已有行时不能要求容量确认（工单 #86）
     const isNewRow = !allModels().some(item => item.id === selectedModelId);
+    const levels = new FormData(event.currentTarget).getAll("reasoning_levels").map(String);
     const model = {
       id: String(fields.id || "").trim(),
       provider_id: providerId,
@@ -938,6 +1044,10 @@
       // 新增的行必须显式确认容量才能保存；已有行带着容量值提交即视为已确认（工单 #86）
       capacity_confirmed: isNewRow,
       accepts_required_tool_call: fields.accepts_required_tool_call === "on",
+      // 推理档位声明（#87）：三项一起提交；没有勾选任何支持档位时整体留空，视为未声明
+      reasoning_levels: levels,
+      default_reasoning_level: levels.length ? (String(fields.default_reasoning_level || "").trim() || null) : null,
+      reasoning_mode: levels.length ? String(fields.reasoning_mode || "").trim() : "",
     };
     const provider = (data.providers || []).find(item => item.id === providerId);
     if (!provider) {
@@ -1003,7 +1113,11 @@
       const value = String(fields[department] || "");
       if (!value) continue;
       const [providerId, modelId] = value.split("/");
-      bindings[department] = { provider_id: providerId, model_id: modelId };
+      const binding = { provider_id: providerId, model_id: modelId };
+      // 请求档位为空时不写入，由服务端按所选模型的默认档位发送（设计说明第 7.2 节）
+      const tier = String(fields[`${department}_tier`] || "").trim();
+      if (tier) binding.requested_tier = tier;
+      bindings[department] = binding;
     }
     try {
       await fetchJSON("/api/department-bindings", { ...jsonHeaders(bindings), method: "PUT" });
@@ -1102,6 +1216,9 @@
         context_window: item.context_window,
         max_output_tokens: item.max_output_tokens, capability_source: item.capability_source || "",
         accepts_required_tool_call: item.accepts_required_tool_call !== false,
+        reasoning_levels: item.reasoning_levels || [],
+        default_reasoning_level: item.default_reasoning_level || null,
+        reasoning_mode: item.reasoning_mode || "",
       })),
       bindings: data.bindings || {},
     };

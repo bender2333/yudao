@@ -184,6 +184,10 @@ class CallTarget(Payload):
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
+    # 模型访问定义声明的推理档位（#87）：支持档位、默认档位与推理参数方式，未声明时为空
+    reasoning_levels: list[str]
+    default_reasoning_level: str | None
+    reasoning_mode: str | None
 
 
 class AttemptIdentity(Payload):
