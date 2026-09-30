@@ -288,6 +288,35 @@ class EventStore:
             for decision in decisions:
                 _save_decision(connection, stream, decision)
 
+    def claim_execution_right(self, stream: str, expected_version: int, events: Sequence[Event],
+                              state: str, *, decisions: Sequence[SavedDecision] = ()) -> int:
+        # 取得一个 run 的执行权（工单 #16，ADR-0018）：在同一个写入事务中核对流版本等于 expected_version，
+        # 以这个流已经记录的执行权编号加一作为新的编号，随这次追加的事件写回，并更新保存的投影与决定请求。
+        # 编号跨进程单调：另一个进程已经取得更大的编号时，这里的 expected_version 核对失败，调用方重新判断。
+        # 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。返回这次取得的执行权编号
+        self._refuse_write()
+        with self._transaction() as connection:
+            saved = connection.execute(
+                "SELECT version, epoch FROM projections WHERE stream = ?", (stream,)
+            ).fetchone()
+            current = 0 if saved is None else saved["version"]
+            if current != expected_version:
+                raise StreamVersionConflict(stream, expected_version, current)
+            recorded = None if saved is None else saved["epoch"]
+            epoch = 1 if recorded is None else recorded + 1
+            for event in events:
+                event.epoch = epoch
+                event.position = _insert(connection, event)
+            connection.execute(
+                "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
+                "epoch = excluded.epoch, state = excluded.state",
+                (stream, expected_version + len(events), events[-1].position, epoch, state),
+            )
+            for decision in decisions:
+                _save_decision(connection, stream, decision)
+        return epoch
+
     def subscribe(self, listener: Callable[[list[Event | ProjectEvent]], None]) -> Callable[[], None]:
         # 登记订阅方：每次提交以后在提交的线程中收到这次提交的事件（已有全局位置），此时不持有任何锁；
         # 订阅方应当很快返回。返回取消订阅的函数

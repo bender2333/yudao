@@ -867,6 +867,13 @@ class DecisionWithdrawnPayload(Payload):
     decision_id: str
     reason: StopReason
 
+class RunResumedPayload(Payload):
+    # 中断的 run 在启动时自动继续（工单 #16）：basis 记录中断位置与继续的依据，
+    # acquired_epoch 是这次取得的执行权编号，previous_epoch 是之前记录的编号（第一次继续时为空）
+    basis: dict[str, Any]
+    acquired_epoch: int
+    previous_epoch: int | None
+
 
 # ---------------------------------------------------------------------------
 # 项目事件
@@ -1076,6 +1083,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
+    EventType.RUN_RESUMED: RunResumedPayload,
     EventType.DECISION_REQUESTED: DecisionRequestedPayload,
     EventType.DECISION_ANSWERED: DecisionAnsweredPayload,
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,

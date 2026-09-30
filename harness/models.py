@@ -79,6 +79,7 @@ class EventType:
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
     RUN_FAILED = "run_failed"
+    RUN_RESUMED = "run_resumed"
     DECISION_REQUESTED = "decision_requested"
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
@@ -672,6 +673,8 @@ class RunProjection:
     stream_version: int = 0
     # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
     run_event_version: int = 0
+    # 创建这个 run 时记录的定义版本（ADR-0014）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
+    definitions_version: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))
