@@ -6,7 +6,7 @@
 import json
 import sqlite3
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType, ProjectEventType
 from harness.projection import project_run, saved_project
 from harness.runtime import LoopSystem
@@ -100,18 +100,19 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     restarted.close()
 
 def test_same_version_unfinished_runs_are_left_to_automatic_continuation(data_dir):
-    # run 事件版本相同的未结束 run 不被本工单停止（交给 #16）
+    # run 事件版本相同的未结束 run 不被本工单停止，交给 #16 自动继续
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     project_id = system.projects.register("同版本项目", "核对同版本的启动")
     run_id = _second_unfinished_run(system, project_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    # 交给 #16 的同版本未结束 run：启动时被自动继续（不再记为因升级停止）。
+    # 这里给一个不会推进 run 的回答，核对它不被版本核对停掉
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([FakeTurn(transcript="no tool call in this reply")]))
     assert restarted.startup_runs.same_version == (run_id,)
     assert restarted.startup_runs.other_version == ()
     projection = project_run(restarted.store, run_id)
-    assert projection.stop_reason is None
-    assert projection.phase not in {"DONE", "PAUSED", "FAILED"}
+    assert projection.stop_reason != STOP_REASON_UPGRADE
     restarted.close()
 
 def test_a_work_item_created_by_the_user_has_the_user_priority(data_dir):

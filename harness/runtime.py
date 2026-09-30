@@ -44,6 +44,7 @@ class LoopSystem:
         provider_config_path: str | Path | None = None,
         dotenv_path: str | Path | None = None,
         step_limits: StepLimits = StepLimits(),
+        resume_on_startup: bool = True,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -90,6 +91,8 @@ class LoopSystem:
         self.startup_runs = classify_startup_runs(self.store)
         for run_id in self.startup_runs.other_version:
             self.upgrade_run(run_id)
+        # 启动的最后一步：自动继续 run 事件版本相同的未结束 run（工单 #16）
+        self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
@@ -100,6 +103,34 @@ class LoopSystem:
             run_id, reason=f"recorded version differs from {RUN_EVENT_VERSION}")
         if projection.phase == "FAILED" and projection.stop_reason == STOP_REASON_UPGRADE:
             return self.projects.restart_work_item_for_upgrade(run_id)
+
+    def resume_startup_runs(self) -> dict[str, int]:
+        # 启动时自动继续所有因进程中断而未结束、run 事件版本相同的 run（工单 #16，恢复契约第 3、5.2 节）：
+        # 每个 run 由流程编排原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
+        # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
+        # 返回取得执行权的 run 与它这次取得的执行权编号
+        resumed: dict[str, int] = {}
+        for run_id in self.startup_runs.same_version:
+            claimed = self.orchestrator.resume_incomplete_run(run_id)
+            if claimed is None:
+                continue
+            epoch, _ = claimed
+            resumed[run_id] = epoch
+            self.run_until_stop(run_id)
+            self.projects.settle(run_id)
+        return resumed
+
+    @classmethod
+    def _resume(cls, data_dir: str | Path, adapter: ModelAdapter) -> dict[str, int]:
+        # 只取得执行权，不继续运行：测试用它表示「这一次恢复在取得执行权之后、继续执行之前退出」，
+        # 下一次打开的进程因此必须重新取得执行权。与 for_testing 一样只接受显式的确定性适配器，
+        # 并且不做启动时的自动继续（传 null 适配器），避免取得执行权以后又运行到停止
+        system = cls(data_dir, test_adapter=adapter, resume_on_startup=False)
+        for run_id in system.startup_runs.same_version:
+            claimed = system.orchestrator.resume_incomplete_run(run_id)
+            if claimed is not None:
+                system.resumed_runs[run_id] = claimed[0]
+        return system.resumed_runs
 
     # 排空与强制升级（应用层与接口层设计说明第 3.2 节「升级」，ADR-0019）
 

@@ -20993,6 +20993,176 @@
         "title": "RunPausedPayload",
         "type": "object"
       },
+      "RunResumedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "run_resumed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RunResumedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RunResumedEvent",
+        "type": "object"
+      },
+      "RunResumedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "additionalProperties": true,
+            "title": "Basis",
+            "type": "object"
+          },
+          "acquired_epoch": {
+            "title": "Acquired Epoch",
+            "type": "integer"
+          },
+          "previous_epoch": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Epoch"
+          }
+        },
+        "required": [
+          "basis",
+          "acquired_epoch",
+          "previous_epoch"
+        ],
+        "title": "RunResumedPayload",
+        "type": "object"
+      },
       "RuntimeDrainStartedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -24770,6 +24940,7 @@
             "run_done": "#/components/schemas/RunDoneEvent",
             "run_failed": "#/components/schemas/RunFailedEvent",
             "run_paused": "#/components/schemas/RunPausedEvent",
+            "run_resumed": "#/components/schemas/RunResumedEvent",
             "runtime_drain_started": "#/components/schemas/RuntimeDrainStartedEvent",
             "runtime_force_upgrade_requested": "#/components/schemas/RuntimeForceUpgradeRequestedEvent",
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
@@ -24906,6 +25077,9 @@
           },
           {
             "$ref": "#/components/schemas/RunFailedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RunResumedEvent"
           },
           {
             "$ref": "#/components/schemas/DecisionRequestedEvent"
