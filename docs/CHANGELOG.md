@@ -311,3 +311,4 @@ claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/m
 qwen3.8 / 2026-10-01 11:20 / docs/architecture-issues.md 为 #176 登记三条待架构师确认的问题（「全部公开画法」的判定口径、画面对象是否包含 setOverlay、整数倍缩放指渲染缓冲还是显示尺寸） / 执行者在像素画面一的移植中遇到验收口径与接口形状不确定，按工作流程登记
 minimax-M3.1 / 2026-10-01 21:05 / 无文档改动；本工单第 2 轮只做合入 origin/main（d4248448）与按合并后的依赖重装，代码与文档正文与第 1 轮一致 / 分支起点早于 #79 合入 main，client/ 目录两侧各自新增导致七个 add/add 冲突，client 的六个文件按「main 上 #79 的外壳 + 本工单像素新增」保留，三份追加型记录两侧条目都保留、按时间顺序排列
 minimax-M3.1 / 2026-10-01 21:20 / client/src/main/window.ts 与 client/tests/e2e/pixel.spec.ts：主进程经 ELECTRON_RENDERER_URL 加载开发服务器渲染的界面（无该变量时仍走 yudao://app 协议，来源不变），端到端测试用 Vite 开发服务器提供渲染进程 / 第 1 轮的图鉴端到端用例从未真实运行过；electron-vite build 把 NODE_ENV 固定为 production，图鉴的 import.meta.env.DEV 分支在构建产物中被消掉，用例必然失败。图鉴只在开发时可用（工单要求），因此改由开发服务器提供界面，参照 OpenCode 0027387 的做法
+claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记的三条（图鉴核对口径、覆盖层接口、缩放的整数倍）追加处理结论 / 架构师处理执行者登记的架构问题
