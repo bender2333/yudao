@@ -48,8 +48,8 @@ Start Station: <start>
 End Station: <end>
 
 Detailed Path:
-  <Line X>: <station> -> <station> -> ... [Transfer Station]
-  <Line Y>: <station> -> <station> -> ...
+  <Line X>: <station> → <station> → ... [Transfer Station]
+  <Line Y>: <station> → <station> → ...
 
 Total Distance: <meters> meters (<km> km)
 Estimated Fare: <fare> yuan

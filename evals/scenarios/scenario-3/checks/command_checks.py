@@ -167,7 +167,7 @@ COMMAND_CHECKS = {
 }
 
 REQUIREMENT_TABLE = {
-    "unit_2_2": "R4", "unit_2_3": "R1", "unit_2_4": ["R2", "R3"],
+    "unit_2_2": "R4", "unit_2_3": "R1", "unit_2_4": "R2", "unit_2_5": "R3",
     "unit_5_2": "R2", "unit_6_1": "R4", "unit_6_2": "R4",
     "unit_8_2": "R7", "unit_9_1": "R1", "unit_10_1": "R7",
     "unit_10_2": "R7", "unit_12_1": "R5",

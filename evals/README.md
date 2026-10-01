@@ -8,7 +8,7 @@
 flowchart TD
     M[scenarios/scenario-3/materials<br/>PRD、接口约定、条目表、起点] --> R[运行器]
     M --> S[scorer]
-    C[scenarios/scenario-3/checks<br/>23 条隐藏检查与零件] --> S
+    C[scenarios/scenario-3/checks<br/>24 条隐藏检查与零件] --> S
     F[scenarios/scenario-3/files<br/>subway_data.json] --> R
     REF[scenarios/scenario-3/reference<br/>参考实现] --> S
 ```
@@ -22,11 +22,11 @@ flowchart TD
 
 ## 材料版本
 
-材料版本是 `scenario-3@1`。修改 PRD、接口约定、条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
+材料版本是 `scenario-3@2`。修改 PRD、接口约定、条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
 
 ## 需求条目与检查
 
-7 个需求条目与 23 条检查的对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 11 条、命令行 10 条、文件比对 2 条。
+7 个需求条目与 24 条检查的对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。
 
 ## 运行评分器
 

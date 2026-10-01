@@ -1,6 +1,6 @@
 """Scenario 3 scorer.
 
-Runs the 23 hidden checks against one delivery directory and writes a
+Runs the 24 hidden checks against one delivery directory and writes a
 machine-readable result. The scorer does not know which side produced the
 delivery: it only reads a directory containing a ``src/`` folder.
 
@@ -16,8 +16,8 @@ import subprocess
 import sys
 
 SCENARIO = "scenario-3"
-MATERIAL_VERSION = "scenario-3@1"
-SCORER_VERSION = "scorer-3@1"
+MATERIAL_VERSION = "scenario-3@2"
+SCORER_VERSION = "scorer-3@2"
 REQUIREMENTS = ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
 
 FILE_CHECKS = {

@@ -1,6 +1,6 @@
 {
   "scenario": "scenario-3",
-  "material_version": "scenario-3@1",
+  "material_version": "scenario-3@2",
   "runtime": "uv-managed Python 3.13",
   "description": "Starting point handed to the system under test. It contains the PRD, the interface agreement and the subway data file. The hidden checks, requirement table and reference implementation are read only by the scorer and never enter the run directory.",
   "files": [

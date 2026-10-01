@@ -1,4 +1,4 @@
-"""The 11 unit checks. Each value is Python source run inside the delivery src."""
+"""The 12 unit checks. Each value is Python source run inside the delivery src."""
 
 COMMON = r'''
 import json
@@ -91,6 +91,48 @@ one_ok = end in one_finder.dist_to and one_finder.get_transfer_count(end) <= 1
 
 sys.exit(report("unit_2_4", zero_ok and one_ok,
     "max_transfers=0 no path: %s, max_transfers=1 transfer<=1: %s" % (zero_ok, one_ok)))
+'''
+
+UNIT_2_5 = COMMON + r'''
+from pathfinding import ShortestPath, PathfindingConfig
+graph, station_to_number, number_to_station = build()
+start = station_to_number["Tiananmen East"]
+end = station_to_number["Zhongguancun"]
+
+def run(preferred):
+    config = PathfindingConfig()
+    config.mode = "least_transfer"
+    config.preferred_lines = preferred
+    finder = ShortestPath(graph, start, config)
+    if end not in finder.dist_to:
+        return None
+    _path_ids, edges = finder.path_with_edges(end)
+    return {
+        "distance": sum(edge.weight for edge in edges),
+        "transfers": finder.get_transfer_count(end),
+        "lines": [edge.line for edge in edges],
+    }
+
+baseline = run([])
+preferred = run(["Line 10"])
+
+if baseline is None or preferred is None:
+    sys.exit(report("unit_2_5", False, "least_transfer mode found no path: %s, %s"
+        % (baseline is None, preferred is None)))
+
+# The preferred line only counts when the route actually runs on it. The
+# baseline route uses Line 1 and Line 4; preferring Line 10 must reroute the
+# path onto Line 10. A path that ignores the preference is indistinguishable
+# from the baseline and fails here.
+problems = []
+if "Line 10" not in preferred["lines"]:
+    problems.append("preferred Line 10 absent from the path: %s" % preferred["lines"])
+if preferred["lines"] == baseline["lines"]:
+    problems.append("preference did not change the route from the baseline")
+if preferred["distance"] == baseline["distance"] and preferred["transfers"] == baseline["transfers"]:
+    problems.append("preference left distance %s and transfers %s unchanged"
+        % (preferred["distance"], preferred["transfers"]))
+sys.exit(report("unit_2_5", not problems, "; ".join(problems)))
 '''
 
 UNIT_5_2 = COMMON + r'''
@@ -264,6 +306,7 @@ SCRIPTS = {
     "unit_2_2": UNIT_2_2,
     "unit_2_3": UNIT_2_3,
     "unit_2_4": UNIT_2_4,
+    "unit_2_5": UNIT_2_5,
     "unit_5_2": UNIT_5_2,
     "unit_6_1": UNIT_6_1,
     "unit_6_2": UNIT_6_2,
@@ -278,6 +321,7 @@ REQUIRED_SYMBOLS = {
     "unit_2_2": ["fare"],
     "unit_2_3": ["models", "pathfinding"],
     "unit_2_4": ["models", "pathfinding"],
+    "unit_2_5": ["models", "pathfinding"],
     "unit_5_2": ["models", "pathfinding"],
     "unit_6_1": ["fare"],
     "unit_6_2": ["fare"],
