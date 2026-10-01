@@ -28954,7 +28954,6 @@
             "department_guidance_responded": "#/components/schemas/DepartmentGuidanceRespondedEvent",
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
-            "department_prompt_updated": "#/components/schemas/DepartmentPromptUpdatedEvent",
             "home_seen": "#/components/schemas/HomeSeenEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
