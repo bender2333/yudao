@@ -1,5 +1,9 @@
 # 后续开发设计与调研资料
 
+> 2026-10-01 新资料：[M1 试用时桌面客户端的打包与安装：事实调研](client-packaging-and-update.md)。支持[桌面客户端的安装、更新与发布设计说明](../design/client-packaging-and-release.md)与 [ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)：OpenCode 桌面版的打包、本机服务与更新做法；electron-builder 与 Electron Forge；electron-updater 的 generic 提供方、无签名与降级；Windows 上的代码签名与「来自网络」标记；Ollama、LM Studio、Docker Desktop 管理本机服务的做法；`uv tool install` 的行为；GitHub Actions 与 Release。只整理事实与来源。
+
+> 2026-09-30 新资料：[computer use 调研：屏幕来源、不打扰用户、家庭版、开发板与 UI Automation](computer-use-without-containers.md)。支持专题 2「computer use」的讨论（[阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节）：14 个项目的屏幕从哪里来、在同一台电脑上怎样不打扰用户、Windows 11 家庭版上哪些做法可行、开发板上直接运行 Xvfb 的软件包与占用，以及 Windows 的 UI Automation。只整理事实与来源。
+
 > 2026-09-30 新资料：[圈复杂度与变异测试调研](complexity-and-mutation-testing.md)。支持 [D35](../requirements/self-hosting.md)：本仓库的复杂度分布与 mutmut 3.8.0 在 `compaction.py`、`collaboration.py` 上的试跑结果、变异测试的成本估算，Stage 3 结束之前手动进行的步骤，mutmut、radon、complexipy 与三个 agent 的 skill 与 MCP 支持，以及 Robert C. Martin、Google、合并队列与自举的做法。
 
 > 2026-09-28 新资料：[computer use 实现调研](computer-use-implementations.md)。支持 [D34](../requirements/browser-and-computer-use.md) 里尚未写进设计的虚拟屏幕、截图尺寸与动作集合，核对 Anthropic 工具合同与 `claude-quickstarts` `dee7116` 的容器参考实现、OpenAI computer 工具与容器配方、Gemini 桌面动作、OMP `fdfeef1f78` 的宿主桌面工具，以及 OSWorld 的客户机环境。

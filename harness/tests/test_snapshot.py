@@ -154,7 +154,7 @@ def test_restore_after_source_deleted_uses_only_persisted_artifacts(data_dir, tm
     expected = capture_public_tree(source).digest
     shutil.rmtree(source)
     assert not source.exists()
-    reopened = LoopSystem(data_dir)
+    reopened = LoopSystem(data_dir, resume_on_startup=False)
     item = reopened.projects.projection(project_id).work_items[0]
     assert item.snapshot["tree_digest"] == expected
     restored = restore_snapshot(reopened.artifacts, run_id, item.snapshot, tmp_path / "recovered")

@@ -1,6 +1,6 @@
 # 桌面客户端、FastAPI 接口层，服务之间使用 HTTP 加 JSON
 
-Status: 「从本机以外访问需要认证」一项，2026-09-28 用户决定在只于局域网内使用期间暂缓：接口层保留认证这一步，局域网访问不校验，访问令牌与 TLS 标为 TODO，离开局域网访问之前加入（[应用层与接口层设计说明](../design/app-and-interface.md)第 6.2、6.3 节）。其余决定继续有效。
+Status: 「从本机以外访问需要认证」一项，2026-09-28 用户决定在只于局域网内使用期间暂缓：接口层保留认证这一步，局域网访问不校验，访问令牌与 TLS 标为 TODO，离开局域网访问之前加入（[应用层与接口层设计说明](../design/app-and-interface.md)第 6.2、6.3 节）。「外包 agent 的运行容器」由 [ADR-0022](0022-run-directly-without-containers.md) 改为外包 agent 的运行进程，Yudao 不使用容器。其余决定继续有效。
 
 界面要改为桌面程序（[系统架构原理](../design/architecture/core-and-materials.md)第 9 节），原型 v7 规定界面只通过查询读取、只通过命令提交（[ADR-0007](0007-boundaries-for-distributed-deployment.md) 第 5 条），Stage 6 要把执行层与观察者部署到不同的机器。决定：
 

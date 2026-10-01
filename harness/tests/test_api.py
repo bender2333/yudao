@@ -200,7 +200,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == ["model_unavailable"]
+    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id

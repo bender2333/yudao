@@ -456,6 +456,7 @@ def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
         original = LoopSystem(
             tmp_path,
             facade=_facade(config_a.base_url, config_b.base_url, credentials=credentials),
+            resume_on_startup=False,
         )
         first_run = original.create_run("first task")
         credentials["credential-b"] = CredentialMaterial("provider-b-key-v2", version="b-v2")
@@ -464,7 +465,7 @@ def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
             config_b.base_url,
             product_provider="provider-b",
             credentials=credentials,
-        ))
+        ), resume_on_startup=False)
         second_run = updated.create_run("second task")
 
         first = original.activate_once(first_run)
