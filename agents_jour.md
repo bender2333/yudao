@@ -758,3 +758,18 @@ qwen3.8 / 2026-10-02 06:05 / 执行者：#89 第 8 轮（自主推进模式，�
 三、改动。facade.py 第 586 至 593 行：selection is None 才提前返回；writes_tier() 的档位全集核对无条件先做，与部门默认 _parse_bindings 同一套规则（facade.py 第 1324 行按 REASONING_LEVELS 全集核对）；writes_model() 为假时在准入块之前返回，准入与目录检查的范围不变。selection.py 已有 writes_tier()，无需改动。全仓库检索 writes_model、writes_tier、REASONING_LEVELS 与 validate_department_setting 的调用点，确认没有第二处同样的提前返回需要跟改；validate_department_setting 的调用点只有 project_and_work_item_commands.py:327 一处。
 
 四、测试（前台单进程，未加 -n）。test_issue_89.py 10 项通过（109.00s）；test_provider_catalog.py 与 test_catalog_api.py 与 test_layers.py 与 test_openapi_snapshot.py 38 项通过（24.00s）。事件序列基准、OpenAPI 快照与客户端生成类型零改动（本轮不改变事件载荷与接口合同形状），git status 只有 facade、测试与记录文件。换行符：四个记录文件与两份改动的代码文件工作树裸 LF 计数均为 0，git ls-files --eol 仍 i/lf w/crlf。
+
+9router/ag/gemini-3.8-flash-high / 2026-10-02 06:40 / 审查者：工单 #89 第 8 轮审查结论为通过。
+
+一、规范检查。工作目录路径为 C:\project\yudao-worktrees\issue-89，分支名称为 issue-89，工单流程标签处于 needs-review，DELIVERY 第 8 轮交付评论要素齐全，工作区无冲突，仅存在未跟踪的 .logs/ 目录。
+
+二、内容核对。核对第 7 轮审查提出的问题修正：harness/providers/facade.py 的 validate_department_setting 方法在第 586 行的提前返回逻辑已调整为仅当 selection is None 时返回；selection.writes_tier() 为真时的档位全集校验无条件先于 writes_model() 执行。当项目部门设置仅修改请求档位、未显式写入模型访问定义（继承部门默认模型）时，不属于档位全集的非法请求档位（例如 requested_tier="extreme"）被正确拦截并返回 409 错误；同时写入合法档位或超出模型声明范围的档位时，行为符合设计规范。harness/tests/test_issue_89.py 已补充针对性测试用例 test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model。分支已合入 origin/main（72c89262），不存在代码冲突与绕过逻辑。
+
+三、测试复核（前台单进程，未加 -n）。
+- uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py：3 passed in 10.93s
+- node --test --test-reporter=dot harness/tests/test_web_ui.js：47 passed in 0.42s
+- uv run python -m pytest harness/tests/test_issue_89.py：10 passed in 49.03s
+- uv run python -m pytest harness/tests/test_provider_catalog.py harness/tests/test_call_target_per_request.py harness/tests/test_catalog_api.py：40 passed in 41.76s
+- uv run python -m pytest harness/tests/test_event_sequence.py：44 passed in 579.35s
+- uv run python -m pytest harness/tests/test_projects.py：28 passed in 589.97s
+各测试全部通过，失败项名称：无。
