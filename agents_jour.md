@@ -448,3 +448,17 @@ omp / 2026-10-01 16:50 / 执行者：#89 第 4 轮（自主推进模式，接上
 一处自我更正：中途读 .gitignore 时把工具输出里的行号当成文件里存在一行 .logs/，据此说 .logs/ 已被忽略；重新用 grep -c 与 git check-ignore 核对，.gitignore 里没有 .logs/ 这一行，该目录也确实未被忽略。结论不变（不提交 .logs/），但依据换成 check-ignore 的实际返回。
 
 待办：跑改动相关的测试文件与前端、test_layers.py、test_openapi_snapshot.py，写 DELIVERY 第 4 轮，标签改 needs-review。
+
+qwen3.8 / 2026-10-01 20:41 / 执行者：#89 第 5 轮（自主推进模式，按第 5 轮任务评论的范围做）。工作区起点：分支 issue-89 在 24deb5bb，已合入 origin/main 到 46ce77f7（#203、#218），另有 docs/CHANGELOG.md 与 docs/architecture-issues.md 两个未提交的记录文件。本轮只做任务评论列的三件事，不扩范围：提交记录文件、再合一次 main、跑指定的四个测试文件、写交付。
+
+（1）提交两个记录文件（62f69910），内容是第 4 轮登记的两项架构问题：接口版本 API_VERSION 与 run 事件版本 RUN_EVENT_VERSION 在删除事件种类后仍为 1、纳入版本管理的客户端生成类型与 openapi 快照脱节；test_work_item_execution_runs_in_loop_and_settles_on_completion 的 60 秒等待预算跑不完三部门完整循环，且在干净的 origin/main 上同样失败，属预存在缺陷，本工单不改测试。
+
+（2）git merge origin/main（2f770310，本轮前进 6 个提交：#188 场景 3 材料 evals/、#172 write_file 按字节、#18 恢复观察 run.recovery、#216 故障矩阵）。冲突只有任务评论预期的两处，都是追加型记录文件：agents_jour.md 与 docs/CHANGELOG.md。两侧记录全部保留、按时间顺序排列（main 的 #18、#172、#188 条目在前，本分支的 #89 第 3、4 轮条目在后）。逐条 grep -c 核对两侧的每一条关键条目在合并后都还在且只出现一次。换行符核对：合并前三个记录文件是 CRLF，合并后 agents_jour.md 450 行 CRLF、docs/CHANGELOG.md 308 行、docs/architecture-issues.md 152 行，裸 LF 计数都是 0，即没有把 CRLF 改成 LF 也没有混入混合换行；git ls-files --eol 显示 i/lf w/crlf 与合并前一致（库里 LF、检出 CRLF，由宿主 core.autocrlf=true 决定）。代码与基准这次没有冲突：#18 的 harness/recovery.py 与 project_queries.py 的 run.recovery、#172 的 workspace.py 与本工单改的 project.settings、_department_prompt 不在同一处，自动合并成功。合并提交 f83e3122，git merge-base --is-ancestor origin/main HEAD 成立。
+
+（3）合并后一致性核对：harness 内 .initial( 只有 orchestrator.py:288 一处调用、签名不带 department_prompts；harness/web/server.py 的 _configure_prompt 走 api/projects/<id>/departments/<dep>/prompts，调用 configure_department_settings 传 ModelSelection(department_prompt=...) 与 base_version，是项目级入口，run 级的 /api/runs/<id>/prompts 已不存在（路由表里 /api/runs/ 分支没有 prompts）；save_department_prompt 仍从 department_prompts.py 导入，是把当次 Prompt 原文写成工件的函数，与已删除的 run 内副本无关。project.settings 与 run.recovery 在 project_queries.py 里同时注册，两侧功能并存。
+
+（4）基准差异归因（合并前后都没重新生成，见（5））。用 .tmp/baseline_kinds.py 逐份比较 44 份基准在 origin/main 与 HEAD 的结构化内容（不是文本 diff，避开 <art#N> 占位符编号整体上移带来的噪音）：事件种类数量变化为「无」；payload 字段集合变化只有两类——run_created 去掉 department_prompts（本工单要求 run 内不留部门 Prompt 副本），以及 context_assembled、model_requested、model_message、model_attempt_finished、model_attempt_failed、model_retry_scheduled、model_request_serialized、tool_called、tool_skipped、compaction_recorded 十种事件各增加 reasoning_levels、default_reasoning_level、reasoning_mode 三个字段（本分支带入的 #87，尚未合入 main）；prompt_version 全部 1561 处由 1 变 0（run 内不再有版本 1 的 Prompt 副本，未写入项目部门设置的部门按内置默认，版本 0）。selection_source、requested_tier、sent_tier 三个字段在 main 上已有 30 处，来自 #133（0f2d66d9 调用目标每次请求解析），不属于本分支引入。占位符编号整体上移是 department_prompts 工件消失后的连带结果，不是额外的语义改动。
+
+（5）自测（前台单进程，未加 -n，只跑任务评论指定的四个文件）：test_layers.py 加 test_openapi_snapshot.py 2 passed in 7.50s；test_issue_89.py 7 passed in 56.17s；test_event_sequence.py 44 passed in 896.68s（0:14:56）。test_event_sequence 是比较模式通过，说明第 3 轮按合并代码重新生成的基准与本轮合并后的代码一致，因此没有运行 --write-event-baselines，本轮零基准文件改动。三项均 0 失败。
+
+待办：写 DELIVERY 第 5 轮，标签改 needs-review；不推送、不建 PR、不关闭工单。
