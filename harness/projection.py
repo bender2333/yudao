@@ -84,17 +84,17 @@ def saved_project(store: EventStore, project_id: str) -> ProjectProjection | Non
     return None if saved is None else _PROJECT_STATE.validate_json(saved.state)
 
 
-def replay_run(store: EventStore, run_id: str) -> RunProjection:
-    # 从 run 流的第一条事件重放运行状态投影：只用于重建与核对
-    events = store.list_events(run_id)
+def replay_run(store: EventStore, run_id: str, *, through: int | None = None) -> RunProjection:
+    # 从 run 流的第一条事件重放运行状态投影：只用于重建、核对与按位置读取（through 给出全局位置的上界）
+    events = store.list_events(run_id, through_position=through)
     if not events:
         raise RunNotFoundError(run_id)
     return project_events(events)
 
 
-def replay_project(store: EventStore, project_id: str) -> ProjectProjection | None:
-    # 从项目流的第一条事件重放项目投影：只用于重建与核对
-    events = store.list_project_events(project_id)
+def replay_project(store: EventStore, project_id: str, *, through: int | None = None) -> ProjectProjection | None:
+    # 从项目流的第一条事件重放项目投影：只用于重建、核对与按位置读取（through 给出全局位置的上界）
+    events = store.list_project_events(project_id, through_position=through)
     return replay(project_stream(project_id), events) if events else None
 
 
@@ -138,12 +138,16 @@ def fold(state: Projection, event: Event | ProjectEvent | CatalogEvent) -> None:
 
 
 def apply_catalog_event(state: CatalogProjection, event: CatalogEvent) -> None:
-    # 目录投影只记最后一条事件与最后一条 catalog_revised 的修订号；目录内容仍由 Provider 模块保存
+    # 目录投影只记最后一条事件与最后一条 catalog_revised 的修订号；目录内容仍由 Provider 模块保存。
+    # home_seen 另记用户查看过的全局位置与时间（工单 #127），控制主机上只有一个
     state.last_event_id = event.event_id
     state.stream_version = event.stream_version
     state.updated_at = event.created_at
     if event.type == CatalogEventType.CATALOG_REVISED:
         state.revision = int(event.payload["revision"])
+    elif event.type == CatalogEventType.HOME_SEEN:
+        state.last_seen_position = int(event.payload["position"])
+        state.last_seen_at = event.created_at
 
 
 def replay(stream: str, events: list[Event] | list[ProjectEvent] | list[CatalogEvent]) -> Projection:

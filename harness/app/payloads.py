@@ -1169,6 +1169,12 @@ class RuntimeForceUpgradeRequestedPayload(Payload):
     restarted_work_items: list[str]
 
 
+class HomeSeenPayload(Payload):
+    # 用户查看过的全局位置（工单 #127）：上一次查看的位置被这次的位置取代，控制主机上只有一个。
+    # 位置的写入时间由事件的 created_at 给出
+    position: int
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1237,4 +1243,5 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
     CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
+    CatalogEventType.HOME_SEEN: HomeSeenPayload,
 }

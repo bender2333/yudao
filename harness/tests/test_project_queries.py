@@ -12,6 +12,7 @@ from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
+from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
     DeliveryFile,
     DepartmentWorkspace,
@@ -32,7 +33,7 @@ from harness.app.project_queries import (
     WorkItemMaterials,
 )
 from harness.app.registry import Registry
-from harness.app.system_queries import SYSTEM_STATUS
+from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn
@@ -124,9 +125,10 @@ def _all_requests(system, project_id, work_item_id, run_id):
                     if event.type == EventType.CONTEXT_ASSEMBLED)
     delivery_event_id = system.project(run_id).delivery_spec.created_event_id
     return [
-        ("system.status", None),
+        ("system.status", SystemStatusRequest()),
         ("decisions.list", DecisionsList()),
         ("projects.list", ProjectsList()),
+        ("home.away_report", AwayReportRequest()),
         ("project.overview", ProjectOverview(project_id=project_id)),
         ("project.loop", ProjectLoop(project_id=project_id)),
         ("project.flow", ProjectFlow(project_id=project_id)),

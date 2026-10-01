@@ -28,7 +28,15 @@ export function createMainWindow(size: { width: number; height: number }): Brows
       sandbox: true,
     },
   });
-  void window.loadURL(`${RENDERER_ORIGIN}/index.html`);
+  // 开发时 electron-vite 把渲染进程的 Vite 开发服务器地址放在这个变量里，界面从它加载
+  // （参照 OpenCode 0027387 packages/desktop/src/main/windows.ts:334-343）；没有这个变量时
+  // 界面走注册过的 yudao://app 协议，来源固定为 yudao://app（接口层只放行这一个来源）
+  const devUrl = process.env.ELECTRON_RENDERER_URL;
+  if (devUrl) {
+    void window.loadURL(new URL("index.html", devUrl).toString());
+  } else {
+    void window.loadURL(`${RENDERER_ORIGIN}/index.html`);
+  }
   return window;
 }
 

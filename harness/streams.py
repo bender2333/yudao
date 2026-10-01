@@ -83,7 +83,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "source_directory_configured",
 })
 
-# 目录流：模型目录与凭据的修订记录，以及排空与强制升级。与项目流一样是跨版本保存的长期事实
+# 目录流：模型目录与凭据的修订记录，以及排空与强制升级、用户查看过的位置。
+# 与项目流一样是跨版本保存的长期事实
 CATALOG_EVENT_TYPES = frozenset({
     "catalog_revised",
     "catalog_candidates_collected",
@@ -91,6 +92,7 @@ CATALOG_EVENT_TYPES = frozenset({
     "credential_changed",
     "runtime_drain_started",
     "runtime_force_upgrade_requested",
+    "home_seen",
 })
 
 # 全部声明过分类的事件种类

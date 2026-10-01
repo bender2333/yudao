@@ -30,6 +30,11 @@ export function parseRoute(hash: string): Route {
     route.name = "connect";
     return route;
   }
+  // 动作图鉴：只在开发时使用，不进入正式的页面入口（页签、侧栏与 paths 里都没有它）
+  if (segments[0] === "gallery") {
+    route.name = "gallery";
+    return route;
+  }
   if (segments[0] === "sys" && segments.length === 2) {
     route.name = SYSTEM_PAGES[segments[1]] ?? "sys-reserved";
     route.systemPage = segments[1];

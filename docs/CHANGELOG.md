@@ -299,6 +299,8 @@ claude-opus-5 / 2026-10-01 / docs/architecture-issues.md 增加两条：#89 登�
 claude-opus-5-5 / 2026-10-01 01:46 / 新增 docs/adr/0023-client-installed-apart-release-is-one-wheel.md（桌面客户端与 Yudao 服务分开安装，一次发布是一个 wheel，客户端版本跟随 Yudao 服务）与 docs/design/client-packaging-and-release.md（桌面客户端的安装、更新与发布设计说明：安装、本机服务的启动与停止、托盘、更新、发布脚本、签名 TODO、验收、工单拆分）；新增 docs/research/client-packaging-and-update.md（客户端打包调研），docs/research/README.md 加入索引；docs/decision.md 新增「桌面客户端的打包、安装与发布」 / 用户选择专题 5 用 grill 讨论，三轮逐项采纳推荐
 claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、6.2、8、10 节、`system.status` 与 `agent.package` 按客户端的安装、更新与发布修改（更新页与更新源、本机停止请求、命令行入口 yudao、发布版本号与正在运行的 run 数、执行代理安装包随 wheel 提供）；docs/design/execution-environment.md 第 5.3.2 节执行代理的安装包改为发布时构建、随 Yudao 服务的 wheel 提供，第 12 节 #144 一行同步；docs/requirements/web-game-frontend.md（D30）与 docs/requirements/stage-requirements-overview.md 第 6 节第 5 项写明已确定并登记遗留；CLAUDE.md 工作流程第 7 步加入发布；CONTEXT.md 加入「Yudao 服务」「桌面客户端」「发布」 / 同上
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
+
+claude-sonnet-4-5 / 2026-10-01 22:50 / docs/architecture-issues.md 追加一条：#127 的工作树换行符（CRLF）与仓库保存的 LF 不一致，仓库本地 core.autocrlf=false 且没有 .gitattributes / 记录实现 #127 时遇到的交付 diff 无法审阅的问题，请架构师确认换行符规则
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 
 qwen3.8 / 2026-10-01 07:40 / docs/architecture-issues.md 为 #135 登记两条架构问题（项目流字段清单拒绝 `project_registered.source` 取值集合的扩大；宿主私有路径的拒绝与 git 仓库接入相冲突）/ 执行者按 3.8 设计说明实施接入命令时遇到与 ADR-0019 及验收第 8、9 项的冲突，按 AGENTS.md 登记并等待架构师确认
@@ -310,3 +312,8 @@ qwen3.8 / 2026-10-01 13:05 / docs/architecture-issues.md 登记一条：合入 o
 omp / 2026-10-01 19:37 / docs/architecture-issues.md 登记两条：#89 删除 run 流事件种类与字段后接口版本（`API_VERSION`）与 run 事件版本（`RUN_EVENT_VERSION`）仍为 1、纳入版本管理的客户端生成类型与快照脱节且无一致性检查；#89 的 `test_work_item_execution_runs_in_loop_and_settles_on_completion` 在 60 秒等待预算内跑不完三部门完整循环（实测 116.1 秒），在干净的 origin/main 上同样失败，与 #219 同类 / 第 4 轮合入 main 并跑改动相关测试时发现，两处都超出本工单范围，交架构师裁决
 claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/main 时把 #79 的接口版本条目（2026-10-01 03:10）排到本工单 #135 的两条条目（07:14、07:40）之前，恢复条目之间的空行 / 该文件按时间顺序追加，合并时两侧都新增了条目，需要按时间重排，本工单未改动任何条目的正文与「处理：待架构师确认」
 qwen3.8 / 2026-10-01 21:32 / docs/architecture-issues.md 追加一条：二次合入 origin/main（`4798231e` #223）以后「部门设置」的改名只到内部模型，HTTP 路由段、部门工作台响应键 `prompt_config` 与 409 的 `reason` 值仍是 prompt 字样 / 合并时确认两侧口径混用，对外命名需要架构师定，本工单不改任何对外名
+
+qwen3.8 / 2026-10-01 11:20 / docs/architecture-issues.md 为 #176 登记三条待架构师确认的问题（「全部公开画法」的判定口径、画面对象是否包含 setOverlay、整数倍缩放指渲染缓冲还是显示尺寸） / 执行者在像素画面一的移植中遇到验收口径与接口形状不确定，按工作流程登记
+minimax-M3.1 / 2026-10-01 21:05 / 无文档改动；本工单第 2 轮只做合入 origin/main（d4248448）与按合并后的依赖重装，代码与文档正文与第 1 轮一致 / 分支起点早于 #79 合入 main，client/ 目录两侧各自新增导致七个 add/add 冲突，client 的六个文件按「main 上 #79 的外壳 + 本工单像素新增」保留，三份追加型记录两侧条目都保留、按时间顺序排列
+minimax-M3.1 / 2026-10-01 21:20 / client/src/main/window.ts 与 client/tests/e2e/pixel.spec.ts：主进程经 ELECTRON_RENDERER_URL 加载开发服务器渲染的界面（无该变量时仍走 yudao://app 协议，来源不变），端到端测试用 Vite 开发服务器提供渲染进程 / 第 1 轮的图鉴端到端用例从未真实运行过；electron-vite build 把 NODE_ENV 固定为 production，图鉴的 import.meta.env.DEV 分支在构建产物中被消掉，用例必然失败。图鉴只在开发时可用（工单要求），因此改由开发服务器提供界面，参照 OpenCode 0027387 的做法
+claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记的三条（图鉴核对口径、覆盖层接口、缩放的整数倍）追加处理结论 / 架构师处理执行者登记的架构问题
