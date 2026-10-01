@@ -422,6 +422,10 @@ qwen3.8 / 2026-10-02 00:35 / 第三次合入 origin/main（8e3f0832，#127、#17
 
 qwen3.8 / 2026-10-02 02:25 / 第 6 轮续：第四次合入 origin/main（合并提交 527588dc，8e3f0832 前进到 1f80b3ad，main 新增 ad4fde86 #226/#227 与两个 docs 提交）/ 实际改动只有 claude_jour.md 两侧并集与 harness/tests/test_issue_18_recovery_observation.py 采纳 main 的 SystemStatusRequest() 修复；agents_jour.md、docs/CHANGELOG.md 冲突取本侧（本侧按条目重建已是两父并集），合入后 origin/main 为 HEAD 祖先，layers+openapi 复跑 2 通过
 
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / docs/design/app-and-interface.md 第 9 节验收第 1 条补上客户端提交的生成类型与快照逐文件相同（`test_openapi_snapshot.py` 内的检查） / #221 按工单要求增加这项检查，设计说明的验收条目需要写明它
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / AGENTS.md「常用命令」中每次都运行的两项检查一条写明 `test_openapi_snapshot.py` 现在的两项检查内容、各自需要先安装的依赖，以及重写快照以后在 client 中运行 `npm run generate:api` 重新生成客户端类型 / #221 把新检查接进执行者与审查者每次都运行的命令，需要写明依赖与重新生成的步骤
+
 qwen3.8 / 2026-10-02 02:42 / 第 6 轮续：第五次合入 origin/main（合并提交 1dde43d4，1f80b3ad 前进到 75c02df5，只有 claude_jour.md 加一行记录、无代码改动）/ claude_jour.md 取两侧并集从 244 条到 245 条，合入后 origin/main 为 HEAD 祖先，OpenAPI 快照与 44 份事件序列基准的生成源未变
 
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
