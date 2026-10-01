@@ -640,3 +640,11 @@ qwen3.8 / 2026-10-02 02:25 / 执行者：#89 第 6 轮续（自主推进模式�
 三、记录文件冲突取本侧。git merge 在 agents_jour.md 与 docs/CHANGELOG.md 各造一个冲突块：origin/main 一侧想加的 23:20、00:05（agents_jour）与 23:25、00:08（CHANGELOG）条目，00:35 那条按条目重建时已从 origin/main（含 ad4fde86）并进来，本侧是两父的并集。判定方法：逐条签名比对，agents_jour.md 本侧 223 条含 origin/main 全部 215 条、docs/CHANGELOG.md 本侧 202 条含 origin/main 全部 197 条、docs/architecture-issues.md 本侧 51 条含 origin/main 全部 46 条，缺失行数 0。冲突块取本侧后清除标记，裸 LF 计数 0，`git ls-files --eol` 三文件仍 i/lf w/crlf。
 
 四、合入没有触及快照与基准的生成源。`git diff --name-only a5c7268d HEAD -- harness/` 只列出 test_issue_18_recovery_observation.py 一个文件，harness 源码、OpenAPI 快照生成链、44 份事件序列基准都不变，因此 00:35 那条记的快照一行删除与基准逐字节相同的结论在合并后仍成立。复跑：`uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py` → 2 passed in 13.54s；`uv run python -m compileall -q harness` 退出码 0。
+
+qwen3.8 / 2026-10-02 02:42 / 执行者：#89 第 6 轮续（自主推进模式，第五次合入 origin/main 到 75c02df5）。承接 02:25 那条之后，git fetch 再次发现 origin/main 从 1f80b3ad 前进一个提交 75c02df5（docs：记录集成层 ad4fde86），只改 claude_jour.md 一行，`git merge-base --is-ancestor origin/main HEAD` 又返回非零，合入。
+
+一、合并提交 1dde43d4，父提交 835ce610 与 75c02df5，干净自动合并（ort 策略），无冲突。claude_jour.md 取两侧并集，从 244 条到 245 条；agents_jour.md、docs/CHANGELOG.md、docs/architecture-issues.md 本轮没有冲突，也不涉及本次 main 前进。合入后 `git merge-base --is-ancestor origin/main HEAD` 返回 0。
+
+二、`git diff --name-only 835ce610 HEAD` 只有 claude_jour.md 一个文件，没有任何 harness 代码、OpenAPI 快照生成源或事件序列基准被改动，因此 02:25 那条记录的快照一行删除与 44 份基准逐字节相同的结论在这一步之后仍然成立。
+
+三、祖先关系与换行符核对：四个记录文件（agents_jour.md 224、claude_jour.md 245、docs/CHANGELOG.md 203、docs/architecture-issues.md 51）相对两个父本条目缺失均为 0，工作树全部 CRLF、裸 LF 计数 0，`git ls-files --eol` 仍是 i/lf w/crlf。
