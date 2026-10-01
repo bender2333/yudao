@@ -7,6 +7,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "generate:api": "node scripts/generate-api.mjs",
+    "generate:pixel": "node scripts/generate-pixel-registry.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -14,7 +15,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "eventsource": "5.1.2"
+    "@fontsource/fusion-pixel-10px-proportional-sc": "5.3.0",
+    "eventsource": "5.1.2",
+    "gsap": "3.13.0",
+    "pixi.js": "8.13.1"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
