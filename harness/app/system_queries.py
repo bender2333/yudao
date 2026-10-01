@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import AwareDatetime
 
-from ..models import EventType
+from ..models import CatalogEventType, EventType
 from ..projection import saved_decisions
 from .contracts import Contract, Snapshot
+from .project_queries import RecoveryStatus, recovery_status
 from .registry import QueryDefinition
 from .replay import ReplayRequest, catalog_through, check_position, decisions_through
 
@@ -43,14 +44,19 @@ class HomeStatus(Contract):
     disk_free_bytes: int | None
 
 class SystemStatus(Contract):
-    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误
+    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误。
+    # version 是服务的发布版本号，running_runs 是还没有结束的 run 数，客户端在停止之前用它显示确认
     log_id: str
     boot_id: str
     started_at: AwareDatetime
+    version: str
+    running_runs: int
     provider: ProviderReadiness
     catalog: CatalogState
     # 排空状态（ADR-0019，3.1）：未排空、排空中与剩余的 run 数、已排空可以升级
     drain: DrainStatus
+    # 恢复观察汇总（3.1，工单 #18）
+    recovery: RecoveryStatus
     # 首页状态项（工单 #127）
     home: HomeStatus
 
@@ -76,13 +82,16 @@ def _system_status(application: Application, request: SystemStatusRequest) -> Sn
         position = through
     readiness = system.provider_status()
     drain = system.drain
+    recovery = recovery_status(application)
     return Snapshot[SystemStatus](position=position, data=SystemStatus(
         log_id=store.log_id, boot_id=application.boot_id, started_at=application.started_at,
+        version=application.version, running_runs=system.running_runs,
         provider=ProviderReadiness(available=readiness["available"], reason=readiness["reason"],
                                    message=readiness["message"]),
         catalog=CatalogState(revision=catalog["revision"], reload_error=catalog["reload_error"]),
         drain=DrainStatus(state=drain.state, version=drain.version, running_runs=drain.running_runs,
                           queued_work_items=drain.queued_work_items),
+        recovery=recovery,
         home=HomeStatus(
             waiting_decisions=sum(1 for item in decisions if item.status == "open"),
             disk_free_bytes=_disk_free_bytes(system.data_dir),
@@ -102,7 +111,12 @@ def _disk_free_bytes(data_dir) -> int | None:
 
 SYSTEM_STATUS = QueryDefinition(
     name="system.status", request=SystemStatusRequest, result=SystemStatus, handle=_system_status,
-    changed_by=(EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
+    changed_by=(EventType.RUN_RESUMED, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
+                EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED,
+                EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+                EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
+                CatalogEventType.RUNTIME_DRAIN_STARTED),
     replayable=True,
 )
 

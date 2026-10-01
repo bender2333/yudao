@@ -143,10 +143,15 @@ class LoopSystem:
     # 排空与强制升级（应用层与接口层设计说明第 3.2 节「升级」，ADR-0019）
 
     @property
+    def running_runs(self) -> int:
+        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态（设计说明第 4.4 节）
+        unfinished = classify_startup_runs(self.store)
+        return len(unfinished.same_version) + len(unfinished.other_version)
+
+    @property
     def drain(self) -> DrainState:
         # 排空状态：未排空、排空中（还有 run 在进行）、已排空可以升级；正在进行的 run 数与期间排队的事项数
-        unfinished = classify_startup_runs(self.store)
-        running = len(unfinished.same_version) + len(unfinished.other_version)
+        running = self.running_runs
         version = self._drain_version()
         if version is None:
             return DrainState(state=DRAIN_IDLE, version=0, running_runs=running)

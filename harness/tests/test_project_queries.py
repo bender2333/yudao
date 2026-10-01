@@ -74,7 +74,7 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     overlays = {item.name: item.queries for item in capabilities.overlays}
     assert overlays["flow"] == ["project.flow"]
     assert overlays["waiting"] == ["project.loop", "decisions.list"]
-    assert "recovery" not in overlays
+    assert overlays["recovery"] == ["run.recovery"]
     assert "context_usage" not in overlays
     assert "semantic_records" not in overlays
 

@@ -150,7 +150,8 @@ class Deployment(Contract):
     log_id: str
     boot_id: str
     version: str
-    api_version: int
+    # example 让接口类型的生成脚本读到这个版本，写进客户端构建时记录的接口版本
+    api_version: int = Field(json_schema_extra={"example": API_VERSION})
     contract_digest: str
     access: AccessMode
 

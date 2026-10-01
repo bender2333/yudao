@@ -11,7 +11,7 @@ from .models import (
     EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
 )
 from .definitions import DEFINITIONS
-from .tools import proposal_kind, tool_action
+from .tools import proposal_kind, proposal_kinds, tool_action
 
 
 # 写入与检查的工具按定义中的动作类别；inspect 请求只认读取整个文件与列出文件这两种读取的结果
@@ -55,11 +55,10 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
         return allowed
     if department != department_for_phase(projection.phase):
         return _diverted_guidance_kinds(department, projection) if has_guidance else set()
-    allowed = {"collaboration_request"} | {
-        "product": {"product_spec", "product_decision"},
-        "engineering": {"engineering_plan", "delivery_spec"},
-        "quality": {"qa_review"},
-    }[department]
+    # 本部门在这种事项种类中可以提交的提案种类由定义给出（工单 #134）：普通事项与建档事项的清单不同
+    allowed = {"collaboration_request"} | (proposal_kinds(department, projection.kind)
+                                           - {"collaboration_request", "collaboration_response",
+                                              "department_guidance_response"})
     if has_guidance:
         allowed.add("department_guidance_response")
     if projection.input_version > projection.processed_input_version:
@@ -549,12 +548,14 @@ def _has_pending_guidance(projection: RunProjection, department: str) -> bool:
 
 
 def _diverted_guidance_kinds(department: str, projection: RunProjection) -> set[str]:
-    if department == "product":
-        allowed = {"collaboration_request", "product_spec", "product_decision", "department_guidance_response"}
-        if projection.input_version > projection.processed_input_version:
-            return allowed - {"product_decision"}
-        return allowed
-    return {"department_guidance_response", "collaboration_request"}
+    if department != "product":
+        return {"department_guidance_response", "collaboration_request"}
+    # 产品被提前安排时仍然可以处理需求：可提交的种类按本事项种类的定义取，再补上回应指导与提出请求
+    allowed = {"collaboration_request", "department_guidance_response"} | (
+        proposal_kinds(department, projection.kind) & {"product_spec", "product_decision"})
+    if projection.input_version > projection.processed_input_version:
+        return allowed - {"product_decision"}
+    return allowed
 
 
 def _content_hash(value: Any) -> str | None:
