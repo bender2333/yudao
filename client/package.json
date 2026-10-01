@@ -1,0 +1,34 @@
+{
+  "name": "yudao-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Yudao 桌面客户端：Electron 外壳、生成的接口类型、连接设置与事件流同步",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "generate:api": "node scripts/generate-api.mjs",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=dot tests/unit/*.test.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "eventsource": "5.1.2"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.1.0",
+    "electron": "44.4.5",
+    "electron-builder": "26.17.0",
+    "electron-vite": "5.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.6"
+  }
+}
