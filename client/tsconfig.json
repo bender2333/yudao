@@ -12,8 +12,9 @@
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": ["src", "scripts", "tests"]
 }

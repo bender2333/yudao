@@ -307,3 +307,8 @@ claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事
 claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
 my-provider/ag/gemini-3.8-flash-high / 2026-10-01 18:20 / docs/design/evaluation-scenarios.md 第 1 节表格的场景 3「正确性与完成度」一行与第 2.3 节「需求条目」一条由 23 条检查、单元 11 改为 24 条检查、单元 12；第 2.3 节「检查的改造」中 test_line_preference 一条写明上游断言 `any(" 1" in edge.line)` 失效的原因，以及改为在两条路线上各指定一条基准路径不经过的线路、再加一组多线路偏好的做法 / #188 第 2 轮新增线路偏好检查，公开材料、评分器与设计说明的检查条数需要一致
 claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/main 时把 #79 的接口版本条目（2026-10-01 03:10）排到本工单 #135 的两条条目（07:14、07:40）之前，恢复条目之间的空行 / 该文件按时间顺序追加，合并时两侧都新增了条目，需要按时间重排，本工单未改动任何条目的正文与「处理：待架构师确认」
+
+qwen3.8 / 2026-10-01 11:20 / docs/architecture-issues.md 为 #176 登记三条待架构师确认的问题（「全部公开画法」的判定口径、画面对象是否包含 setOverlay、整数倍缩放指渲染缓冲还是显示尺寸） / 执行者在像素画面一的移植中遇到验收口径与接口形状不确定，按工作流程登记
+minimax-M3.1 / 2026-10-01 21:05 / 无文档改动；本工单第 2 轮只做合入 origin/main（d4248448）与按合并后的依赖重装，代码与文档正文与第 1 轮一致 / 分支起点早于 #79 合入 main，client/ 目录两侧各自新增导致七个 add/add 冲突，client 的六个文件按「main 上 #79 的外壳 + 本工单像素新增」保留，三份追加型记录两侧条目都保留、按时间顺序排列
+minimax-M3.1 / 2026-10-01 21:20 / client/src/main/window.ts 与 client/tests/e2e/pixel.spec.ts：主进程经 ELECTRON_RENDERER_URL 加载开发服务器渲染的界面（无该变量时仍走 yudao://app 协议，来源不变），端到端测试用 Vite 开发服务器提供渲染进程 / 第 1 轮的图鉴端到端用例从未真实运行过；electron-vite build 把 NODE_ENV 固定为 production，图鉴的 import.meta.env.DEV 分支在构建产物中被消掉，用例必然失败。图鉴只在开发时可用（工单要求），因此改由开发服务器提供界面，参照 OpenCode 0027387 的做法
+claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记的三条（图鉴核对口径、覆盖层接口、缩放的整数倍）追加处理结论 / 架构师处理执行者登记的架构问题
