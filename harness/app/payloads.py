@@ -236,6 +236,8 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 
 class RunCreatedPayload(Payload):
     task: str
+    # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     initial_input: InputRecord
     department_prompts: dict[Department, PromptRecord]
     intend_ref: ArtifactRef
@@ -251,6 +253,8 @@ class RunCreatedPayload(Payload):
     work_item_id: str | None
     baseline: Baseline | None
     snapshot: CodeSnapshot | None
+    # 建档事项的仓库概况工件引用；普通事项没有概况
+    overview_ref: ArtifactRef | None = None
     workspace_digest: str
     project_context_ref: ArtifactRef | None
     prompt_config_versions: dict[Department, int]
@@ -509,6 +513,8 @@ class ToolCallResult(ToolRecord):
     ok: bool
     error: str | None
     output_ref: ArtifactRef | None = None
+    # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
+    after_snapshot_ref: ArtifactRef | None = None
 
 
 class UsageCharge(Versions, CallTarget):
@@ -545,11 +551,23 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     registered_name: str | None = None
     registered_argv: list[str] | None = None
     snapshot_hash: str | None = None
+    # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
+    before_snapshot_ref: ArtifactRef | None = None
 
 
 class ToolSkippedPayload(ToolRecord):
     ok: Literal[False]
     error: str
+
+class ActionVerifiedPayload(ToolRecord):
+    # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
+    # resolution 为 continue 表示用户选择按当前实际状态继续；选择重新执行时不写核实记录，由步骤驱动补执行。
+    # input_item 让这条结果进入部门历史，模型据此继续
+    ok: bool
+    error: str | None = None
+    resolution: Literal["continue"]
+    note: str | None = None
+    decision_id: str | None = None
 
 
 class ProposalSubmittedPayload(Payload):
@@ -761,6 +779,89 @@ class QaSubmittedPayload(Payload):
     git_version: GitVersion
 
 
+class StructureModule(Payload):
+    # 现有结构说明中的一个模块
+    path: str
+    responsibility: str
+
+
+class StructureEntryPoint(Payload):
+    kind: Literal["program", "command_line", "service"]
+    path: str
+    how_to_run: str
+
+
+class StructureBuildItem(Payload):
+    # 构建与测试的一条命令，带本次激活中绑定当前快照的执行回执
+    name: str
+    argv: list[str]
+    purpose: str
+    receipt: CheckReceipt
+
+
+class StructureRequirementLocation(Payload):
+    requirement: str
+    locations: list[str]
+
+
+class StructureAcceptedPayload(Payload):
+    overall: str
+    modules: list[StructureModule]
+    entry_points: list[StructureEntryPoint]
+    build_and_test: list[StructureBuildItem]
+    requirement_locations: list[StructureRequirementLocation]
+    conventions: list[str]
+    product_spec_hash: str
+    code_tree_digest: str
+    kind: Literal["structure"]
+    issuer: Literal["engineering"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    structure_ref: ArtifactRef
+    request_id: str | None
+    git_version: GitVersion
+
+
+class BaselineConclusion(Payload):
+    # 基线核验中对一条初始 PRD 要求的结论
+    requirement: str
+    status: Literal["verified", "read_only", "existing_defect", "unsupported"]
+    evidence: str
+
+
+class BaselineOmission(Payload):
+    capability: str
+    location: str
+
+
+class BaselineOtherFailure(Payload):
+    check: str
+    reason: str
+
+
+class BaselineReviewAcceptedPayload(Payload):
+    verdict: Literal["consistent", "rework_product"]
+    conclusions: list[BaselineConclusion]
+    omissions: list[BaselineOmission]
+    checks: list[CheckReceipt]
+    other_failures: list[BaselineOtherFailure]
+    product_spec_hash: str
+    structure_hash: str
+    code_snapshot_hash: str
+    kind: Literal["baseline_review"]
+    issuer: Literal["quality"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    request_id: str | None
+    git_version: GitVersion
+
+
 class ReviewObservation(Payload):
     # 教训候选来自质检退回
     verdict: str
@@ -850,8 +951,24 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class UnknownActionRequested(Payload):
+    # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
+    # 只阻塞该动作（blocks="action"），不阻塞整个 run。
+    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute
+    kind: Literal["unknown_action"]
+    blocks: Literal["action"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    action_id: str
+    tool: str
+    action_kind: str
+    repeatable: bool
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested
+DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -888,6 +1005,12 @@ class ProjectRegisteredPayload(Payload):
 
 class ProjectRenamedPayload(Payload):
     name: str
+
+
+class ProjectGoalChangedPayload(Payload):
+    # 长期目标改为 goal；goal_ref 是目标原文的工件引用
+    goal: str
+    goal_ref: ArtifactRef
 
 
 class ProjectPinnedPayload(Payload):
@@ -1066,6 +1189,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.TOOL_CALLED: ToolCallResult | UsageCharge,
     EventType.TOOL_STARTED: ToolStartedPayload,
     EventType.TOOL_SKIPPED: ToolSkippedPayload,
+    EventType.ACTION_VERIFIED: ActionVerifiedPayload,
     EventType.PROPOSAL_SUBMITTED: ProposalSubmittedPayload,
     EventType.PROPOSAL_REJECTED: ProposalRejectedPayload,
     EventType.SPEC_ACCEPTED: SpecAcceptedPayload,
@@ -1078,6 +1202,8 @@ PAYLOADS: dict[str, Any] = {
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,
+    EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
+    EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
     EventType.TRANSITION: TransitionPayload,
     EventType.RUN_DONE: RunDonePayload,
@@ -1089,6 +1215,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,
     ProjectEventType.PROJECT_REGISTERED: ProjectRegisteredPayload,
     ProjectEventType.PROJECT_RENAMED: ProjectRenamedPayload,
+    ProjectEventType.PROJECT_GOAL_CHANGED: ProjectGoalChangedPayload,
     ProjectEventType.PROJECT_PINNED: ProjectPinnedPayload,
     ProjectEventType.PROJECT_ARCHIVED: ProjectArchivedPayload,
     ProjectEventType.PROJECT_RESTORED: ProjectRestoredPayload,

@@ -143,6 +143,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "project.create", "reasons": ["command_id_reused"]},
         {"name": "project.rename",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
+        {"name": "project.set_goal",
+         "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.pin",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.archive",
@@ -200,7 +202,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed"]
+    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
