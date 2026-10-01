@@ -79,6 +79,7 @@ _LABELS: dict[str, str] = {
     EventType.DECISION_WITHDRAWN: "撤回了一个决定（{kind}）",
     ProjectEventType.PROJECT_REGISTERED: "建立了项目：{name}",
     ProjectEventType.PROJECT_RENAMED: "项目改名为：{name}",
+    ProjectEventType.PROJECT_GOAL_CHANGED: "修改了项目的长期目标",
     ProjectEventType.PROJECT_PINNED: "把项目固定到列表顶部",
     ProjectEventType.PROJECT_ARCHIVED: "归档了项目",
     ProjectEventType.PROJECT_RESTORED: "恢复了项目",

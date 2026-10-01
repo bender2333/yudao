@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import ipaddress
 import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -18,8 +19,10 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import TypeAdapter
+from starlette.responses import FileResponse, Response
 
 from ..app.application import DEFAULT_REGISTRY, Application
+from ..app.client_update import NO_INSTALLER, ReleaseAssetNotFound, ReleaseAssets
 from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.project_queries import NotFound
@@ -30,7 +33,9 @@ _COMPONENTS = "#/components/schemas/{model}"
 
 
 def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY,
-               access: AccessMode = "local", keepalive_sec: float = 15.0) -> FastAPI:
+               access: AccessMode = "local", keepalive_sec: float = 15.0,
+               on_stop: Callable[[], None] | None = None,
+               release_assets: ReleaseAssets | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         application = open_application()
@@ -56,6 +61,10 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
 
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
+    # 本机停止请求（设计说明第 4.4 节）：不是命令，不产生领域事件，不经过命令注册表
+    _add_stop(api, access=access, on_stop=on_stop)
+    # 更新源（设计说明第 5.1 节）：不是查询与命令，从 wheel 内的发布资源目录读取
+    _add_client_update(api, assets=release_assets)
     # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前
     api.add_middleware(CORSMiddleware, allow_origins=list(CLIENT_ORIGINS), allow_methods=["GET", "POST"],
                        allow_headers=["Content-Type"])
@@ -63,6 +72,52 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
     return api
+
+def _add_stop(api: FastAPI, *, access: AccessMode, on_stop: Callable[[], None] | None) -> None:
+    # POST /api/system/stop：只在本机访问方式下接受，并且请求来自回环地址；局域网访问方式下拒绝。
+    # 服务收到以后停止接受新请求、关闭事件流连接、等待进行中的写入完成、释放进程锁并退出；
+    # 进行中的 run 不等待结束，下次启动时按 3.1 自动继续
+    async def stop(request: Request) -> Response:
+        peer = request.client.host if request.client is not None else ""
+        if access != "local" or not _is_loopback(peer):
+            return JSONResponse(status_code=403, content={"error": "the stop request is only accepted "
+                                                                    "from a loopback address in local access mode"})
+        if on_stop is None:
+            return JSONResponse(status_code=503, content={"error": "this service does not accept a stop request"})
+        on_stop()
+        return JSONResponse(status_code=202, content={"stopping": True})
+
+    api.add_api_route("/api/system/stop", stop, methods=["POST"], operation_id="system_stop", tags=["system"])
+
+def _is_loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+def _add_client_update(api: FastAPI, *, assets: ReleaseAssets | None = None) -> None:
+    # GET /client-update/latest.yml 与 GET /client-update/<文件名>（安装程序与 blockmap），支持 Range。
+    # 文件来自 wheel 内的发布资源目录；没有这个目录（从源码运行）时返回 404，响应写明「没有客户端安装包」
+    assets = ReleaseAssets() if assets is None else assets
+
+    def release_file(name: str) -> Response:
+        try:
+            path = assets.latest_manifest() if name == "latest.yml" else assets.installer(name)
+        except ReleaseAssetNotFound:
+            return JSONResponse(status_code=404, content={"error": NO_INSTALLER})
+        # FileResponse 按 Range 请求返回 206 与请求的片段，供 electron-updater 差分下载
+        return FileResponse(path)
+
+    async def latest_manifest() -> Response:
+        return release_file("latest.yml")
+
+    async def installer(filename: str) -> Response:
+        return release_file(filename)
+
+    api.add_api_route("/client-update/latest.yml", latest_manifest, methods=["GET"],
+                      operation_id="client_update_manifest", tags=["client-update"])
+    api.add_api_route("/client-update/{filename}", installer, methods=["GET"],
+                      operation_id="client_update_file", tags=["client-update"])
 
 
 def contract_digest(api: FastAPI) -> str:

@@ -915,6 +915,10 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     if etype == ProjectEventType.PROJECT_RENAMED:
         state.name = payload["name"]
         return
+    if etype == ProjectEventType.PROJECT_GOAL_CHANGED:
+        state.goal = payload["goal"]
+        state.goal_ref = payload["goal_ref"]
+        return
     if etype == ProjectEventType.PROJECT_PINNED:
         state.pinned = bool(payload["pinned"])
         return

@@ -371,6 +371,19 @@ class ProjectService:
 
         self.writes.transact(project_stream(project_id), rename, command=command)
 
+    def set_goal(self, project_id: str, goal: str, *, command: Command | None = None) -> None:
+        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完
+        _require_text("goal", goal)
+
+        def set_goal(transaction: Transaction) -> None:
+            self._writable_in(transaction, project_id)
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_GOAL_CHANGED, {
+                "goal": goal, "goal_ref": asdict(goal_ref),
+            }, actor="user:local"))
+
+        self.writes.transact(project_stream(project_id), set_goal, command=command)
+
     def pin(self, project_id: str, pinned: bool, *, command: Command | None = None) -> None:
         if not isinstance(pinned, bool):
             raise ValueError("pinned must be a boolean")

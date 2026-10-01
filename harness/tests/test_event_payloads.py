@@ -24,6 +24,7 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects = system.projects
     project_id = projects.register("载荷", "核对每种事件的载荷")
     projects.rename(project_id, "载荷核对")
+    projects.set_goal(project_id, "核对修改以后的长期目标")
     projects.pin(project_id, True)
     projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)

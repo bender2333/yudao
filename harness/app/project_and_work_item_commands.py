@@ -58,6 +58,22 @@ async def _rename_project(application: "Application", command: Command, request:
         raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
 
 
+class ProjectSetGoal(CommandRequest):
+    base_version: int
+    project_id: str
+    goal: Text
+
+
+async def _set_project_goal(application: "Application", command: Command, request: ProjectSetGoal) -> None:
+    _require_current(application, request.project_id, request.base_version)
+    try:
+        application.system.projects.set_goal(request.project_id, request.goal, command=command)
+    except ProjectNotFoundError as missing:
+        raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
+    except ProjectArchivedError as archived:
+        raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
+
+
 class ProjectPin(CommandRequest):
     base_version: int
     project_id: str
@@ -385,6 +401,9 @@ async def _save_source_directory(application: "Application", command: Command,
 
 PROJECT_RENAME = CommandDefinition(
     name="project.rename", request=ProjectRename, refs=NoRefs, handle=_rename_project, derive_refs=_no_refs,
+    reasons=("not_found", "stale_base", "project_archived"))
+PROJECT_SET_GOAL = CommandDefinition(
+    name="project.set_goal", request=ProjectSetGoal, refs=NoRefs, handle=_set_project_goal, derive_refs=_no_refs,
     reasons=("not_found", "stale_base", "project_archived"))
 PROJECT_PIN = CommandDefinition(
     name="project.pin", request=ProjectPin, refs=NoRefs, handle=_pin_project, derive_refs=_no_refs,
