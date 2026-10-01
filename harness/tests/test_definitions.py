@@ -264,10 +264,16 @@ def _without_quality(directory: Path) -> None:
     organization = _read(directory, "organization.json")
     organization["departments"] = organization["departments"][:2]
     _write(directory, "organization.json", organization)
-    for name, key in (("roles.json", None), ("proposal_contracts.json", "roles")):
+    for name, key in (("roles.json", None), ("proposal_contracts.json", "roles"),
+                      ("work_items.json", ("kinds", "onboarding", "departments"))):
         content = _read(directory, name)
-        del (content if key is None else content[key])["quality"]
+        target = content
+        steps = [] if key is None else ([key] if isinstance(key, str) else list(key))
+        for step in steps:
+            target = target[step]
+        del target["quality"]
         _write(directory, name, content)
+
 
 
 def _with_unimplemented_tool(directory: Path) -> None:

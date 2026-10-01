@@ -128,7 +128,7 @@ class ContextAssembly:
                     continue
                 ref = ArtifactRef(**event.payload["message_ref" if event.type == EventType.MODEL_MESSAGE else "input_ref"])
                 item = json.loads(self.artifacts.get_for_run(event.run_id, ref))
-            elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and "input_item" in event.payload:
+            elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED} and "input_item" in event.payload:
                 if (event.payload.get("activation_id"), event.payload.get("step_id")) in failed_steps:
                     continue
                 item = event.payload["input_item"]

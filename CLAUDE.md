@@ -106,7 +106,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 4. 拆分：`/to-tickets` 把父工单拆成可以独立验证的子工单，写明阻塞关系，添加 `ready-for-agent` 标签。
 5. 执行：执行者按 `AGENTS.md` 领取子工单，实现、自测、提交并关闭。
 6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图、验收基线，以及需求索引（`docs/requirements/README.md`）与设计索引（`docs/design/README.md`）中对应条目的状态。
-7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组。一个里程碑的工单全部关闭、集成层批量运行通过以后，架构师在该阶段的文档目录（例如 `docs/stage-3/`）写试用指南，先用真实模型按指南走一遍（桌面客户端用 Playwright 操作），再交给用户试用；用户用 `/qa` 反馈的问题建成工单，排在队列最前面；用户确认以后关闭试用工单与里程碑。试用期间继续推进下一个里程碑。
+7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组。一个里程碑的工单全部关闭、集成层批量运行通过以后，架构师先发布一个版本：运行发布脚本，在干净的提交上构建 Yudao 服务的 wheel（其中包含桌面客户端与执行代理的安装包），打标签并上传到私有仓库的 Release，版本号按里程碑递增（见 `docs/design/client-packaging-and-release.md`）。然后在该阶段的文档目录（例如 `docs/stage-3/`）写试用指南，写明怎样安装这个版本；先用发布出来的版本按指南走一遍（真实模型，桌面客户端用 Playwright 操作，使用单独的数据目录与端口，不安装、不升级用户已经安装的那一份），再交给用户试用；用户用 `/qa` 反馈的问题建成工单，排在队列最前面；用户确认以后关闭试用工单与里程碑。试用期间继续推进下一个里程碑。
 
 第 1 至 4 步在同一个上下文窗口中完成，`/to-tickets` 完成之前不清空、不压缩上下文。
 
@@ -117,13 +117,13 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 ## 自主推进模式
 只有用户明确说“自主推进”并指定范围（一个父工单、一组子工单或一个阶段）时进入这个模式，其余时候按「工作流程」执行。在范围之内，Claude 自行拆分工单、创建 issue、派发任务、转交审查、合并 PR、关闭工单，并在搁置卡住的工单后推进下一个，不逐项询问用户。修改规则文件与已有设计文档仍然先经用户确认。
 
-分工：Claude 建立工单并推进流程，omp 担任执行者，OpenCode 担任审查者。三方通过 issue 评论、标签与 PR 交换信息，执行者与审查者的规则都在 `AGENTS.md`。
+分工：Claude 建立工单并推进流程，omp 担任执行者与审查者。三方通过 issue 评论、标签与 PR 交换信息，执行者与审查者的规则都在 `AGENTS.md`。
 
 流程：
 1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，同时可以开始的工单中先派发较早里程碑的工单，在后台运行
    `omp -p --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
-2. 审查：工单标签变为 `needs-review` 后，Claude 在后台运行
-   `opencode run --agent reviewer --auto --dir C:\project\yudao-worktrees\issue-<编号> --format json "审查工单 #<编号>"`
+2. 审查：工单标签变为 `needs-review` 后，Claude 在 `C:\project\yudao-worktrees\issue-<编号>` 中后台运行
+   `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --model 9router/ag/gemini-3.8-flash-high "你是审查者，按 AGENTS.md「审查者」一节以及两类角色共同遵守的内容工作，忽略「执行者」一节。审查工单 #<编号>"`
 3. 收尾：
    - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
@@ -133,7 +133,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
    - 失败：暂停合并。先用单进程重新运行失败的测试：通过时建工单修正这个不稳定的测试，恢复合并；仍然失败时用 `git bisect run` 只运行失败的测试，找到出问题的提交，建修复工单并关联那个 PR 的工单，排在最前；修复合并后再运行集成层全部，通过后恢复合并。步骤见 `docs/design/test-pyramid.md` 第 4.2 节。
 5. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
 
-命令不指定模型，omp 与 OpenCode 各自使用配置的默认模型，两者配置为不同的模型。
+执行者使用 omp 配置的默认模型，并按配置使用 prewalk；审查者用 `--model` 指定 `9router/ag/gemini-3.8-flash-high`，备用模型 `9router/qdcn/qfmodel` 写在 omp 配置的 `retry.fallbackChains` 中，两者与执行者的模型不同。
 
 ## 工单规范
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。

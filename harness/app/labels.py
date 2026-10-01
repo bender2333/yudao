@@ -13,12 +13,21 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
     template = _LABELS.get(event_type)
     if template is None:
         raise KeyError(f"no event label is defined for {event_type}")
+    if event_type == EventType.RUN_DONE:
+        # 结束说明按停止原因写成中文，不直接显示英文的停止原因
+        return template.format_map({"stop_reason": _done_text(payload)})
     return template.format_map(_Missing(payload))
 
 class _Missing(dict):
     # 模板里出现载荷没有的字段时填入空串：说明仍然生成，不因此失败
     def __missing__(self, key: str) -> str:
         return ""
+
+def _done_text(payload: dict[str, Any]) -> str:
+    # 以完成结束的两种停止原因（普通事项的放行、建档事项的基线核验）
+    return {"released": "已完成并放行", "baseline_verified": "已完成基线核验"}.get(str(payload.get("stop_reason") or ""),
+                                                                       _stop_text(payload))
+
 
 def _stop_text(payload: dict[str, Any]) -> str:
     return str(payload.get("stop_reason") or "")
@@ -58,9 +67,11 @@ _LABELS: dict[str, str] = {
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {version} 版）",
     EventType.QA_SUBMITTED: "质检提交了结论：{verdict}",
+    EventType.STRUCTURE_ACCEPTED: "采纳了现有结构说明（第 {revision} 版）",
+    EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{summary}",
     EventType.TRANSITION: "运行状态从 {from_phase} 变为 {to_phase}",
-    EventType.RUN_DONE: "运行结束：已完成并放行",
+    EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_FAILED: "运行失败：{stop_reason}",
     EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{question}",

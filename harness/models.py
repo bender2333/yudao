@@ -34,6 +34,8 @@ ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
 QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
 
 QA_VERDICTS = ("rework_product", "rework_engineering", "release")
+# 基线核验逐条结论的状态（工单 #134，docs/design/existing-project-onboarding.md 第 4.5 节）
+BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
 # 提案种类：定义中提交类工具提交的种类
 PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
 
@@ -61,6 +63,7 @@ class EventType:
     TOOL_CALLED = "tool_called"
     TOOL_STARTED = "tool_started"
     TOOL_SKIPPED = "tool_skipped"
+    ACTION_VERIFIED = "action_verified"
     PROPOSAL_SUBMITTED = "proposal_submitted"
     PROPOSAL_REJECTED = "proposal_rejected"
     SPEC_ACCEPTED = "spec_accepted"
@@ -73,6 +76,8 @@ class EventType:
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
+    STRUCTURE_ACCEPTED = "structure_accepted"
+    BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
     TRANSITION = "transition"
     RUN_DONE = "run_done"
@@ -117,7 +122,8 @@ class CatalogEventType:
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
     EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
-    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.STRUCTURE_ACCEPTED,
+    EventType.BASELINE_REVIEW_ACCEPTED,
 })
 
 
@@ -639,6 +645,12 @@ class RunProjection:
     delivery_spec: DeliverySpec | None = None
     pending_request: CollaborationRequest | None = None
     last_review: QAReview | None = None
+    # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
+    kind: str = "change"
+    # 建档事项的产出：仓库概况与现有结构的工件引用（设计第 4.1、4.2 节）
+    overview_ref: dict[str, Any] | None = None
+    structure: dict[str, Any] | None = None
+    baseline_review: dict[str, Any] | None = None
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
@@ -649,6 +661,8 @@ class RunProjection:
     request_results: list[dict[str, Any]] = field(default_factory=list)
     product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    structures: list[dict[str, Any]] = field(default_factory=list)
+    baseline_reviews: list[dict[str, Any]] = field(default_factory=list)
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)
     effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)

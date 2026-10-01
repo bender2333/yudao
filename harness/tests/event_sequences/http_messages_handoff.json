@@ -23,6 +23,26 @@
     "command_versions": {},
     "context_window": 32000,
     "definitions_version": "<definitions>",
+    "department_prompts": {
+     "engineering": {
+      "department": "engineering",
+      "prompt_ref": "<art#1>",
+      "text": "<shared#1>",
+      "version": 1
+     },
+     "product": {
+      "department": "product",
+      "prompt_ref": "<art#2>",
+      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
+      "version": 1
+     },
+     "quality": {
+      "department": "quality",
+      "prompt_ref": "<art#3>",
+      "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
+      "version": 1
+     }
+    },
     "git_version": {
      "commit": "<git#1>",
      "parent_commit": null,
@@ -37,15 +57,17 @@
       "tree": "<git#2>"
      },
      "id": "<input#1>",
-     "input_ref": "<art#1>",
-     "intend_ref": "<art#1>",
+     "input_ref": "<art#4>",
+     "intend_ref": "<art#4>",
      "kind": "text",
      "text": "build an echo CLI",
      "version": 1
     },
     "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#1>",
+    "intend_ref": "<art#4>",
+    "kind": "change",
     "max_cycles": 999999,
+    "overview_ref": null,
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -110,7 +132,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "yielded_work": null
    }
@@ -138,10 +160,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#2>",
+    "input_ref": "<art#5>",
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -178,7 +200,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "department": "product",
     "digest": "<sha256#5>",
     "effective_context_window": 32000,
@@ -221,7 +242,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#10>",
@@ -296,17 +317,15 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#3>",
+    "parts_ref": "<art#6>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#4>",
+    "request_ref": "<art#7>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -353,7 +372,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": null,
@@ -366,13 +384,11 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -416,7 +432,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -425,16 +440,14 @@
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_digest": "<sha256#21>",
     "request_id": null,
-    "request_ref": "<art#5>",
+    "request_ref": "<art#8>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -477,7 +490,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 0,
@@ -517,7 +530,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 1,
@@ -557,7 +570,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 3,
@@ -597,7 +610,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 4,
@@ -637,7 +650,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 5,
@@ -675,7 +688,6 @@
     "cost_reported": false,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
     "input_tokens": 101,
@@ -686,14 +698,12 @@
     "ok": true,
     "output_tokens": 10,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "raw_usage_ref": "<art#6>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#9>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -734,7 +744,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -742,16 +751,14 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#7>",
+    "message_ref": "<art#10>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -803,7 +810,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
     "finished_at": "<time>",
@@ -813,20 +819,18 @@
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-1",
     "purpose": "work",
-    "raw_usage_ref": "<art#6>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#9>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#8>",
+    "response_ref": "<art#11>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -835,7 +839,7 @@
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 6,
-    "stream_events_ref": "<art#9>",
+    "stream_events_ref": "<art#12>",
     "stream_first_observed_at": "<time>",
     "stream_first_output_at": "<time>",
     "stream_last_stage": "completed",
@@ -906,7 +910,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -960,7 +964,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "error": null,
@@ -977,15 +980,13 @@
     "model_id": "m-local",
     "name": "submit_product_spec",
     "ok": true,
-    "output_ref": "<art#10>",
+    "output_ref": "<art#13>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -1112,7 +1113,7 @@
      "tree": "<git#4>"
     },
     "input_version": 1,
-    "prd_ref": "<art#11>",
+    "prd_ref": "<art#14>",
     "product_spec_hash": "<sha256#24>",
     "request_id": null,
     "revision": 1
@@ -1161,7 +1162,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "stop_reason": null
    }
   },
@@ -1190,7 +1191,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "yielded_work": null
    }
@@ -1218,10 +1219,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#12>",
+    "input_ref": "<art#15>",
     "input_version": 1,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -1258,7 +1259,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "department": "engineering",
     "digest": "<sha256#29>",
     "effective_context_window": 32000,
@@ -1301,7 +1301,7 @@
       "digest": "<sha256#32>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#33>",
@@ -1382,17 +1382,15 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#13>",
+    "parts_ref": "<art#16>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#14>",
+    "request_ref": "<art#17>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -1439,7 +1437,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#25>",
@@ -1452,13 +1449,11 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -1502,7 +1497,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -1511,16 +1505,14 @@
     "logical_call_id": "<act#2>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_digest": "<sha256#42>",
     "request_id": null,
-    "request_ref": "<art#15>",
+    "request_ref": "<art#18>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -1563,7 +1555,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 0,
@@ -1603,7 +1595,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 1,
@@ -1643,7 +1635,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 3,
@@ -1683,7 +1675,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 4,
@@ -1723,7 +1715,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 5,
@@ -1761,7 +1753,6 @@
     "cost_reported": false,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
     "input_tokens": 102,
@@ -1772,14 +1763,12 @@
     "ok": true,
     "output_tokens": 10,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "raw_usage_ref": "<art#16>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#19>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -1820,7 +1809,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -1828,16 +1816,14 @@
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#17>",
+    "message_ref": "<art#20>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -1889,7 +1875,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
     "finished_at": "<time>",
@@ -1899,20 +1884,18 @@
     "logical_call_id": "<act#2>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-2",
     "purpose": "work",
-    "raw_usage_ref": "<art#16>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#19>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#18>",
+    "response_ref": "<art#21>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -1921,7 +1904,7 @@
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 6,
-    "stream_events_ref": "<art#19>",
+    "stream_events_ref": "<art#22>",
     "stream_first_observed_at": "<time>",
     "stream_first_output_at": "<time>",
     "stream_last_stage": "completed",
@@ -1987,7 +1970,7 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "submit_plan",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -2036,7 +2019,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": null,
     "error": null,
@@ -2045,7 +2027,7 @@
     "id": "toolu-2-0",
     "input_item": {
      "call_id": "toolu-2-0",
-     "output": "<shared#1>",
+     "output": "<shared#2>",
      "type": "function_call_output"
     },
     "input_version": 1,
@@ -2053,15 +2035,13 @@
     "model_id": "m-local",
     "name": "submit_plan",
     "ok": true,
-    "output_ref": "<art#20>",
+    "output_ref": "<art#23>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -2135,7 +2115,7 @@
     "kind": "engineering_plan",
     "objective": "Implement and verify the current echo CLI requirements",
     "parent_hash": null,
-    "plan_ref": "<art#21>",
+    "plan_ref": "<art#24>",
     "reason": "",
     "refactoring": [],
     "request_id": null,
@@ -2177,7 +2157,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "stop_reason": null
    }
   },
@@ -2206,7 +2186,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "yielded_work": null
    }
@@ -2234,10 +2214,10 @@
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#22>",
+    "input_ref": "<art#25>",
     "input_version": 1,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -2274,7 +2254,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "department": "engineering",
     "digest": "<sha256#48>",
     "effective_context_window": 32000,
@@ -2317,7 +2296,7 @@
       "digest": "<sha256#32>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#33>",
@@ -2404,17 +2383,15 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#23>",
+    "parts_ref": "<art#26>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#24>",
+    "request_ref": "<art#27>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -2461,7 +2438,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#25>",
@@ -2474,13 +2450,11 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -2524,7 +2498,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -2533,16 +2506,14 @@
     "logical_call_id": "<act#3>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_digest": "<sha256#54>",
     "request_id": null,
-    "request_ref": "<art#25>",
+    "request_ref": "<art#28>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -2585,7 +2556,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 0,
@@ -2625,7 +2596,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 1,
@@ -2665,7 +2636,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 3,
@@ -2705,7 +2676,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 4,
@@ -2745,7 +2716,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 6,
@@ -2785,7 +2756,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 7,
@@ -2825,7 +2796,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 9,
@@ -2865,7 +2836,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 10,
@@ -2905,7 +2876,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 11,
@@ -2943,7 +2914,6 @@
     "cost_reported": false,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
     "input_tokens": 103,
@@ -2954,14 +2924,12 @@
     "ok": true,
     "output_tokens": 10,
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "raw_usage_ref": "<art#26>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#29>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -3002,7 +2970,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -3010,16 +2977,14 @@
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#27>",
+    "message_ref": "<art#30>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3059,7 +3024,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -3067,16 +3031,14 @@
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#28>",
+    "message_ref": "<art#31>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3116,7 +3078,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -3124,16 +3085,14 @@
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "message_index": 3,
-    "message_ref": "<art#29>",
+    "message_ref": "<art#32>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3185,7 +3144,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
     "finished_at": "<time>",
@@ -3195,20 +3153,18 @@
     "logical_call_id": "<act#3>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-3",
     "purpose": "work",
-    "raw_usage_ref": "<art#26>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#29>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#30>",
+    "response_ref": "<art#33>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -3217,7 +3173,7 @@
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 12,
-    "stream_events_ref": "<art#31>",
+    "stream_events_ref": "<art#34>",
     "stream_first_observed_at": "<time>",
     "stream_first_output_at": "<time>",
     "stream_last_stage": "completed",
@@ -3258,6 +3214,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#35>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#43>",
     "effective_contract_hash": "<sha256#25>",
@@ -3269,7 +3226,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "write_file",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -3292,6 +3249,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
      "path": "src/echo.py"
@@ -3304,7 +3262,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "error": null,
@@ -3321,15 +3278,13 @@
     "model_id": "m-local",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#32>",
+    "output_ref": "<art#37>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3367,6 +3322,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#43>",
     "effective_contract_hash": "<sha256#25>",
@@ -3378,7 +3334,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "run_check",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -3401,6 +3357,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -3417,7 +3374,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "error": null,
@@ -3434,15 +3390,13 @@
     "model_id": "m-local",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#33>",
+    "output_ref": "<art#38>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3493,7 +3447,7 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "submit_delivery",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -3534,7 +3488,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "error": null,
@@ -3551,15 +3504,13 @@
     "model_id": "m-local",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#34>",
+    "output_ref": "<art#39>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3596,7 +3547,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#35>"
+    "transcript_ref": "<art#40>"
    }
   },
   {
@@ -3656,7 +3607,7 @@
     "revision": 1,
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#36>"
+    "tree_ref": "<art#41>"
    }
   },
   {
@@ -3723,7 +3674,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "stop_reason": null
    }
   },
@@ -3752,7 +3703,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "yielded_work": null
    }
@@ -3780,10 +3731,10 @@
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#38>",
+    "input_ref": "<art#43>",
     "input_version": 1,
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -3820,7 +3771,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "department": "quality",
     "digest": "<sha256#63>",
     "effective_context_window": 32000,
@@ -3846,24 +3796,22 @@
     ],
     "guidance_ids": [],
     "guidance_only": false,
-    "injected": "<shared#2>",
+    "injected": "<shared#3>",
     "input_token_estimate": 4657,
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#39>",
+    "parts_ref": "<art#44>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#40>",
+    "request_ref": "<art#45>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -3910,7 +3858,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 32000,
     "effective_contract_hash": "<sha256#25>",
@@ -3923,13 +3870,11 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -3973,7 +3918,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -3982,16 +3926,14 @@
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_digest": "<sha256#74>",
     "request_id": null,
-    "request_ref": "<art#41>",
+    "request_ref": "<art#46>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -4034,7 +3976,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 0,
@@ -4074,7 +4016,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 1,
@@ -4114,7 +4056,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 3,
@@ -4154,7 +4096,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 4,
@@ -4194,7 +4136,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 6,
@@ -4234,7 +4176,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 7,
@@ -4274,7 +4216,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "observed_at": "<time>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "root_step_id": 1,
     "sequence": 8,
@@ -4312,7 +4254,6 @@
     "cost_reported": false,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
     "input_tokens": 104,
@@ -4323,14 +4264,12 @@
     "ok": true,
     "output_tokens": 10,
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "raw_usage_ref": "<art#42>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#47>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -4371,7 +4310,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -4379,16 +4317,14 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#43>",
+    "message_ref": "<art#48>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -4428,7 +4364,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
@@ -4436,16 +4371,14 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#44>",
+    "message_ref": "<art#49>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -4497,7 +4430,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
     "finished_at": "<time>",
@@ -4507,20 +4439,18 @@
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-4",
     "purpose": "work",
-    "raw_usage_ref": "<art#42>",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
+    "raw_usage_ref": "<art#47>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#45>",
+    "response_ref": "<art#50>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -4529,7 +4459,7 @@
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 9,
-    "stream_events_ref": "<art#46>",
+    "stream_events_ref": "<art#51>",
     "stream_first_observed_at": "<time>",
     "stream_first_output_at": "<time>",
     "stream_last_stage": "completed",
@@ -4574,6 +4504,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#73>",
     "effective_contract_hash": "<sha256#25>",
@@ -4585,7 +4516,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "name": "run_check",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -4608,6 +4539,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -4624,7 +4556,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "error": null,
@@ -4641,15 +4572,13 @@
     "model_id": "m-local",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#47>",
+    "output_ref": "<art#52>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -4698,7 +4627,7 @@
     "logical_call_id": "<act#4>:root-1:work",
     "name": "submit_review",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "request_id": null,
     "step_id": 1
    }
@@ -4737,7 +4666,6 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "error": null,
@@ -4754,15 +4682,13 @@
     "model_id": "m-local",
     "name": "submit_review",
     "ok": true,
-    "output_ref": "<art#48>",
+    "output_ref": "<art#53>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
@@ -4799,7 +4725,7 @@
      "rationale",
      "verdict"
     ],
-    "transcript_ref": "<art#49>"
+    "transcript_ref": "<art#54>"
    }
   },
   {
@@ -4841,7 +4767,7 @@
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "evidence_refs": [
-     "<art#50>"
+     "<art#55>"
     ],
     "git_version": {
      "commit": "<git#9>",
@@ -4922,7 +4848,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "stop_reason": "released"
    }
   }
@@ -4933,6 +4859,8 @@
   "actual_provider": "local",
   "adapter": "directory",
   "baseline": null,
+  "baseline_review": null,
+  "baseline_reviews": [],
   "command_versions": {},
   "compactions": [],
   "context_window": 32000,
@@ -4974,7 +4902,7 @@
    "run_id": "<run#1>",
    "status": "active",
    "summary": "implemented echo CLI",
-   "tree_ref": "<art#36>"
+   "tree_ref": "<art#41>"
   },
   "delivery_specs": [
    {
@@ -5012,7 +4940,7 @@
     "run_id": "<run#1>",
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#36>"
+    "tree_ref": "<art#41>"
    }
   ],
   "department_call_targets": {
@@ -5023,13 +4951,10 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "model_id": "m-local",
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -5044,13 +4969,10 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "model_id": "m-local",
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -5065,13 +4987,10 @@
     "context_window": 32000,
     "credential_ref": "SCENARIO_KEY",
     "credential_version": "override",
-    "default_reasoning_level": null,
     "model_id": "m-local",
     "protocol": "messages",
     "provider_config_id": "local",
     "provider_name": "Local",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
@@ -5081,12 +5000,35 @@
    }
   },
   "department_guidance": [],
+  "department_prompts": {
+   "engineering": {
+    "created_event_id": "<evt#1>",
+    "department": "engineering",
+    "prompt_ref": "<art#1>",
+    "text": "<shared#1>",
+    "version": 1
+   },
+   "product": {
+    "created_event_id": "<evt#1>",
+    "department": "product",
+    "prompt_ref": "<art#2>",
+    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
+    "version": 1
+   },
+   "quality": {
+    "created_event_id": "<evt#1>",
+    "department": "quality",
+    "prompt_ref": "<art#3>",
+    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
+    "version": 1
+   }
+  },
   "effective_contract": {
    "content_hash": "<sha256#25>",
    "created_event_id": "<evt#20>",
    "decision_hashes": [],
    "input_version": 1,
-   "prd_ref": "<art#11>",
+   "prd_ref": "<art#14>",
    "product_spec_hash": "<sha256#24>",
    "revision": 1
   },
@@ -5096,7 +5038,7 @@
     "created_event_id": "<evt#20>",
     "decision_hashes": [],
     "input_version": 1,
-    "prd_ref": "<art#11>",
+    "prd_ref": "<art#14>",
     "product_spec_hash": "<sha256#24>",
     "revision": 1
    }
@@ -5110,7 +5052,7 @@
    "id": "<plan#1>",
    "objective": "Implement and verify the current echo CLI requirements",
    "parent_hash": null,
-   "plan_ref": "<art#21>",
+   "plan_ref": "<art#24>",
    "reason": "",
    "refactoring": [],
    "revision": 1,
@@ -5138,7 +5080,7 @@
     "id": "<plan#1>",
     "objective": "Implement and verify the current echo CLI requirements",
     "parent_hash": null,
-    "plan_ref": "<art#21>",
+    "plan_ref": "<art#24>",
     "reason": "",
     "refactoring": [],
     "revision": 1,
@@ -5180,7 +5122,7 @@
     ],
     "kind": "delivery",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#36>"
+    "tree_ref": "<art#41>"
    },
    {
     "checks": [
@@ -5253,15 +5195,16 @@
     "byte_start": 0,
     "created_event_id": "<evt#1>",
     "id": "<input#1>",
-    "input_ref": "<art#1>",
-    "intend_ref": "<art#1>",
+    "input_ref": "<art#4>",
+    "intend_ref": "<art#4>",
     "kind": "text",
     "run_id": "<run#1>",
     "text": "build an echo CLI",
     "version": 1
    }
   ],
-  "intend_ref": "<art#1>",
+  "intend_ref": "<art#4>",
+  "kind": "change",
   "last_activations": {
    "engineering": "<act#3>",
    "product": "<act#1>",
@@ -5289,7 +5232,7 @@
    "effective_contract_hash": "<sha256#25>",
    "engineering_plan_hash": "<sha256#45>",
    "evidence_refs": [
-    "<art#50>"
+    "<art#55>"
    ],
    "id": "<qa#1>",
    "issuer": "quality",
@@ -5350,7 +5293,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#10>",
@@ -5423,12 +5366,12 @@
     "input_version": 1,
     "max_output_tokens": 2048,
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#3>",
+    "parts_ref": "<art#6>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#4>",
+    "request_ref": "<art#7>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#5>",
     "step_id": 1,
@@ -5481,7 +5424,7 @@
       "digest": "<sha256#32>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#33>",
@@ -5560,12 +5503,12 @@
     "input_version": 1,
     "max_output_tokens": 2048,
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#13>",
+    "parts_ref": "<art#16>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#14>",
+    "request_ref": "<art#17>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#25>",
     "step_id": 1,
@@ -5618,7 +5561,7 @@
       "digest": "<sha256#32>",
       "source": "department_rules",
       "tokens": 89,
-      "version": "0"
+      "version": "1"
      },
      {
       "digest": "<sha256#33>",
@@ -5703,12 +5646,12 @@
     "input_version": 1,
     "max_output_tokens": 2048,
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#23>",
+    "parts_ref": "<art#26>",
     "prompt_hash": "<sha256#27>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#24>",
+    "request_ref": "<art#27>",
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#43>",
     "step_id": 1,
@@ -5744,17 +5687,17 @@
     ],
     "guidance_ids": [],
     "guidance_only": false,
-    "injected": "<shared#2>",
+    "injected": "<shared#3>",
     "input_token_estimate": 4657,
     "input_version": 1,
     "max_output_tokens": 2048,
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#39>",
+    "parts_ref": "<art#44>",
     "prompt_hash": "<sha256#61>",
-    "prompt_version": 0,
+    "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#40>",
+    "request_ref": "<art#45>",
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#73>",
     "step_id": 1,
@@ -5794,19 +5737,18 @@
     "max_attempts": 3,
     "max_output_tokens": 2048,
     "model_id": "m-local",
-    "prompt_version": 0,
     "protocol": "messages",
     "provider": "local",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-1",
     "purpose": "work",
-    "raw_usage_ref": "<art#6>",
+    "raw_usage_ref": "<art#9>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#8>",
+    "response_ref": "<art#11>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -5815,12 +5757,12 @@
     "serialization": "sdk_request_json_object",
     "serialized_event_id": "<evt#7>",
     "serialized_request_digest": "<sha256#21>",
-    "serialized_request_ref": "<art#5>",
+    "serialized_request_ref": "<art#8>",
     "started_at": "<time>",
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 6,
-    "stream_events_ref": "<art#9>",
+    "stream_events_ref": "<art#12>",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -5863,19 +5805,18 @@
     "max_attempts": 3,
     "max_output_tokens": 2048,
     "model_id": "m-local",
-    "prompt_version": 0,
     "protocol": "messages",
     "provider": "local",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-2",
     "purpose": "work",
-    "raw_usage_ref": "<art#16>",
+    "raw_usage_ref": "<art#19>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#18>",
+    "response_ref": "<art#21>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -5884,12 +5825,12 @@
     "serialization": "sdk_request_json_object",
     "serialized_event_id": "<evt#27>",
     "serialized_request_digest": "<sha256#42>",
-    "serialized_request_ref": "<art#15>",
+    "serialized_request_ref": "<art#18>",
     "started_at": "<time>",
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 6,
-    "stream_events_ref": "<art#19>",
+    "stream_events_ref": "<art#22>",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -5932,19 +5873,18 @@
     "max_attempts": 3,
     "max_output_tokens": 2048,
     "model_id": "m-local",
-    "prompt_version": 0,
     "protocol": "messages",
     "provider": "local",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-3",
     "purpose": "work",
-    "raw_usage_ref": "<art#26>",
+    "raw_usage_ref": "<art#29>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#30>",
+    "response_ref": "<art#33>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -5953,12 +5893,12 @@
     "serialization": "sdk_request_json_object",
     "serialized_event_id": "<evt#45>",
     "serialized_request_digest": "<sha256#54>",
-    "serialized_request_ref": "<art#25>",
+    "serialized_request_ref": "<art#28>",
     "started_at": "<time>",
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 12,
-    "stream_events_ref": "<art#31>",
+    "stream_events_ref": "<art#34>",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -6001,19 +5941,18 @@
     "max_attempts": 3,
     "max_output_tokens": 2048,
     "model_id": "m-local",
-    "prompt_version": 0,
     "protocol": "messages",
     "provider": "local",
     "provider_config_id": "local",
     "provider_name": "Local",
     "provider_response_id": "msg-4",
     "purpose": "work",
-    "raw_usage_ref": "<art#42>",
+    "raw_usage_ref": "<art#47>",
     "requested_model": "scenario-model",
     "requested_protocol": "messages",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#45>",
+    "response_ref": "<art#50>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -6022,12 +5961,12 @@
     "serialization": "sdk_request_json_object",
     "serialized_event_id": "<evt#75>",
     "serialized_request_digest": "<sha256#74>",
-    "serialized_request_ref": "<art#41>",
+    "serialized_request_ref": "<art#46>",
     "started_at": "<time>",
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 9,
-    "stream_events_ref": "<art#46>",
+    "stream_events_ref": "<art#51>",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -6043,6 +5982,7 @@
    }
   ],
   "outcome": "done",
+  "overview_ref": null,
   "pending_feedback": {},
   "pending_request": null,
   "phase": "DONE",
@@ -6118,6 +6058,29 @@
   "project_context_ref": null,
   "project_id": null,
   "prompt_config_versions": {},
+  "prompt_versions": [
+   {
+    "created_event_id": "<evt#1>",
+    "department": "engineering",
+    "prompt_ref": "<art#1>",
+    "text": "<shared#1>",
+    "version": 1
+   },
+   {
+    "created_event_id": "<evt#1>",
+    "department": "product",
+    "prompt_ref": "<art#2>",
+    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
+    "version": 1
+   },
+   {
+    "created_event_id": "<evt#1>",
+    "department": "quality",
+    "prompt_ref": "<art#3>",
+    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
+    "version": 1
+   }
+  ],
   "provider": "local",
   "registered_commands": {},
   "rejections": [],
@@ -6150,7 +6113,7 @@
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "evidence_refs": [
-     "<art#50>"
+     "<art#55>"
     ],
     "id": "<qa#1>",
     "issuer": "quality",
@@ -6190,6 +6153,8 @@
   "snapshot": null,
   "stop_reason": "released",
   "stream_version": 95,
+  "structure": null,
+  "structures": [],
   "task": "build an echo CLI",
   "token_used": 450,
   "tool_count": 7,
@@ -6207,19 +6172,34 @@
  },
  "artifacts": {
   "<art#1>": {
+   "kind": "department_prompt",
+   "media_type": "text/plain; charset=utf-8",
+   "content": "<shared#1>"
+  },
+  "<art#2>": {
+   "kind": "department_prompt",
+   "media_type": "text/plain; charset=utf-8",
+   "content": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。"
+  },
+  "<art#3>": {
+   "kind": "department_prompt",
+   "media_type": "text/plain; charset=utf-8",
+   "content": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。"
+  },
+  "<art#4>": {
    "kind": "user_input",
    "media_type": "text/plain; charset=utf-8",
    "content": "build an echo CLI"
   },
-  "<art#2>": {
+  "<art#5>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": {
-    "content": "<shared#3>",
+    "content": "<shared#4>",
     "role": "user"
    }
   },
-  "<art#3>": {
+  "<art#6>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6239,7 +6219,7 @@
      "digest": "<sha256#9>",
      "source": "department_rules",
      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-     "version": "0"
+     "version": "1"
     },
     {
      "digest": "<sha256#10>",
@@ -6309,24 +6289,24 @@
     }
    ]
   },
-  "<art#4>": {
+  "<art#7>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
     "input": [
      {
-      "content": "<shared#4>",
+      "content": "<shared#5>",
       "role": "developer"
      },
      {
-      "content": "<shared#3>",
+      "content": "<shared#4>",
       "role": "user"
      }
     ],
     "max_output_tokens": 2048,
     "tools": [
      {
-      "description": "<shared#5>",
+      "description": "<shared#6>",
       "name": "read_file",
       "parameters": {
        "additionalProperties": false,
@@ -6468,7 +6448,7 @@
      {
       "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.",
       "name": "submit_product_spec",
-      "parameters": "<shared#6>",
+      "parameters": "<shared#7>",
       "strict": false,
       "type": "function"
      },
@@ -6532,12 +6512,12 @@
     ]
    }
   },
-  "<art#5>": {
+  "<art#8>": {
    "kind": "sdk_request",
    "media_type": "application/json",
-   "content": "<shared#8>"
+   "content": "<shared#9>"
   },
-  "<art#6>": {
+  "<art#9>": {
    "kind": "model_usage",
    "media_type": "application/json",
    "content": {
@@ -6548,27 +6528,27 @@
     }
    }
   },
-  "<art#7>": {
+  "<art#10>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
-    "arguments": "<shared#11>",
+    "arguments": "<shared#12>",
     "call_id": "toolu-1-0",
     "id": "toolu-1-0",
     "name": "submit_product_spec",
     "type": "function_call"
    }
   },
-  "<art#8>": {
+  "<art#11>": {
    "kind": "sdk_response",
    "media_type": "application/json",
    "content": {
-    "request": "<shared#8>",
+    "request": "<shared#9>",
     "response_id": "msg-1",
     "stop_reason": "tool_use"
    }
   },
-  "<art#9>": {
+  "<art#12>": {
    "kind": "sdk_stream_events",
    "media_type": "application/x-ndjson",
    "content": [
@@ -6607,7 +6587,7 @@
     {
      "event": {
       "delta": {
-       "partial_json": "<shared#11>",
+       "partial_json": "<shared#12>",
        "type": "input_json_delta"
       },
       "index": 0,
@@ -6646,7 +6626,7 @@
     }
    ]
   },
-  "<art#10>": {
+  "<art#13>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6674,17 +6654,17 @@
     ]
    }
   },
-  "<art#11>": {
+  "<art#14>": {
    "kind": "prd",
    "media_type": "text/markdown",
    "content": "# PRD\n\nEffective contract: <sha256#25>\nProductSpec: <sha256#24>\nAccepted user input through version: 1\n\n## Goal\n\nbuild an echo CLI\n\n## Requirements\n\n- print the given argument to stdout\n\n## Boundaries\n\n- do not read files\n\n## Constraints and recorded defaults\n\n- single file implementation\n\n## Acceptance Criteria\n\n- running the program with a word prints that word\n\n## Fatal Conditions\n\n- non-zero exit on valid input\n\n## Non-goals\n\n- network access\n\n## Effective Product Decisions\n\nNone.\n"
   },
-  "<art#12>": {
+  "<art#15>": {
    "kind": "department_input",
    "media_type": "application/json",
-   "content": "<shared#12>"
+   "content": "<shared#13>"
   },
-  "<art#13>": {
+  "<art#16>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6703,8 +6683,8 @@
     {
      "digest": "<sha256#32>",
      "source": "department_rules",
-     "text": "<shared#14>",
-     "version": "0"
+     "text": "<shared#1>",
+     "version": "1"
     },
     {
      "digest": "<sha256#33>",
@@ -6770,7 +6750,7 @@
     "<shared#18>"
    ]
   },
-  "<art#14>": {
+  "<art#17>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6779,18 +6759,18 @@
       "content": "<shared#20>",
       "role": "developer"
      },
-     "<shared#12>"
+     "<shared#13>"
     ],
     "max_output_tokens": 2048,
     "tools": "<shared#21>"
    }
   },
-  "<art#15>": {
+  "<art#18>": {
    "kind": "sdk_request",
    "media_type": "application/json",
    "content": "<shared#27>"
   },
-  "<art#16>": {
+  "<art#19>": {
    "kind": "model_usage",
    "media_type": "application/json",
    "content": {
@@ -6801,7 +6781,7 @@
     }
    }
   },
-  "<art#17>": {
+  "<art#20>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6812,7 +6792,7 @@
     "type": "function_call"
    }
   },
-  "<art#18>": {
+  "<art#21>": {
    "kind": "sdk_response",
    "media_type": "application/json",
    "content": {
@@ -6821,7 +6801,7 @@
     "stop_reason": "tool_use"
    }
   },
-  "<art#19>": {
+  "<art#22>": {
    "kind": "sdk_stream_events",
    "media_type": "application/x-ndjson",
    "content": [
@@ -6899,7 +6879,7 @@
     }
    ]
   },
-  "<art#20>": {
+  "<art#23>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6922,17 +6902,17 @@
     ]
    }
   },
-  "<art#21>": {
+  "<art#24>": {
    "kind": "engineering_plan",
    "media_type": "text/markdown",
    "content": "# Engineering Plan\n\nPlan: <sha256#45>\nEffective contract: <sha256#25>\n\n## Objective\n\nImplement and verify the current echo CLI requirements\n\n## Change Scope\n\n- src/\n\n## Ordered Tasks\n\n### 1. Implement the current contract\n\nOutputs:\n- src/echo.py\n\nVerification: Run the CLI through host checks against the current requirements\n\n## Necessary Refactoring\n\nNone.\n\n## Defaults and Basis\n\nNone.\n"
   },
-  "<art#22>": {
+  "<art#25>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#31>"
   },
-  "<art#23>": {
+  "<art#26>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6951,8 +6931,8 @@
     {
      "digest": "<sha256#32>",
      "source": "department_rules",
-     "text": "<shared#14>",
-     "version": "0"
+     "text": "<shared#1>",
+     "version": "1"
     },
     {
      "digest": "<sha256#33>",
@@ -7024,7 +7004,7 @@
     "<shared#18>"
    ]
   },
-  "<art#24>": {
+  "<art#27>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -7033,7 +7013,7 @@
       "content": "<shared#34>",
       "role": "developer"
      },
-     "<shared#12>",
+     "<shared#13>",
      {
       "arguments": "{\"assumptions\":[],\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}",
       "call_id": "toolu-2-0",
@@ -7043,7 +7023,7 @@
      },
      {
       "call_id": "toolu-2-0",
-      "output": "<shared#1>",
+      "output": "<shared#2>",
       "type": "function_call_output"
      },
      "<shared#31>"
@@ -7052,12 +7032,12 @@
     "tools": "<shared#21>"
    }
   },
-  "<art#25>": {
+  "<art#28>": {
    "kind": "sdk_request",
    "media_type": "application/json",
    "content": "<shared#35>"
   },
-  "<art#26>": {
+  "<art#29>": {
    "kind": "model_usage",
    "media_type": "application/json",
    "content": {
@@ -7068,7 +7048,7 @@
     }
    }
   },
-  "<art#27>": {
+  "<art#30>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7079,7 +7059,7 @@
     "type": "function_call"
    }
   },
-  "<art#28>": {
+  "<art#31>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7090,7 +7070,7 @@
     "type": "function_call"
    }
   },
-  "<art#29>": {
+  "<art#32>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7101,7 +7081,7 @@
     "type": "function_call"
    }
   },
-  "<art#30>": {
+  "<art#33>": {
    "kind": "sdk_response",
    "media_type": "application/json",
    "content": {
@@ -7110,7 +7090,7 @@
     "stop_reason": "tool_use"
    }
   },
-  "<art#31>": {
+  "<art#34>": {
    "kind": "sdk_stream_events",
    "media_type": "application/x-ndjson",
    "content": [
@@ -7256,12 +7236,30 @@
     }
    ]
   },
-  "<art#32>": {
+  "<art#35>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#36>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#57>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#37>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#33>": {
+  "<art#38>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7278,7 +7276,7 @@
     "tree_changed": false
    }
   },
-  "<art#34>": {
+  "<art#39>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7293,18 +7291,18 @@
     "summary": "implemented echo CLI"
    }
   },
-  "<art#35>": {
+  "<art#40>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n\n"
   },
-  "<art#36>": {
+  "<art#41>": {
    "kind": "tree_manifest",
    "media_type": "application/json",
    "content": {
     "blobs": [
      {
-      "artifact": "<art#37>",
+      "artifact": "<art#42>",
       "path": "src/echo.py"
      }
     ],
@@ -7325,17 +7323,17 @@
     "tree_digest": "<sha256#57>"
    }
   },
-  "<art#37>": {
+  "<art#42>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
    "content": "import sys\r\nprint(sys.argv[1])\r\n"
   },
-  "<art#38>": {
+  "<art#43>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#37>"
   },
-  "<art#39>": {
+  "<art#44>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -7355,7 +7353,7 @@
      "digest": "<sha256#66>",
      "source": "department_rules",
      "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-     "version": "0"
+     "version": "1"
     },
     {
      "digest": "<sha256#33>",
@@ -7443,7 +7441,7 @@
     }
    ]
   },
-  "<art#40>": {
+  "<art#45>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -7457,7 +7455,7 @@
     "max_output_tokens": 2048,
     "tools": [
      {
-      "description": "<shared#5>",
+      "description": "<shared#6>",
       "name": "read_file",
       "parameters": {
        "additionalProperties": false,
@@ -7714,12 +7712,12 @@
     ]
    }
   },
-  "<art#41>": {
+  "<art#46>": {
    "kind": "sdk_request",
    "media_type": "application/json",
    "content": "<shared#40>"
   },
-  "<art#42>": {
+  "<art#47>": {
    "kind": "model_usage",
    "media_type": "application/json",
    "content": {
@@ -7730,7 +7728,7 @@
     }
    }
   },
-  "<art#43>": {
+  "<art#48>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7741,7 +7739,7 @@
     "type": "function_call"
    }
   },
-  "<art#44>": {
+  "<art#49>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -7752,7 +7750,7 @@
     "type": "function_call"
    }
   },
-  "<art#45>": {
+  "<art#50>": {
    "kind": "sdk_response",
    "media_type": "application/json",
    "content": {
@@ -7761,7 +7759,7 @@
     "stop_reason": "tool_use"
    }
   },
-  "<art#46>": {
+  "<art#51>": {
    "kind": "sdk_stream_events",
    "media_type": "application/x-ndjson",
    "content": [
@@ -7873,7 +7871,7 @@
     }
    ]
   },
-  "<art#47>": {
+  "<art#52>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7890,7 +7888,7 @@
     "tree_changed": false
    }
   },
-  "<art#48>": {
+  "<art#53>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7903,20 +7901,21 @@
     "verdict": "release"
    }
   },
-  "<art#49>": {
+  "<art#54>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n"
   },
-  "<art#50>": {
+  "<art#55>": {
    "kind": "qa_evidence",
    "media_type": "text/plain",
    "content": "checks passed on the current snapshot"
   }
  },
  "shared": {
-  "<shared#1>": "{\"error\":null,\"ok\":true,\"output\":{\"assumptions\":[],\"kind\":\"engineering_plan\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}}",
-  "<shared#2>": [
+  "<shared#1>": "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。",
+  "<shared#2>": "{\"error\":null,\"ok\":true,\"output\":{\"assumptions\":[],\"kind\":\"engineering_plan\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"reason\":\"\",\"refactoring\":[],\"scope\":[\"src/\"],\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}}",
+  "<shared#3>": [
    {
     "digest": "<sha256#7>",
     "source": "intend",
@@ -7933,7 +7932,7 @@
     "digest": "<sha256#66>",
     "source": "department_rules",
     "tokens": 72,
-    "version": "0"
+    "version": "1"
    },
    {
     "digest": "<sha256#33>",
@@ -8020,12 +8019,12 @@
     "version": "quality"
    }
   ],
-  "<shared#3>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-  "<shared#4>": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[department_rules]\n你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_product_spec\",\"submit_request\"]\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-  "<shared#5>": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
-  "<shared#6>": {
+  "<shared#4>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
+  "<shared#5>": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[department_rules]\n你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_product_spec\",\"submit_request\"]\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
+  "<shared#6>": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
+  "<shared#7>": {
    "additionalProperties": false,
-   "properties": "<shared#7>",
+   "properties": "<shared#8>",
    "required": [
     "goal",
     "requirements",
@@ -8033,7 +8032,7 @@
    ],
    "type": "object"
   },
-  "<shared#7>": {
+  "<shared#8>": {
    "acceptance_criteria": {
     "description": "Must contain at least one item",
     "items": {
@@ -8147,22 +8146,22 @@
     "type": "array"
    }
   },
-  "<shared#8>": {
+  "<shared#9>": {
    "max_tokens": 2048,
    "messages": [
     {
-     "content": "<shared#3>",
+     "content": "<shared#4>",
      "role": "user"
     }
    ],
    "model": "scenario-model",
    "stream": true,
-   "system": "<shared#4>",
-   "tools": "<shared#9>"
+   "system": "<shared#5>",
+   "tools": "<shared#10>"
   },
-  "<shared#9>": [
+  "<shared#10>": [
    {
-    "description": "<shared#5>",
+    "description": "<shared#6>",
     "input_schema": {
      "additionalProperties": false,
      "properties": {
@@ -8291,7 +8290,7 @@
     },
     "name": "run_check"
    },
-   "<shared#10>",
+   "<shared#11>",
    {
     "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
     "input_schema": {
@@ -8348,18 +8347,17 @@
     "name": "submit_request"
    }
   ],
-  "<shared#10>": {
+  "<shared#11>": {
    "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.",
-   "input_schema": "<shared#6>",
+   "input_schema": "<shared#7>",
    "name": "submit_product_spec"
   },
-  "<shared#11>": "{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"]}",
-  "<shared#12>": {
-   "content": "<shared#13>",
+  "<shared#12>": "{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"]}",
+  "<shared#13>": {
+   "content": "<shared#14>",
    "role": "user"
   },
-  "<shared#13>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#25>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#24>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#25>\",\"created_event_id\":\"<evt#20>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#26>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#26>\"},\"product_spec_hash\":\"<sha256#24>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#24>\",\"created_event_id\":\"<evt#19>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#24>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
-  "<shared#14>": "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。",
+  "<shared#14>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#25>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#24>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#25>\",\"created_event_id\":\"<evt#20>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#26>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#26>\"},\"product_spec_hash\":\"<sha256#24>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#24>\",\"created_event_id\":\"<evt#19>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#24>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
   "<shared#15>": {
    "digest": "<sha256#34>",
    "source": "proposal_contract",
@@ -8378,7 +8376,7 @@
   "<shared#20>": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。\"}\n\n[department_rules]\n你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"delivery_spec\":{\"bind\":[\"current_contract.content_hash\",\"current_engineering_plan.content_hash\",\"workspace files must exist\",\"run_check receipts from this activation on the current workspace\"],\"optional\":[\"known_risks\"],\"required\":[\"kind=delivery_spec\",\"summary\",\"files\",\"check_names\"],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"engineering_plan\":{\"assumptions\":[{\"basis\":\"project convention, standard, or maintained component\",\"decision\":\"professional default\"}],\"bind\":[\"current_contract.content_hash (bound by the host when the proposal is accepted)\"],\"optional\":[\"refactoring\",\"assumptions\",\"reason\"],\"required\":[\"kind=engineering_plan\",\"objective\",\"scope\",\"tasks\"],\"scope\":\"relative files, directories ending with /, or . for the full public workspace\",\"tasks\":[{\"outputs\":[\"verifiable output\"],\"title\":\"ordered task\",\"verification\":\"how to verify\"}],\"when\":[\"ENGINEERING\",\"REWORK_ENGINEERING\"]}},\"notes\":[\"先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。\",\"已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。\",\"check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。\"],\"submit_tools\":[\"submit_plan\",\"submit_delivery\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#25>\",\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#24>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"run_command\",\"submit_request\",\"submit_plan\",\"submit_delivery\"]\n\n[current_contract]\n{\"content_hash\":\"<sha256#25>\",\"created_event_id\":\"<evt#20>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#26>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#26>\"},\"product_spec_hash\":\"<sha256#24>\",\"revision\":1}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#24>\",\"created_event_id\":\"<evt#19>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#24>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]",
   "<shared#21>": [
    {
-    "description": "<shared#5>",
+    "description": "<shared#6>",
     "name": "read_file",
     "parameters": {
      "additionalProperties": false,
@@ -8866,11 +8864,11 @@
    "tools": "<shared#29>"
   },
   "<shared#28>": [
-   "<shared#12>"
+   "<shared#13>"
   ],
   "<shared#29>": [
    {
-    "description": "<shared#5>",
+    "description": "<shared#6>",
     "input_schema": {
      "additionalProperties": false,
      "properties": {
@@ -9335,7 +9333,7 @@
    "tools": "<shared#29>"
   },
   "<shared#36>": [
-   "<shared#12>",
+   "<shared#13>",
    {
     "content": [
      {
@@ -9367,7 +9365,7 @@
    {
     "content": [
      {
-      "content": "<shared#1>",
+      "content": "<shared#2>",
       "tool_use_id": "toolu-2-0",
       "type": "tool_result"
      }
@@ -9395,7 +9393,7 @@
   ],
   "<shared#42>": [
    {
-    "description": "<shared#5>",
+    "description": "<shared#6>",
     "input_schema": {
      "additionalProperties": false,
      "properties": {

@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-更新：2026-09-30。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。
+更新：2026-10-01。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。
 
 依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../prototypes/v9/design.md)与[构建约定](../prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../prototypes/v8/design.md)与[构建约定](../prototypes/v8/BUILD.md)），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
@@ -370,7 +370,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `system.status` | 部署身份与本次启动的身份、启动时间、服务重启后自动继续的事项数与待核实、待恢复的事项数（3.1）、Provider 就绪摘要、目录修订号与重读错误；排空状态（[ADR-0019](../adr/0019-project-stream-across-versions.md)）；首页状态项：结果未知的动作数（3.1）、离线的机器数（3.2C）、等待模型服务的 run 数、磁盘可用空间、正在修复的故障数（Stage 4） | 可回放（第 4.1 节 `at`） | 已有 `GET /api/health`；删除运行线程相关字段（`busy`、`active_run_id` 等）；排空状态新增（3.1）；首页状态项随所属工作包新增 |
+| `system.status` | 部署身份与本次启动的身份、启动时间、服务重启后自动继续的事项数与待核实、待恢复的事项数（3.1）、Provider 就绪摘要、目录修订号与重读错误；排空状态（[ADR-0019](../adr/0019-project-stream-across-versions.md)）；首页状态项：结果未知的动作数（3.1）、离线的机器数（3.2C）、等待模型服务的 run 数、磁盘可用空间、正在修复的故障数（Stage 4）；服务的发布版本号与正在运行的 run 数（客户端的更新页与停止确认使用，[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.4 节） | 可回放（第 4.1 节 `at`） | 已有 `GET /api/health`；删除运行线程相关字段（`busy`、`active_run_id` 等）；排空状态新增（3.1）；首页状态项随所属工作包新增；发布版本号与正在运行的 run 数新增 |
 | `projects.list` | 每个项目的名称、置顶、归档、进行中事项数量与状态标记 | 可回放（第 4.1 节 `at`） | 已有 `GET /api/projects`；排队、中断、待核实、待恢复标记新增（3.1、3.4A）；「建档中」「等待确认初始 PRD」「等待建档」标记新增（3.8） |
 | `decisions.list` | 决定请求：身份、所属的项目、事项与 run、种类、阻塞范围、选项与说明、涉及的事实引用、状态（等待回答、已回答、已撤销）、回答；按项目、事项、种类、状态筛选，状态可以多选。等待用户的列表只取「等待回答」，run 结束时撤销的请求不在其中（参照 OpenCode 0027387 `packages/opencode/src/permission/index.ts:54-59`、`:168-171`）；发出时间（界面据此显示已经等待的时长）与挡住的对象（被阻塞的事项，以及同一项目中排在它后面的事项数量）；同时返回 run 流与项目流中的决定请求，项目流中的请求 `run_id` 为空；`initial_prd` 的材料（初始 PRD、结构说明、基线核验的汇总、快照来源、第几轮与上一轮的修改意见） | 可回放（第 4.1 节 `at`） | 新增（#49）；发出时间与挡住的对象新增（界面工作线）；项目流中的请求与 `initial_prd` 的材料新增（3.8） |
 
@@ -444,7 +444,7 @@ sequenceDiagram
 | `runtime.slots` | 槽位数、占用、跨项目队列、重启后的队列状态 | | 新增（#19） |
 | `tools.registry` | 网络授权与最近的取回、MCP 服务与工具及恢复约定（3.2B）；内置工具：Playwright MCP 的版本、浏览器工具与恢复契约，屏幕工具与屏幕尺寸，每个工具是否需要图像输入（3.2D）；只读观察者（Stage 5，#98）；准入钩子（Stage 6） | | 新增（3.2B）；内置工具随 3.2D 加入；观察者与准入钩子随所属阶段加入 |
 | `machines.list` | 控制主机一项：系统与架构、执行位置上的程序、正在执行的动作（3.2C）；登记的机器：名称、地址、用途、在线状态（最近一次成功探测的时间）、系统与架构、执行代码是否一致、安装命令与升级命令、正在执行的动作（项目、部门、工具）、授权使用它的项目（3.2C）；它是哪些项目的运行环境（Stage 4） | 可回放（第 4.1 节 `at`） | 新增（3.2C，执行环境服务设计说明第 7.4 节）；运行环境在 Stage 4 加入 |
-| `agent.package` | 执行代理的安装包（wheel）：控制主机正在运行的版本，按当前的执行代码生成；远程机器按 `machines.list` 给出的安装与升级命令下载，接口以局域网访问方式运行时远程机器才能下载 | | 新增（#144，执行环境服务设计说明第 5.3.2 节） |
+| `agent.package` | 执行代理的安装包（wheel）：发布时构建，包含在 Yudao 服务的 wheel 内，从包内的发布资源目录读取，不在运行时生成；远程机器按 `machines.list` 给出的安装与升级命令下载，接口以局域网访问方式运行时远程机器才能下载；从源码运行没有这个文件时返回 404 | | 新增（#144，执行环境服务设计说明第 5.3.2 节，[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)） |
 | `ops.status` | 运行责任、发布记录、故障链路、故障记录与修复失败次数、备份、运行指标、待授权的外部动作 | | 新增（Stage 4） |
 | `meta.observations` | 流转统计、不符合项、判定点与判定记录 | | 新增（Stage 6） |
 
@@ -585,7 +585,7 @@ sequenceDiagram
 
 - 覆盖层的清单（标识：名称，依赖的查询）：`flow`：交接流向（`project.flow`）；`waiting`：等待关系（`project.loop`、`decisions.list`）；`recovery`：待核实与风险（`run.recovery`）；`context_usage`：上下文占用（`overlay.context_usage`）；`semantic_records`：语义记录（`semantic.records`）。覆盖层的定义登记在注册表中，能力清单按依赖的查询是否都已登记自动列出；`overlays` 字段与五个定义由 #73 加入。
 - 接口版本在删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、事件种类或字段时不变。
-- 客户端在连接时读取能力清单并核对接口版本：与客户端构建时的接口版本不同时，只显示「请更新客户端」的提示，不打开任何页面，不执行命令；相同时，只显示所需查询与命令都已列出的页面、区块与覆盖层（前端技术调研第 3.3 节「研究后才出现的覆盖层」），同一接口版本内新增的查询与页面由能力清单决定是否显示，不要求更新客户端。
+- 客户端在连接时读取能力清单并核对接口版本：与客户端构建时的接口版本不同时，只显示更新页（写明客户端与 Yudao 服务的发布版本号与接口版本，按钮「更新客户端」，更新源是已连接的 Yudao 服务，见[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 5 节），不打开任何页面，不执行命令；相同时，只显示所需查询与命令都已列出的页面、区块与覆盖层（前端技术调研第 3.3 节「研究后才出现的覆盖层」），同一接口版本内新增的查询与页面由能力清单决定是否显示，不要求更新客户端。
 - 本次启动的身份改变时（服务重启），客户端重新读取能力清单并重新同步。
 - 能力清单的读取不需要先有项目。
 
@@ -601,7 +601,8 @@ sequenceDiagram
 - 控制主机是一台常开的机器（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)），客户端通常运行在用户日常使用的电脑上，使用局域网访问方式，只在家里的局域网内访问。2026-09-28 用户决定：只在局域网内使用期间，安全只保留位置并标为 TODO。从外面访问与手机使用随消息渠道（路线图第 5.4 节）放到以后。本机访问方式用于客户端与服务在同一台电脑上的情况（第 10 节第 8 项）。
 - 接口层的认证这一步与客户端连接设置中的令牌一栏保留位置，局域网访问方式下不校验。
 - 事件中只有凭据引用、来源与版本；局域网内凭据命令以明文传输（TODO，随第 6.3 节加入 TLS）。
-- 后端不提供界面文件；FastAPI 自带的文档页面（`/docs`、`/redoc`）关闭，只提供 `/openapi.json`。
+- 后端不提供界面文件；FastAPI 自带的文档页面（`/docs`、`/redoc`）关闭，只提供 `/openapi.json`。另提供客户端的更新源 `/client-update/`（更新清单与安装程序，不属于查询与命令）与执行代理的安装包（`agent.package`），文件来自 Yudao 服务的 wheel 内的发布资源目录（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，设计说明第 5.1 节）。
+- 本机停止请求 `POST /api/system/stop`：只在本机访问方式下接受且请求来自回环地址，局域网访问方式拒绝；不属于命令（不产生领域事件，不带基准版本，不经过命令注册表）。服务收到以后停止接受新请求，关闭事件流连接，等待进行中的写入完成，释放数据目录的进程锁并退出；进行中的 run 在下次启动时按 3.1 自动继续。它与排空不同：排空停止开始新事项并等待 run 结束，用于升级之前（设计说明第 4.4 节）。
 
 ### 6.3 令牌与 TLS（TODO）
 
@@ -670,7 +671,7 @@ sequenceDiagram
 
 ### 7.3 Web 控制台的去留
 
-旧控制台（`harness/web/`、`__main__.py` 的 `serve`）冻结，不增加功能，也不改接新接口；新接口以 `python -m harness api` 启动。D30 当前档的项目页面与模型管理页通过验收以后，由一张工单删除 `harness/web/`、`serve` 子命令与相关测试（`test_web.py`、`test_web_ui.js`、`test_projects_web.py`、`test_provider_config_web.py`，以及 `test_collaboration_views.py`、`test_observability.py` 中通过旧路由的部分），无参启动改为启动新接口。
+旧控制台（`harness/web/`、`__main__.py` 的 `serve`）冻结，不增加功能，也不改接新接口；新接口以 `python -m harness api` 启动，安装以后使用命令行入口 `yudao api`（[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.1 节）。D30 当前档的项目页面与模型管理页通过验收以后，由一张工单删除 `harness/web/`、`serve` 子命令与相关测试（`test_web.py`、`test_web_ui.js`、`test_projects_web.py`、`test_provider_config_web.py`，以及 `test_collaboration_views.py`、`test_observability.py` 中通过旧路由的部分），无参启动改为启动新接口。
 
 理由：
 
@@ -717,6 +718,7 @@ sequenceDiagram
 | 客户端接口类型 | `@hey-api/openapi-ts` 0.99.0（OpenCode 的 SDK 用它生成） |
 | 客户端事件流 | npm `eventsource` 5.1.2，可以传入自定义 fetch，在请求头中带令牌 |
 | 客户端外壳 | Electron 44.4.5；界面按 ADR-0015 |
+| 客户端打包与更新 | electron-builder 26 系列（NSIS，按用户安装）、electron-updater 6 系列（generic 提供方，更新源是 Yudao 服务）；见[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md) |
 | 端到端测试 | Playwright 启动 Electron 应用（ADR-0015） |
 
 ## 9. 验收
@@ -749,7 +751,7 @@ sequenceDiagram
 5. **流式进度事件的数量。** 输出片段加入以后，`model_stream_progress` 只在阶段变化时写入；这会改变 #43 的事件序列基准，在事件流工单中实施并有意识地更新基准。
 6. **接入已有项目的源目录。** 已有代码只经 `project.onboard` 进入（2026-09-29 用户决定，接入已有项目设计说明第 12 节第 1 项）；`work_item.create` 没有代码快照来源。`project.onboard` 填写的源目录路径是控制主机上的路径，同时成为这个项目的第一条源目录登记；以后在项目设置中用 `source_directory.save` 查看与修改，`onboarding.restart` 只能选择登记过的源目录。
 7. **Web 控制台的去留。** 按第 7.3 节：冻结，D30 当前档的项目页面与模型管理页通过验收以后删除。
-8. **桌面客户端启动本机后端。** 连接「本机」时，桌面客户端的主进程在后端没有运行时启动它（`python -m harness api`），作为附属进程管理；也可以按地址连接已经运行的本机或远端部署（与 OpenCode 桌面版相同）。
+8. **桌面客户端启动本机的 Yudao 服务。** 连接「本机」时，桌面客户端在 Yudao 服务没有运行时启动它（`yudao api`），启动为独立的后台进程；退出客户端不停止 Yudao 服务，托盘菜单有「停止 Yudao」，用第 6.2 节的本机停止请求停止；也可以按地址连接已经运行的本机或远端部署。2026-10-01 用户决定（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 至 4.5 节）。
 9. **执行槽位数。** 执行槽位数是部署设置，经命令修改并写成事件；它取决于运行机器的能力，不属于随系统发布的定义。
 10. **取消排队的结果。** 由 3.4A（#19）的设计确定。
 11. **D24 的实施工单。** D24 模型管理属于 Stage 3，父工单 #83，子工单 #84 至 #96；其中 #93、#94 建立模型管理页，#95 建立部门设置弹窗与部门工作间的模型显示，它们依赖 D24 的后端工单。D26 的后端工单是 #50 下的子工单。
