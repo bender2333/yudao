@@ -175,6 +175,12 @@ async def _create_work_item(application: "Application", command: Command, reques
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     if project.archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能新建事项")
+    # 建档之前的事项（3.8 第 2 节）：接入已有项目还没有基线时，普通事项不能开始
+    onboarding = [item for item in project.work_items if item.kind == "onboarding"]
+    if project.source == "existing" and project.current_adoption is None and onboarding:
+        if any(item.status == "in_progress" for item in onboarding):
+            raise Rejection("work_item_in_progress", "项目正在建档，结束以后才能新建事项")
+        raise Rejection("not_allowed", "项目还没有完成建档，请重新开始建档")
     # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
     if system.drain.state != "idle":
         system.projects.queue_work_item(request.project_id, request.text, title=request.title, command=command)
@@ -420,7 +426,8 @@ MATERIAL_RECORD = CommandDefinition(
 WORK_ITEM_CREATE = CommandDefinition(
     name="work_item.create", request=WorkItemCreate, refs=WorkItemRefs, handle=_create_work_item,
     derive_refs=_work_item_refs,
-    reasons=("not_found", "project_archived", "busy", "provider_unavailable"))
+    reasons=("not_found", "project_archived", "busy", "provider_unavailable",
+             "work_item_in_progress", "not_allowed"))
 WORK_ITEM_APPEND_INPUT = CommandDefinition(
     name="work_item.append_input", request=WorkItemAppendInput, refs=NoRefs, handle=_append_input,
     derive_refs=_no_refs, reasons=("not_found", "run_terminal"))
