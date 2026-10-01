@@ -315,3 +315,5 @@ claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记
 
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-01 23:25 / docs/architecture-issues.md 追加 #226 的一条：AGENTS.md「常用命令」的 `pytest -m "unit or module"` 依赖尚未合入的 harness/tests/layers.toml 登记表，在 main 上静默选中 0 项，单元层与模块层没有被运行 / 交付 #226 时实测该命令输出 1575 deselected、退出码 0，执行者无法据此判断这两层是否通过，登记建议由架构师决定
 claude-opus-5-5 / 2026-10-02 00:08 / docs/architecture-issues.md 为 #226 登记的分层命令选中 0 项一条写处理结论 / 架构师处理执行者登记的架构问题
+
+qwen3.8 / 2026-10-02 02:50 / docs/architecture-issues.md 追加 #219 的一条：并行时按墙钟时限等待一次激活收尾的三项测试，其界限与「不加长等待时间」的验收相冲突，第 54 行 #107 已就同一类问题裁定为「时限设为远大于正常用时的值、Git 子进程数量不单独优化」 / 批量写入（abf24dd6）以后一次收尾仍需 3.3 至 5.4 秒、空闲即逼近 5 秒界限，两条要求不能同时成立，按 AGENTS.md 登记并等待架构师定夺
