@@ -8020,7 +8020,7 @@
       {
        "content_hash": "<sha256#51>",
        "path": "src/echo.py",
-       "size": 32
+       "size": 30
       }
      ],
      "format": "yudao-public-tree-v1"
@@ -8031,7 +8031,7 @@
   "<art#27>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
-   "content": "import sys\r\nprint(sys.argv[1])\r\n"
+   "content": "import sys\nprint(sys.argv[1])\n"
   },
   "<art#28>": {
    "kind": "department_input",
@@ -8486,7 +8486,7 @@
       {
        "content_hash": "<sha256#77>",
        "path": "src/echo.py",
-       "size": 43
+       "size": 41
       }
      ],
      "format": "yudao-public-tree-v1"
@@ -8497,7 +8497,7 @@
   "<art#47>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
-   "content": "import sys\r\nprint(' '.join(sys.argv[1:]))\r\n"
+   "content": "import sys\nprint(' '.join(sys.argv[1:]))\n"
   },
   "<art#48>": {
    "kind": "department_input",

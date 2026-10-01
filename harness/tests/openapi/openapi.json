@@ -2679,6 +2679,48 @@
         }
       }
     },
+    "/api/queries/run.recovery": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.recovery",
+        "operationId": "query_run_recovery",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunRecoveryResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -6022,6 +6064,30 @@
         ],
         "title": "InputView"
       },
+      "LateResult": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at",
+          "text",
+          "event_id"
+        ],
+        "title": "LateResult"
+      },
       "LiveAttempt": {
         "properties": {
           "attempt_id": {
@@ -6677,6 +6743,18 @@
               }
             ],
             "title": "Current Adoption"
+          },
+          "interrupted_count": {
+            "type": "integer",
+            "title": "Interrupted Count"
+          },
+          "pending_verification_count": {
+            "type": "integer",
+            "title": "Pending Verification Count"
+          },
+          "waiting_resume_count": {
+            "type": "integer",
+            "title": "Waiting Resume Count"
           }
         },
         "additionalProperties": false,
@@ -6694,7 +6772,10 @@
           "work_item_count",
           "in_progress_count",
           "active_work_item_id",
-          "current_adoption"
+          "current_adoption",
+          "interrupted_count",
+          "pending_verification_count",
+          "waiting_resume_count"
         ],
         "title": "ProjectRow"
       },
@@ -6894,6 +6975,88 @@
           "changed_by"
         ],
         "title": "QueryCapability"
+      },
+      "RecoveryLimits": {
+        "properties": {
+          "activations": {
+            "type": "integer",
+            "title": "Activations"
+          },
+          "model_steps": {
+            "type": "integer",
+            "title": "Model Steps"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "cycle_count": {
+            "type": "integer",
+            "title": "Cycle Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activations",
+          "model_steps",
+          "retries",
+          "cycle_count"
+        ],
+        "title": "RecoveryLimits"
+      },
+      "RecoveryOwner": {
+        "properties": {
+          "epoch": {
+            "type": "integer",
+            "title": "Epoch"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "holds_slot": {
+            "type": "boolean",
+            "title": "Holds Slot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "epoch",
+          "since",
+          "holds_slot"
+        ],
+        "title": "RecoveryOwner"
+      },
+      "RecoveryStatus": {
+        "properties": {
+          "auto_resumed": {
+            "type": "integer",
+            "title": "Auto Resumed"
+          },
+          "pending_verification": {
+            "type": "integer",
+            "title": "Pending Verification"
+          },
+          "waiting_resume": {
+            "type": "integer",
+            "title": "Waiting Resume"
+          },
+          "unknown_actions": {
+            "type": "integer",
+            "title": "Unknown Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "auto_resumed",
+          "pending_verification",
+          "waiting_resume",
+          "unknown_actions"
+        ],
+        "title": "RecoveryStatus"
       },
       "Rejected": {
         "properties": {
@@ -7153,6 +7316,155 @@
           "usage"
         ],
         "title": "RunExportResult"
+      },
+      "RunRecoveryResult": {
+        "properties": {
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "interrupted",
+              "pending_verification",
+              "waiting_resume",
+              "terminated"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "executable": {
+            "type": "boolean",
+            "title": "Executable"
+          },
+          "last_confirmed_position": {
+            "type": "integer",
+            "title": "Last Confirmed Position"
+          },
+          "last_confirmed_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Confirmed Event Id"
+          },
+          "unfinished_actions": {
+            "items": {
+              "$ref": "#/components/schemas/UnfinishedAction"
+            },
+            "type": "array",
+            "title": "Unfinished Actions"
+          },
+          "verifications": {
+            "items": {
+              "$ref": "#/components/schemas/VerificationRecord"
+            },
+            "type": "array",
+            "title": "Verifications"
+          },
+          "next_legal_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Legal Action"
+          },
+          "can_continue": {
+            "type": "boolean",
+            "title": "Can Continue"
+          },
+          "cannot_continue_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cannot Continue Reason"
+          },
+          "unusable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnusableTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RecoveryLimits"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecoveryOwner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "late_results": {
+            "items": {
+              "$ref": "#/components/schemas/LateResult"
+            },
+            "type": "array",
+            "title": "Late Results"
+          },
+          "has_unknown_actions": {
+            "type": "boolean",
+            "title": "Has Unknown Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_item_id",
+          "run_id",
+          "state",
+          "reason",
+          "executable",
+          "last_confirmed_position",
+          "last_confirmed_event_id",
+          "unfinished_actions",
+          "verifications",
+          "next_legal_action",
+          "can_continue",
+          "cannot_continue_reason",
+          "unusable",
+          "limits",
+          "owner",
+          "late_results",
+          "has_unknown_actions"
+        ],
+        "title": "RunRecoveryResult"
       },
       "RuntimeForceUpgrade": {
         "properties": {
@@ -7512,6 +7824,24 @@
         ],
         "title": "Snapshot[RunExportResult]"
       },
+      "Snapshot_RunRecoveryResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunRecoveryResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunRecoveryResult]"
+      },
       "Snapshot_SystemStatus_": {
         "properties": {
           "position": {
@@ -7698,6 +8028,9 @@
           },
           "drain": {
             "$ref": "#/components/schemas/DrainStatus"
+          },
+          "recovery": {
+            "$ref": "#/components/schemas/RecoveryStatus"
           }
         },
         "additionalProperties": false,
@@ -7710,9 +8043,126 @@
           "running_runs",
           "provider",
           "catalog",
-          "drain"
+          "drain",
+          "recovery"
         ],
         "title": "SystemStatus"
+      },
+      "UnfinishedAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_sent",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "activation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Id"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "input_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Version"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "started_event_id": {
+            "type": "string",
+            "title": "Started Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "tool",
+          "department",
+          "status",
+          "activation_id",
+          "step_id",
+          "input_version",
+          "purpose",
+          "repeatable",
+          "before_snapshot_ref",
+          "created_at",
+          "started_event_id"
+        ],
+        "title": "UnfinishedAction"
       },
       "UnknownActionRequested": {
         "properties": {
@@ -7785,6 +8235,37 @@
           "repeatable"
         ],
         "title": "UnknownActionRequested"
+      },
+      "UnusableTarget": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "problem": {
+            "type": "string",
+            "title": "Problem"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "model",
+          "problem"
+        ],
+        "title": "UnusableTarget"
       },
       "UsageGroup": {
         "properties": {
@@ -8056,6 +8537,74 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerificationRecord": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "result": {
+            "type": "string",
+            "title": "Result"
+          },
+          "decided_by": {
+            "type": "string",
+            "title": "Decided By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "tool",
+          "basis",
+          "result",
+          "decided_by",
+          "note",
+          "decision_id",
+          "at",
+          "event_id"
+        ],
+        "title": "VerificationRecord"
       },
       "VersionEntry": {
         "properties": {
@@ -8501,6 +9050,17 @@
             ],
             "title": "Adoption Id"
           },
+          "recovery_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery State"
+          },
           "version": {
             "type": "integer",
             "title": "Version"
@@ -8522,6 +9082,7 @@
           "pending_question",
           "run_id",
           "adoption_id",
+          "recovery_state",
           "version"
         ],
         "title": "WorkItemLoop"
