@@ -391,32 +391,44 @@ class EventStore:
         return [row["stream"] for row in rows]
 
     def stream_events(self, stream: str, *, after_version: int = 0,
-                      through_version: int | None = None) -> list[Event] | list[ProjectEvent]:
-        # 一个流中流内版本大于 after_version（且不大于 through_version）的事件，按版本排列
+                      through_version: int | None = None,
+                      through_position: int | None = None) -> list[Event] | list[ProjectEvent]:
+        # 一个流中流内版本大于 after_version（且不大于 through_version）的事件，按版本排列；
+        # through_position 给出全局位置的上界时只取位置不大于它的事件（按位置读取，工单 #127）
         sql = "SELECT * FROM events WHERE stream = ? AND stream_version > ?"
         params: list[Any] = [stream, after_version]
         if through_version is not None:
             sql += " AND stream_version <= ?"
             params.append(through_version)
+        if through_position is not None:
+            sql += " AND position <= ?"
+            params.append(through_position)
         with self._connection() as connection:
             rows = connection.execute(sql + " ORDER BY stream_version ASC", params).fetchall()
         return [_from_row(row) for row in rows]
 
-    def list_events(self, run_id: str, *, after_version: int = 0) -> list[Event]:
-        return self.stream_events(run_stream(run_id), after_version=after_version)
+    def list_events(self, run_id: str, *, after_version: int = 0,
+                    through_position: int | None = None) -> list[Event]:
+        return self.stream_events(run_stream(run_id), after_version=after_version,
+                                  through_position=through_position)
 
-    def list_project_events(self, project_id: str, *, after_version: int = 0) -> list[ProjectEvent]:
-        return self.stream_events(project_stream(project_id), after_version=after_version)
+    def list_project_events(self, project_id: str, *, after_version: int = 0,
+                            through_position: int | None = None) -> list[ProjectEvent]:
+        return self.stream_events(project_stream(project_id), after_version=after_version,
+                                  through_position=through_position)
 
-    def read(self, after: int = 0, *, limit: int = 1000, projects: Sequence[str] = (),
-             work_items: Sequence[str] = (), runs: Sequence[str] = (), departments: Sequence[str] = (),
-             types: Sequence[str] = ()) -> list[Event | ProjectEvent]:
-        # 按全局位置分批读取：位置大于 after 的事件，按位置排列，至多 limit 条。
+    def read(self, after: int = 0, *, through: int | None = None, limit: int = 1000,
+             projects: Sequence[str] = (), work_items: Sequence[str] = (), runs: Sequence[str] = (),
+             departments: Sequence[str] = (), types: Sequence[str] = ()) -> list[Event | ProjectEvent]:
+        # 按全局位置分批读取：位置大于 after（且不大于 through）的事件，按位置排列，至多 limit 条。
         # 各个范围之间取交集，同一个范围的多个值取并集；省略的范围不限制
         if limit < 1:
             raise ValueError("limit must be positive")
         clauses: list[str] = ["position > ?"]
         params: list[Any] = [after]
+        if through is not None:
+            clauses.append("position <= ?")
+            params.append(through)
         for column, values in (("project_id", projects), ("work_item_id", work_items), ("run_id", runs),
                                ("department", departments), ("type", types)):
             if values:
@@ -434,18 +446,31 @@ class EventStore:
         with self._connection() as connection:
             return _end_position(connection)
 
-    def run_time_bounds(self, run_id: str) -> tuple[str, str] | None:
-        # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取
+    def run_time_bounds(self, run_id: str, *, through: int | None = None) -> tuple[str, str] | None:
+        # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取。
+        # through 给出全局位置的上界时只看到该位置以前的最后一条（按位置读取，工单 #127）
+        sql_tail = " AND position <= ?" if through is not None else ""
+        params: list[Any] = [run_id] if through is None else [run_id, through]
         with self._connection() as connection:
             first = connection.execute(
-                "SELECT created_at FROM events WHERE run_id = ? ORDER BY position ASC LIMIT 1", (run_id,),
+                f"SELECT created_at FROM events WHERE run_id = ?{sql_tail} ORDER BY position ASC LIMIT 1", params,
             ).fetchone()
             if first is None:
                 return None
             last = connection.execute(
-                "SELECT created_at FROM events WHERE run_id = ? ORDER BY position DESC LIMIT 1", (run_id,),
+                f"SELECT created_at FROM events WHERE run_id = ?{sql_tail} ORDER BY position DESC LIMIT 1", params,
             ).fetchone()
         return first["created_at"], last["created_at"]
+
+    def created_at_at(self, position: int) -> str | None:
+        # 位置不大于 position 的最后一条事件的创建时间：按位置读取时用它作为「该位置的时间」（工单 #127）
+        if position <= 0:
+            return None
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT created_at FROM events WHERE position <= ? ORDER BY position DESC LIMIT 1", (position,),
+            ).fetchone()
+        return None if row is None else row["created_at"]
 
     def get_event(self, event_id: str) -> Event | None:
         event = self._get(event_id)
@@ -463,12 +488,16 @@ class EventStore:
             ).fetchall()
         return [row["run_id"] for row in rows]
 
-    def list_project_ids(self) -> list[str]:
+    def list_project_ids(self, *, through: int | None = None) -> list[str]:
+        # 有事件的项目，最近写入的在前；through 给出全局位置的上界时只看该位置以前登记的项目（工单 #127）
+        sql = "SELECT project_id FROM events WHERE stream LIKE 'project:%'"
+        params: list[Any] = []
+        if through is not None:
+            sql += " AND position <= ?"
+            params.append(through)
+        sql += " GROUP BY project_id ORDER BY MAX(position) DESC"
         with self._connection() as connection:
-            rows = connection.execute(
-                "SELECT project_id FROM events WHERE stream LIKE 'project:%' GROUP BY project_id "
-                "ORDER BY MAX(position) DESC"
-            ).fetchall()
+            rows = connection.execute(sql, params).fetchall()
         return [row["project_id"] for row in rows]
 
     def close(self) -> None:
