@@ -6,7 +6,13 @@ import { startBackend, startClient, type Backend, type ClientApp } from "./fixtu
 
 let backend: Backend;
 
+// 启动后端（FakeAdapter 驱动的服务）到首行输出的用时由后端的 git 子进程决定：本机空闲时 18 至 25 秒，
+// 并发负载下 60 至 75 秒（#214）。这个界限只用来防止后端不输出时一直等待，按 #107 的裁定
+// （docs/architecture-issues.md，架构师 2026-09-27 16:55）设为远大于正常用时的值。Playwright 的
+// beforeAll 默认沿用配置里的测试时限（client/playwright.config.ts 的 60 秒），在这里单独放宽这一个会合点，
+// 各条测试自己的时限不变。
 test.beforeAll(async () => {
+  test.setTimeout(300_000);
   backend = await startBackend();
 });
 
