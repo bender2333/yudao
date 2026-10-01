@@ -253,7 +253,6 @@ def test_write_file_stores_the_given_bytes_without_newline_conversion(tmp_path):
     workspace.write_file("cr.txt", "a\rb\r")
     assert (workspace.root / "cr.txt").read_bytes() == b"a\rb\r"
 
-
 def test_file_operations_preserve_legal_leading_spaces_in_names(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file(" file", "bytes")
