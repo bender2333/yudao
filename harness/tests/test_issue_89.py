@@ -343,6 +343,57 @@ def test_the_run_has_no_department_prompt_copy_and_records_the_project_version(t
     finally:
         _close(server_a, server_b)
 
+def test_a_project_setting_tier_outside_the_model_levels_is_saved_and_limited_on_request(tmp_path):
+    # 项目部门设置与部门默认同一套保存规则（设计说明第 4.6、7.3 节）：保存只核对请求档位属于档位全集，
+    # 超出所选模型支持档位的档位照常保存，下一次请求按该模型的支持档位限制
+    server_a, capture_a, base_a = serve(_department_aware("upstream-a"))
+    server_b, capture_b, base_b = serve(_department_aware("upstream-b"))
+    try:
+        opened = _Opened(tmp_path, base_a, base_b)
+        with running_api(opened) as client:
+            opened.admit()
+            project_id = _create_project(client, "P")
+            # model-b 没有声明支持档位，high 仍属于档位全集，保存被接受
+            saved = _post(client, "department_settings.save", base_version=0, project_id=project_id,
+                          department="engineering", provider_id="provider-b", model_id="model-b",
+                          requested_tier="high")
+            assert saved.status_code == 200, saved.text
+            assert _settings(client, project_id, "engineering")["requested_tier"] == "high"
+
+            started = _post(client, "work_item.create", project_id=project_id, text="echo")
+            assert started.status_code == 200, started.text
+            run_id = started.json()["refs"]["run_id"]
+            _finish(opened.system, run_id)
+            engineering = [event for event in _run_requests(opened.system, run_id)
+                           if event.department == "engineering"]
+            assert engineering
+            assert engineering[0].payload["requested_tier"] == "high"
+            # 新模型没有声明支持档位，请求不带推理参数
+            assert engineering[0].payload["sent_tier"] is None
+            # 产品部门仍用部门默认的 model-a，工程部门用项目部门设置选中的 model-b
+            assert {item["model"] for item in capture_b.requests} == {"upstream-b"}
+            assert {item["model"] for item in capture_a.requests} == {"upstream-a"}
+    finally:
+        _close(server_a, server_b)
+
+def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
+    # 请求档位不属于档位全集时保存被拒绝，并指出字段位置
+    server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
+    server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))
+    try:
+        opened = _Opened(tmp_path, base_a, base_b)
+        with running_api(opened) as client:
+            opened.admit()
+            project_id = _create_project(client, "P")
+            rejected = _post(client, "department_settings.save", base_version=0, project_id=project_id,
+                             department="engineering", provider_id="provider-b", model_id="model-b",
+                             requested_tier="extreme")
+            assert rejected.status_code == 409, rejected.text
+            assert "departments.engineering.requested_tier" in rejected.json()["message"]
+            assert _settings(client, project_id, "engineering")["version"] == 0
+    finally:
+        _close(server_a, server_b)
+
 def _finish(system, run_id: str) -> None:
     # 事项的执行在接口进程的事件循环中作为任务运行；等这个任务结束（停在阻塞处或终止）
     import time
