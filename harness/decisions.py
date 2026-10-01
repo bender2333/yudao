@@ -32,7 +32,20 @@ MODEL_UNAVAILABLE = DecisionKind("model_unavailable", "run", (Option("continue",
 DEFINITIONS_CHANGED = DecisionKind("definitions_changed", "run",
                                    (Option("continue", "按新版本继续"), Option("stop", "停止事项")))
 
-DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED)}
+# 模型连续多次只回复文字、没有调用工具（D09，工单 #204）：用户处理以后从暂停位置继续，或者停止事项。
+# 继续以前可以先在部门设置中更换模型，从下一次请求起生效
+NO_TOOL_CALL = DecisionKind("no_tool_call", "run",
+                            (Option("continue", "处理以后继续执行"), Option("stop", "停止事项")))
+
+# 工作区出现公开树无法表示的条目（D09，工单 #204）：用户把条目加入忽略规则或者删除以后从暂停位置继续，或者停止事项
+WORKSPACE_UNREPRESENTABLE = DecisionKind("workspace_unrepresentable", "run",
+                                         (Option("continue", "处理以后继续执行"), Option("stop", "停止事项")))
+
+# 暂停的 run 在回答以后继续的两种决定种类；由暂停的停止原因得到对应的种类
+RESUMABLE_PAUSE_KINDS = {NO_TOOL_CALL.name: NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE.name: WORKSPACE_UNREPRESENTABLE}
+
+DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED,
+                                               NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:

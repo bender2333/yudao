@@ -4923,7 +4923,15 @@
             "title": "Requested At"
           },
           "request": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/PauseRequested"
+              }
+            ],
+            "title": "Request"
           },
           "answer": {
             "anyOf": [
@@ -5886,6 +5894,87 @@
           "queries"
         ],
         "title": "OverlayCapability"
+      },
+      "PauseRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "stop_reason": {
+            "type": "string",
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Stop Reason"
+          },
+          "resumed_at_phase": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PRODUCT_SPEC",
+              "ENGINEERING",
+              "DELIVERY",
+              "QUALITY",
+              "REWORK_PRODUCT",
+              "REWORK_ENGINEERING",
+              "DONE",
+              "PAUSED",
+              "FAILED"
+            ],
+            "title": "Resumed At Phase"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "stop_reason",
+          "resumed_at_phase"
+        ],
+        "title": "PauseRequested"
       },
       "ProjectArchive": {
         "properties": {
@@ -12247,7 +12336,15 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/PauseRequested"
+              }
+            ],
+            "title": "Payload"
           }
         },
         "required": [
@@ -20528,6 +20625,184 @@
         "title": "ReviewObservation",
         "type": "object"
       },
+      "RunContinuedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "run_continued",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RunContinuedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RunContinuedEvent",
+        "type": "object"
+      },
+      "RunContinuedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "stop_reason": {
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Stop Reason",
+            "type": "string"
+          },
+          "resumed_at_phase": {
+            "enum": [
+              "CREATED",
+              "PRODUCT_SPEC",
+              "ENGINEERING",
+              "DELIVERY",
+              "QUALITY",
+              "REWORK_PRODUCT",
+              "REWORK_ENGINEERING",
+              "DONE",
+              "PAUSED",
+              "FAILED"
+            ],
+            "title": "Resumed At Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision_id",
+          "stop_reason",
+          "resumed_at_phase"
+        ],
+        "title": "RunContinuedPayload",
+        "type": "object"
+      },
       "RunCreatedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -25351,6 +25626,7 @@
             "proposal_rejected": "#/components/schemas/ProposalRejectedEvent",
             "proposal_submitted": "#/components/schemas/ProposalSubmittedEvent",
             "qa_submitted": "#/components/schemas/QaSubmittedEvent",
+            "run_continued": "#/components/schemas/RunContinuedEvent",
             "run_created": "#/components/schemas/RunCreatedEvent",
             "run_done": "#/components/schemas/RunDoneEvent",
             "run_failed": "#/components/schemas/RunFailedEvent",
@@ -25495,6 +25771,9 @@
           },
           {
             "$ref": "#/components/schemas/RunResumedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RunContinuedEvent"
           },
           {
             "$ref": "#/components/schemas/DecisionRequestedEvent"

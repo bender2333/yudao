@@ -1799,6 +1799,41 @@
   },
   {
    "event": "<evt#26>",
+   "type": "decision_requested",
+   "actor": "system",
+   "department": "product",
+   "state_before": "PAUSED",
+   "state_after": "PAUSED",
+   "parent_event_id": null,
+   "session_id": null,
+   "provider": null,
+   "model": null,
+   "context_digest": null,
+   "stop_reason": null,
+   "error": null,
+   "artifact_hashes": [],
+   "payload": {
+    "blocks": "run",
+    "department": "product",
+    "description": "运行暂停，停止原因为 no_tool_call。部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。 停止说明：department replied 4 times in a row without calling a tool",
+    "facts": [],
+    "kind": "no_tool_call",
+    "options": [
+     {
+      "id": "continue",
+      "label": "处理以后继续执行"
+     },
+     {
+      "id": "stop",
+      "label": "停止事项"
+     }
+    ],
+    "resumed_at_phase": "PRODUCT_SPEC",
+    "stop_reason": "no_tool_call"
+   }
+  },
+  {
+   "event": "<evt#27>",
    "type": "activation_finished",
    "actor": "system",
    "department": "product",
@@ -2739,7 +2774,7 @@
   },
   "snapshot": null,
   "stop_reason": "no_tool_call",
-  "stream_version": 26,
+  "stream_version": 27,
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 0,

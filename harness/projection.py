@@ -685,6 +685,17 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.active_department = None
         return
 
+    if etype == EventType.RUN_CONTINUED:
+        # 用户在暂停以后回答「处理以后继续执行」（工单 #204）：从暂停位置恢复阶段，清除暂停留下的字段；
+        # 已用的激活次数、模型步数与运行时间保持在暂停时的值，不在这里重置
+        state.phase = payload["resumed_at_phase"]
+        state.outcome = "running"
+        state.stop_reason = None
+        state.human_action = None
+        state.error = None
+        state.active_department = department_for_phase(state.phase)
+        return
+
     if etype == EventType.RUN_FAILED:
         state.phase = "FAILED"
         state.outcome = "failed"

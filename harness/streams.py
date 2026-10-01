@@ -55,6 +55,7 @@ RUN_EVENT_TYPES = frozenset({
     "lesson_candidate_recorded",
     "transition",
     "run_resumed",
+    "run_continued",
     "run_done",
     "run_paused",
     "run_failed",

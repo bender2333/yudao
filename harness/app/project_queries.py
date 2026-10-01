@@ -1284,7 +1284,8 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
                 ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED,
                 ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
-                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED),
+                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_CONTINUED),
 )
 
 PROJECT_OVERVIEW = QueryDefinition(
@@ -1293,6 +1294,7 @@ PROJECT_OVERVIEW = QueryDefinition(
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_CONTINUED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.COLLABORATION_REQUESTED,
                 EventType.COLLABORATION_RESPONDED, EventType.DECISION_REQUESTED),
 )
@@ -1301,7 +1303,8 @@ PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
-                EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.COLLABORATION_REQUESTED),
+                EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.DEPARTMENT_ACTIVATED,
+                EventType.COLLABORATION_REQUESTED),
 )
 
 PROJECT_FLOW = QueryDefinition(

@@ -101,11 +101,13 @@ class Stopped:
     # 步骤驱动停止。reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由流程编排按当时的
     # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行。
     # version 是步骤驱动作出停止判断时（最后一次核对运行状态时）run 流的版本。
-    # target 是这次失败对应的调用目标公开部分（不含密钥）：模型不可用时写进待恢复的决定请求
+    # target 是这次失败对应的调用目标公开部分（不含密钥）：模型不可用时写进待恢复的决定请求。
+    # facts 是停止原因要带给决定请求的事实引用（workspace_unrepresentable 的条目相对路径）
     version: int
     reason: str | None = None
     message: str = ""
     target: dict[str, Any] | None = None
+    facts: list[str] | None = None
 
 
 StepResult = Submitted | Stopped
@@ -182,10 +184,10 @@ class StepDriver:
             return await self._steps()
         except ProviderError as exc:
             return Stopped(self._version, exc.reason, str(exc),
-                           decision_call_target(self._call_public or {}))
+                           decision_call_target(self._call_public or {}), list(exc.facts))
         except UnrepresentableWorkspace as exc:
             # 工作区在记录或其他主机工作中出现无法表示的条目：以 workspace_unrepresentable 暂停
-            return Stopped(self._version, "workspace_unrepresentable", str(exc))
+            return Stopped(self._version, "workspace_unrepresentable", str(exc), None, list(exc.paths))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
             return Stopped(self._version, "provider_error", f"{type(exc).__name__}: {exc}")
@@ -373,7 +375,7 @@ class StepDriver:
                                                                        "step_id": step_id})
                     except UnrepresentableWorkspace as exc:
                         # 工具许可需要工作区事实时发现无法表示的条目：以 workspace_unrepresentable 暂停运行
-                        raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
+                        raise ProviderError(str(exc), reason="workspace_unrepresentable", facts=list(exc.paths)) from exc
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
@@ -392,7 +394,8 @@ class StepDriver:
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                             ))
                         except UnrepresentableWorkspace as exc:
-                            raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
+                            raise ProviderError(str(exc), reason="workspace_unrepresentable",
+                                                facts=list(exc.paths)) from exc
                         ok, output, error = receipt.ok, receipt.output, receipt.error
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": ok, "output": output, "error": error})}
@@ -401,7 +404,9 @@ class StepDriver:
                 self._recorder.tool_called(request, call)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):
-                    raise ProviderError(output["workspace_unrepresentable"], reason="workspace_unrepresentable")
+                    failure = output["workspace_unrepresentable"]
+                    raise ProviderError(failure["message"], reason="workspace_unrepresentable",
+                                        facts=list(failure.get("paths", [])))
                 if not self._proceed():
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
@@ -492,7 +497,8 @@ class StepDriver:
 
         prepared = self._writes.transact(self._stream, prepare)
         if isinstance(prepared, _Unassembled):
-            raise ProviderError(str(prepared.error), reason=prepared.reason) from prepared.error
+            facts = list(prepared.error.paths) if isinstance(prepared.error, UnrepresentableWorkspace) else []
+            raise ProviderError(str(prepared.error), reason=prepared.reason, facts=facts) from prepared.error
         if prepared is None:
             return None
         self._request, self._step = prepared

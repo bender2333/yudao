@@ -850,8 +850,22 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class PauseRequested(Payload):
+    # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现公开树无法表示的条目，
+    # run 暂停并发出这个请求，回答之前这个 run 不推进。description 写明停止原因与人工处理说明；
+    # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径；department 是暂停时正在工作的部门；
+    # resumed_at_phase 是暂停时所在的阶段，回答继续时恢复到它
+    kind: Literal["no_tool_call", "workspace_unrepresentable"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
+    resumed_at_phase: Phase
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested
+DecisionRequestedPayload = ModelUnavailableRequested | PauseRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -873,6 +887,13 @@ class RunResumedPayload(Payload):
     basis: dict[str, Any]
     acquired_epoch: int
     previous_epoch: int | None
+
+class RunContinuedPayload(Payload):
+    # 暂停的 run 在用户回答「处理以后继续执行」以后继续（D09，工单 #204）：decision_id 是被回答的决定请求，
+    # stop_reason 是暂停时的停止原因，resumed_at_phase 是恢复到的阶段（暂停时记录在 run_paused 的 paused_at_phase）
+    decision_id: str
+    stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
+    resumed_at_phase: Phase
 
 
 # ---------------------------------------------------------------------------
@@ -1084,6 +1105,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
     EventType.RUN_RESUMED: RunResumedPayload,
+    EventType.RUN_CONTINUED: RunContinuedPayload,
     EventType.DECISION_REQUESTED: DecisionRequestedPayload,
     EventType.DECISION_ANSWERED: DecisionAnsweredPayload,
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,

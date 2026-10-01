@@ -80,6 +80,7 @@ class EventType:
     RUN_PAUSED = "run_paused"
     RUN_FAILED = "run_failed"
     RUN_RESUMED = "run_resumed"
+    RUN_CONTINUED = "run_continued"
     DECISION_REQUESTED = "decision_requested"
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
