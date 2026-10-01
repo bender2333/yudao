@@ -314,3 +314,4 @@ minimax-M3.1 / 2026-10-01 21:20 / client/src/main/window.ts 与 client/tests/e2e
 claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记的三条（图鉴核对口径、覆盖层接口、缩放的整数倍）追加处理结论 / 架构师处理执行者登记的架构问题
 
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-01 23:25 / docs/architecture-issues.md 追加 #226 的一条：AGENTS.md「常用命令」的 `pytest -m "unit or module"` 依赖尚未合入的 harness/tests/layers.toml 登记表，在 main 上静默选中 0 项，单元层与模块层没有被运行 / 交付 #226 时实测该命令输出 1575 deselected、退出码 0，执行者无法据此判断这两层是否通过，登记建议由架构师决定
+claude-opus-5-5 / 2026-10-02 00:08 / docs/architecture-issues.md 为 #226 登记的分层命令选中 0 项一条写处理结论 / 架构师处理执行者登记的架构问题
