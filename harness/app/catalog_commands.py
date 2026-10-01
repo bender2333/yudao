@@ -48,6 +48,10 @@ class ModelInput(Contract):
     capability_source: str = ""
     capacity_confirmed: bool = False
     accepts_required_tool_call: bool = True
+    # 推理档位声明（#87）：三项一起声明，缺任一项或整体缺省时请求不带推理参数
+    reasoning_levels: list[str] = []
+    default_reasoning_level: str | None = None
+    reasoning_mode: str = ""
 
 
 class DocumentModelInput(ModelInput):
@@ -58,6 +62,8 @@ class DocumentModelInput(ModelInput):
 class BindingInput(Contract):
     provider_id: Text
     model_id: Text
+    # 请求档位（#87）：可以为空，保存时只核对它属于档位全集，实际发送的档位由每次请求按模型限制
+    requested_tier: str | None = None
 
 
 class CatalogDocumentInput(Contract):

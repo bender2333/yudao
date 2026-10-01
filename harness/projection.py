@@ -423,6 +423,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
                             "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "reasoning_levels", "default_reasoning_level", "reasoning_mode",
                             "requested_tier", "sent_tier")
             }
         state.model_requests.append({

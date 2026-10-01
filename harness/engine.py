@@ -39,6 +39,9 @@ from .tools import proposal_kind, tool_action, tool_kind
 # 调用目标的选择来源：本工单只有部门默认这一种；项目部门设置与角色默认由 #89 与 #63 加入（#45）
 DEPARTMENT_DEFAULT_SELECTION = "department_default"
 
+# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+COMPACTION_REQUEST_TIER = "minimal"
+
 
 @dataclass(frozen=True)
 class Judgment:
@@ -221,12 +224,14 @@ class StepDriver:
             self._release_call()
             self._recorder.close()
 
-    def _begin_call(self) -> Stopped | None:
-        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标。失败时不发送请求，交回待恢复的停止结果
+    def _begin_call(self, requested_tier: str | None = None) -> Stopped | None:
+        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标。没有给出请求档位时用部门默认
+        # 保存的档位；给出时以它为准（整理请求传「minimal」）。实际发送的档位由 Provider 按模型
+        # 声明限制。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
         if self._facade is None:
             raise ProviderError("model calls require the provider facade", reason="provider_error")
-        resolution = self._facade.resolve_department_default(self._scope.department)
+        resolution = self._facade.resolve_department_default(self._scope.department, requested_tier)
         if not resolution.available:
             return Stopped(self._version, resolution.reason, resolution.message,
                            decision_call_target(resolution.public))
@@ -563,7 +568,8 @@ class StepDriver:
                  replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
-        # 新的逻辑调用先按部门默认解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
+        # 新的逻辑调用按部门默认解析（Provider 在同一把锁内读取包含请求档位的部门默认，
+        # 并按当前模型声明的支持档位限制）；重试沿用该逻辑调用已经解析的目标与句柄
         scope = self._scope
         if retry_of_step_id is None:
             unavailable = self._begin_call()
@@ -600,6 +606,14 @@ class StepDriver:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
             logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
+            # 整理请求按最低支持档位解析：向 Provider 传「minimal」，它按模型声明取最低支持档位。
+            # 用途只有装配以后才知道，如果这次逻辑调用用的请求档位不是它，重新解析一次
+            # （重新解析会丢弃刚才还没有使用的句柄）；工作请求保持原来的解析
+            if retry_of_step_id is None and assembled.manifest.purpose == "compaction" \
+                    and (self._call_public or {}).get("requested_tier") != COMPACTION_REQUEST_TIER:
+                unavailable = self._begin_call(COMPACTION_REQUEST_TIER)
+                if unavailable is not None:
+                    return unavailable
             self._bind_call(logical_call_id)
             request = ModelRequest(scope.run_id, scope.department, scope.session_id, scope.activation_id,
                                    step_id, assembled, assembled.tools,
