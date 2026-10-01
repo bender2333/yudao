@@ -107,6 +107,57 @@
         }
       }
     },
+    "/api/commands/project.set_goal": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "project.set_goal",
+        "operationId": "command_project_set_goal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectSetGoal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/project.pin": {
       "post": {
         "tags": [
@@ -3237,7 +3288,8 @@
             "enum": [
               "running",
               "completed",
-              "failed"
+              "failed",
+              "unknown"
             ],
             "title": "Status"
           },
@@ -3298,6 +3350,30 @@
                 "type": "null"
               }
             ]
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Snapshot Ref"
           }
         },
         "additionalProperties": false,
@@ -5001,7 +5077,15 @@
             "title": "Requested At"
           },
           "request": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Request"
           },
           "answer": {
             "anyOf": [
@@ -5327,6 +5411,11 @@
             "type": "string",
             "title": "Version"
           },
+          "api_version": {
+            "type": "integer",
+            "title": "Api Version",
+            "example": 1
+          },
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
@@ -5346,6 +5435,7 @@
           "log_id",
           "boot_id",
           "version",
+          "api_version",
           "contract_digest",
           "access"
         ],
@@ -6395,6 +6485,37 @@
         ],
         "title": "ProjectRow"
       },
+      "ProjectSetGoal": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Goal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "project_id",
+          "goal"
+        ],
+        "title": "ProjectSetGoal"
+      },
       "ProjectSettingsResult": {
         "properties": {
           "project_id": {
@@ -7380,6 +7501,78 @@
         ],
         "title": "SystemStatus"
       },
+      "UnknownActionRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unknown_action",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "action",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "action_kind": {
+            "type": "string",
+            "title": "Action Kind"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "action_id",
+          "tool",
+          "action_kind",
+          "repeatable"
+        ],
+        "title": "UnknownActionRequested"
+      },
       "UsageGroup": {
         "properties": {
           "attempts": {
@@ -8250,6 +8443,488 @@
         ],
         "title": "WorkItemStats"
       },
+      "ActionVerifiedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "action_verified",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ActionVerifiedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ActionVerifiedEvent",
+        "type": "object"
+      },
+      "ActionVerifiedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "requested_provider": {
+            "title": "Requested Provider",
+            "type": "string"
+          },
+          "requested_protocol": {
+            "title": "Requested Protocol",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Version"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "configured_max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Max Output Tokens"
+          },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "input_version": {
+            "title": "Input Version",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "integer"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash"
+          },
+          "guidance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guidance Ids",
+            "type": "array"
+          },
+          "guidance_only": {
+            "title": "Guidance Only",
+            "type": "boolean"
+          },
+          "effective_contract_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Contract Hash"
+          },
+          "engineering_plan_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineering Plan Hash"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "attempt_id": {
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "logical_call_id": {
+            "title": "Logical Call Id",
+            "type": "string"
+          },
+          "collaboration_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collaboration Request Id"
+          },
+          "context_event_id": {
+            "title": "Context Event Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "integer"
+          },
+          "input_item": {
+            "$ref": "#/components/schemas/FunctionCallOutput"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "work",
+              "compaction"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "resolution": {
+            "const": "continue",
+            "title": "Resolution",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decision Id"
+          }
+        },
+        "required": [
+          "provider_config_id",
+          "model_id",
+          "provider_name",
+          "protocol",
+          "base_url",
+          "requested_provider",
+          "requested_protocol",
+          "requested_model",
+          "credential_ref",
+          "credential_version",
+          "context_window",
+          "configured_max_output_tokens",
+          "accepts_required_tool_call",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
+          "input_version",
+          "prompt_version",
+          "prompt_hash",
+          "guidance_ids",
+          "guidance_only",
+          "effective_contract_hash",
+          "engineering_plan_hash",
+          "request_id",
+          "attempt_id",
+          "logical_call_id",
+          "collaboration_request_id",
+          "context_event_id",
+          "id",
+          "name",
+          "step_id",
+          "input_item",
+          "activation_id",
+          "purpose",
+          "ok",
+          "resolution"
+        ],
+        "title": "ActionVerifiedPayload",
+        "type": "object"
+      },
       "ActivationFinishedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -8718,6 +9393,338 @@
           "code_tree_digest"
         ],
         "title": "Baseline",
+        "type": "object"
+      },
+      "BaselineConclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "read_only",
+              "existing_defect",
+              "unsupported"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement",
+          "status",
+          "evidence"
+        ],
+        "title": "BaselineConclusion",
+        "type": "object"
+      },
+      "BaselineOmission": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "location"
+        ],
+        "title": "BaselineOmission",
+        "type": "object"
+      },
+      "BaselineOtherFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "reason"
+        ],
+        "title": "BaselineOtherFailure",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "baseline_review_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "BaselineReviewAcceptedEvent",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "verdict": {
+            "enum": [
+              "consistent",
+              "rework_product"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          },
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineConclusion"
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOmission"
+            },
+            "title": "Omissions",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckReceipt"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "other_failures": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOtherFailure"
+            },
+            "title": "Other Failures",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "structure_hash": {
+            "title": "Structure Hash",
+            "type": "string"
+          },
+          "code_snapshot_hash": {
+            "title": "Code Snapshot Hash",
+            "type": "string"
+          },
+          "kind": {
+            "const": "baseline_review",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "quality",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "verdict",
+          "conclusions",
+          "omissions",
+          "checks",
+          "other_failures",
+          "product_spec_hash",
+          "structure_hash",
+          "code_snapshot_hash",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "request_id",
+          "git_version"
+        ],
+        "title": "BaselineReviewAcceptedPayload",
         "type": "object"
       },
       "CatalogCandidatesCollectedEvent": {
@@ -12335,7 +13342,15 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Payload"
           }
         },
         "required": [
@@ -12507,6 +13522,7 @@
           "reason": {
             "enum": [
               "released",
+              "baseline_verified",
               "max_cycles",
               "model_steps_exhausted",
               "no_tool_call",
@@ -19293,6 +20309,162 @@
         "title": "ProjectArchivedPayload",
         "type": "object"
       },
+      "ProjectGoalChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_goal_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectGoalChangedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectGoalChangedEvent",
+        "type": "object"
+      },
+      "ProjectGoalChangedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "title": "Goal",
+            "type": "string"
+          },
+          "goal_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          }
+        },
+        "required": [
+          "goal",
+          "goal_ref"
+        ],
+        "title": "ProjectGoalChangedPayload",
+        "type": "object"
+      },
       "ProjectPinnedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -20761,6 +21933,11 @@
             "title": "Task",
             "type": "string"
           },
+          "kind": {
+            "default": "change",
+            "title": "Kind",
+            "type": "string"
+          },
           "initial_input": {
             "$ref": "#/components/schemas/InputRecord"
           },
@@ -20863,6 +22040,17 @@
                 "type": "null"
               }
             ]
+          },
+          "overview_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "workspace_digest": {
             "title": "Workspace Digest",
@@ -21085,7 +22273,10 @@
         "additionalProperties": false,
         "properties": {
           "stop_reason": {
-            "const": "released",
+            "enum": [
+              "released",
+              "baseline_verified"
+            ],
             "title": "Stop Reason",
             "type": "string"
           }
@@ -22612,6 +23803,374 @@
         "title": "SpecSupersededPayload",
         "type": "object"
       },
+      "StructureAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "structure_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/StructureAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "StructureAcceptedEvent",
+        "type": "object"
+      },
+      "StructureAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "overall": {
+            "title": "Overall",
+            "type": "string"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/StructureModule"
+            },
+            "title": "Modules",
+            "type": "array"
+          },
+          "entry_points": {
+            "items": {
+              "$ref": "#/components/schemas/StructureEntryPoint"
+            },
+            "title": "Entry Points",
+            "type": "array"
+          },
+          "build_and_test": {
+            "items": {
+              "$ref": "#/components/schemas/StructureBuildItem"
+            },
+            "title": "Build And Test",
+            "type": "array"
+          },
+          "requirement_locations": {
+            "items": {
+              "$ref": "#/components/schemas/StructureRequirementLocation"
+            },
+            "title": "Requirement Locations",
+            "type": "array"
+          },
+          "conventions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conventions",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "code_tree_digest": {
+            "title": "Code Tree Digest",
+            "type": "string"
+          },
+          "kind": {
+            "const": "structure",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "engineering",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "structure_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "overall",
+          "modules",
+          "entry_points",
+          "build_and_test",
+          "requirement_locations",
+          "conventions",
+          "product_spec_hash",
+          "code_tree_digest",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "structure_ref",
+          "request_id",
+          "git_version"
+        ],
+        "title": "StructureAcceptedPayload",
+        "type": "object"
+      },
+      "StructureBuildItem": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Argv",
+            "type": "array"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/CheckReceipt"
+          }
+        },
+        "required": [
+          "name",
+          "argv",
+          "purpose",
+          "receipt"
+        ],
+        "title": "StructureBuildItem",
+        "type": "object"
+      },
+      "StructureEntryPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "program",
+              "command_line",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "how_to_run": {
+            "title": "How To Run",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "how_to_run"
+        ],
+        "title": "StructureEntryPoint",
+        "type": "object"
+      },
+      "StructureModule": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "responsibility": {
+            "title": "Responsibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "responsibility"
+        ],
+        "title": "StructureModule",
+        "type": "object"
+      },
+      "StructureRequirementLocation": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirement",
+          "locations"
+        ],
+        "title": "StructureRequirementLocation",
+        "type": "object"
+      },
       "ToolCallRequiredEvent": {
         "additionalProperties": false,
         "properties": {
@@ -23151,6 +24710,17 @@
             "title": "Error"
           },
           "output_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "after_snapshot_ref": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ArtifactRef"
@@ -24086,6 +25656,17 @@
             ],
             "default": null,
             "title": "Snapshot Hash"
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -25394,8 +26975,10 @@
       "EventObject": {
         "discriminator": {
           "mapping": {
+            "action_verified": "#/components/schemas/ActionVerifiedEvent",
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
+            "baseline_review_accepted": "#/components/schemas/BaselineReviewAcceptedEvent",
             "catalog_candidates_collected": "#/components/schemas/CatalogCandidatesCollectedEvent",
             "catalog_revised": "#/components/schemas/CatalogRevisedEvent",
             "catalog_test_finished": "#/components/schemas/CatalogTestFinishedEvent",
@@ -25432,6 +27015,7 @@
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
             "project_archived": "#/components/schemas/ProjectArchivedEvent",
+            "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
             "project_registered": "#/components/schemas/ProjectRegisteredEvent",
             "project_renamed": "#/components/schemas/ProjectRenamedEvent",
@@ -25449,6 +27033,7 @@
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
             "spec_accepted": "#/components/schemas/SpecAcceptedEvent",
             "spec_superseded": "#/components/schemas/SpecSupersededEvent",
+            "structure_accepted": "#/components/schemas/StructureAcceptedEvent",
             "tool_call_required": "#/components/schemas/ToolCallRequiredEvent",
             "tool_called": "#/components/schemas/ToolCalledEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
@@ -25531,6 +27116,9 @@
             "$ref": "#/components/schemas/ToolSkippedEvent"
           },
           {
+            "$ref": "#/components/schemas/ActionVerifiedEvent"
+          },
+          {
             "$ref": "#/components/schemas/ProposalSubmittedEvent"
           },
           {
@@ -25567,6 +27155,12 @@
             "$ref": "#/components/schemas/QaSubmittedEvent"
           },
           {
+            "$ref": "#/components/schemas/StructureAcceptedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedEvent"
+          },
+          {
             "$ref": "#/components/schemas/LessonCandidateRecordedEvent"
           },
           {
@@ -25598,6 +27192,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectRenamedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectGoalChangedEvent"
           },
           {
             "$ref": "#/components/schemas/ProjectPinnedEvent"

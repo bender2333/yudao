@@ -7,11 +7,17 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "path": {"type": "string", "description": "Workspace-relative file path"}
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative file path"
+        }
       },
       "additionalProperties": false,
-      "required": ["path"]
-    }
+      "required": [
+        "path"
+      ]
+    },
+    "repeatable": true
   },
   "list_files": {
     "kind": "environment",
@@ -21,10 +27,14 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "prefix": {"type": "string", "description": "Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory"}
+        "prefix": {
+          "type": "string",
+          "description": "Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory"
+        }
       },
       "additionalProperties": false
-    }
+    },
+    "repeatable": true
   },
   "search": {
     "kind": "environment",
@@ -34,14 +44,38 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "pattern": {"type": "string", "description": "Python re regex searched per line"},
-        "path": {"type": ["string", "null"], "description": "Optional file or directory scope within the public tree"},
-        "max_results": {"type": ["integer", "null"], "description": "Maximum matches per page"},
-        "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated search"}
+        "pattern": {
+          "type": "string",
+          "description": "Python re regex searched per line"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional file or directory scope within the public tree"
+        },
+        "max_results": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum matches per page"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Continuation cursor from a truncated search"
+        }
       },
       "additionalProperties": false,
-      "required": ["pattern"]
-    }
+      "required": [
+        "pattern"
+      ]
+    },
+    "repeatable": true
   },
   "read_range": {
     "kind": "environment",
@@ -51,14 +85,36 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "path": {"type": "string", "description": "Workspace-relative file path"},
-        "start_line": {"type": "integer", "description": "First line to read, 1-based"},
-        "end_line": {"type": ["integer", "null"], "description": "Last line to read, inclusive; omit for end of file"},
-        "cursor": {"type": ["string", "null"], "description": "Continuation cursor from a truncated read"}
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative file path"
+        },
+        "start_line": {
+          "type": "integer",
+          "description": "First line to read, 1-based"
+        },
+        "end_line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Last line to read, inclusive; omit for end of file"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Continuation cursor from a truncated read"
+        }
       },
       "additionalProperties": false,
-      "required": ["path", "start_line"]
-    }
+      "required": [
+        "path",
+        "start_line"
+      ]
+    },
+    "repeatable": true
   },
   "write_file": {
     "kind": "environment",
@@ -68,12 +124,22 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "path": {"type": "string", "description": "Workspace-relative file path"},
-        "content": {"type": "string", "description": "Full file contents"}
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative file path"
+        },
+        "content": {
+          "type": "string",
+          "description": "Full file contents"
+        }
       },
       "additionalProperties": false,
-      "required": ["path", "content"]
-    }
+      "required": [
+        "path",
+        "content"
+      ]
+    },
+    "repeatable": false
   },
   "edit_range": {
     "kind": "environment",
@@ -83,16 +149,44 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "path": {"type": "string", "description": "Workspace-relative file path"},
-        "start_line": {"type": "integer", "description": "First line to replace, 1-based"},
-        "end_line": {"type": "integer", "description": "Last line to replace, inclusive"},
-        "expected_text": {"type": "string", "description": "Exact original lines previously read, joined by newline without a trailing newline"},
-        "new_text": {"type": "string", "description": "Replacement text for the span, lines joined by newline"},
-        "expected_digest": {"type": ["string", "null"], "description": "File content_hash observed when the span was read; omit to skip the digest check"}
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative file path"
+        },
+        "start_line": {
+          "type": "integer",
+          "description": "First line to replace, 1-based"
+        },
+        "end_line": {
+          "type": "integer",
+          "description": "Last line to replace, inclusive"
+        },
+        "expected_text": {
+          "type": "string",
+          "description": "Exact original lines previously read, joined by newline without a trailing newline"
+        },
+        "new_text": {
+          "type": "string",
+          "description": "Replacement text for the span, lines joined by newline"
+        },
+        "expected_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "File content_hash observed when the span was read; omit to skip the digest check"
+        }
       },
       "additionalProperties": false,
-      "required": ["path", "start_line", "end_line", "expected_text", "new_text"]
-    }
+      "required": [
+        "path",
+        "start_line",
+        "end_line",
+        "expected_text",
+        "new_text"
+      ]
+    },
+    "repeatable": false
   },
   "delete_file": {
     "kind": "environment",
@@ -102,12 +196,21 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "path": {"type": "string"},
-        "reason": {"type": "string", "minLength": 1}
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false,
-      "required": ["path", "reason"]
-    }
+      "required": [
+        "path",
+        "reason"
+      ]
+    },
+    "repeatable": false
   },
   "move_file": {
     "kind": "environment",
@@ -117,13 +220,25 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "source": {"type": "string"},
-        "destination": {"type": "string"},
-        "reason": {"type": "string", "minLength": 1}
+        "source": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false,
-      "required": ["source", "destination", "reason"]
-    }
+      "required": [
+        "source",
+        "destination",
+        "reason"
+      ]
+    },
+    "repeatable": false
   },
   "run_check": {
     "kind": "environment",
@@ -133,16 +248,25 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "name": {"type": "string", "description": "Check name, e.g. smoke"},
+        "name": {
+          "type": "string",
+          "description": "Check name, e.g. smoke"
+        },
         "argv": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "description": "Argument vector executed by the host, e.g. [\"python\", \"src/echo.py\", \"hello\"]"
         }
       },
       "additionalProperties": false,
-      "required": ["name", "argv"]
-    }
+      "required": [
+        "name",
+        "argv"
+      ]
+    },
+    "repeatable": true
   },
   "run_command": {
     "kind": "environment",
@@ -152,16 +276,24 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "name": {"type": "string", "description": "Registered command name frozen for this run"},
+        "name": {
+          "type": "string",
+          "description": "Registered command name frozen for this run"
+        },
         "args": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "description": "Extra arguments; every item must be in the registered allowlist"
         }
       },
       "additionalProperties": false,
-      "required": ["name"]
-    }
+      "required": [
+        "name"
+      ]
+    },
+    "repeatable": false
   },
   "submit_product_spec": {
     "kind": "host",
@@ -171,23 +303,87 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "goal": {"type": "string"},
-        "requirements": {"type": "array", "items": {"type": "string"}, "description": "Must contain at least one item"},
-        "acceptance_criteria": {"type": "array", "items": {"type": "string"}, "description": "Must contain at least one item"},
-        "boundaries": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
-        "constraints": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
-        "fatal_conditions": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
-        "non_goals": {"type": "array", "items": {"type": "string"}, "description": "Optional"},
+        "goal": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Must contain at least one item"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Must contain at least one item"
+        },
+        "boundaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "fatal_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
         "change_record": {
           "type": "object",
           "properties": {
-            "changed": {"type": "array", "items": {"type": "string"}, "description": "Requirements added or changed in this revision"},
-            "retained": {"type": "array", "items": {"type": "string"}, "description": "Requirements explicitly preserved"},
-            "retired": {"type": "array", "items": {"type": "string"}, "description": "Requirements explicitly removed"},
-            "rationale": {"type": "string", "minLength": 1}
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements added or changed in this revision"
+            },
+            "retained": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements explicitly preserved"
+            },
+            "retired": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements explicitly removed"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false,
-          "required": ["changed", "retained", "retired", "rationale"],
+          "required": [
+            "changed",
+            "retained",
+            "retired",
+            "rationale"
+          ],
           "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec."
         },
         "decision_changes": {
@@ -195,19 +391,39 @@
           "items": {
             "type": "object",
             "properties": {
-              "decision_hash": {"type": "string"},
-              "disposition": {"type": "string", "enum": ["retain", "integrate", "retire"]},
-              "rationale": {"type": "string"}
+              "decision_hash": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "retain",
+                  "integrate",
+                  "retire"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
             },
             "additionalProperties": false,
-            "required": ["decision_hash", "disposition", "rationale"]
+            "required": [
+              "decision_hash",
+              "disposition",
+              "rationale"
+            ]
           },
           "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec."
         }
       },
       "additionalProperties": false,
-      "required": ["goal", "requirements", "acceptance_criteria"]
-    }
+      "required": [
+        "goal",
+        "requirements",
+        "acceptance_criteria"
+      ]
+    },
+    "repeatable": false
   },
   "submit_product_decision": {
     "kind": "host",
@@ -217,12 +433,20 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "statement": {"type": "string"},
-        "rationale": {"type": "string"}
+        "statement": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
       },
       "additionalProperties": false,
-      "required": ["statement", "rationale"]
-    }
+      "required": [
+        "statement",
+        "rationale"
+      ]
+    },
+    "repeatable": false
   },
   "submit_request": {
     "kind": "host",
@@ -232,16 +456,55 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "recipient": {"type": "string", "enum": ["product", "engineering", "quality"]},
-        "request_type": {"type": "string", "enum": ["consultation", "action"]},
-        "question": {"type": "string"},
-        "background": {"type": "string"},
-        "expected_result": {"type": "string"},
-        "action": {"type": ["string", "null"], "enum": [null, "inspect", "check", "revise_requirements", "revise_delivery"]}
+        "recipient": {
+          "type": "string",
+          "enum": [
+            "product",
+            "engineering",
+            "quality"
+          ]
+        },
+        "request_type": {
+          "type": "string",
+          "enum": [
+            "consultation",
+            "action"
+          ]
+        },
+        "question": {
+          "type": "string"
+        },
+        "background": {
+          "type": "string"
+        },
+        "expected_result": {
+          "type": "string"
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "inspect",
+            "check",
+            "revise_requirements",
+            "revise_delivery"
+          ]
+        }
       },
       "additionalProperties": false,
-      "required": ["recipient", "request_type", "question", "background", "expected_result", "action"]
-    }
+      "required": [
+        "recipient",
+        "request_type",
+        "question",
+        "background",
+        "expected_result",
+        "action"
+      ]
+    },
+    "repeatable": false
   },
   "submit_response": {
     "kind": "host",
@@ -251,14 +514,38 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "request_id": {"type": "string"},
-        "status": {"type": "string", "enum": ["answered", "completed", "declined", "needs_work"]},
-        "text": {"type": "string"},
-        "result_event_ids": {"type": "array", "items": {"type": "string"}, "description": "Actual accepted result or host tool event IDs for this request"}
+        "request_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "answered",
+            "completed",
+            "declined",
+            "needs_work"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "result_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Actual accepted result or host tool event IDs for this request"
+        }
       },
       "additionalProperties": false,
-      "required": ["request_id", "status", "text", "result_event_ids"]
-    }
+      "required": [
+        "request_id",
+        "status",
+        "text",
+        "result_event_ids"
+      ]
+    },
+    "repeatable": false
   },
   "submit_guidance_response": {
     "kind": "host",
@@ -268,14 +555,38 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "guidance_id": {"type": "string"},
-        "status": {"type": "string", "enum": ["explained", "completed", "declined", "needs_work"]},
-        "text": {"type": "string"},
-        "result_event_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional. completed must be a subset of guidance_results; the host binds those results. explained, declined, and needs_work do not require results."}
+        "guidance_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "explained",
+            "completed",
+            "declined",
+            "needs_work"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "result_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. completed must be a subset of guidance_results; the host binds those results. explained, declined, and needs_work do not require results."
+        }
       },
       "additionalProperties": false,
-      "required": ["guidance_id", "status", "text", "result_event_ids"]
-    }
+      "required": [
+        "guidance_id",
+        "status",
+        "text",
+        "result_event_ids"
+      ]
+    },
+    "repeatable": false
   },
   "submit_plan": {
     "kind": "host",
@@ -285,41 +596,88 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "objective": {"type": "string"},
-        "scope": {"type": "array", "items": {"type": "string"}, "description": "Relative files or directories ending with /; . means the entire public workspace"},
+        "objective": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Relative files or directories ending with /; . means the entire public workspace"
+        },
         "tasks": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "title": {"type": "string"},
-              "outputs": {"type": "array", "items": {"type": "string"}, "description": "Observable outputs of this task"},
-              "verification": {"type": "string", "description": "How to verify these outputs"}
+              "title": {
+                "type": "string"
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Observable outputs of this task"
+              },
+              "verification": {
+                "type": "string",
+                "description": "How to verify these outputs"
+              }
             },
             "additionalProperties": false,
-            "required": ["title", "outputs", "verification"]
+            "required": [
+              "title",
+              "outputs",
+              "verification"
+            ]
           },
           "description": "Non-empty tasks in execution order"
         },
-        "refactoring": {"type": "array", "items": {"type": "string"}, "description": "Necessary structural changes, or an empty list"},
+        "refactoring": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Necessary structural changes, or an empty list"
+        },
         "assumptions": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "decision": {"type": "string"},
-              "basis": {"type": "string"}
+              "decision": {
+                "type": "string"
+              },
+              "basis": {
+                "type": "string"
+              }
             },
             "additionalProperties": false,
-            "required": ["decision", "basis"]
+            "required": [
+              "decision",
+              "basis"
+            ]
           },
           "description": "Professional defaults and their basis; do not present defaults as user statements"
         },
-        "reason": {"type": "string", "description": "Reason for adjusting an existing plan; may be empty for the first plan"}
+        "reason": {
+          "type": "string",
+          "description": "Reason for adjusting an existing plan; may be empty for the first plan"
+        }
       },
       "additionalProperties": false,
-      "required": ["objective", "scope", "tasks", "refactoring", "assumptions", "reason"]
-    }
+      "required": [
+        "objective",
+        "scope",
+        "tasks",
+        "refactoring",
+        "assumptions",
+        "reason"
+      ]
+    },
+    "repeatable": false
   },
   "submit_delivery": {
     "kind": "host",
@@ -329,14 +687,39 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "summary": {"type": "string"},
-        "files": {"type": "array", "items": {"type": "string"}, "description": "Workspace-relative files included in the delivery"},
-        "check_names": {"type": "array", "items": {"type": "string"}, "description": "Names passed to run_check in this activation on the current workspace; run_command results do not count"},
-        "known_risks": {"type": "array", "items": {"type": "string"}, "description": "Optional"}
+        "summary": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Workspace-relative files included in the delivery"
+        },
+        "check_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names passed to run_check in this activation on the current workspace; run_command results do not count"
+        },
+        "known_risks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        }
       },
       "additionalProperties": false,
-      "required": ["summary", "files", "check_names"]
-    }
+      "required": [
+        "summary",
+        "files",
+        "check_names"
+      ]
+    },
+    "repeatable": false
   },
   "submit_review": {
     "kind": "host",
@@ -346,23 +729,168 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "verdict": {"type": "string", "enum": ["rework_product", "rework_engineering", "release"]},
-        "rationale": {"type": "string"},
-        "checks": {"type": "array", "items": {"type": "string"}, "description": "Quality check names run via run_check"},
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "rework_product",
+            "rework_engineering",
+            "release"
+          ]
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Quality check names run via run_check"
+        },
         "defects": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "severity": {"type": "string", "enum": ["blocker", "major", "minor"]},
-              "summary": {"type": "string"}
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "blocker",
+                  "major",
+                  "minor"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              }
             },
-            "required": ["severity", "summary"]
+            "required": [
+              "severity",
+              "summary"
+            ]
           }
         }
       },
       "additionalProperties": false,
       "required": ["verdict", "rationale", "checks"]
+    }
+  },
+  "submit_structure": {
+    "kind": "host",
+    "proposal": "structure",
+    "guidance_only": false,
+    "description": "Submit the existing-structure description of an onboarding run. Write only what requires reading several files to establish and what later work can easily get wrong: no generic advice, no complete file tree, nothing you cannot verify. Every entry in build_and_test must have a run_check receipt from this activation on the current workspace snapshot; the recorded exit status is taken from that receipt, and an exit status other than 0 is accepted as it is. Onboarding gives you no write, edit, delete or move tools, so the workspace tree must still equal the snapshot when you submit.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "overall": {"type": "string", "description": "How the repository is composed and how it runs"},
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {"type": "string", "description": "Workspace-relative file or directory"},
+              "responsibility": {"type": "string", "description": "What this module is responsible for"}
+            },
+            "additionalProperties": false,
+            "required": ["path", "responsibility"]
+          }
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {"type": "string", "enum": ["program", "command_line", "service"]},
+              "path": {"type": "string", "description": "Workspace-relative file"},
+              "how_to_run": {"type": "string", "description": "The command that starts it"}
+            },
+            "additionalProperties": false,
+            "required": ["kind", "path", "how_to_run"]
+          }
+        },
+        "build_and_test": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "The name you passed to run_check"},
+              "argv": {"type": "array", "items": {"type": "string"}, "description": "The argv you passed to run_check"},
+              "purpose": {"type": "string", "description": "What this command builds or tests"}
+            },
+            "additionalProperties": false,
+            "required": ["name", "argv", "purpose"]
+          },
+          "description": "Each entry needs a run_check receipt from this activation bound to the current snapshot"
+        },
+        "requirement_locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {"type": "string", "description": "The initial PRD requirement, written as it appears"},
+              "locations": {"type": "array", "items": {"type": "string"}, "description": "Main files or directories, workspace-relative"}
+            },
+            "additionalProperties": false,
+            "required": ["requirement", "locations"]
+          }
+        },
+        "conventions": {"type": "array", "items": {"type": "string"}, "description": "Code generation, special environment variables, slow tests or tests that need an external service"}
+      },
+      "additionalProperties": false,
+      "required": ["overall", "modules", "entry_points", "build_and_test", "requirement_locations"]
+    }
+  },
+  "submit_baseline_review": {
+    "kind": "host",
+    "proposal": "baseline_review",
+    "guidance_only": false,
+    "description": "Submit the baseline review of an onboarding run. Do not apply the release rules of a normal work item: a check that exits non-zero does not by itself reject the baseline. conclusions carries exactly one conclusion for every requirement of the current initial PRD, with status verified (evidence names a passing check), read_only (evidence gives the location that supports it), existing_defect (evidence names the failing check) or unsupported (code, documentation and tests none of them support the description). checks are the run_check receipts of this activation bound to the current snapshot and the current ProductSpec, at least one, and the recorded exit status is taken from the receipt. Every check with a non-zero exit status that no existing_defect conclusion references must appear in other_failures with the reason. consistent requires no unsupported conclusion, no omission and no unexplained failing check; rework_product requires at least one unsupported conclusion or one omission. Engineering receipts are not accepted as QA evidence.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "verdict": {"type": "string", "enum": ["consistent", "rework_product"]},
+        "conclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {"type": "string", "description": "The initial PRD requirement, written as it appears"},
+              "status": {"type": "string", "enum": ["verified", "read_only", "existing_defect", "unsupported"]},
+              "evidence": {"type": "string", "description": "A passing check name, a location, or the failing check name"}
+            },
+            "additionalProperties": false,
+            "required": ["requirement", "status", "evidence"]
+          }
+        },
+        "omissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "capability": {"type": "string", "description": "An outward-facing capability missing from the initial PRD"},
+              "location": {"type": "string", "description": "Where it lives in the repository, workspace-relative"}
+            },
+            "additionalProperties": false,
+            "required": ["capability", "location"]
+          }
+        },
+        "checks": {"type": "array", "items": {"type": "string"}, "description": "Baseline check names run via run_check in this activation"},
+        "other_failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "check": {"type": "string", "description": "The failing check name"},
+              "reason": {"type": "string", "description": "Why it fails, for example it needs network or an external service"}
+            },
+            "additionalProperties": false,
+            "required": ["check", "reason"]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": ["verdict", "conclusions", "checks"]
     }
   }
 }

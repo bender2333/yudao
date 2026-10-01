@@ -119,7 +119,7 @@ class Role(_Definition):
     # 可以使用的工具，按这个顺序提供给模型
     tools: tuple[Identifier, ...]
     # 可见范围：除全体角色共同的材料以外，本角色还能看到的材料
-    visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects"], ...]
+    visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"], ...]
 
 
 class Tool(_Definition):
@@ -128,6 +128,9 @@ class Tool(_Definition):
     kind: Literal["host", "environment"]
     # 环境工具的动作类别：读取、写入、检查、登记的本地命令；许可规则按动作类别适用（写入要在工程计划的范围之内等）
     action: Literal["read", "write", "check", "command"] | None = None
+    # 结果未知时这个动作能否重新执行（恢复契约第 4 节：「重新执行」只在契约声明可以重复的动作上提供）：
+    # 只读、检查与不改变工作区外的命令可以重复，写入与有外部副作用的命令不能；主机工具不产生动作，不使用这一项
+    repeatable: bool = False
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
     # 许可规则：因待处理指导被提前安排、只能回应指导的激活可以使用
@@ -196,6 +199,57 @@ class StopReason(_Definition):
     human_action: str | None
 
 
+PhaseName = Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z_]*$")]
+
+
+class DepartmentWork(_Definition):
+    # 事项种类为某个部门写的说明：本种类内的角色说明、可以使用的工具与提案合同的注意事项。
+    # 某个部门没有写明时，这个种类沿用 roles.json 中部门自己的角色说明与工具清单。
+    prompt: str = Field(min_length=1)
+    tools: tuple[Identifier, ...] = Field(min_length=1)
+    notes: tuple[str, ...] = ()
+
+
+class WorkItemKind(_Definition):
+    # 事项种类（ADR-0014）：部门说明、工具清单与阶段迁移按种类定义
+    label: str = Field(min_length=1)
+    # 本种类的 run 进入完成状态时的停止原因，必须是 stop_reasons.json 中的编号
+    stop_reason: Identifier
+    # 各部门在本种类中的说明，键是部门编号
+    departments: Mapping[Identifier, DepartmentWork] = Field(default_factory=dict)
+    # 阶段迁移：提案种类 -> 接纳结果 -> 迁移的路径，每段是（来源阶段，目标阶段）；
+    # 迁移本身仍由控制核心写成事件，定义只给出接纳以后应当走哪条路
+    transitions: Mapping[Identifier, Mapping[Identifier, tuple[tuple[PhaseName, PhaseName], ...]]] = \
+        Field(default_factory=dict)
+
+    freeze_work_items = _frozen("departments", "transitions")
+
+    @model_validator(mode="after")
+    def _connected(self) -> "WorkItemKind":
+        for kind, outcomes in self.transitions.items():
+            for outcome, path in outcomes.items():
+                if not path:
+                    raise ValueError(f"transitions.{kind}.{outcome} 至少需要一段迁移")
+                for previous, following in zip(path, path[1:]):
+                    if previous[1] != following[0]:
+                        raise ValueError(f"transitions.{kind}.{outcome} 的迁移不相接：{previous[1]} 与 {following[0]}")
+        return self
+
+
+class OverviewCategory(_Definition):
+    # 仓库概况的一类：识别用的文件名模式与列出的条目上限，超出部分写明数量
+    patterns: tuple[str, ...] = Field(min_length=1)
+    limit: int = Field(gt=0)
+
+
+class WorkItems(_Definition):
+    # work_items.json：事项种类的清单与仓库概况的文件名模式表
+    kinds: Mapping[Identifier, WorkItemKind] = Field(min_length=1)
+    repository_overview: Mapping[Identifier, OverviewCategory] = Field(min_length=1)
+
+    freeze_work_items = _frozen("kinds", "repository_overview")
+
+
 class Definitions(_Definition):
     version: str
     organization: Organization
@@ -208,8 +262,10 @@ class Definitions(_Definition):
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
+    # 事项种类与仓库概况的模式表，来自 work_items.json
+    work_items: WorkItems
 
-    freeze_collections = _frozen("roles", "tools", "stop_reasons")
+    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items")
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -219,12 +275,40 @@ class Definitions(_Definition):
         # 部门的角色（现在每个部门一个角色，编号与部门相同）
         return self.roles[department]
 
-    def proposal_contract(self, department: str) -> dict[str, Any]:
-        # 部门的角色的提案合同：角色自己的部分接上共同的部分，交回普通的 JSON 结构
+    def work_item(self, kind: str) -> WorkItemKind:
+        # 事项种类的定义；普通事项没有部门说明与阶段迁移，沿用 roles.json
+        definition = self.work_items.kinds.get(kind)
+        if definition is None:
+            raise ValueError(f"work item kind {kind!r} is not defined in work_items.json")
+        return definition
+
+    def department_work(self, department: str, kind: str) -> DepartmentWork | None:
+        # 部门在本事项种类中的说明；没有定义时交回 None，由调用方使用 roles.json 的角色说明
+        return self.work_item(kind).departments.get(department)
+
+    def transitions(self, kind: str, proposal: str, result: str) -> tuple[tuple[str, str], ...]:
+        # 事项种类中一次接纳的阶段迁移：种类没有写明这条路径时没有迁移
+        return self.work_item(kind).transitions.get(proposal, {}).get(result, ())
+
+    def tools_for(self, department: str, kind: str = "change") -> tuple[Identifier, ...]:
+        # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单
+        work = self.department_work(department, kind)
+        return work.tools if work is not None else self.roles[department].tools
+
+    def proposal_contract(self, department: str, kind: str = "change") -> dict[str, Any]:
+        # 部门在事项种类中的提案合同：角色自己的部分接上共同的部分，再按本种类的工具清单筛选，
+        # 交回普通的 JSON 结构；建档中的部门因此看不到普通事项的提交工具与提案说明
         own, shared = self.proposal_contracts.roles[department], self.proposal_contracts.shared
-        return {"submit_tools": [*own.submit_tools, *shared.submit_tools],
-                "kinds": thaw({**own.kinds, **shared.kinds}),
-                "notes": [*own.notes, *shared.notes]}
+        available = {self.tools[tool].proposal for tool in self.tools_for(department, kind)
+                     if tool in self.tools and self.tools[tool].kind == "host" and self.tools[tool].proposal is not None}
+        submit_tools = [tool for tool in [*own.submit_tools, *shared.submit_tools]
+                        if self.tools[tool].proposal in available]
+        kinds = {name: description for name, description in {**own.kinds, **shared.kinds}.items() if name in available}
+        work = self.department_work(department, kind)
+        # 建档等事项种类的角色说明写在种类里，普通事项的注意事项来自角色自己的部分
+        own_notes = () if work is not None else own.notes
+        notes = [*own_notes, *(work.notes if work is not None else ()), *shared.notes]
+        return {"submit_tools": submit_tools, "kinds": thaw(kinds), "notes": notes}
 
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因只来自定义中的清单
@@ -243,6 +327,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
     "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
+    "work_items.json": ("work_items", TypeAdapter(WorkItems)),
 }
 
 
@@ -306,8 +391,8 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
 
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
-    # 类型以外的核对：部门与角色一一对应，角色的工具都有定义且不重复，一种提案只由一个工具提交，
-    # 提案合同与角色的提交工具相符，服务方案的编号不重复
+    # 类型以外的核对：部门与角色一一对应，角色与事项种类的工具都有定义且不重复，一种提案只由一个工具提交，
+    # 提案合同与各事项种类可以使用的主机工具相符，事项种类的停止原因在清单中，服务方案的编号不重复
     issues: list[tuple[str, str, str]] = []
     organization: Organization = parts["organization"]
     roles: dict[str, Role] = parts["roles"]
@@ -332,6 +417,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         for index, tool in enumerate(role.tools):
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
+    issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
         if tool.proposal is not None and tool.proposal in submitters:
@@ -339,7 +425,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
                            f"提案种类 {tool.proposal} 已经由 {submitters[tool.proposal]} 提交"))
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
-    issues.extend(_contract_references(parts["proposal_contracts"], roles, tools))
+    issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
     presets: ServicePresets = parts["service_presets"]
     identities = [preset.id for preset in presets.presets]
     for index, identity in enumerate(identities):
@@ -348,9 +434,35 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
     return issues
 
 
-def _contract_references(contracts: ProposalContracts, roles: dict[str, Role],
-                         tools: dict[str, Tool]) -> list[tuple[str, str, str]]:
-    # 每个角色都有提案合同；合同的提交工具正是角色可以使用的主机工具，合同说明的提案种类正是这些工具提交的种类
+def _work_item_references(work_items: WorkItems, organization: Organization, tools: dict[str, Tool],
+                          stop_reasons: dict[str, StopReason]) -> list[tuple[str, str, str]]:
+    # 事项种类：键是部门，工具都有定义且不重复，停止原因在清单中，阶段迁移的路径相接（类型已经核对）
+    issues: list[tuple[str, str, str]] = []
+    file = "work_items.json"
+    members = {department.id for department in organization.departments}
+    for name, kind in work_items.kinds.items():
+        if kind.stop_reason not in stop_reasons:
+            issues.append((file, f"kinds.{name}.stop_reason", f"停止原因 {kind.stop_reason} 没有定义"))
+        for department in sorted(set(kind.departments) - members):
+            issues.append((file, f"kinds.{name}.departments.{department}", "部门不属于任何组织"))
+        for department, work in kind.departments.items():
+            if department not in members:
+                continue
+            repeated = sorted({tool for tool in work.tools if work.tools.count(tool) > 1})
+            if repeated:
+                issues.append((file, f"kinds.{name}.departments.{department}.tools",
+                               "重复的工具 " + "、".join(repeated)))
+            for index, tool in enumerate(work.tools):
+                if tool not in tools:
+                    issues.append((file, f"kinds.{name}.departments.{department}.tools[{index}]",
+                                   f"工具 {tool} 没有定义"))
+    return issues
+
+
+def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], tools: dict[str, Tool],
+                         work_items: WorkItems) -> list[tuple[str, str, str]]:
+    # 每个角色都有提案合同；合同的提交工具正是这个角色在各事项种类中可以使用的主机工具合起来的范围
+    # （普通事项取 roles.json 的清单，建档等事项取种类自己的清单），合同说明的提案种类正是这些工具提交的种类
     issues: list[tuple[str, str, str]] = []
     file = "proposal_contracts.json"
     for role in sorted(set(roles) - set(contracts.roles)):
@@ -360,11 +472,17 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role],
     for name, own in contracts.roles.items():
         if name not in roles:
             continue
+        usable = [tool for tool in roles[name].tools if tool in tools and tools[tool].kind == "host"]
+        for kind, definition in work_items.kinds.items():
+            work = definition.departments.get(name)
+            if work is None:
+                continue
+            usable.extend(tool for tool in work.tools if tool in tools and tools[tool].kind == "host")
+        host_tools = sorted(set(usable))
         submit_tools = [*own.submit_tools, *contracts.shared.submit_tools]
-        host_tools = [tool for tool in roles[name].tools if tool in tools and tools[tool].kind == "host"]
-        if len(submit_tools) != len(set(submit_tools)) or set(submit_tools) != set(host_tools):
+        if len(submit_tools) != len(set(submit_tools)) or sorted(submit_tools) != host_tools:
             issues.append((file, f"roles.{name}.submit_tools",
-                           "与共同部分合起来必须恰好是角色可以使用的主机工具：" + "、".join(host_tools)))
+                           "与共同部分合起来必须恰好是各事项种类可以使用的主机工具：" + "、".join(host_tools)))
             continue
         kinds = {tools[tool].proposal for tool in submit_tools}
         described = set(own.kinds) | set(contracts.shared.kinds)

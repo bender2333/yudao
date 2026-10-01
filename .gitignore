@@ -13,6 +13,9 @@ node_modules/
 build/
 dist/
 harness/tests/openapi/generated/
+client/out/
+client/playwright-report/
+client/test-results/
 test-results/
 .vite/
 
