@@ -359,3 +359,17 @@ main 在 #17 之后新增的都是文档提交（ADR-0023 客户端安装与发�
 
 
 my-provider/ag/gemini-3.8-flash-high / 2026-10-01 11:45 / 审查者：工单 #17 第 2 轮审查通过。规范核对：工作树路径为 C:\project\yudao-worktrees\issue-17，分支为 issue-17，工单流程标签处于 needs-review，DELIVERY 第 2 轮评论包含改动清单、合并与冲突处理、测试命令与结尾计数、逐条验收核对说明。内容核对：合并 origin/main 解决冲突，保留 main 上 #202 的 department 写法与 #212 工具定义；删除本分支 architecture-issues.md 中已在 main 解决的条目；动作前后快照存放在任务独立对象区域，不建立 Git 提交、不改动分支索引；未发送、已完成、结果未知三类动作均有明确处置；未知副作用未解决前不继续依赖它的步骤；部分执行的模型响应仅补剩余合法动作，不整批重新发送也不重新调用模型；接管前不并发修改同一工作区；采纳结算跨恢复保持幂等；可重复动作提供重新执行选项，不可重复动作仅提供继续与停止选项；decision.answer 正常解除阻塞并生成核实记录；run.actions 返回动作状态与前后快照；代码无假实现、无多余向后兼容层。单进程独立复核测试：test_layers 与 test_openapi_snapshot 2 项通过；-m "unit or module" 收集 0 项（1519 deselected，登记表未合入，按回退规则处理）；test_issue_17_action_recovery 9 项通过；test_issue_16_recovery 12 项通过；test_decisions 等决策与装配裁决五文件 22 项通过；test_api 8 项通过；test_project_queries 23 项通过；test_engine 与 test_interaction_engine 34 项通过；test_event_classification 与 test_tools 与 test_range_edit 67 项通过；test_event_sequence 44 项通过；前端测试 43 项通过；OpenAPI 类型生成与检查通过。审查结论 REVIEW: PASS，PR #210 处于可合并状态。
+
+qwen3.8 / 2026-10-01 12:20 / 执行者：#89 第 3 轮（合入 main）。领取时标签 ready-for-agent（上一轮 REVIEW: PASS 以后 PR #215 与 main 冲突，被架构师改回，见最新任务评论）。worktree 核对：C:\project\yudao-worktrees\issue-89 只剩一个空目录、不是 git 仓库，git worktree list 里也没有它（分支 issue-89 还在，HEAD=9672f3e4，领先 main 14、落后 16）。删掉空目录，git worktree add 到 issue-89 分支，工作区干净。标签改为 in-progress。
+
+合并 origin/main（85669c28，含 #134、#79、#17）：48 处冲突，其中 44 个事件序列基准、harness/orchestrator.py 与三个记录文件。
+
+（1）orchestrator.py 两处冲突都要保留两侧的能力，不是简单选边。导入处：本分支的 save_department_prompt（每次请求把当次的 Prompt 原文写成工件）与 main 的 repository_overview（建档的仓库概况）互不冲突，两条同时保留。create_run 处：本分支是 initial = self.interactions.initial(run_id, task)，main 先按事项种类算出三个部门的 Prompt 再 initial(..., department_prompts=prompts) 写进 run_created，两句在语义上对立：本工单的核心要求就是 run 内不留部门 Prompt 副本，而 harness/interactions.py 在合并里已取本分支一侧（initial 的签名不再有 department_prompts 参数），保留 main 那一句会 TypeError。所以采用本分支的调用，把 #134 要的能力（建档等事项种类写明在本种类里的部门说明，优先于 roles.json 的角色说明）移到每次请求的取值处 _department_prompt：没有写入项目部门设置的部门 Prompt 时，先按 projection.kind 取 DEFINITIONS.department_work(department, kind) 的说明，种类没有写明该部门时沿用 DEFINITIONS.role(department).prompt，与本工单「没有写入时使用内置默认 Prompt、版本 0」一致，只是默认值按事项种类取。RunProjection.kind 由 main 带入（run_created 的 kind 字段，旧事件没有时按 change 理解），不需要新增字段。
+
+（2）44 个事件序列基准先取 main 一侧清掉冲突标记，合并提交以后按 --write-event-baselines 重新生成，再单独跑一次比较模式确认与代码一致。相对 main 的差异来自两部分：本工单去掉 run_created 的 department_prompts、prompt_version 由 1 变 0（工件编号随之上移），以及本分支已合入的 #87 给请求事件加的 reasoning_levels、default_reasoning_level、reasoning_mode 三个字段（#87 尚未合入 main）。相对本分支合并前的基准，差异只有 #134/#17 新增的 kind、overview_ref、structure 与 baseline_review、before_snapshot_ref 与 after_snapshot_ref 这类新增字段，没有删改 main 的既有内容。基准文件在库里是 LF、工作树 core.autocrlf=true，所以核对一律加 --ignore-cr-at-eol，避免把换行差异误当成内容变化。
+
+（3）三个记录文件都是追加型冲突，两侧的记录全部保留：agents_jour.md 本分支的 #87、#89 条目在前，main 的 #79、#17 条目在后；docs/CHANGELOG.md 与 docs/architecture-issues.md 同理。核对方式：合并提交相对 main 只多本分支的记录（CHANGELOG +2、architecture-issues +6、agents_jour +17），相对本分支只多 main 的记录（+6、+6、+57），没有删掉任何一侧的条目。换行符核对：三个文件都是 CRLF、没有裸 LF，与合并前一致。
+
+（4）harness/tests/test_onboarding.py 的建档 run 创建调用删掉 department_prompts 实参（本工单已删除 create_run 的这个参数，留着会 TypeError）；该测试没有断言 run 内的 Prompt 内容，删除实参不改变它核对的内容。
+
+待办：跑改动相关的测试文件与前端、test_layers.py、test_openapi_snapshot.py，写 DELIVERY 第 3 轮，标签改 needs-review。

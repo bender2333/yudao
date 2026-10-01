@@ -8768,6 +8768,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -8944,6 +8973,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",

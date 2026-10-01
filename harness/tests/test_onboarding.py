@@ -28,7 +28,6 @@ def _onboarding_run(tmp_path: Path, script, *, source: Path | None = None) -> tu
     run_id = system.create_run(
         GOAL, run_id="run_onboarding", kind="onboarding", initial_tree=tree, code_snapshot=snapshot,
         project_id="proj_onboarding", work_item_id="wi_onboarding", project_context="项目：已有项目接入",
-        department_prompts={department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS},
         prompt_config_versions={department: 0 for department in DEPARTMENTS},
     )
     return system, run_id
