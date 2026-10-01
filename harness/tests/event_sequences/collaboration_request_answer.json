@@ -7613,7 +7613,7 @@
       {
        "content_hash": "<sha256#70>",
        "path": "src/echo.py",
-       "size": 32
+       "size": 30
       }
      ],
      "format": "yudao-public-tree-v1"
@@ -7624,7 +7624,7 @@
   "<art#40>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
-   "content": "import sys\r\nprint(sys.argv[1])\r\n"
+   "content": "import sys\nprint(sys.argv[1])\n"
   },
   "<art#41>": {
    "kind": "department_input",
