@@ -23,6 +23,8 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 REASONING_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
 # 推理参数方式：一份声明只使用一种，只用于与它相符的协议（设计说明第 7.4 节）
 REASONING_MODES = frozenset({"effort", "adaptive", "budget"})
+# 输入方式的取值（模型管理设计说明第 4.3 节）：文本总是包含，图像可选
+INPUT_MODALITIES = frozenset({"text", "image"})
 # 推理参数方式与协议的相符关系
 REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
     "effort": frozenset({"responses", "chat_completions"}),
@@ -83,6 +85,9 @@ class ModelDefinition:
     capability_source: str = ""
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
+    # 输入方式（模型管理设计说明第 4.3 节）：取值为 text 与 image，文本总是包含；
+    # 运行层按它决定提供哪些工具、哪些内容可以放入请求（第 5.6 节）。预填来自模型能力表，用户可以修改
+    input_modalities: tuple[str, ...] = ("text",)
     # 推理档位声明（ADR-0006）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
     # 推理参数方式与所属连接的协议相符；三项一起声明，没有任何一项时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
@@ -103,6 +108,7 @@ class ModelDefinition:
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
+            "input_modalities": list(self.input_modalities),
             "reasoning_levels": list(self.reasoning_levels),
             "default_reasoning_level": self.default_reasoning_level,
             "reasoning_mode": self.reasoning_mode,
@@ -398,6 +404,12 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
             if not isinstance(model.accepts_required_tool_call, bool):
                 issues.append(ValidationIssue(f"{location}.accepts_required_tool_call", "必须为 true 或 false"))
+            if not isinstance(model.input_modalities, tuple) \
+                    or not all(isinstance(item, str) and item in INPUT_MODALITIES for item in model.input_modalities):
+                issues.append(ValidationIssue(f"{location}.input_modalities",
+                                              "取值只能是 " + "、".join(sorted(INPUT_MODALITIES))))
+            elif "text" not in model.input_modalities:
+                issues.append(ValidationIssue(f"{location}.input_modalities", "文本输入总是包含"))
             _validate_reasoning_declaration(model, location, provider_by_id, issues)
         if issues:
             raise CatalogValidationError(issues)
@@ -498,7 +510,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     allowed = {
         "id", "provider_id", "model", "context_window", "max_output_tokens",
         "capability_source", "accepts_required_tool_call", "protocol",
-        "reasoning_levels", "default_reasoning_level", "reasoning_mode",
+        "reasoning_levels", "default_reasoning_level", "reasoning_mode", "input_modalities",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
@@ -529,6 +541,19 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     mode = raw.get("reasoning_mode", "")
     if isinstance(mode, str):
         mode = mode.strip()
+    modalities = raw.get("input_modalities", ("text",))
+    if isinstance(modalities, list) and all(isinstance(item, str) for item in modalities):
+        # 输入方式去重，已知取值按文本、图像排列，未知取值保留在末尾供形状校验指出（设计说明第 4.3 节）
+        declared: list[str] = []
+        for item in modalities:
+            name = item.strip()
+            if name and name not in declared:
+                declared.append(name)
+        modalities = tuple([item for item in ("text", "image") if item in declared]
+                           + [item for item in declared if item not in INPUT_MODALITIES])
+    elif not isinstance(modalities, tuple):
+        modalities = ("text",)
+        issues.append(ValidationIssue(f"{location}.input_modalities", "应为字符串数组"))
     return ModelDefinition(
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
         context_window=raw.get("context_window"),
@@ -537,6 +562,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         reasoning_levels=levels if isinstance(levels, tuple) else (),
         default_reasoning_level=default_level,
         reasoning_mode=mode if isinstance(mode, str) else "",
+        input_modalities=modalities if isinstance(modalities, tuple) else ("text",),
     ), issues
 
 
