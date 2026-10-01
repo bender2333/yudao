@@ -517,6 +517,8 @@ class ToolCallResult(ToolRecord):
     ok: bool
     error: str | None
     output_ref: ArtifactRef | None = None
+    # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
+    after_snapshot_ref: ArtifactRef | None = None
 
 
 class UsageCharge(Versions, CallTarget):
@@ -553,11 +555,23 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     registered_name: str | None = None
     registered_argv: list[str] | None = None
     snapshot_hash: str | None = None
+    # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
+    before_snapshot_ref: ArtifactRef | None = None
 
 
 class ToolSkippedPayload(ToolRecord):
     ok: Literal[False]
     error: str
+
+class ActionVerifiedPayload(ToolRecord):
+    # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
+    # resolution 为 continue 表示用户选择按当前实际状态继续；选择重新执行时不写核实记录，由步骤驱动补执行。
+    # input_item 让这条结果进入部门历史，模型据此继续
+    ok: bool
+    error: str | None = None
+    resolution: Literal["continue"]
+    note: str | None = None
+    decision_id: str | None = None
 
 
 class ProposalSubmittedPayload(Payload):
@@ -941,8 +955,24 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class UnknownActionRequested(Payload):
+    # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
+    # 只阻塞该动作（blocks="action"），不阻塞整个 run。
+    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute
+    kind: Literal["unknown_action"]
+    blocks: Literal["action"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    action_id: str
+    tool: str
+    action_kind: str
+    repeatable: bool
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested
+DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -1157,6 +1187,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.TOOL_CALLED: ToolCallResult | UsageCharge,
     EventType.TOOL_STARTED: ToolStartedPayload,
     EventType.TOOL_SKIPPED: ToolSkippedPayload,
+    EventType.ACTION_VERIFIED: ActionVerifiedPayload,
     EventType.PROPOSAL_SUBMITTED: ProposalSubmittedPayload,
     EventType.PROPOSAL_REJECTED: ProposalRejectedPayload,
     EventType.SPEC_ACCEPTED: SpecAcceptedPayload,

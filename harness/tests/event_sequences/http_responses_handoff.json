@@ -2880,6 +2880,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#35>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#39>",
     "effective_contract_hash": "<sha256#25>",
@@ -2914,6 +2915,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
      "path": "src/echo.py"
@@ -2943,7 +2945,7 @@
     "model_id": "m-local",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#35>",
+    "output_ref": "<art#37>",
     "prompt_hash": "<sha256#27>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -2989,6 +2991,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#39>",
     "effective_contract_hash": "<sha256#25>",
@@ -3023,6 +3026,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -3056,7 +3060,7 @@
     "model_id": "m-local",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#36>",
+    "output_ref": "<art#38>",
     "prompt_hash": "<sha256#27>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -3173,7 +3177,7 @@
     "model_id": "m-local",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#37>",
+    "output_ref": "<art#39>",
     "prompt_hash": "<sha256#27>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -3218,7 +3222,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#38>"
+    "transcript_ref": "<art#40>"
    }
   },
   {
@@ -3278,7 +3282,7 @@
     "revision": 1,
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#39>"
+    "tree_ref": "<art#41>"
    }
   },
   {
@@ -3402,7 +3406,7 @@
     "engineering_plan_hash": "<sha256#45>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#41>",
+    "input_ref": "<art#43>",
     "input_version": 1,
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
@@ -3475,7 +3479,7 @@
     "max_output_tokens": 2048,
     "model_id": "m-local",
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#42>",
+    "parts_ref": "<art#44>",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -3485,7 +3489,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#43>",
+    "request_ref": "<art#45>",
     "requested_model": "scenario-model",
     "requested_protocol": "responses",
     "requested_provider": "local",
@@ -3613,7 +3617,7 @@
     "reasoning_mode": null,
     "request_digest": "<sha256#74>",
     "request_id": null,
-    "request_ref": "<art#44>",
+    "request_ref": "<art#46>",
     "requested_model": "scenario-model",
     "requested_protocol": "responses",
     "requested_provider": "local",
@@ -3740,7 +3744,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#45>",
+    "message_ref": "<art#47>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
@@ -3797,7 +3801,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#46>",
+    "message_ref": "<art#48>",
     "model_id": "m-local",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
@@ -3982,7 +3986,7 @@
     "requested_protocol": "responses",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#48>",
+    "response_ref": "<art#50>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -3991,7 +3995,7 @@
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 4,
-    "stream_events_ref": "<art#49>",
+    "stream_events_ref": "<art#51>",
     "stream_first_observed_at": "<time>",
     "stream_first_output_at": "<time>",
     "stream_last_stage": "completed",
@@ -4036,6 +4040,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#36>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#63>",
     "effective_contract_hash": "<sha256#25>",
@@ -4070,6 +4075,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
+    "after_snapshot_ref": "<art#36>",
     "args": {
      "argv": [
       "<python>",
@@ -4103,7 +4109,7 @@
     "model_id": "m-local",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#50>",
+    "output_ref": "<art#52>",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -4216,7 +4222,7 @@
     "model_id": "m-local",
     "name": "submit_review",
     "ok": true,
-    "output_ref": "<art#51>",
+    "output_ref": "<art#53>",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
     "protocol": "responses",
@@ -4261,7 +4267,7 @@
      "rationale",
      "verdict"
     ],
-    "transcript_ref": "<art#52>"
+    "transcript_ref": "<art#54>"
    }
   },
   {
@@ -4303,7 +4309,7 @@
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "evidence_refs": [
-     "<art#53>"
+     "<art#55>"
     ],
     "git_version": {
      "commit": "<git#9>",
@@ -4438,7 +4444,7 @@
    "run_id": "<run#1>",
    "status": "active",
    "summary": "implemented echo CLI",
-   "tree_ref": "<art#39>"
+   "tree_ref": "<art#41>"
   },
   "delivery_specs": [
    {
@@ -4476,7 +4482,7 @@
     "run_id": "<run#1>",
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#39>"
+    "tree_ref": "<art#41>"
    }
   ],
   "department_call_targets": {
@@ -4667,7 +4673,7 @@
     ],
     "kind": "delivery",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#39>"
+    "tree_ref": "<art#41>"
    },
    {
     "checks": [
@@ -4777,7 +4783,7 @@
    "effective_contract_hash": "<sha256#25>",
    "engineering_plan_hash": "<sha256#45>",
    "evidence_refs": [
-    "<art#53>"
+    "<art#55>"
    ],
    "id": "<qa#1>",
    "issuer": "quality",
@@ -5237,12 +5243,12 @@
     "input_version": 1,
     "max_output_tokens": 2048,
     "output_reserve_tokens": 2048,
-    "parts_ref": "<art#42>",
+    "parts_ref": "<art#44>",
     "prompt_hash": "<sha256#61>",
     "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#43>",
+    "request_ref": "<art#45>",
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#63>",
     "step_id": 1,
@@ -5492,12 +5498,12 @@
     "provider_name": "Local",
     "provider_response_id": "resp-4",
     "purpose": "work",
-    "raw_usage_ref": "<art#47>",
+    "raw_usage_ref": "<art#49>",
     "requested_model": "scenario-model",
     "requested_protocol": "responses",
     "requested_provider": "local",
     "requested_tier": null,
-    "response_ref": "<art#48>",
+    "response_ref": "<art#50>",
     "retry_of_step_id": null,
     "root_step_id": 1,
     "selection_source": "department_default",
@@ -5506,12 +5512,12 @@
     "serialization": "sdk_request_json_object",
     "serialized_event_id": "<evt#65>",
     "serialized_request_digest": "<sha256#74>",
-    "serialized_request_ref": "<art#44>",
+    "serialized_request_ref": "<art#46>",
     "started_at": "<time>",
     "status": "completed",
     "step_id": 1,
     "stream_event_count": 4,
-    "stream_events_ref": "<art#49>",
+    "stream_events_ref": "<art#51>",
     "usage": {
      "cache_read_tokens": 0,
      "cache_write_tokens": 0,
@@ -5658,7 +5664,7 @@
     "effective_contract_hash": "<sha256#25>",
     "engineering_plan_hash": "<sha256#45>",
     "evidence_refs": [
-     "<art#53>"
+     "<art#55>"
     ],
     "id": "<qa#1>",
     "issuer": "quality",
@@ -6669,11 +6675,29 @@
    ]
   },
   "<art#35>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#36>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#57>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#37>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#36>": {
+  "<art#38>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6690,7 +6714,7 @@
     "tree_changed": false
    }
   },
-  "<art#37>": {
+  "<art#39>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6705,18 +6729,18 @@
     "summary": "implemented echo CLI"
    }
   },
-  "<art#38>": {
+  "<art#40>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n\n"
   },
-  "<art#39>": {
+  "<art#41>": {
    "kind": "tree_manifest",
    "media_type": "application/json",
    "content": {
     "blobs": [
      {
-      "artifact": "<art#40>",
+      "artifact": "<art#42>",
       "path": "src/echo.py"
      }
     ],
@@ -6737,17 +6761,17 @@
     "tree_digest": "<sha256#57>"
    }
   },
-  "<art#40>": {
+  "<art#42>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
    "content": "import sys\r\nprint(sys.argv[1])\r\n"
   },
-  "<art#41>": {
+  "<art#43>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#36>"
   },
-  "<art#42>": {
+  "<art#44>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -6855,7 +6879,7 @@
     }
    ]
   },
-  "<art#43>": {
+  "<art#45>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6864,7 +6888,7 @@
     "tools": "<shared#41>"
    }
   },
-  "<art#44>": {
+  "<art#46>": {
    "kind": "sdk_request",
    "media_type": "application/json",
    "content": {
@@ -6876,7 +6900,7 @@
     "tools": "<shared#41>"
    }
   },
-  "<art#45>": {
+  "<art#47>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6888,7 +6912,7 @@
     "type": "function_call"
    }
   },
-  "<art#46>": {
+  "<art#48>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6900,7 +6924,7 @@
     "type": "function_call"
    }
   },
-  "<art#47>": {
+  "<art#49>": {
    "kind": "model_usage",
    "media_type": "application/json",
    "content": {
@@ -6918,7 +6942,7 @@
     }
    }
   },
-  "<art#48>": {
+  "<art#50>": {
    "kind": "sdk_response",
    "media_type": "application/json",
    "content": {
@@ -6960,7 +6984,7 @@
     }
    }
   },
-  "<art#49>": {
+  "<art#51>": {
    "kind": "sdk_stream_events",
    "media_type": "application/x-ndjson",
    "content": [
@@ -7065,7 +7089,7 @@
     }
    ]
   },
-  "<art#50>": {
+  "<art#52>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7082,7 +7106,7 @@
     "tree_changed": false
    }
   },
-  "<art#51>": {
+  "<art#53>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -7095,12 +7119,12 @@
     "verdict": "release"
    }
   },
-  "<art#52>": {
+  "<art#54>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n"
   },
-  "<art#53>": {
+  "<art#55>": {
    "kind": "qa_evidence",
    "media_type": "text/plain",
    "content": "checks passed on the current snapshot"

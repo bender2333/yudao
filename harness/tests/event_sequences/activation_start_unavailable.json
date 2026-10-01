@@ -2376,6 +2376,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#23>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#33>",
     "effective_contract_hash": "<sha256#22>",
@@ -2410,6 +2411,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
      "path": "src/echo.py"
@@ -2439,7 +2441,7 @@
     "model_id": "fake-model",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#23>",
+    "output_ref": "<art#25>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2486,6 +2488,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#33>",
     "effective_contract_hash": "<sha256#22>",
@@ -2520,6 +2523,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "argv": [
       "<python>",
@@ -2554,7 +2558,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#24>",
+    "output_ref": "<art#26>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2671,7 +2675,7 @@
     "model_id": "fake-model",
     "name": "submit_delivery",
     "ok": true,
-    "output_ref": "<art#25>",
+    "output_ref": "<art#27>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2716,7 +2720,7 @@
      "known_risks",
      "summary"
     ],
-    "transcript_ref": "<art#26>"
+    "transcript_ref": "<art#28>"
    }
   },
   {
@@ -2776,7 +2780,7 @@
     "revision": 1,
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#27>"
+    "tree_ref": "<art#29>"
    }
   },
   {
@@ -2900,7 +2904,7 @@
     "engineering_plan_hash": "<sha256#39>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#29>",
+    "input_ref": "<art#31>",
     "input_version": 1,
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
@@ -2973,7 +2977,7 @@
     "max_output_tokens": 4800,
     "model_id": "fake-model",
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#30>",
+    "parts_ref": "<art#32>",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2983,7 +2987,7 @@
     "reasoning_levels": [],
     "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#31>",
+    "request_ref": "<art#33>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -3098,7 +3102,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#32>",
+    "message_ref": "<art#34>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
@@ -3155,7 +3159,7 @@
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
-    "message_ref": "<art#33>",
+    "message_ref": "<art#35>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
@@ -3341,6 +3345,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#53>",
     "effective_contract_hash": "<sha256#22>",
@@ -3375,6 +3380,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#4>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "argv": [
       "<python>",
@@ -3409,7 +3415,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#34>",
+    "output_ref": "<art#36>",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3522,7 +3528,7 @@
     "model_id": "fake-model",
     "name": "submit_review",
     "ok": true,
-    "output_ref": "<art#35>",
+    "output_ref": "<art#37>",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -3567,7 +3573,7 @@
      "rationale",
      "verdict"
     ],
-    "transcript_ref": "<art#36>"
+    "transcript_ref": "<art#38>"
    }
   },
   {
@@ -3609,7 +3615,7 @@
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
     "evidence_refs": [
-     "<art#37>"
+     "<art#39>"
     ],
     "git_version": {
      "commit": "<git#9>",
@@ -3744,7 +3750,7 @@
    "run_id": "<run#1>",
    "status": "active",
    "summary": "implemented echo CLI",
-   "tree_ref": "<art#27>"
+   "tree_ref": "<art#29>"
   },
   "delivery_specs": [
    {
@@ -3782,7 +3788,7 @@
     "run_id": "<run#1>",
     "status": "active",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#27>"
+    "tree_ref": "<art#29>"
    }
   ],
   "department_call_targets": {
@@ -3973,7 +3979,7 @@
     ],
     "kind": "delivery",
     "summary": "implemented echo CLI",
-    "tree_ref": "<art#27>"
+    "tree_ref": "<art#29>"
    },
    {
     "checks": [
@@ -4083,7 +4089,7 @@
    "effective_contract_hash": "<sha256#22>",
    "engineering_plan_hash": "<sha256#39>",
    "evidence_refs": [
-    "<art#37>"
+    "<art#39>"
    ],
    "id": "<qa#1>",
    "issuer": "quality",
@@ -4543,12 +4549,12 @@
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
-    "parts_ref": "<art#30>",
+    "parts_ref": "<art#32>",
     "prompt_hash": "<sha256#52>",
     "prompt_version": 1,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#31>",
+    "request_ref": "<art#33>",
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#53>",
     "step_id": 1,
@@ -4904,7 +4910,7 @@
     "effective_contract_hash": "<sha256#22>",
     "engineering_plan_hash": "<sha256#39>",
     "evidence_refs": [
-     "<art#37>"
+     "<art#39>"
     ],
     "id": "<qa#1>",
     "issuer": "quality",
@@ -5773,11 +5779,29 @@
    }
   },
   "<art#23>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#24>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#48>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#25>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#24>": {
+  "<art#26>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -5794,7 +5818,7 @@
     "tree_changed": false
    }
   },
-  "<art#25>": {
+  "<art#27>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -5809,18 +5833,18 @@
     "summary": "implemented echo CLI"
    }
   },
-  "<art#26>": {
+  "<art#28>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n\n"
   },
-  "<art#27>": {
+  "<art#29>": {
    "kind": "tree_manifest",
    "media_type": "application/json",
    "content": {
     "blobs": [
      {
-      "artifact": "<art#28>",
+      "artifact": "<art#30>",
       "path": "src/echo.py"
      }
     ],
@@ -5841,17 +5865,17 @@
     "tree_digest": "<sha256#48>"
    }
   },
-  "<art#28>": {
+  "<art#30>": {
    "kind": "tree_file",
    "media_type": "application/octet-stream",
    "content": "import sys\r\nprint(sys.argv[1])\r\n"
   },
-  "<art#29>": {
+  "<art#31>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": "<shared#22>"
   },
-  "<art#30>": {
+  "<art#32>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -5959,7 +5983,7 @@
     }
    ]
   },
-  "<art#31>": {
+  "<art#33>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -6230,7 +6254,7 @@
     ]
    }
   },
-  "<art#32>": {
+  "<art#34>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6241,7 +6265,7 @@
     "type": "function_call"
    }
   },
-  "<art#33>": {
+  "<art#35>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -6252,7 +6276,7 @@
     "type": "function_call"
    }
   },
-  "<art#34>": {
+  "<art#36>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6269,7 +6293,7 @@
     "tree_changed": false
    }
   },
-  "<art#35>": {
+  "<art#37>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
@@ -6282,12 +6306,12 @@
     "verdict": "release"
    }
   },
-  "<art#36>": {
+  "<art#38>": {
    "kind": "transcript",
    "media_type": "text/plain",
    "content": "\n"
   },
-  "<art#37>": {
+  "<art#39>": {
    "kind": "qa_evidence",
    "media_type": "text/plain",
    "content": "checks passed on the current snapshot"

@@ -3159,7 +3159,8 @@
             "enum": [
               "running",
               "completed",
-              "failed"
+              "failed",
+              "unknown"
             ],
             "title": "Status"
           },
@@ -3220,6 +3221,30 @@
                 "type": "null"
               }
             ]
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Snapshot Ref"
           }
         },
         "additionalProperties": false,
@@ -5002,7 +5027,15 @@
             "title": "Requested At"
           },
           "request": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Request"
           },
           "answer": {
             "anyOf": [
@@ -5328,6 +5361,11 @@
             "type": "string",
             "title": "Version"
           },
+          "api_version": {
+            "type": "integer",
+            "title": "Api Version",
+            "example": 1
+          },
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
@@ -5347,6 +5385,7 @@
           "log_id",
           "boot_id",
           "version",
+          "api_version",
           "contract_digest",
           "access"
         ],
@@ -7419,6 +7458,78 @@
         ],
         "title": "SystemStatus"
       },
+      "UnknownActionRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unknown_action",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "action",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "action_kind": {
+            "type": "string",
+            "title": "Action Kind"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "action_id",
+          "tool",
+          "action_kind",
+          "repeatable"
+        ],
+        "title": "UnknownActionRequested"
+      },
       "UsageGroup": {
         "properties": {
           "attempts": {
@@ -8288,6 +8399,488 @@
           "not_started"
         ],
         "title": "WorkItemStats"
+      },
+      "ActionVerifiedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "action_verified",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ActionVerifiedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ActionVerifiedEvent",
+        "type": "object"
+      },
+      "ActionVerifiedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "requested_provider": {
+            "title": "Requested Provider",
+            "type": "string"
+          },
+          "requested_protocol": {
+            "title": "Requested Protocol",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Version"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "configured_max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Max Output Tokens"
+          },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "input_version": {
+            "title": "Input Version",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "integer"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash"
+          },
+          "guidance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guidance Ids",
+            "type": "array"
+          },
+          "guidance_only": {
+            "title": "Guidance Only",
+            "type": "boolean"
+          },
+          "effective_contract_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Contract Hash"
+          },
+          "engineering_plan_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineering Plan Hash"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "attempt_id": {
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "logical_call_id": {
+            "title": "Logical Call Id",
+            "type": "string"
+          },
+          "collaboration_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collaboration Request Id"
+          },
+          "context_event_id": {
+            "title": "Context Event Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "integer"
+          },
+          "input_item": {
+            "$ref": "#/components/schemas/FunctionCallOutput"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "work",
+              "compaction"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "resolution": {
+            "const": "continue",
+            "title": "Resolution",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decision Id"
+          }
+        },
+        "required": [
+          "provider_config_id",
+          "model_id",
+          "provider_name",
+          "protocol",
+          "base_url",
+          "requested_provider",
+          "requested_protocol",
+          "requested_model",
+          "credential_ref",
+          "credential_version",
+          "context_window",
+          "configured_max_output_tokens",
+          "accepts_required_tool_call",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
+          "input_version",
+          "prompt_version",
+          "prompt_hash",
+          "guidance_ids",
+          "guidance_only",
+          "effective_contract_hash",
+          "engineering_plan_hash",
+          "request_id",
+          "attempt_id",
+          "logical_call_id",
+          "collaboration_request_id",
+          "context_event_id",
+          "id",
+          "name",
+          "step_id",
+          "input_item",
+          "activation_id",
+          "purpose",
+          "ok",
+          "resolution"
+        ],
+        "title": "ActionVerifiedPayload",
+        "type": "object"
       },
       "ActivationFinishedEvent": {
         "additionalProperties": false,
@@ -12770,7 +13363,15 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/ModelUnavailableRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              }
+            ],
+            "title": "Payload"
           }
         },
         "required": [
@@ -24204,6 +24805,17 @@
               }
             ],
             "default": null
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -25165,6 +25777,17 @@
             ],
             "default": null,
             "title": "Snapshot Hash"
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -26505,6 +27128,7 @@
       "EventObject": {
         "discriminator": {
           "mapping": {
+            "action_verified": "#/components/schemas/ActionVerifiedEvent",
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
             "baseline_review_accepted": "#/components/schemas/BaselineReviewAcceptedEvent",
@@ -26642,6 +27266,9 @@
           },
           {
             "$ref": "#/components/schemas/ToolSkippedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ActionVerifiedEvent"
           },
           {
             "$ref": "#/components/schemas/ProposalSubmittedEvent"

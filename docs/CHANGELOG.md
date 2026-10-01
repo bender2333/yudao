@@ -300,3 +300,4 @@ claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
 opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
+claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
