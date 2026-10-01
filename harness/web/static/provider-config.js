@@ -153,6 +153,11 @@
       const label = level === (model && model.default_reasoning_level) ? `${level}（默认）` : level;
       options.push(`<option value="${escapeHtml(level)}"${level === current ? " selected" : ""}>${escapeHtml(label)}</option>`);
     }
+    // 已保存的请求档位不在当前模型的支持档位内时补上这一项：保存按档位全集核对，
+    // 该档位由下一次请求按新模型重新限制（设计说明第 7.3 节）
+    if (current && !levels.includes(current)) {
+      options.push(`<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}（超出当前模型支持档位，按模型限制）</option>`);
+    }
     return options.join("");
   }
 
@@ -670,8 +675,8 @@
           const undeclared = !!bindingForm[id] && !levels.length;
           return `<div class="yp-binding-row">
             <label>${label}<select name="${id}" data-pc-binding-pair="${id}"${index === 0 ? ' data-pc-field="binding-product"' : ""}>${pairOptions(bindingForm[id])}</select></label>
-            <label>推理档位<select name="${id}_tier" data-pc-binding-tier="${id}"${levels.length ? "" : " disabled"}>${tierOptions(model, bindingTierForm[id])}</select></label>
-            ${undeclared ? `<p class="yp-small" data-pc-tier-hint="${id}">该模型未声明推理档位，请求不带推理参数。</p>` : ""}
+            <label>推理档位<select name="${id}_tier" data-pc-binding-tier="${id}"${levels.length || bindingTierForm[id] ? "" : " disabled"}>${tierOptions(model, bindingTierForm[id])}</select></label>
+            ${undeclared && !bindingTierForm[id] ? `<p class="yp-small" data-pc-tier-hint="${id}">该模型未声明推理档位，请求不带推理参数。</p>` : ""}
           </div>`;
         }).join("")}
         <p class="yp-small">未准入的模型不能绑定到部门，下拉列表中已标注原因。缺任一部门时创建事项会指出该部门。在途事项仍用创建时的快照。</p>

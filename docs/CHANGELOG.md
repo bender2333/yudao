@@ -409,6 +409,11 @@ claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-01 23:25 / docs/architecture-issues.md 追加 #226 的一条：AGENTS.md「常用命令」的 `pytest -m "unit or module"` 依赖尚未合入的 harness/tests/layers.toml 登记表，在 main 上静默选中 0 项，单元层与模块层没有被运行 / 交付 #226 时实测该命令输出 1575 deselected、退出码 0，执行者无法据此判断这两层是否通过，登记建议由架构师决定
 
 claude-opus-5-5 / 2026-10-02 00:08 / docs/architecture-issues.md 为 #226 登记的分层命令选中 0 项一条写处理结论 / 架构师处理执行者登记的架构问题
+claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置
+opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
+qwen3.8 / 2026-10-01 16:45 / docs/architecture-issues.md 登记一条：客户端的生成接口类型与接口层快照没有自动检查，main 上提交的 types.gen.ts 已经与同一时刻的快照不一致 / #87 第 6 轮核对接口合同改动的影响范围时发现，交架构师决定是否把一致性写进自动检查
+claude-opus-5-5 / 2026-10-01 18:40 / docs/architecture-issues.md 为 #87 登记的客户端生成类型与快照不同步一条追加处理结论（建工单 #221） / 架构师处理执行者登记的架构问题
+
 
 qwen3.8 / 2026-10-02 00:35 / 第三次合入 origin/main（8e3f0832，#127、#176、#226）：harness/projects.py 的导入冲突取两侧并集（main 的 replay_project、replay_run 与本工单的 ModelSelection）；harness/tests/openapi/openapi.json 的 EventType 枚举保留 main 的 home_seen，按合并后代码用 --write-openapi-snapshot 重新生成，删掉本工单已移除的 department_prompt_updated 接线（相对合并提交一行删除）；事件序列基准按 --write-event-baselines 重新生成后 44 份与合并提交逐字节相同，不提交；三个记录文件改为按条目重建（脚本取本分支合并前、origin/main、当前工作树三个来源的条目并集，缺失条目按时间戳插入），补回第一次拼接时静默丢掉的五段条目：本分支 #89 第 3 轮 12:20 与第 4 轮 16:50 两条日记、main 的 #226 执行者 23:20 与审查者 00:05 两条日记、docs/CHANGELOG.md 的 23:25 与 00:08 两条、docs/architecture-issues.md 的 23:25 一条，换行符仍为 CRLF / 第 6 轮任务评论要求第三次合入 origin/main，消除本分支落后 main 导致的审查障碍；记录文件是追加型冲突的高发处，逐条目核对是本轮唯一能证明「两侧都保留」的手段
 

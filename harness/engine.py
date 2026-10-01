@@ -40,6 +40,9 @@ from .tools import proposal_kind, tool_action, tool_kind
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
 
+# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+COMPACTION_REQUEST_TIER = "minimal"
+
 
 @dataclass(frozen=True)
 class Judgment:
@@ -235,6 +238,7 @@ class StepDriver:
 
     def _begin_call(self, requested_tier: str | None = None) -> Stopped | None:
         # 新的逻辑调用：读取该项目该部门当前的部门设置（模型选择与部门 Prompt），交 Provider 解析调用目标；
+        # 请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
         # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
         # 选择来源是提供模型访问定义的那一层。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
@@ -582,7 +586,8 @@ class StepDriver:
                  replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
-        # 新的逻辑调用先按部门默认保存的请求档位解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
+        # 新的逻辑调用按「项目部门设置、部门默认」合并后解析（Provider 在同一把锁内读取，
+        # 并按当前模型声明的支持档位限制）；重试沿用该逻辑调用已经解析的目标与句柄
         scope = self._scope
         if retry_of_step_id is None:
             unavailable = self._begin_call()

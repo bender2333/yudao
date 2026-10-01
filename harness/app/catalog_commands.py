@@ -62,7 +62,7 @@ class DocumentModelInput(ModelInput):
 class BindingInput(Contract):
     provider_id: Text
     model_id: Text
-    # 请求档位（#87）：可以为空，保存时必须属于所选模型访问定义声明的支持档位
+    # 请求档位（#87）：可以为空，保存时只核对它属于档位全集，实际发送的档位由每次请求按模型限制
     requested_tier: str | None = None
 
 

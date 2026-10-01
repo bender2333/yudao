@@ -210,8 +210,8 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
 
 
 def test_department_defaults_carry_the_requested_tier(tmp_path):
-    # 部门默认保存可为空的请求档位（设计说明第 5.1 节，工单 #87）：请求档位必须属于所选定义的支持档位，
-    # 保存后查询把它交回；不属于支持档位时整份拒绝并指出字段位置
+    # 部门默认保存可为空的请求档位（设计说明第 5.1 节，工单 #87）：请求档位只核对它属于档位全集，
+    # 保存后查询把它交回；超出所选模型支持档位的档位照常保存，不属于档位全集时整份拒绝并指出字段位置
     document = _document()
     document["models"][0]["reasoning_levels"] = ["low", "medium"]
     document["models"][0]["default_reasoning_level"] = "low"
@@ -231,9 +231,18 @@ def test_department_defaults_carry_the_requested_tier(tmp_path):
         assert catalog["models"][0]["default_reasoning_level"] == "low"
         assert catalog["models"][0]["reasoning_mode"] == "effort"
 
-        rejected = _command(client, "catalog.department_defaults.save", base_version=catalog["revision"],
+        # 超出所选模型支持档位的档位属于档位全集，保存被接受（下一次请求按模型限制）
+        above = _command(client, "catalog.department_defaults.save", base_version=catalog["revision"],
+                         bindings={department: {"provider_id": "p1", "model_id": "m1",
+                                                "requested_tier": "high"}
+                                   for department in DEPARTMENTS})
+        assert above.status_code == 200, above.text
+        assert _catalog(client)["bindings"]["product"]["requested_tier"] == "high"
+
+        rejected = _command(client, "catalog.department_defaults.save",
+                            base_version=_catalog(client)["revision"],
                             bindings={department: {"provider_id": "p1", "model_id": "m1",
-                                                   "requested_tier": "high"}
+                                                   "requested_tier": "extreme"}
                                       for department in DEPARTMENTS})
         assert rejected.status_code >= 400
         assert "bindings.product.requested_tier" in rejected.text

@@ -40,6 +40,7 @@ from .resolve import (
 from .responses import ProviderConnections
 from .selection import ModelSelection, merge_selection
 from .store import (
+    REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
     AdmissionRecord,
     ProviderStore,
@@ -553,7 +554,7 @@ class ProviderFacade:
         # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认，与项目部门设置一起合并后解析。
         # 模型访问定义与请求档位分别按「项目部门设置、部门默认」的顺序取得第一个写入了的项，
         # 选择来源是提供模型访问定义的那一层（设计说明第 5.3 节）。调用方给出 requested_tier 时按它解析
-        # （整理请求使用最低支持档位），否则使用合并得到的请求档位（#87）
+        # （整理请求使用最低支持档位），否则使用合并得到的请求档位；解析时按当前模型声明的支持档位限制（#87）
         with self._lock:
             default = _as_selection(self._bindings.get(str(department)))
             project_selection = _as_selection(project) if project is not None else None
@@ -578,11 +579,15 @@ class ProviderFacade:
     def validate_department_setting(self, department: str,
                                     project: ModelSelection | Mapping[str, Any] | None,
                                     ) -> None:
-        # 保存项目部门设置时的检查（设计说明第 5.2 节）：写入了模型时，所选定义必须已准入且未作废，
-        # 请求档位必须属于保存时生效模型的支持档位。目录与准入的校验留在 Provider 模块，应用层只转调
+        # 保存项目部门设置时的检查（设计说明第 5.2 节）：写入了模型时，所选定义必须已准入且未作废；
+        # 写入了请求档位时，它必须属于档位全集，是否落在所选模型的支持档位由每次请求的限制决定
+        # （第 7.3 节，部门默认与项目部门设置同一套核对）。目录与准入的校验留在 Provider 模块，应用层只转调
         selection = _as_selection(project)
         if selection is None or not selection.writes_model():
             return
+        if selection.writes_tier() and selection.requested_tier not in REASONING_LEVELS:
+            raise CatalogValidationError((ValidationIssue(
+                f"departments.{department}.requested_tier", "请求档位不属于支持的档位"),))
         with self._lock:
             model = self._store.models.get(selection.model_id or "")
             if model is None:
@@ -600,13 +605,6 @@ class ProviderFacade:
                 if not admission_is_current(record, model, provider):
                     raise CatalogValidationError((ValidationIssue(
                         f"departments.{department}.model_id", "该模型访问定义的准入已作废，请重新执行模型测试"),))
-            if selection.writes_tier():
-                tier = selection.requested_tier
-                if tier not in model.reasoning_levels:
-                    raise CatalogValidationError((ValidationIssue(
-                        f"departments.{department}.requested_tier",
-                        "请求档位不属于该模型访问定义声明的支持档位" if model.reasoning_levels
-                        else "该模型访问定义没有声明推理档位，请求档位应为空"),))
 
     def bind_call_key(self, handle_id: str, call_key: str) -> None:
         # 把已解析的目标改挂到这次逻辑调用的身份上；重试沿用同一身份，凭据材料仍留在 Provider 模块
@@ -1313,17 +1311,16 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
         if model.provider_id != provider.id:
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
-        # 请求档位（#87）：可以为空，写入时必须属于所选定义声明的支持档位
+        # 请求档位（#87）：可以为空，写入时只核对它属于档位全集；
+        # 是否落在所选模型的支持档位由每次请求的限制决定（设计说明第 7.3 节）
         requested_tier = item.get("requested_tier")
         if requested_tier is not None and not isinstance(requested_tier, str):
             issues.append(ValidationIssue(f"{location}.requested_tier", "请求档位必须为字符串"))
             continue
         tier = (requested_tier or "").strip()
-        if tier and tier not in model.reasoning_levels:
+        if tier and tier not in REASONING_LEVELS:
             issues.append(ValidationIssue(
-                f"{location}.requested_tier",
-                "请求档位不属于该模型访问定义声明的支持档位" if model.reasoning_levels
-                else "该模型访问定义没有声明推理档位，请求档位应为空"))
+                f"{location}.requested_tier", "请求档位不属于支持的档位"))
             continue
         binding = {"provider_id": provider.id, "model_id": model.id}
         if tier:
