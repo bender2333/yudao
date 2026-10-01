@@ -203,7 +203,6 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
         "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
-<<<<<<< HEAD
         "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
         "home.away_report",
     }
