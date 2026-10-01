@@ -56,6 +56,7 @@ from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .recovery import ACTION_UNKNOWN, build_unknown_action_request, classify_actions, resolved_by_decision
 from .sessions import SessionFactory
+from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import normalize_registered_commands
 from .validation import ProposalDecision
@@ -108,7 +109,6 @@ class _SafeNode:
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
-SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref"})
 
 
 def _validate_run_ownership(

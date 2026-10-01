@@ -33,7 +33,7 @@ from .models import (
     department_for_phase,
     new_id,
 )
-from .projection import RunNotFoundError, project_run, saved_project
+from .projection import RunNotFoundError, project_run, replay_project, replay_run, saved_project
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
@@ -57,6 +57,11 @@ class ProjectArchivedError(ValueError):
 class WorkItemInProgressError(ValueError):
     """有进行中事项时不能归档或记录材料。"""
 
+class OnboardingNotAllowedError(ValueError):
+    """重新开始建档不满足条件：项目不是接入已有项目建立的、已有基线或已有进行中的建档事项。"""
+
+class SourceDirectoryNotFoundError(KeyError):
+    """登记名对应的源目录不存在。"""
 
 class PromptConfigConflict(Exception):
     """所编辑的配置版本已过期；`current` 是项目当前配置的读取体。"""
@@ -80,23 +85,26 @@ class SourceDirectoryConflict(Exception):
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
-                       include_history: bool = True) -> ProjectProjection:
+                       include_history: bool = True, through: int | None = None) -> ProjectProjection:
     # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
-    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们
-    state = saved_project(store, project_id)
+    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们。
+    # through 给出全局位置的上界时按位置读取：项目与所属 run 的投影都从事件重放到该位置（工单 #127）
+    state = saved_project(store, project_id) if through is None else replay_project(store, project_id, through=through)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state, include_history=include_history)
+    return _compose(store, state, include_history=include_history, through=through)
 
 
-def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True) -> ProjectProjection:
+def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True,
+             through: int | None = None) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
     _default_prompts(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
-        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history)
+        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history,
+                          through=through)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
 
@@ -111,9 +119,10 @@ def _default_prompts(state: ProjectProjection) -> ProjectProjection:
 
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
-                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True) -> None:
+                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
+                      through: int | None = None) -> None:
     try:
-        run = project_run(store, item.run_id)
+        run = project_run(store, item.run_id) if through is None else replay_run(store, item.run_id, through=through)
     except RunNotFoundError:
         item.status = "not_started"
         return
@@ -137,7 +146,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     else:
         item.status = "in_progress"
     if include_history:
-        events = store.list_events(item.run_id)
+        events = store.list_events(item.run_id, through_position=through)
         handoffs = work_item_handoffs(events)
         item.last_handoff = handoffs[-1] if handoffs else None
         item.rework = [
@@ -334,9 +343,10 @@ class ProjectService:
 
     # 项目登记与状态
 
-    def register(self, name: str, goal: str, *, command: Command | None = None) -> str:
+    def register(self, name: str, goal: str, *, source: str = "idea",
+                 command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
-        # 不保存目标原文，也不新建项目
+        # 不保存目标原文，也不新建项目。source 为 idea（想法新建）或 existing（接入已有项目）
         _require_text("name", name)
         _require_text("goal", goal)
         project_id = new_id("proj")
@@ -344,11 +354,104 @@ class ProjectService:
         def register(transaction: Transaction) -> None:
             goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
+                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
+
+    def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
+                max_cycles: int = DEFINITIONS.limits.max_cycles,
+                run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                context_window: int = 32_000,
+                command: Command | None = None) -> tuple[str, str, str]:
+        # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
+        # 登记建档事项（kind 为 onboarding，带快照记录），随后创建建档 run。
+        # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
+        # 调用方（应用层）先采集快照并把错误转成 source_invalid
+        _require_text("name", name)
+        _require_text("goal", goal)
+        _require_text("source_name", source_name)
+        _require_text("source_path", source_path)
+        project_id = new_id("proj")
+        work_item_id, run_id = new_id("wi"), new_id("run")
+        tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
+
+        def onboard(transaction: Transaction) -> _NewWorkItem | None:
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
+                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "existing",
+            }, actor="user:local"))
+            transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
+                "name": source_name, "path": source_path, "version": 1, "base_version": 0,
+            }, actor="user:local"))
+            project = _default_prompts(deepcopy(transaction.projection))
+            return self._work_item_created(
+                transaction, project, goal, title=name, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
+                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+                work_item_id=work_item_id, run_id=run_id, kind="onboarding",
+            )
+
+        item = self._start_in(project_id, onboard, command=command)
+        return project_id, item.work_item_id, item.run_id
+
+    def restart_onboarding(self, project_id: str, source_name: str, *,
+                           max_cycles: int = DEFINITIONS.limits.max_cycles,
+                           run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                           context_window: int = 32_000,
+                           command: Command | None = None) -> tuple[str, str]:
+        # 重新开始建档（3.8 第 3.1 节）：从登记的源目录重新采集快照，开始新的建档事项。
+        # 只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用
+        _require_text("source_name", source_name)
+        project = self._writable(project_id)
+        if project.source != "existing":
+            raise OnboardingNotAllowedError("项目不是接入已有项目建立的")
+        if project.current_adoption is not None:
+            raise OnboardingNotAllowedError("项目已经有基线采纳")
+        if any(item.status == "in_progress" for item in _compose(self.store, deepcopy(project)).work_items):
+            raise WorkItemInProgressError(f"work item in progress: {project_id}")
+        directory = project.source_directories.get(source_name)
+        if directory is None:
+            raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")
+        work_item_id, run_id = new_id("wi"), new_id("run")
+        tree, snapshot = ingest_snapshot(directory.path, self.artifacts, run_id)
+
+        def restart(transaction: Transaction) -> _NewWorkItem | None:
+            state = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            return self._work_item_created(
+                transaction, state, state.goal, title=state.name, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
+                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+                work_item_id=work_item_id, run_id=run_id, kind="onboarding",
+            )
+
+        item = self._start_in(project_id, restart, command=command)
+        return item.work_item_id, item.run_id
+
+    def _start_in(self, project_id: str, create: Callable[[Transaction], _NewWorkItem | None], *,
+                  command: Command | None = None) -> _NewWorkItem:
+        # 在已有的项目流事务结果上创建 run；创建失败时在项目流记下失败的原因。
+        # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
+        token = object()
+        self._starting.setdefault(project_id, set()).add(token)
+        try:
+            item = self.writes.transact(project_stream(project_id), create, command=command)
+            if item is None:
+                raise ValueError("the work item transaction produced no work item")
+            try:
+                self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
+            except Exception as exc:
+                self.writes.append(project_stream(project_id), NewProjectEvent(
+                    ProjectEventType.WORK_ITEM_START_FAILED,
+                    {"work_item_id": item.work_item_id, "run_id": item.run_id,
+                     "error": str(exc) or type(exc).__name__},
+                    actor="system",
+                ))
+                raise
+        finally:
+            self._starting[project_id].discard(token)
+        return item
 
     def rename(self, project_id: str, name: str, *, command: Command | None = None) -> None:
         _require_text("name", name)
@@ -439,37 +542,11 @@ class ProjectService:
 
         return self._start(project_id, create, command=command)
 
-    def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
-                                      title: str | None = None,
-                                      max_cycles: int = DEFINITIONS.limits.max_cycles,
-                                      run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
-                                      context_window: int = 32_000) -> tuple[str, str]:
-        # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
-        _require_text("text", text)
-        _require_title(title)
-        if not isinstance(source_dir, str) or not source_dir.strip():
-            raise ValueError("source_dir must be a non-empty string")
-        self._writable(project_id)
-        self.settle_pending(project_id)
-        work_item_id, run_id = new_id("wi"), new_id("run")
-        tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
-
-        def create(transaction: Transaction) -> _NewWorkItem:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
-            return self._work_item_created(
-                transaction, project, text, title=title, max_cycles=max_cycles,
-                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
-                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
-                work_item_id=work_item_id, run_id=run_id,
-            )
-
-        return self._start(project_id, create)
-
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
                            title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
                            baseline: dict[str, Any] | None, initial_tree: Any, snapshot: dict[str, Any] | None,
                            source_run: Any, work_item_id: str, run_id: str,
-                           priority: str = PRIORITY_USER) -> _NewWorkItem:
+                           priority: str = PRIORITY_USER, kind: str = "change") -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
@@ -489,6 +566,7 @@ class ProjectService:
             "definitions_version": DEFINITIONS.version,
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
+            "kind": kind,
         }, actor="user:local"))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
@@ -497,7 +575,7 @@ class ProjectService:
                 project_id=project.project_id, work_item_id=work_item_id, baseline=baseline,
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
                 department_prompts=department_prompts, prompt_config_versions=prompt_config_versions,
-                registered_commands=frozen_commands, command_versions=command_versions,
+                registered_commands=frozen_commands, command_versions=command_versions, kind=kind,
             ),
         )
 
@@ -505,21 +583,7 @@ class ProjectService:
                command: Command | None = None) -> tuple[str, str]:
         # 在项目流登记事项，再创建它的 run；创建失败时在项目流记下失败的原因。
         # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
-        token = object()
-        self._starting.setdefault(project_id, set()).add(token)
-        try:
-            item = self.writes.transact(project_stream(project_id), create, command=command)
-            try:
-                self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
-            except Exception as exc:
-                self.writes.append(project_stream(project_id), NewProjectEvent(
-                    ProjectEventType.WORK_ITEM_START_FAILED,
-                    {"work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__},
-                    actor="system",
-                ))
-                raise
-        finally:
-            self._starting[project_id].discard(token)
+        item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
 
     def restart_work_item_for_upgrade(self, run_id: str, *, command: Command | None = None) -> tuple[str, str] | None:

@@ -117,6 +117,8 @@ class CatalogEventType:
     # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
     RUNTIME_DRAIN_STARTED = "runtime_drain_started"
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
+    # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
+    HOME_SEEN = "home_seen"
 
 
 GIT_VERSION_EVENTS = frozenset({
@@ -532,11 +534,14 @@ class CatalogEvent:
 @dataclass
 class CatalogProjection:
     # 目录流的投影：只记最后一条事件与最后一条 catalog_revised 的修订号。
-    # 目录内容与凭据仍由 Provider 模块保存，这里不复制
+    # 目录内容与凭据仍由 Provider 模块保存，这里不复制。
+    # last_seen_position 是用户查看过的全局位置（工单 #127），控制主机上只有一个
     last_event_id: str | None = None
     stream_version: int = 0
     updated_at: str | None = None
     revision: int = 0
+    last_seen_position: int | None = None
+    last_seen_at: str | None = None
 
 
 @dataclass
@@ -830,6 +835,8 @@ class WorkItem:
     event_id: str
     snapshot: dict[str, Any] | None = None
     start_error: str | None = None
+    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     command_versions: dict[str, int] = field(default_factory=dict)
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"

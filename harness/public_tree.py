@@ -82,6 +82,10 @@ def is_private_path(relative: str) -> bool:
     parts = relative.replace("\\", "/").casefold().split("/")
     return parts[0] == ".checks" or ".git" in parts
 
+def is_git_metadata(relative: str) -> bool:
+    # 仓库自身的 Git 元数据：公开树排除它（设计第 4.2 节），快照接入不因为它拒绝源目录
+    return ".git" in relative.replace("\\", "/").casefold().split("/")
+
 def validate_public_path(relative: str) -> None:
     """Accept an unambiguous portable relative path, never silently normalize it."""
     if not isinstance(relative, str) or not relative or "\\" in relative:
@@ -384,6 +388,6 @@ def _git_probe(probe: Path, work_tree: Path, *arguments: str, data: bytes | None
 __all__ = [
     "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
     "capture_public_tree", "excluded_by_ignore_rules", "has_ignore_rules", "ignore_probe_directory",
-    "is_private_path", "materialize_tree", "resolve_public_path", "unrepresentable_reason",
+    "is_git_metadata", "is_private_path", "materialize_tree", "resolve_public_path", "unrepresentable_reason",
     "validate_manifest", "validate_public_path", "verify_public_tree",
 ]

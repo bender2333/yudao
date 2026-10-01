@@ -1,0 +1,7921 @@
+{
+ "generatedFrom": "docs/prototypes/v9/js/pixel/{sprites.js,engine.js}",
+ "inventory": {
+  "functions": [
+   "R",
+   "RB",
+   "actorFrame",
+   "animDuration",
+   "animFrame",
+   "arrow",
+   "bitmap",
+   "bitmapDef",
+   "box",
+   "bubble",
+   "charFrame",
+   "createScene",
+   "createVignette",
+   "drawActor",
+   "drawBitmap",
+   "drawIcon",
+   "drawShadow",
+   "fitText",
+   "hash",
+   "headTop",
+   "hourglass",
+   "itemRect",
+   "levelAtLeast",
+   "linePts",
+   "makeCanvas",
+   "measure",
+   "mix",
+   "parseSpriteKey",
+   "pixText",
+   "reducedMotion",
+   "renderSprite",
+   "resolveAction",
+   "rgba",
+   "rolePalette",
+   "shotImage",
+   "sign",
+   "signStyle",
+   "stampMark",
+   "text"
+  ],
+  "data": [
+   "ACTIONS",
+   "ANIMS",
+   "BASE_MOTIONS",
+   "BITMAPS",
+   "CHAR",
+   "CHAR_H",
+   "CHAR_W",
+   "DEPTS",
+   "EVENT_ACTIONS",
+   "FONT",
+   "FONT3",
+   "HAIRS",
+   "ITEM_COLORS",
+   "ITEM_SHADES",
+   "PAL",
+   "POSES",
+   "ROLE_KINDS",
+   "ROLE_NAMES",
+   "SKINS",
+   "SPRITE_LEVELS",
+   "STATUS_ACTIONS",
+   "VIGNETTES",
+   "VIGNETTE_SPRITES",
+   "ease",
+   "paint"
+  ],
+  "all": [
+   "ACTIONS",
+   "ANIMS",
+   "BASE_MOTIONS",
+   "BITMAPS",
+   "CHAR",
+   "CHAR_H",
+   "CHAR_W",
+   "DEPTS",
+   "EVENT_ACTIONS",
+   "FONT",
+   "FONT3",
+   "HAIRS",
+   "ITEM_COLORS",
+   "ITEM_SHADES",
+   "PAL",
+   "POSES",
+   "R",
+   "RB",
+   "ROLE_KINDS",
+   "ROLE_NAMES",
+   "SKINS",
+   "SPRITE_LEVELS",
+   "STATUS_ACTIONS",
+   "VIGNETTES",
+   "VIGNETTE_SPRITES",
+   "actorFrame",
+   "animDuration",
+   "animFrame",
+   "arrow",
+   "bitmap",
+   "bitmapDef",
+   "box",
+   "bubble",
+   "charFrame",
+   "createScene",
+   "createVignette",
+   "drawActor",
+   "drawBitmap",
+   "drawIcon",
+   "drawShadow",
+   "ease",
+   "fitText",
+   "hash",
+   "headTop",
+   "hourglass",
+   "itemRect",
+   "levelAtLeast",
+   "linePts",
+   "makeCanvas",
+   "measure",
+   "mix",
+   "paint",
+   "parseSpriteKey",
+   "pixText",
+   "reducedMotion",
+   "renderSprite",
+   "resolveAction",
+   "rgba",
+   "rolePalette",
+   "shotImage",
+   "sign",
+   "signStyle",
+   "stampMark",
+   "text"
+  ]
+ },
+ "levels": [
+  "ui",
+  "3.1",
+  "3.2C",
+  "3.4A",
+  "3.8",
+  "3.2B",
+  "3.2D",
+  "S4",
+  "S5"
+ ],
+ "levelLabels": {
+  "ui": "界面工作线",
+  "3.1": "3.1 可靠恢复",
+  "3.2C": "3.2C 执行环境服务",
+  "3.4A": "3.4A 不同项目并行",
+  "3.8": "3.8 接入已有项目",
+  "3.2B": "3.2B 网络与 MCP",
+  "3.2D": "3.2D 浏览器与 computer use",
+  "S4": "Stage 4",
+  "S5": "Stage 5"
+ },
+ "levelTags": {
+  "ui": null,
+  "3.1": "3.1",
+  "3.2C": "3.2C",
+  "3.4A": "3.4A",
+  "3.8": "3.8",
+  "3.2B": "3.2B",
+  "3.2D": "3.2D",
+  "S4": "Stage 4",
+  "S5": "Stage 5"
+ },
+ "charW": 32,
+ "charH": 40,
+ "font": "\"Microsoft YaHei UI\", \"Microsoft YaHei\", \"PingFang SC\", \"Hiragino Sans GB\", \"Noto Sans SC\", \"Source Han Sans SC\", sans-serif",
+ "registries": {
+  "PAL": {
+   "ink": "#1e1a2e",
+   "ink2": "#352e4d",
+   "inkSoft": "#4a4262",
+   "white": "#fbf8f1",
+   "white2": "#dedad0",
+   "white3": "#bdb8ad",
+   "grey1": "#cdd2da",
+   "grey2": "#9aa2b0",
+   "grey3": "#6b7382",
+   "grey4": "#474d5a",
+   "grey5": "#2f333d",
+   "grey6": "#22252d",
+   "paper": "#f6eed8",
+   "paper2": "#e3d5b3",
+   "paper3": "#bfac88",
+   "pline": "#8f9cc8",
+   "wood1": "#dca46a",
+   "wood2": "#b27a44",
+   "wood3": "#83552d",
+   "wood4": "#5a381b",
+   "metal1": "#dde4ec",
+   "metal2": "#aab6c4",
+   "metal3": "#7b8796",
+   "metal4": "#525a68",
+   "red1": "#ff9a90",
+   "red2": "#e5484d",
+   "red3": "#a82b3a",
+   "red4": "#6e1c2a",
+   "green1": "#a4f5b6",
+   "green2": "#3fbf66",
+   "green3": "#23804a",
+   "green4": "#15502f",
+   "yellow1": "#fff2b0",
+   "yellow2": "#f7cb46",
+   "yellow3": "#c99324",
+   "yellow4": "#8a5f14",
+   "blue1": "#b0d6ff",
+   "blue2": "#4f94e8",
+   "blue3": "#2e60ad",
+   "blue4": "#1d3d73",
+   "orange1": "#ffc990",
+   "orange2": "#f08a3c",
+   "pink1": "#ffc2dc",
+   "pink2": "#f27ec2",
+   "glass": "#d8edff",
+   "glass2": "#9fc9ef",
+   "screen0": "#0b1d14",
+   "screen1": "#18402a",
+   "screen2": "#35a05d",
+   "screen3": "#7ef5a0",
+   "screen4": "#d4ffe0",
+   "amber0": "#2a1a08",
+   "amber1": "#ffb347",
+   "card1": "#e8bd7f",
+   "card2": "#cc9657",
+   "card3": "#9c6a3a",
+   "card4": "#6f4724",
+   "tea": "#8c5a2c",
+   "leaf1": "#8fd46a",
+   "leaf2": "#4fa24a",
+   "leaf3": "#2f6d36",
+   "pot1": "#d9774a",
+   "pot2": "#a8522f",
+   "eye": "#2a2238",
+   "mouth": "#9a3f45",
+   "blush": "#f5a093",
+   "beige1": "#efe7d2",
+   "beige2": "#d4c8a8",
+   "beige3": "#a89a78",
+   "beige4": "#7a6d52",
+   "shadow": "rgba(20, 16, 36, 0.28)"
+  },
+  "CHAR": {
+   "head": {
+    "f": [
+     "..SSSSSSSS..",
+     ".SSSSSSSSSS.",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     ".SSSSSSSSSS.",
+     "..ssssssss.."
+    ],
+    "s": [
+     "..SSSSSSSS..",
+     ".SSSSSSSSSS.",
+     "SSSSSSSSSSS.",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSsSSSSSSS",
+     "SSSSsSSSSSSS",
+     "SSSSSSSSSSS.",
+     ".SSSSSSSSSS.",
+     "..ssssssss.."
+    ],
+    "b": [
+     "..SSSSSSSS..",
+     ".SSSSSSSSSS.",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     "SSSSSSSSSSSS",
+     ".SSSSSSSSSS.",
+     "..ssssssss.."
+    ]
+   },
+   "faces": {
+    "f": {
+     "normal": {
+      "E": [
+       [
+        3,
+        5
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "blink": {
+      "E": [
+       [
+        2,
+        6
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        6
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "happy": {
+      "E": [
+       [
+        2,
+        6
+       ],
+       [
+        3,
+        5
+       ],
+       [
+        4,
+        6
+       ],
+       [
+        7,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        4,
+        8
+       ],
+       [
+        5,
+        9
+       ],
+       [
+        6,
+        9
+       ],
+       [
+        7,
+        8
+       ]
+      ],
+      "B": [
+       [
+        1,
+        7
+       ],
+       [
+        10,
+        7
+       ]
+      ]
+     },
+     "sad": {
+      "E": [
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        2,
+        5
+       ],
+       [
+        9,
+        5
+       ]
+      ],
+      "M": [
+       [
+        4,
+        9
+       ],
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ],
+       [
+        7,
+        9
+       ]
+      ]
+     },
+     "surprised": {
+      "E": [
+       [
+        3,
+        5
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ],
+       [
+        5,
+        9
+       ],
+       [
+        6,
+        9
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "down": {
+      "E": [
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        3,
+        5
+       ],
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "closed": {
+      "E": [
+       [
+        2,
+        6
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        6
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ],
+       [
+        5,
+        9
+       ],
+       [
+        6,
+        9
+       ]
+      ],
+      "B": [
+       [
+        1,
+        7
+       ],
+       [
+        10,
+        7
+       ]
+      ]
+     },
+     "worried": {
+      "E": [
+       [
+        3,
+        5
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        2,
+        4
+       ],
+       [
+        9,
+        4
+       ]
+      ],
+      "M": [
+       [
+        4,
+        9
+       ],
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        9
+       ],
+       [
+        7,
+        8
+       ]
+      ]
+     },
+     "bored": {
+      "E": [
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        3,
+        5
+       ],
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ]
+      ]
+     },
+     "talk": {
+      "E": [
+       [
+        3,
+        5
+       ],
+       [
+        3,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ],
+       [
+        5,
+        9
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "left": {
+      "E": [
+       [
+        2,
+        5
+       ],
+       [
+        2,
+        6
+       ],
+       [
+        7,
+        5
+       ],
+       [
+        7,
+        6
+       ]
+      ],
+      "M": [
+       [
+        4,
+        8
+       ],
+       [
+        5,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "right": {
+      "E": [
+       [
+        4,
+        5
+       ],
+       [
+        4,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        6,
+        8
+       ],
+       [
+        7,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "up": {
+      "E": [
+       [
+        3,
+        4
+       ],
+       [
+        3,
+        5
+       ],
+       [
+        8,
+        4
+       ],
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        5,
+        8
+       ],
+       [
+        6,
+        8
+       ]
+      ],
+      "B": [
+       [
+        2,
+        7
+       ],
+       [
+        9,
+        7
+       ]
+      ]
+     }
+    },
+    "s": {
+     "normal": {
+      "E": [
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ],
+      "B": [
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "blink": {
+      "E": [
+       [
+        8,
+        6
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ],
+      "B": [
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "happy": {
+      "E": [
+       [
+        7,
+        6
+       ],
+       [
+        8,
+        5
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        9,
+        8
+       ],
+       [
+        10,
+        8
+       ],
+       [
+        10,
+        9
+       ]
+      ],
+      "B": [
+       [
+        8,
+        7
+       ]
+      ]
+     },
+     "sad": {
+      "E": [
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        10,
+        9
+       ]
+      ]
+     },
+     "surprised": {
+      "E": [
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ],
+       [
+        10,
+        9
+       ]
+      ],
+      "B": [
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "down": {
+      "E": [
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ]
+     },
+     "closed": {
+      "E": [
+       [
+        8,
+        6
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ],
+       [
+        10,
+        9
+       ]
+      ],
+      "B": [
+       [
+        8,
+        7
+       ]
+      ]
+     },
+     "worried": {
+      "E": [
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        9
+       ]
+      ]
+     },
+     "bored": {
+      "E": [
+       [
+        8,
+        6
+       ]
+      ],
+      "s": [
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ]
+     },
+     "talk": {
+      "E": [
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ],
+       [
+        10,
+        9
+       ]
+      ],
+      "B": [
+       [
+        9,
+        7
+       ]
+      ]
+     },
+     "left": {
+      "E": [
+       [
+        8,
+        5
+       ],
+       [
+        8,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ]
+     },
+     "right": {
+      "E": [
+       [
+        9,
+        5
+       ],
+       [
+        9,
+        6
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ]
+     },
+     "up": {
+      "E": [
+       [
+        8,
+        4
+       ],
+       [
+        8,
+        5
+       ]
+      ],
+      "M": [
+       [
+        10,
+        8
+       ]
+      ]
+     }
+    }
+   },
+   "hair": {
+    "tuft": {
+     "f": [
+      "......HH......",
+      ".......H......",
+      "...HHHHHHHH...",
+      "..HHHHHhhHHH..",
+      ".HHHHHHHHhHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHH.HHHH.HH.",
+      ".HH........HH.",
+      ".H..........H.",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      ".....HH.......",
+      "......H.......",
+      "..HHHHHHHH....",
+      ".HHHHHHHhHHH..",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHHHH.HH.",
+      "HHHHH.........",
+      ".HHH..........",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "......HH......",
+      ".......H......",
+      "...HHHHHHHH...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHhHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "..HHHHHHHHHH..",
+      "..............",
+      ".............."
+     ]
+    },
+    "sidepart": {
+     "f": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHhhHHHHHH..",
+      ".HHhHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHH..HH.",
+      ".HH........HH.",
+      ".HH.........H.",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "..............",
+      "..HHHHHHHH....",
+      ".HHHHHhhHHH...",
+      "HHHHHHHHHHHH..",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHHH.....",
+      "HHHHH.........",
+      ".HHH..........",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHhHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "..HHHHHHHHHH..",
+      "..............",
+      ".............."
+     ]
+    },
+    "messy": {
+     "f": [
+      "..............",
+      "...H..H...H...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHhHHHHH.",
+      "HHHHHhHHHHHHHH",
+      "HHHHHHHHHHHHHH",
+      ".HHH.HHH.HHHH.",
+      "HHH........HHH",
+      ".H..........H.",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "..H..H..H.....",
+      ".HHHHHHHHH....",
+      "HHHHHHhHHHH...",
+      "HHHHHHHHHHHH..",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHHH.HH..",
+      "HHHHHH........",
+      "HHHH..........",
+      ".H............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "...H..H...H...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHHHHHHH.",
+      "HHHHHHHHHHHHHH",
+      "HHHHHhHHHHHHHH",
+      "HHHHHHHHHHHHHH",
+      "HHHHHHHHHHHHHH",
+      ".HHHHHHHHHHHH.",
+      "..HHHHHHHHHH..",
+      "..............",
+      ".............."
+     ]
+    },
+    "spiky": {
+     "f": [
+      "..H....H...H..",
+      "..HH..HHH.HH..",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHhHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HH.HHH.HH.HH.",
+      ".H..........H.",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      ".H...H..H.....",
+      ".HH.HHHHH.....",
+      "HHHHHHHHHH....",
+      "HHHHHHHHHHH...",
+      "HHHHHhHHHHHH..",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHH.H.H..",
+      "HHHH..........",
+      ".HH...........",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..H....H...H..",
+      "..HH..HHH.HH..",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHhHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "..HHHHHHHHHH..",
+      "..............",
+      ".............."
+     ]
+    },
+    "bob": {
+     "f": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHHHHHhHHH..",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "HHH........HHH",
+      "HHH........HHH",
+      "HH..........HH",
+      "HH..........HH",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "..............",
+      "..HHHHHHHH....",
+      ".HHHHHHHHhH...",
+      "HHHHHHHHHHHH..",
+      "HHHHHHHHHHHHH.",
+      "HHHHHHHHHHHH..",
+      "HHHHHH........",
+      "HHHHHH........",
+      "HHHHH.........",
+      ".HHHH.........",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHhHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "HHHHHHHHHHHHHH",
+      "HHHHHHHHHHHHHH",
+      "HHHHHHHHHHHHHH",
+      ".HHHHHHHHHHHH.",
+      ".............."
+     ]
+    },
+    "buzz": {
+     "f": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHHHHhHHHH..",
+      ".HHHHHHHHHHHH.",
+      ".HHH......HHH.",
+      ".H..........H.",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "..............",
+      "..HHHHHHHH....",
+      ".HHHHHhHHHH...",
+      "HHHHHHHHHHHH..",
+      "HHHHHHH.......",
+      "HHHH..........",
+      ".HH...........",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "..............",
+      "...HHHHHHHH...",
+      "..HHHHHHHHHH..",
+      ".HHHHHHhHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      ".HHHHHHHHHHHH.",
+      "..HHHHHHHHHH..",
+      "..............",
+      "..............",
+      ".............."
+     ]
+    }
+   },
+   "acc": {
+    "glasses": {
+     "f": [
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..gggg..gggg..",
+      ".gGGGGggGGGGg.",
+      ".gGGGGggGGGGg.",
+      "..gggg..gggg..",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "........ggg...",
+      ".....gggGGGg..",
+      ".......gGGGg..",
+      "........ggg...",
+      "..............",
+      ".............."
+     ],
+     "b": null
+    },
+    "headphones": {
+     "f": [
+      "..............",
+      "....aaaaaa....",
+      "..aa......aa..",
+      ".a..........a.",
+      ".a..........a.",
+      ".a..........a.",
+      "AA..........AA",
+      "AA..........AA",
+      "AA..........AA",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "....aaa.......",
+      ".....a........",
+      ".....a........",
+      ".....a........",
+      ".....a........",
+      "....AAA.......",
+      "....AAA.......",
+      "....AAA.......",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "....aaaaaa....",
+      "..aa......aa..",
+      ".a..........a.",
+      ".a..........a.",
+      ".a..........a.",
+      "AA..........AA",
+      "AA..........AA",
+      "AA..........AA",
+      "..............",
+      "..............",
+      ".............."
+     ]
+    },
+    "headset": {
+     "f": [
+      "..............",
+      "....aaaaaa....",
+      "..aa......aa..",
+      ".a..........a.",
+      ".a............",
+      ".a............",
+      "AA............",
+      "AA............",
+      "AA............",
+      ".aa...........",
+      "...aaaA.......",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "....aaa.......",
+      ".....a........",
+      ".....a........",
+      ".....a........",
+      ".....a........",
+      "....AAA.......",
+      "....AAA.......",
+      "....AAA.......",
+      ".....aaa......",
+      "........aaA...",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "....aaaaaa....",
+      "..aa......aa..",
+      ".a..........a.",
+      "............a.",
+      "............a.",
+      "............AA",
+      "............AA",
+      "............AA",
+      "..............",
+      "..............",
+      ".............."
+     ]
+    },
+    "hat": {
+     "f": [
+      "..............",
+      "....AAAAAA....",
+      "...AAAAAAAA...",
+      "...AAAAAAAA...",
+      "...KKKKKKKK...",
+      "AAAAAAAAAAAAAA",
+      ".aaaaaaaaaaaa.",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "s": [
+      "..............",
+      "...AAAAAA.....",
+      "..AAAAAAAA....",
+      "..AAAAAAAA....",
+      "..KKKKKKKK....",
+      "AAAAAAAAAAAAAA",
+      ".aaaaaaaaaaaa.",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ],
+     "b": [
+      "..............",
+      "....AAAAAA....",
+      "...AAAAAAAA...",
+      "...AAAAAAAA...",
+      "...KKKKKKKK...",
+      "AAAAAAAAAAAAAA",
+      ".aaaaaaaaaaaa.",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      ".............."
+     ]
+    }
+   },
+   "outfit": {
+    "uniform": {
+     "f": [
+      "cCCTTTTCCc",
+      "cCCCTTCCCc",
+      "cKKCCCCCCc",
+      "cKkCCCCCCc",
+      "cCCCCCCCCc",
+      "cccccccccc"
+     ],
+     "s": [
+      "cCCCCCCT",
+      "cCCCCCCC",
+      "cCCCCCKC",
+      "cCCCCCkC",
+      "cCCCCCCC",
+      "cccccccc"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cccccccccc"
+     ]
+    },
+    "suit": {
+     "f": [
+      "cCTTKKTTCc",
+      "cCCTKKTCCc",
+      "cCCTKKTCCc",
+      "cCCCKKCCCc",
+      "cCCCCCCCCc",
+      "cccccccccc"
+     ],
+     "s": [
+      "cCCCCCTK",
+      "cCCCCCCK",
+      "cCCCCCCK",
+      "cCCCCCCC",
+      "cCCCCCCC",
+      "cccccccc"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCcCCCc",
+      "cccccccccc"
+     ]
+    },
+    "sweater": {
+     "f": [
+      "cCCTTTTCCc",
+      "cCCCTTCCCc",
+      "cCCCCCCCCc",
+      "cCLCCCCLCc",
+      "cCCCLLCCCc",
+      "cccccccccc"
+     ],
+     "s": [
+      "cCCCCCCT",
+      "cCCCCCCC",
+      "cCCCCCCC",
+      "cCCCCLCC",
+      "cCCCCCCC",
+      "cccccccc"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCLCCCCLCc",
+      "cCCCLLCCCc",
+      "cccccccccc"
+     ]
+    },
+    "hoodie": {
+     "f": [
+      "cCCTCCTCCc",
+      "cCCTCCTCCc",
+      "cCCCCCCCCc",
+      "cCCccccCCc",
+      "cCcCCCCcCc",
+      "cccccccccc"
+     ],
+     "s": [
+      "cCCCCCCT",
+      "cCCCCCCT",
+      "cCCCCCCC",
+      "cCCCCccC",
+      "cCCCCCcC",
+      "cccccccc"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cccccccccc"
+     ]
+    },
+    "vest": {
+     "f": [
+      "cXCTTTTCXc",
+      "cXCTTTTCXc",
+      "cXCCTTCCXc",
+      "cCcCTTCcCc",
+      "cCCCTTCCCc",
+      "cccccccccc"
+     ],
+     "s": [
+      "XCCCCCTT",
+      "XCCCCCTT",
+      "XCCCCCCT",
+      "cCCCCcCT",
+      "cCCCCCCT",
+      "cccccccc"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cccccccccc"
+     ]
+    },
+    "labcoat": {
+     "f": [
+      "wWWTTTTWWw",
+      "wWWWTTWWWw",
+      "wWKWWWWWWw",
+      "wWKWWWWWWw",
+      "wWWWWWWWWw",
+      "wWWWWwWWWw",
+      "wWWWWwWWWw",
+      "wwwwwPwwww"
+     ],
+     "s": [
+      "wWWWWWWT",
+      "wWWWWWWT",
+      "wWWWWKWW",
+      "wWWWWKWW",
+      "wWWWWWWW",
+      "wWWWWWWW",
+      "wWWWWWWw",
+      "wwwwwwww"
+     ],
+     "b": [
+      "wWWWWWWWWw",
+      "wWWWWWWWWw",
+      "wWWWWWWWWw",
+      "wWWWWWWWWw",
+      "wWWWWWWWWw",
+      "wWWWWwWWWw",
+      "wWWWWwWWWw",
+      "wwwwwPwwww"
+     ]
+    },
+    "jumpsuit": {
+     "f": [
+      "cCCTTTTCCc",
+      "cCCCLCCCCc",
+      "cCWWLCCCCc",
+      "cCCCLCCCCc",
+      "KKKKkkKKKK",
+      "cCCCLCCCCc"
+     ],
+     "s": [
+      "cCCCCCCT",
+      "cCCCCCLC",
+      "cCCCCCLC",
+      "cCCCCCLC",
+      "KKKKKKKK",
+      "cCCCCCCC"
+     ],
+     "b": [
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "cCCCCCCCCc",
+      "KKKKKKKKKK",
+      "cCCCCCCCCc"
+     ]
+    }
+   },
+   "legs": {
+    "stand": [
+     "PPPPPPPPPP",
+     ".PPP..PPP.",
+     ".PPP..PPP.",
+     ".pPP..PPp.",
+     "FFFF..FFFF",
+     "FFFf..fFFF"
+    ],
+    "sit": [
+     "PPPPPPPPPP",
+     "FFFF..FFFF",
+     "FFFf..fFFF"
+    ],
+    "crouch": [
+     ".PPPPPPPPPP.",
+     "PPPPp..pPPPP",
+     "FFFF....FFFF"
+    ],
+    "tap": [
+     "PPPPPPPPPP",
+     ".PPP..PPP.",
+     ".PPP..PPP.",
+     ".pPP..FFFF",
+     "FFFF..FFFf",
+     "FFFf......"
+    ]
+   },
+   "hood": {
+    "f": {
+     "x": 10,
+     "y": 24,
+     "rows": [
+      ".CCC....CCC.",
+      "CCCC....CCCC"
+     ]
+    },
+    "s": {
+     "x": 8,
+     "y": 23,
+     "rows": [
+      ".CC..",
+      "CCCC.",
+      "CCCCC",
+      "cCCCC",
+      ".cc.."
+     ]
+    },
+    "b": {
+     "x": 10,
+     "y": 24,
+     "rows": [
+      "..CCCCCCCC..",
+      ".CCCCCCCCCC.",
+      "..cCCCCCCc..",
+      "...cccccc..."
+     ]
+    }
+   },
+   "pack": {
+    "s": {
+     "x": 7,
+     "y": 25,
+     "rows": [
+      ".XXXX.",
+      "XXXXXX",
+      "XxXXXX",
+      "XxXooX",
+      "XxXXXX",
+      "XxXXXX",
+      "XXXXXX",
+      "xxxxxx"
+     ]
+    },
+    "b": {
+     "x": 11,
+     "y": 25,
+     "rows": [
+      ".XXXXXXXX.",
+      "XXXXXXXXXX",
+      "XxXXXXXXxX",
+      "XxXooooXxX",
+      "XxXXXXXXxX",
+      "XxXXXXXXxX",
+      "XXXXXXXXXX",
+      "xxxxxxxxxx"
+     ]
+    }
+   }
+  },
+  "DEPTS": {
+   "product": {
+    "name": "产品",
+    "main": "#2fa58c",
+    "shade": "#1e7563",
+    "light": "#78dcc3",
+    "wall": "#f0e2c4",
+    "wall2": "#e2cfa8",
+    "wall3": "#cdb68a",
+    "trim": "#8a6a44",
+    "floor": "#c8935c",
+    "floor2": "#b07d4a",
+    "floor3": "#8e6035",
+    "rug": "#d9786a",
+    "rug2": "#b85a4e"
+   },
+   "engineering": {
+    "name": "工程",
+    "main": "#3c7bd0",
+    "shade": "#285597",
+    "light": "#82b1f2",
+    "wall": "#c9d6e6",
+    "wall2": "#b4c4d9",
+    "wall3": "#9aabc3",
+    "trim": "#56657d",
+    "floor": "#8f99a8",
+    "floor2": "#7d8797",
+    "floor3": "#646d7c",
+    "rug": "#5a82b8",
+    "rug2": "#436596"
+   },
+   "quality": {
+    "name": "质检",
+    "main": "#8f5fcf",
+    "shade": "#6541a0",
+    "light": "#c3a0f2",
+    "wall": "#ebe8f3",
+    "wall2": "#dcd6ea",
+    "wall3": "#c4bcd9",
+    "trim": "#7a6c99",
+    "floor": "#e9e6ef",
+    "floor2": "#c9c2d9",
+    "floor3": "#aaa0c0",
+    "rug": "#a98bd8",
+    "rug2": "#8a6cbc"
+   },
+   "operations": {
+    "name": "运维",
+    "main": "#e07b34",
+    "shade": "#a9561f",
+    "light": "#f7b27a",
+    "wall": "#3e4656",
+    "wall2": "#353c4a",
+    "wall3": "#2b313d",
+    "trim": "#1f232c",
+    "floor": "#343a47",
+    "floor2": "#2a2f3a",
+    "floor3": "#4a5162",
+    "rug": "#50596b",
+    "rug2": "#3f4757"
+   }
+  },
+  "SKINS": [
+   [
+    "#f8d3ad",
+    "#e1ab82"
+   ],
+   [
+    "#eab68c",
+    "#ca8e64"
+   ],
+   [
+    "#b97c54",
+    "#955b3c"
+   ]
+  ],
+  "HAIRS": {
+   "black": [
+    "#2b2536",
+    "#4d4565"
+   ],
+   "brown": [
+    "#6e4631",
+    "#94644a"
+   ],
+   "chestnut": [
+    "#5a3a2a",
+    "#80573f"
+   ],
+   "auburn": [
+    "#a24a2c",
+    "#cc6c45"
+   ],
+   "dbrown": [
+    "#3d2a22",
+    "#5e4336"
+   ],
+   "grey": [
+    "#a8acb4",
+    "#d5d8de"
+   ]
+  },
+  "ROLE_KINDS": {
+   "agent": {
+    "label": "部门 Agent",
+    "hair": "tuft",
+    "hairColor": "brown",
+    "skin": 0,
+    "outfit": "uniform",
+    "acc": [],
+    "idleItem": null
+   },
+   "manager": {
+    "label": "经理",
+    "hair": "sidepart",
+    "hairColor": "black",
+    "skin": 1,
+    "outfit": "suit",
+    "acc": [],
+    "idleItem": "clipboard"
+   },
+   "architect": {
+    "label": "架构师",
+    "hair": "messy",
+    "hairColor": "chestnut",
+    "skin": 0,
+    "outfit": "sweater",
+    "acc": [
+     "glasses"
+    ],
+    "idleItem": "blueprint"
+   },
+   "lead": {
+    "label": "主程",
+    "hair": "spiky",
+    "hairColor": "black",
+    "skin": 2,
+    "outfit": "hoodie",
+    "acc": [
+     "headphones"
+    ],
+    "hood": true,
+    "idleItem": null
+   },
+   "explorer": {
+    "label": "探索者",
+    "hair": "sidepart",
+    "hairColor": "auburn",
+    "skin": 1,
+    "outfit": "vest",
+    "acc": [
+     "hat"
+    ],
+    "pack": true,
+    "idleItem": null
+   },
+   "reviewer": {
+    "label": "审查者",
+    "hair": "bob",
+    "hairColor": "black",
+    "skin": 1,
+    "outfit": "uniform",
+    "acc": [],
+    "armband": true,
+    "idleItem": "pen_red"
+   },
+   "tester": {
+    "label": "测试工程师",
+    "hair": "bob",
+    "hairColor": "black",
+    "skin": 0,
+    "outfit": "labcoat",
+    "acc": [],
+    "idleItem": "magnifier"
+   },
+   "ops": {
+    "label": "运维",
+    "hair": "buzz",
+    "hairColor": "dbrown",
+    "skin": 2,
+    "outfit": "jumpsuit",
+    "acc": [
+     "headset"
+    ],
+    "idleItem": null
+   }
+  },
+  "ROLE_NAMES": {
+   "product.agent": "产品部门 Agent",
+   "engineering.agent": "工程部门 Agent",
+   "quality.agent": "质检部门 Agent",
+   "product.manager": "产品部门经理",
+   "product.architect": "产品架构师",
+   "product.explorer": "产品探索者",
+   "product.reviewer": "产品审查者",
+   "engineering.manager": "工程经理",
+   "engineering.architect": "工程架构师",
+   "engineering.lead": "主程",
+   "engineering.explorer": "工程探索者",
+   "engineering.reviewer": "工程审查者",
+   "quality.manager": "质检经理",
+   "quality.tester": "测试工程师",
+   "quality.explorer": "质检探索者",
+   "quality.reviewer": "质检审查者",
+   "operations.ops": "运维部门 Agent"
+  },
+  "ITEM_COLORS": [
+   "#e8505b",
+   "#f7c948",
+   "#3fc1e8",
+   "#f27ec2",
+   "#8fd14f",
+   "#b98558"
+  ],
+  "ITEM_SHADES": [
+   "#a8303c",
+   "#c29424",
+   "#2585aa",
+   "#b8508e",
+   "#5f9a2d",
+   "#85583a"
+  ],
+  "SPRITE_LEVELS": {
+   "product.agent": "ui",
+   "engineering.agent": "ui",
+   "quality.agent": "ui",
+   "operations.ops": "S4",
+   "product.manager": "S5",
+   "product.architect": "S5",
+   "product.explorer": "S5",
+   "product.reviewer": "S5",
+   "engineering.manager": "S5",
+   "engineering.architect": "S5",
+   "engineering.lead": "S5",
+   "engineering.explorer": "S5",
+   "engineering.reviewer": "S5",
+   "quality.manager": "S5",
+   "quality.tester": "S5",
+   "quality.explorer": "S5",
+   "quality.reviewer": "S5"
+  },
+  "BITMAPS": {
+   "clipboard": {
+    "name": "clipboard",
+    "rows": [
+     "..mmm..",
+     "bbmMmbb",
+     "bWWWWWb",
+     "bWlllWb",
+     "bWWWWWb",
+     "bWllWWb",
+     "bWWWWWb",
+     "bWlllWb",
+     "bbbbbbb"
+    ],
+    "map": {
+     "m": "#aab6c4",
+     "M": "#7b8796",
+     "b": "#b27a44",
+     "W": "#fbf8f1",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "blueprint": {
+    "name": "blueprint",
+    "rows": [
+     ".UUUUUUUU.",
+     "WUUuUUUUUW",
+     ".uuuuuuuu."
+    ],
+    "map": {
+     "U": "#5b8fd8",
+     "u": "#39649f",
+     "W": "#fbf8f1"
+    },
+    "outline": true
+   },
+   "blueprint_v": {
+    "name": "blueprint_v",
+    "rows": [
+     ".W.",
+     "UUU",
+     "UuU",
+     "UUU",
+     "UUU",
+     "UuU",
+     "UUU",
+     "UUU",
+     ".W."
+    ],
+    "map": {
+     "U": "#5b8fd8",
+     "u": "#39649f",
+     "W": "#fbf8f1"
+    },
+    "outline": true
+   },
+   "magnifier": {
+    "name": "magnifier",
+    "rows": [
+     ".mmmm..",
+     "mGGWGm.",
+     "mGGGGm.",
+     "mGGGGm.",
+     ".mmmm..",
+     "....bb.",
+     ".....bb"
+    ],
+    "map": {
+     "m": "#c99324",
+     "G": "#d8edff",
+     "W": "#fbf8f1",
+     "b": "#5a381b"
+    },
+    "outline": true
+   },
+   "doc": {
+    "name": "doc",
+    "rows": [
+     "WWWWW.",
+     "WllWWw",
+     "WWWWWW",
+     "WlllWW",
+     "WWWWWW",
+     "WllWWW",
+     "WWWWWW",
+     "wwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "doc_write": {
+    "name": "doc_write",
+    "rows": [
+     "WWWWWWW",
+     "WllllWW",
+     "WWWWWWW",
+     "WlllWWW",
+     "wwwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "docs": {
+    "name": "docs",
+    "rows": [
+     "WWWWWWW.",
+     "wwwwwwww",
+     "WWWWWWWW",
+     "lwwwwwww",
+     "WWWWWWWW",
+     "wwwwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "folder": {
+    "name": "folder",
+    "rows": [
+     "YYY.....",
+     "YYYYYYYY",
+     "yyyyyyyy",
+     "yyyWWyyy",
+     "yyyyyyyy",
+     "YYYYYYYY"
+    ],
+    "map": {
+     "Y": "#d9a64e",
+     "y": "#f0c878",
+     "W": "#fbf8f1"
+    },
+    "outline": true
+   },
+   "scroll": {
+    "name": "scroll",
+    "rows": [
+     "bppppprppb",
+     "bppppprppb",
+     "bpqqqqrqqb"
+    ],
+    "map": {
+     "b": "#83552d",
+     "p": "#f6eed8",
+     "q": "#e3d5b3",
+     "r": "#e5484d"
+    },
+    "outline": true
+   },
+   "cup": {
+    "name": "cup",
+    "rows": [
+     "wkkkw.",
+     "WWWWWW",
+     "WWWWW.",
+     ".www.."
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "k": "#8c5a2c"
+    },
+    "outline": true
+   },
+   "stamp": {
+    "name": "stamp",
+    "rows": [
+     ".bbb.",
+     ".bBb.",
+     "..b..",
+     "..b..",
+     "BBBBB",
+     "XXXXX"
+    ],
+    "map": {
+     "b": "#83552d",
+     "B": "#b27a44",
+     "X": "#e5484d"
+    },
+    "outline": true
+   },
+   "card": {
+    "name": "card",
+    "rows": [
+     "XXXXXX",
+     "WWWWWW",
+     "WllllW",
+     "WWWWWW",
+     "WlllWW"
+    ],
+    "map": {
+     "X": "#f7cb46",
+     "W": "#fbf8f1",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "card_result": {
+    "name": "card_result",
+    "rows": [
+     "XXXXXX",
+     "WWWWWW",
+     "WlllgW",
+     "WWWggW",
+     "WlgWWW"
+    ],
+    "map": {
+     "X": "#3fbf66",
+     "W": "#fbf8f1",
+     "l": "#8f9cc8",
+     "g": "#23804a"
+    },
+    "outline": true
+   },
+   "paperball": {
+    "name": "paperball",
+    "rows": [
+     ".W.",
+     "WwW",
+     ".w."
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "box": {
+    "name": "box",
+    "rows": [
+     ".qqqqqqqqqq.",
+     "qqqqqqqqqqqq",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "nnnnnnnnnnnn"
+    ],
+    "map": {
+     "q": "#e8bd7f",
+     "N": "#cc9657",
+     "n": "#9c6a3a"
+    },
+    "outline": true
+   },
+   "box_open": {
+    "name": "box_open",
+    "rows": [
+     "qq........qq",
+     ".qq......qq.",
+     "nddddddddddn",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "NNNNNNNNNNNN",
+     "nnnnnnnnnnnn"
+    ],
+    "map": {
+     "q": "#e8bd7f",
+     "N": "#cc9657",
+     "n": "#9c6a3a",
+     "d": "#6f4724"
+    },
+    "outline": true
+   },
+   "box_sealed": {
+    "name": "box_sealed",
+    "rows": [
+     ".qqqqTTqqqq.",
+     "qqqqqTTqqqqq",
+     "NNNNNTTNNNNN",
+     "NNNNNTTNRRNN",
+     "NNNNNTTRrRRN",
+     "NNNNNTTNRRNN",
+     "NNNNNTTNNNNN",
+     "nnnnnTTnnnnn"
+    ],
+    "map": {
+     "q": "#e8bd7f",
+     "N": "#cc9657",
+     "n": "#9c6a3a",
+     "T": "#efe0b8",
+     "R": "#e5484d",
+     "r": "#ff9a90"
+    },
+    "outline": true
+   },
+   "box_release": {
+    "name": "box_release",
+    "rows": [
+     ".qqqqTTqqqq.",
+     "qqqqqTTqqqqq",
+     "NNWWWWWNNNNN",
+     "NNWgggWNRRNN",
+     "NNWgWgWRrRRN",
+     "NNWgggWNRRNN",
+     "NNWWWWWNNNNN",
+     "nnnnnTTnnnnn"
+    ],
+    "map": {
+     "q": "#e8bd7f",
+     "N": "#cc9657",
+     "n": "#9c6a3a",
+     "T": "#efe0b8",
+     "W": "#fbf8f1",
+     "g": "#3fbf66",
+     "R": "#e5484d",
+     "r": "#ff9a90"
+    },
+    "outline": true
+   },
+   "box_rework": {
+    "name": "box_rework",
+    "rows": [
+     ".qqqqTTqqqq.",
+     "qqqqqTTqqqqq",
+     "NNWWWWWWWNNN",
+     "NNWrrrrrWNNN",
+     "NNWrWrWrWNNN",
+     "NNWrrrrrWNNN",
+     "NNWWWWWWWNNN",
+     "nnnnnTTnnnnn"
+    ],
+    "map": {
+     "q": "#e8bd7f",
+     "N": "#cc9657",
+     "n": "#9c6a3a",
+     "T": "#efe0b8",
+     "W": "#fbf8f1",
+     "r": "#e5484d"
+    },
+    "outline": true
+   },
+   "slip_release": {
+    "name": "slip_release",
+    "rows": [
+     "WWWWWW",
+     "WllllW",
+     "WWWWWW",
+     "WgggWW",
+     "WgWgWW",
+     "WgggWW",
+     "wwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8",
+     "g": "#3fbf66"
+    },
+    "outline": true
+   },
+   "slip_defect": {
+    "name": "slip_defect",
+    "rows": [
+     "WWWWWW",
+     "WllllW",
+     "WWWWWW",
+     "WrrrWW",
+     "WrWrWW",
+     "WrrrWW",
+     "wwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8",
+     "r": "#e5484d"
+    },
+    "outline": true
+   },
+   "ticket": {
+    "name": "ticket",
+    "rows": [
+     "WWWWWWWW",
+     "WWWWWWWW",
+     "WWWWWWWW",
+     "WWWWWWWW",
+     "WWWWWWWW",
+     "wwwwwwww"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8"
+    },
+    "outline": true
+   },
+   "form": {
+    "name": "form",
+    "rows": [
+     "rrrrrrr",
+     "WWWWWWW",
+     "WlllllW",
+     "WWWWWWW",
+     "WllllWW",
+     "WWWWWWW",
+     "WlllWWW",
+     "WWWWWbW",
+     "wwwwwww"
+    ],
+    "map": {
+     "r": "#f08a3c",
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8",
+     "b": "#2e60ad"
+    },
+    "outline": true
+   },
+   "eraser": {
+    "name": "eraser",
+    "rows": [
+     "WWWWW",
+     "bbbbb",
+     "BBBBB"
+    ],
+    "map": {
+     "W": "#dedad0",
+     "b": "#474d5a",
+     "B": "#6b7382"
+    },
+    "outline": true
+   },
+   "decision": {
+    "name": "decision",
+    "rows": [
+     "bbbbbbb",
+     "WWWWWWW",
+     "WlllllW",
+     "WWWWWWW",
+     "WllWWgW",
+     "WWWWgWW",
+     "wwwwwww"
+    ],
+    "map": {
+     "b": "#4f94e8",
+     "W": "#fbf8f1",
+     "w": "#dedad0",
+     "l": "#8f9cc8",
+     "g": "#23804a"
+    },
+    "outline": true
+   },
+   "note": {
+    "name": "note",
+    "rows": [
+     "YYYYY",
+     "YyyyY",
+     "YYYYY",
+     "YyyYY",
+     "yyyyy"
+    ],
+    "map": {
+     "Y": "#fff2b0",
+     "y": "#f7cb46"
+    },
+    "outline": true
+   },
+   "note_done": {
+    "name": "note_done",
+    "rows": [
+     "YYYYY",
+     "YyyyY",
+     "YYYYg",
+     "YgYgY",
+     "yygyy"
+    ],
+    "map": {
+     "Y": "#fff2b0",
+     "y": "#f7cb46",
+     "g": "#23804a"
+    },
+    "outline": true
+   },
+   "letter": {
+    "name": "letter",
+    "rows": [
+     "WWWWWWWW",
+     "wWWWWWWw",
+     "WwWWWWwW",
+     "WWwWWwWW",
+     "WWWwwWrr",
+     "wwwwwwrr"
+    ],
+    "map": {
+     "W": "#fbf8f1",
+     "w": "#bdb8ad",
+     "r": "#e5484d"
+    },
+    "outline": true
+   },
+   "pen": {
+    "name": "pen",
+    "rows": [
+     "K",
+     "K",
+     "K",
+     "m"
+    ],
+    "map": {
+     "K": "#2e60ad",
+     "m": "#aab6c4"
+    },
+    "outline": true
+   },
+   "pen_red": {
+    "name": "pen_red",
+    "rows": [
+     "K",
+     "K",
+     "K",
+     "m"
+    ],
+    "map": {
+     "K": "#e5484d",
+     "m": "#aab6c4"
+    },
+    "outline": true
+   },
+   "tape": {
+    "name": "tape",
+    "rows": [
+     ".TT.",
+     "TmmT",
+     "TmmT",
+     ".TT."
+    ],
+    "map": {
+     "T": "#efe0b8",
+     "m": "#9c6a3a"
+    },
+    "outline": true
+   },
+   "bulb": {
+    "name": "bulb",
+    "rows": [
+     "...yyy...",
+     "..yYYYy..",
+     ".yYWYYYy.",
+     ".yYWYYYy.",
+     ".yYYYYYy.",
+     ".yYYYYYy.",
+     "..yYYYy..",
+     "...yYy...",
+     "...mmm...",
+     "...MMM...",
+     "...mmm..."
+    ],
+    "map": {
+     "y": "#f7cb46",
+     "Y": "#fff2b0",
+     "W": "#fbf8f1",
+     "m": "#aab6c4",
+     "M": "#7b8796"
+    },
+    "outline": true
+   },
+   "question": {
+    "name": "question",
+    "rows": [
+     ".YYY.",
+     "YYyYY",
+     "yy.YY",
+     "..YYy",
+     "..Yy.",
+     "..y..",
+     ".....",
+     "..Y..",
+     "..y.."
+    ],
+    "map": {
+     "Y": "#f7cb46",
+     "y": "#c99324"
+    },
+    "outline": true
+   },
+   "exclaim": {
+    "name": "exclaim",
+    "rows": [
+     "RRR",
+     "RRR",
+     "RRR",
+     "RrR",
+     ".r.",
+     "...",
+     "RRR",
+     "rrr"
+    ],
+    "map": {
+     "R": "#e5484d",
+     "r": "#a82b3a"
+    },
+    "outline": true
+   },
+   "check": {
+    "name": "check",
+    "rows": [
+     "......G",
+     ".....GG",
+     "G...GG.",
+     "GG.GG..",
+     ".GGG...",
+     "..G...."
+    ],
+    "map": {
+     "G": "#3fbf66"
+    },
+    "outline": true
+   },
+   "cross": {
+    "name": "cross",
+    "rows": [
+     "RR...RR",
+     ".RR.RR.",
+     "..RRR..",
+     ".RR.RR.",
+     "RR...RR"
+    ],
+    "map": {
+     "R": "#e5484d"
+    },
+    "outline": true
+   },
+   "heart": {
+    "name": "heart",
+    "rows": [
+     ".RR.RR.",
+     "RRRRRRR",
+     "RRRRRRR",
+     ".RRRRR.",
+     "..RRR..",
+     "...R..."
+    ],
+    "map": {
+     "R": "#f27ec2"
+    },
+    "outline": true
+   },
+   "zzz": {
+    "name": "zzz",
+    "rows": [
+     "WWWW",
+     "..W.",
+     ".W..",
+     "WWWW"
+    ],
+    "map": {
+     "W": "#fbf8f1"
+    },
+    "outline": true
+   },
+   "flag": {
+    "name": "flag",
+    "rows": [
+     "mXXXXX..",
+     "mXXXXXXX",
+     "mXXXXXXx",
+     "mxXXXXx.",
+     "m.xxx...",
+     "m.......",
+     "m.......",
+     "m.......",
+     "m.......",
+     "m.......",
+     "M......."
+    ],
+    "map": {
+     "m": "#aab6c4",
+     "M": "#7b8796",
+     "X": "#ffffff",
+     "x": "#cccccc"
+    },
+    "outline": true
+   },
+   "flag2": {
+    "name": "flag2",
+    "rows": [
+     "mXXXX...",
+     "mXXXXXX.",
+     "mXXXXXXX",
+     "mXXXXXxx",
+     "mxxxx...",
+     "m.......",
+     "m.......",
+     "m.......",
+     "m.......",
+     "m.......",
+     "M......."
+    ],
+    "map": {
+     "m": "#aab6c4",
+     "M": "#7b8796",
+     "X": "#ffffff",
+     "x": "#cccccc"
+    },
+    "outline": true
+   },
+   "smoke1": {
+    "name": "smoke1",
+    "rows": [
+     ".ww.",
+     "wWWw",
+     "wWWw",
+     ".ww."
+    ],
+    "map": {
+     "W": "#b9bcc4",
+     "w": "#8e929c"
+    },
+    "outline": false
+   },
+   "smoke2": {
+    "name": "smoke2",
+    "rows": [
+     "..ww..",
+     ".wWWw.",
+     "wWWWWw",
+     "wWWWWw",
+     ".wWWw.",
+     "..ww.."
+    ],
+    "map": {
+     "W": "#c7c9d0",
+     "w": "#9da1ab"
+    },
+    "outline": false
+   },
+   "deskMonitor": {
+    "name": "deskMonitor",
+    "rows": [
+     ".EEEEEEEEEEEEEEEEEE.",
+     "EEEEEEEEEEEEEEEEEEEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEdSSSSSSSSSSSSSSdEe",
+     "EEddddddddddddddddEe",
+     "EEEEEEEEEEEEEEELEEEe",
+     "eeeeeeeeeeeeeeeeeeee",
+     ".....eeeeeeeeee.....",
+     "....dddddddddddd...."
+    ],
+    "map": {
+     "E": "#efe7d2",
+     "e": "#d4c8a8",
+     "d": "#a89a78",
+     "S": "#0b1d14",
+     "L": "#3fbf66"
+    },
+    "outline": true
+   },
+   "keyboard": {
+    "name": "keyboard",
+    "rows": [
+     "wwwwwwwwwwwwww",
+     "wgwgwgwgwgwgww",
+     "gggggggggggggg"
+    ],
+    "map": {
+     "w": "#cdd2da",
+     "g": "#6b7382"
+    },
+    "outline": true
+   },
+   "clock": {
+    "name": "clock",
+    "rows": [
+     "....FFFFF....",
+     "..FFWWWWWFF..",
+     ".FWWWWoWWWWF.",
+     ".FWWWWWWWWWF.",
+     "FWWWWWWWWWWWF",
+     "FWWWWWWWWWWWF",
+     "FoWWWWWWWWWoF",
+     "FWWWWWWWWWWWF",
+     "FWWWWWWWWWWWF",
+     ".FWWWWWWWWWF.",
+     ".FWWWWoWWWWF.",
+     "..FFWWWWWFF..",
+     "....FFFFF...."
+    ],
+    "map": {
+     "F": "#83552d",
+     "W": "#fbf8f1",
+     "o": "#352e4d"
+    },
+    "outline": true
+   },
+   "lamp": {
+    "name": "lamp",
+    "rows": [
+     "......oo......",
+     "......oo......",
+     "....LLLLLL....",
+     "..LLLLLLLLLL..",
+     ".LLLLLLLLLLLL.",
+     "..yyyyyyyyyy.."
+    ],
+    "map": {
+     "o": "#474d5a",
+     "L": "#9aa2b0",
+     "y": "#fff2b0"
+    },
+    "outline": true
+   },
+   "plant": {
+    "name": "plant",
+    "rows": [
+     ".....GG.......",
+     "....GgG..GG...",
+     "..GG.GgG.GgG..",
+     ".GgG..GgGgG...",
+     "..GgG..GgG..G.",
+     "...GgGGgG..GgG",
+     ".G..GgGgGGgG..",
+     "GgGG..GgGgG...",
+     ".GgGG.GgG.....",
+     "..GGgGGgG.....",
+     "....GgGG......",
+     ".....GG.......",
+     "...NNNNNNNN...",
+     "...NnnnnnnN...",
+     "....NNNNNN....",
+     "....NnnnnN....",
+     "....NNNNNN....",
+     ".....nnnn....."
+    ],
+    "map": {
+     "G": "#4fa24a",
+     "g": "#8fd46a",
+     "N": "#d9774a",
+     "n": "#a8522f"
+    },
+    "outline": true
+   },
+   "bin": {
+    "name": "bin",
+    "rows": [
+     "mmmmmmmmmm",
+     "MMMMMMMMMM",
+     "MdMdMdMdMM",
+     "MdMdMdMdMM",
+     ".MdMdMdMd.",
+     ".MdMdMdMd.",
+     ".MMMMMMMM.",
+     "..dddddd.."
+    ],
+    "map": {
+     "m": "#dde4ec",
+     "M": "#7b8796",
+     "d": "#525a68"
+    },
+    "outline": true
+   },
+   "teapot": {
+    "name": "teapot",
+    "rows": [
+     "...bb....",
+     "..WWWW...",
+     "WWWWWWWW.",
+     "W.WWWWWWW",
+     "W.WWWWWW.",
+     ".WWWWWW..",
+     "..wwww..."
+    ],
+    "map": {
+     "W": "#9fd3c7",
+     "w": "#6aa89a",
+     "b": "#83552d"
+    },
+    "outline": true
+   },
+   "beacon": {
+    "name": "beacon",
+    "rows": [
+     "..LL..",
+     ".LLLL.",
+     "LLWLLL",
+     "LLLLLL",
+     "mmmmmm",
+     "MMMMMM"
+    ],
+    "map": {
+     "L": "#f7cb46",
+     "W": "#fbf8f1",
+     "m": "#6b7382",
+     "M": "#474d5a"
+    },
+    "outline": true
+   },
+   "beacon_red": {
+    "name": "beacon_red",
+    "rows": [
+     "..LL..",
+     ".LLLL.",
+     "LLWLLL",
+     "LLLLLL",
+     "mmmmmm",
+     "MMMMMM"
+    ],
+    "map": {
+     "L": "#e5484d",
+     "W": "#fbf8f1",
+     "m": "#6b7382",
+     "M": "#474d5a"
+    },
+    "outline": true
+   },
+   "cart": {
+    "name": "cart",
+    "rows": [
+     "mm........................",
+     ".m........................",
+     ".m........................",
+     "..m.......................",
+     "..mmmmmmmmmmmmmmmmmmmmmmmm",
+     "..MMMMMMMMMMMMMMMMMMMMMMMM",
+     "...m..................m...",
+     "...m..................m...",
+     "..MMMMMMMMMMMMMMMMMMMMMMM.",
+     "..oWo................oWo..",
+     "...o..................o..."
+    ],
+    "map": {
+     "m": "#aab6c4",
+     "M": "#7b8796",
+     "o": "#2f333d",
+     "W": "#9aa2b0"
+    },
+    "outline": true
+   }
+  },
+  "POSES": {
+   "stand": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "stand_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "stand_happy": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "stand_sad": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "sad",
+    "legs": "stand",
+    "A": [
+     1,
+     5
+    ],
+    "B": [
+     -1,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "look_l": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "left",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "look_r": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "look_up": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "wait0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     -4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "wait1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "tap",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     -4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "cheer0": {
+    "v": "f",
+    "sit": 0,
+    "bob": -3,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     -2,
+     -7
+    ],
+    "B": [
+     2,
+     -7
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "cheer1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     -2,
+     -4
+    ],
+    "B": [
+     2,
+     -4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "stretch0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     -1,
+     -6
+    ],
+    "B": [
+     1,
+     -6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "stretch1": {
+    "v": "f",
+    "sit": 0,
+    "bob": -1,
+    "hx": 0,
+    "hy": -1,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     -2,
+     -8
+    ],
+    "B": [
+     2,
+     -8
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "scratch0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -2,
+     -8
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "scratch1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": -1,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -1,
+     -9
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "shake0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": -1,
+    "hy": 0,
+    "face": "sad",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "shake1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": "sad",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "puzzled": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -4,
+     -1
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "puzzled_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -4,
+     -1
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_sign": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     1,
+     -10
+    ],
+    "B": [
+     -1,
+     -10
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_sign_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     1,
+     -10
+    ],
+    "B": [
+     -1,
+     -10
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_form": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     3,
+     -1
+    ],
+    "B": [
+     -3,
+     -1
+    ],
+    "item": {
+     "id": "form",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_form_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     3,
+     -1
+    ],
+    "B": [
+     -3,
+     -1
+    ],
+    "item": {
+     "id": "form",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_ticket": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     2
+    ],
+    "item": {
+     "id": "ticket",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "hold_ticket_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "left",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     2
+    ],
+    "item": {
+     "id": "ticket",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "carry_f": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     2,
+     3
+    ],
+    "B": [
+     -2,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "reach_r0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     3,
+     -2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "reach_r1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     4,
+     -3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "rummage0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     4,
+     -2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "rummage1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     3,
+     -4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "grab_folder": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     4,
+     -3
+    ],
+    "item": {
+     "id": "folder",
+     "hand": "B",
+     "dx": -1,
+     "dy": -5
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "magnify": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -1,
+     -2
+    ],
+    "item": {
+     "id": "magnifier",
+     "hand": "B",
+     "dx": -5,
+     "dy": -5
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "magnify_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": -1,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -2,
+     -2
+    ],
+    "item": {
+     "id": "magnifier",
+     "hand": "B",
+     "dx": -5,
+     "dy": -5
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "read_stand": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     2
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "read_stand_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     2
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "give": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     5,
+     0
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": 1,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "give_b": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     5,
+     1
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": 1,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "take": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     -5,
+     0
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "A",
+     "dx": -5,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "throw0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     2,
+     -7
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": -2,
+     "dy": -4
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "throw1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     6,
+     -2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "catch0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "surprised",
+    "legs": "stand",
+    "A": [
+     -1,
+     -7
+    ],
+    "B": [
+     1,
+     -7
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "catch1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     2,
+     -4
+    ],
+    "B": [
+     -2,
+     -4
+    ],
+    "item": {
+     "id": "letter",
+     "at": "both",
+     "dy": -1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "fold0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "doc_write",
+     "at": "both"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "fold1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     2,
+     3
+    ],
+    "B": [
+     -2,
+     3
+    ],
+    "item": {
+     "id": "letter",
+     "at": "both"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "place_low": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     5
+    ],
+    "B": [
+     -3,
+     5
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "stamp_up": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     1,
+     -8
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": -2,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "stamp_mid": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -1,
+     0
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": -2,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "stamp_down": {
+    "v": "f",
+    "sit": 0,
+    "bob": 1,
+    "hx": 0,
+    "hy": 0,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -3,
+     5
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": -2,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "inspect0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 1,
+    "hx": 0,
+    "hy": 1,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "magnifier",
+     "hand": "B",
+     "dx": -5,
+     "dy": -5
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "inspect1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 1,
+    "hx": -1,
+    "hy": 1,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -6,
+     3
+    ],
+    "item": {
+     "id": "magnifier",
+     "hand": "B",
+     "dx": -5,
+     "dy": -5
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "tick0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -2,
+     2
+    ],
+    "item": {
+     "id": "clipboard",
+     "hand": "A",
+     "dx": -1,
+     "dy": -6
+    },
+    "item2": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "headDown": false,
+    "idle": false
+   },
+   "tick1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -1,
+     3
+    ],
+    "item": {
+     "id": "clipboard",
+     "hand": "A",
+     "dx": -1,
+     "dy": -6
+    },
+    "item2": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "headDown": false,
+    "idle": false
+   },
+   "hold_clip0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -2,
+     2
+    ],
+    "item": {
+     "id": "clipboard",
+     "hand": "A",
+     "dx": -1,
+     "dy": -6
+    },
+    "item2": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "headDown": false,
+    "idle": false
+   },
+   "hold_clip1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "normal",
+    "legs": "stand",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     4
+    ],
+    "item": {
+     "id": "clipboard",
+     "hand": "A",
+     "dx": -1,
+     "dy": -6
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "lever_up": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     2,
+     -6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "lever_down": {
+    "v": "f",
+    "sit": 0,
+    "bob": 1,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     2,
+     1
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "watch_r": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     1,
+     5
+    ],
+    "B": [
+     -1,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "crouch0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "crouch",
+    "A": [
+     -1,
+     5
+    ],
+    "B": [
+     1,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "crouch1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "crouch",
+    "A": [
+     1,
+     4
+    ],
+    "B": [
+     -1,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "gather0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     4
+    ],
+    "B": [
+     -3,
+     4
+    ],
+    "item": {
+     "id": "docs",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "gather1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "docs",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "tidy0": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -5,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "tidy1": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     5,
+     4
+    ],
+    "B": [
+     -3,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "arms_crossed": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "bored",
+    "legs": "stand",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     -4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "point_r": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "right",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     5,
+     -3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "talk": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "talk",
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -2,
+     2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "shock": {
+    "v": "f",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "surprised",
+    "legs": "stand",
+    "A": [
+     -2,
+     -2
+    ],
+    "B": [
+     2,
+     -2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -2,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_b": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -2,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "type0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -3,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "type1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     5
+    ],
+    "B": [
+     -3,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "think": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -4,
+     -1
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "think_b": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -4,
+     -1
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "tea0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "cup",
+     "hand": "B",
+     "dx": -3,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "tea1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": -1,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -4,
+     0
+    ],
+    "item": {
+     "id": "cup",
+     "hand": "B",
+     "dx": -3,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_stretch0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     -1,
+     -6
+    ],
+    "B": [
+     1,
+     -6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_stretch1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": -1,
+    "face": "closed",
+    "legs": "stand",
+    "A": [
+     -2,
+     -8
+    ],
+    "B": [
+     2,
+     -8
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "slump0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 5,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     4,
+     6
+    ],
+    "B": [
+     -4,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": true,
+    "idle": false
+   },
+   "slump1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 4,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     4,
+     6
+    ],
+    "B": [
+     -4,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": true,
+    "idle": false
+   },
+   "read_sit0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "read_sit1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "write0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -3,
+     5
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "write1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -2,
+     5
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "write2": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     6
+    ],
+    "B": [
+     -4,
+     6
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_relax": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "bored",
+    "legs": "stand",
+    "A": [
+     4,
+     4
+    ],
+    "B": [
+     -4,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_relax_b": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": "blink",
+    "legs": "stand",
+    "A": [
+     4,
+     4
+    ],
+    "B": [
+     -4,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_happy": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -2,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_up": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -2,
+     6
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_wait": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "up",
+    "legs": "stand",
+    "A": [
+     4,
+     4
+    ],
+    "B": [
+     -4,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_fold0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     4
+    ],
+    "B": [
+     -3,
+     4
+    ],
+    "item": {
+     "id": "doc_write",
+     "at": "both"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_fold1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "stand",
+    "A": [
+     2,
+     4
+    ],
+    "B": [
+     -2,
+     4
+    ],
+    "item": {
+     "id": "letter",
+     "at": "both"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_card": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "stand",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_scratch0": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -2,
+     -8
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "sit_scratch1": {
+    "v": "f",
+    "sit": 1,
+    "bob": 0,
+    "hx": -1,
+    "hy": 0,
+    "face": "worried",
+    "legs": "stand",
+    "A": [
+     2,
+     6
+    ],
+    "B": [
+     -1,
+     -9
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "walk0": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w0",
+    "A": [
+     2,
+     4
+    ],
+    "B": [
+     -2,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "carry0": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w0",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "front"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "push0": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "w0",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "walk1": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w1",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "carry1": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w1",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "front"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "push1": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "w1",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "walk2": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w2",
+    "A": [
+     -2,
+     4
+    ],
+    "B": [
+     2,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "carry2": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w2",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "front"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "push2": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "w2",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "walk3": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w3",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "carry3": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "w3",
+    "A": [
+     3,
+     3
+    ],
+    "B": [
+     3,
+     3
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "front"
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "push3": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "w3",
+    "A": [
+     4,
+     3
+    ],
+    "B": [
+     4,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "run0": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "r0",
+    "A": [
+     3,
+     2
+    ],
+    "B": [
+     -3,
+     3
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "run1": {
+    "v": "s",
+    "sit": 0,
+    "bob": -2,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "r1",
+    "A": [
+     0,
+     4
+    ],
+    "B": [
+     0,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "run2": {
+    "v": "s",
+    "sit": 0,
+    "bob": -1,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "r2",
+    "A": [
+     -3,
+     3
+    ],
+    "B": [
+     3,
+     2
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "run3": {
+    "v": "s",
+    "sit": 0,
+    "bob": -2,
+    "hx": 1,
+    "hy": 0,
+    "face": null,
+    "legs": "r3",
+    "A": [
+     0,
+     4
+    ],
+    "B": [
+     0,
+     4
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "side": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "ss",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "side_b": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": null,
+    "legs": "ss",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": true
+   },
+   "side_reach": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "ss",
+    "A": [
+     5,
+     0
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "side_place": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "down",
+    "legs": "ss",
+    "A": [
+     5,
+     2
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "front",
+     "dx": 4,
+     "dy": 1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "side_throw0": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "ss",
+    "A": [
+     -3,
+     -5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "A",
+     "dx": -2,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "side_throw1": {
+    "v": "s",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": "happy",
+    "legs": "ss",
+    "A": [
+     6,
+     -2
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_b": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 1,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     5
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_write0": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -1,
+     -8
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_write1": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     1,
+     -8
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_write2": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     2,
+     -7
+    ],
+    "item": {
+     "id": "pen",
+     "hand": "B",
+     "dx": 0,
+     "dy": -3
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_pin0": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     0,
+     -9
+    ],
+    "item": {
+     "id": "$hold",
+     "hand": "B",
+     "dx": -1,
+     "dy": -4
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_pin1": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     1,
+     -9
+    ],
+    "B": [
+     0,
+     -9
+    ],
+    "item": null,
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_post": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     2,
+     -8
+    ],
+    "B": [
+     -2,
+     -8
+    ],
+    "item": {
+     "id": "$hold",
+     "at": "both",
+     "dy": -1
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_erase0": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     -3,
+     -8
+    ],
+    "item": {
+     "id": "eraser",
+     "hand": "B",
+     "dx": -1,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   },
+   "back_erase1": {
+    "v": "b",
+    "sit": 0,
+    "bob": 0,
+    "hx": 0,
+    "hy": 0,
+    "face": null,
+    "legs": "stand",
+    "A": [
+     0,
+     5
+    ],
+    "B": [
+     3,
+     -8
+    ],
+    "item": {
+     "id": "eraser",
+     "hand": "B",
+     "dx": -1,
+     "dy": -2
+    },
+    "item2": null,
+    "headDown": false,
+    "idle": false
+   }
+  },
+  "ANIMS": {
+   "idle": {
+    "frames": [
+     [
+      "stand",
+      1300
+     ],
+     [
+      "stand_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2200
+   },
+   "idle_happy": {
+    "frames": [
+     [
+      "stand_happy",
+      900
+     ],
+     [
+      "stand_b",
+      700
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1600
+   },
+   "stand_sad": {
+    "frames": [
+     [
+      "stand_sad",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "look_l": {
+    "frames": [
+     [
+      "look_l",
+      900
+     ],
+     [
+      "stand_b",
+      700
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1600
+   },
+   "look_r": {
+    "frames": [
+     [
+      "look_r",
+      900
+     ],
+     [
+      "stand_b",
+      700
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1600
+   },
+   "look_up": {
+    "frames": [
+     [
+      "look_up",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "walk": {
+    "frames": [
+     [
+      "walk0",
+      95
+     ],
+     [
+      "walk1",
+      95
+     ],
+     [
+      "walk2",
+      95
+     ],
+     [
+      "walk3",
+      95
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 380
+   },
+   "carry": {
+    "frames": [
+     [
+      "carry0",
+      115
+     ],
+     [
+      "carry1",
+      115
+     ],
+     [
+      "carry2",
+      115
+     ],
+     [
+      "carry3",
+      115
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 460
+   },
+   "run": {
+    "frames": [
+     [
+      "run0",
+      85
+     ],
+     [
+      "run1",
+      85
+     ],
+     [
+      "run2",
+      85
+     ],
+     [
+      "run3",
+      85
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 340
+   },
+   "push": {
+    "frames": [
+     [
+      "push0",
+      170
+     ],
+     [
+      "push1",
+      170
+     ],
+     [
+      "push2",
+      170
+     ],
+     [
+      "push3",
+      170
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 680
+   },
+   "side": {
+    "frames": [
+     [
+      "side",
+      1200
+     ],
+     [
+      "side_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2100
+   },
+   "sit": {
+    "frames": [
+     [
+      "sit",
+      1500
+     ],
+     [
+      "sit_b",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2500
+   },
+   "type": {
+    "frames": [
+     [
+      "type0",
+      110
+     ],
+     [
+      "type1",
+      110
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 220
+   },
+   "think": {
+    "frames": [
+     [
+      "think",
+      1100
+     ],
+     [
+      "think_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2000
+   },
+   "tea": {
+    "frames": [
+     [
+      "tea0",
+      2000
+     ],
+     [
+      "tea1",
+      1000
+     ],
+     [
+      "tea0",
+      1600
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 4600
+   },
+   "stretch_sit": {
+    "frames": [
+     [
+      "sit_stretch0",
+      260
+     ],
+     [
+      "sit_stretch1",
+      1100
+     ],
+     [
+      "sit_stretch0",
+      260
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1620
+   },
+   "stretch": {
+    "frames": [
+     [
+      "stretch0",
+      260
+     ],
+     [
+      "stretch1",
+      1100
+     ],
+     [
+      "stretch0",
+      260
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1620
+   },
+   "slump": {
+    "frames": [
+     [
+      "slump0",
+      1500
+     ],
+     [
+      "slump1",
+      1100
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2600
+   },
+   "read_sit": {
+    "frames": [
+     [
+      "read_sit0",
+      1000
+     ],
+     [
+      "read_sit1",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2000
+   },
+   "read_stand": {
+    "frames": [
+     [
+      "read_stand",
+      1000
+     ],
+     [
+      "read_stand_b",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2000
+   },
+   "write": {
+    "frames": [
+     [
+      "write0",
+      150
+     ],
+     [
+      "write1",
+      150
+     ],
+     [
+      "write2",
+      150
+     ],
+     [
+      "write1",
+      150
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 600
+   },
+   "rummage": {
+    "frames": [
+     [
+      "rummage0",
+      170
+     ],
+     [
+      "rummage1",
+      170
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 340
+   },
+   "reach": {
+    "frames": [
+     [
+      "reach_r0",
+      200
+     ],
+     [
+      "reach_r1",
+      500
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 700
+   },
+   "grab_folder": {
+    "frames": [
+     [
+      "grab_folder",
+      700
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 700
+   },
+   "magnify": {
+    "frames": [
+     [
+      "magnify",
+      700
+     ],
+     [
+      "magnify_b",
+      700
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1400
+   },
+   "lever": {
+    "frames": [
+     [
+      "lever_up",
+      450
+     ],
+     [
+      "lever_down",
+      450
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 900
+   },
+   "watch_r": {
+    "frames": [
+     [
+      "watch_r",
+      1000
+     ],
+     [
+      "look_r",
+      800
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1800
+   },
+   "shake": {
+    "frames": [
+     [
+      "shake0",
+      150
+     ],
+     [
+      "shake1",
+      150
+     ],
+     [
+      "shake0",
+      150
+     ],
+     [
+      "shake1",
+      150
+     ],
+     [
+      "stand_sad",
+      500
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 1100
+   },
+   "throw": {
+    "frames": [
+     [
+      "throw0",
+      450
+     ],
+     [
+      "throw1",
+      550
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1000
+   },
+   "side_throw": {
+    "frames": [
+     [
+      "side_throw0",
+      400
+     ],
+     [
+      "side_throw1",
+      500
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 900
+   },
+   "catch": {
+    "frames": [
+     [
+      "catch0",
+      400
+     ],
+     [
+      "catch1",
+      800
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1200
+   },
+   "fold": {
+    "frames": [
+     [
+      "fold0",
+      500
+     ],
+     [
+      "fold1",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1100
+   },
+   "sit_fold": {
+    "frames": [
+     [
+      "sit_fold0",
+      600
+     ],
+     [
+      "sit_fold1",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 1,
+    "total": 1200
+   },
+   "place": {
+    "frames": [
+     [
+      "place_low",
+      700
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 700
+   },
+   "side_place": {
+    "frames": [
+     [
+      "side_place",
+      700
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 700
+   },
+   "side_reach": {
+    "frames": [
+     [
+      "side_reach",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 600
+   },
+   "scratch": {
+    "frames": [
+     [
+      "scratch0",
+      180
+     ],
+     [
+      "scratch1",
+      180
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 360
+   },
+   "sit_scratch": {
+    "frames": [
+     [
+      "sit_scratch0",
+      180
+     ],
+     [
+      "sit_scratch1",
+      180
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 360
+   },
+   "stamp": {
+    "frames": [
+     [
+      "stamp_up",
+      380
+     ],
+     [
+      "stamp_mid",
+      70
+     ],
+     [
+      "stamp_down",
+      450
+     ],
+     [
+      "stamp_up",
+      300
+     ],
+     [
+      "stamp_mid",
+      70
+     ],
+     [
+      "stamp_down",
+      520
+     ]
+    ],
+    "loop": false,
+    "still": 2,
+    "total": 1790
+   },
+   "stamp_once": {
+    "frames": [
+     [
+      "stamp_up",
+      400
+     ],
+     [
+      "stamp_mid",
+      70
+     ],
+     [
+      "stamp_down",
+      650
+     ]
+    ],
+    "loop": false,
+    "still": 2,
+    "total": 1120
+   },
+   "inspect": {
+    "frames": [
+     [
+      "inspect0",
+      520
+     ],
+     [
+      "inspect1",
+      520
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1040
+   },
+   "tick": {
+    "frames": [
+     [
+      "tick0",
+      260
+     ],
+     [
+      "tick1",
+      260
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 520
+   },
+   "hold_clip": {
+    "frames": [
+     [
+      "hold_clip0",
+      300
+     ],
+     [
+      "hold_clip1",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1200
+   },
+   "board_write": {
+    "frames": [
+     [
+      "back_write0",
+      170
+     ],
+     [
+      "back_write1",
+      170
+     ],
+     [
+      "back_write2",
+      170
+     ],
+     [
+      "back_write1",
+      170
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 680
+   },
+   "board_pin": {
+    "frames": [
+     [
+      "back_post",
+      700
+     ],
+     [
+      "back_pin1",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 1300
+   },
+   "note_pin": {
+    "frames": [
+     [
+      "back_pin0",
+      500
+     ],
+     [
+      "back_pin1",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 1100
+   },
+   "board_erase": {
+    "frames": [
+     [
+      "back_erase0",
+      130
+     ],
+     [
+      "back_erase1",
+      130
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 260
+   },
+   "back": {
+    "frames": [
+     [
+      "back",
+      1200
+     ],
+     [
+      "back_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2100
+   },
+   "wait": {
+    "frames": [
+     [
+      "wait0",
+      320
+     ],
+     [
+      "wait1",
+      320
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 640
+   },
+   "hold_sign": {
+    "frames": [
+     [
+      "hold_sign",
+      900
+     ],
+     [
+      "hold_sign_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1800
+   },
+   "hold_form": {
+    "frames": [
+     [
+      "hold_form",
+      900
+     ],
+     [
+      "hold_form_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1800
+   },
+   "hold_ticket": {
+    "frames": [
+     [
+      "hold_ticket",
+      1100
+     ],
+     [
+      "hold_ticket_b",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 2100
+   },
+   "carry_f": {
+    "frames": [
+     [
+      "carry_f",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "cheer": {
+    "frames": [
+     [
+      "cheer0",
+      260
+     ],
+     [
+      "cheer1",
+      260
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 520
+   },
+   "crouch": {
+    "frames": [
+     [
+      "crouch0",
+      300
+     ],
+     [
+      "crouch1",
+      300
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 600
+   },
+   "gather": {
+    "frames": [
+     [
+      "gather0",
+      500
+     ],
+     [
+      "gather1",
+      500
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "tidy": {
+    "frames": [
+     [
+      "tidy0",
+      260
+     ],
+     [
+      "tidy1",
+      260
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 520
+   },
+   "sit_relax": {
+    "frames": [
+     [
+      "sit_relax",
+      1700
+     ],
+     [
+      "sit_relax_b",
+      1300
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 3000
+   },
+   "sit_happy": {
+    "frames": [
+     [
+      "sit_happy",
+      1000
+     ],
+     [
+      "sit_b",
+      700
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1700
+   },
+   "sit_up": {
+    "frames": [
+     [
+      "sit_up",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "sit_wait": {
+    "frames": [
+     [
+      "sit_wait",
+      900
+     ],
+     [
+      "sit_relax_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1800
+   },
+   "sit_card": {
+    "frames": [
+     [
+      "sit_card",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "puzzled": {
+    "frames": [
+     [
+      "puzzled",
+      900
+     ],
+     [
+      "puzzled_b",
+      900
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1800
+   },
+   "freeze": {
+    "frames": [
+     [
+      "stand",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   },
+   "give": {
+    "frames": [
+     [
+      "give",
+      600
+     ],
+     [
+      "give_b",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 1200
+   },
+   "take": {
+    "frames": [
+     [
+      "take",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 600
+   },
+   "arms_crossed": {
+    "frames": [
+     [
+      "arms_crossed",
+      1300
+     ],
+     [
+      "wait1",
+      300
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1600
+   },
+   "point_r": {
+    "frames": [
+     [
+      "point_r",
+      800
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 800
+   },
+   "shock": {
+    "frames": [
+     [
+      "shock",
+      600
+     ]
+    ],
+    "loop": false,
+    "still": 0,
+    "total": 600
+   },
+   "talk": {
+    "frames": [
+     [
+      "talk",
+      240
+     ],
+     [
+      "stand",
+      240
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 480
+   },
+   "type_still": {
+    "frames": [
+     [
+      "type0",
+      1000
+     ]
+    ],
+    "loop": true,
+    "still": 0,
+    "total": 1000
+   }
+  },
+  "ACTIONS": {
+   "tea": {
+    "label": "喝茶与伸懒腰",
+    "fact": "部门未工作",
+    "source": "部门状态",
+    "action": "坐在工位喝茶，偶尔起身在房间里走动、伸懒腰",
+    "room": "灯光调暗",
+    "level": "ui",
+    "anim": "tea"
+   },
+   "activate": {
+    "label": "起身走到工位",
+    "fact": "部门开始工作",
+    "source": "department_activated",
+    "action": "起身走到工位",
+    "room": "屏幕亮起，CRT 显示目标",
+    "level": "ui",
+    "anim": "walk"
+   },
+   "fetch_folder": {
+    "label": "取出文件夹",
+    "fact": "装配上下文",
+    "source": "context_assembled",
+    "action": "从文件柜取出文件夹放到桌上",
+    "room": "—",
+    "level": "ui",
+    "anim": "rummage"
+   },
+   "type_think": {
+    "label": "打字与思考气泡",
+    "fact": "模型请求中",
+    "source": "model_requested、model_request_serialized",
+    "action": "打字，头顶思考气泡",
+    "room": "屏幕滚动字符",
+    "level": "ui",
+    "anim": "type"
+   },
+   "stream_text": {
+    "label": "气泡逐字出现",
+    "fact": "流式输出",
+    "source": "model_stream_progress",
+    "action": "气泡中逐字出现文字",
+    "room": "—",
+    "level": "ui",
+    "anim": "type"
+   },
+   "idea": {
+    "label": "气泡变成灯泡",
+    "fact": "请求完成",
+    "source": "model_attempt_finished",
+    "action": "气泡变成灯泡",
+    "room": "—",
+    "level": "ui",
+    "anim": "sit_happy"
+   },
+   "retry_wait": {
+    "label": "沙漏与重试次数",
+    "fact": "等待重试",
+    "source": "model_retry_scheduled",
+    "action": "头顶沙漏与「第 n/m 次」",
+    "room": "—",
+    "level": "ui",
+    "anim": "sit_wait"
+   },
+   "slump": {
+    "label": "趴在桌上",
+    "fact": "请求失败",
+    "source": "model_attempt_failed",
+    "action": "趴在桌上",
+    "room": "桌上红灯",
+    "level": "ui",
+    "anim": "slump"
+   },
+   "search": {
+    "label": "翻文件柜举放大镜",
+    "fact": "搜索",
+    "source": "tool_started（search）",
+    "action": "翻文件柜，举放大镜",
+    "room": "文件柜抽屉打开",
+    "level": "ui",
+    "anim": "magnify"
+   },
+   "read": {
+    "label": "捧着文件阅读",
+    "fact": "按区间阅读",
+    "source": "tool_started（read_range、read_file）",
+    "action": "捧着文件阅读",
+    "room": "—",
+    "level": "ui",
+    "anim": "read_sit"
+   },
+   "write": {
+    "label": "在文件上写字",
+    "fact": "编辑",
+    "source": "tool_started（edit_range、write_file）",
+    "action": "在文件上写字",
+    "room": "屏幕显示增删的行",
+    "level": "ui",
+    "anim": "write"
+   },
+   "run_command": {
+    "label": "走到终端拉下拉杆",
+    "fact": "执行登记命令",
+    "source": "tool_started（run_command）到 tool_called",
+    "action": "走到终端拉下拉杆",
+    "room": "终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟",
+    "level": "ui",
+    "anim": "lever"
+   },
+   "toss": {
+    "label": "摇头扔纸团",
+    "fact": "工具被拒绝",
+    "source": "tool_skipped",
+    "action": "摇头，把纸团扔进废纸篓",
+    "room": "—",
+    "level": "ui",
+    "anim": "shake"
+   },
+   "submit": {
+    "label": "放进提案托盘",
+    "fact": "提交提案",
+    "source": "proposal_submitted",
+    "action": "把文件放进提案托盘",
+    "room": "—",
+    "level": "ui",
+    "anim": "side_place"
+   },
+   "returned": {
+    "label": "文件退回挠头",
+    "fact": "提案被退回",
+    "source": "proposal_rejected",
+    "action": "文件被退回，小人挠头",
+    "room": "—",
+    "level": "ui",
+    "anim": "scratch"
+   },
+   "stamp_valid": {
+    "label": "卷轴盖「有效」章",
+    "fact": "需求接纳",
+    "source": "spec_accepted、contract_accepted",
+    "action": "产品在卷轴上盖「有效」章，卷起后放进管道口",
+    "room": "卷轴放上卷轴架",
+    "level": "ui",
+    "anim": "stamp"
+   },
+   "pin_plan": {
+    "label": "计划贴上白板",
+    "fact": "计划接纳",
+    "source": "plan_accepted",
+    "action": "工程把计划贴上白板",
+    "room": "—",
+    "level": "ui",
+    "anim": "board_pin"
+   },
+   "seal": {
+    "label": "装箱贴封条盖章",
+    "fact": "交付封存",
+    "source": "delivery_accepted",
+    "action": "工程装箱、贴封条、盖封存章，把箱子推进管道口",
+    "room": "—",
+    "level": "ui",
+    "anim": "stamp"
+   },
+   "take_box": {
+    "label": "从管道口取出箱子",
+    "fact": "质检取件",
+    "source": "交接到达质检（transition，to 为 quality）",
+    "action": "从管道口取出箱子放上检验台",
+    "room": "—",
+    "level": "ui",
+    "anim": "reach"
+   },
+   "inspect": {
+    "label": "放大镜检查箱子",
+    "fact": "质检核验",
+    "source": "质检的检查动作（tool_started：run_check）",
+    "action": "用放大镜检查箱子，清单逐项打勾",
+    "room": "—",
+    "level": "ui",
+    "anim": "inspect"
+   },
+   "stamp_release": {
+    "label": "盖绿色「放行」章",
+    "fact": "放行",
+    "source": "qa_submitted（release）",
+    "action": "盖绿色「放行」章，把放行单与箱子放进通往成果库的管道",
+    "room": "—",
+    "level": "ui",
+    "anim": "stamp"
+   },
+   "stamp_rework": {
+    "label": "盖红色「返工」章",
+    "fact": "返工",
+    "source": "qa_submitted（rework_engineering、rework_product）",
+    "action": "盖红色「返工」章，把箱子放进回流管道",
+    "room": "—",
+    "level": "ui",
+    "anim": "stamp"
+   },
+   "send_letter": {
+    "label": "写纸条塞进传信管口",
+    "fact": "发出询问",
+    "source": "collaboration_requested",
+    "action": "写纸条装进信筒，塞进传信管口，在管道口等待",
+    "room": "—",
+    "level": "ui",
+    "anim": "side_place"
+   },
+   "answer_letter": {
+    "label": "取出信筒并回答",
+    "fact": "收到询问并回答",
+    "source": "collaboration_responded",
+    "action": "从传信管口取出信筒，写回答后塞回",
+    "room": "—",
+    "level": "ui",
+    "anim": "catch"
+   },
+   "guidance_in": {
+    "label": "门缝塞进纸条",
+    "fact": "收到指导",
+    "source": "department_guidance_received",
+    "action": "—",
+    "room": "门缝塞进纸条，信箱灯亮",
+    "level": "ui",
+    "anim": "sit"
+   },
+   "guidance_read": {
+    "label": "阅读并钉上纸条",
+    "fact": "指导进入输入",
+    "source": "department_guidance_applied",
+    "action": "拿起纸条阅读，钉在墙上",
+    "room": "—",
+    "level": "ui",
+    "anim": "read_stand"
+   },
+   "guidance_reply": {
+    "label": "在纸条上写回复",
+    "fact": "回应指导",
+    "source": "department_guidance_responded",
+    "action": "在纸条上写回复",
+    "room": "—",
+    "level": "ui",
+    "anim": "board_write"
+   },
+   "compact": {
+    "label": "纸堆整理进档案盒",
+    "fact": "压缩",
+    "source": "compaction_recorded",
+    "action": "把桌上成堆的纸整理进「摘要」档案盒",
+    "room": "档案盒上的编号加一",
+    "level": "ui",
+    "anim": "gather"
+   },
+   "compact_fail": {
+    "label": "纸堆散落重新整理",
+    "fact": "压缩未生效",
+    "source": "compaction_failed",
+    "action": "纸堆散落，小人重新整理",
+    "room": "—",
+    "level": "ui",
+    "anim": "crouch"
+   },
+   "paused": {
+    "label": "坐下",
+    "fact": "暂停",
+    "source": "run_paused",
+    "action": "坐下",
+    "room": "门口立「已暂停」牌",
+    "level": "ui",
+    "anim": "sit_relax"
+   },
+   "failed": {
+    "label": "趴下",
+    "fact": "失败",
+    "source": "run_failed",
+    "action": "趴下",
+    "room": "门口立「失败」牌与停止原因",
+    "level": "ui",
+    "anim": "slump"
+   },
+   "done": {
+    "label": "举手欢呼",
+    "fact": "完成",
+    "source": "run_done",
+    "action": "举手欢呼",
+    "room": "门口立「已完成」牌",
+    "level": "ui",
+    "anim": "cheer"
+   },
+   "cancelled": {
+    "label": "收拾桌面",
+    "fact": "取消",
+    "source": "run_failed（reason 为 cancelled）",
+    "action": "收拾桌面",
+    "room": "门口立「已取消」牌",
+    "level": "ui",
+    "anim": "tidy"
+   },
+   "hold_card": {
+    "label": "举牌写明缺少的项",
+    "fact": "待恢复",
+    "source": "模型引用无法使用（waiting_resume）",
+    "action": "举牌，牌上写缺少的项",
+    "room": "门口立「待恢复」牌",
+    "level": "ui",
+    "anim": "hold_sign"
+   },
+   "freeze": {
+    "label": "静止不动",
+    "fact": "中断",
+    "source": "恢复观察状态（x_run_interrupted）",
+    "action": "静止不动",
+    "room": "灯灭，墙上时钟停住",
+    "level": "3.1",
+    "anim": "freeze"
+   },
+   "resume": {
+    "label": "伸懒腰回到工位",
+    "fact": "自动继续",
+    "source": "Yudao 启动时自动继续（x_run_auto_resumed）",
+    "action": "伸懒腰后回到工位",
+    "room": "灯亮起，时钟继续走",
+    "level": "3.1",
+    "anim": "stretch"
+   },
+   "puzzled": {
+    "label": "头顶黄色问号",
+    "fact": "待核实",
+    "source": "恢复观察状态与未完成动作（x_action_unknown）",
+    "action": "站在未完成动作的物件旁，头顶黄色问号",
+    "room": "物件闪烁",
+    "level": "3.1",
+    "anim": "puzzled"
+   },
+   "decided": {
+    "label": "接过决定单照着做",
+    "fact": "用户对结果未知的动作作出决定",
+    "source": "决定请求的回答（x_decision_answered）",
+    "action": "从门缝接过决定单，读完后按决定走向终端重新执行、回到工位继续或收拾桌面",
+    "room": "物件停止闪烁",
+    "level": "3.1",
+    "anim": "read_stand"
+   },
+   "remote_run": {
+    "label": "终端显示机器名称与线",
+    "fact": "远程执行",
+    "source": "动作在登记的机器上执行（x_remote_action_started）",
+    "action": "走到终端，终端屏幕上显示机器名称与一根通往门外的线",
+    "room": "动作结束前线上有流动的光点",
+    "level": "3.2C",
+    "anim": "lever"
+   },
+   "remote_unknown": {
+    "label": "盯着终端头顶问号",
+    "fact": "远程动作结果未知",
+    "source": "执行代理心跳超时（x_machine_offline）",
+    "action": "盯着终端，头顶黄色问号",
+    "room": "终端屏幕变为雪花",
+    "level": "3.2C",
+    "anim": "watch_r"
+   },
+   "read_existing": {
+    "label": "搬旧档案逐本阅读",
+    "fact": "阅读已有项目",
+    "source": "建档事项中的 tool_started（read_file、read_range、search）",
+    "action": "从大厅搬来一摞旧档案，逐本阅读并做摘录",
+    "room": "白板上出现「现有行为」清单",
+    "level": "3.8",
+    "anim": "read_sit"
+   },
+   "net_fetch": {
+    "label": "邮筒寄出请求取回资料",
+    "fact": "网络取回",
+    "source": "网络取回工具（x_network_fetch）",
+    "action": "走到门口的邮筒寄出请求，取回资料",
+    "room": "—",
+    "level": "3.2B",
+    "anim": "walk"
+   },
+   "mcp_press": {
+    "label": "按下工具面板的按钮",
+    "fact": "调用 MCP 工具",
+    "source": "MCP 工具调用（x_mcp_called）",
+    "action": "在墙上的工具面板上按下对应的按钮",
+    "room": "面板上该按钮亮灯",
+    "level": "3.2B",
+    "anim": "reach"
+   },
+   "trial": {
+    "label": "坐在试用台前点击与输入",
+    "fact": "试用网页或桌面程序",
+    "source": "浏览器与 computer use 工具调用（x_trial_step）",
+    "action": "测试工程师坐在试用台前点击与输入",
+    "room": "试用台显示器嵌入最近一张真实截图的缩略图（像素边框）；模型不能看图时显示可访问性结构的文字行",
+    "level": "3.2D",
+    "anim": "type"
+   },
+   "self_test": {
+    "label": "在自己的显示器前点击",
+    "fact": "工程自测网页",
+    "source": "工程的浏览器工具调用（tool_started：browser）",
+    "action": "工程在自己的显示器前点击",
+    "room": "显示器嵌入截图缩略图",
+    "level": "3.2D",
+    "anim": "type"
+   },
+   "deploy": {
+    "label": "推车把箱子推进门",
+    "fact": "部署",
+    "source": "运维的部署记录（x_deployed）",
+    "action": "运维推车把箱子推进通往机房的门",
+    "room": "备份柜先亮一格（部署前备份）",
+    "level": "S4",
+    "anim": "push"
+   },
+   "rollback": {
+    "label": "从门里取回旧版本",
+    "fact": "回滚",
+    "source": "运维的回滚记录（x_rolled_back）",
+    "action": "运维从门里取回旧版本的箱子",
+    "room": "—",
+    "level": "S4",
+    "anim": "carry"
+   },
+   "fault": {
+    "label": "跑向监控屏写故障信",
+    "fact": "发现故障",
+    "source": "故障记录（x_fault_recorded）",
+    "action": "运维跑向监控屏，写故障信件放进通往大厅的管道",
+    "room": "监控屏变红",
+    "level": "S4",
+    "anim": "run"
+   },
+   "wait_provider": {
+    "label": "坐着看墙上的时钟",
+    "fact": "等待模型服务",
+    "source": "进入等待模型服务（x_provider_wait_entered）",
+    "action": "坐在工位上看着墙上的时钟",
+    "room": "灯光调暗，管道停止流动",
+    "level": "S4",
+    "anim": "sit_wait"
+   },
+   "hold_form": {
+    "label": "举着申请单在门口等待",
+    "fact": "外部动作待授权",
+    "source": "运维对常设授权清单以外动作的决定请求（external_action）",
+    "action": "举着申请单在门口等待",
+    "room": "—",
+    "level": "S4",
+    "anim": "hold_form"
+   },
+   "assign": {
+    "label": "递任务卡",
+    "fact": "分派角色任务",
+    "source": "角色任务事件（x_role_task_assigned）",
+    "action": "中心角色把任务卡递到工具角色的桌上",
+    "room": "白板上的计划条目标上分派对象",
+    "level": "S5",
+    "anim": "give"
+   },
+   "hand_back": {
+    "label": "交回结果卡",
+    "fact": "角色交回结果",
+    "source": "角色结果事件（x_role_result_returned）",
+    "action": "工具角色把结果卡交回中心角色",
+    "room": "条目改为已交回",
+    "level": "S5",
+    "anim": "give"
+   },
+   "review": {
+    "label": "红笔批注盖章",
+    "fact": "审查",
+    "source": "审查任务（x_review_recorded）",
+    "action": "审查者拿红笔在成果上批注，盖「通过」或「退回」",
+    "room": "—",
+    "level": "S5",
+    "anim": "stamp"
+   },
+   "explore": {
+    "label": "背包出门查资料",
+    "fact": "探索者查资料",
+    "source": "探索者的网络取回（x_explorer_fetch）",
+    "action": "背上背包走出门，回来时抱着资料",
+    "room": "—",
+    "level": "S5",
+    "anim": "walk"
+   },
+   "replan": {
+    "label": "擦掉计划重写",
+    "fact": "停滞后重新规划",
+    "source": "部门账本的进展判断（x_replanned）",
+    "action": "中心角色在白板上擦掉计划重写",
+    "room": "—",
+    "level": "S5",
+    "anim": "board_erase"
+   },
+   "manager_out": {
+    "label": "经理走到管道口",
+    "fact": "经理对外",
+    "source": "经理转交询问、提交部门成果（Stage 5）",
+    "action": "经理走到管道口与传信管口",
+    "room": "—",
+    "level": "S5",
+    "anim": "walk"
+   },
+   "semantic": {
+    "label": "卡片放进语义记录柜",
+    "fact": "语义整理",
+    "source": "语义整理事件（x_semantic_recorded）",
+    "action": "—",
+    "room": "墙边的语义记录柜里卡片增加",
+    "level": "S5",
+    "anim": "side_place"
+   }
+  },
+  "BASE_MOTIONS": {
+   "idle": {
+    "label": "待机呼吸与眨眼",
+    "fact": "站立待机",
+    "anim": "idle"
+   },
+   "walk": {
+    "label": "走路四帧",
+    "fact": "在房间与走廊中移动",
+    "anim": "walk"
+   },
+   "carry": {
+    "label": "搬运",
+    "fact": "搬运包裹与资料",
+    "anim": "carry"
+   },
+   "run": {
+    "label": "跑步",
+    "fact": "发现故障时赶往监控屏",
+    "anim": "run"
+   },
+   "sit": {
+    "label": "坐在工位",
+    "fact": "在工位上",
+    "anim": "sit"
+   },
+   "type": {
+    "label": "打字",
+    "fact": "在工位工作",
+    "anim": "type"
+   }
+  },
+  "STATUS_ACTIONS": {
+   "idle": "tea",
+   "paused": "paused",
+   "failed": "failed",
+   "done": "done",
+   "cancelled": "cancelled",
+   "interrupted": "freeze",
+   "pending_verification": "puzzled",
+   "waiting_resume": "hold_card"
+  },
+  "EVENT_ACTIONS": {
+   "department_activated": "activate",
+   "context_assembled": "fetch_folder",
+   "model_requested": "type_think",
+   "model_request_serialized": "type_think",
+   "model_stream_progress": "stream_text",
+   "model_attempt_finished": "idea",
+   "model_retry_scheduled": "retry_wait",
+   "model_attempt_failed": "slump",
+   "tool_started": {
+    "by": "tool",
+    "map": {
+     "search": "search",
+     "read_range": "read",
+     "read_file": "read",
+     "edit_range": "write",
+     "write_file": "write",
+     "run_command": "run_command",
+     "run_check": "inspect",
+     "browser": "self_test"
+    }
+   },
+   "tool_called": {
+    "by": "tool",
+    "map": {
+     "run_command": "run_command",
+     "browser": "self_test"
+    }
+   },
+   "tool_skipped": "toss",
+   "proposal_submitted": "submit",
+   "proposal_rejected": "returned",
+   "spec_accepted": "stamp_valid",
+   "contract_accepted": "stamp_valid",
+   "plan_accepted": "pin_plan",
+   "delivery_accepted": "seal",
+   "qa_submitted": {
+    "by": "verdict",
+    "map": {
+     "release": "stamp_release",
+     "rework_engineering": "stamp_rework",
+     "rework_product": "stamp_rework"
+    }
+   },
+   "collaboration_requested": "send_letter",
+   "collaboration_responded": "answer_letter",
+   "department_guidance_received": "guidance_in",
+   "department_guidance_applied": "guidance_read",
+   "department_guidance_responded": "guidance_reply",
+   "compaction_recorded": "compact",
+   "compaction_failed": "compact_fail",
+   "run_paused": "paused",
+   "run_failed": {
+    "by": "reason",
+    "map": {
+     "cancelled": "cancelled"
+    },
+    "default": "failed"
+   },
+   "run_done": "done",
+   "x_run_interrupted": "freeze",
+   "x_run_auto_resumed": "resume",
+   "x_action_unknown": "puzzled",
+   "x_decision_answered": {
+    "by": "kind",
+    "map": {
+     "unknown_action": "decided"
+    },
+    "default": null
+   },
+   "x_decision_issued": {
+    "by": "kind",
+    "map": {
+     "external_action": "hold_form",
+     "waiting_resume": "hold_card"
+    },
+    "default": null
+   },
+   "x_remote_action_started": "remote_run",
+   "x_machine_offline": "remote_unknown",
+   "x_network_fetch": "net_fetch",
+   "x_mcp_called": "mcp_press",
+   "x_trial_step": "trial",
+   "x_deployed": "deploy",
+   "x_rolled_back": "rollback",
+   "x_fault_recorded": "fault",
+   "x_provider_wait_entered": "wait_provider",
+   "x_role_task_assigned": "assign",
+   "x_role_result_returned": "hand_back",
+   "x_review_recorded": "review",
+   "x_explorer_fetch": "explore",
+   "x_replanned": "replan",
+   "x_semantic_recorded": "semantic"
+  },
+  "VIGNETTE_SPRITES": {
+   "tea": "product.agent",
+   "activate": "engineering.agent",
+   "fetch_folder": "product.agent",
+   "type_think": "engineering.agent",
+   "stream_text": "quality.agent",
+   "idea": "product.agent",
+   "retry_wait": "engineering.agent",
+   "slump": "quality.agent",
+   "search": "product.agent",
+   "read": "quality.agent",
+   "write": "engineering.agent",
+   "run_command": "engineering.agent",
+   "toss": "engineering.agent",
+   "submit": "product.agent",
+   "returned": "product.agent",
+   "stamp_valid": "product.agent",
+   "pin_plan": "engineering.agent",
+   "seal": "engineering.lead",
+   "take_box": "quality.tester",
+   "inspect": "quality.tester",
+   "stamp_release": "quality.tester",
+   "stamp_rework": "quality.tester",
+   "send_letter": "engineering.agent",
+   "answer_letter": "product.agent",
+   "guidance_in": "quality.agent",
+   "guidance_read": "engineering.agent",
+   "guidance_reply": "engineering.agent",
+   "compact": "engineering.agent",
+   "compact_fail": "product.agent",
+   "paused": "product.agent",
+   "failed": "quality.agent",
+   "done": "engineering.agent",
+   "cancelled": "product.agent",
+   "freeze": "engineering.agent",
+   "resume": "engineering.agent",
+   "puzzled": "engineering.agent",
+   "decided": "engineering.agent",
+   "hold_card": "quality.agent",
+   "remote_run": "engineering.agent",
+   "remote_unknown": "engineering.agent",
+   "read_existing": "product.agent",
+   "net_fetch": "engineering.agent",
+   "mcp_press": "engineering.lead",
+   "trial": "quality.tester",
+   "self_test": "engineering.lead",
+   "deploy": "operations.ops",
+   "rollback": "operations.ops",
+   "fault": "operations.ops",
+   "wait_provider": "engineering.agent",
+   "hold_form": "operations.ops",
+   "assign": "engineering.manager",
+   "hand_back": "engineering.lead",
+   "review": "quality.reviewer",
+   "explore": "engineering.explorer",
+   "replan": "engineering.architect",
+   "manager_out": "engineering.manager",
+   "semantic": "product.architect",
+   "idle": "engineering.agent",
+   "walk": "engineering.agent",
+   "carry": "engineering.lead:2",
+   "run": "operations.ops",
+   "sit": "product.agent",
+   "type": "engineering.agent",
+   "role": "engineering.agent"
+  },
+  "FONT3": {
+   "0": [
+    "111",
+    "101",
+    "101",
+    "101",
+    "111"
+   ],
+   "1": [
+    "010",
+    "110",
+    "010",
+    "010",
+    "111"
+   ],
+   "2": [
+    "111",
+    "001",
+    "111",
+    "100",
+    "111"
+   ],
+   "3": [
+    "111",
+    "001",
+    "011",
+    "001",
+    "111"
+   ],
+   "4": [
+    "101",
+    "101",
+    "111",
+    "001",
+    "001"
+   ],
+   "5": [
+    "111",
+    "100",
+    "111",
+    "001",
+    "111"
+   ],
+   "6": [
+    "111",
+    "100",
+    "111",
+    "101",
+    "111"
+   ],
+   "7": [
+    "111",
+    "001",
+    "010",
+    "010",
+    "010"
+   ],
+   "8": [
+    "111",
+    "101",
+    "111",
+    "101",
+    "111"
+   ],
+   "9": [
+    "111",
+    "101",
+    "111",
+    "001",
+    "111"
+   ],
+   "r": [
+    "000",
+    "101",
+    "110",
+    "100",
+    "100"
+   ],
+   "v": [
+    "000",
+    "101",
+    "101",
+    "101",
+    "010"
+   ],
+   "x": [
+    "000",
+    "101",
+    "010",
+    "101",
+    "000"
+   ],
+   "n": [
+    "000",
+    "110",
+    "101",
+    "101",
+    "101"
+   ],
+   "#": [
+    "101",
+    "111",
+    "101",
+    "111",
+    "101"
+   ],
+   "/": [
+    "001",
+    "001",
+    "010",
+    "100",
+    "100"
+   ],
+   ":": [
+    "000",
+    "010",
+    "000",
+    "010",
+    "000"
+   ],
+   "-": [
+    "000",
+    "000",
+    "111",
+    "000",
+    "000"
+   ],
+   "+": [
+    "000",
+    "010",
+    "111",
+    "010",
+    "000"
+   ],
+   ".": [
+    "000",
+    "000",
+    "000",
+    "000",
+    "010"
+   ],
+   "%": [
+    "101",
+    "001",
+    "010",
+    "100",
+    "101"
+   ],
+   " ": [
+    "000",
+    "000",
+    "000",
+    "000",
+    "000"
+   ]
+  }
+ }
+}
