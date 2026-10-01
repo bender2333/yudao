@@ -322,3 +322,5 @@ claude-opus-5-5 / 2026-10-01 18:40 / docs/architecture-issues.md 为 #87 登记�
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/CHANGELOG.md 与 agents_jour.md 追加 #214 第 1 轮的记录 / 执行者按规则记录本工单的改动、测试与架构问题登记
 claude-opus-5-5 / 2026-10-02 03:28 / docs/architecture-issues.md 为 #214 登记的端到端测试后端启动超时一条写处理结论 / 架构师处理执行者登记的架构问题
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / docs/design/app-and-interface.md 第 9 节验收第 1 条补上客户端提交的生成类型与快照逐文件相同（`test_openapi_snapshot.py` 内的检查） / #221 按工单要求增加这项检查，设计说明的验收条目需要写明它
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / AGENTS.md「常用命令」中每次都运行的两项检查一条写明 `test_openapi_snapshot.py` 现在的两项检查内容、各自需要先安装的依赖，以及重写快照以后在 client 中运行 `npm run generate:api` 重新生成客户端类型 / #221 把新检查接进执行者与审查者每次都运行的命令，需要写明依赖与重新生成的步骤
