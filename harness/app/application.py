@@ -33,7 +33,7 @@ from .catalog_commands import (
 )
 from .catalog_queries import CATALOG_DOCUMENT_QUERY, CATALOG_QUERY
 from .commands import execute
-from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
+from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .event_stream import EventScope, EventStream
@@ -169,7 +169,7 @@ class Application:
     def capabilities(self, contract_digest: str, *, access: AccessMode) -> Capabilities:
         return self.registry.capabilities(Deployment(
             log_id=self.system.store.log_id, boot_id=self.boot_id, version=self.version,
-            contract_digest=contract_digest, access=access,
+            api_version=API_VERSION, contract_digest=contract_digest, access=access,
         ))
 
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
