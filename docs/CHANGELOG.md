@@ -435,3 +435,5 @@ qwen3.8 / 2026-10-02 02:42 / 第 6 轮续：第五次合入 origin/main（合并
 claude-opus-5-5 / 2026-10-02 03:28 / docs/architecture-issues.md 为 #214 登记的端到端测试后端启动超时一条写处理结论 / 架构师处理执行者登记的架构问题
 
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 04:16 / 第 7 轮：合入 #87（8216be51 推理档位）后按设计说明第 4.6、7.3、9.2 节统一保存时请求档位的核对口径——项目部门设置与部门默认一样只核对属于档位全集，是否落在所选模型的支持档位由每次请求限制；同步改 harness/providers/facade.py（validate_department_setting 移到 REASONING_LEVELS 全集核对并移出锁）、harness/app/catalog_commands.py 注释、harness/engine.py 注释，采纳 #87 的前端档位下拉与测试；按合并后代码用 --write-event-baselines 重新生成 12 份 http 事件序列基准；agents_jour.md 与 docs/CHANGELOG.md 按条目并集重建 / 第 7 轮任务评论要求两边的功能都保留：#87 的请求档位与本工单的项目部门设置（模型与请求档位分别继承）在同一处保存规则上原本不一致，按设计说明已定的口径统一；本轮把两侧按事件字段并存的基准改为按合并后代码重新生成，记录文件按条目并集重建并逐条核对
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 04:40 / 第 7 轮续：合入 #221（6bd9839c 客户端生成类型与 OpenAPI 快照的一致性检查）后按快照重新生成 client/src/renderer/src/api/generated（DepartmentSetting 与 DepartmentSettingsSave 增加 provider_id、model_id、requested_tier、prompt_configured），使 test_openapi_snapshot.py 的类型检查通过 / #221 建立的检查把「改动接口合同的工单必须同时提交重新生成的客户端类型」变成硬性要求，本工单的接口合同在 #89 首次合入 main 后变更过，快照按本分支重新生成而客户端类型仍按 main 生成，检查因此失败
