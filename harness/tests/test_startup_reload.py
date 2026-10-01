@@ -112,14 +112,18 @@ def test_no_config_start(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_cli_default_command(tmp_path, monkeypatch, capsys):
-    # 不写子命令时启动控制台。默认端口是 8765；只给端口时，地址是 127.0.0.1，数据目录与模型目录取当前目录的
-    # .yudao 下的默认位置；没有模型目录时以空态启动，停止时正常退出
+    # 不写子命令时启动控制台。默认端口是 8765；只给端口时，地址是 127.0.0.1，数据目录与模型目录取
+    # 用户数据目录（设计说明第 3.4 节）；没有模型目录时以空态启动，停止时正常退出。
+    # 测试用环境变量把用户数据目录的根改到临时目录，不写用户的真实目录
     from harness.__main__ import build_parser
     from harness.tests.console_helpers import run_console
     from harness.tests.test_provider_config_web import get_json
 
     assert build_parser().parse_args([]).port == 8765
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
+    data_dir = tmp_path / "Local" / "Yudao"
     seen = {}
 
     def check(host: str, port: int) -> None:
@@ -131,8 +135,8 @@ def test_cli_default_command(tmp_path, monkeypatch, capsys):
     health = seen["health"]
     assert health["provider_available"] is False
     assert health["provider_reload_error"] is None
-    assert health["provider_config"] == str((tmp_path / ".yudao" / "providers.json").resolve())
-    assert (tmp_path / ".yudao" / "native-loop" / "events.sqlite").is_file()
+    assert health["provider_config"] == str((data_dir / "providers.json").resolve())
+    assert (data_dir / "events.sqlite").is_file()
     assert "stopped" in capsys.readouterr().out
 
 
@@ -171,7 +175,7 @@ def _startup_config(state: str):
 def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
     # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：命令行装配的系统与控制台照常启动；
     # 创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
-    # 当前目录是测试目录，默认的凭据文件 .yudao/.env 落在这里
+    # 凭据文件默认在数据目录内（设计说明第 3.4 节）
     from harness.__main__ import production_system
     from harness.projection import saved_decisions
     from harness.tests.test_provider_config_web import get_json, request, running_server
@@ -195,7 +199,7 @@ def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_
     assert health["provider_available"] is False
     assert isinstance(listed["providers"], list)
     status_view = system.facade.config_status()
-    assert status_view["dotenv_path"] == str((tmp_path / ".yudao" / ".env").resolve())
+    assert status_view["dotenv_path"] == str((tmp_path / "data" / ".env").resolve())
     if state == "invalid_json":
         assert status_view["reload_error"]
         assert health["provider_reload_error"]

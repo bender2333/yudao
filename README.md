@@ -42,7 +42,7 @@ uv sync --frozen
 
 ### 配置 Provider
 
-无配置也能启动控制台：`uv run python -m harness` 直接使用默认路径，配置缺失时进入空态，可以在页面里逐项完成接入。非敏感配置写在 `.yudao/providers.json`；凭据默认只在进程内存中有效，需要跨重启时写入 `.yudao/.env`。
+无配置也能启动服务：`yudao api`（从源码运行时为 `uv run python -m harness api`）直接使用默认路径，配置缺失时进入空态，可以在页面里逐项完成接入。非敏感配置写在数据目录内的 `providers.json`；凭据默认只在进程内存中有效，需要跨重启时写入数据目录内的 `.env`。
 
 ```json
 {
@@ -80,28 +80,33 @@ uv sync --frozen
 
 Provider 连接只信任操作系统的证书库：私有 CA 与企业代理的证书装在系统证书库中即可；`SSL_CERT_FILE`、`SSL_CERT_DIR` 这两个环境变量对 Provider 连接不起作用。
 
-凭据来源优先级为进程内存覆盖 > 进程环境变量 > `.yudao/.env`。页面填写 Key 默认只对本进程有效，勾选持久化才写入 `.env`；已保存的 Key 不回填，也不进入日志、事件与导出。
+凭据来源优先级为进程内存覆盖 > 进程环境变量 > 数据目录内的 `.env`。页面填写 Key 默认只对本进程有效，勾选持久化才写入 `.env`；已保存的 Key 不回填，也不进入日志、事件与导出。
 
 服务方案（OpenCode Go 是第一个预置方案）自带端点、认证方式与模型列表地址；模型列表只产生候选，候选要建立访问定义并执行一次模型测试通过（准入）后才能绑定到部门。
 
 ### 启动服务
 
-```bash
-# 等价于 uv run python -m harness serve，默认 data-dir .yudao/native-loop、provider-config .yudao/providers.json、端口 8765
-uv run python -m harness
-```
-
-访问 [http://localhost:8765](http://localhost:8765) 打开 Web 控制台。
-
-界面保存、磁盘修改（约 1 秒轮询，按内容哈希核对）与手动重载都对新建事项生效；已创建事项继续使用创建时冻结的模型、协议与凭据。
-
-桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）单独启动，参数与 `serve` 相同：
+Yudao 服务用 `yudao` 命令启动（安装发布 wheel 以后；从源码运行时用 `uv run python -m harness`）：
 
 ```bash
-uv run python -m harness api --data-dir .yudao/native-loop --port 8765
+yudao api
 ```
 
-同一个数据目录只允许一个服务进程：`api` 与 `serve`（含 `demo --serve`）启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出。
+`yudao api` 的参数与 `python -m harness api` 相同：`--data-dir`、`--host`、`--port`、`--access`、`--provider-config`。`yudao --version` 输出发布版本号；`yudao client install` 运行随 wheel 发布的桌面客户端安装程序。
+
+默认数据目录是用户数据目录：Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`（遵守 `XDG_DATA_HOME`）。事件日志、工件、进程锁 `service.lock`、`providers.json`、`.env` 与日志目录 `logs/` 都在其中；日志按大小轮换。开发、评测与走查用 `--data-dir` 指向其他目录。
+
+旧的 Web 控制台（`uv run python -m harness`，等价 `serve` 子命令）冻结，桌面客户端完成以后删除。
+
+服务提供桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）与客户端的更新源：
+
+- `POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）
+- `GET /api/queries/{名称}`（快照与位置）
+- `GET /api/capabilities`、`GET /openapi.json`
+- `GET /client-update/latest.yml` 与 `GET /client-update/<文件名>`（客户端的更新清单与安装程序，支持 Range）
+- `POST /api/system/stop`（本机停止请求：只在本机访问方式下接受且请求来自回环地址，服务停止接受新请求并退出）
+
+同一个数据目录只允许一个服务进程：启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出并写明占用的数据目录。
 
 ### 运行演示（无需 API 密钥）
 
@@ -112,10 +117,10 @@ uv run python -m harness demo --serve --port 8765
 ### 重放历史任务
 
 ```bash
-uv run python -m harness replay <run_id>
+yudao replay <run_id>
 ```
 
-默认数据目录是 `.yudao/native-loop`。
+只读的子命令（`replay`、`project`）默认使用上面说的用户数据目录，用 `--data-dir` 指向其他目录。
 
 ## 测试
 
@@ -287,11 +292,11 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 目录格式见 [Provider 与三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 与 `max_output_tokens` 必须明确；协议在模型访问定义上声明，`responses`、`chat_completions`、`messages` 三条已接入，一条定义只走一条协议。有效窗口取任务限制与模型窗口较小值，工作与压缩输出均受该模型限制。
 
-凭据只经内存、进程环境或 `.yudao/.env` 解析，Key 不回填、不进入日志、事件、Git 与导出：
+凭据只经内存、进程环境或数据目录内的 `.env` 解析，Key 不回填、不进入日志、事件、Git 与导出：
 
 ```powershell
 $env:YUDAO_OPENCODE_GO_KEY = '<your-api-key>'
-uv run python -m harness
+yudao api
 ```
 
 `credential_ref` 对应环境变量名称；应用不读取 `provider.md`。旧的 `YUDAO_MODEL_*` 单配置入口与 Provider 级 `protocol` 字段已移除，旧的目录文件按新结构明确报错，不做迁移。任务创建时冻结三部门的目标与认证句柄，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。Provider 模块在后台轮询本地配置与 `.env`（约 1 秒，按内容核对），界面保存与手动重载也经同一接口发布；文件损坏时保留上一有效版本并持续显示重载错误。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。

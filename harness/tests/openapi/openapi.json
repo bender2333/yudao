@@ -2691,6 +2691,84 @@
         }
       }
     },
+    "/api/system/stop": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Stop",
+        "operationId": "system_stop",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-update/latest.yml": {
+      "get": {
+        "tags": [
+          "client-update"
+        ],
+        "summary": "Latest Manifest",
+        "operationId": "client_update_manifest",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-update/{filename}": {
+      "get": {
+        "tags": [
+          "client-update"
+        ],
+        "summary": "Installer",
+        "operationId": "client_update_file",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -7270,6 +7348,14 @@
             "format": "date-time",
             "title": "Started At"
           },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "running_runs": {
+            "type": "integer",
+            "title": "Running Runs"
+          },
           "provider": {
             "$ref": "#/components/schemas/ProviderReadiness"
           },
@@ -7286,6 +7372,8 @@
           "log_id",
           "boot_id",
           "started_at",
+          "version",
+          "running_runs",
           "provider",
           "catalog",
           "drain"
