@@ -22,6 +22,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
+from .reasoning import chat_reasoning_effort
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
@@ -300,6 +301,10 @@ def _chat_request_params(invocation: _ChatInvocation, target: FrozenTarget) -> d
     limit = invocation.provider_input.max_output_tokens
     if limit is not None:
         params["max_tokens"] = int(limit)
+    # 推理参数（#87）：effort 方式发送 reasoning_effort，档位是冻结目标里的实际发送档位
+    effort = chat_reasoning_effort(target)
+    if effort is not None:
+        params["reasoning_effort"] = effort
     return params
 
 

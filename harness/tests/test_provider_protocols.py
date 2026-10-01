@@ -205,6 +205,136 @@ def test_model_test_admits_a_chat_model():
     assert stored["admitted"] is True
     assert stored["protocol"] == "chat_completions"
 
+def test_model_test_sends_reasoning_parameters_at_the_default_level():
+    # 模型测试按该模型的默认档位发送推理参数（设计说明第 4.3、7.5 节）
+    server, capture, base = serve(chat_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="chat_completions",
+                             reasoning_levels=["low", "medium"], default_reasoning_level="medium",
+                             reasoning_mode="effort")
+        result = facade.model_test("go", "m-go")
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert result["ok"] is True and result["admitted"] is True
+    assert capture.requests[0]["reasoning_effort"] == "medium"
+
+def test_model_test_sends_no_reasoning_parameters_without_a_declaration():
+    server, capture, base = serve(chat_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="chat_completions")
+        facade.model_test("go", "m-go")
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert "reasoning_effort" not in capture.requests[0]
+
+def test_responses_sends_reasoning_effort_for_the_sent_tier():
+    # Responses 的 effort 方式：reasoning.effort 取实际发送的档位（设计说明第 7.4 节）
+    server, capture, base = serve(responses_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="responses",
+                             reasoning_levels=["low", "medium"], default_reasoning_level="low",
+                             reasoning_mode="effort")
+        target = bound_target(facade, requested_tier="high")
+        invoke(facade, target, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    body = capture.requests[0]
+    # 请求档位 high 被限制到不高于它的最高支持档位 medium
+    assert body["reasoning"] == {"effort": "medium"}
+
+def test_chat_completions_sends_reasoning_effort_for_the_sent_tier():
+    server, capture, base = serve(chat_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="chat_completions",
+                             reasoning_levels=["low", "medium"], default_reasoning_level="low",
+                             reasoning_mode="effort")
+        target = bound_target(facade, requested_tier="minimal")
+        invoke(facade, target, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    # 请求档位 minimal 没有不高于它的支持档位，取最低支持档位 low
+    assert capture.requests[0]["reasoning_effort"] == "low"
+
+def test_messages_adaptive_sends_thinking_and_output_config():
+    server, capture, base = serve(messages_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="messages",
+                             reasoning_levels=["low", "high"], default_reasoning_level="low",
+                             reasoning_mode="adaptive")
+        target = bound_target(facade, requested_tier="high")
+        invoke(facade, target, model_call(HI, max_output_tokens=4096, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    body = capture.requests[0]
+    assert body["thinking"] == {"type": "adaptive"}
+    assert body["output_config"] == {"effort": "high"}
+
+@pytest.mark.parametrize(("level", "budget"), [
+    ("minimal", 1024), ("low", 4096), ("medium", 8192), ("high", 16384),
+    ("xhigh", 32768), ("max", 32768),
+])
+def test_messages_budget_sends_budget_tokens_by_level(level, budget):
+    server, capture, base = serve(messages_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="messages",
+                             reasoning_levels=[level], default_reasoning_level=level,
+                             reasoning_mode="budget")
+        target = bound_target(facade, requested_tier=level)
+        invoke(facade, target, model_call(HI, max_output_tokens=40000, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert capture.requests[0]["thinking"] == {"type": "enabled", "budget_tokens": budget}
+
+def test_messages_budget_caps_tokens_at_output_limit_minus_reserve():
+    # 预算不超过本次输出上限减 4000（设计说明第 7.4 节）
+    server, capture, base = serve(messages_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="messages",
+                             reasoning_levels=["high"], default_reasoning_level="high",
+                             reasoning_mode="budget")
+        target = bound_target(facade, requested_tier="high")
+        invoke(facade, target, model_call(HI, max_output_tokens=10000, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert capture.requests[0]["thinking"] == {"type": "enabled", "budget_tokens": 6000}
+
+def test_messages_budget_is_not_sent_when_the_output_limit_cannot_hold_it():
+    # 输出上限减 4000 以后容不下最低思考预算时不发送思考参数，交给上游按自身默认推理
+    server, capture, base = serve(messages_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="messages",
+                             reasoning_levels=["minimal"], default_reasoning_level="minimal",
+                             reasoning_mode="budget")
+        target = bound_target(facade, requested_tier="minimal")
+        invoke(facade, target, model_call(HI, max_output_tokens=3000, session_id="s", attempt_id="a"))
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert "thinking" not in capture.requests[0]
+
+def test_undeclared_model_sends_no_reasoning_parameters():
+    # 没有声明推理档位的模型，三种协议都不带推理参数
+    for protocol, responder in (("responses", responses_responder),
+                                ("chat_completions", chat_responder),
+                                ("messages", messages_responder)):
+        server, capture, base = serve(responder)
+        try:
+            facade = facade_with(base + "/v1", protocol=protocol)
+            target = bound_target(facade, requested_tier="high")
+            invoke(facade, target, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
+        finally:
+            server.shutdown()
+            server.server_close()
+        body = capture.requests[0]
+        assert "reasoning" not in body and "reasoning_effort" not in body and "thinking" not in body, protocol
+
 
 @pytest.mark.parametrize(("protocol", "responder", "official"), [
     ("responses", responses_responder, "https://opencode.ai/zen/go/v1/responses"),
