@@ -298,7 +298,10 @@ claude-opus-5-5 / 2026-10-01 01:46 / 新增 docs/adr/0023-client-installed-apart
 claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、6.2、8、10 节、`system.status` 与 `agent.package` 按客户端的安装、更新与发布修改（更新页与更新源、本机停止请求、命令行入口 yudao、发布版本号与正在运行的 run 数、执行代理安装包随 wheel 提供）；docs/design/execution-environment.md 第 5.3.2 节执行代理的安装包改为发布时构建、随 Yudao 服务的 wheel 提供，第 12 节 #144 一行同步；docs/requirements/web-game-frontend.md（D30）与 docs/requirements/stage-requirements-overview.md 第 6 节第 5 项写明已确定并登记遗留；CLAUDE.md 工作流程第 7 步加入发布；CONTEXT.md 加入「Yudao 服务」「桌面客户端」「发布」 / 同上
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
+
+qwen3.8 / 2026-10-01 07:40 / docs/architecture-issues.md 为 #135 登记两条架构问题（项目流字段清单拒绝 `project_registered.source` 取值集合的扩大；宿主私有路径的拒绝与 git 仓库接入相冲突）/ 执行者按 3.8 设计说明实施接入命令时遇到与 ADR-0019 及验收第 8、9 项的冲突，按 AGENTS.md 登记并等待架构师确认
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
 claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事件序列基准缺少 `definitions_version` 投影字段，44 项基准在 #200 加入该字段后未重写 / #172 需要重写事件序列基准，登记这项与写出字节改动无关的既有差异并说明处置
 claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
 my-provider/ag/gemini-3.8-flash-high / 2026-10-01 18:20 / docs/design/evaluation-scenarios.md 第 1 节表格的场景 3「正确性与完成度」一行与第 2.3 节「需求条目」一条由 23 条检查、单元 11 改为 24 条检查、单元 12；第 2.3 节「检查的改造」中 test_line_preference 一条写明上游断言 `any(" 1" in edge.line)` 失效的原因，以及改为在两条路线上各指定一条基准路径不经过的线路、再加一组多线路偏好的做法 / #188 第 2 轮新增线路偏好检查，公开材料、评分器与设计说明的检查条数需要一致
+claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/main 时把 #79 的接口版本条目（2026-10-01 03:10）排到本工单 #135 的两条条目（07:14、07:40）之前，恢复条目之间的空行 / 该文件按时间顺序追加，合并时两侧都新增了条目，需要按时间重排，本工单未改动任何条目的正文与「处理：待架构师确认」

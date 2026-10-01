@@ -30,7 +30,7 @@ CommandId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-
 RejectionReason = Literal[
     "stale_base", "not_found", "already_exists", "project_archived", "work_item_in_progress", "run_terminal",
     "busy", "provider_unavailable", "catalog_invalid", "in_use", "decision_closed", "option_invalid",
-    "not_allowed", "command_id_reused",
+    "not_allowed", "command_id_reused", "source_invalid",
 ]
 REJECTION_REASONS: tuple[str, ...] = get_args(RejectionReason)
 

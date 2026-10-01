@@ -952,6 +952,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             run_time_limit_sec=int(payload["run_time_limit_sec"]),
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
+            kind=payload.get("kind", "change"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:
