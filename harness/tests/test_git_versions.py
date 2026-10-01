@@ -302,11 +302,104 @@ def test_malformed_or_truncated_git_batch_output_is_rejected(store, monkeypatch,
         store.read_files(RUN, version)
 
 
+def test_snapshot_write_batches_object_writes_and_ref_check(store, monkeypatch):
+    # 收尾必须把每个版本的 Git 子进程数压到固定上限：对象按类型各一次批量写入，引用检查不另开进程
+    first = _prepare(store, {"intend.md": b"first"}, code=_tree({"a/1.txt": b"1\n", "a/b/2.txt": b"2\n", "c/3.txt": b"3\n"}))
+    commands = _failing_git(monkeypatch, lambda command: False)
+    second = _prepare(store, {"intend.md": b"second"}, first["commit"], code=_tree({"a/1.txt": b"1\n", "d/2.txt": b"x\r\n", "e/f/g/3.txt": b"3\n"}))
+    written = list(commands)
+    assert store.read_files(RUN, second) == {
+        "intend.md": b"second", "code/a/1.txt": b"1\n", "code/d/2.txt": b"x\r\n", "code/e/f/g/3.txt": b"3\n",
+    }
+    _git(store, "fsck", "--strict", "--no-reflogs")
+    assert [command for command in written if "mktree" in command] == []
+    assert [command for command in written if "show-ref" in command or "for-each-ref" in command] == []
+    assert len([command for command in written if "hash-object" in command]) == 2
+    assert len([command for command in written if "ls-tree" in command]) == 2
+    assert len([command for command in written if "cat-file" in command]) == 4
+    assert len(written) == 10
+
+
+def test_written_tree_is_rejected_when_its_loose_object_does_not_match_the_digest(store, monkeypatch):
+    # 写后验证必须自己重算摘要：Git 批量读取被改坏的松散对象时原样返回字节且退出码为零
+    run = subprocess.run
+    tampered = []
+
+    def corrupting(command, **kwargs):
+        completed = run(command, **kwargs)
+        if "hash-object" not in command or "-t" not in command or completed.returncode != 0:
+            return completed
+        if command[command.index("-t") + 1] != "tree":
+            return completed
+        oid = completed.stdout.decode("ascii").split()[-1]
+        path = store.root / (RUN + ".git") / "objects" / oid[:2] / oid[2:]
+        if not path.exists():
+            return completed
+        raw = bytearray(zlib.decompress(path.read_bytes()))
+        raw[-1] ^= 0x01
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+        path.write_bytes(zlib.compress(bytes(raw)))
+        tampered.append(oid)
+        return completed
+
+    monkeypatch.setattr(subprocess, "run", corrupting)
+    with pytest.raises(GitVersionError):
+        _prepare(store, {"a": b"a"}, code=_tree({"dir0/file.txt": b"x\n", "dir1/file.txt": b"y\n"}))
+    assert tampered != []
+
+
+def test_written_blob_is_rejected_when_its_loose_object_does_not_match_the_digest(store, monkeypatch):
+    run = subprocess.run
+    tampered = []
+
+    def corrupting(command, **kwargs):
+        completed = run(command, **kwargs)
+        if "hash-object" not in command or "-t" in command or completed.returncode != 0:
+            return completed
+        listed = [item for item in completed.stdout.decode("ascii").split() if item]
+        if len(listed) != 1:
+            return completed
+        oid = listed[0]
+        path = store.root / (RUN + ".git") / "objects" / oid[:2] / oid[2:]
+        if not path.exists():
+            return completed
+        raw = bytearray(zlib.decompress(path.read_bytes()))
+        raw[-1] ^= 0x01
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+        path.write_bytes(zlib.compress(bytes(raw)))
+        tampered.append(oid)
+        return completed
+
+    monkeypatch.setattr(subprocess, "run", corrupting)
+    with pytest.raises(GitVersionError):
+        _prepare(store, {"PRD.md": b"original\n"})
+    assert tampered != []
+
+
+def test_snapshot_write_keeps_temporary_blob_files_outside_the_repository_root(store, monkeypatch):
+    # 批量写入的待哈希文件放在系统临时目录，读探测与写版本都不许在版本库根内留下文件
+    seen = []
+    run = subprocess.run
+
+    def recording(command, **kwargs):
+        if "hash-object" in command and "--stdin-paths" in command:
+            seen.extend(Path(item) for item in kwargs["input"].decode().splitlines() if item)
+        return run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", recording)
+    _prepare(store, {"intend.md": b"x\n"}, code=_tree({"a/b/c.txt": b"y\n"}))
+    assert seen != []
+    assert all(not str(path).startswith(str(store.root)) for path in seen)
+    assert all(path.is_absolute() for path in seen)
+    assert not any(path.exists() for path in seen)
+
+
 def test_material_updates_reuse_validated_code_objects_and_batch_the_reads(store, monkeypatch):
     first = _prepare(store, {"intend.md": b"first"}, code=_tree({f"file-{index}.txt": str(index).encode() for index in range(20)}))
     commands = _failing_git(monkeypatch, lambda command: False)
     second = _prepare(store, {"intend.md": b"second"}, first["commit"])
-    assert len([command for command in commands if "hash-object" in command]) == 1
+    # 内容与树各一次批量写入：二十个代码文件全部复用已校验的对象，没有逐个写入
+    assert len([command for command in commands if "hash-object" in command]) == 2
     reads = [command for command in commands if "cat-file" in command]
     assert len(reads) == 4
     assert all(command[command.index("cat-file") + 1] == "--batch" for command in reads)

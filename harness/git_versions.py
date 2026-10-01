@@ -9,6 +9,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -20,6 +21,7 @@ _OID = re.compile(r"[0-9a-f]{40}")
 _RUN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
 _FORMAT = "yudao-git-version-v1"
 _ERROR = "Git version is unavailable or invalid"
+_TREE_MODES = {"tree": b"40000", "blob": b"100644"}
 
 
 class GitVersionError(ValueError):
@@ -94,13 +96,15 @@ class GitVersionStore:
         self._oid(commit)
         # This immutable ref preserves objects, but does not accept a business version.
         reference = "refs/snapshots/" + commit
-        existing = self._git(repo, "for-each-ref", "--format=%(objectname)", reference)
-        if existing == b"":
-            self._git(repo, "update-ref", reference, commit, "0" * 40)
-        elif existing != (commit + "\n").encode("ascii"):
+        # 引用绑定与提交内容在同一次批量读里探测：缺失即首次绑定，已存在则必须正好是本次版本
+        revision, bound = self._snapshot(repo, run_id, commit)
+        if bound and revision != {"commit": commit, "parent_commit": parent_commit, "tree": tree}:
             raise GitVersionError(_ERROR)
+        if not bound:
+            self._git(repo, "update-ref", reference, commit, "0" * 40)
         revision = {"commit": commit, "parent_commit": parent_commit, "tree": tree}
-        if self._load(repo, run_id, revision) != files:
+        # 绑定以后按引用回读：Git 会一并校验提交与树的层级结构
+        if self._read_tree(repo, reference, expected_root=tree)[0] != files:
             raise GitVersionError(_ERROR)
         return revision
 
@@ -158,12 +162,12 @@ class GitVersionStore:
             raise GitVersionError(_ERROR)
         return self._read_tree(repo, revision["tree"])[0]
 
-    def _read_tree(self, repo: Path, tree: str) -> tuple[dict[str, bytes], dict[str, str]]:
-        entries = self._git(repo, "ls-tree", "-r", "-t", "-z", tree).split(b"\0")
+    def _read_tree(self, repo: Path, revision_ref: str, *, expected_root: str | None = None) -> tuple[dict[str, bytes], dict[str, str]]:
+        entries = self._git(repo, "ls-tree", "-r", "-t", "-z", revision_ref).split(b"\0")
         if entries[-1] != b"":
             raise GitVersionError(_ERROR)
         file_objects = {}
-        requested = {tree: "tree"}
+        requested = {(revision_ref if expected_root is None else expected_root): "tree"}
         for entry in entries[:-1]:
             try:
                 metadata, name = entry.split(b"\t", 1)
@@ -188,13 +192,26 @@ class GitVersionStore:
         return files, file_objects
 
     def _commit(self, repo: Path, run_id: str, commit: str) -> dict[str, Any]:
-        self._oid(commit)
-        ref = self._git(repo, "show-ref", "--verify", "--hash", "refs/snapshots/" + commit)
-        if ref != (commit + "\n").encode("ascii"):
+        revision, bound = self._snapshot(repo, run_id, commit)
+        if not bound or revision is None:
             raise GitVersionError(_ERROR)
-        raw = self._object(repo, commit, "commit")
+        return revision
+
+    def _snapshot(self, repo: Path, run_id: str, commit: str) -> tuple[dict[str, Any] | None, bool]:
+        """Read one snapshot commit and report whether the immutable ref already binds it."""
+        self._oid(commit)
+        # 绑定探测、提交内容与树的指向在同一次批量读里完成，不再单开引用查询进程
+        binding, stored, root = self._batch(repo, (
+            ("refs/snapshots/" + commit, "commit", commit),
+            (commit, "commit", commit),
+            (commit + "^{tree}", "tree", None),
+        ))
+        if binding is None:
+            return None, False
+        if stored is None or root is None:
+            raise GitVersionError(_ERROR)
         try:
-            header, body = raw.split(b"\n\n", 1)
+            header, body = stored[1].split(b"\n\n", 1)
             trees = [line[5:].decode("ascii") for line in header.split(b"\n") if line.startswith(b"tree ")]
             parents = [line[7:].decode("ascii") for line in header.split(b"\n") if line.startswith(b"parent ")]
             metadata = json.loads(body)
@@ -209,23 +226,43 @@ class GitVersionStore:
                 self._oid(parents[0])
         except (ValueError, UnicodeError):
             raise GitVersionError(_ERROR) from None
-        return {"commit": commit, "parent_commit": parents[0] if parents else None, "tree": trees[0]}
-
-    def _object(self, repo: Path, oid: str, kind: str) -> bytes:
-        return self._objects(repo, {oid: kind})[oid]
+        # 引用解析出的树必须就是提交头里的那一棵，缺失即说明引用未指向本提交
+        if root[0] != trees[0]:
+            raise GitVersionError(_ERROR)
+        return {"commit": commit, "parent_commit": parents[0] if parents else None, "tree": trees[0]}, True
 
     def _objects(self, repo: Path, requested: dict[str, str]) -> dict[str, bytes]:
         for oid in requested:
             self._oid(oid)
-        output = self._git(repo, "cat-file", "--batch", data="".join(oid + "\n" for oid in requested).encode("ascii"))
+        records = self._batch(repo, tuple((oid, kind, oid) for oid, kind in requested.items()))
         objects = {}
+        for oid, record in zip(requested, records):
+            if record is None:
+                raise GitVersionError(_ERROR)
+            objects[oid] = record[1]
+        return objects
+
+    def _batch(self, repo: Path, requests: tuple[tuple[str, str, str | None], ...]) -> list[tuple[str, bytes] | None]:
+        """Read many objects in one Git process; an unresolvable request comes back as None."""
+        output = self._git(
+            repo, "cat-file", "--batch",
+            data="".join(request + "\n" for request, _, _ in requests).encode("ascii"),
+        )
+        records: list[tuple[str, bytes] | None] = []
         offset = 0
         # Batch payloads are length-delimited; binary data may contain any delimiter.
-        for expected_oid, expected_kind in requested.items():
+        for line, expected_kind, expected_oid in requests:
             try:
                 end = output.index(b"\n", offset)
-                oid, kind, size = output[offset:end].split(b" ")
-                if oid.decode("ascii") != expected_oid or kind.decode("ascii") != expected_kind or not size.isdigit():
+                fields = output[offset:end].split(b" ")
+                if len(fields) == 2 and fields[1] == b"missing":
+                    records.append(None)
+                    offset = end + 1
+                    continue
+                oid, kind, size = fields
+                observed_kind = kind.decode("ascii")
+                object_id = oid.decode("ascii")
+                if observed_kind != expected_kind or not size.isdigit():
                     raise ValueError
                 length = int(size)
                 raw = output[end + 1:end + 1 + length]
@@ -234,43 +271,95 @@ class GitVersionStore:
                     raise ValueError
                 offset += 1
                 # Git may read a recompressed loose object even when its OID is wrong.
-                digest = hashlib.sha1(kind + b" " + str(length).encode("ascii") + b"\0" + raw).hexdigest()
-                if digest != expected_oid:
+                if self._digest(observed_kind, raw) != object_id:
+                    raise ValueError
+                if expected_oid is not None and object_id != expected_oid:
                     raise ValueError
             except (ValueError, UnicodeError):
                 raise GitVersionError(_ERROR) from None
-            objects[expected_oid] = raw
+            records.append((object_id, raw))
         if offset != len(output):
             raise GitVersionError(_ERROR)
-        return objects
+        return records
 
     def _write_tree(
         self, repo: Path, files: dict[str, bytes], previous_files: dict[str, bytes], previous_objects: dict[str, str],
     ) -> str:
-        nodes: dict[str, Any] = {}
-        for path, data in files.items():
-            node = nodes
-            parts = path.split("/")
-            for part in parts[:-1]:
-                node = node.setdefault(part, {})
-            if path in previous_files and previous_files[path] == data:
-                node[parts[-1]] = previous_objects[path].encode("ascii")
-            else:
-                node[parts[-1]] = self._git(repo, "hash-object", "-w", "--stdin", "--no-filters", data=data).strip()
+        objects = {
+            path: previous_objects[path]
+            for path, data in files.items()
+            if path in previous_files and previous_files[path] == data
+        }
+        # 临时文件落在版本库根之外：读操作要求版本库目录在写入前后逐字节一致
+        staging = Path(tempfile.mkdtemp(prefix="yudao-git-"))
+        try:
+            objects.update(self._write_blobs(repo, staging, {
+                path: data for path, data in files.items() if path not in objects}))
+            nodes: dict[str, Any] = {}
+            for path, object_id in objects.items():
+                node = nodes
+                for part in path.split("/")[:-1]:
+                    node = node.setdefault(part, {})
+                node[path.split("/")[-1]] = object_id
+            return self._write_trees(repo, staging, nodes)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
 
-        def write(node: dict[str, Any]) -> str:
+    def _write_blobs(self, repo: Path, staging: Path, pending: dict[str, bytes]) -> dict[str, str]:
+        # 一次进程写入全部变更内容；Git 返回的摘要必须与自算摘要逐项相等
+        if not pending:
+            return {}
+        items = list(pending.items())
+        paths = self._stage(staging, "blob", [data for _, data in items])
+        written = self._hash_objects(repo, "blob", paths, [self._digest("blob", data) for _, data in items])
+        return {path: object_id for (path, _), object_id in zip(items, written)}
+
+    def _write_trees(self, repo: Path, staging: Path, nodes: dict[str, Any]) -> str:
+        records: list[bytes] = []
+
+        def build(node: dict[str, Any]) -> str:
             entries = []
             for name, value in node.items():
-                if isinstance(value, dict):
-                    prefix = b"040000 tree " + write(value).encode("ascii")
-                else:
-                    prefix = b"100644 blob " + value
-                entries.append(prefix + b"\t" + name.encode("utf-8") + b"\0")
-            result = self._git(repo, "mktree", "-z", data=b"".join(entries)).decode("ascii").strip()
-            self._oid(result)
-            return result
+                subtree = isinstance(value, dict)
+                object_id = build(value) if subtree else value
+                # Git 比较 tree 条目时把目录名连同结尾的斜杠一起排序
+                # 条目内容是「模式 名字 结束符 对象摘要的二十字节原始形式」，不含对象种类
+                entries.append((
+                    name.encode("utf-8") + (b"/" if subtree else b""),
+                    _TREE_MODES["tree" if subtree else "blob"] + b" " + name.encode("utf-8") + b"\x00" + bytes.fromhex(object_id),
+                ))
+            content = b"".join(record for _, record in sorted(entries))
+            records.append(content)
+            return self._digest("tree", content)
 
-        return write(nodes)
+        root = build(nodes)
+        paths = self._stage(staging, "tree", records)
+        self._hash_objects(repo, "tree", paths, [self._digest("tree", content) for content in records])
+        return root
+
+    @staticmethod
+    def _stage(staging: Path, kind: str, payloads: list[bytes]) -> list[str]:
+        paths = []
+        for index, data in enumerate(payloads):
+            file = staging / (kind + "-" + str(index))
+            file.write_bytes(data)
+            paths.append(str(file))
+        return paths
+
+    def _hash_objects(self, repo: Path, kind: str, paths: list[str], expected: list[str]) -> list[str]:
+        written = self._git(
+            repo, "hash-object", "-w", *(["-t", kind] if kind != "blob" else []), "--no-filters", "--stdin-paths",
+            data=os.fsencode("\n".join(paths)) + b"\n",
+        ).decode("ascii").split()
+        if len(written) != len(expected) or any(
+            _OID.fullmatch(observed) is None or observed != want for observed, want in zip(written, expected)
+        ):
+            raise GitVersionError(_ERROR)
+        return written
+
+    @staticmethod
+    def _digest(kind: str, payload: bytes) -> str:
+        return hashlib.sha1(kind.encode("ascii") + b" " + str(len(payload)).encode("ascii") + b"\0" + payload).hexdigest()
 
     def _repository(self, run_id: str, *, create: bool = False) -> Path:
         self._run_id(run_id)

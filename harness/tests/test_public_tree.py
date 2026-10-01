@@ -7,8 +7,8 @@ import pytest
 
 from harness.models import hash_bytes
 from harness.public_tree import (
-    CapturedFile, CapturedTree, TreeError, capture_public_tree, materialize_tree,
-    validate_manifest, validate_public_path, verify_public_tree,
+    CapturedFile, CapturedTree, TreeError, capture_public_tree, excluded_by_ignore_rules,
+    materialize_tree, validate_manifest, validate_public_path, verify_public_tree,
 )
 
 
@@ -308,3 +308,81 @@ def test_captured_tree_cannot_hide_mutable_or_unvalidated_file_contents():
         CapturedTree([], ())
     with pytest.raises(TreeError, match="declared parent"):
         CapturedTree((), (CapturedFile("missing/file", b"data"),))
+
+def _record_git_commands(monkeypatch):
+    # 观测 Git 命令行（忽略规则探测）的真实执行：包一层只记录参数，命令本身照常执行
+    executed: list[list[str]] = []
+    original = subprocess.run
+
+    def recording_run(command, *args, **kwargs):
+        if isinstance(command, (list, tuple)) and any(part == "check-ignore" for part in command):
+            executed.append([str(part) for part in command])
+        return original(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", recording_run)
+    return executed
+
+def _ignore_workspace(root, *, rules=None):
+    root.mkdir()
+    (root / "src").mkdir()
+    (root / "src" / "app.py").write_bytes(b"print('hello')\n")
+    (root / "build").mkdir()
+    (root / "build" / "out.bin").write_bytes(b"\x00\x01\x02")
+    (root / "nested" / "empty").mkdir(parents=True)
+    if rules is not None:
+        (root / ".gitignore").write_text(rules, encoding="utf-8")
+    return root
+
+def test_ignore_rules_exclude_nothing_when_the_workspace_has_no_ignore_file(tmp_path, monkeypatch):
+    # 工作区内没有 .gitignore 时没有任何规则可以排除路径：判定不出现在 Git 命令行上
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work")
+    relatives = ["src/app.py", "build/out.bin", "build"]
+    assert excluded_by_ignore_rules(workspace, relatives) == frozenset()
+    assert executed == []
+
+def test_ignore_rules_exclude_the_paths_the_project_lists(tmp_path, monkeypatch):
+    # 有忽略文件时仍由 Git 命令行判定，被排除的路径与被保留的路径分开
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work", rules="build/\n")
+    relatives = ["src/app.py", "build/out.bin", "build"]
+    assert excluded_by_ignore_rules(workspace, relatives) == {"build", "build/out.bin"}
+    assert len(executed) == 1
+
+def test_a_capture_over_a_workspace_without_ignore_files_never_starts_git(tmp_path, monkeypatch):
+    # 一次采集的每一层目录都判定一遍忽略规则；工作区没有忽略文件时整次采集不执行 Git 命令行
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work")
+    tree = capture_public_tree(workspace, True)
+    assert executed == []
+    assert [item.path for item in tree.files] == ["build/out.bin", "src/app.py"]
+    assert tree.directories == ("build", "nested", "nested/empty", "src")
+
+def test_a_capture_still_excludes_ignored_directories_with_git(tmp_path, monkeypatch):
+    # 有忽略文件时采集的公开树排除它：被忽略的目录不进入公开树，其中的条目也不再进入
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work", rules="build/\n")
+    tree = capture_public_tree(workspace, True)
+    assert [item.path for item in tree.files] == [".gitignore", "src/app.py"]
+    assert tree.directories == ("nested", "nested/empty", "src")
+    assert executed
+
+def test_an_ignore_file_in_a_nested_directory_only_excludes_paths_under_it(tmp_path, monkeypatch):
+    # 忽略文件放在子目录时只影响它以下的路径：工作区根下的路径仍然进入公开树
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work")
+    (workspace / "src" / ".gitignore").write_text("app.py\n", encoding="utf-8")
+    tree = capture_public_tree(workspace, True)
+    assert [item.path for item in tree.files] == ["build/out.bin", "src/.gitignore"]
+    assert tree.directories == ("build", "nested", "nested/empty", "src")
+    assert executed
+
+def test_a_nested_git_directory_keeps_its_own_ignore_rules(tmp_path, monkeypatch):
+    # 子目录里的 .git 目录使其中的忽略文件仍然生效：Git 到该目录为止继续读它自己的规则
+    executed = _record_git_commands(monkeypatch)
+    workspace = _ignore_workspace(tmp_path / "work")
+    (workspace / "src" / ".git").mkdir()
+    (workspace / "src" / ".gitignore").write_text("app.py\n", encoding="utf-8")
+    tree = capture_public_tree(workspace, True)
+    assert [item.path for item in tree.files] == ["build/out.bin", "src/.gitignore"]
+    assert executed
