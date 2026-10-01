@@ -107,6 +107,57 @@
         }
       }
     },
+    "/api/commands/project.set_goal": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "project.set_goal",
+        "operationId": "command_project_set_goal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectSetGoal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/project.pin": {
       "post": {
         "tags": [
@@ -6355,6 +6406,37 @@
           "current_adoption"
         ],
         "title": "ProjectRow"
+      },
+      "ProjectSetGoal": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Goal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "project_id",
+          "goal"
+        ],
+        "title": "ProjectSetGoal"
       },
       "ProjectSettingsResult": {
         "properties": {
@@ -20139,6 +20221,162 @@
         "title": "ProjectArchivedPayload",
         "type": "object"
       },
+      "ProjectGoalChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_goal_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectGoalChangedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectGoalChangedEvent",
+        "type": "object"
+      },
+      "ProjectGoalChangedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "title": "Goal",
+            "type": "string"
+          },
+          "goal_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          }
+        },
+        "required": [
+          "goal",
+          "goal_ref"
+        ],
+        "title": "ProjectGoalChangedPayload",
+        "type": "object"
+      },
       "ProjectPinnedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -26689,6 +26927,7 @@
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
             "project_archived": "#/components/schemas/ProjectArchivedEvent",
+            "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
             "project_registered": "#/components/schemas/ProjectRegisteredEvent",
             "project_renamed": "#/components/schemas/ProjectRenamedEvent",
@@ -26865,6 +27104,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectRenamedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectGoalChangedEvent"
           },
           {
             "$ref": "#/components/schemas/ProjectPinnedEvent"

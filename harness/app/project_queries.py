@@ -1320,6 +1320,7 @@ def _optional_run(application: Application, run_id: str) -> Any:
 PROJECTS_LIST = QueryDefinition(
     name="projects.list", request=ProjectsList, result=ProjectList, handle=_projects_list,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
                 ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
@@ -1331,6 +1332,7 @@ PROJECTS_LIST = QueryDefinition(
 PROJECT_OVERVIEW = QueryDefinition(
     name="project.overview", request=ProjectOverview, result=ProjectOverviewResult, handle=_project_overview,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
@@ -1408,6 +1410,7 @@ RUN_ATTEMPT = QueryDefinition(
 PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
                 ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
 )

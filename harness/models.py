@@ -93,6 +93,7 @@ class EventType:
 class ProjectEventType:
     PROJECT_REGISTERED = "project_registered"
     PROJECT_RENAMED = "project_renamed"
+    PROJECT_GOAL_CHANGED = "project_goal_changed"
     PROJECT_PINNED = "project_pinned"
     PROJECT_ARCHIVED = "project_archived"
     PROJECT_RESTORED = "project_restored"
