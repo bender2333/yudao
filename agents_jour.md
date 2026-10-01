@@ -740,3 +740,21 @@ qwen3.8 / 2026-10-02 02:42 / 执行者：#89 第 6 轮续（自主推进模式�
 二、处理。按快照重新生成：client 目录 `npm ci` 之后执行 `node scripts/generate-api.mjs`，得到 17 个生成文件与 interface-version.ts 的改动；真正有内容差异的是 index.ts（多出 DepartmentSetting 的导出顺序变化）与 types.gen.ts（DepartmentPromptState 增加 prompt_configured，DepartmentSetting 增加 provider_id、model_id、requested_tier、prompt_configured，DepartmentSettingsSave 相应增加 4 个字段），其余 15 个文件只是换行符与生成器版本造成的行尾差异。生成后 test_openapi_snapshot.py 通过，说明快照与客户端类型已经同步。
 
 三、复跑（前台单进程）。test_layers.py 与 test_openapi_snapshot.py 3 项通过（13.12s，含 #221 新增的类型检查）；test_issue_89.py 9 项通过（94.03s）；前端 test_web_ui.js 47 项通过 0 失败；client 的 `npm run typecheck` 退出码 0。
+
+9router/ag/gemini-3.8-flash-high / 2026-10-02 05:20 / 审查者：工单 #89 第 7 轮审查结论为未通过。
+
+一、规范检查。工作目录路径为 C:\project\yudao-worktrees\issue-89，分支名称为 issue-89，工单流程标签处于 needs-review，DELIVERY 第 7 轮交付评论要素齐全，工作区仅有未跟踪的 .logs/ 目录。
+
+二、测试复核（前台单进程，未加 -n）。uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py 3 项通过（7.92s）；node --test --test-reporter=dot harness/tests/test_web_ui.js 47 项通过（0.67s）；uv run python -m pytest harness/tests/test_issue_89.py harness/tests/test_provider_catalog.py harness/tests/test_call_target_per_request.py harness/tests/test_catalog_api.py 49 项通过（85.29s）；uv run python -m pytest harness/tests/test_event_sequence.py 44 项通过（591.11s）。
+
+三、内容核对发现问题。harness/providers/facade.py 第 586 行至第 590 行：validate_department_setting 方法在第 586 行包含提前返回逻辑 if selection is None or not selection.writes_model(): return。依据设计说明第 5.2 节、第 5.3 节与第 9.2 节，项目部门设置的模型访问定义与请求档位分别继承，每一项都可以单独写入；保存时写入的请求档位必须属于档位全集。当项目部门设置仅修改请求档位、未显式写入模型访问定义（继承部门默认模型）时，由于 selection.writes_model() 为假，函数在第 586 行提前返回，导致第 588 行至第 590 行针对请求档位是否属于档位全集的校验被跳过。此时调用 department_settings.save 保存不属于档位全集的非法请求档位（例如 requested_tier="extreme"），命令返回状态码 200 并被成功写入项目事件流。档位全集校验应在 selection.writes_tier() 为真时无条件执行，不受 writes_model() 影响；同时 harness/tests/test_issue_89.py 中需补充未指定模型访问定义时保存非法请求档位被拒绝的测试用例。保留 worktree，工单评论 REVIEW: FAIL，标签改为 review-failed。
+
+qwen3.8 / 2026-10-02 06:05 / 执行者：#89 第 8 轮（自主推进模式，按第 7 轮 REVIEW: FAIL 修正）。任务范围只有一处：harness/providers/facade.py 的 validate_department_setting 在 selection.writes_model() 为假时提前返回，跳过请求档位属于档位全集的核对，只写档位、模型继承部门默认时非法档位会被保存。
+
+一、合入 origin/main。fetch 后 main 只前进一个 docs 提交 72c89262（记录执行者模型服务超时，只改 claude_jour.md 一行），git merge origin/main 干净自动合并，无冲突，合入后 git merge-base --is-ancestor origin/main HEAD 返回 0。标签按本轮认领由 ready-for-agent 改为 in-progress。
+
+二、测试先行。补 harness/tests/test_issue_89.py::test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model：只写 departments.engineering.requested_tier="extreme"、不给 provider_id 与 model_id，期望 409 并指出 departments.engineering.requested_tier、设置版本仍为 0。修改前该用例失败，命令返回 200 并被写入（断言 200 == 409）。应用层的保存入口允许这种保存（project_and_work_item_commands.py:319 只核对 provider_id 与 model_id 成对出现），缺陷只在 Provider 的保存校验里，修复限于 validate_department_setting 一处。
+
+三、改动。facade.py 第 586 至 593 行：selection is None 才提前返回；writes_tier() 的档位全集核对无条件先做，与部门默认 _parse_bindings 同一套规则（facade.py 第 1324 行按 REASONING_LEVELS 全集核对）；writes_model() 为假时在准入块之前返回，准入与目录检查的范围不变。selection.py 已有 writes_tier()，无需改动。全仓库检索 writes_model、writes_tier、REASONING_LEVELS 与 validate_department_setting 的调用点，确认没有第二处同样的提前返回需要跟改；validate_department_setting 的调用点只有 project_and_work_item_commands.py:327 一处。
+
+四、测试（前台单进程，未加 -n）。test_issue_89.py 10 项通过（109.00s）；test_provider_catalog.py 与 test_catalog_api.py 与 test_layers.py 与 test_openapi_snapshot.py 38 项通过（24.00s）。事件序列基准、OpenAPI 快照与客户端生成类型零改动（本轮不改变事件载荷与接口合同形状），git status 只有 facade、测试与记录文件。换行符：四个记录文件与两份改动的代码文件工作树裸 LF 计数均为 0，git ls-files --eol 仍 i/lf w/crlf。
