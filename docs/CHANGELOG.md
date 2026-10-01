@@ -127,6 +127,8 @@ claude-opus-5-5 / 2026-09-26 12:34 / docs/design/department-roles.md：第 6.2 �
 
 claude-opus-5-5 / 2026-09-26 15:05 / docs/architecture-issues.md 登记 #47 的架构问题：没有工具调用时主机追加的 user 消息与「通知」的关系、D09 的停止原因清单缺少 no_tool_call、请求合同没有 tool_choice / #47 修复中发现设计与需求文档没有覆盖的边界，交给架构师处理
 
+claude-opus-5-5 / 2026-09-26 15:10 / docs/architecture-issues.md 登记 #4、#5 验收标准与 ADR-0003、ADR-0004 现行内容的冲突及未拆工单的 D24 改动 / Stage 2.7 工单核对中发现的规范矛盾
+
 claude-opus-5-5 / 2026-09-26 15:13 / 新增 docs/design/app-and-interface.md（应用层与接口层：模块、命令合同与清单、查询与读取模型、事件流、能力清单、访问方式与认证、与现有 Web 的对照与迁移、使用的技术、验收，第 10 节为架构师的决定）；docs/design/README.md 登记；docs/design/architecture/overall-architecture.md 第 10 节加入 #72、#73 至 #77、#79 至 #82、#50 下的 D26 工单与 3.2B（#68、#69），第 11 节加入长期目标能否修改；docs/program-roadmap.md 第 2 节加入应用层骨架 #72（排在 #49 之前）、Stage 4 的部门内多角色写明 ADR-0016、ADR-0017 与工单，新增应用层、接口层与桌面客户端一条；GitHub 新建 #50 至 #67（D26 与 #22 下的两张）、#68 与 #69（3.2B）、#70 至 #82（应用层、接口层与桌面客户端），#44、#49、#16 的正文与依赖同步，解除 #16 对 #15 的依赖 / 用户要求自动推进项目；应用层是用户决定、3.1 的继续执行与桌面客户端的共同前提
 
 claude-opus-5-5 / 2026-09-26 15:40 / docs/design/model-management.md 第 4.3 节写明容量只从上游模型列表预填、连接测试读取模型列表地址、fake 协议只在测试或演示方式启动时可用，第 4.4 节写明影响列表由查询 catalog.change_impact 提供，第 5.2 节写明每个项目每个部门一份设置一个版本；docs/design/README.md 与 docs/program-roadmap.md 第 5.1 节写入 D24 的工单；GitHub 新建 D24 父工单 #83 与子工单 #84 至 #96 / 为 D24 建立工单时出现的五处设计缺口由架构师在已确认设计的范围内决定
@@ -146,8 +148,6 @@ claude-opus-5-5 / 2026-09-26 17:50 / docs/architecture-issues.md 登记 #103 的
 claude-opus-5-5 / 2026-09-26 18:22 / docs/architecture-issues.md 为 #103 登记的问题追加处理结论；docs/program-roadmap.md 第 2 节与 docs/design/architecture/overall-architecture.md 第 10 节加入 #106 / #103 发现请求中另有两处文字没有区分动作回执与检查回执，统一说法并排在 #43 之前
 
 claude-opus-5-5 / 2026-09-26 20:02 / docs/current-baseline.md、docs/stage-3-plan.md、docs/program-roadmap.md 与 docs/design/architecture/overall-architecture.md 第 10 节把 3.2A 改为已验收（#12 至 #15 关闭，真实模型全链路 run_5f1aff849e244a37），删除基线中 #15 受凭据阻塞的开放项 / #15 真实验收完成并关闭
-
-claude-opus-5-5 / 2026-09-26 15:10 / docs/architecture-issues.md 登记 #4、#5 验收标准与 ADR-0003、ADR-0004 现行内容的冲突及未拆工单的 D24 改动 / Stage 2.7 工单核对中发现的规范矛盾
 
 claude-opus-5-5 / 2026-09-26 20:52 / docs/requirements/execution-limits.md（D09）与 docs/requirements/provider-retries.md（D17）中的模型步数上限改写为部门循环的参数 `max_model_steps` / #43 第 2 个提交把重试间隔、尝试次数与最大模型步数改为部门循环的参数（StepLimits），模块常量 `MAX_MODEL_STEPS` 已删除
 
@@ -175,6 +175,8 @@ claude-opus-5-5 / 2026-09-27 11:44 / #44 完成后更新：docs/design/architect
 
 claude-opus-5-5 / 2026-09-27 12:55 / docs/architecture-issues.md 登记三条：取消进行中时激活与运行循环交回的运行状态（#107）、三种协议的传输诊断只有 Responses 有传输阶段（#108）、Messages 流中的过载错误与流式进度的协议差异（#108 代码审查） / #107 修正了取消与激活结束之间的先后，需要写进总体架构；#108 按工单保持 Chat Completions 的结果不变，另外发现的协议差异需要架构师决定是否开工单
 
+claude-opus-5-5 / 2026-09-27 16:25 / docs/architecture-issues.md 登记两条：组织定义中的流转规则（交接顺序与阶段迁移、质检退回的去向、询问动作的含义、事项种类）仍是状态机代码（#48）；事项记录的定义版本与运行实际使用的定义、限额可能不同（#48） / #48 迁入定义的是写在代码中的文字、清单与参数，流转规则由定义驱动、升级以后继续旧事项的处理需要架构师决定
+
 claude-opus-5-5 / 2026-09-27 16:55 / docs/architecture-issues.md 登记一条：两个运行同时进行的测试按墙钟时限等待的主机工作包含接纳规格时的 16 个 Git 子进程（#107） / 负载更高时这项测试仍有失败，工单不允许加长等待，需要架构师决定减少子进程或调整测试核对的内容
 
 claude-opus-5-5 / 2026-09-27 17:40 / docs/design/architecture/overall-architecture.md 第 5 节写明取消由发起的一方写入、交回的运行状态包含已经开始的取消；docs/architecture-issues.md 为 #107、#108 登记的四条问题追加处理结论（#111、#112） / #105、#107、#108 完成后处理登记的问题
@@ -182,8 +184,6 @@ claude-opus-5-5 / 2026-09-27 17:40 / docs/design/architecture/overall-architectu
 claude-opus-5-5 / 2026-09-27 18:04 / docs/architecture-issues.md 登记四条：anthropic 的声明范围与锁定版本和 Messages 协议的计时不一致、事件对象中不由命令写入的事件的 actor 与 role、能力清单的覆盖层没有标识与负责的工单、命令行的其他子命令与数据目录的进程锁 / #72 执行与代码审查中发现，需要架构师决定
 
 claude-opus-5-5 / 2026-09-27 18:10 / docs/design/app-and-interface.md 第 5.2 节写明 actor 由写入方经写入口声明、role 在 Stage 4 之前为空，第 6.1 节给出五个覆盖层的标识与由 #73 加入，第 7.2 节写明写入的子命令取得进程锁、只读的子命令以只读方式打开数据目录；docs/architecture-issues.md 为 #72 登记的四条问题追加处理结论 / #72 完成后处理登记的问题
-
-claude-opus-5-5 / 2026-09-27 16:25 / docs/architecture-issues.md 登记两条：组织定义中的流转规则（交接顺序与阶段迁移、质检退回的去向、询问动作的含义、事项种类）仍是状态机代码（#48）；事项记录的定义版本与运行实际使用的定义、限额可能不同（#48） / #48 迁入定义的是写在代码中的文字、清单与参数，流转规则由定义驱动、升级以后继续旧事项的处理需要架构师决定
 
 claude-opus-5-5 / 2026-09-27 21:05 / #48 完成后更新：docs/design/architecture/overall-architecture.md 第 6.1 节写明定义层、应用层与接口层的代码位置；docs/design/semantic-system.md 第 11 节工具一行改为定义与执行环境的位置；docs/architecture-issues.md 为 #48 登记的两条问题追加处理结论 / #48 于 2026-09-27 关闭
 
@@ -197,6 +197,10 @@ claude-opus-5-5 / 2026-09-27 22:54 / docs/stage-3/organization-comparison-sample
 
 claude-opus-5-5 / 2026-09-28 16:40 / docs/design/app-and-interface.md 第 4.3 节 decisions.list：返回内容加入所属的项目、事项与 run，筛选条件由「是否已回答」改为可多选的状态（等待回答、已回答、已撤销），写明等待用户的列表只取等待回答 / #49 核对：已撤销的请求混在「未回答」中，界面按项目列出时需要知道所属事项；参照 OpenCode 与 OMP 的等待请求做法，用户确认
 
+claude-opus-5-5 / 2026-09-28 17:05 / ADR-0018 增加「扩展途径」：执行能力不够时增加执行环境，模型服务限流时增加连接，一台控制主机容纳不下时按项目分成多个控制核心实例，各有触发条件，部门不作为拆分单位；ADR-0018 不再取代 ADR-0012 的多实例一项，ADR-0012 状态说明、decision.md、D29、路线图第 3 行、第 5.4 节与历史对照表同步 / 用户认为分布式与微服务化有助于资源调度和以后的并发，是很好的长期架构，同意写进 ADR-0018
+
+claude-opus-5-5 / 2026-09-28 17:47 / 新增 ADR-0019（项目流跨 Yudao 版本保存，run 流跟随应用版本，run 事件版本不同时排空后升级）与 D33（接入已有项目，Stage 3 的 3.8）；路线图、Stage 3 计划、恢复合同、D27、D29、ADR-0018、D32、需求索引、阶段需求总览、验收基线、原型 v7 设计说明与 decision.md 按两轮讨论的结论修改：故障记录与修复失败上限、部署前备份与回滚兼容、交付软件密钥、运维读取的内容按外部内容处理、PRD 默认运行要求、未回答的决定、常开的控制主机、外部报到与看门狗、数据保留、通知只在界面显示、Stage 4 完成依据增加连续 5 个修复事项的请求长度检查 / 用户按两条成功标准核对路线图盲区后采纳推荐
+
 claude-opus-5-5 / 2026-09-28 17:55 / 新增 docs/adr/0018-single-control-host-remote-execution.md（一台控制主机，执行环境有本机进程、本机容器、远程执行代理三种实现，执行权没有期限与续期）；ADR-0007、ADR-0012 的状态说明写明被取代的部分；ADR-0013 的数据库一条改为 SQLite 保存在控制主机上，删去 3.4B 的理由；ADR-0008、ADR-0014、ADR-0016 的 Stage 7 改为 Stage 6 / 用户确认 Yudao 只有一个人使用，会部署到多台电脑与树莓派，多机需求在执行环境
 
 claude-opus-5-5 / 2026-09-28 17:55 / 重写 docs/program-roadmap.md：阶段按执行顺序重新编号（Stage 3 通用工具、可靠恢复与执行环境，新增 3.2C、删除 3.4B；Stage 4 运维部门与长时间运行；Stage 5 部门内协作、上下文与界面；Stage 6 受治理的系统演化，暂时不做），3.1 改为启动时自动继续，3.9 第一次执行 D32 对照实验 / 用户确认的成功标准：独立高质量交付，长时间自我运行并自我修复交付的软件
@@ -205,122 +209,231 @@ claude-opus-5-5 / 2026-09-28 17:55 / 需求记录：D29 由 distributed-deployme
 
 claude-opus-5-5 / 2026-09-28 17:55 / 设计文档同步：stage-3-plan.md、恢复契约（启动时自动继续，上游拒绝凭据进入等待模型服务）、总体架构、系统架构原理、应用层与接口层设计说明（删除 3.4B 的命令与未采纳候选，决定种类加入等待模型服务的通知）、模型管理设计说明第 5.5 节、语义系统与部门内多角色设计说明、设计索引、当前验收基线、原型 v7 设计说明（删除 3.4B 的元素）、运行责任样例、decision.md 与 CONTEXT.md 的新术语 / 同上；各处链接改为 remote-execution.md
 
-claude-opus-5-5 / 2026-09-28 17:05 / ADR-0018 增加「扩展途径」：执行能力不够时增加执行环境，模型服务限流时增加连接，一台控制主机容纳不下时按项目分成多个控制核心实例，各有触发条件，部门不作为拆分单位；ADR-0018 不再取代 ADR-0012 的多实例一项，ADR-0012 状态说明、decision.md、D29、路线图第 3 行、第 5.4 节与历史对照表同步 / 用户认为分布式与微服务化有助于资源调度和以后的并发，是很好的长期架构，同意写进 ADR-0018
-claude-opus-5-5 / 2026-09-28 17:47 / 新增 ADR-0019（项目流跨 Yudao 版本保存，run 流跟随应用版本，run 事件版本不同时排空后升级）与 D33（接入已有项目，Stage 3 的 3.8）；路线图、Stage 3 计划、恢复合同、D27、D29、ADR-0018、D32、需求索引、阶段需求总览、验收基线、原型 v7 设计说明与 decision.md 按两轮讨论的结论修改：故障记录与修复失败上限、部署前备份与回滚兼容、交付软件密钥、运维读取的内容按外部内容处理、PRD 默认运行要求、未回答的决定、常开的控制主机、外部报到与看门狗、数据保留、通知只在界面显示、Stage 4 完成依据增加连续 5 个修复事项的请求长度检查 / 用户按两条成功标准核对路线图盲区后采纳推荐
-claude-opus-5-5 / 2026-09-28 21:50 / 新增 docs/design/evaluation-scenarios.md（三个评测场景、评分、过程检查点、报告与评测工具的模块划分）；改写 D32（三个场景、OpenCode 基础分现在运行、质检具备浏览器工具）；需求索引、设计索引、路线图、Stage 3 计划、decision.md 与 CONTEXT.md（评测场景、完成度、丰富程度、质检误放行）同步 / 用户确认版本回归与 OpenCode 对照共用 WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价三个场景，先运行 OpenCode 基础分
 claude-opus-5-5 / 2026-09-28 21:44 / 新增 docs/research/evaluation-benchmarks.md（三个评测场景的来源、版本、检查与公开成绩，同档候选，没有选用的评测与原因）；评测场景设计、D32、设计索引、调研索引与 decision.md 写明：没有建立工单，实施之前由用户逐项审阅 / 用户要求先记录需求与设计摘要，评测是最重要的工作；调研下载的材料只在会话容器中，需要把核对过的事实写进仓库
+
+claude-opus-5-5 / 2026-09-28 21:50 / 新增 docs/design/evaluation-scenarios.md（三个评测场景、评分、过程检查点、报告与评测工具的模块划分）；改写 D32（三个场景、OpenCode 基础分现在运行、质检具备浏览器工具）；需求索引、设计索引、路线图、Stage 3 计划、decision.md 与 CONTEXT.md（评测场景、完成度、丰富程度、质检误放行）同步 / 用户确认版本回归与 OpenCode 对照共用 WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价三个场景，先运行 OpenCode 基础分
+
 claude-opus-5-5 / 2026-09-28 22:41 / 界面工作线提前到 Stage 3：路线图、Stage 3 计划、总体架构第 10 节、D30（新增「长时间运行以后的界面」）、需求索引、阶段需求总览、应用层与接口层设计说明（系统首页的待你决定与离开期间的报告、home.mark_seen、machines.list 与 machine.save、决定种类增加初始 PRD 确认与连续修复失败、排空状态、托盘提醒、能力清单的接口版本、访问令牌加 TLS、界面没有通过验收时工作包不关闭）、设计索引与原型 v7 设计说明的状态按用户决定修改；CONTEXT.md 增加「离开期间的报告」 / 长时间运行以后用户隔一段时间回来查看，Stage 3 与 Stage 4 的决定、登记与确认都需要界面，用户采纳推荐claude-opus-5-5 / 2026-09-28 22:55 / 访问方式改为本机与局域网两种，局域网内认证与加密保留位置并标为 TODO（应用层与接口层设计说明第 6.2、6.3 节、ADR-0015 状态、ADR-0018、D29、D30、总体架构、系统架构原理、Stage 3 计划、路线图、需求索引、阶段需求总览、D12 启动与凭据重读、设计索引、CONTEXT.md）；评测工作线与界面工作线并行，Stage 3 结束之前必须完成（路线图近期顺序与第 4 节、Stage 3 计划新增一行与 3.9 前置、D32、评测场景设计、需求索引） / 用户决定只在局域网内使用期间安全只占位，评测最重要但不需要先做好、本阶段结束之前必须完成
+
 claude-opus-5-5 / 2026-09-28 23:35 / 新增 D34（浏览器与 computer use，Stage 3 的 3.2D）与调研记录 docs/research/browser-and-computer-use.md（Codex 69f7140、OMP、OpenCode 的做法与可选方案比较）；路线图与 Stage 3 计划加入 3.2D（依赖 3.2B、3.2C，3.9 的前置）；模型管理设计说明新增第 5.6 节部门的必需能力（质检为图像输入），第 5.5 节、恢复合同第 10 行加上相应的待恢复原因；D32 与评测场景设计改为使用用户提供的、有视觉能力的同一个模型，场景 1 依赖 3.2D；总体架构、需求与设计索引、调研索引、阶段需求总览、评测场景选题调研同步；CONTEXT.md 增加「必需能力」 / 评测要在 Stage 3 结束之前完成，场景 1 需要质检操作网页；用户要求参考 Codex，决定质检必须有视觉能力，评测模型由用户提供，安全按普通浏览器 MCP 的默认做法
+
 claude-opus-5-5 / 2026-09-28 23:38 / docs/agents/triage-labels.md 新增自主推进模式的四个流程标签（in-progress、needs-review、review-passed、review-failed）及切换者；同时 CLAUDE.md 新增「自主推进模式」，AGENTS.md 分为共同要求、执行者与审查者三部分，新增 .opencode/agent/reviewer.md / 用户决定由 Claude 自主推进工单，omp 担任执行者，OpenCode 担任审查者
+
 claude-opus-5-5 / 2026-09-28 23:50 / 质检的视觉能力改为只提醒：模型管理设计说明第 5.6 节改为「部门的建议能力」（不满足时照常保存并提醒，请求时按模型实际能力提供工具，不能看图时不提供 computer use，浏览器只给可访问性结构），第 5.5 节与恢复合同第 10 行删去相应的待恢复原因；D34、路线图、Stage 3 计划（3.2D 的完成依据）、总体架构、需求索引、阶段需求总览、D32、评测场景设计与 decision.md 同步；CONTEXT.md 的术语改为「建议能力」 / 用户决定质检部门设置时只提醒，不强制要求支持图像
+
 grok-4.7 / 2026-09-28 23:55 / 新增 docs/research/computer-use-implementations.md（Anthropic 工具集与 claude-quickstarts dee7116 的虚拟屏幕、截图缩放与 17 个动作，OpenAI computer 工具与容器配方，Gemini 桌面动作与 0–999 坐标，OMP fdfeef1f78 的宿主桌面工具，OSWorld 的客户机环境）；docs/research/README.md、docs/research/browser-and-computer-use.md 与 D34 待设计项加上链接 / 用户要求调研 computer use 的实现，D34 的虚拟屏幕、截图尺寸与动作集合还没有设计
+
 claude-opus-5-5 / 2026-09-29 00:28 / 新增 docs/prototypes/v8/design.md（原型 v8 设计说明：首页状态项、楼与地下室机房、离开期间的报告与关键事实回放、决定卡片、交接管道与传信管、质检试用台、同一项目排队调整顺序、按工作包分为九档、四个示例项目与四台机器、十九个场景）；D30 增加「原型 v8 的方向」并修改机房位置与元观察范围；ADR-0018、D29、路线图、Stage 3 计划（3.2C 与第 5.3 节）、总体架构、阶段需求总览改为在系统中登记机器、在项目中授权使用；应用层与接口层设计说明增加 work_item.reorder、machine_authorization.save、需要恢复备份的回滚决定、system.status 的首页状态项、home.away_report 的关键事实列表、project.loop 的机器、project.settings 的机器授权与运维设置，删除候选相关的两个命令与 ops.accept_responsibility；需求索引与 decision.md 同步 / 用户开始 v8 原型讨论，三轮问题全部采纳推荐
+
 claude-opus-5-5 / 2026-09-29 01:06 / 新增 docs/prototypes/v8/BUILD.md（原型 v8 构建约定：界面层与示例后端分层、Y8.api 的能力清单、查询、命令与事件流、初始数据加事件日志的折叠与按位置读取、九档、数据形状、世界设定与跨文件标识、十九个场景的分配、任务分工）与原型核心代码（index.html、y8.js、contract/registry.js、contract/backend.js、contract/handlers/core.js、ui/kit.js、ui/app.js、ui/shell.js、ui/toolbar.js、styles/base.css） / 用户要求开始制作 v8 原型，架构师做核心设计与架构，简单逻辑交给 omp
+
 claude-opus-5-5 / 2026-09-29 01:10 / 重写 docs/stage-3-plan.md（阶段结束时用户能做什么、各工作包涉及的架构层、按工作包父工单排列的工作包表与层次和阻塞规则、版本回归规则、强制升级优先级由 3.4A 验收、执行槽位为部署设置，删除 3.3 与 3.7）；新增 docs/design/local-tools.md（3.2A 的使用过程、工具边界与依赖，由计划第 4 节移出）并加入 docs/design/README.md；路线图 D24 移入 Stage 3、删除 3.3、3.7 分到 Stage 5 与 Stage 6、依赖图与近期顺序按工作包父工单重画、历史编号表增加三行；模型管理设计说明增加模型能力表（models.dev 快照）、模型访问定义的输入方式、建议能力的提醒规则，第 4.4、4.7、5.5 节改为进入待恢复；D24 需求、CONTEXT.md（调用目标、模型访问定义、模型能力表）、Provider 层设计说明同步；应用层与接口层设计说明增加 source_directory.save、runtime.start_drain、runtime.force_upgrade、catalog.change_impact、提醒字段与能力表字段，machine_authorization.save 的运行环境与常设授权移到 Stage 4，随工作包验收界面的名单补全；总体架构第 8、10 节、阶段需求总览、当前验收基线同步；ADR-0019 项目流清单加入语义系统的跨事项内容，语义系统设计说明第 4 节增加事件流的划分，D25 增加第 29 条；startup-provider-reload 的删除目录文件改为待恢复 / 用户要求按新的路线图与总体架构重排 Stage 3 任务，并核对全部工单的依赖与拆分
+
+claude-opus-5-5 / 2026-09-29 01:20 / 原型 v8 新增项目楼层画面 pixel/floor.js（交接管道、传信管、回流管道、大厅队列与阀门、通往机房的门、五种覆盖层）、楼与机房 pixel/building.js、决定卡片 ui/cards.js、回放时间轴 ui/replay.js、画面面板 ui/scenes.js、首页 ui/views/home.js 与 styles/home.css；BUILD.md 增加补丁的 put 形式 / 按 v8 设计说明制作首页与循环画面
+
 opencode-go/deepseek-v4.1-flash / 2026-09-29 01:33 / 总体架构第 6.1 节的执行环境一行写明从封存快照建立工作区、执行动作并交回回执与交付封存所需的 snapshot() / 工单 #110 把工作区的建立与交付封存改到执行环境
+
+claude-opus-5-5 / 2026-09-29 01:42 / 新增 docs/design/execution-environment.md（3.2C 执行环境服务：合同与三种实现、本机容器、执行代理、心跳与结果未知、执行位置、认证 TODO、验收场景与工单拆分）与 docs/research/execution-environment.md（docker-py、Anthropic computer-use-demo、OpenCode、OMP、Bazel 远程执行 API、心跳参照）；新增 docs/design/existing-project-onboarding.md（3.8 建档事项：部门产出、初始 PRD 的确认往返、基线采纳、大仓库、失败与中断、工单拆分）；docs/design/README.md 增加两项索引 / Stage 3 自主推进，3.2C 与 3.8 拆分工单之前需要设计说明
 
 opencode-go/deepseek-v4.1-flash / 2026-09-29 01:45 / docs/architecture-issues.md 登记 #45 提交 2 接入运行循环之前的六条待决定项（上游拒绝凭据的分类、`department_activated` 的目标字段、创建事项时的校验、部门默认读取与解析的持锁入口、删除 `provider_credentials_lost`、事项级窗口是否参与阈值） / 提交计划要求提交 2 等架构师对这六条答复，工单上仍没有答复；按 AGENTS.md 的架构问题登记要求记录冲突、可选做法与建议，避免把未确定的形状先写进事件序列基准
 
-opencode-go/deepseek-v4.1-flash / 2026-09-29 03:20 / docs/architecture-issues.md 在 #45 六条待决定项下面追加架构师的答复与处理；docs/requirements/department-providers.md 的「当前状态」与「配置与生效」改为按每次请求解析调用目标的实现现状（创建事项不再解析、解析失败进入待恢复、新修订从下一次请求起生效），第 4 点的启动前检查注明由 #89 按项目部门设置在新建事项前引入 / 工单 #45 第 2 轮的任务评论给出六条答复，文档需要与实现以后的行为一致
-claude-opus-5-5 / 2026-09-29 01:42 / 新增 docs/design/execution-environment.md（3.2C 执行环境服务：合同与三种实现、本机容器、执行代理、心跳与结果未知、执行位置、认证 TODO、验收场景与工单拆分）与 docs/research/execution-environment.md（docker-py、Anthropic computer-use-demo、OpenCode、OMP、Bazel 远程执行 API、心跳参照）；新增 docs/design/existing-project-onboarding.md（3.8 建档事项：部门产出、初始 PRD 的确认往返、基线采纳、大仓库、失败与中断、工单拆分）；docs/design/README.md 增加两项索引 / Stage 3 自主推进，3.2C 与 3.8 拆分工单之前需要设计说明
-claude-opus-5-5 / 2026-09-29 01:20 / 原型 v8 新增项目楼层画面 pixel/floor.js（交接管道、传信管、回流管道、大厅队列与阀门、通往机房的门、五种覆盖层）、楼与机房 pixel/building.js、决定卡片 ui/cards.js、回放时间轴 ui/replay.js、画面面板 ui/scenes.js、首页 ui/views/home.js 与 styles/home.css；BUILD.md 增加补丁的 put 形式 / 按 v8 设计说明制作首页与循环画面
 claude-opus-5-5 / 2026-09-29 01:46 / 原型 v8 的 BUILD.md 与能力登记表按新的设计说明修改：project.onboard 成为正式名称（参数增加源目录名称），增加 onboarding.restart、execution_placement.save，3.8 的临时事件改为 initial_prd_proposed、project_decision_*、baseline_adopted 等正式名称，初始 PRD 的回答写入 project_decision_answered；合同待补只剩查询的 at 参数；删除 CHANGELOG 中重复的一行 01:10 记录 / 3.2C 执行环境服务与 3.8 接入已有项目的设计说明已经写成
+
+opencode-go/deepseek-v4.1-flash / 2026-09-29 03:20 / docs/architecture-issues.md 在 #45 六条待决定项下面追加架构师的答复与处理；docs/requirements/department-providers.md 的「当前状态」与「配置与生效」改为按每次请求解析调用目标的实现现状（创建事项不再解析、解析失败进入待恢复、新修订从下一次请求起生效），第 4 点的启动前检查注明由 #89 按项目部门设置在新建事项前引入 / 工单 #45 第 2 轮的任务评论给出六条答复，文档需要与实现以后的行为一致
+
 opencode-go/deepseek-v4.1-flash / 2026-09-29 03:45 / docs/architecture-issues.md 登记 #76 的两条（桌面客户端页面的来源字符串尚未确定；事件流订阅的验收依赖 #75） / 执行中遇到的规范遗漏与工单依赖按规则登记
+
 opencode-go/deepseek-v4.1-flash / 2026-09-29 03:51 / docs/architecture-issues.md 登记一条：#77 目录修订号同时覆盖定义与部门默认，按修订号比较的准入陈旧标记因此比设计第 4.4 节的字段级口径粗 / 记录执行中发现的与设计口径的差异与建议
+
 claude-opus-5-5 / 2026-09-29 07:20 / 模型管理设计说明第 4.3、4.4、10 节：删除模型测试中的图像请求，输入方式与新增的「是否接受要求调用工具」都不影响准入，值来自模型能力表与用户声明并直接使用；应用层与接口层设计说明的 catalog.model.test 与 catalog.connection.save 同步；docs/architecture-issues.md 中 #102 条目的处理改为已决定 / 用户决定信任 models.dev，出错时替换来源，不在准入中叠加核实
+
 claude-opus-5-5 / 2026-09-29 07:24 / ADR-0002 容量预填加上模型能力表，输入方式与是否接受要求调用工具保持准入，准入作废后进入待恢复；ADR-0003 加入模型能力表（发布前由脚本从 models.dev 提取，随版本发布，运行时不刷新）；ADR-0005 调用目标带输入方式，模型无法使用时进入待恢复 / 用户同意三份 ADR 与模型管理设计说明保持一致
+
 claude-opus-5-5 / 2026-09-29 07:30 / D17 的 TLS 上下文改为每个线程共用一个 / 用户确认；与 #114 的实现和 docs/architecture-issues.md 的处理一致
+
 claude-opus-5-5 / 2026-09-29 07:50 / ADR-0019 增加机器流，规则 1 的例外改为项目流与机器流（CLAUDE.md、AGENTS.md）；ADR-0018 写明本机容器经本机端口用同一份 HTTP 合同调用执行代理、本机进程在进程内调用、运行环境 Stage 4 起指定；3.8 与 3.2C 设计说明的待确认项改为用户确认的决定（work_item.create 删除代码快照来源、检查时限 600 秒、验收项目 openai-agents-python、机器流、树清单 v2、机器不可用时进入待恢复、远程验收等树莓派）；应用层增加 project.onboard、onboarding.restart、execution_placement.save 与拒绝原因 container_engine_unavailable、source_invalid；评测场景 2 先建档，场景镜像登记为本机容器的基础镜像；D29、D33、总体架构第 3、7.3、7.4、8、11 节、CONTEXT.md（机器流、执行位置、运行工作区、检查工作区、执行环境池、执行代码摘要）、本地通用工具、Stage 3 计划、需求总览与设计索引同步 / 用户对 3.8 与 3.2C 的待确认项采纳推荐，暂时不能提供树莓派
+
 claude-opus-5-5 / 2026-09-29 08:05 / 执行环境服务与接入已有项目设计说明的工单拆分节写上工单编号（#128–#131、#140–#145；#134–#139）；树莓派上的系统服务验收归入工单 I；模型管理设计说明第 4.1 节写明能力表由提取脚本在发布前生成 / 剩余工单已经建立
+
 claude-opus-5-5 / 2026-09-29 08:12 / 新增 docs/design/browser-and-computer-use.md（3.2D 设计草稿：试用会话与试用镜像、Playwright MCP、虚拟屏幕与 8 个屏幕工具、按输入方式提供工具、截图证据、试用用例与逐条结论、恢复契约、工单拆分、第 16 节待确认）并加入设计索引 / 用户要求起草 3.2D 的设计
+
 claude-opus-5-5 / 2026-09-29 08:22 / 原型 v8 各部分完成（omp 任务 A1 系统数据、A2 待办清单与 openai-agents、A3 地铁票价与温湿度服务、B 项目页面、C 部门页面、D 部门房间与动作图鉴、E 系统页，架构师集成并修正：采纳与修复使用各自的事件、画面增加「等待你的决定」、场景 19 按回放的实际范围重写、概览循环画面的布局、外壳对未部署项目的处理）；九档全部页面与十九个场景没有控制台错误；docs/prototypes/CHANGELOG.md 增加 v8，v8 设计说明、D30、需求索引与路线图第 4 项的状态改为「原型文件已制作，待用户审阅」 / 按 v8 设计说明与构建约定制作原型
+
 claude-opus-5-5 / 2026-09-29 09:30 / 原型 v8 收尾（omp 任务 F）：Stage 5 之前的事件与场景不出现角色名，界面不直接显示英文枚举值与内部标识，阅读已有项目由建档事项的读取工具事件驱动，模型测试不再测图像并增加「是否接受要求调用工具」列，运行环境与常设授权只在 Stage 4 起出现；初始 PRD 的「提出修改」必须附说明（否则 not_allowed）；BUILD.md 增加画面状态 waiting_decision；九档全部页面与十九个场景复查没有控制台错误 / 集成检查发现的文字与规则问题，以及应用层设计说明 initial_prd 一行的规则
 
 opencode-go/deepseek-v4.1-flash / 2026-09-29 10:30 / docs/architecture-issues.md 登记：应用层保存的读取模型（数据目录的 read-models.sqlite，只读打开时在内存中重建）与「只有事件日志打开数据库并写 events、projections、commands」的源码检查冲突，检查保留原有意图并为 app/read_models.py 加具名例外 / #73 按设计说明第 4.2 节保存可以删除后重建的调用尝试表与流转记录，等待架构师确认
+
 claude-opus-5-5 / 2026-09-29 10:50 / 3.2D 设计说明改为已确认（启动方式由工程写在交付说明的 launch 字段，缺少时退回工程；逐条验收条件的通过证据才能放行；新增质检无法核验；所有本机容器带试用层；不提供 browser_evaluate 与 browser_run_code_unsafe；8 个屏幕工具），第 17 节写上工单 #147–#155；CONTEXT.md 新增试用一组术语；D34、应用层（run.trials、evidence.screenshot、质检无法核验，查询 34 个）、模型管理第 5.6 节、执行环境服务第 5.2.3 节、总体架构第 7.3、7.4 节、恢复契约第 4 节、语义系统第 13 节、评测场景第 9 节、Stage 3 计划、路线图第 10 项、需求索引、需求总览与设计索引同步 / 用户对 3.2D 设计第 16 节采纳推荐
+
 claude-opus-5-5 / 2026-09-29 10:58 / 原型 v8 按已确认的 3.2D 设计修改：设计说明第 6 节增加决定种类「质检无法核验」，第 7.1 节试用记录改为截图标明模型是否看到并可查看原尺寸与可访问性结构摘录，第 7.3 节交付增加交付说明中的启动方式，第 8.3 节试用台的截图来自 1280×800 的虚拟屏幕、模型不能看图时照常显示截图并标明「模型只读取文字」，删除第 15 节中已确定的截图尺寸一项；原型代码增加查询 run.trials、evidence.screenshot 与决定种类 cannot_verify，部门工作间的试用记录显示缩略图与原尺寸；BUILD.md 同步 / yudao-67 转告 3.2D 设计（36f0a03）与原型的两处不一致
+
 claude-opus-5-5 / 2026-09-29 14:19 / 应用层与接口层设计说明第 4.1 节增加「按位置读取（回放）」：可回放的查询接受 at 参数，返回处理到该位置时的快照；第 4.3 节 system.status、projects.list、decisions.list、project.loop、machines.list 的「位置」一列标为可回放；第 6.1 节能力清单的 queries 标明是否可回放；decision.md 记录决定；原型 v8 删除「合同待补」的标注，BUILD.md 同步 / 用户同意把原型回放用的 at 参数写进接口合同
 
 claude-sonnet-5 / 2026-09-29 15:58 / 修改 core-and-materials.md 第 2 节「四条不变量」（权威拓扑改为属于 ADR-0014 的组织定义，只随用户批准的新版本改变，并加入裁决规则 U 采纳新版本前校验权威关系结构的三条标准）与第 3 节「人留在意图这一层」（产品部门的解释立即生效，用独立下游核验的有无判断要不要阻塞等待用户）；同步修改文中另外两处「权威拓扑是设计时的常量」的措辞；修改 adr/0014-versioned-definitions.md 理由部分的措辞；新增 adr/0020-block-only-when-no-downstream-check.md；decision.md 记录决定 / 用户认为「权威拓扑是设计时的常量」「目标层只由用户修改」两条写法容易把事情说死、有讨好与免责的嫌疑，要求按第一性原理重新审查并写回文件
 
-claude-sonnet-5 / 2026-09-29 16:10 / 新增 docs/prototypes/v9/design.md（像素引擎改为实体—组件—系统结构：房间与管道图结构声明代替 layoutFor/pipesFor 写死坐标，事件变任务或者信号、任务目录复用 v8 design.md 第 5.4、8.3 节两张表，角色头顶对话框补完 v8 第 8.3 节已写但没实现的思考气泡；范围明确只换引擎结构，屏幕、导航、画风、事实对照表不变，不新增部门）；docs/prototypes/CHANGELOG.md 增加 v9 条目 / 用户确认继续做原型，验证游戏化方向的第一步——结构改动要现在做、范围收到最小，画法与导航之类的扩展留给之后逐步验证
 claude-opus-5-5 / 2026-09-29 16:10 / 新增 docs/design/test-pyramid.md（测试分层：三层定义与目录、边界检查、时间上限、各角色运行的层、集成层每 5 个 PR 批量运行与失败处理、测试往下层移、输出读取），设计索引增加条目 / 全量测试 28 分钟、每个执行者与审查者都运行并把输出带进上下文，并发运行时内存耗尽；用户要求整理成三层的测试金字塔，并决定审查者只跑单元与模块层、集成层按批运行
+
+claude-sonnet-5 / 2026-09-29 16:10 / 新增 docs/prototypes/v9/design.md（像素引擎改为实体—组件—系统结构：房间与管道图结构声明代替 layoutFor/pipesFor 写死坐标，事件变任务或者信号、任务目录复用 v8 design.md 第 5.4、8.3 节两张表，角色头顶对话框补完 v8 第 8.3 节已写但没实现的思考气泡；范围明确只换引擎结构，屏幕、导航、画风、事实对照表不变，不新增部门）；docs/prototypes/CHANGELOG.md 增加 v9 条目 / 用户确认继续做原型，验证游戏化方向的第一步——结构改动要现在做、范围收到最小，画法与导航之类的扩展留给之后逐步验证
+
 claude-opus-5-5 / 2026-09-29 16:40 / test-pyramid.md 第 8 节写明层之间的导入规则由 import-linter 契约检查；第 9 节把往下层移分成可以同时进行的两部分，写明第 2 步合并后进行中分支的处理；新增第 10 节保存用户已确认的规则文件修改原文 / 用户确认规则文件的修改内容，等第 2 步合并以后写入
+
 claude-opus-5-5 / 2026-09-29 16:55 / 测试分层设计说明与设计索引写上工单 #157（#158 至 #161） / 建立测试分层的父工单与子工单
+
 claude-opus-5-5 / 2026-09-29 17:18 / 测试分层设计说明改为用登记表 harness/tests/layers.toml 表示分层：测试文件与辅助文件原地不动，不建层目录，混合文件登记为最高一层，根 conftest 按登记表加标记并按层检查，运行命令改为按标记选择；第 3、8、9 节重写，第 10 节的规则文件修改已写入并删除；AGENTS.md 常用命令（uv、三层命令、执行者与审查者不运行全量）、执行者自测与交付、审查者测试与结论，CLAUDE.md 自主推进模式增加第 4 步集成层批量运行 / 用户要求用对进行中工单影响更小的方式实施测试分层，并先修改规则
+
 opencode-go/deepseek-v4.1-flash / 2026-09-29 17:40 / 合入 main（a540917）后的记录整理：#110 的第 1 轮记录与 #45 的两轮记录按时间顺序并列保留，没有改动既有条目 / 工单 #110 第 2 轮把分支合入 main 并解决 agents_jour.md 与 docs/CHANGELOG.md 的追加冲突
+
 claude-sonnet-5-5 / 2026-09-29 18:07 / docs/prototypes/v9/BUILD.md 与 design.md 中部门房间 room.js 的范围改为原样保留：分层图去掉 room.js 到 ecs.js 的连线，文件结构、负责者表（去掉任务 R）、接口说明、渲染说明与设计说明第 1、7 节同步修改；BUILD.md 第 3.3 节代码注释里的「任务 T」改为「任务 F」 / 用户确认取消任务 R，v9 只改项目楼层与楼里的画面
+
 claude-opus-5-5 / 2026-09-29 18:20 / docs/architecture-issues.md 中 #73 读取模型数据库一条写入处理：采纳具名例外，读取模型使用自己的 read-models.sqlite，不打开事件日志的数据库、不写三张日志表 / #73 审查通过并合并
+
 claude-sonnet-5-5 / 2026-09-29 18:21 / 新增 docs/prototypes/v9/checks/（env.js、record.js、replay.js）：楼层画面的确定性验收脚本，record.js 在 v8 页面播放全部场景并录下项目楼层画面收到的调用，replay.js 把录下的调用按固定的时钟与随机数回放给 v8 与 v9 的楼层画面，在静止检查点比较整张画面的像素与小人的位置姿势 / 任务 F 改写楼层画面，需要不依赖执行者自述的客观验收依据
+
 claude-sonnet-5-5 / 2026-09-29 19:19 / docs/prototypes/v9/js/pixel/ecs.js 与 floor.js 改写为实体—组件—系统：房间与管道由声明排布，部门角色的持续状态取自快照（ch.rest），事件变成任务放进队列，交接由两端角色的任务与沿管道移动的包裹实体组成，小人头顶按当前任务显示对话框，待机时偶尔起身走动；building.js 由任务 B 改写并合入，room.js 保持 v8 原样；checks/ 的 replay.js 增加减少动画选项、随机走动开关与有差异时重跑一次 / 实现 v9 设计说明第 3 至 6 节，静止画面与 v8 逐像素相同
+
 claude-sonnet-5-5 / 2026-09-29 19:47 / docs/prototypes/v9/BUILD.md 第 2、3、4 节与 design.md 第 3 至 8 节按已实现的 ecs.js 改写：实体与组件的形状、房间与管道的声明、任务目录、队列规则（持续状态、上限、静止、待机走动）、渲染与对话框、验收脚本；docs/prototypes/CHANGELOG.md 的 v9 条目改为已交付；docs/prototypes/v9/checks/ 增加 matrix-home.js、matrix-floor.js、scenarios.js、walkers.js、identity-building.js、life.js / 设计说明与构建约定和代码保持一致；用户确认按已实现的内容改写
-claude-sonnet-5-5 / 2026-09-29 21:12 / docs/prototypes/v9/design.md 与 BUILD.md 按补全后的实现改写：第一步补上多角色、空闲角色自己找事做、管道持续流动、机房与楼的实体化，第二步运维部门只写声明（新增 js/pixel/floor-decl.js），第三步决定请求在世界里回答（新增 js/pixel/decision-card.js，项目概览页的决定区块改为大厅的板与文字列表）；docs/prototypes/CHANGELOG.md 的 v9 条目同步；docs/prototypes/v9/checks/ 增加 behaviors.js，replay.js、life.js、record.js 增加自主行为开关与录制选项 / 用户提供架构师 16:10 的原话，要求按原话把没做到的部分补上
-opencode-go/deepseek-v4.1-flash / 2026-09-29 21:35 / harness/tests/openapi/openapi.json 按服务端重写（`--write-openapi-snapshot`）：合入 main 后同一份文档里同时包含 16 个应用层项目查询（含读取模型）与 #77 的目录查询、目录与凭据命令；harness/app/application.py 的能力清单把 `*PROJECT_QUERIES` 与目录命令、查询合并；harness/tests/test_api.py 的命令集合、查询集合与覆盖层断言按合并后的清单重写 / #77 第 3 轮合入 main（#45、#73、#110）
+
 claude-opus-5-5 / 2026-09-29 20:15 / docs/architecture-issues.md 中 #76 两条与 #77 一条写入处理：客户端页面来源固定为 yudao://app（#79 沿用）；局域网订阅事件流的验收移到 #75；准入陈旧改按受影响字段判断（#86） / #76、#77 审查通过并合并
 
+claude-sonnet-5-5 / 2026-09-29 21:12 / docs/prototypes/v9/design.md 与 BUILD.md 按补全后的实现改写：第一步补上多角色、空闲角色自己找事做、管道持续流动、机房与楼的实体化，第二步运维部门只写声明（新增 js/pixel/floor-decl.js），第三步决定请求在世界里回答（新增 js/pixel/decision-card.js，项目概览页的决定区块改为大厅的板与文字列表）；docs/prototypes/CHANGELOG.md 的 v9 条目同步；docs/prototypes/v9/checks/ 增加 behaviors.js，replay.js、life.js、record.js 增加自主行为开关与录制选项 / 用户提供架构师 16:10 的原话，要求按原话把没做到的部分补上
+
+opencode-go/deepseek-v4.1-flash / 2026-09-29 21:35 / harness/tests/openapi/openapi.json 按服务端重写（`--write-openapi-snapshot`）：合入 main 后同一份文档里同时包含 16 个应用层项目查询（含读取模型）与 #77 的目录查询、目录与凭据命令；harness/app/application.py 的能力清单把 `*PROJECT_QUERIES` 与目录命令、查询合并；harness/tests/test_api.py 的命令集合、查询集合与覆盖层断言按合并后的清单重写 / #77 第 3 轮合入 main（#45、#73、#110）
+
+claude-sonnet-5-5 / 2026-09-29 22:28 / docs/prototypes/v9/design.md 与 BUILD.md 按独立代码审查的修复同步：决定板立在大厅地面上，卡片盖章期间与说明栏的文字留着，翻页与关闭按钮分开，回放到过去的时间点没有角色，运维数据出现时世界重新声明并保留在途的包裹与角色，材料放不下时截断、选项太多时收窄；docs/prototypes/v9/checks/behaviors.js 增加 15 项 / 独立审查发现 9 处缺陷，其中 Stage 5 回放报错、决定单被插队丢失最严重，全部修复并各有回归检查
 
 claude-sonnet-5 / 2026-09-29 22:40 / docs/examples/providers.json 按 ADR-0004 重写：协议移到 Provider 配置（新增 opencode-go-responses 与 opencode-go-chat 两条共用凭据引用的连接），模型访问定义删除 protocol 与 admitted_protocol；README.md「配置 Provider」示例同步（protocol 移到 provider），并写明请求路径拼接规则与 Provider 连接只信任操作系统证书库、SSL_CERT_FILE/SSL_CERT_DIR 不起作用 / #84 实施 ADR-0004（一份连接一种协议）与 #114 条目（README 的 Provider 证书说明），示例与文档与实现一致
-claude-sonnet-5-5 / 2026-09-29 22:28 / docs/prototypes/v9/design.md 与 BUILD.md 按独立代码审查的修复同步：决定板立在大厅地面上，卡片盖章期间与说明栏的文字留着，翻页与关闭按钮分开，回放到过去的时间点没有角色，运维数据出现时世界重新声明并保留在途的包裹与角色，材料放不下时截断、选项太多时收窄；docs/prototypes/v9/checks/behaviors.js 增加 15 项 / 独立审查发现 9 处缺陷，其中 Stage 5 回放报错、决定单被插队丢失最严重，全部修复并各有回归检查
-claude / 2026-09-30 02:25 / docs/architecture-issues.md 追加 #75 的两条：#75 `role` 范围参数在 events 表没有 role 索引、`EventStore.read()` 没有 role 条件（Stage 5 需要补）；#75 事件对象的 `actor` 在合同里是非空字符串而日志列可为 NULL，本次把空提出者写成空串 / #75 实现过程中发现，交架构师确认
+
+claude-opus-5-5 / 2026-09-30 00:00 / docs/decision.md 新增「自举作为核心目标；单一写入角色是短期取舍；质量检查按部门分为工序；变异与复杂度做成研发工具」一条 / 用户在讨论变异测试、复杂度检查与测试流程进入 Yudao 时作出的决定
+
 claude-sonnet-5-5 / 2026-09-30 00:50 / docs/prototypes/v9/design.md 第 1、4、6、9、10、11 节、BUILD.md 第 1、2、3、4 节与 docs/prototypes/CHANGELOG.md 的 v9 条目按小人头顶的说话气泡改写：项目楼层与部门房间共用 js/pixel/say.js 的目录，交接、分派、询问的两端各说一句，收到询问的房间走到传信管口取信，减少动画时照样显示；docs/prototypes/v9/checks/behaviors.js 增加 33 项 / 用户指出小人的互动没有气泡（例如工程经理代表部门提交交付说明时头顶应该说「现在提交交付说明」），部门房间画面原先完全没有说话气泡
 
-opencode-go/deepseek-v4.1-flash / 2026-09-30 10:20 / 模型管理设计说明第 3 节两张表（模型访问定义与调用目标）与 ADR-0005 的调用目标枚举加入「是否接受要求调用工具」；第 4.3、4.4 节已写明默认为接受、修改保持准入 / 工单 #102 实施该字段，文档与实现保持一致
-claude-sonnet-5-5 / 2026-09-30 01:30 / docs/prototypes/v9/ 改名：js/y8.js 改名为 js/y9.js，全局对象 Y8 改为 Y9，CSS 类名前缀 y8- 改为 y9-，存储键前缀 y8. 改为 y9.，顶栏标签、页面标题与样式文件的标题写 v9；checks/env.js 增加 spaceOf，record.js、replay.js、identity-building.js、life.js 按页面所属的版本取命名空间与存储键；BUILD.md 开头说明命名随版本改名，design.md 状态改为定稿；docs/prototypes/CHANGELOG.md 的 v9 条目增加版本标识与定稿两项 / 用户要求确保原型是 v9 并结束原型设计，v9 由 v8 整份复制而来，界面与代码里仍然是 v8 的名字，与 v7 到 v8 的做法不一致
-claude-sonnet-5-5 / 2026-09-30 01:58 / docs/program-roadmap.md（近期顺序图的原型节点、第 4 项界面工作线的原型依据改为原型 v9 并注明原型设计已结束，更新日期与说明补一句）、docs/design/README.md、app-and-interface.md、existing-project-onboarding.md、execution-environment.md、browser-and-computer-use.md 中对原型 v8 的引用改为原型 v9：整体性的引用（#125 的依据、原型的示例项目、构建约定的链接）直接改为 v9，指向章节号的引用写成「原型 v9 沿用 v8 设计说明第 N 节」；app-and-interface.md 的依据一行去掉「尚未制作，完成后替换链接」，改为 v9 设计说明与构建约定的链接；五份设计文档的更新日期改为 2026-09-30 / 用户要求在原型设计结束以后，把设计文档与路线图里的原型 v8 引用改成 v9；v9 的设计说明与构建约定只写与 v8 不同的地方，屏幕清单、页面导航与接口层的章节仍在 v8 的文档里，所以章节号引用保留 v8 设计说明作为出处
-muse-spark-1.3-contributor-free / 2026-09-30 02:34 / harness/tests/openapi/openapi.json 按服务端重写（--write-openapi-snapshot）：#85 第 1 轮给 CatalogCandidatesCollectedPayload 增加 candidates 字段后快照未同步，本轮合入 origin/main 重跑 test_openapi_snapshot 时发现；重写后的差异只有 candidates 字段与其在 required 列表中的一项，并在 harness/tests/openapi 运行 npm run check 由快照生成 TypeScript 类型并编译通过 / #85 第 2 轮按任务评论合入最新 origin/main 后重跑 test_layers 与 test_openapi_snapshot，快照是接口合同的记录，有意的加字段变化要用测试自带的重写开关重新生成
-claude-opus-5-5 / 2026-09-30 00:00 / docs/decision.md 新增「自举作为核心目标；单一写入角色是短期取舍；质量检查按部门分为工序；变异与复杂度做成研发工具」一条 / 用户在讨论变异测试、复杂度检查与测试流程进入 Yudao 时作出的决定
 claude-opus-5-5 / 2026-09-30 00:53 / docs/decision.md 新增「圈复杂度与变异测试在本阶段末手动进行；工具放到下一阶段」一条，2026-09-29 一条的「影响」改为需求写进 D35、自举的 ADR 与路线图等的调整先经用户确认；新增 docs/requirements/self-hosting.md（D35 自举：用户原话、已确认的五项、讨论中的分析、前提与现在的路线位置、待用户确认的事项），docs/requirements/README.md 增加 D35 一行 / 用户决定当前阶段不建工具、不改动开发流程的规则，Stage 3 结束之前与 Claude 手动进行一次圈复杂度与变异测试，先把以后要做的事情规划好
+
 claude-opus-5-5 / 2026-09-30 00:53 / 新增 docs/research/complexity-and-mutation-testing.md（本仓库的复杂度分布、mutmut 3.8.0 在 compaction.py 与 collaboration.py 上的试跑与成本估算、手动进行的步骤、工具的事实与成熟做法），docs/research/README.md 增加索引 / 保存 2026-09-29 至 09-30 的实测与调研结果，作为本阶段末手动检查的方法与下一阶段研发工具的依据
+
 claude-opus-5-5 / 2026-09-30 00:53 / docs/design/README.md 测试分层一条的内容按设计说明改为登记表 layers.toml 与已有的辅助文件，状态与 docs/design/test-pyramid.md 的状态写明同日暂缓 / 索引与设计说明不一致；#157 与 #158 已由用户在 2026-09-29 决定暂缓
+
+claude-sonnet-5-5 / 2026-09-30 01:30 / docs/prototypes/v9/ 改名：js/y8.js 改名为 js/y9.js，全局对象 Y8 改为 Y9，CSS 类名前缀 y8- 改为 y9-，存储键前缀 y8. 改为 y9.，顶栏标签、页面标题与样式文件的标题写 v9；checks/env.js 增加 spaceOf，record.js、replay.js、identity-building.js、life.js 按页面所属的版本取命名空间与存储键；BUILD.md 开头说明命名随版本改名，design.md 状态改为定稿；docs/prototypes/CHANGELOG.md 的 v9 条目增加版本标识与定稿两项 / 用户要求确保原型是 v9 并结束原型设计，v9 由 v8 整份复制而来，界面与代码里仍然是 v8 的名字，与 v7 到 v8 的做法不一致
+
+claude-sonnet-5-5 / 2026-09-30 01:58 / docs/program-roadmap.md（近期顺序图的原型节点、第 4 项界面工作线的原型依据改为原型 v9 并注明原型设计已结束，更新日期与说明补一句）、docs/design/README.md、app-and-interface.md、existing-project-onboarding.md、execution-environment.md、browser-and-computer-use.md 中对原型 v8 的引用改为原型 v9：整体性的引用（#125 的依据、原型的示例项目、构建约定的链接）直接改为 v9，指向章节号的引用写成「原型 v9 沿用 v8 设计说明第 N 节」；app-and-interface.md 的依据一行去掉「尚未制作，完成后替换链接」，改为 v9 设计说明与构建约定的链接；五份设计文档的更新日期改为 2026-09-30 / 用户要求在原型设计结束以后，把设计文档与路线图里的原型 v8 引用改成 v9；v9 的设计说明与构建约定只写与 v8 不同的地方，屏幕清单、页面导航与接口层的章节仍在 v8 的文档里，所以章节号引用保留 v8 设计说明作为出处
+
+claude / 2026-09-30 02:25 / docs/architecture-issues.md 追加 #75 的两条：#75 `role` 范围参数在 events 表没有 role 索引、`EventStore.read()` 没有 role 条件（Stage 5 需要补）；#75 事件对象的 `actor` 在合同里是非空字符串而日志列可为 NULL，本次把空提出者写成空串 / #75 实现过程中发现，交架构师确认
+
+muse-spark-1.3-contributor-free / 2026-09-30 02:34 / harness/tests/openapi/openapi.json 按服务端重写（--write-openapi-snapshot）：#85 第 1 轮给 CatalogCandidatesCollectedPayload 增加 candidates 字段后快照未同步，本轮合入 origin/main 重跑 test_openapi_snapshot 时发现；重写后的差异只有 candidates 字段与其在 required 列表中的一项，并在 harness/tests/openapi 运行 npm run check 由快照生成 TypeScript 类型并编译通过 / #85 第 2 轮按任务评论合入最新 origin/main 后重跑 test_layers 与 test_openapi_snapshot，快照是接口合同的记录，有意的加字段变化要用测试自带的重写开关重新生成
+
+opencode-go/deepseek-v4.1-flash / 2026-09-30 10:20 / 模型管理设计说明第 3 节两张表（模型访问定义与调用目标）与 ADR-0005 的调用目标枚举加入「是否接受要求调用工具」；第 4.3、4.4 节已写明默认为接受、修改保持准入 / 工单 #102 实施该字段，文档与实现保持一致
+
 claude-opus-5-5 / 2026-09-30 12:10 / docs/program-roadmap.md 第 1 节 Stage 3 的状态与第 2 节近期顺序图按工单进度更新（#45、原型 v9 并入已完成，各工作包的完成数与执行中的工单）；docs/stage-3-plan.md 开头状态、第 3 节各工作包的子工单编号（#126、#140–#145、#134–#139、#146、#127）与原型依据改为 v9、第 8 节补两次集成层批量运行的结果；docs/current-baseline.md 的代码起点改为 1bbd5b81，新增集成层批量运行、用户决定与调用目标解析、应用层与接口层、模型管理四行 / 整体状态核对：三份状态文档停在 2026-09-29，没有反映此后合并的 #45、#73、#74、#76、#77、#84、#85、#102、#110 与原型设计的结束
+
 claude-opus-5-5 / 2026-09-30 14:51 / 新增 docs/adr/0021-client-pixel-view-follows-v9-structure.md（正式客户端的像素画面按原型 v9 的实体—组件—系统结构实现，技术按 ADR-0015）；docs/stage-3-plan.md 开头状态、第 3 节（界面工作线与各工作包的工单编号、前置写法、父工单之间只保留两处阻塞、D21 由 #80 实现、#172 与 #173）、第 7 节（圈复杂度与变异测试）、第 8 节（关键路径），新增第 9 节「试用里程碑」；docs/program-roadmap.md 第 2 节写明像素画面的实现方式、界面工单与四个试用里程碑；docs/requirements/README.md 的 D21、D24、D29、D30、D32、D33 六行与 docs/design/README.md 中模型管理、执行环境服务、浏览器与 computer use、接入已有项目、应用层与接口层、评测场景、恢复契约的状态行按实施进度与里程碑更新；docs/decision.md 新增 2026-09-30「Stage 3 按四个试用里程碑推进，正式客户端的像素画面按 v9 结构实现」 / 用户要求梳理 Stage 3 的工单、任务分解、架构依赖与需求管理，并要求有自己能试用和核对的里程碑；经逐项讨论确定里程碑、界面拆分与像素画面的实现方式
+
 claude-opus-5-5 / 2026-09-30 15:02 / docs/design/evaluation-scenarios.md 开头状态（审阅完毕、各部分所属的里程碑）、第 1 节版本回归的时机、第 3 节时间上限与超时的评分、第 10 节实施顺序（里程碑与依赖、界面智能体与裁判沿用的做法）；docs/requirements/comparison-experiment.md 状态行；docs/design/browser-and-computer-use.md 第 14 节场景 7、docs/design/existing-project-onboarding.md 第 10 节第 12 项与工单表、docs/design/execution-environment.md 第 10 节末段改为版本回归在里程碑试用之前运行；docs/stage-3-plan.md 第 3、7、9 节，docs/program-roadmap.md 第 2 节第 5 项，docs/requirements/README.md 的 D32 与 docs/design/README.md 的评测场景条目同步；docs/decision.md 新增「评测场景设计审阅」 / 用户逐项审阅评测场景设计，确定评测各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分
+
 claude-opus-5-5 / 2026-09-30 15:21 / docs/stage-3-plan.md 第 3 节评测工作线一行与第 9 节 M2、M3、M4 三行，docs/design/evaluation-scenarios.md 开头状态，docs/design/README.md、docs/requirements/README.md 与 docs/requirements/comparison-experiment.md 的评测状态写上工单 #188 至 #198 / 用户运行 /to-tickets，#118 拆成 11 张子工单并按里程碑分组
+
 claude-opus-5-5 / 2026-09-30 15:48 / docs/design/evaluation-scenarios.md 第 3 节模型一行、第 4.3 节与第 9 节写明评测使用的模型与模型服务的环境变量；docs/requirements/comparison-experiment.md 增加用户原话、已确认的模型一条与实现状态；docs/decision.md 新增「评测使用的模型」 / 用户提供模型服务并指定被测模型 DeepSeek V4.1 Flash、界面智能体 gh/gemini-3.8-flash、裁判 cc/claude-sonnet-5-5，三者经核对都能读图
+
 claude-opus-5-5 / 2026-09-30 16:02 / docs/design/evaluation-scenarios.md 第 4.3 节、docs/requirements/comparison-experiment.md（原话与已确认的模型一条）、docs/decision.md「评测使用的模型」中的裁判改为 qdcn/qmodel_38max / 用户指定裁判改用 qdcn/qmodel_38max，经核对能读图
+
 claude-opus-5-5 / 2026-09-30 16:54 / docs/architecture-issues.md 中 #16 定义版本决定请求一条写入处理：写在 run 流，种类 definitions_changed，阻塞范围为 run / #16 审查通过并合并
+
 claude-opus-5-5 / 2026-09-30 17:47 / docs/architecture-issues.md 中 #75 两条写入处理：按角色筛选的索引与 read() 条件由 Stage 5 实施（#50 评论）；事件对象中历史事件的空提出者表示「写入时没有声明」，作为 actor 的缺省含义 / #75 审查通过并合并
+
 claude-opus-5-5 / 2026-09-30 18:31 / docs/decision.md「评测使用的模型」补充裁判是 Qwen3.8 Max；新增「真实 Provider 验收使用 9router；长期目标可以修改；暂停的 run 可以继续；#155 的文本模型」与「远程执行验收使用的开发板是 Orange Pi AIpro」两条 / 记录用户对 Stage 3 待澄清事项的答复与核对的事实
+
 claude-opus-5-5 / 2026-09-30 18:58 / 长期目标可以修改：docs/design/app-and-interface.md 第 3.2 节增加 `project.set_goal`、第 10 节第 12 项写明规则，docs/design/architecture/overall-architecture.md 第 11 节删去这一待讨论项；暂停以后继续：docs/requirements/execution-limits.md（D09）写明决定请求与继续的规则，app-and-interface.md 第 3.3 节与 overall-architecture.md 第 7.4 节的决定表增加这一种并补上定义版本的决定请求，CONTEXT.md「决定请求」同步；开发板改为 Orange Pi AIpro：docs/design/execution-environment.md（状态、第 1.1、5.3.2、5.3.4、6.1、10、11 节与工单表，安装包由控制主机提供，升级使用 --reinstall）、docs/stage-3-plan.md（第 1、3、8、9 节，并加入 #203、#204）、docs/program-roadmap.md、docs/requirements/remote-execution.md、docs/adr/0018-single-control-host-remote-execution.md、docs/design/architecture/core-and-materials.md、overall-architecture.md、CONTEXT.md、docs/design/existing-project-onboarding.md、docs/requirements/existing-project-onboarding.md、docs/design/README.md、docs/requirements/operations-department.md、docs/requirements/stage-requirements-overview.md、docs/requirements/README.md（D09、D29）；app-and-interface.md 增加查询 `agent.package`；docs/decision.md 两条写明修改文件 / 用户确认按清单修改文档，并建立 #203、#204
+
 claude-opus-5-5 / 2026-09-30 19:10 / docs/stage-3-plan.md 第 3 节 3.9 一行、docs/program-roadmap.md 第 13 项、docs/requirements/stage-requirements-overview.md 3.9 一行写明组合验收使用 openai-agents-python，浏览器与 computer use 的结论引用 #155；docs/decision.md 新增「3.9 使用 openai-agents-python；模型服务不限流；开发板的登录」 / 用户采纳 3.9 的推荐，说明模型服务不限流，开发板的公钥由架构师添加
+
 claude-opus-5-5 / 2026-09-30 19:25 / docs/decision.md 新增「不使用容器」，写明需要重新确定的设计与暂停派发的 15 张工单 / 用户决定完全不用容器
+
 claude-opus-5-5 / 2026-09-30 19:40 / docs/decision.md「不使用容器」一条补充方向：WSL 作为一台登记的机器，以及 WSL 的核对结果 / 用户选择用 WSL 代替本机容器
+
 claude-opus-5-5 / 2026-09-30 20:37 / docs/decision.md「不使用容器」一条改为：执行环境（包括是否需要 WSL）、computer use、跨平台工具库列为待讨论的专题，记录用户原话与意见；docs/requirements/stage-requirements-overview.md 第 6 节改为 Stage 3 待讨论的专题清单（五项）与以后阶段的讨论；docs/requirements/self-hosting.md（D35）待确认事项增加第 5 项跨平台；docs/research/complexity-and-mutation-testing.md 第 1.4 节增加能在 Windows 上运行的工具与 cosmic-ray 的实测 / 用户要求把这个话题列为 TODO 单独讨论，并记录
+
 claude-opus-5-5 / 2026-09-30 22:18 / 新增 docs/adr/0022-run-directly-without-containers.md（代码在执行位置上直接运行，不使用容器与 WSL）；ADR-0018、ADR-0012、ADR-0010、ADR-0015 的状态行注明被取代的部分；docs/decision.md 新增「不使用容器以后的执行环境」 / 专题 1 讨论中用户采纳六项推荐，并确认修改清单
+
 claude-opus-5-5 / 2026-09-30 22:18 / docs/design/execution-environment.md 改为本机进程与远程执行代理两种实现：第 5.2 节改为执行位置上的程序与依赖缓存，第 8 节写明代码的权限与来源不明的仓库，第 7、9、10、11 节按控制主机构建、开发板检查修改，第 12 节改用工单号；docs/design/evaluation-scenarios.md 改为在控制主机上直接运行：运行目录在仓库之外，隐藏材料在运行结束以后复制并查找材料目录的路径，三个场景使用 Python 3.13，场景 1 的端口由 PORT 给出，场景 2 写明 Windows 上的核对结果，场景 2、3 的 Yudao 一侧移到 M2 / 同上
+
 claude-opus-5-5 / 2026-09-30 22:18 / docs/design/browser-and-computer-use.md 与 D34：试用在 run 的执行位置上直接进行，第 3.2 节改为执行位置上的程序，端口由 Yudao 分配并经 PORT 传入，computer use 的屏幕从哪里来待专题 2，第 16 节决定 3、验收场景与工单表按此修改 / 同上
+
 claude-opus-5-5 / 2026-09-30 22:18 / CONTEXT.md、D29、D31、D32、D35、需求概览、需求索引、Stage 3 计划（第 1 至 3 节、第 7 节、关键路径、M2 与 M3 的内容，M3 改名为「远程执行、外部工具、多项目并行」）、路线图、当前验收基线、设计索引、本地通用工具、接入已有项目（来源不明的仓库，openai-agents-python 的测试命令写明 Python 3.13）、总体架构、系统架构原理、应用层与接口层按 ADR-0022 修改 / 同上
+
 claude-opus-5-5 / 2026-09-30 22:18 / 新增 docs/research/computer-use-without-containers.md（14 个项目的屏幕来源、在同一台电脑上不打扰用户的做法、Windows 11 家庭版的限制、开发板上直接运行 Xvfb 的软件包与占用、Windows 的 UI Automation），docs/research/README.md 加入索引；需求概览第 6 节第 2 项写明调研已完成，并加入启动方式怎样适应不同系统的待讨论项 / 用户同意 computer use 的调研在后台进行；质检的检查位置可能与工程的系统不同
+
 claude-opus-5-5 / 2026-09-30 22:46 / docs/design/execution-environment.md 第 10 节场景 1 增加可执行标记在开发板上的核对；docs/design/browser-and-computer-use.md 第 17 节截图证据与请求中的截图由 #149 实现，#148、#149 的中断验收在本机进程上进行，#155 增加 #143 的阻塞；docs/stage-3-plan.md 关键路径写明 #155 另外依赖 #143 / 同步工单时发现：可执行标记没有工单在 Linux 上验证，#148 没有截图的来源，#149 的远程验收依赖 3.2C 的远程部分
+
 qwen3.8 / 2026-09-30 23:30 / docs/architecture-issues.md 为 #134 登记一处合入 origin/main 时的基线核对：分支落后 origin/main 7 个提交，#205 修好了 #16 与 #75 合并遗留的两处 `NewEvent(..., role=...)` 并重生成事件序列基准 / 交付 #134 前核对该失败不是本工单引入，合入以后消失
+
 claude-opus-5-5 / 2026-10-01 01:15 / docs/architecture-issues.md 为 #202 登记的执行槽位占用问题追加处理结论 / 架构师处理执行者登记的架构问题
+
+claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置
+claude-opus-5 / 2026-10-01 / docs/architecture-issues.md 增加两条：#89 登记事项内没有部门 Prompt 副本与按事件重新装配请求的审计的冲突，以及项目事件种类改名与 ADR-0019 的边界 / #89 执行中发现，供架构师处置
+
+claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置
+
 claude-opus-5-5 / 2026-10-01 01:46 / 新增 docs/adr/0023-client-installed-apart-release-is-one-wheel.md（桌面客户端与 Yudao 服务分开安装，一次发布是一个 wheel，客户端版本跟随 Yudao 服务）与 docs/design/client-packaging-and-release.md（桌面客户端的安装、更新与发布设计说明：安装、本机服务的启动与停止、托盘、更新、发布脚本、签名 TODO、验收、工单拆分）；新增 docs/research/client-packaging-and-update.md（客户端打包调研），docs/research/README.md 加入索引；docs/decision.md 新增「桌面客户端的打包、安装与发布」 / 用户选择专题 5 用 grill 讨论，三轮逐项采纳推荐
+
 claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、6.2、8、10 节、`system.status` 与 `agent.package` 按客户端的安装、更新与发布修改（更新页与更新源、本机停止请求、命令行入口 yudao、发布版本号与正在运行的 run 数、执行代理安装包随 wheel 提供）；docs/design/execution-environment.md 第 5.3.2 节执行代理的安装包改为发布时构建、随 Yudao 服务的 wheel 提供，第 12 节 #144 一行同步；docs/requirements/web-game-frontend.md（D30）与 docs/requirements/stage-requirements-overview.md 第 6 节第 5 项写明已确定并登记遗留；CLAUDE.md 工作流程第 7 步加入发布；CONTEXT.md 加入「Yudao 服务」「桌面客户端」「发布」 / 同上
+
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
 
-claude-sonnet-4-5 / 2026-10-01 22:50 / docs/architecture-issues.md 追加一条：#127 的工作树换行符（CRLF）与仓库保存的 LF 不一致，仓库本地 core.autocrlf=false 且没有 .gitattributes / 记录实现 #127 时遇到的交付 diff 无法审阅的问题，请架构师确认换行符规则
+opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
+
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 
-qwen3.8 / 2026-10-01 07:40 / docs/architecture-issues.md 为 #135 登记两条架构问题（项目流字段清单拒绝 `project_registered.source` 取值集合的扩大；宿主私有路径的拒绝与 git 仓库接入相冲突）/ 执行者按 3.8 设计说明实施接入命令时遇到与 ADR-0019 及验收第 8、9 项的冲突，按 AGENTS.md 登记并等待架构师确认
-claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
 claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事件序列基准缺少 `definitions_version` 投影字段，44 项基准在 #200 加入该字段后未重写 / #172 需要重写事件序列基准，登记这项与写出字节改动无关的既有差异并说明处置
-claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
-my-provider/ag/gemini-3.8-flash-high / 2026-10-01 18:20 / docs/design/evaluation-scenarios.md 第 1 节表格的场景 3「正确性与完成度」一行与第 2.3 节「需求条目」一条由 23 条检查、单元 11 改为 24 条检查、单元 12；第 2.3 节「检查的改造」中 test_line_preference 一条写明上游断言 `any(" 1" in edge.line)` 失效的原因，以及改为在两条路线上各指定一条基准路径不经过的线路、再加一组多线路偏好的做法 / #188 第 2 轮新增线路偏好检查，公开材料、评分器与设计说明的检查条数需要一致
-claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/main 时把 #79 的接口版本条目（2026-10-01 03:10）排到本工单 #135 的两条条目（07:14、07:40）之前，恢复条目之间的空行 / 该文件按时间顺序追加，合并时两侧都新增了条目，需要按时间重排，本工单未改动任何条目的正文与「处理：待架构师确认」
+
+qwen3.8 / 2026-10-01 07:40 / docs/architecture-issues.md 为 #135 登记两条架构问题（项目流字段清单拒绝 `project_registered.source` 取值集合的扩大；宿主私有路径的拒绝与 git 仓库接入相冲突）/ 执行者按 3.8 设计说明实施接入命令时遇到与 ADR-0019 及验收第 8、9 项的冲突，按 AGENTS.md 登记并等待架构师确认
+
+claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
 
 qwen3.8 / 2026-10-01 11:20 / docs/architecture-issues.md 为 #176 登记三条待架构师确认的问题（「全部公开画法」的判定口径、画面对象是否包含 setOverlay、整数倍缩放指渲染缓冲还是显示尺寸） / 执行者在像素画面一的移植中遇到验收口径与接口形状不确定，按工作流程登记
+
+qwen3.8 / 2026-10-01 13:05 / docs/architecture-issues.md 登记一条：合入 origin/main 时 #134 与 #89 对「事项种类的部门说明」归属的冲突，及处置（把种类说明优先于角色说明从 create_run 写入 run 移到 _department_prompt 每次请求读取，版本 0，不参与项目部门设置版本历史） / 第 3 轮合入 main 时两侧语义在同一处对立，需架构师确认口径
+
+qwen3.8 / 2026-10-01 16:45 / docs/architecture-issues.md 登记一条：客户端的生成接口类型与接口层快照没有自动检查，main 上提交的 types.gen.ts 已经与同一时刻的快照不一致 / #87 第 6 轮核对接口合同改动的影响范围时发现，交架构师决定是否把一致性写进自动检查
+
+claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
+
+my-provider/ag/gemini-3.8-flash-high / 2026-10-01 18:20 / docs/design/evaluation-scenarios.md 第 1 节表格的场景 3「正确性与完成度」一行与第 2.3 节「需求条目」一条由 23 条检查、单元 11 改为 24 条检查、单元 12；第 2.3 节「检查的改造」中 test_line_preference 一条写明上游断言 `any(" 1" in edge.line)` 失效的原因，以及改为在两条路线上各指定一条基准路径不经过的线路、再加一组多线路偏好的做法 / #188 第 2 轮新增线路偏好检查，公开材料、评分器与设计说明的检查条数需要一致
+
+claude-opus-5-5 / 2026-10-01 18:40 / docs/architecture-issues.md 为 #87 登记的客户端生成类型与快照不同步一条追加处理结论（建工单 #221） / 架构师处理执行者登记的架构问题
+
+omp / 2026-10-01 19:37 / docs/architecture-issues.md 登记两条：#89 删除 run 流事件种类与字段后接口版本（`API_VERSION`）与 run 事件版本（`RUN_EVENT_VERSION`）仍为 1、纳入版本管理的客户端生成类型与快照脱节且无一致性检查；#89 的 `test_work_item_execution_runs_in_loop_and_settles_on_completion` 在 60 秒等待预算内跑不完三部门完整循环（实测 116.1 秒），在干净的 origin/main 上同样失败，与 #219 同类 / 第 4 轮合入 main 并跑改动相关测试时发现，两处都超出本工单范围，交架构师裁决
+
+claude-opus-4-6 / 2026-10-01 20:05 / docs/architecture-issues.md 合入 origin/main 时把 #79 的接口版本条目（2026-10-01 03:10）排到本工单 #135 的两条条目（07:14、07:40）之前，恢复条目之间的空行 / 该文件按时间顺序追加，合并时两侧都新增了条目，需要按时间重排，本工单未改动任何条目的正文与「处理：待架构师确认」
+
 minimax-M3.1 / 2026-10-01 21:05 / 无文档改动；本工单第 2 轮只做合入 origin/main（d4248448）与按合并后的依赖重装，代码与文档正文与第 1 轮一致 / 分支起点早于 #79 合入 main，client/ 目录两侧各自新增导致七个 add/add 冲突，client 的六个文件按「main 上 #79 的外壳 + 本工单像素新增」保留，三份追加型记录两侧条目都保留、按时间顺序排列
+
 minimax-M3.1 / 2026-10-01 21:20 / client/src/main/window.ts 与 client/tests/e2e/pixel.spec.ts：主进程经 ELECTRON_RENDERER_URL 加载开发服务器渲染的界面（无该变量时仍走 yudao://app 协议，来源不变），端到端测试用 Vite 开发服务器提供渲染进程 / 第 1 轮的图鉴端到端用例从未真实运行过；electron-vite build 把 NODE_ENV 固定为 production，图鉴的 import.meta.env.DEV 分支在构建产物中被消掉，用例必然失败。图鉴只在开发时可用（工单要求），因此改由开发服务器提供界面，参照 OpenCode 0027387 的做法
+
+qwen3.8 / 2026-10-01 21:32 / docs/architecture-issues.md 追加一条：二次合入 origin/main（`4798231e` #223）以后「部门设置」的改名只到内部模型，HTTP 路由段、部门工作台响应键 `prompt_config` 与 409 的 `reason` 值仍是 prompt 字样 / 合并时确认两侧口径混用，对外命名需要架构师定，本工单不改任何对外名
+
 claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记的三条（图鉴核对口径、覆盖层接口、缩放的整数倍）追加处理结论 / 架构师处理执行者登记的架构问题
 
+claude-sonnet-4-5 / 2026-10-01 22:50 / docs/architecture-issues.md 追加一条：#127 的工作树换行符（CRLF）与仓库保存的 LF 不一致，仓库本地 core.autocrlf=false 且没有 .gitattributes / 记录实现 #127 时遇到的交付 diff 无法审阅的问题，请架构师确认换行符规则
+
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-01 23:25 / docs/architecture-issues.md 追加 #226 的一条：AGENTS.md「常用命令」的 `pytest -m "unit or module"` 依赖尚未合入的 harness/tests/layers.toml 登记表，在 main 上静默选中 0 项，单元层与模块层没有被运行 / 交付 #226 时实测该命令输出 1575 deselected、退出码 0，执行者无法据此判断这两层是否通过，登记建议由架构师决定
+
 claude-opus-5-5 / 2026-10-02 00:08 / docs/architecture-issues.md 为 #226 登记的分层命令选中 0 项一条写处理结论 / 架构师处理执行者登记的架构问题
-claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#87 登记部门默认的请求档位在保存时按模型支持档位校验与第 7.3 节的运行中重新限制互相矛盾 / #87 执行中发现，供架构师处置
-opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
-qwen3.8 / 2026-10-01 16:45 / docs/architecture-issues.md 登记一条：客户端的生成接口类型与接口层快照没有自动检查，main 上提交的 types.gen.ts 已经与同一时刻的快照不一致 / #87 第 6 轮核对接口合同改动的影响范围时发现，交架构师决定是否把一致性写进自动检查
-claude-opus-5-5 / 2026-10-01 18:40 / docs/architecture-issues.md 为 #87 登记的客户端生成类型与快照不同步一条追加处理结论（建工单 #221） / 架构师处理执行者登记的架构问题
-9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
-9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/CHANGELOG.md 与 agents_jour.md 追加 #214 第 1 轮的记录 / 执行者按规则记录本工单的改动、测试与架构问题登记
-claude-opus-5-5 / 2026-10-02 03:28 / docs/architecture-issues.md 为 #214 登记的端到端测试后端启动超时一条写处理结论 / 架构师处理执行者登记的架构问题
+
+qwen3.8 / 2026-10-02 00:35 / 第三次合入 origin/main（8e3f0832，#127、#176、#226）：harness/projects.py 的导入冲突取两侧并集（main 的 replay_project、replay_run 与本工单的 ModelSelection）；harness/tests/openapi/openapi.json 的 EventType 枚举保留 main 的 home_seen，按合并后代码用 --write-openapi-snapshot 重新生成，删掉本工单已移除的 department_prompt_updated 接线（相对合并提交一行删除）；事件序列基准按 --write-event-baselines 重新生成后 44 份与合并提交逐字节相同，不提交；三个记录文件改为按条目重建（脚本取本分支合并前、origin/main、当前工作树三个来源的条目并集，缺失条目按时间戳插入），补回第一次拼接时静默丢掉的五段条目：本分支 #89 第 3 轮 12:20 与第 4 轮 16:50 两条日记、main 的 #226 执行者 23:20 与审查者 00:05 两条日记、docs/CHANGELOG.md 的 23:25 与 00:08 两条、docs/architecture-issues.md 的 23:25 一条，换行符仍为 CRLF / 第 6 轮任务评论要求第三次合入 origin/main，消除本分支落后 main 导致的审查障碍；记录文件是追加型冲突的高发处，逐条目核对是本轮唯一能证明「两侧都保留」的手段
+
+qwen3.8 / 2026-10-02 02:25 / 第 6 轮续：第四次合入 origin/main（合并提交 527588dc，8e3f0832 前进到 1f80b3ad，main 新增 ad4fde86 #226/#227 与两个 docs 提交）/ 实际改动只有 claude_jour.md 两侧并集与 harness/tests/test_issue_18_recovery_observation.py 采纳 main 的 SystemStatusRequest() 修复；agents_jour.md、docs/CHANGELOG.md 冲突取本侧（本侧按条目重建已是两父并集），合入后 origin/main 为 HEAD 祖先，layers+openapi 复跑 2 通过
+
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / docs/design/app-and-interface.md 第 9 节验收第 1 条补上客户端提交的生成类型与快照逐文件相同（`test_openapi_snapshot.py` 内的检查） / #221 按工单要求增加这项检查，设计说明的验收条目需要写明它
+
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:35 / AGENTS.md「常用命令」中每次都运行的两项检查一条写明 `test_openapi_snapshot.py` 现在的两项检查内容、各自需要先安装的依赖，以及重写快照以后在 client 中运行 `npm run generate:api` 重新生成客户端类型 / #221 把新检查接进执行者与审查者每次都运行的命令，需要写明依赖与重新生成的步骤
+
+qwen3.8 / 2026-10-02 02:42 / 第 6 轮续：第五次合入 origin/main（合并提交 1dde43d4，1f80b3ad 前进到 75c02df5，只有 claude_jour.md 加一行记录、无代码改动）/ claude_jour.md 取两侧并集从 244 条到 245 条，合入后 origin/main 为 HEAD 祖先，OpenAPI 快照与 44 份事件序列基准的生成源未变
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/CHANGELOG.md 与 agents_jour.md 追加 #214 第 1 轮的记录 / 执行者按规则记录本工单的改动、测试与架构问题登记
+
+claude-opus-5-5 / 2026-10-02 03:28 / docs/architecture-issues.md 为 #214 登记的端到端测试后端启动超时一条写处理结论 / 架构师处理执行者登记的架构问题
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 04:16 / 第 7 轮：合入 #87（8216be51 推理档位）后按设计说明第 4.6、7.3、9.2 节统一保存时请求档位的核对口径——项目部门设置与部门默认一样只核对属于档位全集，是否落在所选模型的支持档位由每次请求限制；同步改 harness/providers/facade.py（validate_department_setting 移到 REASONING_LEVELS 全集核对并移出锁）、harness/app/catalog_commands.py 注释、harness/engine.py 注释，采纳 #87 的前端档位下拉与测试；按合并后代码用 --write-event-baselines 重新生成 12 份 http 事件序列基准；agents_jour.md 与 docs/CHANGELOG.md 按条目并集重建 / 第 7 轮任务评论要求两边的功能都保留：#87 的请求档位与本工单的项目部门设置（模型与请求档位分别继承）在同一处保存规则上原本不一致，按设计说明已定的口径统一；本轮把两侧按事件字段并存的基准改为按合并后代码重新生成，记录文件按条目并集重建并逐条核对
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 04:40 / 第 7 轮续：合入 #221（6bd9839c 客户端生成类型与 OpenAPI 快照的一致性检查）后按快照重新生成 client/src/renderer/src/api/generated（DepartmentSetting 与 DepartmentSettingsSave 增加 provider_id、model_id、requested_tier、prompt_configured），使 test_openapi_snapshot.py 的类型检查通过 / #221 建立的检查把「改动接口合同的工单必须同时提交重新生成的客户端类型」变成硬性要求，本工单的接口合同在 #89 首次合入 main 后变更过，快照按本分支重新生成而客户端类型仍按 main 生成，检查因此失败

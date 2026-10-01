@@ -37,6 +37,7 @@ from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn
+from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.saved_rewrite import rewrite_saved_event
@@ -277,7 +278,8 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
 def test_current_queries_cover_the_old_read_scenarios(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("对照", GOAL)
-    system.projects.configure_prompt(project_id, "product", "产品提示", 0)
+    system.projects.configure_department_settings(
+        project_id, "product", ModelSelection(department_prompt="产品提示"), 0)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
     projection = system.run_until_stop(run_id)
     application = _application(system)
@@ -318,7 +320,10 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
         project_id=project_id, department="product", work_item=work_item_id,
     ))
     assert workspace.data.prompt.configured_version == 1
-    assert workspace.data.prompt.used_version == projection.department_prompts["product"].version
+    assert workspace.data.prompt.prompt_configured is True
+    # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）
+    assert workspace.data.prompt.used_version == 1
+    assert workspace.data.setting.model_id is None and workspace.data.setting.requested_tier is None
 
     actions = application.query("run.actions", RunActions(run_id=run_id))
     assert any(action.tool == "write_file" and action.receipt.ok for action in actions.data.actions)

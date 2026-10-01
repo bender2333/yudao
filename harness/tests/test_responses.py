@@ -58,11 +58,10 @@ def _request(*, session_id="session", history=None, max_output_tokens=None, atte
     prompt_text = DEFINITIONS.role("product").prompt
     prompt_hash = hash_bytes(prompt_text.encode("utf-8"))
     prompt_ref = ArtifactRef("department_prompt", prompt_hash, f"run/{prompt_hash[7:9]}/{prompt_hash[7:]}")
-    projection = RunProjection(task="local request", department_prompts={
-        "product": DepartmentPrompt("product", 1, prompt_text, prompt_ref, "initial-prompt"),
-    })
+    projection = RunProjection(task="local request")
+    prompt = DepartmentPrompt("product", 1, prompt_text, prompt_ref, "initial-prompt")
     context = ContextAssembler().assemble(
-        projection, department="product", session_id=session_id, activation_id="activation",
+        projection, department="product", session_id=session_id, activation_id="activation", prompt=prompt,
     )
     return model_call([*context.input_items, *(history or [])], TOOLS, session_id=session_id,
                       max_output_tokens=max_output_tokens, attempt_id=attempt_id)

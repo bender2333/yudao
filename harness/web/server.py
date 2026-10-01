@@ -17,13 +17,14 @@ from ..git_audit import git_version_detail
 from ..models import ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, ProjectEvent, json_dumps
 from ..observability import MAX_LIMIT, AttemptNotFoundError, ObservabilityQuery
 from ..providers.errors import CatalogValidationError
+from ..providers.selection import ModelSelection
 from ..projection import RunNotFoundError, project_run
 from ..replay_check import ReplayIntegrityError
 from ..projects import (
     CommandConfigConflict,
+    DepartmentSettingConflict,
     ProjectArchivedError,
     ProjectNotFoundError,
-    PromptConfigConflict,
     WorkItemInProgressError,
     project_event_card,
     project_overview,
@@ -207,8 +208,6 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 return self._replay_run(parts[2])
             if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "inputs":
                 return self._add_input(parts[2])
-            if len(parts) == 5 and parts[:2] == ["api", "runs"] and parts[3] == "prompts":
-                return self._update_prompt(parts[2], parts[4])
             if len(parts) == 6 and parts[:2] == ["api", "runs"] and parts[3] == "departments" and parts[5] == "guidance":
                 return self._add_guidance(parts[2], parts[4])
             if parts == ["api", "projects"]:
@@ -273,7 +272,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc), "reason": "work_item_in_progress"}, 409)
         except ProjectArchivedError as exc:
             self._send_json({"error": str(exc), "reason": "project_archived"}, 409)
-        except PromptConfigConflict as exc:
+        except DepartmentSettingConflict as exc:
             self._send_json({"error": str(exc), "reason": "prompt_config_conflict", "current": exc.current}, 409)
         except CommandConfigConflict as exc:
             self._send_json({"error": str(exc), "reason": "command_config_conflict", "current": exc.current}, 409)
@@ -345,13 +344,6 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         self._send_json({"ok": True, "run_id": run_id, "phase": projection.phase,
                          "input_version": projection.input_version,
                          "processed_input_version": projection.processed_input_version}, 201)
-
-    def _update_prompt(self, run_id: str, department: str) -> None:
-        projection = self.server.system.update_prompt(run_id, department, self._text_body())
-        prompt = projection.department_prompts[department]
-        self._send_json({"ok": True, "run_id": run_id, "department": department,
-                         "prompt_version": prompt.version,
-                         "prompt_hash": prompt.prompt_ref.content_hash}, 201)
 
     def _add_guidance(self, run_id: str, department: str) -> None:
         projection = self.server.system.add_guidance(run_id, department, self._text_body())
@@ -482,7 +474,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
         if set(body) != {"text", "base_version"}:
             raise ValueError("body must contain text and base_version")
-        result = self.server.system.projects.configure_prompt(project_id, department, body["text"], body["base_version"])
+        result = self.server.system.projects.configure_department_settings(
+            project_id, department, ModelSelection(department_prompt=body["text"]), body["base_version"])
         self._send_json(result)
 
     def _configure_command(self, project_id: str, name: str) -> None:
@@ -890,11 +883,11 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 if not items:
                     return self._send_json({"error": "work item not found"}, 404)
             observability = ObservabilityQuery(store, self.server.system.artifacts)
-            config = project.prompt_configs[department]
+            setting = project.department_settings[department]
             return self._send_json({
                 "department": department,
                 "project_id": project_id,
-                "prompt_config": {"version": config.version, "source": config.source},
+                "prompt_config": {"version": setting.version, "source": setting.source},
                 "items": [
                     {
                         "work_item_id": item.work_item_id, "title": item.title, "status": item.status,
@@ -904,7 +897,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                 ],
             })
         if rest[:1] == ["prompts"] and len(rest) == 2:
-            return self._send_json(projects.read_prompt(project_id, unquote(rest[1])))
+            return self._send_json(projects.read_department_setting(project_id, unquote(rest[1])))
         if rest == ["commands"]:
             return self._send_json({"project_id": project_id, "commands": projects.read_commands(project_id)})
         if rest[:1] == ["commands"] and len(rest) == 2:

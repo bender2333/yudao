@@ -38,6 +38,7 @@ from .resolve import (
     resolve_snapshot,
 )
 from .responses import ProviderConnections
+from .selection import ModelSelection, merge_selection
 from .store import (
     REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
@@ -547,28 +548,66 @@ class ProviderFacade:
             _, public = self._call_targets.pop(str(handle_id))
             return dict(public)
 
-    def resolve_department_default(self, department: str,
-                                   requested_tier: str | None = None) -> CallTargetResolution:
-        # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认并解析。
-        # 请求档位取部门默认里保存的档位；调用方另给出档位时以它为准（整理请求传「minimal」）。
-        # 解析时按当前模型声明的支持档位限制（#87）
+    def resolve_department_default(self, department: str, requested_tier: str | None = None, *,
+                                   project: ModelSelection | Mapping[str, Any] | None = None,
+                                   ) -> CallTargetResolution:
+        # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认，与项目部门设置一起合并后解析。
+        # 模型访问定义与请求档位分别按「项目部门设置、部门默认」的顺序取得第一个写入了的项，
+        # 选择来源是提供模型访问定义的那一层（设计说明第 5.3 节）。调用方给出 requested_tier 时按它解析
+        # （整理请求使用最低支持档位），否则使用合并得到的请求档位；解析时按当前模型声明的支持档位限制（#87）
         with self._lock:
-            binding = self._bindings.get(str(department))
-            if binding is None:
+            default = _as_selection(self._bindings.get(str(department)))
+            project_selection = _as_selection(project) if project is not None else None
+            merged = merge_selection(project_selection, default)
+            if not merged.resolved:
                 return CallTargetResolution(
-                    False, "provider_unavailable", f"部门 {department} 未绑定 Provider 与模型",
-                    call_target_public(None, requested_tier),
+                    False, "provider_unavailable",
+                    f"部门 {department} 未选择模型访问定义，请配置部门默认或本项目的部门设置",
+                    call_target_public(None, requested_tier), selection_source=merged.selection_source,
                 )
-            tier = requested_tier or binding.get("requested_tier")
+            tier = requested_tier if requested_tier is not None else merged.requested_tier
             resolution, target = _resolve_call_target(
-                self._store, self._credentials, binding.get("model_id"), tier,
+                self._store, self._credentials, merged.model_id, tier,
                 self._admissions,
             )
             if target is None:
-                return resolution
+                return replace(resolution, selection_source=merged.selection_source)
             handle_id = f"target_{uuid4().hex[:16]}"
             self._call_targets[handle_id] = (target, dict(resolution.public))
-            return replace(resolution, handle_id=handle_id)
+            return replace(resolution, handle_id=handle_id, selection_source=merged.selection_source)
+
+    def validate_department_setting(self, department: str,
+                                    project: ModelSelection | Mapping[str, Any] | None,
+                                    ) -> None:
+        # 保存项目部门设置时的检查（设计说明第 5.2 节）：模型访问定义与请求档位分别继承，每一项都可以单独写入。
+        # 写入了请求档位时，它必须属于档位全集，与是否写入模型无关；是否落在生效模型的支持档位由每次请求的限制
+        # 决定（第 7.3 节，部门默认与项目部门设置同一套核对）。写入了模型时，所选定义必须已准入且未作废。
+        # 目录与准入的校验留在 Provider 模块，应用层只转调
+        selection = _as_selection(project)
+        if selection is None:
+            return
+        if selection.writes_tier() and selection.requested_tier not in REASONING_LEVELS:
+            raise CatalogValidationError((ValidationIssue(
+                f"departments.{department}.requested_tier", "请求档位不属于支持的档位"),))
+        if not selection.writes_model():
+            return
+        with self._lock:
+            model = self._store.models.get(selection.model_id or "")
+            if model is None:
+                raise CatalogValidationError((ValidationIssue(
+                    f"departments.{department}.model_id", "模型访问定义不存在"),))
+            provider = self._store.providers.get(model.provider_id)
+            if provider is None:
+                raise CatalogValidationError((ValidationIssue(
+                    f"departments.{department}.model_id", "Provider 配置不存在"),))
+            if provider.protocol != "fake":
+                record = self._admissions.get(model.id)
+                if record is None:
+                    raise CatalogValidationError((ValidationIssue(
+                        f"departments.{department}.model_id", "该模型访问定义尚未通过模型测试准入"),))
+                if not admission_is_current(record, model, provider):
+                    raise CatalogValidationError((ValidationIssue(
+                        f"departments.{department}.model_id", "该模型访问定义的准入已作废，请重新执行模型测试"),))
 
     def bind_call_key(self, handle_id: str, call_key: str) -> None:
         # 把已解析的目标改挂到这次逻辑调用的身份上；重试沿用同一身份，凭据材料仍留在 Provider 模块
@@ -1224,6 +1263,27 @@ def _reject_fake_if_normal(store: ProviderStore, startup_mode: str) -> None:
     if issues:
         raise CatalogValidationError(issues)
 
+
+def _as_selection(raw: Any) -> ModelSelection | None:
+    # 部门默认（绑定）与项目部门设置都表示成一层的模型选择：模型两项、请求档位与部门 Prompt。
+    # 未知形状按没有写入处理，由合并规则决定使用哪一层
+    if raw is None:
+        return None
+    if isinstance(raw, ModelSelection):
+        return raw
+    if isinstance(raw, Mapping):
+        return ModelSelection(
+            provider_id=_optional_text(raw.get("provider_id")),
+            model_id=_optional_text(raw.get("model_id")),
+            requested_tier=_optional_text(raw.get("requested_tier")),
+            department_prompt=_optional_text(raw.get("department_prompt")),
+        )
+    return None
+
+def _optional_text(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
 
 def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]:
     if raw is None:

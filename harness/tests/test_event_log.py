@@ -102,8 +102,7 @@ def test_cross_project_reads_follow_the_order_of_writing(data_dir):
 def test_every_event_declares_its_actor_and_the_department_lives_in_the_department_column(data_dir):
     # 提出者由写入方声明（设计第 5.2 节）：命令写入的事件为命令的提出者、角色任务中的记录与提案为
     # department:<部门>、流程编排与控制核心自己的判断为 system；role 列为空，部门只在 department 列
-    user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED,
-                   EventType.DEPARTMENT_GUIDANCE_RECEIVED}
+    user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED}
     system_events = {EventType.RUN_CREATED, EventType.TRANSITION, EventType.DEPARTMENT_ACTIVATED,
                      EventType.ACTIVATION_FINISHED, EventType.PRODUCT_INPUT_ASSIGNED,
                      EventType.COLLABORATION_CLOSED, EventType.RUN_DONE, EventType.RUN_PAUSED,

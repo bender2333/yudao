@@ -11,8 +11,6 @@ import threading
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .definitions import DEFINITIONS
-from .department_prompts import save_department_prompt
 from .event_store import EventStore
 from .projection import project_run
 from .write_path import NewEvent, Transaction
@@ -41,14 +39,10 @@ class InteractionWriter:
         # 原始意图材料的发布依次进行：「读取已经提交的原始意图、写出文件」之间不插入另一次发布
         self._publication = threading.Lock()
 
-    def initial(self, run_id: str, text: str, *, department_prompts: dict[str, str] | None = None) -> dict[str, Any]:
-        # 写入首个输入与各部门的初始 Prompt：内置默认 Prompt 取自定义，项目层用项目部门设置替代
+    def initial(self, run_id: str, text: str) -> dict[str, Any]:
+        # 写入首个输入：部门 Prompt 不在 run 内留副本，每次模型请求从项目部门设置读取（设计说明第 5.4、6 节）
         received = self._input(run_id, text, version=1, kind="text", previous_ref=None, parent_commit=None)
-        prompt_texts = ({department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS}
-                        if department_prompts is None else department_prompts)
-        prompts = {department: self._prompt(run_id, department, text, 1)
-                   for department, text in prompt_texts.items()}
-        return {"initial_input": received, "department_prompts": prompts,
+        return {"initial_input": received,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
     def receive(self, transaction: Transaction, text: str, *, command: bool,
@@ -68,16 +62,6 @@ class InteractionWriter:
             EventType.USER_INPUT_RECEIVED, actor="user:local",
             state_before=projection.phase, state_after=projection.phase, payload=payload,
             artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
-        ))[0]
-
-    def update_prompt(self, transaction: Transaction, department: str, text: str) -> Event:
-        projection = transaction.projection
-        payload = self._prompt(projection.run_id, department, text,
-                               projection.department_prompts[department].version + 1)
-        return transaction.append(NewEvent(
-            EventType.DEPARTMENT_PROMPT_UPDATED, actor="user:local", department=department,
-            state_before=projection.phase, state_after=projection.phase, payload=payload,
-            artifact_hashes=[payload["prompt_ref"]["content_hash"]],
         ))[0]
 
     def receive_guidance(self, transaction: Transaction, department: str, text: str, *,
@@ -153,7 +137,3 @@ class InteractionWriter:
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
-
-    def _prompt(self, run_id: str, department: str, text: str, version: int) -> dict[str, Any]:
-        ref = save_department_prompt(self.artifacts, run_id, department, text)
-        return {"department": department, "version": version, "text": text, "prompt_ref": asdict(ref)}

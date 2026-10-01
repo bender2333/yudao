@@ -1337,6 +1337,10 @@ export type DepartmentPromptState = {
      * Used Event Id
      */
     used_event_id: string | null;
+    /**
+     * Prompt Configured
+     */
+    prompt_configured?: boolean;
 };
 
 /**
@@ -1359,6 +1363,22 @@ export type DepartmentSetting = {
      * Source
      */
     source: string;
+    /**
+     * Provider Id
+     */
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Prompt Configured
+     */
+    prompt_configured?: boolean;
 };
 
 /**
@@ -1382,9 +1402,21 @@ export type DepartmentSettingsSave = {
      */
     department: string;
     /**
-     * Text
+     * Provider Id
      */
-    text: string;
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Department Prompt
+     */
+    department_prompt?: string | null;
 };
 
 /**
@@ -1416,6 +1448,7 @@ export type DepartmentWorkspaceResult = {
      */
     active: boolean;
     prompt: DepartmentPromptState;
+    setting: DepartmentSetting;
     /**
      * Guidance
      */
@@ -7326,13 +7359,13 @@ export type DepartmentPromptConfiguredEvent = {
      * Type
      */
     type: 'department_prompt_configured';
-    payload: DepartmentPromptConfiguredPayload;
+    payload: DepartmentSettingsConfiguredPayload;
 };
 
 /**
- * DepartmentPromptConfiguredPayload
+ * DepartmentSettingsConfiguredPayload
  */
-export type DepartmentPromptConfiguredPayload = {
+export type DepartmentSettingsConfiguredPayload = {
     /**
      * Department
      */
@@ -7341,101 +7374,27 @@ export type DepartmentPromptConfiguredPayload = {
      * Version
      */
     version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
     /**
      * Base Version
      */
     base_version: number;
-};
-
-/**
- * DepartmentPromptUpdatedEvent
- */
-export type DepartmentPromptUpdatedEvent = {
     /**
-     * Position
+     * Provider Id
      */
-    position: number;
+    provider_id?: string | null;
     /**
-     * Previous
+     * Model Id
      */
-    previous: number;
+    model_id?: string | null;
     /**
-     * Event Id
+     * Requested Tier
      */
-    event_id: string;
+    requested_tier?: string | null;
     /**
-     * At
+     * Department Prompt
      */
-    at: string;
-    /**
-     * Stream
-     */
-    stream: string;
-    /**
-     * Stream Version
-     */
-    stream_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string | null;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string | null;
-    /**
-     * Run Id
-     */
-    run_id: string | null;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality' | null;
-    /**
-     * Role
-     */
-    role: string | null;
-    /**
-     * Actor
-     */
-    actor: string;
-    /**
-     * Command Id
-     */
-    command_id: string | null;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Type
-     */
-    type: 'department_prompt_updated';
-    payload: DepartmentPromptUpdatedPayload;
-};
-
-/**
- * DepartmentPromptUpdatedPayload
- */
-export type DepartmentPromptUpdatedPayload = {
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality';
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
+    department_prompt?: string | null;
+    department_prompt_ref?: ArtifactRef | null;
 };
 
 /**
@@ -10341,25 +10300,6 @@ export type ProjectRestoredPayload = {
 };
 
 /**
- * PromptRecord
- */
-export type PromptRecord = {
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality';
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
-};
-
-/**
  * ProposalRejectedEvent
  */
 export type ProposalRejectedEvent = {
@@ -10783,12 +10723,6 @@ export type RunCreatedPayload = {
      */
     kind?: string;
     initial_input: InputRecord;
-    /**
-     * Department Prompts
-     */
-    department_prompts: {
-        [key: string]: PromptRecord;
-    };
     intend_ref: ArtifactRef;
     git_version: GitVersion;
     /**
@@ -13317,8 +13251,6 @@ export type EventObject = ({
 } & UserInputReceivedEvent) | ({
     type: 'product_input_assigned';
 } & ProductInputAssignedEvent) | ({
-    type: 'department_prompt_updated';
-} & DepartmentPromptUpdatedEvent) | ({
     type: 'department_guidance_received';
 } & DepartmentGuidanceReceivedEvent) | ({
     type: 'department_guidance_applied';

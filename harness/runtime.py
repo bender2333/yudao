@@ -311,9 +311,6 @@ class LoopSystem:
     def add_input(self, run_id: str, text: str) -> RunProjection:
         return self.orchestrator.add_input(run_id, text)
 
-    def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
-        return self.orchestrator.update_prompt(run_id, department, text)
-
     def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
         return self.orchestrator.add_guidance(run_id, department, text)
 

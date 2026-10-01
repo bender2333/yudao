@@ -275,12 +275,14 @@ def decision_call_target(public: Mapping[str, Any]) -> dict[str, Any] | None:
 @dataclass(frozen=True)
 class CallTargetResolution:
     # 一次模型调用的调用目标解析结果：public 是进入事件与界面的公开部分，不含密钥；
-    # 成功时 handle_id 指向 Provider 模块内部持有的目标，执行调用时才从凭据来源取出材料
+    # 成功时 handle_id 指向 Provider 模块内部持有的目标，执行调用时才从凭据来源取出材料。
+    # selection_source 是提供模型访问定义的那一层（部门默认或项目部门设置，设计说明第 5.3 节）
     available: bool
     reason: str
     message: str
     public: Mapping[str, Any]
     handle_id: str | None = None
+    selection_source: str | None = None
 
 
 def resolve_call_target(
