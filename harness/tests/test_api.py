@@ -148,6 +148,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
                      "provider_unavailable", "command_id_reused"]},
         {"name": "project.rename",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
+        {"name": "project.set_goal",
+         "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.pin",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.archive",
@@ -197,16 +199,17 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
         "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
-        "project.settings", "run.export", "replay.check", "catalog", "catalog.document",
+        "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
     }
-    # 覆盖层只列出依赖的查询都已登记的：flow 与 waiting 的依赖已登记，其余依赖的查询尚未加入
+    # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入
     assert capabilities["overlays"] == [
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
+        {"name": "recovery", "queries": ["run.recovery"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed"]
+    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id

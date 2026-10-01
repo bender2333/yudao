@@ -40,6 +40,7 @@ RUN_EVENT_TYPES = frozenset({
     "tool_called",
     "tool_started",
     "tool_skipped",
+    "action_verified",
     "proposal_submitted",
     "proposal_rejected",
     "spec_accepted",
@@ -69,6 +70,7 @@ RUN_EVENT_TYPES = frozenset({
 PROJECT_EVENT_TYPES = frozenset({
     "project_registered",
     "project_renamed",
+    "project_goal_changed",
     "project_pinned",
     "project_archived",
     "project_restored",

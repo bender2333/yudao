@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 from pydantic import AwareDatetime
+from ..models import CatalogEventType, EventType
 from .contracts import Contract, Snapshot
+from .project_queries import RecoveryStatus, recovery_status
 from .registry import QueryDefinition
 
 if TYPE_CHECKING:
@@ -33,14 +35,19 @@ class DrainStatus(Contract):
     queued_work_items: int
 
 class SystemStatus(Contract):
-    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误
+    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误。
+    # version 是服务的发布版本号，running_runs 是还没有结束的 run 数，客户端在停止之前用它显示确认
     log_id: str
     boot_id: str
     started_at: AwareDatetime
+    version: str
+    running_runs: int
     provider: ProviderReadiness
     catalog: CatalogState
     # 排空状态（ADR-0019，3.1）：未排空、排空中与剩余的 run 数、已排空可以升级
     drain: DrainStatus
+    # 恢复观察汇总（3.1，工单 #18）
+    recovery: RecoveryStatus
 
 # 这个文件用了 from __future__ import annotations，SystemStatus 引用 DrainStatus 时需要重建模型
 SystemStatus.model_rebuild()
@@ -51,17 +58,28 @@ def _system_status(application: Application, _request: None) -> Snapshot[SystemS
     readiness = system.provider_status()
     catalog = system.facade.config_status()
     drain = system.drain
+    recovery = recovery_status(application)
     return Snapshot[SystemStatus](position=position, data=SystemStatus(
         log_id=system.store.log_id, boot_id=application.boot_id, started_at=application.started_at,
+        version=application.version, running_runs=system.running_runs,
         provider=ProviderReadiness(available=readiness["available"], reason=readiness["reason"],
                                    message=readiness["message"]),
         catalog=CatalogState(revision=catalog["revision"], reload_error=catalog["reload_error"]),
         drain=DrainStatus(state=drain.state, version=drain.version, running_runs=drain.running_runs,
                           queued_work_items=drain.queued_work_items),
+        recovery=recovery,
     ))
 
 
-SYSTEM_STATUS = QueryDefinition(name="system.status", request=None, result=SystemStatus, handle=_system_status)
+SYSTEM_STATUS = QueryDefinition(
+    name="system.status", request=None, result=SystemStatus, handle=_system_status,
+    changed_by=(EventType.RUN_RESUMED, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
+                EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED,
+                EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+                EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
+                CatalogEventType.RUNTIME_DRAIN_STARTED),
+)
 
 class LiveAttempt(Contract):
     # 进行中的调用尝试（设计说明第 5.6 节）：是否在进行中，以及各通道已收到的文字。

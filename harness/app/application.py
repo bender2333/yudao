@@ -33,7 +33,7 @@ from .catalog_commands import (
 )
 from .catalog_queries import CATALOG_DOCUMENT_QUERY, CATALOG_QUERY
 from .commands import execute
-from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
+from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .event_stream import EventScope, EventStream
@@ -47,6 +47,7 @@ from .project_and_work_item_commands import (
     PROJECT_PIN,
     PROJECT_RENAME,
     PROJECT_RESTORE,
+    PROJECT_SET_GOAL,
     SOURCE_DIRECTORY_SAVE,
     WORK_ITEM_APPEND_INPUT,
     WORK_ITEM_CANCEL,
@@ -87,7 +88,7 @@ class ReadOnlyCore:
 
 # 能力清单的 decisions 取自决定合同中的种类：当前部署会发出的决定请求
 DEFAULT_REGISTRY = Registry(
-    commands=[PROJECT_CREATE, PROJECT_ONBOARD, ONBOARDING_RESTART, PROJECT_RENAME, PROJECT_PIN, PROJECT_ARCHIVE, PROJECT_RESTORE,
+    commands=[PROJECT_CREATE, PROJECT_ONBOARD, ONBOARDING_RESTART, PROJECT_RENAME, PROJECT_SET_GOAL, PROJECT_PIN, PROJECT_ARCHIVE, PROJECT_RESTORE,
               MATERIAL_RECORD, WORK_ITEM_CREATE, WORK_ITEM_APPEND_INPUT, WORK_ITEM_CANCEL, GUIDANCE_SEND,
               DEPARTMENT_SETTINGS_SAVE, COMMAND_REGISTRATION_SAVE, SOURCE_DIRECTORY_SAVE,
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,
@@ -168,7 +169,7 @@ class Application:
     def capabilities(self, contract_digest: str, *, access: AccessMode) -> Capabilities:
         return self.registry.capabilities(Deployment(
             log_id=self.system.store.log_id, boot_id=self.boot_id, version=self.version,
-            contract_digest=contract_digest, access=access,
+            api_version=API_VERSION, contract_digest=contract_digest, access=access,
         ))
 
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
