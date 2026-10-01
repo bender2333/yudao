@@ -523,3 +523,13 @@ qwen3.8 / 2026-10-01 15:10 / 执行者：#87 第 6 轮（自主推进模式，�
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 03:34 / 执行者：安装依赖（uv sync --frozen；harness/tests/openapi 与 client 各一次 npm install，52 与 412 个包），随后在 client 运行 npm run generate:api，输出 4 个文件、接口版本 1。核对改动范围：17 个文件在 git 状态里显示为已修改，其中 16 个是工作区换行由 LF 变 CRLF 的差异，按换行归一以后与提交内容相同；内容真正改变的只有 generated/types.gen.ts，增加 200 行、删除 0 行，18 处改动全部是 #87 合入快照的四个推理档位字段（requested_tier、reasoning_levels、default_reasoning_level、reasoning_mode）分布到既有类型上，没有新增或删除导出类型，diff --check 无空白问题。提交只含 types.gen.ts 一个文件。
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 03:36 / 执行者：验证两个方向。正向：重新生成以后 test_openapi_snapshot.py 两项通过，client 的 typecheck 与单元测试、openapi 检查目录的 npm run check、前端测试全部通过。反向：把快照 CallTarget.reasoning_levels 的元素类型由 string 改为 integer，test_the_committed_client_types_match_the_snapshot 失败并写明「内容不同：types.gen.ts」，服务与快照比较同时失败；用文件编辑工具把元素类型改回 string 以后，openapi.json 的 git diff 为 0，测试恢复通过。生成的目录受工具保护不能直接编辑，所以反向验证改在快照上进行，验收条件「改动快照而不重新生成客户端类型时新检查失败并指出不一致的文件」由此覆盖。
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 03:38 / 执行者：测试计数。test_layers.py 与 test_openapi_snapshot.py 3 项通过（6.38s）；test_openapi_snapshot.py、test_api.py、test_client_update.py 13 项通过（16.52s）；前端 test_web_ui.js 47 项通过（0.40s）；client 单元测试 37 项通过；client 的 typecheck 与 openapi 检查目录的 npm run check 退出码 0。`uv run python -m pytest -m "unit or module"` 输出 1604 deselected、选中 0 项，harness/tests/layers.toml 登记表仍未合入（父工单 #158），按 AGENTS.md「登记表建立之前」的回退规定运行相关测试文件与前端测试。遇到的架构问题：无。
+
+执行者 / qwen3.8 / 2026-10-02 00:10 / #207 准备
+- worktree issue-207 已存在、分支一致，标签 ready-for-agent → in-progress。阻塞 #206、#79 均 CLOSED。
+- 已读设计说明 client-packaging-and-release.md 第 4.3/4.4/4.5 节、ADR-0023、app-and-interface.md 第 6/7.1 节。
+- 客户端外壳 #79 已有：主进程 index/tray/window/settings/preload，连接走渲染进程 ClientApp.open → connect → GET /api/capabilities；单实例锁与关闭隐藏窗口已实现。
+- #206 已提供：yudao api 入口（harness/__main__.py）、POST /api/system/stop（api/app.py _add_stop，仅本机回环）、system.status 的 version/running_runs（system_queries.py）。
+
+执行者 / qwen3.8 / 2026-10-02 00:15 / #207 「health」口径
+- 打包说明第 4.3 节说「先请求 health」；app-and-interface.md 第 7.1 节迁移表把旧 GET /api/health 映射到 system.status，并写明新接口不保留旧路由。接口层 create_app 里没有 /api/health。
+- 结论：本机存活性探测用已存在的 GET /api/capabilities（能拿到 HTTP 响应即服务在运行；连接被拒=未运行）。不新增 /api/health 路由，避免与第 7.1 节冲突。
