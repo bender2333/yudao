@@ -39,6 +39,7 @@ from .resolve import (
 )
 from .responses import ProviderConnections
 from .store import (
+    REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
     AdmissionRecord,
     ProviderStore,
@@ -549,7 +550,8 @@ class ProviderFacade:
     def resolve_department_default(self, department: str,
                                    requested_tier: str | None = None) -> CallTargetResolution:
         # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认并解析。
-        # 对外的解析入口仍只接收模型访问定义引用与请求档位，不接收部门（#45 架构答复第 4 条）
+        # 请求档位取部门默认里保存的档位；调用方另给出档位时以它为准（整理请求传「minimal」）。
+        # 解析时按当前模型声明的支持档位限制（#87）
         with self._lock:
             binding = self._bindings.get(str(department))
             if binding is None:
@@ -557,8 +559,9 @@ class ProviderFacade:
                     False, "provider_unavailable", f"部门 {department} 未绑定 Provider 与模型",
                     call_target_public(None, requested_tier),
                 )
+            tier = requested_tier or binding.get("requested_tier")
             resolution, target = _resolve_call_target(
-                self._store, self._credentials, binding.get("model_id"), requested_tier,
+                self._store, self._credentials, binding.get("model_id"), tier,
                 self._admissions,
             )
             if target is None:
@@ -624,6 +627,7 @@ class ProviderFacade:
                 base_url=provider.base_url,
                 credential_ref=provider.credential_ref,
                 model=model.model,
+                reasoning_mode=model.reasoning_mode,
             )
             self._admissions[model.id] = record
             self._publish()
@@ -1250,7 +1254,21 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
         if model.provider_id != provider.id:
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
-        bindings[str(department)] = {"provider_id": provider.id, "model_id": model.id}
+        # 请求档位（#87）：可以为空，写入时只核对它属于档位全集；
+        # 是否落在所选模型的支持档位由每次请求的限制决定（设计说明第 7.3 节）
+        requested_tier = item.get("requested_tier")
+        if requested_tier is not None and not isinstance(requested_tier, str):
+            issues.append(ValidationIssue(f"{location}.requested_tier", "请求档位必须为字符串"))
+            continue
+        tier = (requested_tier or "").strip()
+        if tier and tier not in REASONING_LEVELS:
+            issues.append(ValidationIssue(
+                f"{location}.requested_tier", "请求档位不属于支持的档位"))
+            continue
+        binding = {"provider_id": provider.id, "model_id": model.id}
+        if tier:
+            binding["requested_tier"] = tier
+        bindings[str(department)] = binding
     if issues:
         raise CatalogValidationError(issues)
     return bindings

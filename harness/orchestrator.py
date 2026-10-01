@@ -1020,6 +1020,9 @@ class Orchestrator:
             "configured_max_output_tokens": None,
             "selection_source": None,
             "accepts_required_tool_call": None,
+            "reasoning_levels": [],
+            "default_reasoning_level": None,
+            "reasoning_mode": None,
             "requested_tier": None,
             "sent_tier": None,
         }
