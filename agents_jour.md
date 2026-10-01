@@ -386,3 +386,13 @@ qwen3.8 / 2026-10-01 12:20 / 执行者：#89 第 3 轮（合入 main）。领取
 （4）harness/tests/test_onboarding.py 的建档 run 创建调用删掉 department_prompts 实参（本工单已删除 create_run 的这个参数，留着会 TypeError）；该测试没有断言 run 内的 Prompt 内容，删除实参不改变它核对的内容。
 
 待办：跑改动相关的测试文件与前端、test_layers.py、test_openapi_snapshot.py，写 DELIVERY 第 3 轮，标签改 needs-review。
+
+omp / 2026-10-01 16:50 / 执行者：#89 第 4 轮（自主推进模式，接上一轮被架构师停止的执行）。上一轮合并以后 main 继续前进，本轮核对发现上一轮合入的是 85669c28，而 main 已经到 46ce77f7，中间 8 个提交没有进入本分支，其中 #203（修改项目长期目标，e1360776）与 #218（命令行入口与数据目录，b00e0078）都改代码。#89 上一轮写的 DELIVERY 第 3 轮从未发出，工单标签当时被改回 ready-for-agent，本轮按最新任务评论继续，把这件事做完。
+
+核对本工单实现本身（合入前的代码）：selection.py 的 merge_selection 是无副作用的合并规则，模型访问定义与请求档位各自按项目部门设置、部门默认的顺序取第一个写入了的项，选择来源取提供模型访问定义的那一层（PROJECT_DEPARTMENT_SETTING_SOURCE 或 DEPARTMENT_DEFAULT_SOURCE），编排的 _department_selection 与 Provider 的 resolve_department_default 走同一个规则；facade.validate_department_setting 在保存时检查所选定义存在、连接存在、已通过准入、准入未作废（admission_is_current），请求档位必须在 model.reasoning_levels 内；projects.configure_department_settings 把三项作为一个事件 DEPARTMENT_SETTINGS_CONFIGURED 写入、版本加一、base_version 不等时抛 DepartmentSettingConflict，事件种类字符串仍是 department_prompt_configured（ADR-0019 要求跨版本不改名），projection 同时接受旧载荷的 text、prompt_ref；orchestrator._department_prompt 每次请求从项目部门设置读取，没有写入时用种类说明或角色说明、版本 0，run 内不再有副本；audit 与 smoke 按激活事件记录的 prompt_version 从项目流版本历史取当时文本。
+
+本轮补提交第 3 轮遗留的两处记录（docs/CHANGELOG.md、docs/architecture-issues.md 各一条，登记 #134 与 #89 在「事项种类的部门说明」归属上的冲突与处置），随后合入当前 origin/main。两处冲突都保留两侧语义：harness/app/project_queries.py 的 project.settings 的 changed_by 保留 main 的 PROJECT_GOAL_CHANGED，同时保留本工单把种类改名为 DEPARTMENT_SETTINGS_CONFIGURED 的取值；harness/tests/project_stream_fields.json 的 added_defaults 同时保留本工单登记的 department_prompt_configured 五个新字段与 main 登记的 project_goal_changed 两个字段。合并后核对两侧实现都还在：models.py 的两个事件种类常量、labels.py 与 payloads.py 的两条登记、projection.py 的 goal 与 department_settings 两处应用、projects.py 的 set_goal 与 configure_department_settings、interactions.initial 不再有 department_prompts 参数；harness 内已无 DEPARTMENT_PROMPT_CONFIGURED 与 configure_prompt 的残留引用。
+
+一处自我更正：中途读 .gitignore 时把工具输出里的行号当成文件里存在一行 .logs/，据此说 .logs/ 已被忽略；重新用 grep -c 与 git check-ignore 核对，.gitignore 里没有 .logs/ 这一行，该目录也确实未被忽略。结论不变（不提交 .logs/），但依据换成 check-ignore 的实际返回。
+
+待办：跑改动相关的测试文件与前端、test_layers.py、test_openapi_snapshot.py，写 DELIVERY 第 4 轮，标签改 needs-review。
