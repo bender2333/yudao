@@ -319,3 +319,6 @@ claude-opus-5 / 2026-10-01 01:20 / docs/architecture-issues.md 增加一条：#8
 opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
 qwen3.8 / 2026-10-01 16:45 / docs/architecture-issues.md 登记一条：客户端的生成接口类型与接口层快照没有自动检查，main 上提交的 types.gen.ts 已经与同一时刻的快照不一致 / #87 第 6 轮核对接口合同改动的影响范围时发现，交架构师决定是否把一致性写进自动检查
 claude-opus-5-5 / 2026-10-01 18:40 / docs/architecture-issues.md 为 #87 登记的客户端生成类型与快照不同步一条追加处理结论（建工单 #221） / 架构师处理执行者登记的架构问题
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/CHANGELOG.md 与 agents_jour.md 追加 #214 第 1 轮的记录 / 执行者按规则记录本工单的改动、测试与架构问题登记
+claude-opus-5-5 / 2026-10-02 03:28 / docs/architecture-issues.md 为 #214 登记的端到端测试后端启动超时一条写处理结论 / 架构师处理执行者登记的架构问题
