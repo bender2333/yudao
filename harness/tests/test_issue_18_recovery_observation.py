@@ -23,7 +23,7 @@ from harness.app.project_queries import (
     RunActions,
     RunRecovery,
 )
-from harness.app.system_queries import SYSTEM_STATUS
+from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
@@ -212,7 +212,7 @@ def test_system_status_counts_match_the_event_log(data_dir):
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
     application = _application(restarted)
-    status = _query(application, SYSTEM_STATUS, None)
+    status = _query(application, SYSTEM_STATUS, SystemStatusRequest())
     assert status.recovery.pending_verification == 1
     assert status.recovery.unknown_actions == 1
     assert status.recovery.waiting_resume == 0
