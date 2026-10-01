@@ -146,15 +146,38 @@ def ignore_probe_directory(root: str | Path) -> Path:
         raise TreeError(f"Ignore probe directory is not a plain name: {probe.name!r}")
     return probe
 
+def has_ignore_rules(root: str | Path, relative: str) -> bool:
+    """Whether any ignore file Git reads for this relative path can exclude it.
+
+    Git reads the ignore files inside the work tree plus the probe repository's own
+    info/exclude. The probe repository is created with an empty template, so it has no
+    info/exclude, and its environment points core.excludesFile and core.attributesFile at
+    the null device. The only rules that can apply to a relative path therefore live in
+    the directories from the work tree root down to that path's own parent, and a .git
+    directory ends the search because Git stops there. A workspace holding no ignore file
+    at all excludes nothing, and no Git command line is started to learn that.
+    """
+    base = _absolute_path(root)
+    if os.path.exists(ignore_probe_directory(base) / "info" / "exclude"):
+        return True
+    directory = base
+    for part in PurePosixPath(relative).parent.parts:
+        directory = directory / part
+        if (directory / ".gitignore").exists() or (directory / ".git").exists():
+            return True
+    return (base / ".gitignore").exists() or (base / ".git").exists()
+
 def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> frozenset[str]:
     """The relatives the project's ignore rules exclude, decided by the Git command line.
 
     The probe repository belongs to the workspace root and lives beside it, so the
     enclosing repository's rules (for example an outer .gitignore) do not leak in.
     Returns the paths Git echoes back; exit code 1 with no output means nothing is
-    ignored.
+    ignored. Relatives no ignore file can reach are not decided on the command line: with
+    no ignore file at all the answer is empty and the Git process is never started.
     """
-    if not relatives:
+    candidates = [relative for relative in relatives if has_ignore_rules(root, relative)]
+    if not candidates:
         return frozenset()
     base = _absolute_path(root)
     probe = ignore_probe_directory(base)
@@ -164,7 +187,7 @@ def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> froz
     environment = _git_environment()
     output = _git_probe(
         probe, base, "check-ignore", "--no-index", "--stdin", "-z",
-        data="\0".join(relatives).encode("utf-8") + b"\0", environment=environment,
+        data="\0".join(candidates).encode("utf-8") + b"\0", environment=environment,
     )
     return frozenset(item for item in output.decode("utf-8", errors="strict").split("\0") if item)
 
@@ -364,7 +387,7 @@ def _git_probe(probe: Path, work_tree: Path, *arguments: str, data: bytes | None
 
 __all__ = [
     "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
-    "capture_public_tree", "excluded_by_ignore_rules", "ignore_probe_directory",
+    "capture_public_tree", "excluded_by_ignore_rules", "has_ignore_rules", "ignore_probe_directory",
     "is_git_metadata", "is_private_path", "materialize_tree", "resolve_public_path", "unrepresentable_reason",
     "validate_manifest", "validate_public_path", "verify_public_tree",
 ]

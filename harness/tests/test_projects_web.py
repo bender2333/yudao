@@ -17,6 +17,12 @@ from harness.tests.test_web import get_json, request, running_server, wait_until
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
+# 等待一次事项结算或一次工作线程结束（`_wait_work_item`、`wait_until`、worker 的会合点）的墙钟界限只用来
+# 防止测试一直等待，按 #107 的裁定（架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常
+# 用时的值，与 #112 实施方案的 120 秒同一口径。一次结算含一次版本存储写入，正常用时数秒；
+# 事项是否按预期结束由等待之后的状态断言核对。
+_WAIT_LIMIT = 120
+
 
 def _release_script(summary="v1", files=None):
     return [product_spec(), plan_turn(), delivery_turn(summary=summary, files=files), review_turn("release", f"ok {summary}")]
@@ -41,7 +47,7 @@ def _register(host, port, name="Echo", goal=GOAL):
     return _post(host, port, "/api/projects", {"name": name, "goal": goal}, 201)["project_id"]
 
 
-def _wait_work_item(host, port, project_id, work_item_id, statuses=("adopted", "held", "stopped"), timeout=60.0):
+def _wait_work_item(host, port, project_id, work_item_id, statuses=("adopted", "held", "stopped"), timeout=_WAIT_LIMIT):
     """等到事项进入终态且工作线程已退出（GET 项目会补跑结算，可能先于工作线程结束）。"""
 
     def check():
@@ -59,13 +65,15 @@ def _gated_turn():
 
     def turn(_request):
         entered.set()
-        assert release.wait(timeout=20)
+        assert release.wait(timeout=_WAIT_LIMIT)
         return product_spec()
 
     return turn, entered, release
 
 
-def _read_sse_blocks(host, port, path, count, headers=None, timeout=10):
+def _read_sse_blocks(host, port, path, count, headers=None, timeout=_WAIT_LIMIT):
+    # 事件流：本文件的事项已经结算、事件已经落盘，这里读的是回环上已有的事件，只用来防止读不到事件时
+    # 一直等待；推送的位置与块数由读取之后的断言核对
     conn = HTTPConnection(host, port, timeout=timeout)
     blocks = []
     try:
@@ -165,7 +173,7 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         work_item_id, run_id = created["work_item_id"], created["run_id"]
         assert created["phase"] == "PRODUCT_SPEC" and work_item_id.startswith("wi_") and run_id.startswith("run_")
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             health = get_json(host, port, "/api/health")
             assert health["busy"] is True and health["active_run_id"] == run_id
             assert health["active_project_id"] == project_id and health["active_work_item_id"] == work_item_id
@@ -239,7 +247,7 @@ def test_second_work_item_returns_409_while_worker_is_busy(data_dir):
         project_id = _register(host, port)
         first = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "第一个"}, 201)
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             status, raw, _ = request(host, port, "POST", f"/api/projects/{project_id}/work-items", {"text": "第二个"})
             assert status == 409 and json.loads(raw)["reason"] == "busy", raw
             status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare"})
@@ -247,7 +255,7 @@ def test_second_work_item_returns_409_while_worker_is_busy(data_dir):
             assert len(get_json(host, port, f"/api/projects/{project_id}")["work_items"]) == 1
         finally:
             release.set()
-        wait_until(lambda: not server.busy())
+        wait_until(lambda: not server.busy(), timeout=_WAIT_LIMIT)
         second = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "第二个"}, 201)
         assert second["work_item_id"] != first["work_item_id"]
         _wait_work_item(host, port, project_id, second["work_item_id"])
@@ -404,7 +412,7 @@ def test_in_progress_archive_and_materials_return_409(data_dir):
         project_id = _register(host, port)
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "进行中"}, 201)
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             before = [event.event_id for event in system.store.list_project_events(project_id)]
             for path, body in (
                 (f"/api/projects/{project_id}/archive", {}),
