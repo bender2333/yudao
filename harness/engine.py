@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Any, Protocol
 
-from .actions import Action, ActionReceipt, FactsQuery, Preconditions, WorkspaceFacts
+from .actions import Action, ActionReceipt, FactsQuery, Preconditions, TreeFacts, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
@@ -28,7 +28,7 @@ from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
-from .models import TERMINAL_PHASES, DepartmentPrompt, RunProjection, json_dumps
+from .models import TERMINAL_PHASES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
 from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
@@ -117,6 +117,33 @@ class _Unassembled:
     reason: str
     error: Exception
 
+@dataclass(frozen=True)
+class _RecoveredCall:
+    # 补执行上一次激活里没有处置的工具调用时用的请求身份（工单 #17）：沿用中断时那次响应的身份，
+    # 与记录接口读取的字段一致，使补执行的 tool_started/tool_called 与原来那次响应对应得上
+    run_id: str
+    department: str
+    session_id: str
+    activation_id: str
+    step_id: int
+    request_id: str | None
+    context_event_id: str | None
+    effective_contract_hash: str | None
+    engineering_plan_hash: str | None
+    call_target: dict[str, Any]
+    purpose: str = "work"
+    attempt: int = 1
+    attempt_id: str | None = None
+    logical_call_id: str | None = None
+    root_step_id: int | None = None
+    retry_of_step_id: int | None = None
+    input_version: int = 0
+    max_output_tokens: int | None = None
+    tool_choice: str = "auto"
+    attempt_started_at: str | None = None
+    attempt_started_monotonic: float | None = None
+    attempt_finished_monotonic: float | None = None
+
 
 class StepDriver:
     # 一次激活的步骤驱动。cancelled 是这次激活的取消信号，由流程编排持有；cancel() 可以从任何线程调用
@@ -142,6 +169,7 @@ class StepDriver:
                                 basis.effective_contract_hash, basis.engineering_plan_hash, basis.input_version)
         self._stream = run_stream(scope.run_id)
         self._writes = writes
+        self._artifacts = artifacts
         self._assembly = assembly
         self._recorder = StepRecorder(writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
         self._adapter = adapter
@@ -242,6 +270,9 @@ class StepDriver:
 
     async def _steps(self) -> StepResult:
         limits = self._limits
+        # 工单 #17：上一次激活的完整模型响应里还有没执行的合法动作时，先补执行这些动作，不重新调用模型
+        # （恢复契约第 4、5 节）。补执行以后照常进入步骤循环，下一次模型请求带上这些工具结果
+        await self._continue_unexecuted_calls()
         attempt = 1
         root_step_id = 1
         retry_of_step_id = None
@@ -360,6 +391,7 @@ class StepDriver:
                 identity = str(item.get("call_id") or "")
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
+                after_snapshot = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -394,11 +426,16 @@ class StepDriver:
                         except UnrepresentableWorkspace as exc:
                             raise ProviderError(str(exc), reason="workspace_unrepresentable") from exc
                         ok, output, error = receipt.ok, receipt.output, receipt.error
+                        # 动作后的公开树快照：与动作前快照、动作参数一起构成核实的依据
+                        try:
+                            after_snapshot = _tree_snapshot(self._environment.query(FactsQuery(tree=True)).tree)
+                        except UnrepresentableWorkspace:
+                            after_snapshot = None
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": ok, "output": output, "error": error})}
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
-                self._recorder.tool_called(request, call)
+                self._recorder.tool_called(request, call, after_snapshot=after_snapshot)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):
                     raise ProviderError(output["workspace_unrepresentable"], reason="workspace_unrepresentable")
@@ -414,6 +451,103 @@ class StepDriver:
                     return Submitted(proposal, response, self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
+
+    async def _continue_unexecuted_calls(self) -> None:
+        # 工单 #17（恢复契约第 4、5 节）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
+        # 也没有 tool_called 或 tool_skipped——进程在把整个响应执行完之前退出。这里补执行这些动作，
+        # 每个都照常经过工具许可与执行环境，写好 tool_called；不重新调用模型，也不整批重发已经执行过的动作
+        calls, request = self._unexecuted_calls()
+        for call in calls:
+            if not self._proceed():
+                return
+            await self._execute_call(request, call)
+
+    def _unexecuted_calls(self) -> tuple[list[dict[str, Any]], _RecoveredCall | None]:
+        # 最近一次进入历史的完整模型响应里，没有得到处置的工具调用。每一条 MODEL_MESSAGE 事件保存响应中的一个
+        # 输出条目（function_call / message），同一次响应的事件共享（激活、步骤）：按这一组收集，再排除已经
+        # 处置的（tool_started/tool_called/tool_skipped）。压缩请求的回答不是工作响应，跳过
+        events = self._writes.read(self._stream).events()
+        dispositioned: set[str] = set()
+        responses: dict[tuple[str, int], list[Any]] = {}
+        order: list[tuple[str, int]] = []
+        for event in events:
+            payload = event.payload or {}
+            if event.department != self._scope.department or payload.get("purpose") == "compaction":
+                continue
+            if event.type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                              EventType.ACTION_VERIFIED):
+                identity = payload.get("id")
+                if identity:
+                    dispositioned.add(str(identity))
+            elif event.type == EventType.MODEL_MESSAGE and payload.get("message_ref"):
+                key = (str(payload.get("activation_id") or ""), int(payload.get("step_id") or 0))
+                if key not in responses:
+                    responses[key] = []
+                    order.append(key)
+                responses[key].append(event)
+        if not order:
+            return [], None
+        key = order[-1]
+        group = responses[key]
+        pending: list[dict[str, Any]] = []
+        for event in group:
+            ref = ArtifactRef(**event.payload["message_ref"])
+            item = json.loads(self._artifacts.get_for_run(self._scope.run_id, ref))
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            identity = str(item.get("call_id") or item.get("id") or "")
+            if identity and identity not in dispositioned:
+                pending.append({"id": identity, "name": str(item.get("name") or ""),
+                                "arguments": item.get("arguments")})
+        if not pending:
+            return [], None
+        payload = group[0].payload
+        return pending, _RecoveredCall(
+            run_id=self._scope.run_id, department=self._scope.department, session_id=self._scope.session_id,
+            activation_id=self._scope.activation_id, step_id=int(payload.get("step_id") or 0),
+            request_id=payload.get("collaboration_request_id"), context_event_id=payload.get("context_event_id"),
+            effective_contract_hash=self._scope.basis.effective_contract_hash,
+            engineering_plan_hash=self._scope.basis.engineering_plan_hash,
+            call_target=dict(self._call_public or {}), purpose="work",
+        )
+
+    async def _execute_call(self, request: "_RecoveredCall", item: dict[str, Any]) -> None:
+        # 执行一个没有处置的工具调用并记录结果：与 _steps 的工具循环走同一条路径（工具许可、环境执行、记录）
+        identity = str(item.get("id") or "")
+        name = str(item.get("name") or "")
+        raw_args = item.get("arguments")
+        after_snapshot = None
+        try:
+            args = json.loads(raw_args)
+            if not isinstance(args, dict):
+                raise ValueError("tool arguments must be an object")
+        except (TypeError, ValueError) as exc:
+            args = {"invalid_arguments": raw_args}
+            ok, output, error = False, None, f"invalid tool arguments: {exc}"
+        else:
+            permission, facts = self._begin_tool(request, {"id": identity, "name": name, "args": args,
+                                                           "step_id": request.step_id})
+            if permission.stopped or not permission.allowed:
+                return
+            if tool_kind(name) == "host":
+                ok, output, error = True, _run_host_tool(name, args), None
+            else:
+                receipt = await self._perform(Action(
+                    action_id=f"{request.activation_id}:recovered:{identity}", kind=tool_action(name),
+                    tool=name, department=request.department, input=args,
+                    preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
+                ))
+                ok, output, error = receipt.ok, receipt.output, receipt.error
+                try:
+                    after_snapshot = _tree_snapshot(self._environment.query(FactsQuery(tree=True)).tree)
+                except UnrepresentableWorkspace:
+                    after_snapshot = None
+        input_item = {"type": "function_call_output", "call_id": identity,
+                      "output": json_dumps({"ok": ok, "output": output, "error": error})}
+        self._recorder.tool_called(request,
+                                   {"id": identity, "name": name, "args": args, "ok": ok, "output": output,
+                                    "error": error, "step_id": request.step_id, "input_item": input_item},
+                                   after_snapshot=after_snapshot)
 
     def _tool_choice(self, purpose: str, tools: list[dict[str, Any]], replies_without_tool_call: int) -> str:
         # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
@@ -581,7 +715,17 @@ class StepDriver:
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
             if permission.allowed:
-                self._recorder.tool_started(transaction, request, call, permission.command_basis)
+                # 动作前的公开树快照（工单 #17）：许可允许以后、执行之前查询，与事件一起写入。
+                # 主机工具（提交）不产生动作，不需要快照；事实查询原本只为许可取需要的路径，快照单独查一次公开树
+                if tool_kind(call["name"]) != "host":
+                    tree = facts.tree
+                    if tree is None:
+                        tree = self._environment.query(FactsQuery(tree=True)).tree
+                    before_snapshot = _tree_snapshot(tree)
+                else:
+                    before_snapshot = None
+                self._recorder.tool_started(transaction, request, call, permission.command_basis,
+                                            before_snapshot=before_snapshot)
             return permission, facts
 
         return self._writes.transact(self._stream, begin)
@@ -607,6 +751,13 @@ class StepDriver:
                 "input_item": {"type": "function_call_output", "call_id": item["call_id"],
                                "output": json_dumps({"ok": False, "output": None, "error": error})}})
 
+
+def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
+    # 公开树的动作前后快照（工单 #17）：摘要用于比对效果是否发生，文件清单给出动作前后的文件集合，
+    # 使核实能判断「效果已经写入」「还没有写入」。不含文件内容，只是依据
+    if tree is None:
+        return None
+    return {"digest": tree.digest, "files": list(tree.files)}
 
 def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据

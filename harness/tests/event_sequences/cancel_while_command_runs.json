@@ -67,7 +67,9 @@
     },
     "intend_path": "materials/<run#1>/intend.md",
     "intend_ref": "<art#4>",
+    "kind": "change",
     "max_cycles": 999999,
+    "overview_ref": null,
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -2198,6 +2200,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#22>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2261,6 +2264,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#22>",
     "args": {
      "name": "serve"
     },
@@ -2288,7 +2292,7 @@
     "model_id": "fake-model",
     "name": "run_command",
     "ok": true,
-    "output_ref": "<art#22>",
+    "output_ref": "<art#23>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2396,6 +2400,8 @@
   "actual_provider": "fake",
   "adapter": "fake",
   "baseline": null,
+  "baseline_review": null,
+  "baseline_reviews": [],
   "command_versions": {
    "serve": 1
   },
@@ -2592,6 +2598,7 @@
    }
   ],
   "intend_ref": "<art#4>",
+  "kind": "change",
   "last_activations": {
    "engineering": "<act#3>",
    "product": "<act#1>"
@@ -3176,6 +3183,7 @@
    }
   ],
   "outcome": "failed",
+  "overview_ref": null,
   "pending_feedback": {},
   "pending_request": null,
   "phase": "FAILED",
@@ -3323,6 +3331,8 @@
   "snapshot": null,
   "stop_reason": "cancelled",
   "stream_version": 41,
+  "structure": null,
+  "structures": [],
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 3,
@@ -4136,6 +4146,14 @@
    }
   },
   "<art#22>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#23>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {

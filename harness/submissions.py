@@ -13,12 +13,12 @@ import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .contracts import contract_payload, render_plan, render_prd
+from .contracts import contract_payload, render_plan, render_prd, render_structure
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
 from .environment import LocalEnvironment
 from .git_versions import GitVersionStore
-from .models import Event, EventType, RunProjection, new_id, utc_now
+from .models import ArtifactRef, Event, EventType, RunProjection, new_id, utc_now
 from .projection import apply_event
 from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
@@ -138,6 +138,24 @@ class SubmissionWriter:
             artifact["evidence_refs"] = [asdict(ref)]
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/qa.json"] = _json_bytes(prepared[event][1])
+        elif kind == "structure":
+            # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同（设计第 4.1 节）
+            if projection.snapshot is None or artifact["code_tree_digest"] != projection.snapshot["tree_digest"]:
+                raise ValueError("Structure does not match the snapshot of the onboarding run")
+            environment.verify_tree(snapshot)
+            artifact["id"] = new_id("structure")
+            ref = self.artifacts.put(run_id, "structure", render_structure(artifact), media_type="text/markdown")
+            artifact["structure_ref"] = asdict(ref)
+            event = append(EventType.STRUCTURE_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
+            updates["specs/structure.json"] = _json_bytes(prepared[event][1])
+            updates["STRUCTURE.md"] = materials["STRUCTURE.md"] = self.artifacts.get_for_run(run_id, ref)
+        elif kind == "baseline_review":
+            if projection.snapshot is None or artifact["code_snapshot_hash"] != projection.snapshot["tree_digest"]:
+                raise ValueError("Baseline review does not match the snapshot of the onboarding run")
+            environment.verify_tree(snapshot)
+            artifact["id"] = new_id("baseline")
+            event = append(EventType.BASELINE_REVIEW_ACCEPTED, artifact, [artifact["content_hash"]])
+            updates["specs/baseline.json"] = _json_bytes(prepared[event][1])
         else:
             raise ValueError(f"unhandled artifact kind {kind}")
 
@@ -162,7 +180,7 @@ class SubmissionWriter:
             for event_type, payload, _hashes in prepared:
                 if event_type != EventType.SPEC_SUPERSEDED:
                     payload["git_version"] = revision
-        if kind in {"delivery_spec", "qa_review"}:
+        if kind in {"delivery_spec", "qa_review", "structure", "baseline_review"}:
             environment.verify_tree(snapshot)
         previous_materials: dict[str, bytes | None] = {}
 
@@ -177,6 +195,9 @@ class SubmissionWriter:
             for name, raw in materials.items():
                 if name == "PRD.md":
                     ref = projection.effective_contract.prd_ref if projection.effective_contract else None
+                elif name == "STRUCTURE.md":
+                    ref = (ArtifactRef(**projection.structures[-1]["structure_ref"])
+                           if projection.structures else None)
                 else:
                     ref = projection.engineering_plans[-1].plan_ref if projection.engineering_plans else None
                 previous_materials[name] = None if ref is None else self.artifacts.get_for_run(run_id, ref)

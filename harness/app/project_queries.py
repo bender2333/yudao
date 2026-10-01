@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import Field, field_validator
 
 from ..git_audit import git_version_detail
+from ..definitions import DEFINITIONS
+from ..event_store import run_stream
 from ..models import (
-    ArtifactRef, DEPARTMENTS, EventType, GIT_VERSION_EVENTS, ProjectEventType, hash_bytes,
+    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, EventType, GIT_VERSION_EVENTS, ProjectEventType, hash_bytes,
 )
 from ..observability import ObservabilityQuery
 from ..projection import (
@@ -22,6 +24,11 @@ from ..projection import (
 )
 from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
+from ..recovery import (
+    ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_PENDING_VERIFICATION, OBSERVATION_RUNNING,
+    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, observation_state, open_decisions,
+    open_resume_decisions, unresolved_unknown_actions,
+)
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
 from .payloads import Department
@@ -92,6 +99,11 @@ class ProjectRow(Contract):
     in_progress_count: int
     active_work_item_id: str | None
     current_adoption: str | None
+    # 中断、待核实与待恢复的标记（工单 #18）：本项目里处于这些恢复观察状态的事项数；
+    # 为零时仍是 0，不省略
+    interrupted_count: int
+    pending_verification_count: int
+    waiting_resume_count: int
 
 
 class ProjectList(Contract):
@@ -105,6 +117,7 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
         state = _project(application, project_id)
         if state.archived and not request.include_archived:
             continue
+        observations = [_recovery_observation(application, item.run_id) for item in state.work_items]
         rows.append(ProjectRow(
             project_id=state.project_id, name=state.name, goal=state.goal, source=state.source,
             pinned=state.pinned, archived=state.archived, created_at=state.created_at,
@@ -112,6 +125,9 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             in_progress_count=sum(item.status == "in_progress" for item in state.work_items),
             active_work_item_id=state.active_work_item_id,
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
+            interrupted_count=observations.count(OBSERVATION_INTERRUPTED),
+            pending_verification_count=observations.count(OBSERVATION_PENDING_VERIFICATION),
+            waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
         ))
     return Snapshot[ProjectList](position=store.end_position(), data=ProjectList(projects=rows))
 
@@ -231,6 +247,8 @@ class WorkItemLoop(Contract):
     pending_question: str | None
     run_id: str
     adoption_id: str | None
+    # 恢复观察状态（工单 #18）：运行中、中断、待核实、待恢复、已终止；run 没有创建时没有
+    recovery_state: str | None
     # 事项的版本：取消事项等命令的基准版本
     version: int
 
@@ -258,7 +276,8 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
-            run_id=item.run_id, adoption_id=item.adoption_id, version=item.stream_version,
+            run_id=item.run_id, adoption_id=item.adoption_id,
+            recovery_state=_recovery_observation(application, item.run_id), version=item.stream_version,
         ))
     return Snapshot[ProjectLoopResult](
         position=store.end_position(),
@@ -635,13 +654,15 @@ class ActionView(Contract):
     action_id: str
     tool: str
     department: str | None
-    status: Literal["running", "completed", "failed"]
+    status: Literal["running", "completed", "failed", "unknown"]
     activation_id: str | None
     step_id: int | None
     input_version: int | None
     prompt_version: int | None
     created_at: str
     receipt: ActionReceipt | None
+    before_snapshot_ref: dict[str, Any] | None = None
+    after_snapshot_ref: dict[str, Any] | None = None
 
 
 class RunActionsResult(Contract):
@@ -651,23 +672,41 @@ class RunActionsResult(Contract):
 def _run_actions(application: Application, request: RunActions) -> Snapshot[RunActionsResult]:
     store = application.system.store
     _run(application, request.run_id)
+    events = _tool_events(store, request.run_id)
     actions: list[ActionView] = []
-    started: dict[str, Any] = {}
-    for event in _tool_events(store, request.run_id):
+    started: dict[tuple[str, int | None, str], Any] = {}
+    for event in events:
         payload = event.payload or {}
+        if event.type not in (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                              EventType.ACTION_VERIFIED):
+            continue
         if payload.get("name") == "provider_usage":
             continue
-        action_id = str(payload.get("id") or event.event_id)
+        identity = action_identity(event)
         if event.type == EventType.TOOL_STARTED:
-            started[action_id] = event
+            started[identity] = event
             continue
-        started_event = started.pop(action_id, None)
-        actions.append(_action_view(event, action_id, started_event, completed=True))
-    for action_id, event in started.items():
-        actions.append(_action_view(event, action_id, None, completed=False))
+        started_event = started.pop(identity, None)
+        actions.append(_action_view(event, identity, started_event))
+    # 有 tool_started、还没有结果的动作用运行状态区分（工单 #17，恢复契约第 1 节）：这次激活仍在进行
+    # 的时候是运行中，否则是结果未知，等待核实
+    live = _live_activations(events)
+    for identity, event in started.items():
+        actions.append(_action_view(None, identity, event, live=identity[0] in live))
     actions.sort(key=lambda item: item.created_at)
     return Snapshot[RunActionsResult](position=store.end_position(), data=RunActionsResult(actions=actions))
 
+
+def _live_activations(events: list[Any]) -> set[str]:
+    # 仍在进行、还没有 activation_finished 的激活（工单 #17）：DEPARTMENT_ACTIVATED 开启，ACTIVATION_FINISHED 结束
+    open_activations: set[str] = set()
+    for event in events:
+        payload = event.payload or {}
+        if event.type == EventType.DEPARTMENT_ACTIVATED and payload.get("activation_id"):
+            open_activations.add(str(payload["activation_id"]))
+        elif event.type == EventType.ACTIVATION_FINISHED and payload.get("activation_id"):
+            open_activations.discard(str(payload["activation_id"]))
+    return open_activations
 
 def _tool_events(store: Any, run_id: str) -> list[Any]:
     # 一个 run 的工具事件：按位置反复读取到没有为止（按 run 与位置的索引，不是整个日志的扫描）
@@ -675,7 +714,9 @@ def _tool_events(store: Any, run_id: str) -> list[Any]:
     cursor = 0
     while True:
         batch = store.read(after=cursor, runs=(run_id,), limit=500,
-                           types=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED))
+                           types=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                                  EventType.ACTION_VERIFIED, EventType.DEPARTMENT_ACTIVATED,
+                                  EventType.ACTIVATION_FINISHED))
         if not batch:
             break
         collected.extend(batch)
@@ -683,30 +724,48 @@ def _tool_events(store: Any, run_id: str) -> list[Any]:
     return collected
 
 
-def _action_view(event: Any, action_id: str, started_event: Any, *, completed: bool) -> ActionView:
-    payload = event.payload or {}
-    started_payload = {} if started_event is None else started_event.payload
-    if not completed:
+def _action_view(result_event: Any | None, identity: tuple[str, int | None, str],
+                 started_event: Any | None, *, live: bool = False) -> ActionView:
+    # 一个动作的读取视图（工单 #17）：状态、回执，以及动作前后的快照引用（动作前取自 tool_started，
+    # 动作后取自 tool_called）。result_event 为空表示只有 tool_started、还没有结果
+    action_id = identity[2]
+    if result_event is None:
+        payload = {} if started_event is None else (started_event.payload or {})
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or ""), department=event.department,
-            status="running", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            action_id=action_id, tool=str(payload.get("name") or ""),
+            department=None if started_event is None else started_event.department,
+            status="running" if live else "unknown",
+            activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
-            created_at=event.created_at, receipt=None,
+            created_at="" if started_event is None else started_event.created_at, receipt=None,
+            before_snapshot_ref=payload.get("before_snapshot_ref"),
+        )
+    payload = result_event.payload or {}
+    if result_event.type == EventType.ACTION_VERIFIED:
+        return ActionView(
+            action_id=action_id, tool=str(payload.get("name") or ""), department=result_event.department,
+            status="completed", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
+            created_at=result_event.created_at, receipt=None,
         )
     ok = bool(payload.get("ok"))
+    started_payload = {} if started_event is None else (started_event.payload or {})
     return ActionView(
         action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
-        department=event.department, status="completed" if ok else "failed",
+        department=result_event.department,
+        status="completed" if ok else "failed",
         activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
         input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
-        created_at=event.created_at,
+        created_at=result_event.created_at,
         receipt=ActionReceipt(
-            registered_name=started_payload.get("registered_name") or payload.get("registered_name"),
-            registered_argv=started_payload.get("registered_argv"),
-            args=dict(payload.get("args") or started_payload.get("args") or {}),
-            ok=ok, error=payload.get("error"), output_ref=payload.get("output_ref"),
-            event_id=event.event_id, created_at=event.created_at,
+            registered_name=payload.get("registered_name") or started_payload.get("registered_name"),
+            registered_argv=started_payload.get("registered_argv") or payload.get("registered_argv"),
+            args=dict(payload.get("args") or started_payload.get("args") or {}), ok=ok, error=payload.get("error"),
+            output_ref=payload.get("output_ref"), event_id=result_event.event_id,
+            created_at=result_event.created_at,
         ),
+        before_snapshot_ref=started_payload.get("before_snapshot_ref"),
+        after_snapshot_ref=payload.get("after_snapshot_ref"),
     )
 
 
@@ -1271,6 +1330,53 @@ def _optional_run(application: Application, run_id: str) -> Any:
     except RunNotFoundError:
         return None
 
+def _recovery_observation(application: Application, run_id: str) -> str | None:
+    # 一个事项的恢复观察状态（工单 #18，v8 设计说明第 7.2 节）：由 run 的事件、决定请求与投影的终态得出。
+    # run 没有创建时没有恢复观察状态
+    run = _optional_run(application, run_id)
+    if run is None:
+        return None
+    events = application.system.store.list_events(run_id)
+    decisions = _run_decisions(application, run_id)
+    return observation_state(events, decisions.values(), terminal=run.phase in TERMINAL_PHASES)
+
+class RecoveryStatus(Contract):
+    # 恢复观察的汇总（工单 #18，设计说明第 4.3 节 system.status 的 3.1 部分）：服务重启后自动继续的事项数、
+    # 待核实与待恢复的事项数、结果未知的动作数。数字取自事件日志与决定请求，
+    # 与 run.recovery、projects.list 用同一份事实
+    auto_resumed: int
+    pending_verification: int
+    waiting_resume: int
+    unknown_actions: int
+
+def recovery_status(application: Application) -> RecoveryStatus:
+    # 恢复观察的汇总（工单 #18，system.status 的 recovery）：全部 run 按恢复观察状态计数，
+    # 结果未知的动作数按未完成动作累加，自动继续的事项数取本次启动自动继续的 run（工单 #16）。
+    # 只读取事件日志与决定请求，不写入，不调用模型
+    store = application.system.store
+    pending_verification = 0
+    waiting_resume = 0
+    unknown_actions = 0
+    for run_id in store.list_run_ids():
+        run = _optional_run(application, run_id)
+        if run is None:
+            continue
+        events = store.list_events(run_id)
+        decisions = _run_decisions(application, run_id)
+        state = observation_state(events, decisions.values(), terminal=run.phase in TERMINAL_PHASES)
+        if state == OBSERVATION_PENDING_VERIFICATION:
+            pending_verification += 1
+        elif state == OBSERVATION_WAITING_RESUME:
+            waiting_resume += 1
+        unknown_actions += len(unresolved_unknown_actions(events, decisions.values()))
+    resumed = getattr(application.system, "resumed_runs", None)
+    return RecoveryStatus(
+        auto_resumed=0 if not resumed else len(resumed),
+        pending_verification=pending_verification,
+        waiting_resume=waiting_resume,
+        unknown_actions=unknown_actions,
+    )
+
 
 # ---------------------------------------------------------------------------
 # 查询登记
@@ -1279,17 +1385,21 @@ def _optional_run(application: Application, run_id: str) -> Any:
 PROJECTS_LIST = QueryDefinition(
     name="projects.list", request=ProjectsList, result=ProjectList, handle=_projects_list,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
                 ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
                 ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED,
                 ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
-                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED),
+                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
+                EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
 )
 
 PROJECT_OVERVIEW = QueryDefinition(
     name="project.overview", request=ProjectOverview, result=ProjectOverviewResult, handle=_project_overview,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
@@ -1301,7 +1411,10 @@ PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
-                EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.COLLABORATION_REQUESTED),
+                EventType.RUN_PAUSED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
+                EventType.COLLABORATION_REQUESTED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
+                EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED,
+                EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
 )
 
 PROJECT_FLOW = QueryDefinition(
@@ -1331,7 +1444,8 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
 
 RUN_ACTIONS = QueryDefinition(
     name="run.actions", request=RunActions, result=RunActionsResult, handle=_run_actions,
-    changed_by=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED),
+    changed_by=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
 )
 
 WORK_ITEM_MATERIALS = QueryDefinition(
@@ -1367,6 +1481,7 @@ RUN_ATTEMPT = QueryDefinition(
 PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+                ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
                 ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
 )
@@ -1379,8 +1494,260 @@ REPLAY_CHECK = QueryDefinition(
     name="replay.check", request=ReplayCheck, result=ReplayCheckResult, handle=_replay_check, changed_by=(),
 )
 
+
+# ---------------------------------------------------------------------------
+# run.recovery (工单 #18，设计说明第 4.3 节「恢复与动作核实（3.1）」)
+
+class RunRecovery(Contract):
+    run_id: str
+
+class UnfinishedAction(Contract):
+    # 未完成动作（v8 设计说明第 7.2 节）：动作身份、所属部门、输入依据、执行前后快照与状态。
+    # 未发送的动作由保存的模型响应给出（engine 补执行），结果未知的动作有 tool_started 没有结果
+    action_id: str
+    tool: str
+    department: str | None
+    status: Literal["not_sent", "unknown"]
+    activation_id: str | None
+    step_id: int | None
+    input_version: int | None
+    purpose: str | None
+    repeatable: bool
+    before_snapshot_ref: dict[str, Any] | None
+    created_at: str
+    started_event_id: str
+
+class VerificationRecord(Contract):
+    # 核实记录：追加在动作之后，不改写原始观察。basis 与 result 是核实依据与核实结果，
+    # decision_id 给出覆盖它的决定请求，note 是用户回答时的说明
+    action_id: str
+    tool: str
+    basis: str
+    result: str
+    decided_by: str
+    note: str | None
+    decision_id: str | None
+    at: str
+    event_id: str
+
+class RecoveryLimits(Contract):
+    # 限额（v8 设计说明第 7.2 节）：已用激活次数、模型步骤与重试尝试；恢复不清零。
+    # 等待模型服务的时间在 Stage 4 加入，等待期间不计入运行时间上限
+    activations: int
+    model_steps: int
+    retries: int
+    cycle_count: int
+
+class RecoveryOwner(Contract):
+    # 执行所有权（v8 设计说明第 7.2 节）：当前执行者与取得时间。没有有效执行者时为空。
+    # 执行槽位在 3.4A 之前只有一个，holds_slot 表示这个 run 是否占用它
+    epoch: int
+    since: str
+    holds_slot: bool
+
+class LateResult(Contract):
+    # 迟到结果：旧执行者写入的、不推进状态的记录（v8 设计说明第 7.2 节）
+    at: str
+    text: str
+    event_id: str
+
+class UnusableTarget(Contract):
+    # 待恢复原因：哪个部门的模型无法使用、模型与具体问题；供恢复页写明修复入口
+    department: str
+    model: str | None
+    problem: str
+
+class RunRecoveryResult(Contract):
+    # 一个事项的恢复观察（设计说明第 4.3 节）：恢复观察状态、待恢复原因、最后已确认位置、未完成动作、
+    # 核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果
+    work_item_id: str
+    run_id: str
+    state: Literal["running", "interrupted", "pending_verification", "waiting_resume", "terminated"]
+    reason: str | None
+    executable: bool
+    last_confirmed_position: int
+    last_confirmed_event_id: str | None
+    unfinished_actions: list[UnfinishedAction]
+    verifications: list[VerificationRecord]
+    next_legal_action: str | None
+    can_continue: bool
+    cannot_continue_reason: str | None
+    unusable: UnusableTarget | None
+    limits: RecoveryLimits
+    owner: RecoveryOwner | None
+    late_results: list[LateResult]
+    has_unknown_actions: bool
+
+# 一个事项的恢复观察状态对应的下一项合法操作（v8 设计说明第 7.2 节）
+_NEXT_ACTION = {
+    OBSERVATION_RUNNING: "none",
+    OBSERVATION_INTERRUPTED: "continue",
+    OBSERVATION_PENDING_VERIFICATION: "verify_action",
+    OBSERVATION_WAITING_RESUME: "repair_and_resume",
+    OBSERVATION_TERMINATED: None,
+}
+
+def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[RunRecoveryResult]:
+    # 只读取：run 的事件与决定请求、投影与保存的限额计数。不写入，不触发结算，不调用模型与工具
+    store = application.system.store
+    run = _run(application, request.run_id)
+    events = store.list_events(request.run_id)
+    decisions = _run_decisions(application, request.run_id)
+    terminal = run.phase in TERMINAL_PHASES
+    state = observation_state(events, decisions.values(), terminal=terminal)
+    # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
+    unfinished = [] if terminal else _unfinished_actions(events, decisions.values())
+    verifications = _verification_records(events, decisions.values())
+    resume_requests = [] if terminal else open_resume_decisions(decisions.values())
+    unknown_requests = [] if terminal else open_decisions(decisions.values(), kind="unknown_action")
+    return Snapshot[RunRecoveryResult](
+        position=store.end_position(),
+        data=RunRecoveryResult(
+            work_item_id=run.work_item_id or "", run_id=run.run_id, state=state,
+            reason=_recovery_reason(run, state, resume_requests),
+            executable=not terminal,
+            last_confirmed_position=store.end_position(), last_confirmed_event_id=run.last_event_id,
+            unfinished_actions=unfinished, verifications=verifications,
+            next_legal_action=_NEXT_ACTION[state],
+            can_continue=_can_continue(state, terminal),
+            cannot_continue_reason=_cannot_continue_reason(run, state, terminal, resume_requests),
+            unusable=_unusable_target(resume_requests),
+            limits=RecoveryLimits(activations=_activation_count(events),
+                                  model_steps=_model_step_count(events),
+                                  retries=_retry_count(events), cycle_count=run.cycle_count),
+            owner=_owner(run, events, unknown_requests),
+            # 迟到结果：3.1 的执行权在写入口拦住旧执行者的写入（write_path 的 claim_execution_right 与
+            # StaleExecutionRight），被拒的写入不落盘，因此 3.1 没有迟到结果可列。远程执行代理上的迟到回执
+            # 由 3.2C 在 run.actions 上补齐
+            late_results=[],
+            has_unknown_actions=bool(unfinished) or bool(unknown_requests),
+        ),
+    )
+
+def _run_decisions(application: Application, run_id: str) -> dict[str, Any]:
+    # 一个 run 流保存的决定请求，按身份：与事件在同一个事务中更新，重放只读取
+    return load_decisions(application.system.store.projection(run_stream(run_id)))
+
+def _recovery_reason(run: Any, state: str, resume_requests: list[Any]) -> str | None:
+    # 恢复观察状态的说明：中断给出停止位置，待恢复给出无法使用的模型，待核实给出未完成动作数，
+    # 已终止给出停止原因；运行中不需要说明
+    if state == OBSERVATION_INTERRUPTED:
+        return f"进程在 {run.phase} 阶段停止，等待启动时自动继续"
+    if state == OBSERVATION_WAITING_RESUME and resume_requests:
+        return str(resume_requests[0].request.get("description") or resume_requests[0].kind)
+    if state == OBSERVATION_PENDING_VERIFICATION:
+        return "有结果未知的动作，等待核实的决定请求回答"
+    if state == OBSERVATION_TERMINATED:
+        return f"运行以 {run.stop_reason or run.outcome} 结束"
+    return None
+
+def _can_continue(state: str, terminal: bool) -> bool:
+    # 继续执行是否可用：已终止不可继续；运行中已经在执行；其余状态在用户处理（回答或修复）以后可继续
+    if terminal:
+        return False
+    return state == OBSERVATION_RUNNING
+
+def _cannot_continue_reason(run: Any, state: str, terminal: bool, resume_requests: list[Any]) -> str | None:
+    # 继续执行不可用的原因
+    if terminal:
+        return f"运行已经结束：{run.stop_reason or run.outcome}"
+    if state == OBSERVATION_WAITING_RESUME:
+        return "模型引用无法使用或定义版本不同，等待用户回答决定请求"
+    if state == OBSERVATION_PENDING_VERIFICATION:
+        return "有结果未知的动作，等待核实以后继续"
+    if state == OBSERVATION_INTERRUPTED:
+        return "进程中断，等待启动时自动继续"
+    return None
+
+def _unusable_target(resume_requests: list[Any]) -> UnusableTarget | None:
+    # 待恢复原因：只对「模型引用无法使用」的请求给出部门、模型与具体问题
+    for decision in resume_requests:
+        if decision.kind != "model_unavailable":
+            continue
+        target = decision.request.get("target") or {}
+        return UnusableTarget(department=str(decision.request.get("department") or ""),
+                              model=target.get("requested_model") or target.get("actual_model"),
+                              problem=str(decision.request.get("description") or decision.request.get("message") or ""))
+    return None
+
+def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAction]:
+    # 未完成动作：结果未知的动作（tool_started 没有结果或核实记录）。未发送的动作由保存的模型响应
+    # 给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
+    action_ids = {identity[2] for identity in unresolved_unknown_actions(events, decisions)}
+    unfinished: list[UnfinishedAction] = []
+    for event in events:
+        if event.type != EventType.TOOL_STARTED:
+            continue
+        payload = event.payload or {}
+        action_id = str(payload.get("id") or event.event_id)
+        if action_id not in action_ids:
+            continue
+        tool = str(payload.get("name") or "")
+        unfinished.append(UnfinishedAction(
+            action_id=action_id, tool=tool, department=event.department, status=ACTION_UNKNOWN,
+            activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            input_version=payload.get("input_version"), purpose=payload.get("purpose"),
+            repeatable=_action_repeatable(tool), before_snapshot_ref=payload.get("before_snapshot_ref"),
+            created_at=event.created_at, started_event_id=event.event_id,
+        ))
+    unfinished.sort(key=lambda item: item.created_at)
+    return unfinished
+
+def _action_repeatable(tool_name: str) -> bool:
+    tool = DEFINITIONS.tools.get(tool_name)
+    return bool(tool is not None and tool.repeatable)
+
+def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
+    # 核实记录：action_verified 事件（用户选择按当前实际状态继续时追加）与已回答的核实请求一起列出。
+    # 记录追加在动作之后，原始观察不改写
+    answers = {decision.decision_id: decision for decision in decisions
+               if decision.kind == "unknown_action" and decision.status == "answered"}
+    records: list[VerificationRecord] = []
+    for event in events:
+        if event.type != EventType.ACTION_VERIFIED:
+            continue
+        payload = event.payload or {}
+        decision_id = payload.get("decision_id")
+        answer = answers.get(decision_id) if isinstance(decision_id, str) else None
+        records.append(VerificationRecord(
+            action_id=str(payload.get("id") or event.event_id), tool=str(payload.get("name") or ""),
+            basis="用户选择按当前实际状态继续", result="动作效果按当前实际状态接受",
+            decided_by="user", note=None if answer is None else (answer.answer or {}).get("note"),
+            decision_id=decision_id if isinstance(decision_id, str) else None,
+            at=event.created_at, event_id=event.event_id,
+        ))
+    records.sort(key=lambda item: item.at)
+    return records
+
+def _activation_count(events: list[Any]) -> int:
+    return len([event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED])
+
+def _model_step_count(events: list[Any]) -> int:
+    return len([event for event in events if event.type == EventType.MODEL_REQUESTED])
+
+def _retry_count(events: list[Any]) -> int:
+    return len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED])
+
+def _owner(run: Any, events: list[Any], unknown_requests: list[Any]) -> RecoveryOwner | None:
+    # 执行所有权：最后一次取得执行权的事件（run_resumed）给出编号与时间；没有恢复过时没有执行者。
+    # 结果未知的动作还等待回答时不占用执行槽位（它没有在推进）
+    resumed = [event for event in events if event.type == EventType.RUN_RESUMED]
+    if not resumed:
+        return None
+    last = resumed[-1]
+    return RecoveryOwner(epoch=int(last.payload.get("acquired_epoch") or 0), since=last.created_at,
+                         holds_slot=not unknown_requests)
+
+RUN_RECOVERY = QueryDefinition(
+    name="run.recovery", request=RunRecovery, result=RunRecoveryResult, handle=_run_recovery,
+    changed_by=(EventType.RUN_RESUMED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
+                EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+                EventType.DECISION_WITHDRAWN, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
+)
+
 PROJECT_QUERIES = (
     PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL,
     DEPARTMENT_WORKSPACE, RUN_ACTIONS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
-    RUN_ATTEMPT, PROJECT_SETTINGS, RUN_EXPORT, REPLAY_CHECK,
+    RUN_ATTEMPT, PROJECT_SETTINGS, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
 )

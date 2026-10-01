@@ -6,7 +6,7 @@
   "retry_initial_delay_sec": 1.0,
   "retry_max_delay_sec": 60.0,
   "tool_call_required_limit": 3,
-  "check_timeout_sec": 30,
+  "check_timeout_sec": 600,
   "tool_output_limit": 4000,
   "command_timeout_max_sec": 600
 }
