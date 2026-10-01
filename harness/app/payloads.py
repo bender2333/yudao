@@ -85,6 +85,8 @@ class CodeSnapshot(Payload):
     files: list[str]
     directories: list[str]
     tree_ref: ArtifactRef
+    # 快照的 git 来源：提交、分支与是否有未提交的修改；源目录不是 git 仓库或旧事件没有这个字段时为空
+    provenance: dict[str, Any] | None = None
 
 
 class InputRecord(Payload):
@@ -1004,7 +1006,8 @@ class ProjectRegisteredPayload(Payload):
     name: str
     goal: str
     goal_ref: ArtifactRef
-    source: Literal["idea"]
+    # 项目来源：想法新建为 idea，接入已有项目为 existing
+    source: Literal["idea", "existing"]
 
 
 class ProjectRenamedPayload(Payload):
@@ -1045,6 +1048,8 @@ class WorkItemCreatedPayload(Payload):
     definitions_version: str
     # 事项在队列中的优先级：因升级重新开始的事项排在最前面；旧事件没有这个字段时按用户新要求处理（ADR-0019）
     priority: str = PRIORITY_USER
+    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -1168,6 +1173,12 @@ class RuntimeForceUpgradeRequestedPayload(Payload):
     restarted_work_items: list[str]
 
 
+class HomeSeenPayload(Payload):
+    # 用户查看过的全局位置（工单 #127）：上一次查看的位置被这次的位置取代，控制主机上只有一个。
+    # 位置的写入时间由事件的 created_at 给出
+    position: int
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1237,4 +1248,5 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
     CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
+    CatalogEventType.HOME_SEEN: HomeSeenPayload,
 }

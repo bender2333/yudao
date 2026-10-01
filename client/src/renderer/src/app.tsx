@@ -2,7 +2,7 @@
 // 本工单建立外壳、连接设置、接口版本核对、事件流同步与视图同步；首页页面（#175）、
 // 项目页面（#80）与像素画面（#176 至 #180）由各自的工单实现，这里只留出它们的位置。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
@@ -13,6 +13,12 @@ import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
 import { PlaceholderPage } from "./views/placeholder";
+
+// 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
+const LazyGallery = lazy(async () => {
+  const mod = await import("./views/pixel/gallery");
+  return { default: mod.GalleryPage };
+});
 
 export function App() {
   const appRef = useRef<ClientApp | null>(null);
@@ -118,6 +124,15 @@ export function App() {
     await window.yudao?.saveSettings(next);
   }, []);
 
+  // 动作图鉴只在开发时可用：直接开 #/gallery 就能看画法，不必先连上后端。
+  // 用动态导入：正式构建里这段分支被整体消掉，图鉴的代码不进正式包，也就没有正式的页面入口。
+  if (import.meta.env.DEV && route.name === "gallery") {
+    return (
+      <Suspense fallback={<div className="gate"><div className="card"><h1>正在载入图鉴…</h1></div></div>}>
+        <LazyGallery />
+      </Suspense>
+    );
+  }
   if (state.kind === "connecting") {
     return <div className="gate"><div className="card"><h1>连接中…</h1></div></div>;
   }
