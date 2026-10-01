@@ -8,33 +8,30 @@ import os
 import re
 import shutil
 import stat
-import subprocess
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .public_tree import CapturedFile, CapturedTree, TreeError, validate_public_path
+import pygit2
+from pygit2.enums import FileMode, ObjectType, RepositoryInitFlag, RepositoryOpenFlag
 
+from .public_tree import CapturedFile, CapturedTree, TreeError, validate_public_path
 
 _OID = re.compile(r"[0-9a-f]{40}")
 _RUN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
 _FORMAT = "yudao-git-version-v1"
 _ERROR = "Git version is unavailable or invalid"
-_TREE_MODES = {"tree": b"40000", "blob": b"100644"}
-
+_TREE_MODES = {"tree": FileMode.TREE, "blob": FileMode.BLOB}
+# 空树的固定摘要：空内容的树对象摘要，差异用它当首个版本的基准
+_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 class GitVersionError(ValueError):
     """A snapshot cannot be written or verified without ambiguity."""
-
 
 class GitVersionStore:
     def __init__(self, root: str | Path, *, read_only: bool = False) -> None:
         self.root = Path(root).absolute()
         self.read_only = read_only
-        self._git_path = shutil.which("git")
-        if self._git_path is None:
-            raise GitVersionError("Git executable is unavailable")
         self._hooks = self.root / "empty-hooks"
         if read_only:
             # 只读使用不建立目录：需要 Git 历史的操作在目录缺失时给出同样的错误
@@ -68,12 +65,12 @@ class GitVersionStore:
                 raise GitVersionError(_ERROR)
         if code_tree is not None and not isinstance(code_tree, CapturedTree):
             raise GitVersionError(_ERROR)
-        repo = self._repository(run_id, create=True)
+        repository = self._repository(run_id, create=True)
         previous_files: dict[str, bytes] = {}
         previous_objects: dict[str, str] = {}
         if parent_commit is not None:
-            parent = self._commit(repo, run_id, parent_commit)
-            previous_files, previous_objects = self._read_tree(repo, parent["tree"])
+            parent = self._commit(repository, run_id, parent_commit)
+            previous_files, previous_objects = self._read_tree(repository, parent["tree"])
         files = dict(previous_files)
         for path, data in updates.items():
             if data is None:
@@ -84,27 +81,25 @@ class GitVersionStore:
             files = {path: data for path, data in files.items() if not path.startswith("code/")}
             files.update({"code/" + item.path: item.data for item in code_tree.files})
         self._validate_files(files)
-        tree = self._write_tree(repo, files, previous_files, previous_objects)
+        tree = self._write_tree(repository, files, previous_files, previous_objects)
         metadata = json.dumps(
             {"format": _FORMAT, "run_id": run_id, "message": message},
             ensure_ascii=True, sort_keys=True, separators=(",", ":"),
         ).encode("utf-8") + b"\n"
-        arguments = ["commit-tree", tree]
-        if parent_commit is not None:
-            arguments.extend(["-p", parent_commit])
-        commit = self._git(repo, *arguments, data=metadata).decode("ascii").strip()
+        parents = [] if parent_commit is None else [pygit2.Oid(hex=parent_commit)]
+        commit = self._write_commit(repository, parents, tree, metadata)
         self._oid(commit)
         # This immutable ref preserves objects, but does not accept a business version.
         reference = "refs/snapshots/" + commit
-        # 引用绑定与提交内容在同一次批量读里探测：缺失即首次绑定，已存在则必须正好是本次版本
-        revision, bound = self._snapshot(repo, run_id, commit)
+        # 引用绑定与提交内容在同一次读里探测：缺失即首次绑定，已存在则必须正好是本次版本
+        revision, bound = self._snapshot(repository, run_id, commit)
         if bound and revision != {"commit": commit, "parent_commit": parent_commit, "tree": tree}:
             raise GitVersionError(_ERROR)
         if not bound:
-            self._git(repo, "update-ref", reference, commit, "0" * 40)
+            self._bind_reference(repository, reference, commit)
         revision = {"commit": commit, "parent_commit": parent_commit, "tree": tree}
-        # 绑定以后按引用回读：Git 会一并校验提交与树的层级结构
-        if self._read_tree(repo, reference, expected_root=tree)[0] != files:
+        # 绑定以后按引用回读：读取会一并校验提交与树的层级结构
+        if self._read_tree(repository, reference, expected_root=tree)[0] != files:
             raise GitVersionError(_ERROR)
         return revision
 
@@ -112,8 +107,8 @@ class GitVersionStore:
         self.read_files(run_id, revision)
 
     def read_files(self, run_id: str, revision: dict[str, Any]) -> dict[str, bytes]:
-        repo = self._repository(run_id)
-        return self._load(repo, run_id, revision)
+        repository = self._repository(run_id)
+        return self._load(repository, run_id, revision)
 
     def read_file(self, run_id: str, revision: dict[str, Any], path: str) -> bytes:
         self._path(path)
@@ -126,92 +121,89 @@ class GitVersionStore:
         return self.show(run_id, revision)["diff"]
 
     def show(self, run_id: str, revision: dict[str, Any]) -> dict[str, Any]:
-        repo = self._repository(run_id)
-        self._load(repo, run_id, revision)
+        repository = self._repository(run_id)
+        self._load(repository, run_id, revision)
         parent_commit = revision["parent_commit"]
+        base = None
         if parent_commit is not None:
-            parent = self._commit(repo, run_id, parent_commit)
-            self._read_tree(repo, parent["tree"])
-        base = ["diff-tree", "--root", "--no-commit-id", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-relative", "-r"]
-        changes = self._git(repo, *base, "--name-status", "-z", revision["commit"]).split(b"\0")
+            parent = self._commit(repository, run_id, parent_commit)
+            self._read_tree(repository, parent["tree"])
+            base = self._tree(repository, parent["tree"])
+        else:
+            # 首个版本没有父提交，与一棵空树比较得到全部文件的新增
+            base = self._empty_tree(repository)
+        comparison = self._diff(repository, base, self._tree(repository, revision["tree"]))
         files = []
-        if changes[-1] != b"" or (len(changes) - 1) % 2:
-            raise GitVersionError(_ERROR)
-        binary = set()
-        for item in self._git(repo, *base, "--numstat", "-z", revision["commit"]).split(b"\0"):
-            if not item:
-                continue
-            added, deleted, path = item.split(b"\t", 2)
-            if added == b"-" and deleted == b"-":
-                binary.add(path)
-        for index in range(0, len(changes) - 1, 2):
-            status, path = changes[index:index + 2]
-            if status not in {b"A", b"M", b"D"}:
-                raise GitVersionError(_ERROR)
-            files.append({"path": path.decode("utf-8"), "status": status.decode("ascii"), "binary": path in binary})
-        patch = self._git(
-            repo, *base, "--patch", "--no-ext-diff", "--no-textconv", "--no-color", "--full-index",
-            "--src-prefix=a/", "--dst-prefix=b/", revision["commit"],
-        ).decode("utf-8", errors="replace")
-        return {**revision, "files": files, "diff": patch}
+        for patch in comparison:
+            path, status, binary = self._delta(patch)
+            files.append({"path": path, "status": status, "binary": binary})
+        return {**revision, "files": files, "diff": comparison.patch}
 
-    def _load(self, repo: Path, run_id: str, revision: dict[str, Any]) -> dict[str, bytes]:
+    def _load(self, repository: pygit2.Repository, run_id: str, revision: dict[str, Any]) -> dict[str, bytes]:
         self._revision(revision)
-        actual = self._commit(repo, run_id, revision["commit"])
+        actual = self._commit(repository, run_id, revision["commit"])
         if actual != revision:
             raise GitVersionError(_ERROR)
-        return self._read_tree(repo, revision["tree"])[0]
+        return self._read_tree(repository, revision["tree"])[0]
 
-    def _read_tree(self, repo: Path, revision_ref: str, *, expected_root: str | None = None) -> tuple[dict[str, bytes], dict[str, str]]:
-        entries = self._git(repo, "ls-tree", "-r", "-t", "-z", revision_ref).split(b"\0")
-        if entries[-1] != b"":
-            raise GitVersionError(_ERROR)
-        file_objects = {}
-        requested = {(revision_ref if expected_root is None else expected_root): "tree"}
-        for entry in entries[:-1]:
-            try:
-                metadata, name = entry.split(b"\t", 1)
-                mode, kind, oid = metadata.split(b" ")
-                path = name.decode("utf-8")
-                object_id = oid.decode("ascii")
-            except (ValueError, UnicodeError):
-                raise GitVersionError(_ERROR) from None
-            self._path(path)
-            if mode == b"040000" and kind == b"tree":
-                requested[object_id] = "tree"
-            elif mode == b"100644" and kind == b"blob":
-                if path in file_objects:
-                    raise GitVersionError(_ERROR)
-                requested[object_id] = "blob"
-                file_objects[path] = object_id
-            else:
+    def _read_tree(
+        self, repository: pygit2.Repository, revision_ref: str, *, expected_root: str | None = None
+    ) -> tuple[dict[str, bytes], dict[str, str]]:
+        tree = self._tree(repository, revision_ref, expected_root=expected_root)
+        file_objects: dict[str, str] = {}
+        for path, object_id, kind in self._entries(repository, tree, ""):
+            if kind != "blob":
+                # 树的条目只接受普通文件与目录，符号链接与可执行位等不进入版本
                 raise GitVersionError(_ERROR)
-        objects = self._objects(repo, requested)
-        files = {path: objects[oid] for path, oid in file_objects.items()}
+            if path in file_objects:
+                raise GitVersionError(_ERROR)
+            file_objects[path] = object_id
+        blobs = self._payloads(repository, file_objects)
+        files = {path: blobs[oid] for path, oid in file_objects.items()}
         self._validate_files(files)
         return files, file_objects
 
-    def _commit(self, repo: Path, run_id: str, commit: str) -> dict[str, Any]:
-        revision, bound = self._snapshot(repo, run_id, commit)
+    def _entries(
+        self, repository: pygit2.Repository, tree: pygit2.Tree, prefix: str,
+    ) -> list[tuple[str, str, str]]:
+        collected: list[tuple[str, str, str]] = []
+        try:
+            children = list(tree)
+        except (pygit2.GitError, ValueError):
+            raise GitVersionError(_ERROR) from None
+        for child in children:
+            path = prefix + child.name
+            self._path(path)
+            if child.type_str == "tree":
+                collected.extend(self._entries(repository, child, path + "/"))
+            elif child.type_str == "blob":
+                collected.append((path, str(child.id), "blob"))
+            else:
+                raise GitVersionError(_ERROR)
+        return collected
+
+    def _commit(self, repository: pygit2.Repository, run_id: str, commit: str) -> dict[str, Any]:
+        revision, bound = self._snapshot(repository, run_id, commit)
         if not bound or revision is None:
             raise GitVersionError(_ERROR)
         return revision
 
-    def _snapshot(self, repo: Path, run_id: str, commit: str) -> tuple[dict[str, Any] | None, bool]:
+    def _snapshot(
+        self, repository: pygit2.Repository, run_id: str, commit: str
+    ) -> tuple[dict[str, Any] | None, bool]:
         """Read one snapshot commit and report whether the immutable ref already binds it."""
         self._oid(commit)
-        # 绑定探测、提交内容与树的指向在同一次批量读里完成，不再单开引用查询进程
-        binding, stored, root = self._batch(repo, (
-            ("refs/snapshots/" + commit, "commit", commit),
-            (commit, "commit", commit),
-            (commit + "^{tree}", "tree", None),
-        ))
-        if binding is None:
+        reference = "refs/snapshots/" + commit
+        target = self._reference_target(repository, reference)
+        if target is None:
             return None, False
-        if stored is None or root is None:
+        if target != commit:
+            raise GitVersionError(_ERROR)
+        stored = self._raw(repository, commit, ObjectType.COMMIT)
+        if stored is None:
             raise GitVersionError(_ERROR)
         try:
-            header, body = stored[1].split(b"\n\n", 1)
+            header, body = stored.split(b"\n\n", 1)
             trees = [line[5:].decode("ascii") for line in header.split(b"\n") if line.startswith(b"tree ")]
             parents = [line[7:].decode("ascii") for line in header.split(b"\n") if line.startswith(b"parent ")]
             metadata = json.loads(body)
@@ -227,177 +219,201 @@ class GitVersionStore:
         except (ValueError, UnicodeError):
             raise GitVersionError(_ERROR) from None
         # 引用解析出的树必须就是提交头里的那一棵，缺失即说明引用未指向本提交
-        if root[0] != trees[0]:
+        if self._tree_id(repository, commit) != trees[0]:
             raise GitVersionError(_ERROR)
         return {"commit": commit, "parent_commit": parents[0] if parents else None, "tree": trees[0]}, True
 
-    def _objects(self, repo: Path, requested: dict[str, str]) -> dict[str, bytes]:
-        for oid in requested:
-            self._oid(oid)
-        records = self._batch(repo, tuple((oid, kind, oid) for oid, kind in requested.items()))
-        objects = {}
-        for oid, record in zip(requested, records):
-            if record is None:
-                raise GitVersionError(_ERROR)
-            objects[oid] = record[1]
-        return objects
-
-    def _batch(self, repo: Path, requests: tuple[tuple[str, str, str | None], ...]) -> list[tuple[str, bytes] | None]:
-        """Read many objects in one Git process; an unresolvable request comes back as None."""
-        output = self._git(
-            repo, "cat-file", "--batch",
-            data="".join(request + "\n" for request, _, _ in requests).encode("ascii"),
-        )
-        records: list[tuple[str, bytes] | None] = []
-        offset = 0
-        # Batch payloads are length-delimited; binary data may contain any delimiter.
-        for line, expected_kind, expected_oid in requests:
-            try:
-                end = output.index(b"\n", offset)
-                fields = output[offset:end].split(b" ")
-                if len(fields) == 2 and fields[1] == b"missing":
-                    records.append(None)
-                    offset = end + 1
-                    continue
-                oid, kind, size = fields
-                observed_kind = kind.decode("ascii")
-                object_id = oid.decode("ascii")
-                if observed_kind != expected_kind or not size.isdigit():
-                    raise ValueError
-                length = int(size)
-                raw = output[end + 1:end + 1 + length]
-                offset = end + 1 + length
-                if len(raw) != length or output[offset:offset + 1] != b"\n":
-                    raise ValueError
-                offset += 1
-                # Git may read a recompressed loose object even when its OID is wrong.
-                if self._digest(observed_kind, raw) != object_id:
-                    raise ValueError
-                if expected_oid is not None and object_id != expected_oid:
-                    raise ValueError
-            except (ValueError, UnicodeError):
-                raise GitVersionError(_ERROR) from None
-            records.append((object_id, raw))
-        if offset != len(output):
-            raise GitVersionError(_ERROR)
-        return records
-
     def _write_tree(
-        self, repo: Path, files: dict[str, bytes], previous_files: dict[str, bytes], previous_objects: dict[str, str],
+        self, repository: pygit2.Repository, files: dict[str, bytes],
+        previous_files: dict[str, bytes], previous_objects: dict[str, str],
     ) -> str:
+        # 内容未变的文件沿用上一版已经校验过的对象，只写入真正改变的内容
         objects = {
             path: previous_objects[path]
             for path, data in files.items()
             if path in previous_files and previous_files[path] == data
         }
-        # 临时文件落在版本库根之外：读操作要求版本库目录在写入前后逐字节一致
-        staging = Path(tempfile.mkdtemp(prefix="yudao-git-"))
-        try:
-            objects.update(self._write_blobs(repo, staging, {
-                path: data for path, data in files.items() if path not in objects}))
-            nodes: dict[str, Any] = {}
-            for path, object_id in objects.items():
-                node = nodes
-                for part in path.split("/")[:-1]:
-                    node = node.setdefault(part, {})
-                node[path.split("/")[-1]] = object_id
-            return self._write_trees(repo, staging, nodes)
-        finally:
-            shutil.rmtree(staging, ignore_errors=True)
+        for path, data in files.items():
+            if path not in objects:
+                objects[path] = self._write_blob(repository, data)
+        nodes: dict[str, Any] = {}
+        for path, object_id in objects.items():
+            node = nodes
+            for part in path.split("/")[:-1]:
+                node = node.setdefault(part, {})
+            node[path.split("/")[-1]] = object_id
+        return str(self._write_trees(repository, nodes))
 
-    def _write_blobs(self, repo: Path, staging: Path, pending: dict[str, bytes]) -> dict[str, str]:
-        # 一次进程写入全部变更内容；Git 返回的摘要必须与自算摘要逐项相等
-        if not pending:
-            return {}
-        items = list(pending.items())
-        paths = self._stage(staging, "blob", [data for _, data in items])
-        written = self._hash_objects(repo, "blob", paths, [self._digest("blob", data) for _, data in items])
-        return {path: object_id for (path, _), object_id in zip(items, written)}
-
-    def _write_trees(self, repo: Path, staging: Path, nodes: dict[str, Any]) -> str:
-        records: list[bytes] = []
-
-        def build(node: dict[str, Any]) -> str:
-            entries = []
-            for name, value in node.items():
-                subtree = isinstance(value, dict)
-                object_id = build(value) if subtree else value
-                # Git 比较 tree 条目时把目录名连同结尾的斜杠一起排序
-                # 条目内容是「模式 名字 结束符 对象摘要的二十字节原始形式」，不含对象种类
-                entries.append((
-                    name.encode("utf-8") + (b"/" if subtree else b""),
-                    _TREE_MODES["tree" if subtree else "blob"] + b" " + name.encode("utf-8") + b"\x00" + bytes.fromhex(object_id),
-                ))
-            content = b"".join(record for _, record in sorted(entries))
-            records.append(content)
-            return self._digest("tree", content)
-
-        root = build(nodes)
-        paths = self._stage(staging, "tree", records)
-        self._hash_objects(repo, "tree", paths, [self._digest("tree", content) for content in records])
-        return root
+    def _write_trees(self, repository: pygit2.Repository, nodes: dict[str, Any]) -> pygit2.Oid:
+        builder = repository.TreeBuilder()
+        for name, value in nodes.items():
+            builder.insert(
+                name,
+                self._write_trees(repository, value) if isinstance(value, dict) else pygit2.Oid(hex=value),
+                _TREE_MODES["tree" if isinstance(value, dict) else "blob"],
+            )
+        return builder.write()
 
     @staticmethod
-    def _stage(staging: Path, kind: str, payloads: list[bytes]) -> list[str]:
-        paths = []
-        for index, data in enumerate(payloads):
-            file = staging / (kind + "-" + str(index))
-            file.write_bytes(data)
-            paths.append(str(file))
-        return paths
+    def _empty_tree(repository: pygit2.Repository) -> pygit2.Tree:
+        # 空树在建库时已经写入，这里只按它的固定摘要读取
+        try:
+            return repository[pygit2.Oid(hex=_EMPTY_TREE)]
+        except (pygit2.GitError, KeyError, ValueError):
+            raise GitVersionError(_ERROR) from None
 
-    def _hash_objects(self, repo: Path, kind: str, paths: list[str], expected: list[str]) -> list[str]:
-        written = self._git(
-            repo, "hash-object", "-w", *(["-t", kind] if kind != "blob" else []), "--no-filters", "--stdin-paths",
-            data=os.fsencode("\n".join(paths)) + b"\n",
-        ).decode("ascii").split()
-        if len(written) != len(expected) or any(
-            _OID.fullmatch(observed) is None or observed != want for observed, want in zip(written, expected)
-        ):
+    def _diff(
+        self, repository: pygit2.Repository, base: pygit2.Tree | None, head: pygit2.Tree,
+    ) -> pygit2.Diff:
+        try:
+            return repository.diff(base, head, context_lines=3)
+        except (pygit2.GitError, ValueError, KeyError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _delta(patch: pygit2.Patch) -> tuple[str, str, bool]:
+        file = patch.delta.new_file
+        path = file.path or patch.delta.old_file.path
+        if not isinstance(path, str):
             raise GitVersionError(_ERROR)
-        return written
+        try:
+            path.encode("utf-8")
+        except UnicodeError:
+            raise GitVersionError(_ERROR) from None
+        try:
+            status = {pygit2.enums.DeltaStatus.ADDED: "A",
+                      pygit2.enums.DeltaStatus.DELETED: "D",
+                      pygit2.enums.DeltaStatus.MODIFIED: "M"}[patch.delta.status]
+        except (KeyError, ValueError):
+            raise GitVersionError(_ERROR) from None
+        # 二进制内容没有文本行块，差异在补丁里只有一行说明
+        return path, status, not patch.hunks
+
+    def _repository(self, run_id: str, *, create: bool = False) -> pygit2.Repository:
+        self._run_id(run_id)
+        self._directory(self.root)
+        self._directory(self._hooks)
+        path = self.root / (run_id + ".git")
+        if not os.path.lexists(path):
+            if not create:
+                raise GitVersionError(_ERROR)
+            self._initialize(path)
+        self._directory(path)
+        for child in (path / "objects", path / "objects" / "info", path / "refs"):
+            self._directory(child)
+        if os.path.lexists(path / "objects" / "info" / "alternates"):
+            raise GitVersionError(_ERROR)
+        return self._open(path)
+
+    @staticmethod
+    def _initialize(path: Path) -> None:
+        try:
+            # 空模板与关闭钩子：宿主的版本库不读模板内容，也没有任何钩子可以运行
+            repository = pygit2.init_repository(str(path), bare=True, flags=(
+                RepositoryInitFlag.BARE | RepositoryInitFlag.MKPATH
+                | RepositoryInitFlag.EXTERNAL_TEMPLATE
+            ))
+            # 空树在建库时写好：首个版本没有父提交，差异要拿它当基准，读取时才不用写入版本库
+            repository.TreeBuilder().write()
+        except (pygit2.GitError, OSError, ValueError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _open(path: Path) -> pygit2.Repository:
+        try:
+            # NO_SEARCH 只按给出的路径打开，版本库位置不随上层的版本库或环境改变
+            return pygit2.Repository(str(path), flags=RepositoryOpenFlag.NO_SEARCH)
+        except (pygit2.GitError, KeyError, OSError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _tree(
+        repository: pygit2.Repository, revision: str, *, expected_root: str | None = None,
+    ) -> pygit2.Tree:
+        if expected_root is not None:
+            GitVersionStore._oid(expected_root)
+        try:
+            resolved = repository.revparse_single(revision)
+            if expected_root is not None and str(resolved.peel(pygit2.Commit).tree.id) != expected_root:
+                raise GitVersionError(_ERROR)
+            return resolved.peel(pygit2.Tree)
+        except (pygit2.GitError, KeyError, ValueError, TypeError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _tree_id(repository: pygit2.Repository, commit: str) -> str:
+        try:
+            return str(repository.revparse_single(commit + "^{tree}").id)
+        except (pygit2.GitError, KeyError, ValueError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _reference_target(repository: pygit2.Repository, reference: str) -> str | None:
+        try:
+            return str(repository.references[reference].target)
+        except KeyError:
+            return None
+        except (pygit2.GitError, ValueError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _bind_reference(repository: pygit2.Repository, reference: str, commit: str) -> None:
+        try:
+            repository.references.create(reference, pygit2.Oid(hex=commit), force=False)
+        except (pygit2.GitError, KeyError, ValueError, OSError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _write_blob(repository: pygit2.Repository, data: bytes) -> str:
+        try:
+            return str(repository.create_blob(data))
+        except (pygit2.GitError, ValueError, OSError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _write_commit(
+        repository: pygit2.Repository, parents: list[pygit2.Oid], tree: pygit2.Oid, metadata: bytes,
+    ) -> str:
+        # 提交的身份固定：作者与提交者是宿主，消息承载本次接纳的元数据
+        timestamp = datetime.now(timezone.utc).timestamp()
+        try:
+            signature = pygit2.Signature("Yudao", "host@yudao.invalid", int(timestamp), 0)
+            return str(repository.create_commit(
+                None, signature, signature, metadata.decode("utf-8"), tree, parents,
+            ))
+        except (pygit2.GitError, ValueError, UnicodeError, OSError):
+            raise GitVersionError(_ERROR) from None
+
+    @staticmethod
+    def _raw(repository: pygit2.Repository, oid: str, kind: ObjectType) -> bytes | None:
+        try:
+            observed, payload = repository.read(pygit2.Oid(hex=oid))
+        except KeyError:
+            return None
+        except (pygit2.GitError, ValueError):
+            raise GitVersionError(_ERROR) from None
+        if observed != kind:
+            raise GitVersionError(_ERROR)
+        # 读取到的字节按自算摘要逐项核对：松散对象被改写以后内容与它的名称不再一致
+        if GitVersionStore._digest(kind.name.lower(), payload) != oid:
+            raise GitVersionError(_ERROR)
+        return payload
+
+    @staticmethod
+    def _payloads(repository: pygit2.Repository, file_objects: dict[str, str]) -> dict[str, bytes]:
+        blobs: dict[str, bytes] = {}
+        for oid in file_objects.values():
+            if oid in blobs:
+                continue
+            payload = GitVersionStore._raw(repository, oid, ObjectType.BLOB)
+            if payload is None:
+                raise GitVersionError(_ERROR)
+            blobs[oid] = payload
+        return blobs
 
     @staticmethod
     def _digest(kind: str, payload: bytes) -> str:
         return hashlib.sha1(kind.encode("ascii") + b" " + str(len(payload)).encode("ascii") + b"\0" + payload).hexdigest()
-
-    def _repository(self, run_id: str, *, create: bool = False) -> Path:
-        self._run_id(run_id)
-        self._directory(self.root)
-        self._directory(self._hooks)
-        repo = self.root / (run_id + ".git")
-        if not os.path.lexists(repo):
-            if not create:
-                raise GitVersionError(_ERROR)
-            self._git(repo, "init", "--bare", "--template=", "--object-format=sha1")
-        self._directory(repo)
-        for path in (repo / "objects", repo / "objects" / "info", repo / "refs"):
-            self._directory(path)
-        if os.path.lexists(repo / "objects" / "info" / "alternates"):
-            raise GitVersionError(_ERROR)
-        return repo
-
-    def _git(self, repo: Path, *arguments: str, data: bytes | None = None) -> bytes:
-        environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
-        timestamp = datetime.now(timezone.utc).isoformat()
-        environment.update({
-            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
-            "GIT_ATTR_NOSYSTEM": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0",
-            "GIT_AUTHOR_NAME": "Yudao", "GIT_AUTHOR_EMAIL": "host@yudao.invalid", "GIT_AUTHOR_DATE": timestamp,
-            "GIT_COMMITTER_NAME": "Yudao", "GIT_COMMITTER_EMAIL": "host@yudao.invalid", "GIT_COMMITTER_DATE": timestamp,
-        })
-        command = [
-            self._git_path, "--no-pager", "--git-dir=" + str(repo),
-            "-c", "core.hooksPath=" + str(self._hooks), "-c", "commit.gpgSign=false",
-            "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "core.autocrlf=false",
-            "-c", "core.attributesFile=" + os.devnull, "-c", "core.quotePath=false",
-            "-c", "diff.renames=false", "-c", "diff.noprefix=false", *arguments,
-        ]
-        try:
-            completed = subprocess.run(command, input=data, capture_output=True, shell=False, env=environment, timeout=30, check=True)
-        except (OSError, subprocess.SubprocessError):
-            raise GitVersionError(_ERROR) from None
-        return completed.stdout
 
     @staticmethod
     def _directory(path: Path, *, create: bool = False) -> None:
