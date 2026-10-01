@@ -401,6 +401,10 @@ export type BindingInput = {
      * Model Id
      */
     model_id: string;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
 };
 
 /**
@@ -485,6 +489,18 @@ export type CallTarget = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
 };
 
 /**
@@ -610,6 +626,10 @@ export type CatalogBinding = {
      * Model Id
      */
     model_id: string;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
 };
 
 /**
@@ -846,6 +866,18 @@ export type CatalogModel = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string;
 };
 
 /**
@@ -1481,6 +1513,18 @@ export type DocumentModelInput = {
      */
     accepts_required_tool_call?: boolean;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels?: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level?: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode?: string;
+    /**
      * Provider Id
      */
     provider_id: string;
@@ -1836,6 +1880,18 @@ export type ModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels?: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level?: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode?: string;
 };
 
 /**
@@ -3914,6 +3970,18 @@ export type ActionVerifiedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -5480,6 +5548,18 @@ export type CompactionRecordedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -5733,6 +5813,18 @@ export type ContextAssembledPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Effective Contract Hash
      */
@@ -7915,6 +8007,18 @@ export type ModelAttemptFailedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -8187,6 +8291,18 @@ export type ModelAttemptFinishedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -8437,6 +8553,18 @@ export type ModelMessagePayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -8650,6 +8778,18 @@ export type ModelRequestSerializedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -8868,6 +9008,18 @@ export type ModelRequestedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -9105,6 +9257,18 @@ export type ModelRetryScheduledPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -11942,6 +12106,18 @@ export type ToolCallResult = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -12233,6 +12409,18 @@ export type ToolSkippedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -12676,6 +12864,18 @@ export type UsageCharge = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
