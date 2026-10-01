@@ -327,7 +327,14 @@ class StepRecorder:
         ))
         self._record(*drafts)
 
-    def tool_called(self, request: ModelRequest, call: dict[str, Any]) -> None:
+    def tool_called(self, request: ModelRequest, call: dict[str, Any],
+                    after_snapshot: dict[str, Any] | None = None) -> None:
+        # 动作后的公开树快照与结果一起写入（工单 #17）：与动作前的快照、动作参数一起构成核实依据，
+        # 放在 run 自己的对象区域，不建立提交、不改动分支索引
+        if after_snapshot is not None:
+            after_ref = self._artifacts.put(request.run_id, "snapshot/after", json_dumps(after_snapshot),
+                                            media_type="application/json")
+            call["after_snapshot_ref"] = asdict(after_ref)
         self._record(*self._observe(request, _Observation(call["id"], "tool", call)))
 
     def tool_skipped(self, request: ModelRequest, call: dict[str, Any]) -> None:
@@ -522,20 +529,25 @@ class StepRecorder:
                      "previous_compaction_event_id": result.previous_compaction_event_id}))
 
     def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
-                     command_basis: dict[str, Any]) -> None:
-        # 工具许可允许以后、执行之前记录；登记命令带着许可时的执行依据
+                     command_basis: dict[str, Any], before_snapshot: dict[str, Any] | None = None) -> None:
+        # 工具许可允许以后、执行之前记录；登记命令带着许可时的执行依据。
+        # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约第 4 节）：中断以后按这份快照与
+        # 动作参数核对实际效果，快照放在 run 自己的对象区域，不建立提交、不改动分支索引
         scope = self.scope
-        self._record_in(transaction, self._draft(
-            EventType.TOOL_STARTED,
-            payload={**call, "activation_id": request.activation_id,
-                     "attempt_id": request.attempt_id,
-                     "logical_call_id": request.logical_call_id,
-                     "collaboration_request_id": request.request_id,
-                     "context_event_id": request.context_event_id,
-                     "attempt": request.attempt,
-                     **scope.versions(),
-                     **scope.work_basis(),
-                     **command_basis}))
+        payload = {**call, "activation_id": request.activation_id,
+                   "attempt_id": request.attempt_id,
+                   "logical_call_id": request.logical_call_id,
+                   "collaboration_request_id": request.request_id,
+                   "context_event_id": request.context_event_id,
+                   "attempt": request.attempt,
+                   **scope.versions(),
+                   **scope.work_basis(),
+                   **command_basis}
+        if before_snapshot is not None:
+            before_ref = self._artifacts.put(scope.run_id, "snapshot/before", json_dumps(before_snapshot),
+                                             media_type="application/json")
+            payload["before_snapshot_ref"] = asdict(before_ref)
+        self._record_in(transaction, self._draft(EventType.TOOL_STARTED, payload=payload))
 
     def _draft(self, type: str, **fields: Any) -> Draft:
         # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。

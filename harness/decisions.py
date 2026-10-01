@@ -32,12 +32,25 @@ MODEL_UNAVAILABLE = DecisionKind("model_unavailable", "run", (Option("continue",
 DEFINITIONS_CHANGED = DecisionKind("definitions_changed", "run",
                                    (Option("continue", "按新版本继续"), Option("stop", "停止事项")))
 
-DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED)}
+# 结果未知的动作（工单 #17，恢复契约第 4 节）：工具已发出但结果未确认，由用户决定如何处理。
+# 阻塞范围为动作（不是 run），其他合法动作可以继续；「重新执行」只在契约声明该动作可以重复时提供，
+# 创建决定请求时按动作的 repeatable 属性过滤选项
+UNKNOWN_ACTION = DecisionKind("unknown_action", "action",
+                              (Option("reexecute", "重新执行"),
+                               Option("continue", "按当前实际状态继续"),
+                               Option("stop", "停止事项")))
+
+DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
     # 有未回答、阻塞整个 run 的决定请求
     return any(decision.status == "open" and decision.blocks == "run" for decision in decisions)
+
+def blocks_activation(decisions: Iterable[DecisionRequest]) -> bool:
+    # 有未回答的「核实结果未知的动作」请求：在它得到回答以前，依赖这个动作的下一步不继续。
+    # 动作级阻塞与 run 级阻塞一样不让流程编排开始新的激活，区别只在决定请求的阻塞范围标注为动作
+    return any(decision.status == "open" and decision.kind == UNKNOWN_ACTION.name for decision in decisions)
 
 
 class DecisionNotFound(KeyError):

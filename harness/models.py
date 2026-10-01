@@ -64,6 +64,7 @@ class EventType:
     TOOL_CALLED = "tool_called"
     TOOL_STARTED = "tool_started"
     TOOL_SKIPPED = "tool_skipped"
+    ACTION_VERIFIED = "action_verified"
     PROPOSAL_SUBMITTED = "proposal_submitted"
     PROPOSAL_REJECTED = "proposal_rejected"
     SPEC_ACCEPTED = "spec_accepted"

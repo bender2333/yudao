@@ -2241,6 +2241,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#23>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2275,6 +2276,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "content": "import sys\nprint(sys.argv[1])\n",
      "path": "src/echo.py"
@@ -2303,7 +2305,7 @@
     "model_id": "fake-model",
     "name": "write_file",
     "ok": true,
-    "output_ref": "<art#23>",
+    "output_ref": "<art#25>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -2348,6 +2350,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#24>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#31>",
     "effective_contract_hash": "<sha256#22>",
@@ -2403,6 +2406,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#3>",
+    "after_snapshot_ref": "<art#24>",
     "args": {
      "argv": [
       "<python>",
@@ -2436,7 +2440,7 @@
     "model_id": "fake-model",
     "name": "run_check",
     "ok": true,
-    "output_ref": "<art#24>",
+    "output_ref": "<art#26>",
     "prompt_hash": "<sha256#24>",
     "prompt_version": 1,
     "protocol": "fake",
@@ -4287,11 +4291,29 @@
    }
   },
   "<art#23>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#1>",
+    "files": []
+   }
+  },
+  "<art#24>": {
+   "kind": "snapshot/after",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#48>",
+    "files": [
+     "src/echo.py"
+    ]
+   }
+  },
+  "<art#25>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "src/echo.py"
   },
-  "<art#24>": {
+  "<art#26>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": {
