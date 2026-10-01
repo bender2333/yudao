@@ -630,3 +630,13 @@ qwen3.8 / 2026-10-02 00:35 / 执行者：#89 第 6 轮（自主推进模式，�
 八、本轮改动清单。合并提交 40cd7100（harness/projects.py 的导入、harness/tests/openapi/openapi.json 的枚举接线、三个记录文件）；随后一个提交放重新生成的 OpenAPI 快照（相对合并提交一行删除）与按条目重建后的三个记录文件（补回合并丢掉的五段条目）。事件序列基准零改动（重新生成的结果与合并提交逐字节相同）。未推送、未创建 PR、未关闭工单。
 
 九、留给审查者的三处核对。一是重新生成的 OpenAPI 快照删掉 department_prompt_updated 枚举项与 DepartmentPromptUpdatedEvent、DepartmentPromptUpdatedPayload、PromptRecord、DepartmentPromptConfiguredPayload 四个 schema，来源是本工单而不是合并：main 上 models.py:47 仍声明 EventType.DEPARTMENT_PROMPT_UPDATED、streams.py:23 仍把它列进 RUN_EVENT_TYPES，所以 main 的快照与 main 的代码一致；本工单删除 run 内部门 Prompt 副本时一并删掉了声明与事件接线，重新生成才把这五项一并去掉，与 models.py、streams.py 的实际内容对应。二是三个记录文件本轮从「手工拼接」换成「按条目重建」，脚本与核对项见第五节；审查者后续合入 main 时建议同样按条目核对，避免再次静默丢条目。三是 harness/tests/layers.toml 尚未建立，-m "unit or module" 选中 0 项，本轮按 AGENTS.md 的回退规则运行相关文件。
+
+qwen3.8 / 2026-10-02 02:25 / 执行者：#89 第 6 轮续（自主推进模式，第四次合入 origin/main 到 1f80b3ad）。承接 00:35 那条之后，本地 git fetch 使 origin/main 从 8e3f0832 前进到 1f80b3ad，`git merge-base --is-ancestor origin/main HEAD` 返回非零，说明工单要求的合入 origin/main 还没满足，再次合入。
+
+一、合入范围与提交。合并提交 527588dc，父提交 a5c7268d（本轮上一步的交付提交）与 1f80b3ad（origin/main）。main 新前进三个提交：ad4fde86（集成层修复 #18 与 #127 合并后 system.status 的调用，工单 #226/#227）、18d9b10f（docs：记录 #226 合并与集成层重新运行）、1f80b3ad（docs：记录 omp 后台命令导致执行者提前结束的原因与处理）。合入后 `git merge-base --is-ancestor origin/main HEAD` 返回 0。
+
+二、实际改动只有两处。claude_jour.md 自动合并取两侧并集，244 条 = a5c7268d 的 242 条 + main 独有 18d9b10f、1f80b3ad 两条，相对两个父本与 origin/main 零条目缺失。harness/tests/test_issue_18_recovery_observation.py 采用 main 的修复：导入 SystemStatusRequest 并把第 215 行以 None 调用的位置改为传 SystemStatusRequest() 空请求，与 #127 调整后的查询合同一致，本侧与 origin/main 该文件逐字节一致。
+
+三、记录文件冲突取本侧。git merge 在 agents_jour.md 与 docs/CHANGELOG.md 各造一个冲突块：origin/main 一侧想加的 23:20、00:05（agents_jour）与 23:25、00:08（CHANGELOG）条目，00:35 那条按条目重建时已从 origin/main（含 ad4fde86）并进来，本侧是两父的并集。判定方法：逐条签名比对，agents_jour.md 本侧 223 条含 origin/main 全部 215 条、docs/CHANGELOG.md 本侧 202 条含 origin/main 全部 197 条、docs/architecture-issues.md 本侧 51 条含 origin/main 全部 46 条，缺失行数 0。冲突块取本侧后清除标记，裸 LF 计数 0，`git ls-files --eol` 三文件仍 i/lf w/crlf。
+
+四、合入没有触及快照与基准的生成源。`git diff --name-only a5c7268d HEAD -- harness/` 只列出 test_issue_18_recovery_observation.py 一个文件，harness 源码、OpenAPI 快照生成链、44 份事件序列基准都不变，因此 00:35 那条记的快照一行删除与基准逐字节相同的结论在合并后仍成立。复跑：`uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py` → 2 passed in 13.54s；`uv run python -m compileall -q harness` 退出码 0。
