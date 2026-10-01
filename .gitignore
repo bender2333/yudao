@@ -10,6 +10,7 @@ third_party/
 
 # --- node / build ---
 node_modules/
+build/
 dist/
 harness/tests/openapi/generated/
 client/out/
@@ -20,6 +21,7 @@ test-results/
 
 # --- tooling / scratch ---
 .tmp/
+evals/scenarios/scenario-3/checks/_work/
 .tmp-codex-test/
 .tmp-omp-profile/
 .tmp-omp-*.log
@@ -27,6 +29,9 @@ test-results/
 .mission-workspaces/
 .remember/
 .yudao/
+
+# --- 发布资源：客户端安装包、更新清单与执行代理的 wheel，随 wheel 发布（设计说明第 5.1、6.1 节） ---
+harness/release_assets/
 
 # --- python ---
 __pycache__/

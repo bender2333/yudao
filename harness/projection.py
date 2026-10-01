@@ -309,6 +309,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.run_event_version = int(payload.get("run_event_version", 0))
         # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（ADR-0014）
         state.definitions_version = str(payload.get("definitions_version", ""))
+        # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
+        state.kind = str(payload.get("kind", "change"))
+        state.overview_ref = payload.get("overview_ref")
         return
 
     if etype == EventType.USER_INPUT_RECEIVED:
@@ -638,6 +641,31 @@ def apply_event(state: RunProjection, event: Event) -> None:
         )
         return
 
+    if etype == EventType.STRUCTURE_ACCEPTED:
+        _clear_feedback(state, event.department)
+        record = {key: value for key, value in payload.items() if key != "git_version"}
+        state.structures.append(record)
+        state.structure = record
+        state.evidence.append({"kind": "structure", "content_hash": payload["content_hash"],
+                               "structure_ref": payload["structure_ref"],
+                               "code_tree_digest": payload["code_tree_digest"],
+                               "product_spec_hash": payload["product_spec_hash"]})
+        return
+
+    if etype == EventType.BASELINE_REVIEW_ACCEPTED:
+        _clear_feedback(state, event.department)
+        record = {key: value for key, value in payload.items() if key != "git_version"}
+        state.baseline_reviews.append(record)
+        state.baseline_review = record
+        if record["verdict"] == "rework_product":
+            state.rework_count += 1
+            _supersede_active_deliveries(state, "baseline_rework_product")
+        state.evidence.append({"kind": "baseline_review", "verdict": record["verdict"],
+                               "content_hash": record["content_hash"], "checks": record["checks"],
+                               "product_spec_hash": record["product_spec_hash"],
+                               "code_snapshot_hash": record["code_snapshot_hash"]})
+        return
+
     if etype == EventType.QA_SUBMITTED:
         _clear_feedback(state, event.department)
         review = _review_from_payload(payload, event)
@@ -901,6 +929,10 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     if etype == ProjectEventType.PROJECT_RENAMED:
         state.name = payload["name"]
         return
+    if etype == ProjectEventType.PROJECT_GOAL_CHANGED:
+        state.goal = payload["goal"]
+        state.goal_ref = payload["goal_ref"]
+        return
     if etype == ProjectEventType.PROJECT_PINNED:
         state.pinned = bool(payload["pinned"])
         return
@@ -920,6 +952,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             run_time_limit_sec=int(payload["run_time_limit_sec"]),
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
+            kind=payload.get("kind", "change"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:

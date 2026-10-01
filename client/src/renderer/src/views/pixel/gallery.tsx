@@ -34,7 +34,17 @@ function GridPreview({ grid, w, h, zoom = 3 }: { grid: Grid; w: number; h: numbe
       }
     }
   }, [grid, w, h, zoom]);
-  return <canvas className="gallery-grid" ref={ref} style={{ imageRendering: "pixelated" }} />;
+  return (
+    <canvas
+      className="gallery-grid"
+      ref={ref}
+      style={{ imageRendering: "pixelated" }}
+      // 逻辑尺寸写在属性上：测试据此核对画布是逻辑尺寸的整数倍
+      data-grid-w={w}
+      data-grid-h={h}
+      data-grid-zoom={zoom}
+    />
+  );
 }
 
 function SampleView({ member }: { member: GalleryMember }): React.JSX.Element {

@@ -1,6 +1,11 @@
 {
   "added_defaults": {
+    "project_goal_changed": {
+      "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
+      "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
+    },
     "work_item_created": {
+      "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
     }
   },
@@ -138,6 +143,10 @@
       "text": "string"
     },
     "project_archived": {},
+    "project_goal_changed": {
+      "goal": "string",
+      "goal_ref": "object"
+    },
     "project_pinned": {
       "pinned": "boolean"
     },
@@ -145,7 +154,7 @@
       "goal": "string",
       "goal_ref": "object",
       "name": "string",
-      "source": "const string"
+      "source": "enum string"
     },
     "project_renamed": {
       "name": "string"
@@ -162,6 +171,7 @@
       "command_versions": "object",
       "context_window": "integer",
       "definitions_version": "string",
+      "kind": "string",
       "max_cycles": "integer",
       "priority": "string",
       "project_context_ref": "object",

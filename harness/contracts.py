@@ -108,3 +108,30 @@ def render_plan(plan: dict[str, Any]) -> str:
     if plan["reason"]:
         lines.extend(["", "## Adjustment Reason", "", plan["reason"]])
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_structure(structure: dict[str, Any]) -> str:
+    # 现有结构说明的材料（docs/design/existing-project-onboarding.md 第 4.4 节）：主机由接纳结果生成
+    lines = ["# 现有结构说明", "",
+             f"结构说明：{structure['content_hash']}",
+             f"初始 PRD：{structure['product_spec_hash']}",
+             f"所描述的代码树摘要：{structure['code_tree_digest']}", "",
+             "## 总体说明", "", structure["overall"], "", "## 模块", ""]
+    lines.extend(f"- `{item['path']}`：{item['responsibility']}" for item in structure["modules"])
+    lines.extend(["", "## 入口", ""])
+    lines.extend(f"- {item['kind']}：`{item['path']}`，运行方式：{item['how_to_run']}"
+                 for item in structure["entry_points"])
+    lines.extend(["", "## 构建与测试", ""])
+    for item in structure["build_and_test"]:
+        lines.append(f"- {item['name']}（`{' '.join(item['argv'])}`）：{item['purpose']}")
+        receipt = item["receipt"]
+        lines.append(f"  本次激活的回执：退出状态 {receipt['exit_code']}；{receipt['summary']}")
+    lines.extend(["", "## 要求所在的位置", ""])
+    for item in structure["requirement_locations"]:
+        lines.append(f"- {item['requirement']}")
+        lines.extend(f"  - `{path}`" for path in item["locations"])
+    lines.extend(["", "## 约定与注意事项", ""])
+    lines.extend(f"- {item}" for item in structure["conventions"])
+    if not structure["conventions"]:
+        lines.append("无。")
+    return "\n".join(lines).rstrip() + "\n"

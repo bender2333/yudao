@@ -95,6 +95,33 @@ class ContextAssembler:
                 projection.project_context_ref["content_hash"].split(":", 1)[1][:12],
                 project_text,
             ))
+        if projection.kind == "onboarding" and projection.overview_ref is not None:
+            # 仓库概况：建档中三个部门都看得见的常驻栏目，由控制核心按快照生成（设计第 4.2 节）
+            if self.artifacts is None:
+                raise ValueError("the repository overview requires an artifact store")
+            parts.append(ContextPart(
+                "existing_overview",
+                projection.overview_ref["content_hash"].split(":", 1)[1][:12],
+                self.artifacts.get_for_run(
+                    projection.run_id, ArtifactRef(**projection.overview_ref),
+                ).decode("utf-8"),
+            ))
+        if "existing_structure" in visible and projection.structure is not None:
+            # 现有结构说明：只有工程的可见范围包含它（设计第 4.4 节，工单 #134 验收第 5 项）
+            if self.artifacts is None:
+                raise ValueError("the structure description requires an artifact store")
+            structure = projection.structure
+            parts.append(ContextPart(
+                "existing_structure",
+                structure["content_hash"].split(":", 1)[1][:12],
+                self.artifacts.get_for_run(
+                    projection.run_id, ArtifactRef(**structure["structure_ref"]),
+                ).decode("utf-8") + "\n\n" + json_dumps({
+                    "code_tree_digest": structure["code_tree_digest"],
+                    "product_spec_hash": structure["product_spec_hash"],
+                    "revision": structure["revision"],
+                }),
+            ))
         if guidance_items:
             parts.append(ContextPart(
                 "department_guidance",
@@ -121,7 +148,7 @@ class ContextAssembler:
             ContextPart("input_handling", None, rules.input_handling),
             ContextPart("professional_completion", None, rules.professional_completion),
             ContextPart("collaboration_rules", None, rules.collaboration_rules),
-            ContextPart("proposal_contract", department, json_dumps(DEFINITIONS.proposal_contract(department))),
+            ContextPart("proposal_contract", department, json_dumps(DEFINITIONS.proposal_contract(department, projection.kind))),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
         ])
@@ -325,16 +352,26 @@ class ContextAssembler:
 
 
 def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
-    work = {
-        "product": "形成并提交当前产品要求。",
-        "engineering": "依据当前产品要求实现、运行检查并提交交付。",
-        "quality": "独立验证当前交付，提交放行或返工决定。",
-    }[department]
+    if projection.kind == "onboarding":
+        # 建档事项中的工作文字（工单 #134）：读取与核验现有代码，没有实现与放行
+        work = {
+            "product": "依据 existing_overview 与读取到的代码、文档、测试，形成并提交描述现有行为的初始 PRD。",
+            "engineering": "读取现有代码，用 run_check 运行构建与测试的命令，提交绑定当前快照的现有结构说明。",
+            "quality": "独立核验初始 PRD 与现有行为是否一致，提交基线核验。",
+        }[department]
+    else:
+        work = {
+            "product": "形成并提交当前产品要求。",
+            "engineering": "依据当前产品要求实现、运行检查并提交交付。",
+            "quality": "独立验证当前交付，提交放行或返工决定。",
+        }[department]
     if department == "product" and projection.phase == "REWORK_PRODUCT":
-        work = "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。"
+        work = ("根据基线核验中 unsupported 的结论与遗漏修改初始 PRD 的描述，并提交新的 ProductSpec。"
+                if projection.kind == "onboarding"
+                else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
     elif department == "engineering" and projection.effective_decisions:
         work = "依据 current_product_decisions 中已正式接纳的有效决定继续当前工程工作。"
-    if department == "engineering" and projection.engineering_plan is None:
+    if projection.kind != "onboarding" and department == "engineering" and projection.engineering_plan is None:
         work += " 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。"
     if projection.pending_request is not None and projection.pending_request.recipient == department:
         request = projection.pending_request
