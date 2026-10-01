@@ -13,6 +13,7 @@ from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCre
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
 from .proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from .providers.selection import ModelSelection
 from .runtime import LoopSystem
 
 DEMO_TASK = "Build a local echo CLI that prints its argument and follows product decisions on flags."
@@ -149,13 +150,15 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
     work_item_id, run_id = created.refs.work_item_id, created.refs.run_id
     task = system.orchestrator.work_item_execution(run_id)
     assert task is not None, "work_item.create did not start the run task"
-    # 等到第一次工程计划被接纳，再追加变更、更新 Prompt
+    # 等到第一次工程计划被接纳，再追加变更、修改本项目的部门 Prompt（从产品部门的下一次请求起生效）
     await _wait_for(lambda: system.project(run_id).engineering_plan is not None)
     await _command(application, "work_item.append_input",
                    WorkItemAppendInput(command_id=str(uuid.uuid4()), work_item_id=work_item_id, text=DEMO_CHANGE))
-    system.update_prompt(
-        run_id, "product",
-        DEFINITIONS.role("product").prompt + "\nExplicitly account for changed, retained, and retired requirements.")
+    system.projects.configure_department_settings(
+        project_id, "product",
+        ModelSelection(department_prompt=DEFINITIONS.role("product").prompt
+                       + "\nExplicitly account for changed, retained, and retired requirements."),
+        base_version=system.projects.read_department_setting(project_id, "product")["version"])
     await task
     projection = system.project(run_id)
     if projection.phase != "DONE":

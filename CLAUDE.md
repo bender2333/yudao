@@ -120,10 +120,10 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 分工：Claude 建立工单并推进流程，omp 担任执行者与审查者。三方通过 issue 评论、标签与 PR 交换信息，执行者与审查者的规则都在 `AGENTS.md`。
 
 流程：
-1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，同时可以开始的工单中先派发较早里程碑的工单，在后台运行
-   `omp -p --mode json --auto-approve --max-time 4h "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
+1. 派发：Claude 创建带 `ready-for-agent` 标签的 issue，同时可以开始的工单中先派发较早里程碑的工单，在 `C:\project\yudao-worktrees\issue-<编号>` 中（不存在时先建立）后台运行
+   `omp -p --mode json --auto-approve --max-time 4h --config docs/agents/omp-print-runs.yml "你是执行者，按 AGENTS.md「执行者」一节的自主推进模式处理工单 #<编号>"`
 2. 审查：工单标签变为 `needs-review` 后，Claude 在 `C:\project\yudao-worktrees\issue-<编号>` 中后台运行
-   `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --model 9router/ag/gemini-3.8-flash-high "你是审查者，按 AGENTS.md「审查者」一节以及两类角色共同遵守的内容工作，忽略「执行者」一节。审查工单 #<编号>"`
+   `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --config docs/agents/omp-print-runs.yml --model 9router/ag/gemini-3.8-flash-high "你是审查者，按 AGENTS.md「审查者」一节以及两类角色共同遵守的内容工作，忽略「执行者」一节。审查工单 #<编号>"`
 3. 收尾：
    - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
@@ -133,7 +133,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
    - 失败：暂停合并。先用单进程重新运行失败的测试：通过时建工单修正这个不稳定的测试，恢复合并；仍然失败时用 `git bisect run` 只运行失败的测试，找到出问题的提交，建修复工单并关联那个 PR 的工单，排在最前；修复合并后再运行集成层全部，通过后恢复合并。步骤见 `docs/design/test-pyramid.md` 第 4.2 节。
 5. 搁置：同一工单 3 轮审查仍未通过，或者执行、审查异常结束时，Claude 给工单加上 `ready-for-human` 标签，评论卡住的原因，记入 `claude_jour.md`，然后推进下一个没有阻塞项的工单，等用户回来决定。
 
-执行者使用 omp 配置的默认模型，并按配置使用 prewalk；审查者用 `--model` 指定 `9router/ag/gemini-3.8-flash-high`，备用模型 `9router/qdcn/qfmodel` 写在 omp 配置的 `retry.fallbackChains` 中，两者与执行者的模型不同。
+执行者使用 omp 配置的默认模型，并按配置使用 prewalk；审查者用 `--model` 指定 `9router/ag/gemini-3.8-flash-high`，备用模型 `9router/qdcn/qfmodel` 写在 omp 配置的 `retry.fallbackChains` 中，两者与执行者的模型不同。`docs/agents/omp-print-runs.yml` 关闭 omp 的后台命令，执行者与审查者的命令都在前台运行，测试结果能交回。
 
 ## 工单规范
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。

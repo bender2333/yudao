@@ -14,7 +14,18 @@ from typing import Any, Iterable
 
 from .artifacts import ArtifactStore
 from .event_store import EventStore
-from .models import ArtifactRef, DEPARTMENTS, Event, EventType, Usage, canonical_hash, json_dumps
+from .models import (
+    ArtifactRef,
+    DEPARTMENTS,
+    DepartmentPrompt,
+    Event,
+    EventType,
+    ProjectEventType,
+    Usage,
+    canonical_hash,
+    hash_bytes,
+    json_dumps,
+)
 from .projection import RunNotFoundError, project_run
 from .views import compaction_coverage, event_card, run_payload
 
@@ -460,17 +471,15 @@ class ObservabilityQuery:
              if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == department),
             None,
         )
-        latest_prompt = projection.department_prompts.get(department)
+        # 部门 Prompt 来自项目部门设置（run 内没有副本）：当前设置与该激活实际采用的版本
+        current_prompt = _project_department_prompt(self.store, projection.project_id, department)
+        latest_prompt = asdict(current_prompt)
         prompt = None
-        adopted_prompt_version = None if adopted_activation is None else adopted_activation.payload.get("prompt_version")
-        adopted_prompt_hash = None if adopted_activation is None else adopted_activation.payload.get("prompt_hash")
         if adopted_activation is not None:
-            prompt = next(
-                (item for item in reversed(projection.prompt_versions)
-                 if item.department == department
-                 and (adopted_prompt_version is None or item.version == adopted_prompt_version)
-                 and (adopted_prompt_hash is None or item.prompt_ref.content_hash == adopted_prompt_hash)),
-                None,
+            prompt = _project_department_prompt(
+                self.store, projection.project_id, department,
+                version=adopted_activation.payload.get("prompt_version"),
+                prompt_hash=adopted_activation.payload.get("prompt_hash"),
             )
         binding = projection.provider_bindings.get(department)
         provider = _department_provider(binding)
@@ -535,7 +544,7 @@ class ObservabilityQuery:
                 "adopted_activation_id": None if adopted_activation is None else adopted_activation.payload.get("activation_id"),
                 "adopted_event_id": None if adopted_activation is None else adopted_activation.event_id,
             },
-            "prompt_latest": None if latest_prompt is None else {**asdict(latest_prompt), "status": "pending"},
+            "prompt_latest": {**latest_prompt, "status": "pending"},
         }
 
     def _filtered_attempts(
@@ -690,6 +699,66 @@ def model_usage(store: EventStore, artifacts: ArtifactStore, run_id: str, **filt
 def export_observability(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
     return ObservabilityQuery(store, artifacts).export_run(run_id)
 
+
+def _project_department_prompt(store: EventStore, project_id: str | None, department: str, *,
+                               version: int | None = None,
+                               prompt_hash: str | None = None) -> DepartmentPrompt | None:
+    # 界面读取的部门 Prompt：没有给出 version 时是该 run 所属项目当前的部门设置；
+    # 给出 version 与 prompt_hash 时是该激活实际采用的版本，取自项目部门设置的版本历史，
+    # 历史中没有匹配（版本或内容哈希不符）时返回空。不属于项目的运行使用内置默认 Prompt
+    from .definitions import DEFINITIONS
+    from .projection import saved_project
+    from .projects import _default_settings
+    text = DEFINITIONS.role(department).prompt
+    ref = ArtifactRef(kind="text", content_hash="", path="")
+    event_id = ""
+    if project_id is None:
+        if version is None:
+            ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
+            return DepartmentPrompt(department, 0, text, ref, "")
+        if version == 0:
+            computed = hash_bytes(text.encode("utf-8"))
+            if prompt_hash is not None and prompt_hash != computed:
+                return None
+            ref = ArtifactRef(kind="department_prompt", content_hash=computed, path="")
+            return DepartmentPrompt(department, 0, text, ref, "")
+        return None
+    if version is None:
+        state = saved_project(store, project_id)
+        if state is not None:
+            _default_settings(state)
+            setting = state.department_settings.get(department)
+            if setting is not None and setting.configured_prompt:
+                returned = setting.version
+                if setting.prompt_ref is not None:
+                    ref = ArtifactRef(**setting.prompt_ref)
+                return DepartmentPrompt(department, returned, setting.text, ref,
+                                        "" if setting.event_id is None else setting.event_id)
+        ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
+        return DepartmentPrompt(department, 0, text, ref, "")
+    if version == 0:
+        wanted = prompt_hash
+        computed = hash_bytes(text.encode("utf-8"))
+        if wanted is not None and wanted != computed:
+            return None
+        ref = ArtifactRef(kind="department_prompt", content_hash=computed, path="")
+        return DepartmentPrompt(department, 0, text, ref, "")
+    for event in store.list_project_events(project_id):
+        if event.type != ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED:
+            continue
+        payload = event.payload
+        if payload.get("department") != department or int(payload.get("version", 0)) != version:
+            continue
+        if prompt_hash is not None:
+            recorded = payload.get("department_prompt_ref", payload.get("prompt_ref")) or {}
+            if recorded.get("content_hash") != prompt_hash:
+                return None
+        text = payload.get("department_prompt", payload.get("text")) or text
+        prompt_ref = payload.get("department_prompt_ref", payload.get("prompt_ref"))
+        if prompt_ref is not None:
+            ref = ArtifactRef(**prompt_ref)
+        return DepartmentPrompt(department, version, text, ref, event.event_id)
+    return None
 
 def department_view(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> dict[str, Any]:
     return ObservabilityQuery(store, artifacts).department(run_id, department)

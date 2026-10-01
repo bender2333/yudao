@@ -3,7 +3,8 @@ from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
 from harness.assembly import ContextAssembly, ModelLimits, StepFrame, model_limits
-from harness.models import ArtifactRef, EventType, RunProjection
+from harness.definitions import DEFINITIONS
+from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjection, hash_bytes
 from harness.projection import apply_event
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -33,9 +34,16 @@ def _rebuild_recorded_steps(system, run_id):
     for index, event in enumerate(events):
         payload = event.payload
         if event.type == EventType.DEPARTMENT_ACTIVATED:
+            # bare run 的部门 Prompt 是内置默认 Prompt（版本 0），run 内没有副本
+            text = DEFINITIONS.role(event.department).prompt
+            prompt = DepartmentPrompt(
+                department=event.department, version=0, text=text,
+                prompt_ref=ArtifactRef(kind="department_prompt",
+                                       content_hash=hash_bytes(text.encode("utf-8")), path=""),
+                created_event_id="")
             frames[payload["activation_id"]] = StepFrame(
                 department=event.department, session_id=event.session_id, activation_id=payload["activation_id"],
-                prompt=projection.department_prompts[event.department], guidance_only=payload["guidance_only"],
+                prompt=prompt, guidance_only=payload["guidance_only"],
                 effective_contract_hash=payload["effective_contract_hash"],
                 engineering_plan_hash=payload["engineering_plan_hash"], input_version=payload["input_version"],
             )

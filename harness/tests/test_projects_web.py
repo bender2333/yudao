@@ -17,6 +17,12 @@ from harness.tests.test_web import get_json, request, running_server, wait_until
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
+# 等待一次事项结算或一次工作线程结束（`_wait_work_item`、`wait_until`、worker 的会合点）的墙钟界限只用来
+# 防止测试一直等待，按 #107 的裁定（架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常
+# 用时的值，与 #112 实施方案的 120 秒同一口径。一次结算含一次版本存储写入，正常用时数秒；
+# 事项是否按预期结束由等待之后的状态断言核对。
+_WAIT_LIMIT = 120
+
 
 def _release_script(summary="v1", files=None):
     return [product_spec(), plan_turn(), delivery_turn(summary=summary, files=files), review_turn("release", f"ok {summary}")]
@@ -41,7 +47,7 @@ def _register(host, port, name="Echo", goal=GOAL):
     return _post(host, port, "/api/projects", {"name": name, "goal": goal}, 201)["project_id"]
 
 
-def _wait_work_item(host, port, project_id, work_item_id, statuses=("adopted", "held", "stopped"), timeout=60.0):
+def _wait_work_item(host, port, project_id, work_item_id, statuses=("adopted", "held", "stopped"), timeout=_WAIT_LIMIT):
     """等到事项进入终态且工作线程已退出（GET 项目会补跑结算，可能先于工作线程结束）。"""
 
     def check():
@@ -59,13 +65,15 @@ def _gated_turn():
 
     def turn(_request):
         entered.set()
-        assert release.wait(timeout=20)
+        assert release.wait(timeout=_WAIT_LIMIT)
         return product_spec()
 
     return turn, entered, release
 
 
-def _read_sse_blocks(host, port, path, count, headers=None, timeout=10):
+def _read_sse_blocks(host, port, path, count, headers=None, timeout=_WAIT_LIMIT):
+    # 事件流：本文件的事项已经结算、事件已经落盘，这里读的是回环上已有的事件，只用来防止读不到事件时
+    # 一直等待；推送的位置与块数由读取之后的断言核对
     conn = HTTPConnection(host, port, timeout=timeout)
     blocks = []
     try:
@@ -131,7 +139,7 @@ def test_project_registration_listing_and_state_commands(data_dir):
         assert detail["goal"] == GOAL and detail["work_items"] == [] and detail["current_adoption"] is None
         assert set(detail["overview"]) == {"goal", "current_adoption", "pending", "recent"}
         assert detail["overview"]["recent"][0]["type"] == ProjectEventType.PROJECT_RENAMED
-        assert {config["version"] for config in detail["prompt_configs"].values()} == {0}
+        assert {config["version"] for config in detail["department_settings"].values()} == {0}
         _post(host, port, f"/api/projects/{second}/archive")
         assert [row["name"] for row in get_json(host, port, "/api/projects")["projects"]] == ["改名后"]
         archived_rows = get_json(host, port, "/api/projects?archived=1")["projects"]
@@ -165,7 +173,7 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         work_item_id, run_id = created["work_item_id"], created["run_id"]
         assert created["phase"] == "PRODUCT_SPEC" and work_item_id.startswith("wi_") and run_id.startswith("run_")
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             health = get_json(host, port, "/api/health")
             assert health["busy"] is True and health["active_run_id"] == run_id
             assert health["active_project_id"] == project_id and health["active_work_item_id"] == work_item_id
@@ -217,7 +225,8 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         prompt = get_json(host, port, f"/api/projects/{project_id}/prompts/quality")
         quality_prompt = DEFINITIONS.role("quality").prompt
         assert prompt == {"department": "quality", "text": quality_prompt, "default_text": quality_prompt,
-                          "version": 0, "updated_at": None, "source": "default"}
+                          "prompt_configured": False, "provider_id": None, "model_id": None,
+                          "requested_tier": None, "version": 0, "updated_at": None, "source": "default"}
 
         # GET /api/runs 仍列出项目 run 与 bare run；POST /api/runs 已删除。
         status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare run"})
@@ -238,7 +247,7 @@ def test_second_work_item_returns_409_while_worker_is_busy(data_dir):
         project_id = _register(host, port)
         first = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "第一个"}, 201)
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             status, raw, _ = request(host, port, "POST", f"/api/projects/{project_id}/work-items", {"text": "第二个"})
             assert status == 409 and json.loads(raw)["reason"] == "busy", raw
             status, raw, _ = request(host, port, "POST", "/api/runs", {"task": "bare"})
@@ -246,7 +255,7 @@ def test_second_work_item_returns_409_while_worker_is_busy(data_dir):
             assert len(get_json(host, port, f"/api/projects/{project_id}")["work_items"]) == 1
         finally:
             release.set()
-        wait_until(lambda: not server.busy())
+        wait_until(lambda: not server.busy(), timeout=_WAIT_LIMIT)
         second = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "第二个"}, 201)
         assert second["work_item_id"] != first["work_item_id"]
         _wait_work_item(host, port, project_id, second["work_item_id"])
@@ -274,9 +283,9 @@ def test_two_projects_are_isolated_over_http(data_dir):
             assert foreign not in raw_a
         view_a = json.loads(raw_a)
         assert view_a["work_items"][0]["status"] == "adopted" and view_a["materials"] == []
-        assert view_a["prompt_configs"]["quality"]["source"] == "default"
+        assert view_a["department_settings"]["quality"]["source"] == "default"
         view_b = get_json(host, port, f"/api/projects/{project_b}")
-        assert view_b["prompt_configs"]["quality"]["version"] == 1 and len(view_b["materials"]) == 1
+        assert view_b["department_settings"]["quality"]["version"] == 1 and len(view_b["materials"]) == 1
         for foreign in (project_a, created_a["work_item_id"], created_a["run_id"]):
             assert foreign not in json.dumps(view_b)
 
@@ -357,11 +366,11 @@ def test_prompt_config_endpoints(data_dir):
         department = get_json(host, port, f"/api/projects/{project_id}/departments/engineering")
         assert department["prompt_config"] == {"version": 2, "source": "configured"} and department["items"] == []
         detail = get_json(host, port, f"/api/projects/{project_id}")
-        assert [entry["version"] for entry in detail["prompt_config_history"]] == [1, 2]
-        # 新事项固化 v2。
+        assert [entry["version"] for entry in detail["department_setting_history"]] == [1, 2]
+        # 新事项记下项目部门设置的版本；部门 Prompt 不在 run 内留副本。
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "v2 期间的事项"}, 201)
         run = system.project(created["run_id"])
-        assert run.department_prompts["engineering"].text == "工程 v2" and run.prompt_config_versions["engineering"] == 2
+        assert run.prompt_config_versions["engineering"] == 2
         _wait_work_item(host, port, project_id, created["work_item_id"])
 
 
@@ -403,7 +412,7 @@ def test_in_progress_archive_and_materials_return_409(data_dir):
         project_id = _register(host, port)
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "进行中"}, 201)
         try:
-            assert entered.wait(10)
+            assert entered.wait(_WAIT_LIMIT)
             before = [event.event_id for event in system.store.list_project_events(project_id)]
             for path, body in (
                 (f"/api/projects/{project_id}/archive", {}),

@@ -4,7 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
-from harness.models import ArtifactRef, EventType, canonical_hash, estimate_tokens, json_dumps
+from harness.definitions import DEFINITIONS
+from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_hash, estimate_tokens, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
@@ -27,8 +28,13 @@ def _submit(identity="submit"):
 def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("echo")
-    context = ContextAssembler().assemble(system.project(run_id), department="engineering",
-                                          session_id="session", activation_id="activation")
+    # 部门 Prompt 来自项目部门设置，run 内没有副本；不属于项目的运行使用内置默认 Prompt
+    context = ContextAssembler().assemble(
+        system.project(run_id), department="engineering", session_id="session", activation_id="activation",
+        prompt=DepartmentPrompt(department="engineering", version=0,
+                                text=DEFINITIONS.role("engineering").prompt,
+                                prompt_ref=ArtifactRef(kind="department_prompt", content_hash="", path=""),
+                                created_event_id=""))
     call = model_call(context.input_items, context.tools)
     adapter = FakeAdapter([FakeTurn(writes={"owned.txt": "content"})])
     response = complete(adapter, call)

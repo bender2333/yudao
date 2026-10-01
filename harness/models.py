@@ -44,7 +44,6 @@ class EventType:
     RUN_CREATED = "run_created"
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
-    DEPARTMENT_PROMPT_UPDATED = "department_prompt_updated"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
     DEPARTMENT_GUIDANCE_APPLIED = "department_guidance_applied"
     DEPARTMENT_GUIDANCE_RESPONDED = "department_guidance_responded"
@@ -101,7 +100,9 @@ class ProjectEventType:
     WORK_ITEM_START_FAILED = "work_item_start_failed"
     DELIVERABLE_ADOPTED = "deliverable_adopted"
     ADOPTION_HELD = "adoption_held"
-    DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
+    # 项目部门设置的三项写成同一种事件；事件种类字符串跨版本保持 department_prompt_configured（ADR-0019），
+    # 只增加字段（provider_id、model_id、requested_tier）
+    DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
@@ -615,8 +616,6 @@ class RunProjection:
     product_work_input_version: int = 0
     processed_input_version: int = 0
     inputs: list[UserInput] = field(default_factory=list)
-    department_prompts: dict[str, DepartmentPrompt] = field(default_factory=dict)
-    prompt_versions: list[DepartmentPrompt] = field(default_factory=list)
     department_guidance: list[DepartmentGuidance] = field(default_factory=list)
     yielded_work: dict[str, Any] | None = None
     phase: str = "CREATED"
@@ -754,11 +753,17 @@ class HeldCandidate:
 
 
 @dataclass
-class PromptConfig:
+class DepartmentSetting:
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；
+    # 三项一起保存、一个版本（设计说明第 5.2 节）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
     department: str
     version: int
     text: str
     source: str
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    configured_prompt: bool = False
     prompt_ref: dict[str, Any] | None = None
     base_version: int | None = None
     updated_at: str | None = None
@@ -868,8 +873,8 @@ class ProjectProjection:
     current_adoption: Adoption | None = None
     adoptions: list[Adoption] = field(default_factory=list)
     held: list[HeldCandidate] = field(default_factory=list)
-    prompt_configs: dict[str, PromptConfig] = field(default_factory=dict)
-    prompt_config_history: list[PromptConfig] = field(default_factory=list)
+    department_settings: dict[str, DepartmentSetting] = field(default_factory=dict)
+    department_setting_history: list[DepartmentSetting] = field(default_factory=list)
     commands: dict[str, RegisteredCommand] = field(default_factory=dict)
     command_history: list[RegisteredCommand] = field(default_factory=list)
     materials: list[Material] = field(default_factory=list)
