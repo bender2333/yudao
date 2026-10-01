@@ -394,6 +394,24 @@ def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
     finally:
         _close(server_a, server_b)
 
+def test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model(tmp_path):
+    # 模型访问定义与请求档位分别继承（设计说明第 5.2、5.3、9.2 节）：只写入请求档位、模型跟随部门默认时，
+    # 写入的请求档位同样要属于档位全集，不因此跳过核对
+    server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
+    server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))
+    try:
+        opened = _Opened(tmp_path, base_a, base_b)
+        with running_api(opened) as client:
+            opened.admit()
+            project_id = _create_project(client, "P")
+            rejected = _post(client, "department_settings.save", base_version=0, project_id=project_id,
+                             department="engineering", requested_tier="extreme")
+            assert rejected.status_code == 409, rejected.text
+            assert "departments.engineering.requested_tier" in rejected.json()["message"]
+            assert _settings(client, project_id, "engineering")["version"] == 0
+    finally:
+        _close(server_a, server_b)
+
 def _finish(system, run_id: str) -> None:
     # 事项的执行在接口进程的事件循环中作为任务运行；等这个任务结束（停在阻塞处或终止）
     import time

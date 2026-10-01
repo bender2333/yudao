@@ -579,15 +579,18 @@ class ProviderFacade:
     def validate_department_setting(self, department: str,
                                     project: ModelSelection | Mapping[str, Any] | None,
                                     ) -> None:
-        # 保存项目部门设置时的检查（设计说明第 5.2 节）：写入了模型时，所选定义必须已准入且未作废；
-        # 写入了请求档位时，它必须属于档位全集，是否落在所选模型的支持档位由每次请求的限制决定
-        # （第 7.3 节，部门默认与项目部门设置同一套核对）。目录与准入的校验留在 Provider 模块，应用层只转调
+        # 保存项目部门设置时的检查（设计说明第 5.2 节）：模型访问定义与请求档位分别继承，每一项都可以单独写入。
+        # 写入了请求档位时，它必须属于档位全集，与是否写入模型无关；是否落在生效模型的支持档位由每次请求的限制
+        # 决定（第 7.3 节，部门默认与项目部门设置同一套核对）。写入了模型时，所选定义必须已准入且未作废。
+        # 目录与准入的校验留在 Provider 模块，应用层只转调
         selection = _as_selection(project)
-        if selection is None or not selection.writes_model():
+        if selection is None:
             return
         if selection.writes_tier() and selection.requested_tier not in REASONING_LEVELS:
             raise CatalogValidationError((ValidationIssue(
                 f"departments.{department}.requested_tier", "请求档位不属于支持的档位"),))
+        if not selection.writes_model():
+            return
         with self._lock:
             model = self._store.models.get(selection.model_id or "")
             if model is None:
