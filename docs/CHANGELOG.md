@@ -315,3 +315,5 @@ claude-opus-5-5 / 2026-10-01 22:25 / docs/architecture-issues.md 为 #176 登记
 
 9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-01 23:25 / docs/architecture-issues.md 追加 #226 的一条：AGENTS.md「常用命令」的 `pytest -m "unit or module"` 依赖尚未合入的 harness/tests/layers.toml 登记表，在 main 上静默选中 0 项，单元层与模块层没有被运行 / 交付 #226 时实测该命令输出 1575 deselected、退出码 0，执行者无法据此判断这两层是否通过，登记建议由架构师决定
 claude-opus-5-5 / 2026-10-02 00:08 / docs/architecture-issues.md 为 #226 登记的分层命令选中 0 项一条写处理结论 / 架构师处理执行者登记的架构问题
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/architecture-issues.md 追加 #214 一条：端到端测试的后端启动时间（本机约 70 秒）超过 client/playwright.config.ts 的 60000 毫秒上限，shell.spec.ts 的 9 项在本机无法直接运行 / 本工单的验收标准包含端到端测试，需要登记等待上限的定法供架构师决定
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:45 / docs/CHANGELOG.md 与 agents_jour.md 追加 #214 第 1 轮的记录 / 执行者按规则记录本工单的改动、测试与架构问题登记
