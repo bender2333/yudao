@@ -96,4 +96,5 @@ _LABELS: dict[str, str] = {
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: "收集了模型候选：{count} 个",
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{status}",
     CatalogEventType.CREDENTIAL_CHANGED: "凭据发生变化：{operation}",
+    CatalogEventType.HOME_SEEN: "记下用户查看的位置：{position}",
 }

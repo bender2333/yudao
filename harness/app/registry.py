@@ -35,12 +35,13 @@ class CommandDefinition:
 @dataclass(frozen=True)
 class QueryDefinition:
     # 一个查询。handle 只读取，返回快照（数据与它已经包含的最大全局位置）；changed_by 是会改变结果的事件种类，
-    # 客户端收到这些事件时重新查询
+    # 客户端收到这些事件时重新查询；replayable 为真时接受设计说明第 4.1 节的 at（全局位置，按位置读取）
     name: str
     request: type[BaseModel] | None
     result: type[Any]
     handle: Callable[[Application, Any], Snapshot[Any]]
     changed_by: tuple[str, ...] = ()
+    replayable: bool = False
 
 
 @dataclass(frozen=True)
@@ -90,7 +91,8 @@ class Registry:
     def capabilities(self, deployment: Deployment) -> Capabilities:
         return Capabilities(
             deployment=deployment,
-            queries=[QueryCapability(name=item.name, changed_by=list(item.changed_by)) for item in self.queries.values()],
+            queries=[QueryCapability(name=item.name, changed_by=list(item.changed_by), replayable=item.replayable)
+                     for item in self.queries.values()],
             commands=[CommandCapability(name=name, reasons=list(self.reasons(name))) for name in self.commands],
             decisions=list(self.decisions),
             event_types=list(EVENT_TYPES),
