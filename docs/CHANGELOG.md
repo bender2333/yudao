@@ -301,3 +301,4 @@ claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
 claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事件序列基准缺少 `definitions_version` 投影字段，44 项基准在 #200 加入该字段后未重写 / #172 需要重写事件序列基准，登记这项与写出字节改动无关的既有差异并说明处置
 claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
+my-provider/ag/gemini-3.8-flash-high / 2026-10-01 18:20 / docs/design/evaluation-scenarios.md 第 1 节表格的场景 3「正确性与完成度」一行与第 2.3 节「需求条目」一条由 23 条检查、单元 11 改为 24 条检查、单元 12；第 2.3 节「检查的改造」中 test_line_preference 一条写明上游断言 `any(" 1" in edge.line)` 失效的原因，以及改为在两条路线上各指定一条基准路径不经过的线路、再加一组多线路偏好的做法 / #188 第 2 轮新增线路偏好检查，公开材料、评分器与设计说明的检查条数需要一致

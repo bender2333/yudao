@@ -96,14 +96,13 @@ sys.exit(report("unit_2_4", zero_ok and one_ok,
 UNIT_2_5 = COMMON + r'''
 from pathfinding import ShortestPath, PathfindingConfig
 graph, station_to_number, number_to_station = build()
-start = station_to_number["Tiananmen East"]
-end = station_to_number["Zhongguancun"]
 
-def run(preferred):
+def run(start_name, end_name, preferred):
     config = PathfindingConfig()
     config.mode = "least_transfer"
     config.preferred_lines = preferred
-    finder = ShortestPath(graph, start, config)
+    finder = ShortestPath(graph, station_to_number[start_name], config)
+    end = station_to_number[end_name]
     if end not in finder.dist_to:
         return None
     _path_ids, edges = finder.path_with_edges(end)
@@ -113,25 +112,31 @@ def run(preferred):
         "lines": [edge.line for edge in edges],
     }
 
-baseline = run([])
-preferred = run(["Line 10"])
+# 线路偏好在路径真的走上偏好线路时才成立。两条路线各选一条基准路径没有经过的线路：
+# 天安门东到中关村最少换乘时基准走 Line 1 与 Line 4，丰台东大街到西单基准走 Line 1 与 Line 9。
+# 只按某一个线路名称特殊处理的交付会在另一条路线上露出来。
+ROUTES = [
+    ("Tiananmen East", "Zhongguancun", ["Line 10"], "Line 10"),
+    ("Fengtai East Street", "Xidan", ["Line 4"], "Line 4"),
+    ("Fengtai East Street", "Xidan", ["Line 2", "Line 4"], "Line 4"),
+]
 
-if baseline is None or preferred is None:
-    sys.exit(report("unit_2_5", False, "least_transfer mode found no path: %s, %s"
-        % (baseline is None, preferred is None)))
-
-# The preferred line only counts when the route actually runs on it. The
-# baseline route uses Line 1 and Line 4; preferring Line 10 must reroute the
-# path onto Line 10. A path that ignores the preference is indistinguishable
-# from the baseline and fails here.
 problems = []
-if "Line 10" not in preferred["lines"]:
-    problems.append("preferred Line 10 absent from the path: %s" % preferred["lines"])
-if preferred["lines"] == baseline["lines"]:
-    problems.append("preference did not change the route from the baseline")
-if preferred["distance"] == baseline["distance"] and preferred["transfers"] == baseline["transfers"]:
-    problems.append("preference left distance %s and transfers %s unchanged"
-        % (preferred["distance"], preferred["transfers"]))
+for start_name, end_name, preferred, expected_line in ROUTES:
+    baseline = run(start_name, end_name, [])
+    chosen = run(start_name, end_name, preferred)
+    label = "%s->%s preferred %s" % (start_name, end_name, preferred)
+    if baseline is None or chosen is None:
+        problems.append("%s: least_transfer mode found no path" % label)
+        continue
+    if expected_line not in chosen["lines"]:
+        problems.append("%s: path does not run on %s: %s" % (label, expected_line, chosen["lines"]))
+        continue
+    if chosen["lines"] == baseline["lines"]:
+        problems.append("%s: preference did not change the route from the baseline" % label)
+    if chosen["distance"] == baseline["distance"] and chosen["transfers"] == baseline["transfers"]:
+        problems.append("%s: preference left distance %s and transfers %s unchanged"
+            % (label, chosen["distance"], chosen["transfers"]))
 sys.exit(report("unit_2_5", not problems, "; ".join(problems)))
 '''
 
@@ -319,15 +324,15 @@ SCRIPTS = {
 
 REQUIRED_SYMBOLS = {
     "unit_2_2": ["fare"],
-    "unit_2_3": ["models", "pathfinding"],
-    "unit_2_4": ["models", "pathfinding"],
-    "unit_2_5": ["models", "pathfinding"],
-    "unit_5_2": ["models", "pathfinding"],
+    "unit_2_3": ["models", "data_loader", "pathfinding"],
+    "unit_2_4": ["models", "data_loader", "pathfinding"],
+    "unit_2_5": ["models", "data_loader", "pathfinding"],
+    "unit_5_2": ["models", "data_loader", "pathfinding"],
     "unit_6_1": ["fare"],
     "unit_6_2": ["fare"],
-    "unit_8_2": ["models", "pathfinding"],
-    "unit_9_1": ["models", "pathfinding"],
+    "unit_8_2": ["models", "data_loader", "pathfinding"],
+    "unit_9_1": ["models", "data_loader", "pathfinding"],
     "unit_10_1": ["data_loader"],
     "unit_10_2": ["data_loader"],
-    "unit_12_1": ["models", "pathfinding", "fare"],
+    "unit_12_1": ["models", "data_loader", "pathfinding", "fare"],
 }
