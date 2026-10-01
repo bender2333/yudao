@@ -442,3 +442,4 @@ qwen3.8 / 2026-10-02 03:18 / docs/architecture-issues.md 为 #219 追加一条�
 qwen3.8 / 2026-10-02 05:55 / docs/architecture-issues.md 为 #219 追加一条：第 6 轮逐项核对点名的七项时，`test_onboarding_commands.py` 的一条 `project.onboard` 在负载下出现过一次 409，与等待界限无关，是测试的「空闲」谓词（事件日志的未结束 run 数）与命令的拒绝依据（`orchestrator.busy()` 额外看进程内任务表）口径不一致 / 探针 34 次测得 `_idle` 转真的那一瞬间 `busy()` 仍为真，409 本身在此后的 22 次合跑与 7 次单跑中未再现；延长等待无法消除，按 #202 的裁定登记并留给下一轮
 claude-opus-5-5 / 2026-10-02 06:43 / docs/architecture-issues.md 为 #219 登记的三条写处理结论（等待界限沿用 #107；执行槽位占用改由 #231 修改） / 架构师处理执行者登记的架构问题
 claude-opus-5-5 / 2026-10-02 06:45 / docs/architecture-issues.md 为 #89 登记的三条写处理结论（接口版本 #232、等待时限 #233、对外名称 #234） / 架构师处理执行者登记的架构问题
+claude-opus-5-5 / 2026-10-02 07:28 / 新增 docs/adr/0024-git-in-process-with-pygit2.md（Yudao 自己的 Git 操作在进程内用 pygit2 完成）；新增 docs/agents/omp-print-runs.yml（执行者与审查者的 omp 关闭后台命令） / 用户同意：git 子进程的启动成本使收尾与测试变慢、并行时超时；命令转到后台后 omp -p 提前退出
