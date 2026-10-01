@@ -301,3 +301,5 @@ claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md
 claude-sonnet-4-5 / 2026-10-01 22:50 / docs/architecture-issues.md 追加一条：#127 的工作树换行符（CRLF）与仓库保存的 LF 不一致，仓库本地 core.autocrlf=false 且没有 .gitattributes / 记录实现 #127 时遇到的交付 diff 无法审阅的问题，请架构师确认换行符规则
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
+claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事件序列基准缺少 `definitions_version` 投影字段，44 项基准在 #200 加入该字段后未重写 / #172 需要重写事件序列基准，登记这项与写出字节改动无关的既有差异并说明处置
+claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题
