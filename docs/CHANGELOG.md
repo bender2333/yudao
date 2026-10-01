@@ -299,3 +299,5 @@ claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
+claude / 2026-10-01 07:32 / docs/architecture-issues.md 登记 #172 一条：事件序列基准缺少 `definitions_version` 投影字段，44 项基准在 #200 加入该字段后未重写 / #172 需要重写事件序列基准，登记这项与写出字节改动无关的既有差异并说明处置
+claude-opus-5-5 / 2026-10-01 17:35 / docs/architecture-issues.md 为 #172 登记的事件序列基准缺少 definitions_version 一条追加处理结论 / 架构师处理执行者登记的架构问题

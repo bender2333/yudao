@@ -80,7 +80,7 @@ class Workspace:
         path = self.resolve_writable(rel)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.resolve_writable(rel)
-        path.write_text(content, encoding="utf-8")
+        path.write_bytes(content.encode("utf-8"))
         return rel
 
     def read_file(self, rel: str) -> str:
