@@ -475,3 +475,29 @@ minimax-M3.1 / 2026-10-01 20:45 / 执行者：#176 第 2 轮（合入 origin/mai
 六、登记架构问题。docs/architecture-issues.md 末尾追加一条：AGENTS.md「常用命令」把 `uv run python -m pytest -m "unit or module"` 列为每次必跑，但 markers 依赖尚未合入的 layers.toml，命令静默选中 0 项，审查者无法据此判断单元层与模块层是否通过，登记 #226 的观察与建议（由 #158 合入后恢复，或在登记建立前把该命令从规则文件移除）。
 
 9router/ag/gemini-3.8-flash-high / 2026-10-02 00:05 / 审查者：工单 #226 审查结论为通过。规范检查通过：工作目录路径为 C:\project\yudao-worktrees\issue-226，分支名称为 issue-226，工单流程标签处于 needs-review，DELIVERY 第 1 轮交付评论要素齐全（改动清单、全仓库调用核对、测试命令与结尾计数、逐条验收核对说明），工作区干净。内容核对通过：git diff origin/main...HEAD 涉及 4 个文件，harness/tests/test_issue_18_recovery_observation.py 导入 SystemStatusRequest 并且将第 215 行以 None 调用的位置调整为传 SystemStatusRequest() 空请求，与 #127 调整后的查询合同一致，保持原读取语义；全仓库调用核对无遗漏，未编写向后兼容逻辑或者伪造替身（mock）。自动化测试单进程独立复核：目标文件 test_issue_18_recovery_observation.py 12 项通过（120.15s）；关联与合同文件 test_issue_127.py、test_api.py、test_layers.py、test_openapi_snapshot.py 21 项通过（182.69s）；前端 test_web_ui.js 43 项通过（1011ms）；-m "unit or module" 由于 layers.toml 登记表未合入取消选择 1575 项。执行者登记的架构问题符合现状。
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:40 / 执行者：工单 #221「客户端生成的接口类型与 OpenAPI 快照保持一致的检查」第 1 轮，worktree 与分支 issue-221 已存在且工作区干净，标签由 ready-for-agent 改为 in-progress。工单正文没有评论，来源是 #87 在 docs/architecture-issues.md 登记的架构问题。
+
+调查。读了 client/scripts/generate-api.mjs：它调用本地 node_modules/.bin/openapi-ts，参数是 `-i harness/tests/openapi/openapi.json -o client/src/renderer/src/api/generated`，生成类型以后另外写 client/src/renderer/src/api/interface-version.ts，值取自快照 Deployment.api_version 的 example。读 harness/tests/openapi/openapi-ts.config.mjs 与 package.json：检查目录的 check 脚本是 `openapi-ts && tsc -p tsconfig.json`，devDependencies 为 @hey-api/openapi-ts 0.99.0 与 typescript 6.0.3。client/package.json 的依赖里 @hey-api/openapi-ts 同样是 0.99.0，两处生成选项一致。读 harness/tests/test_openapi_snapshot.py：它只核对运行中的服务返回的 /openapi.json 与 harness/tests/openapi/openapi.json 相同，用 difflib 输出差异，重写快照用 --write-openapi-snapshot。client/src/renderer/src/api/generated/ 由 16 个 .ts 文件组成（约 335 KB），提交在 git 里。
+
+安装依赖。harness/tests/openapi 与 client 的 node_modules 在本机都不存在，各运行一次 npm install（分别为 52 与 412 个包）。openapi-ts 的可执行文件在 Windows 上是 .cmd，直接执行报 command not found，改用 node node_modules/@hey-api/openapi-ts/bin/run.js 调用。
+
+核对生成的可重复性与文件集合。按快照生成到 .tmp/gen-a 与 .tmp/gen-b 两处，diff -r 结果为空，说明同一份快照两次生成逐字节相同，可以用作比对基准。两次生成各 16 个 .ts 文件，与提交的 generated/ 目录文件集合相同。
+
+发现漂移。与提交的生成目录比较，16 个文件全部报告不同。查原因：生成的 types.gen.ts 是 LF，提交的工作区副本是 CRLF，仓库 core.autocrlf=true 且没有 .gitattributes，比较必须统一换行。把提交的文件从 git 对象取出（blob 为 LF）再与生成结果比较，仍有 249898 与 221852 字节的差别，diff 显示缺少 AcceptedOnboardRefs、AwayRange、AwayReport、ProjectOnboard、OnboardingRestart、RunRecoveryResult、ActionVerifiedPayload 等类型，status 枚举多出 'unknown'，与工单正文所说的 #17（PR #210）与 #134（PR #212）的合同变化一致。
+
+实现检查。新增 harness/tests/client_types_check.py：常量记录仓库根、快照、openapi 检查目录、提交的生成目录与 interface-version.ts；临时目录用仓库内的 .tmp/client-types-check（.gitignore 第 23 行已忽略 .tmp/）；check_client_types() 删除旧临时目录、按快照生成、递归列出两个目录的文件、报告缺少与多余的文件、逐文件按统一换行后的内容报告不同、核对 interface-version.ts 是否记录快照的 api_version，返回字符串清单。生成工具未安装时抛出写明文件路径的 AssertionError，生成进程非零退出时抛出含标准输出与标准错误的 AssertionError。文件读取全部按 utf-8，接口版本从快照的 components.schemas.Deployment.properties.api_version.example 读取。
+
+在 harness/tests/test_openapi_snapshot.py 追加 test_the_committed_client_types_match_the_snapshot，断言清单为空并在失败消息里逐条列出；--write-openapi-snapshot 时跳过这项检查，理由是重写快照的工单必须先在 openapi 检查目录运行 npm run check 编译、再在 client 运行 npm run generate:api 并提交，两项检查都通过以后再跑正常模式。放在同一个文件里，执行者与审查者每次都运行的命令已经包含它，无需改动分层登记表（#158 之前也没有登记表）。
+
+重新生成。在 client 运行 npm run generate:api，接口版本仍为 1。内容真正改变的只有 3 个文件：generated/index.ts、generated/sdk.gen.ts、generated/types.gen.ts；其余 13 个生成文件与 interface-version.ts 只是 stat 变化（工作区 LF 变 CRLF），按换行归一后与提交内容相同。types.gen.ts 新增 84 个导出类型、删除 3 个，符合 #17 与 #134 的合同变化。
+
+验证两个方向。正向：新检查报出 3 个内容不同的文件（index.ts、sdk.gen.ts、types.gen.ts），重新生成以后通过。反向：临时给快照 AwayRange.id 的枚举加上 "30d"，新检查失败并写明「内容不同：types.gen.ts」，原有的服务与快照比较同时失败；重新生成以后 types.gen.ts 出现 `'since_seen' | '24h' | '7d' | '30d'`，新检查通过；用文件编辑工具把快照枚举改回三项，git diff 对 openapi.json 为 0，重新生成以后工作区回到只有 3 个生成文件与测试文件有内容差别。
+
+接入规则与文档。AGENTS.md「常用命令」中每次都运行的那一条写明 test_openapi_snapshot.py 现在的两项检查内容、各自需要先安装的依赖，以及重写快照以后在 client 运行 npm run generate:api 重新生成并提交；docs/design/app-and-interface.md 第 9 节验收第 1 条补上客户端提交的生成类型与快照逐文件相同；docs/CHANGELOG.md 追加两条，格式为「模型 ID / 时间 / 改动 / 原因」。全仓库 grep 确认 AGENTS.md、CLAUDE.md、docs/design/test-pyramid.md 与 docs/agents/ 下没有别处引用同一条命令。
+
+测试。test_layers.py 与 test_openapi_snapshot.py 3 项通过；test_openapi_snapshot.py、test_api.py、test_client_update.py 13 项通过；client 运行 npm run typecheck 通过（tsc -p tsconfig.json --noEmit）；openapi 检查目录运行 npm run check 通过；前端 harness/tests/test_web_ui.js 43 项通过；client 单元测试 37 项通过。`uv run python -m pytest -m "unit or module"` 输出 1576 deselected、退出码 5，与 #226 登记的 layers.toml 尚未合入一致，按 AGENTS.md 的回退规定运行相关测试文件与前端测试。
+
+遇到的架构问题：无。生成选项两处一致、接口版本仍为 1、检查放在既有文件内没有触及分层与接口层的边界，没有与既有设计冲突的地方。
+
+9router/minimax-cn/MiniMax-M3.1-Flash-Preview / 2026-10-02 02:50 / 执行者：交付前的复核中发现 client_types_check.py 最初把生成结果放在固定的 .tmp/client-types-check，函数开头先 shutil.rmtree 再生成；同时运行两个 pytest 进程时，一个进程删除了另一个正在使用的目录，后者读到的文件集合不完整，报出一批「多余文件」而失败。改为 WORK_DIR 只作为父目录，每次调用用 tempfile.mkdtemp 在其中建独立子目录，finally 中 shutil.rmtree 删除该子目录；比对结束以后父目录为空。同时把 COMMITTED_TYPES 目录不存在的判断移到生成之前。复现与验证：改动前同时运行两个 pytest 进程，其中一个因另一方删除目录而失败；改动后两个进程都通过，父目录不留子目录。
