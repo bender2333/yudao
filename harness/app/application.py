@@ -37,7 +37,7 @@ from .contracts import AccessMode, Accepted, Capabilities, CommandRequest, Deplo
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .event_stream import EventScope, EventStream
-from .project_commands import PROJECT_CREATE
+from .project_commands import ONBOARDING_RESTART, PROJECT_CREATE, PROJECT_ONBOARD
 from .project_and_work_item_commands import (
     COMMAND_REGISTRATION_SAVE,
     DEPARTMENT_SETTINGS_SAVE,
@@ -87,7 +87,7 @@ class ReadOnlyCore:
 
 # 能力清单的 decisions 取自决定合同中的种类：当前部署会发出的决定请求
 DEFAULT_REGISTRY = Registry(
-    commands=[PROJECT_CREATE, PROJECT_RENAME, PROJECT_PIN, PROJECT_ARCHIVE, PROJECT_RESTORE,
+    commands=[PROJECT_CREATE, PROJECT_ONBOARD, ONBOARDING_RESTART, PROJECT_RENAME, PROJECT_PIN, PROJECT_ARCHIVE, PROJECT_RESTORE,
               MATERIAL_RECORD, WORK_ITEM_CREATE, WORK_ITEM_APPEND_INPUT, WORK_ITEM_CANCEL, GUIDANCE_SEND,
               DEPARTMENT_SETTINGS_SAVE, COMMAND_REGISTRATION_SAVE, SOURCE_DIRECTORY_SAVE,
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,

@@ -56,6 +56,108 @@
         }
       }
     },
+    "/api/commands/project.onboard": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "project.onboard",
+        "operationId": "command_project_onboard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOnboard"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_OnboardRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/onboarding.restart": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "onboarding.restart",
+        "operationId": "command_onboarding_restart",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRestart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_OnboardRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, not_allowed, source_invalid, busy, provider_unavailable, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/project.rename": {
       "post": {
         "tags": [
@@ -340,7 +442,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, work_item_in_progress, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -2993,6 +3095,35 @@
         ],
         "title": "Accepted[NoRefs]"
       },
+      "Accepted_OnboardRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/OnboardRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[OnboardRefs]"
+      },
       "Accepted_ProjectRefs_": {
         "properties": {
           "command_id": {
@@ -4476,7 +4607,8 @@
                 "decision_closed",
                 "option_invalid",
                 "not_allowed",
-                "command_id_reused"
+                "command_id_reused",
+                "source_invalid"
               ]
             },
             "type": "array",
@@ -5865,6 +5997,60 @@
         "type": "object",
         "title": "NoRefs"
       },
+      "OnboardRefs": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "work_item_id",
+          "run_id"
+        ],
+        "title": "OnboardRefs"
+      },
+      "OnboardingRestart": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "null",
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "source_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "project_id",
+          "source_name"
+        ],
+        "title": "OnboardingRestart"
+      },
       "OverlayCapability": {
         "properties": {
           "name": {
@@ -6076,6 +6262,49 @@
           "event_id"
         ],
         "title": "ProjectMaterial"
+      },
+      "ProjectOnboard": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "null",
+            "title": "Base Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Goal"
+          },
+          "source_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Name"
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "name",
+          "goal",
+          "source_name",
+          "source_path"
+        ],
+        "title": "ProjectOnboard"
       },
       "ProjectOverviewResult": {
         "properties": {
@@ -6296,6 +6525,17 @@
               }
             ],
             "title": "Current Adoption"
+          },
+          "onboarding_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onboarding Status"
           }
         },
         "additionalProperties": false,
@@ -6313,7 +6553,8 @@
           "work_item_count",
           "in_progress_count",
           "active_work_item_id",
-          "current_adoption"
+          "current_adoption",
+          "onboarding_status"
         ],
         "title": "ProjectRow"
       },
@@ -6506,7 +6747,8 @@
               "decision_closed",
               "option_invalid",
               "not_allowed",
-              "command_id_reused"
+              "command_id_reused",
+              "source_invalid"
             ],
             "title": "Reason"
           },
@@ -7705,6 +7947,10 @@
             "type": "string",
             "title": "Work Item Id"
           },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -7815,6 +8061,7 @@
         "type": "object",
         "required": [
           "work_item_id",
+          "kind",
           "title",
           "text",
           "run_id",
@@ -7917,6 +8164,10 @@
             "type": "string",
             "title": "Work Item Id"
           },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
           "sign": {
             "type": "string",
             "title": "Sign"
@@ -8016,6 +8267,7 @@
         "type": "object",
         "required": [
           "work_item_id",
+          "kind",
           "sign",
           "color_index",
           "status",
@@ -9748,6 +10000,19 @@
           },
           "tree_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provenance"
           }
         },
         "required": [
@@ -19843,7 +20108,10 @@
             "$ref": "#/components/schemas/ArtifactRef"
           },
           "source": {
-            "const": "idea",
+            "enum": [
+              "idea",
+              "existing"
+            ],
             "title": "Source",
             "type": "string"
           }
@@ -25778,6 +26046,11 @@
           "priority": {
             "default": "user",
             "title": "Priority",
+            "type": "string"
+          },
+          "kind": {
+            "default": "change",
+            "title": "Kind",
             "type": "string"
           }
         },

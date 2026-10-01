@@ -828,6 +828,8 @@ class WorkItem:
     event_id: str
     snapshot: dict[str, Any] | None = None
     start_error: str | None = None
+    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     command_versions: dict[str, int] = field(default_factory=dict)
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
