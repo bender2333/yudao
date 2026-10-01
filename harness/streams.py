@@ -70,6 +70,7 @@ RUN_EVENT_TYPES = frozenset({
 PROJECT_EVENT_TYPES = frozenset({
     "project_registered",
     "project_renamed",
+    "project_goal_changed",
     "project_pinned",
     "project_archived",
     "project_restored",

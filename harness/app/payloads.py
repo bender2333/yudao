@@ -1007,6 +1007,12 @@ class ProjectRenamedPayload(Payload):
     name: str
 
 
+class ProjectGoalChangedPayload(Payload):
+    # 长期目标改为 goal；goal_ref 是目标原文的工件引用
+    goal: str
+    goal_ref: ArtifactRef
+
+
 class ProjectPinnedPayload(Payload):
     pinned: bool
 
@@ -1209,6 +1215,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,
     ProjectEventType.PROJECT_REGISTERED: ProjectRegisteredPayload,
     ProjectEventType.PROJECT_RENAMED: ProjectRenamedPayload,
+    ProjectEventType.PROJECT_GOAL_CHANGED: ProjectGoalChangedPayload,
     ProjectEventType.PROJECT_PINNED: ProjectPinnedPayload,
     ProjectEventType.PROJECT_ARCHIVED: ProjectArchivedPayload,
     ProjectEventType.PROJECT_RESTORED: ProjectRestoredPayload,
