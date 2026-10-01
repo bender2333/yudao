@@ -30,6 +30,7 @@
     "electron": "44.4.5",
     "electron-builder": "26.17.0",
     "electron-vite": "5.0.0",
+    "pngjs": "^7.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "6.0.3",
