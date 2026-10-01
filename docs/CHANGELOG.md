@@ -301,3 +301,4 @@ claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md
 opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
+qwen3.8 / 2026-10-01 16:45 / docs/architecture-issues.md 登记一条：客户端的生成接口类型与接口层快照没有自动检查，main 上提交的 types.gen.ts 已经与同一时刻的快照不一致 / #87 第 6 轮核对接口合同改动的影响范围时发现，交架构师决定是否把一致性写进自动检查
