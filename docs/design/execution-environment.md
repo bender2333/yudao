@@ -1,6 +1,6 @@
 # 执行环境服务设计说明
 
-更新：2026-10-01。状态：设计已确认（2026-09-29 用户确认第 11 节的决定；2026-09-30 按 ADR-0022 修改，代码在执行位置上直接运行；2026-10-01 执行代理的安装包改为发布时构建，见第 5.3.2 节），未实施；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位（第 1.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2C，父工单 [#120](https://github.com/bender2333/yudao/issues/120)。
+更新：2026-10-01。状态：设计已确认（2026-09-29 用户确认第 11 节的决定；2026-09-30 按 ADR-0022 修改，代码在执行位置上直接运行；2026-10-01 执行代理的安装包改为发布时构建，见第 5.3.2 节；同日 3.2B 的网络取回与登记的 MCP 服务器固定在控制主机，见第 1 节末），未实施；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位（第 1.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2C，父工单 [#120](https://github.com/bender2333/yudao/issues/120)。
 
 依据：需求 [D29](../requirements/remote-execution.md)；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）、[ADR-0022](../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行，不使用容器）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md)（其余边界作为执行环境服务的合同）、[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（服务之间使用 HTTP 加 JSON）；[总体架构](architecture/overall-architecture.md)第 3、6.3、7 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 3、4、6 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、4.3、6.3 节；[本地通用工具设计说明](local-tools.md)；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4.2、9.2 节）。调研：[执行环境服务调研](../research/execution-environment.md)。用词以 `CONTEXT.md` 为准。
 
@@ -13,7 +13,7 @@
 - 远程动作按心跳判断存活；超过时限没有心跳时动作结果记为未知，按 3.1 的动作核实处理；之后到达的回执记为迟到事实。
 - 执行代理的安装、以操作系统服务运行、版本核对与升级。
 
-3.2C 的合同同时是后续工作包的基础：3.2B 的网络取回与 MCP、3.2D 的试用工具、Stage 4 运维部门的外部动作都作为新的动作类别加入同一份合同，3.2B 与 3.2D 的工单只依赖合同所在的 #128；是否作为本项目的运行环境与常设授权在 Stage 4 加入项目的机器授权；3.4A 的执行槽位调度不改变执行环境的合同。
+3.2C 的合同同时是后续工作包的基础：3.2B 的网络取回与登记的 MCP 服务器、3.2D 的试用工具、Stage 4 运维部门的外部动作都作为新的动作类别加入同一份合同，3.2B 与 3.2D 的工单只依赖合同所在的 #128；3.2B 的两类动作固定在控制主机，由本机进程实现提供，执行代理不实现它们（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)、[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 3 节）；是否作为本项目的运行环境与常设授权在 Stage 4 加入项目的机器授权；3.4A 的执行槽位调度不改变执行环境的合同。
 
 ### 1.1 测试与验收用的机器
 
