@@ -302,3 +302,4 @@ claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md
 claude-opus-5-5 / 2026-10-01 04:25 / docs/architecture-issues.md 为 #134 的合入核对条目追加处理结论 / 架构师处理执行者登记的条目
 claude-opus-5-5 / 2026-10-01 10:40 / docs/architecture-issues.md 为 #79 登记的接口版本字段边界问题追加处理结论（字段由 #79 加入，#127 复用） / 架构师处理执行者登记的架构问题
 qwen3.8 / 2026-10-01 13:05 / docs/architecture-issues.md 登记一条：合入 origin/main 时 #134 与 #89 对「事项种类的部门说明」归属的冲突，及处置（把种类说明优先于角色说明从 create_run 写入 run 移到 _department_prompt 每次请求读取，版本 0，不参与项目部门设置版本历史） / 第 3 轮合入 main 时两侧语义在同一处对立，需架构师确认口径
+omp / 2026-10-01 19:37 / docs/architecture-issues.md 登记两条：#89 删除 run 流事件种类与字段后接口版本（`API_VERSION`）与 run 事件版本（`RUN_EVENT_VERSION`）仍为 1、纳入版本管理的客户端生成类型与快照脱节且无一致性检查；#89 的 `test_work_item_execution_runs_in_loop_and_settles_on_completion` 在 60 秒等待预算内跑不完三部门完整循环（实测 116.1 秒），在干净的 origin/main 上同样失败，与 #219 同类 / 第 4 轮合入 main 并跑改动相关测试时发现，两处都超出本工单范围，交架构师裁决
