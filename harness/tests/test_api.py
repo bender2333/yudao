@@ -141,6 +141,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         document = client.get("/openapi.json").json()
     assert capabilities["commands"] == [
         {"name": "project.create", "reasons": ["command_id_reused"]},
+        {"name": "project.onboard",
+         "reasons": ["source_invalid", "busy", "provider_unavailable", "command_id_reused"]},
+        {"name": "onboarding.restart",
+         "reasons": ["not_found", "project_archived", "not_allowed", "source_invalid", "busy",
+                     "provider_unavailable", "command_id_reused"]},
         {"name": "project.rename",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.set_goal",
@@ -154,7 +159,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["not_found", "project_archived", "work_item_in_progress", "not_allowed",
                      "command_id_reused"]},
         {"name": "work_item.create",
-         "reasons": ["not_found", "project_archived", "busy", "provider_unavailable", "command_id_reused"]},
+         "reasons": ["not_found", "project_archived", "busy", "provider_unavailable",
+                     "work_item_in_progress", "not_allowed", "command_id_reused"]},
         {"name": "work_item.append_input", "reasons": ["not_found", "run_terminal", "command_id_reused"]},
         {"name": "work_item.cancel", "reasons": ["not_found", "run_terminal", "command_id_reused"]},
         {"name": "guidance.send",

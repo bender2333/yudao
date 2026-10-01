@@ -101,6 +101,8 @@ class ProjectRow(Contract):
     in_progress_count: int
     active_work_item_id: str | None
     current_adoption: str | None
+    # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待建档为 awaiting_onboarding；其余为空
+    onboarding_status: str | None
     # 中断、待核实与待恢复的标记（工单 #18）：本项目里处于这些恢复观察状态的事项数；
     # 为零时仍是 0，不省略
     interrupted_count: int
@@ -128,12 +130,20 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             in_progress_count=sum(item.status == "in_progress" for item in state.work_items),
             active_work_item_id=state.active_work_item_id,
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
+            onboarding_status=_onboarding_status(state),
             interrupted_count=observations.count(OBSERVATION_INTERRUPTED),
             pending_verification_count=observations.count(OBSERVATION_PENDING_VERIFICATION),
             waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
         ))
     return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
 
+def _onboarding_status(state: Any) -> str | None:
+    # 建档中的项目还没有基线采纳：有进行中的建档事项时为 onboarding，否则为 awaiting_onboarding
+    if state.source != "existing" or state.current_adoption is not None:
+        return None
+    if any(item.kind == "onboarding" and item.status == "in_progress" for item in state.work_items):
+        return "onboarding"
+    return "awaiting_onboarding"
 
 # ---------------------------------------------------------------------------
 # project.overview
@@ -147,6 +157,7 @@ class ProjectOverview(Contract):
 
 class WorkItemCard(Contract):
     work_item_id: str
+    kind: str
     title: str
     text: str
     run_id: str
@@ -195,7 +206,7 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             stats=_work_item_stats(items),
             work_items=[
                 WorkItemCard(
-                    work_item_id=item.work_item_id, title=item.title, text=item.text, run_id=item.run_id,
+                    work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
                     version=item.stream_version, created_at=item.created_at, status=item.status,
                     department=item.department, phase=item.phase, round=item.cycle_count,
                     stop_reason=item.stop_reason, human_action=item.human_action,
@@ -239,6 +250,7 @@ class ProjectLoop(ReplayRequest):
 
 class WorkItemLoop(Contract):
     work_item_id: str
+    kind: str
     sign: str
     color_index: int
     status: str
@@ -277,7 +289,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         run = _optional_run(application, item.run_id, through=through)
         bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
-            work_item_id=item.work_item_id, sign=item.title, color_index=index + 1, status=item.status,
+            work_item_id=item.work_item_id, kind=item.kind, sign=item.title, color_index=index + 1, status=item.status,
             department=item.department, phase=item.phase, round=item.cycle_count,
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
