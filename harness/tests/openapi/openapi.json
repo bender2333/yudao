@@ -4111,6 +4111,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -4289,6 +4300,35 @@
               }
             ],
             "title": "Sent Tier"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -4309,7 +4349,10 @@
           "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
-          "sent_tier"
+          "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CallTarget"
       },
@@ -4547,6 +4590,17 @@
           "model_id": {
             "type": "string",
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -4900,6 +4954,28 @@
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -4911,7 +4987,10 @@
           "context_window",
           "max_output_tokens",
           "capability_source",
-          "accepts_required_tool_call"
+          "accepts_required_tool_call",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CatalogModel"
       },
@@ -5689,6 +5768,11 @@
               }
             ],
             "title": "Used Event Id"
+          },
+          "prompt_configured": {
+            "type": "boolean",
+            "title": "Prompt Configured",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5720,6 +5804,44 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "prompt_configured": {
+            "type": "boolean",
+            "title": "Prompt Configured",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5751,10 +5873,50 @@
             "type": "string",
             "title": "Department"
           },
-          "text": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Text"
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "department_prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Prompt"
           }
         },
         "additionalProperties": false,
@@ -5763,8 +5925,7 @@
           "command_id",
           "base_version",
           "project_id",
-          "department",
-          "text"
+          "department"
         ],
         "title": "DepartmentSettingsSave"
       },
@@ -5817,6 +5978,9 @@
           },
           "prompt": {
             "$ref": "#/components/schemas/DepartmentPromptState"
+          },
+          "setting": {
+            "$ref": "#/components/schemas/DepartmentSetting"
           },
           "guidance": {
             "items": {
@@ -5880,6 +6044,7 @@
           "phase",
           "active",
           "prompt",
+          "setting",
           "guidance",
           "messages",
           "context",
@@ -5975,6 +6140,30 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
           },
           "provider_id": {
             "type": "string",
@@ -6551,6 +6740,30 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -10077,6 +10290,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -10253,6 +10495,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -13163,6 +13408,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -13305,6 +13579,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -13670,6 +13947,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -13915,6 +14221,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -16608,7 +16917,7 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/DepartmentPromptConfiguredPayload"
+            "$ref": "#/components/schemas/DepartmentSettingsConfiguredPayload"
           }
         },
         "required": [
@@ -16632,7 +16941,7 @@
         "title": "DepartmentPromptConfiguredEvent",
         "type": "object"
       },
-      "DepartmentPromptConfiguredPayload": {
+      "DepartmentSettingsConfiguredPayload": {
         "additionalProperties": false,
         "properties": {
           "department": {
@@ -16647,198 +16956,77 @@
           "version": {
             "title": "Version",
             "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
           },
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requested Tier"
+          },
+          "department_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Department Prompt"
+          },
+          "department_prompt_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
           "department",
           "version",
-          "text",
-          "prompt_ref",
           "base_version"
         ],
-        "title": "DepartmentPromptConfiguredPayload",
-        "type": "object"
-      },
-      "DepartmentPromptUpdatedEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "previous": {
-            "title": "Previous",
-            "type": "integer"
-          },
-          "event_id": {
-            "title": "Event Id",
-            "type": "string"
-          },
-          "at": {
-            "format": "date-time",
-            "title": "At",
-            "type": "string"
-          },
-          "stream": {
-            "title": "Stream",
-            "type": "string"
-          },
-          "stream_version": {
-            "title": "Stream Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Item Id"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "actor": {
-            "title": "Actor",
-            "type": "string"
-          },
-          "command_id": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command Id"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "type": {
-            "const": "department_prompt_updated",
-            "title": "Type",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/DepartmentPromptUpdatedPayload"
-          }
-        },
-        "required": [
-          "position",
-          "previous",
-          "event_id",
-          "at",
-          "stream",
-          "stream_version",
-          "project_id",
-          "work_item_id",
-          "run_id",
-          "department",
-          "role",
-          "actor",
-          "command_id",
-          "label",
-          "type",
-          "payload"
-        ],
-        "title": "DepartmentPromptUpdatedEvent",
-        "type": "object"
-      },
-      "DepartmentPromptUpdatedPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Department",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          }
-        },
-        "required": [
-          "department",
-          "version",
-          "text",
-          "prompt_ref"
-        ],
-        "title": "DepartmentPromptUpdatedPayload",
+        "title": "DepartmentSettingsConfiguredPayload",
         "type": "object"
       },
       "FailureObservation": {
@@ -17955,6 +18143,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -18230,6 +18447,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -18553,6 +18773,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -18801,6 +19050,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -19119,6 +19371,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -19272,6 +19553,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -19578,6 +19862,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -19729,6 +20042,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -20036,6 +20352,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -20214,6 +20559,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -20525,6 +20873,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -20688,6 +21065,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -22600,39 +22980,6 @@
         "title": "ProjectRestoredPayload",
         "type": "object"
       },
-      "PromptRecord": {
-        "additionalProperties": false,
-        "properties": {
-          "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Department",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          }
-        },
-        "required": [
-          "department",
-          "version",
-          "text",
-          "prompt_ref"
-        ],
-        "title": "PromptRecord",
-        "type": "object"
-      },
       "ProposalRejectedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -23461,20 +23808,6 @@
           "initial_input": {
             "$ref": "#/components/schemas/InputRecord"
           },
-          "department_prompts": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/PromptRecord"
-            },
-            "propertyNames": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ]
-            },
-            "title": "Department Prompts",
-            "type": "object"
-          },
           "intend_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
@@ -23626,7 +23959,6 @@
         "required": [
           "task",
           "initial_input",
-          "department_prompts",
           "intend_ref",
           "git_version",
           "intend_path",
@@ -26096,6 +26428,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -26269,6 +26630,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -26722,6 +27086,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -26862,6 +27255,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -27652,6 +28048,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -27794,6 +28219,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -28526,7 +28954,6 @@
             "department_guidance_responded": "#/components/schemas/DepartmentGuidanceRespondedEvent",
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
-            "department_prompt_updated": "#/components/schemas/DepartmentPromptUpdatedEvent",
             "home_seen": "#/components/schemas/HomeSeenEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
@@ -28580,9 +29007,6 @@
           },
           {
             "$ref": "#/components/schemas/ProductInputAssignedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/DepartmentPromptUpdatedEvent"
           },
           {
             "$ref": "#/components/schemas/DepartmentGuidanceReceivedEvent"

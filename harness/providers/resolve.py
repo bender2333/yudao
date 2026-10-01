@@ -8,6 +8,7 @@ from .credentials import CredentialChain, CredentialMaterial
 from .errors import CatalogValidationError, ValidationIssue
 from .presets import preset_header_profile
 from .store import (
+    REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
     AdmissionRecord,
     ModelDefinition,
@@ -15,6 +16,24 @@ from .store import (
     ProviderStore,
     admission_is_current,
 )
+
+def limit_reasoning_level(model: ModelDefinition, requested_tier: str | None) -> str | None:
+    # 按模型声明限制请求档位（设计说明第 7.3 节）：请求档位为空时用默认档位；
+    # 否则取不高于请求档位的最高支持档位，没有这样的档位时取最低支持档位；
+    # 模型没有声明支持档位时不发送推理参数
+    if not model.reasoning_levels:
+        return None
+    if requested_tier is None or not requested_tier.strip():
+        return model.default_reasoning_level
+    requested = requested_tier.strip()
+    if requested not in REASONING_LEVELS:
+        # 未知档位名按「没有不高于它的支持档位」处理，落到最低支持档位
+        supported = [level for level in model.reasoning_levels if level in REASONING_LEVELS]
+        return supported[0] if supported else model.reasoning_levels[0]
+    not_above = [level for level in model.reasoning_levels if REASONING_LEVELS.index(level) <= REASONING_LEVELS.index(requested)]
+    if not_above:
+        return not_above[-1]
+    return model.reasoning_levels[0]
 
 
 # 冻结目标：任务创建时取得的不可变调用目标，只持有认证句柄
@@ -34,6 +53,11 @@ class FrozenTarget:
     capability_source: str = ""
     # 模型访问定义声明的是否接受要求调用工具（#102）
     accepts_required_tool_call: bool = True
+    # 推理档位声明（ADR-0006）与本次请求实际发送的档位；未声明档位时不发送推理参数
+    reasoning_levels: tuple[str, ...] = ()
+    default_reasoning_level: str | None = None
+    reasoning_mode: str = ""
+    sent_tier: str | None = None
     header_profile: str = ""
     preset_id: str = ""
     revision: int = 0
@@ -56,6 +80,10 @@ class FrozenTarget:
             "credential_ref": self.credential_ref,
             "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
+            "reasoning_levels": list(self.reasoning_levels),
+            "default_reasoning_level": self.default_reasoning_level,
+            "reasoning_mode": self.reasoning_mode,
+            "sent_tier": self.sent_tier,
             "header_profile": self.header_profile,
             "preset_id": self.preset_id,
             "revision": self.revision,
@@ -95,7 +123,7 @@ def resolve_snapshot(
     issues: list[ValidationIssue] = []
     targets: dict[str, FrozenTarget] = {}
     seen: set[str] = set()
-    for key, provider_id, model_id in normalized:
+    for key, provider_id, model_id, requested_tier in normalized:
         location = f"selections.{key}"
         if key in seen:
             issues.append(ValidationIssue(location, "选择键重复"))
@@ -141,6 +169,10 @@ def resolve_snapshot(
             credential_ref=provider.credential_ref or None,
             capability_source=model.capability_source,
             accepts_required_tool_call=model.accepts_required_tool_call,
+            reasoning_levels=model.reasoning_levels,
+            default_reasoning_level=model.default_reasoning_level,
+            reasoning_mode=model.reasoning_mode,
+            sent_tier=limit_reasoning_level(model, requested_tier),
             header_profile=preset_header_profile(provider.preset_id),
             preset_id=provider.preset_id,
             revision=store.revision,
@@ -154,27 +186,29 @@ def resolve_snapshot(
 
 def _normalize_selections(
     selections: Sequence[Mapping[str, Any]] | Mapping[str, Mapping[str, Any]],
-) -> list[tuple[str, Any, Any]]:
-    # 同时接受列表与映射，键为任意选择名
-    normalized: list[tuple[str, Any, Any]] = []
+) -> list[tuple[str, Any, Any, Any]]:
+    # 同时接受列表与映射，键为任意选择名；选择可以带请求档位（#87）
+    normalized: list[tuple[str, Any, Any, Any]] = []
     if isinstance(selections, Mapping):
         for key, item in selections.items():
             if not isinstance(item, Mapping):
-                normalized.append((str(key), None, None))
+                normalized.append((str(key), None, None, None))
                 continue
             provider_id = item.get("provider_id", item.get("providerId"))
             model_id = item.get("model_id", item.get("modelId"))
+            requested_tier = item.get("requested_tier", item.get("requestedTier"))
             explicit_key = item.get("key", item.get("target_key", key))
-            normalized.append((str(explicit_key), provider_id, model_id))
+            normalized.append((str(explicit_key), provider_id, model_id, requested_tier))
         return normalized
     for index, item in enumerate(selections):
         if not isinstance(item, Mapping):
-            normalized.append((f"selections[{index}]", None, None))
+            normalized.append((f"selections[{index}]", None, None, None))
             continue
         key = item.get("key", item.get("target_key", item.get("department", f"selections[{index}]")))
         provider_id = item.get("provider_id", item.get("providerId"))
         model_id = item.get("model_id", item.get("modelId"))
-        normalized.append((str(key), provider_id, model_id))
+        requested_tier = item.get("requested_tier", item.get("requestedTier"))
+        normalized.append((str(key), provider_id, model_id, requested_tier))
     return normalized
 
 
@@ -195,6 +229,7 @@ def call_target_public(
     model: ModelDefinition | None = None,
     provider: ProviderDefinition | None = None,
     material: CredentialMaterial | None = None,
+    sent_tier: str | None = None,
 ) -> dict[str, Any]:
     # 调用目标的公开部分：进入请求事件与界面，不含密钥；解析尚未确定的项为空值
     return {
@@ -211,8 +246,11 @@ def call_target_public(
         "context_window": None if model is None else model.context_window,
         "configured_max_output_tokens": None if model is None else model.max_output_tokens,
         "accepts_required_tool_call": None if model is None else model.accepts_required_tool_call,
+        "reasoning_levels": [] if model is None else list(model.reasoning_levels),
+        "default_reasoning_level": None if model is None else model.default_reasoning_level,
+        "reasoning_mode": None if model is None else (model.reasoning_mode or None),
         "requested_tier": requested_tier,
-        "sent_tier": None,
+        "sent_tier": sent_tier,
     }
 
 
@@ -237,12 +275,14 @@ def decision_call_target(public: Mapping[str, Any]) -> dict[str, Any] | None:
 @dataclass(frozen=True)
 class CallTargetResolution:
     # 一次模型调用的调用目标解析结果：public 是进入事件与界面的公开部分，不含密钥；
-    # 成功时 handle_id 指向 Provider 模块内部持有的目标，执行调用时才从凭据来源取出材料
+    # 成功时 handle_id 指向 Provider 模块内部持有的目标，执行调用时才从凭据来源取出材料。
+    # selection_source 是提供模型访问定义的那一层（部门默认或项目部门设置，设计说明第 5.3 节）
     available: bool
     reason: str
     message: str
     public: Mapping[str, Any]
     handle_id: str | None = None
+    selection_source: str | None = None
 
 
 def resolve_call_target(
@@ -254,8 +294,9 @@ def resolve_call_target(
 ) -> tuple[CallTargetResolution, FrozenTarget | None]:
     # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不接收部门。
     # 检查定义存在、所属连接存在、协议受支持、窗口已知、准入有效、凭据引用可解析；
-    # 准入有效性按受影响字段逐项比较（工单 #86），fake 只用于确定性测试，不要求准入与凭据。
-    # 请求档位本次原样记录，不限制到支持范围也不编码（#87）
+    # fake 只用于确定性测试，不要求准入与凭据。准入有效性按受影响字段逐项比较（工单 #86）。
+    # 请求档位原样记录，实际发送的档位按模型声明限制到支持范围（设计说明第 7.3 节），
+    # 编码在协议适配器完成
     def unavailable(message: str, public: dict[str, Any]) -> tuple[CallTargetResolution, None]:
         return CallTargetResolution(False, "provider_unavailable", message, public), None
 
@@ -265,7 +306,8 @@ def resolve_call_target(
     if model is None:
         return unavailable("模型访问定义不存在", call_target_public(model_id, requested_tier))
     provider = store.providers.get(model.provider_id)
-    public = call_target_public(model_id, requested_tier, model=model, provider=provider)
+    public = call_target_public(model_id, requested_tier, model=model, provider=provider,
+                                sent_tier=limit_reasoning_level(model, requested_tier))
     if provider is None:
         return unavailable("Provider 配置不存在", public)
     if provider.protocol not in SUPPORTED_PROTOCOLS:
@@ -298,11 +340,17 @@ def resolve_call_target(
         credential_ref=provider.credential_ref or None,
         capability_source=model.capability_source,
         accepts_required_tool_call=model.accepts_required_tool_call,
+        reasoning_levels=model.reasoning_levels,
+        default_reasoning_level=model.default_reasoning_level,
+        reasoning_mode=model.reasoning_mode,
+        sent_tier=limit_reasoning_level(model, requested_tier),
         header_profile=preset_header_profile(provider.preset_id),
         preset_id=provider.preset_id,
         revision=store.revision,
         credential_version=(material.version if material is not None else None),
         api_key=(material.secret if material is not None else ""),
     )
-    resolved = call_target_public(model_id, requested_tier, model=model, provider=provider, material=material)
+    resolved = call_target_public(model_id, requested_tier, model=model, provider=provider,
+                                  material=material,
+                                  sent_tier=limit_reasoning_level(model, requested_tier))
     return CallTargetResolution(True, "", "", resolved), target

@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
+from .definitions import DEFINITIONS
 from .event_store import (
     EventStore, SavedDecision, SavedProjection, is_catalog_stream, is_run_stream, project_stream, run_stream,
 )
@@ -22,7 +23,7 @@ from .models import (
     CollaborationResponse,
     DecisionRequest,
     DepartmentGuidance,
-    DepartmentPrompt,
+    DepartmentSetting,
     ArtifactRef,
     ContextExclusion,
     ContextManifest,
@@ -42,7 +43,6 @@ from .models import (
     ProjectEvent,
     ProjectEventType,
     ProjectProjection,
-    PromptConfig,
     QAReview,
     RegisteredCommand,
     RunProjection,
@@ -286,10 +286,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.inputs.append(initial)
         state.input_version = initial.version
         state.product_work_input_version = initial.version
-        for value in payload["department_prompts"].values():
-            prompt = _prompt_from_payload(value, event)
-            state.department_prompts[prompt.department] = prompt
-            state.prompt_versions.append(prompt)
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
         state.run_time_limit_sec = int(payload["run_time_limit_sec"])
@@ -330,12 +326,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.product_work_input_version = payload["through_version"]
         state.phase = "PRODUCT_SPEC"
         state.active_department = "product"
-        return
-
-    if etype == EventType.DEPARTMENT_PROMPT_UPDATED:
-        prompt = _prompt_from_payload(payload, event)
-        state.department_prompts[prompt.department] = prompt
-        state.prompt_versions.append(prompt)
         return
 
     if etype == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
@@ -423,6 +413,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
                             "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "reasoning_levels", "default_reasoning_level", "reasoning_mode",
                             "requested_tier", "sent_tier")
             }
         state.model_requests.append({
@@ -446,6 +437,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "credential_ref": payload.get("credential_ref"),
             "credential_version": payload.get("credential_version"),
             "selection_source": payload.get("selection_source"),
+            "prompt_version": payload.get("prompt_version"),
             "requested_tier": payload.get("requested_tier"),
             "sent_tier": payload.get("sent_tier"),
             "provider": requested_provider,
@@ -736,12 +728,6 @@ def _input_from_payload(payload: dict[str, Any], event: Event) -> UserInput:
     )
 
 
-def _prompt_from_payload(payload: dict[str, Any], event: Event) -> DepartmentPrompt:
-    return DepartmentPrompt(
-        department=payload["department"], version=payload["version"], text=payload["text"],
-        prompt_ref=ArtifactRef(**payload["prompt_ref"]), created_event_id=event.event_id,
-    )
-
 
 def _guidance_from_payload(payload: dict[str, Any], event: Event) -> DepartmentGuidance:
     return DepartmentGuidance(
@@ -985,14 +971,25 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             stream_version=event.stream_version, event_id=event.event_id,
         ))
         return
-    if etype == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED:
-        config = PromptConfig(
-            department=payload["department"], version=int(payload["version"]), text=payload["text"],
-            source="configured", prompt_ref=payload["prompt_ref"], base_version=payload["base_version"],
+    if etype == ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED:
+        department = payload["department"]
+        # 旧版本的事件只带 text（部门 Prompt），新版本带 department_prompt 与模型、请求档位（ADR-0019）
+        if "department_prompt" in payload:
+            configured_prompt = payload["department_prompt"]
+            prompt_ref = payload.get("department_prompt_ref")
+        else:
+            configured_prompt = payload.get("text")
+            prompt_ref = payload.get("prompt_ref")
+        text = configured_prompt if configured_prompt is not None else DEFINITIONS.role(department).prompt
+        setting = DepartmentSetting(
+            department=department, version=int(payload["version"]), text=text, source="configured",
+            provider_id=payload.get("provider_id"), model_id=payload.get("model_id"),
+            requested_tier=payload.get("requested_tier"), configured_prompt=configured_prompt is not None,
+            prompt_ref=prompt_ref, base_version=payload.get("base_version"),
             updated_at=event.created_at, event_id=event.event_id,
         )
-        state.prompt_configs[config.department] = config
-        state.prompt_config_history.append(config)
+        state.department_settings[department] = setting
+        state.department_setting_history.append(setting)
         return
     if etype == ProjectEventType.COMMAND_CONFIGURED:
         command = RegisteredCommand(

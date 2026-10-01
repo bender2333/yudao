@@ -13,7 +13,7 @@ import json
 import math
 import time
 from contextlib import aclosing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Event
 from typing import Any, Protocol
 
@@ -33,11 +33,15 @@ from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import decision_call_target, event_call_target
+from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
 
-# 调用目标的选择来源：本工单只有部门默认这一种；项目部门设置与角色默认由 #89 与 #63 加入（#45）
-DEPARTMENT_DEFAULT_SELECTION = "department_default"
+# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+COMPACTION_REQUEST_TIER = "minimal"
+
+# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+COMPACTION_REQUEST_TIER = "minimal"
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,15 @@ class SafeNode(Protocol):
 
     def end(self, transaction: Transaction, reason: str, message: str) -> None:
         # 以停止原因结束运行：运行的结束与调用方在同一事务中刚写下的记录一起提交
+        ...
+
+    def department_selection(self, department: str) -> ModelSelection | None:
+        # 设置来源（项目层）：本次请求该项目该部门的项目部门设置中的模型选择；
+        # 不属于项目的运行时为空，全部使用部门默认（设计说明第 6 节）
+        ...
+
+    def department_prompt(self, department: str) -> DepartmentPrompt:
+        # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
         ...
 
 
@@ -182,6 +195,8 @@ class StepDriver:
         self._request: ModelRequest | None = None
         self._action: Action | None = None
         self._step: StepRequest | None = None
+        # 这次逻辑调用读取的部门 Prompt；每次新的逻辑调用从项目部门设置重新读取
+        self._prompt: DepartmentPrompt = prompt
         self._task: asyncio.Task[StepResult] | None = None
         # 这次逻辑调用在 Provider 模块保留的句柄与公开部分；重试沿用，调用结束以后丢弃
         self._call_handle: str | None = None
@@ -221,17 +236,25 @@ class StepDriver:
             self._release_call()
             self._recorder.close()
 
-    def _begin_call(self) -> Stopped | None:
-        # 新的逻辑调用：由 Provider 按当前部门默认解析调用目标。失败时不发送请求，交回待恢复的停止结果
+    def _begin_call(self, requested_tier: str | None = None) -> Stopped | None:
+        # 新的逻辑调用：读取该项目该部门当前的部门设置（模型选择与部门 Prompt），交 Provider 解析调用目标；
+        # 请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
+        # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
+        # 选择来源是提供模型访问定义的那一层。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
         if self._facade is None:
             raise ProviderError("model calls require the provider facade", reason="provider_error")
-        resolution = self._facade.resolve_department_default(self._scope.department)
+        project = self._nodes.department_selection(self._scope.department)
+        self._prompt = self._nodes.department_prompt(self._scope.department)
+        self._frame = replace(self._frame, prompt=self._prompt)
+        resolution = self._facade.resolve_department_default(
+            self._scope.department, requested_tier, project=project)
         if not resolution.available:
             return Stopped(self._version, resolution.reason, resolution.message,
                            decision_call_target(resolution.public))
         self._call_handle = resolution.handle_id
-        self._call_public = event_call_target(resolution.public, selection_source=DEPARTMENT_DEFAULT_SELECTION)
+        self._call_public = event_call_target(resolution.public,
+                                              selection_source=resolution.selection_source)
         return None
 
     def _bind_call(self, logical_call_id: str) -> None:
@@ -563,7 +586,8 @@ class StepDriver:
                  replies_without_tool_call: int) -> Stopped | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
-        # 新的逻辑调用先按部门默认解析调用目标；重试沿用该逻辑调用已经解析的目标与句柄
+        # 新的逻辑调用按「项目部门设置、部门默认」合并后解析（Provider 在同一把锁内读取，
+        # 并按当前模型声明的支持档位限制）；重试沿用该逻辑调用已经解析的目标与句柄
         scope = self._scope
         if retry_of_step_id is None:
             unavailable = self._begin_call()
@@ -600,6 +624,14 @@ class StepDriver:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
             logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
+            # 整理请求按最低支持档位解析：向 Provider 传「minimal」，它按模型声明取最低支持档位。
+            # 用途只有装配以后才知道，如果这次逻辑调用用的请求档位不是它，重新解析一次
+            # （重新解析会丢弃刚才还没有使用的句柄）；工作请求保持原来的解析
+            if retry_of_step_id is None and assembled.manifest.purpose == "compaction" \
+                    and (self._call_public or {}).get("requested_tier") != COMPACTION_REQUEST_TIER:
+                unavailable = self._begin_call(COMPACTION_REQUEST_TIER)
+                if unavailable is not None:
+                    return unavailable
             self._bind_call(logical_call_id)
             request = ModelRequest(scope.run_id, scope.department, scope.session_id, scope.activation_id,
                                    step_id, assembled, assembled.tools,

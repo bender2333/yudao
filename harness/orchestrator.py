@@ -38,8 +38,10 @@ from .streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_ru
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
 from .definitions import DEFINITIONS
+from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from .models import (
+    ArtifactRef,
     Event as RunEvent,
     DEPARTMENTS,
     DecisionRequest,
@@ -51,6 +53,7 @@ from .models import (
     new_id,
 )
 from .providers import ProviderConnections, ProviderFacade
+from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
@@ -62,9 +65,8 @@ from .tools import normalize_registered_commands
 from .validation import ProposalDecision
 from .workspace import WorkspaceSnapshot
 
-# 由用户提出的事件：输入、部门 Prompt 更新与部门指导（提出者为 user:local）
-_USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_PROMPT_UPDATED,
-                          EventType.DEPARTMENT_GUIDANCE_RECEIVED})
+# 由用户提出的事件：输入与部门指导（提出者为 user:local）
+_USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
 
 @dataclass
@@ -107,6 +109,13 @@ class _SafeNode:
     def end(self, transaction: Transaction, reason: str, message: str) -> None:
         self._orchestrator._end(transaction, reason, message)
 
+    def department_selection(self, department: str) -> ModelSelection | None:
+        return self._orchestrator._department_selection(self._activation.run_id, department)
+
+    def department_prompt(self, department: str) -> DepartmentPrompt:
+        projection = self._orchestrator.project(self._activation.run_id)
+        return self._orchestrator._department_prompt(projection, department)
+
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
 
@@ -119,13 +128,12 @@ def _validate_run_ownership(
     initial_tree: CapturedTree | None,
     code_snapshot: dict[str, Any] | None,
     project_context: str | None,
-    department_prompts: dict[str, str] | None,
     prompt_config_versions: dict[str, int] | None,
 ) -> None:
     """项目归属参数要么全给（项目层）要么全不给（bare run）；基线与初始树成对出现。"""
     ownership = {
         "project_id": project_id, "work_item_id": work_item_id, "project_context": project_context,
-        "department_prompts": department_prompts, "prompt_config_versions": prompt_config_versions,
+        "prompt_config_versions": prompt_config_versions,
     }
     given = [name for name, value in ownership.items() if value is not None]
     if given and len(given) != len(ownership):
@@ -148,10 +156,6 @@ def _validate_run_ownership(
         for name in ("project_id", "work_item_id", "project_context"):
             if not isinstance(ownership[name], str) or not ownership[name].strip():
                 raise ValueError(f"{name} must be a non-empty string")
-        if not isinstance(department_prompts, dict) or set(department_prompts) != set(DEPARTMENTS):
-            raise ValueError("department_prompts must cover exactly the three departments")
-        if any(not isinstance(text, str) or not text.strip() for text in department_prompts.values()):
-            raise ValueError("department prompt text must be non-empty")
         if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(DEPARTMENTS):
             raise ValueError("prompt_config_versions must cover exactly the three departments")
         if any(type(version) is not int or version < 0 for version in prompt_config_versions.values()):
@@ -245,7 +249,6 @@ class Orchestrator:
         initial_tree: CapturedTree | None = None,
         code_snapshot: dict[str, Any] | None = None,
         project_context: str | None = None,
-        department_prompts: dict[str, str] | None = None,
         prompt_config_versions: dict[str, int] | None = None,
         registered_commands: dict[str, Any] | None = None,
         command_versions: dict[str, int] | None = None,
@@ -270,7 +273,7 @@ class Orchestrator:
         _validate_run_ownership(
             project_id=project_id, work_item_id=work_item_id, baseline=baseline, initial_tree=initial_tree,
             code_snapshot=code_snapshot,
-            project_context=project_context, department_prompts=department_prompts,
+            project_context=project_context,
             prompt_config_versions=prompt_config_versions,
         )
         frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
@@ -281,16 +284,8 @@ class Orchestrator:
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
         environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
         workspace_digest = environment.snapshot().digest
-        # 事项种类的部门说明优先于项目里配置的角色说明（工单 #134）：建档的读取顺序与粒度规则写在种类定义中
-        fallback = department_prompts if department_prompts is not None else {
-            department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS
-        }
-        prompts = {
-            department: (work.prompt if (work := DEFINITIONS.department_work(department, kind)) is not None
-                         else fallback[department])
-            for department in DEPARTMENTS
-        }
-        initial = self.interactions.initial(run_id, task, department_prompts=prompts)
+        # 部门 Prompt 不在 run 内留副本（工单 #89）：每次模型请求按事项种类与项目部门设置读取
+        initial = self.interactions.initial(run_id, task)
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
         project_context_ref = None
@@ -474,19 +469,6 @@ class Orchestrator:
         if projection.phase in TERMINAL_PHASES or not aborted():
             return projection
         return self.cancel(run_id)
-
-    def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
-        if department not in DEPARTMENTS:
-            raise ValueError("unknown department")
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError("prompt must be a non-empty string")
-
-        def update(transaction: Transaction) -> None:
-            self._require_open(run_id, transaction.projection, "This run has ended; prompts can be edited in a new task.")
-            self.interactions.update_prompt(transaction, department, text)
-
-        self.writes.transact(run_stream(run_id), update)
-        return self.project(run_id)
 
     def add_guidance(self, run_id: str, department: str, text: str, *,
                      base_version: int | None = None, command: Command | None = None) -> RunProjection:
@@ -958,7 +940,8 @@ class Orchestrator:
 
         activation_id = new_id("act")
         transaction.on_commit(lambda: session.activate(activation_id))
-        prompt = projection.department_prompts[department]
+        # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（第 5.3 节）
+        prompt = self._department_prompt(projection, department)
         basis = WorkBasis.current(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
@@ -987,6 +970,40 @@ class Orchestrator:
         )
         return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, yielded_work,
                            transaction.projection.stream_version)
+
+    def _project_department_setting(self, projection: RunProjection, department: str):
+        # 运行层的设置来源：事项创建时由项目层提供，每次请求读取该项目该部门当前的项目部门设置。
+        # 不属于项目的运行（命令行与测试）没有项目层，返回空设置（第 6 节）
+        if projection.project_id is None or self.projects is None:
+            return None
+        return self.projects.read_projection_setting(projection.project_id, department)
+
+    def _department_selection(self, run_id: str, department: str) -> ModelSelection | None:
+        # 本次请求该部门的项目部门设置中的模型选择；不属于项目的运行时为空（全部使用部门默认）
+        projection = self.project(run_id)
+        setting = self._project_department_setting(projection, department)
+        if setting is None:
+            return None
+        return ModelSelection(provider_id=setting.provider_id, model_id=setting.model_id,
+                              requested_tier=setting.requested_tier)
+
+    def _department_prompt(self, projection: RunProjection, department: str) -> DepartmentPrompt:
+        # 部门 Prompt 从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）。
+        # 请求事件记录的 Prompt 版本是项目部门设置中写入的部门 Prompt 版本，没有写入时为 0。
+        # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
+        setting = self._project_department_setting(projection, department)
+        if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
+            # 没有项目部门设置的部门 Prompt 时，事项种类的部门说明优先于 roles.json 的角色说明（工单 #134）：
+            # 建档等种类在种类定义中写明本种类的角色说明，未写明的部门沿用自己的角色说明
+            work = DEFINITIONS.department_work(department, projection.kind)
+            text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
+            ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
+            return DepartmentPrompt(department, 0, text, ref, "")
+        return DepartmentPrompt(
+            department=department, version=setting.version, text=setting.text,
+            prompt_ref=ArtifactRef(**setting.prompt_ref),
+            created_event_id="" if setting.event_id is None else setting.event_id,
+        )
 
     @staticmethod
     def _work_basis(projection: RunProjection) -> dict[str, Any]:
@@ -1020,6 +1037,9 @@ class Orchestrator:
             "configured_max_output_tokens": None,
             "selection_source": None,
             "accepts_required_tool_call": None,
+            "reasoning_levels": [],
+            "default_reasoning_level": None,
+            "reasoning_mode": None,
             "requested_tier": None,
             "sent_tier": None,
         }
@@ -1436,7 +1456,7 @@ class Orchestrator:
         ))
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
-        # 新的输入或指导：user_input_received、department_prompt_updated 与 department_guidance_received 由用户提出，
+        # 新的输入或指导：user_input_received 与 department_guidance_received 由用户提出，
         # 部门指导在事件载荷与 department 列中写明部门
         if not any(event.type in _USER_EVENTS for event in transaction.events_after(version)):
             return False

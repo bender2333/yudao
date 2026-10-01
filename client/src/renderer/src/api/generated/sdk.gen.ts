@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CapabilitiesData, CapabilitiesResponses, CommandCatalogCandidatesCollectData, CommandCatalogCandidatesCollectErrors, CommandCatalogCandidatesCollectResponses, CommandCatalogConnectionDeleteData, CommandCatalogConnectionDeleteErrors, CommandCatalogConnectionDeleteResponses, CommandCatalogConnectionSaveData, CommandCatalogConnectionSaveErrors, CommandCatalogConnectionSaveResponses, CommandCatalogConnectionTestData, CommandCatalogConnectionTestErrors, CommandCatalogConnectionTestResponses, CommandCatalogDepartmentDefaultsSaveData, CommandCatalogDepartmentDefaultsSaveErrors, CommandCatalogDepartmentDefaultsSaveResponses, CommandCatalogDocumentSaveData, CommandCatalogDocumentSaveErrors, CommandCatalogDocumentSaveResponses, CommandCatalogModelTestData, CommandCatalogModelTestErrors, CommandCatalogModelTestResponses, CommandCatalogReloadData, CommandCatalogReloadErrors, CommandCatalogReloadResponses, CommandCommandRegistrationSaveData, CommandCommandRegistrationSaveErrors, CommandCommandRegistrationSaveResponses, CommandCredentialClearOverrideData, CommandCredentialClearOverrideErrors, CommandCredentialClearOverrideResponses, CommandCredentialRemovePersistedData, CommandCredentialRemovePersistedErrors, CommandCredentialRemovePersistedResponses, CommandCredentialSetData, CommandCredentialSetErrors, CommandCredentialSetResponses, CommandDecisionAnswerData, CommandDecisionAnswerErrors, CommandDecisionAnswerResponses, CommandDepartmentSettingsSaveData, CommandDepartmentSettingsSaveErrors, CommandDepartmentSettingsSaveResponses, CommandGuidanceSendData, CommandGuidanceSendErrors, CommandGuidanceSendResponses, CommandMaterialRecordData, CommandMaterialRecordErrors, CommandMaterialRecordResponses, CommandProjectArchiveData, CommandProjectArchiveErrors, CommandProjectArchiveResponses, CommandProjectCreateData, CommandProjectCreateErrors, CommandProjectCreateResponses, CommandProjectPinData, CommandProjectPinErrors, CommandProjectPinResponses, CommandProjectRenameData, CommandProjectRenameErrors, CommandProjectRenameResponses, CommandProjectRestoreData, CommandProjectRestoreErrors, CommandProjectRestoreResponses, CommandRuntimeForceUpgradeData, CommandRuntimeForceUpgradeErrors, CommandRuntimeForceUpgradeResponses, CommandRuntimeStartDrainData, CommandRuntimeStartDrainErrors, CommandRuntimeStartDrainResponses, CommandSourceDirectorySaveData, CommandSourceDirectorySaveErrors, CommandSourceDirectorySaveResponses, CommandWorkItemAppendInputData, CommandWorkItemAppendInputErrors, CommandWorkItemAppendInputResponses, CommandWorkItemCancelData, CommandWorkItemCancelErrors, CommandWorkItemCancelResponses, CommandWorkItemCreateData, CommandWorkItemCreateErrors, CommandWorkItemCreateResponses, EventsData, EventsErrors, EventsResponses, QueryAttemptLiveData, QueryAttemptLiveErrors, QueryAttemptLiveResponses, QueryCatalogData, QueryCatalogDocumentData, QueryCatalogDocumentResponses, QueryCatalogResponses, QueryDecisionsListData, QueryDecisionsListErrors, QueryDecisionsListResponses, QueryDeliveryFileData, QueryDeliveryFileErrors, QueryDeliveryFileResponses, QueryDepartmentWorkspaceData, QueryDepartmentWorkspaceErrors, QueryDepartmentWorkspaceResponses, QueryEventDetailData, QueryEventDetailErrors, QueryEventDetailResponses, QueryProjectAttemptsData, QueryProjectAttemptsErrors, QueryProjectAttemptsResponses, QueryProjectFlowData, QueryProjectFlowErrors, QueryProjectFlowResponses, QueryProjectLoopData, QueryProjectLoopErrors, QueryProjectLoopResponses, QueryProjectOverviewData, QueryProjectOverviewErrors, QueryProjectOverviewResponses, QueryProjectSettingsData, QueryProjectSettingsErrors, QueryProjectSettingsResponses, QueryProjectsListData, QueryProjectsListErrors, QueryProjectsListResponses, QueryProjectUsageData, QueryProjectUsageErrors, QueryProjectUsageResponses, QueryReplayCheckData, QueryReplayCheckErrors, QueryReplayCheckResponses, QueryRunActionsData, QueryRunActionsErrors, QueryRunActionsResponses, QueryRunAttemptData, QueryRunAttemptErrors, QueryRunAttemptResponses, QueryRunExportData, QueryRunExportErrors, QueryRunExportResponses, QuerySystemStatusData, QuerySystemStatusResponses, QueryWorkItemInputsData, QueryWorkItemInputsErrors, QueryWorkItemInputsResponses, QueryWorkItemMaterialsData, QueryWorkItemMaterialsErrors, QueryWorkItemMaterialsResponses } from './types.gen';
+import type { CapabilitiesData, CapabilitiesResponses, ClientUpdateFileData, ClientUpdateFileErrors, ClientUpdateFileResponses, ClientUpdateManifestData, ClientUpdateManifestResponses, CommandCatalogCandidatesCollectData, CommandCatalogCandidatesCollectErrors, CommandCatalogCandidatesCollectResponses, CommandCatalogConnectionDeleteData, CommandCatalogConnectionDeleteErrors, CommandCatalogConnectionDeleteResponses, CommandCatalogConnectionSaveData, CommandCatalogConnectionSaveErrors, CommandCatalogConnectionSaveResponses, CommandCatalogConnectionTestData, CommandCatalogConnectionTestErrors, CommandCatalogConnectionTestResponses, CommandCatalogDepartmentDefaultsSaveData, CommandCatalogDepartmentDefaultsSaveErrors, CommandCatalogDepartmentDefaultsSaveResponses, CommandCatalogDocumentSaveData, CommandCatalogDocumentSaveErrors, CommandCatalogDocumentSaveResponses, CommandCatalogModelTestData, CommandCatalogModelTestErrors, CommandCatalogModelTestResponses, CommandCatalogReloadData, CommandCatalogReloadErrors, CommandCatalogReloadResponses, CommandCommandRegistrationSaveData, CommandCommandRegistrationSaveErrors, CommandCommandRegistrationSaveResponses, CommandCredentialClearOverrideData, CommandCredentialClearOverrideErrors, CommandCredentialClearOverrideResponses, CommandCredentialRemovePersistedData, CommandCredentialRemovePersistedErrors, CommandCredentialRemovePersistedResponses, CommandCredentialSetData, CommandCredentialSetErrors, CommandCredentialSetResponses, CommandDecisionAnswerData, CommandDecisionAnswerErrors, CommandDecisionAnswerResponses, CommandDepartmentSettingsSaveData, CommandDepartmentSettingsSaveErrors, CommandDepartmentSettingsSaveResponses, CommandGuidanceSendData, CommandGuidanceSendErrors, CommandGuidanceSendResponses, CommandHomeMarkSeenData, CommandHomeMarkSeenErrors, CommandHomeMarkSeenResponses, CommandMaterialRecordData, CommandMaterialRecordErrors, CommandMaterialRecordResponses, CommandOnboardingRestartData, CommandOnboardingRestartErrors, CommandOnboardingRestartResponses, CommandProjectArchiveData, CommandProjectArchiveErrors, CommandProjectArchiveResponses, CommandProjectCreateData, CommandProjectCreateErrors, CommandProjectCreateResponses, CommandProjectOnboardData, CommandProjectOnboardErrors, CommandProjectOnboardResponses, CommandProjectPinData, CommandProjectPinErrors, CommandProjectPinResponses, CommandProjectRenameData, CommandProjectRenameErrors, CommandProjectRenameResponses, CommandProjectRestoreData, CommandProjectRestoreErrors, CommandProjectRestoreResponses, CommandProjectSetGoalData, CommandProjectSetGoalErrors, CommandProjectSetGoalResponses, CommandRuntimeForceUpgradeData, CommandRuntimeForceUpgradeErrors, CommandRuntimeForceUpgradeResponses, CommandRuntimeStartDrainData, CommandRuntimeStartDrainErrors, CommandRuntimeStartDrainResponses, CommandSourceDirectorySaveData, CommandSourceDirectorySaveErrors, CommandSourceDirectorySaveResponses, CommandWorkItemAppendInputData, CommandWorkItemAppendInputErrors, CommandWorkItemAppendInputResponses, CommandWorkItemCancelData, CommandWorkItemCancelErrors, CommandWorkItemCancelResponses, CommandWorkItemCreateData, CommandWorkItemCreateErrors, CommandWorkItemCreateResponses, EventsData, EventsErrors, EventsResponses, QueryAttemptLiveData, QueryAttemptLiveErrors, QueryAttemptLiveResponses, QueryCatalogData, QueryCatalogDocumentData, QueryCatalogDocumentResponses, QueryCatalogResponses, QueryDecisionsListData, QueryDecisionsListErrors, QueryDecisionsListResponses, QueryDeliveryFileData, QueryDeliveryFileErrors, QueryDeliveryFileResponses, QueryDepartmentWorkspaceData, QueryDepartmentWorkspaceErrors, QueryDepartmentWorkspaceResponses, QueryEventDetailData, QueryEventDetailErrors, QueryEventDetailResponses, QueryHomeAwayReportData, QueryHomeAwayReportErrors, QueryHomeAwayReportResponses, QueryProjectAttemptsData, QueryProjectAttemptsErrors, QueryProjectAttemptsResponses, QueryProjectFlowData, QueryProjectFlowErrors, QueryProjectFlowResponses, QueryProjectLoopData, QueryProjectLoopErrors, QueryProjectLoopResponses, QueryProjectOverviewData, QueryProjectOverviewErrors, QueryProjectOverviewResponses, QueryProjectSettingsData, QueryProjectSettingsErrors, QueryProjectSettingsResponses, QueryProjectsListData, QueryProjectsListErrors, QueryProjectsListResponses, QueryProjectUsageData, QueryProjectUsageErrors, QueryProjectUsageResponses, QueryReplayCheckData, QueryReplayCheckErrors, QueryReplayCheckResponses, QueryRunActionsData, QueryRunActionsErrors, QueryRunActionsResponses, QueryRunAttemptData, QueryRunAttemptErrors, QueryRunAttemptResponses, QueryRunExportData, QueryRunExportErrors, QueryRunExportResponses, QueryRunRecoveryData, QueryRunRecoveryErrors, QueryRunRecoveryResponses, QuerySystemStatusData, QuerySystemStatusErrors, QuerySystemStatusResponses, QueryWorkItemInputsData, QueryWorkItemInputsErrors, QueryWorkItemInputsResponses, QueryWorkItemMaterialsData, QueryWorkItemMaterialsErrors, QueryWorkItemMaterialsResponses, SystemStopData, SystemStopResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -31,10 +31,46 @@ export const commandProjectCreate = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
+ * project.onboard
+ */
+export const commandProjectOnboard = <ThrowOnError extends boolean = false>(options: Options<CommandProjectOnboardData, ThrowOnError>): RequestResult<CommandProjectOnboardResponses, CommandProjectOnboardErrors, ThrowOnError> => (options.client ?? client).post<CommandProjectOnboardResponses, CommandProjectOnboardErrors, ThrowOnError>({
+    url: '/api/commands/project.onboard',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * onboarding.restart
+ */
+export const commandOnboardingRestart = <ThrowOnError extends boolean = false>(options: Options<CommandOnboardingRestartData, ThrowOnError>): RequestResult<CommandOnboardingRestartResponses, CommandOnboardingRestartErrors, ThrowOnError> => (options.client ?? client).post<CommandOnboardingRestartResponses, CommandOnboardingRestartErrors, ThrowOnError>({
+    url: '/api/commands/onboarding.restart',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * project.rename
  */
 export const commandProjectRename = <ThrowOnError extends boolean = false>(options: Options<CommandProjectRenameData, ThrowOnError>): RequestResult<CommandProjectRenameResponses, CommandProjectRenameErrors, ThrowOnError> => (options.client ?? client).post<CommandProjectRenameResponses, CommandProjectRenameErrors, ThrowOnError>({
     url: '/api/commands/project.rename',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * project.set_goal
+ */
+export const commandProjectSetGoal = <ThrowOnError extends boolean = false>(options: Options<CommandProjectSetGoalData, ThrowOnError>): RequestResult<CommandProjectSetGoalResponses, CommandProjectSetGoalErrors, ThrowOnError> => (options.client ?? client).post<CommandProjectSetGoalResponses, CommandProjectSetGoalErrors, ThrowOnError>({
+    url: '/api/commands/project.set_goal',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -343,9 +379,21 @@ export const commandRuntimeForceUpgrade = <ThrowOnError extends boolean = false>
 });
 
 /**
+ * home.mark_seen
+ */
+export const commandHomeMarkSeen = <ThrowOnError extends boolean = false>(options: Options<CommandHomeMarkSeenData, ThrowOnError>): RequestResult<CommandHomeMarkSeenResponses, CommandHomeMarkSeenErrors, ThrowOnError> => (options.client ?? client).post<CommandHomeMarkSeenResponses, CommandHomeMarkSeenErrors, ThrowOnError>({
+    url: '/api/commands/home.mark_seen',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * system.status
  */
-export const querySystemStatus = <ThrowOnError extends boolean = false>(options?: Options<QuerySystemStatusData, ThrowOnError>): RequestResult<QuerySystemStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<QuerySystemStatusResponses, unknown, ThrowOnError>({ url: '/api/queries/system.status', ...options });
+export const querySystemStatus = <ThrowOnError extends boolean = false>(options?: Options<QuerySystemStatusData, ThrowOnError>): RequestResult<QuerySystemStatusResponses, QuerySystemStatusErrors, ThrowOnError> => (options?.client ?? client).get<QuerySystemStatusResponses, QuerySystemStatusErrors, ThrowOnError>({ url: '/api/queries/system.status', ...options });
 
 /**
  * attempt.live
@@ -438,6 +486,11 @@ export const queryRunExport = <ThrowOnError extends boolean = false>(options: Op
 export const queryReplayCheck = <ThrowOnError extends boolean = false>(options?: Options<QueryReplayCheckData, ThrowOnError>): RequestResult<QueryReplayCheckResponses, QueryReplayCheckErrors, ThrowOnError> => (options?.client ?? client).get<QueryReplayCheckResponses, QueryReplayCheckErrors, ThrowOnError>({ url: '/api/queries/replay.check', ...options });
 
 /**
+ * run.recovery
+ */
+export const queryRunRecovery = <ThrowOnError extends boolean = false>(options: Options<QueryRunRecoveryData, ThrowOnError>): RequestResult<QueryRunRecoveryResponses, QueryRunRecoveryErrors, ThrowOnError> => (options.client ?? client).get<QueryRunRecoveryResponses, QueryRunRecoveryErrors, ThrowOnError>({ url: '/api/queries/run.recovery', ...options });
+
+/**
  * catalog
  */
 export const queryCatalog = <ThrowOnError extends boolean = false>(options?: Options<QueryCatalogData, ThrowOnError>): RequestResult<QueryCatalogResponses, unknown, ThrowOnError> => (options?.client ?? client).get<QueryCatalogResponses, unknown, ThrowOnError>({ url: '/api/queries/catalog', ...options });
@@ -448,9 +501,29 @@ export const queryCatalog = <ThrowOnError extends boolean = false>(options?: Opt
 export const queryCatalogDocument = <ThrowOnError extends boolean = false>(options?: Options<QueryCatalogDocumentData, ThrowOnError>): RequestResult<QueryCatalogDocumentResponses, unknown, ThrowOnError> => (options?.client ?? client).get<QueryCatalogDocumentResponses, unknown, ThrowOnError>({ url: '/api/queries/catalog.document', ...options });
 
 /**
+ * home.away_report
+ */
+export const queryHomeAwayReport = <ThrowOnError extends boolean = false>(options?: Options<QueryHomeAwayReportData, ThrowOnError>): RequestResult<QueryHomeAwayReportResponses, QueryHomeAwayReportErrors, ThrowOnError> => (options?.client ?? client).get<QueryHomeAwayReportResponses, QueryHomeAwayReportErrors, ThrowOnError>({ url: '/api/queries/home.away_report', ...options });
+
+/**
  * Capabilities
  */
 export const capabilities = <ThrowOnError extends boolean = false>(options?: Options<CapabilitiesData, ThrowOnError>): RequestResult<CapabilitiesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<CapabilitiesResponses, unknown, ThrowOnError>({ url: '/api/capabilities', ...options });
+
+/**
+ * Stop
+ */
+export const systemStop = <ThrowOnError extends boolean = false>(options?: Options<SystemStopData, ThrowOnError>): RequestResult<SystemStopResponses, unknown, ThrowOnError> => (options?.client ?? client).post<SystemStopResponses, unknown, ThrowOnError>({ url: '/api/system/stop', ...options });
+
+/**
+ * Latest Manifest
+ */
+export const clientUpdateManifest = <ThrowOnError extends boolean = false>(options?: Options<ClientUpdateManifestData, ThrowOnError>): RequestResult<ClientUpdateManifestResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ClientUpdateManifestResponses, unknown, ThrowOnError>({ url: '/client-update/latest.yml', ...options });
+
+/**
+ * Installer
+ */
+export const clientUpdateFile = <ThrowOnError extends boolean = false>(options: Options<ClientUpdateFileData, ThrowOnError>): RequestResult<ClientUpdateFileResponses, ClientUpdateFileErrors, ThrowOnError> => (options.client ?? client).get<ClientUpdateFileResponses, ClientUpdateFileErrors, ThrowOnError>({ url: '/client-update/{filename}', ...options });
 
 /**
  * events

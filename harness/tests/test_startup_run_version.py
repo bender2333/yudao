@@ -9,6 +9,7 @@ import sqlite3
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType, ProjectEventType
 from harness.projection import project_run, saved_project
+from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.streams import PRIORITY_UPGRADE_RESTART, PRIORITY_USER, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.tests.helpers import happy_script
@@ -17,7 +18,8 @@ def _adopted_project(data_dir):
     # 一个项目：第一个事项完成并被采纳，项目有了当前采纳成果
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     project_id = system.projects.register("升级项目", "核对启动时的版本核对")
-    system.projects.configure_prompt(project_id, "engineering", "先写计划再写代码。", 0)
+    system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)
     system.projects.configure_command(project_id, "lint", ["python", "-m", "flake8"], args=[])
     _work_item_id, run_id = system.projects.start_work_item(project_id, "第一个事项")
     system.run_until_stop(run_id)
@@ -55,7 +57,7 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     second_run = _second_unfinished_run(system, project_id)
     before = saved_project(system.store, project_id).to_dict()
     # 项目的长期事实：当前 PRD 与采纳成果、项目部门设置、登记命令
-    facts_before = {key: before[key] for key in ("name", "goal", "current_adoption", "adoptions", "prompt_configs", "commands")}
+    facts_before = {key: before[key] for key in ("name", "goal", "current_adoption", "adoptions", "department_settings", "commands")}
     adoption_before = system.projects.projection(project_id).current_adoption
     assert adoption_before is not None
     end = system.store.end_position()
@@ -73,7 +75,7 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     assert project.current_adoption is not None
     assert project.current_adoption.adoption_id == adoption_before.adoption_id
     # 项目设置完整重建：部门 Prompt 与登记命令
-    assert project.prompt_configs["engineering"].source == "configured"
+    assert project.department_settings["engineering"].source == "configured"
     assert "lint" in project.commands
     # 重放不调用模型
     assert adapter.invocations == []

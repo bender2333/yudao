@@ -62,6 +62,25 @@ export type AcceptedNoRefs = {
 };
 
 /**
+ * Accepted[OnboardRefs]
+ */
+export type AcceptedOnboardRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: OnboardRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
  * Accepted[ProjectRefs]
  */
 export type AcceptedProjectRefs = {
@@ -160,7 +179,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed';
+    status: 'running' | 'completed' | 'failed' | 'unknown';
     /**
      * Activation Id
      */
@@ -182,6 +201,18 @@ export type ActionView = {
      */
     created_at: string;
     receipt: ActionReceipt | null;
+    /**
+     * Before Snapshot Ref
+     */
+    before_snapshot_ref?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * After Snapshot Ref
+     */
+    after_snapshot_ref?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -307,6 +338,58 @@ export type AttemptView = {
 };
 
 /**
+ * AwayRange
+ */
+export type AwayRange = {
+    /**
+     * Id
+     */
+    id: 'since_seen' | '24h' | '7d';
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * From At
+     */
+    from_at: string;
+    /**
+     * From Position
+     */
+    from_position: number;
+    /**
+     * To Position
+     */
+    to_position: number;
+    /**
+     * To At
+     */
+    to_at: string;
+};
+
+/**
+ * AwayReport
+ */
+export type AwayReport = {
+    last_seen: LastSeen;
+    range: AwayRange;
+    /**
+     * Ranges
+     */
+    ranges: Array<{
+        [key: string]: string;
+    }>;
+    /**
+     * Summary
+     */
+    summary: Array<ReportItem>;
+    /**
+     * Facts
+     */
+    facts: Array<ReportFact>;
+};
+
+/**
  * BindingInput
  */
 export type BindingInput = {
@@ -318,6 +401,24 @@ export type BindingInput = {
      * Model Id
      */
     model_id: string;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+};
+
+/**
+ * BlockedObjects
+ */
+export type BlockedObjects = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Queued After
+     */
+    queued_after: number;
 };
 
 /**
@@ -388,6 +489,18 @@ export type CallTarget = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
 };
 
 /**
@@ -513,6 +626,10 @@ export type CatalogBinding = {
      * Model Id
      */
     model_id: string;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
 };
 
 /**
@@ -749,6 +866,18 @@ export type CatalogModel = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string;
 };
 
 /**
@@ -879,7 +1008,7 @@ export type CommandCapability = {
     /**
      * Reasons
      */
-    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused'>;
+    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid'>;
 };
 
 /**
@@ -1150,7 +1279,11 @@ export type DecisionView = {
      * Requested At
      */
     requested_at: string;
-    request: ModelUnavailableRequested;
+    blocked: BlockedObjects | null;
+    /**
+     * Request
+     */
+    request: ModelUnavailableRequested | UnknownActionRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -1204,6 +1337,10 @@ export type DepartmentPromptState = {
      * Used Event Id
      */
     used_event_id: string | null;
+    /**
+     * Prompt Configured
+     */
+    prompt_configured?: boolean;
 };
 
 /**
@@ -1226,6 +1363,22 @@ export type DepartmentSetting = {
      * Source
      */
     source: string;
+    /**
+     * Provider Id
+     */
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Prompt Configured
+     */
+    prompt_configured?: boolean;
 };
 
 /**
@@ -1249,9 +1402,21 @@ export type DepartmentSettingsSave = {
      */
     department: string;
     /**
-     * Text
+     * Provider Id
      */
-    text: string;
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Department Prompt
+     */
+    department_prompt?: string | null;
 };
 
 /**
@@ -1283,6 +1448,7 @@ export type DepartmentWorkspaceResult = {
      */
     active: boolean;
     prompt: DepartmentPromptState;
+    setting: DepartmentSetting;
     /**
      * Guidance
      */
@@ -1379,6 +1545,18 @@ export type DocumentModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels?: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level?: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode?: string;
     /**
      * Provider Id
      */
@@ -1554,6 +1732,20 @@ export type HttpValidationError = {
 };
 
 /**
+ * HomeStatus
+ */
+export type HomeStatus = {
+    /**
+     * Waiting Decisions
+     */
+    waiting_decisions: number;
+    /**
+     * Disk Free Bytes
+     */
+    disk_free_bytes: number | null;
+};
+
+/**
  * InputView
  */
 export type InputView = {
@@ -1594,6 +1786,38 @@ export type InputView = {
 };
 
 /**
+ * LastSeen
+ */
+export type LastSeen = {
+    /**
+     * At
+     */
+    at: string | null;
+    /**
+     * Position
+     */
+    position: number | null;
+};
+
+/**
+ * LateResult
+ */
+export type LateResult = {
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Event Id
+     */
+    event_id: string;
+};
+
+/**
  * LiveAttempt
  */
 export type LiveAttempt = {
@@ -1611,6 +1835,24 @@ export type LiveAttempt = {
     channels: {
         [key: string]: string;
     };
+};
+
+/**
+ * MarkSeen
+ */
+export type MarkSeen = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: number | null;
+    /**
+     * Position
+     */
+    position: number;
 };
 
 /**
@@ -1671,6 +1913,18 @@ export type ModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels?: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level?: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode?: string;
 };
 
 /**
@@ -1717,6 +1971,46 @@ export type ModelUnavailableRequested = {
  */
 export type NoRefs = {
     [key: string]: never;
+};
+
+/**
+ * OnboardRefs
+ */
+export type OnboardRefs = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+};
+
+/**
+ * OnboardingRestart
+ */
+export type OnboardingRestart = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Name
+     */
+    source_name: string;
 };
 
 /**
@@ -1849,6 +2143,36 @@ export type ProjectMaterial = {
      * Event Id
      */
     event_id: string;
+};
+
+/**
+ * ProjectOnboard
+ */
+export type ProjectOnboard = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Goal
+     */
+    goal: string;
+    /**
+     * Source Name
+     */
+    source_name: string;
+    /**
+     * Source Path
+     */
+    source_path: string;
 };
 
 /**
@@ -2007,6 +2331,44 @@ export type ProjectRow = {
      * Current Adoption
      */
     current_adoption: string | null;
+    /**
+     * Onboarding Status
+     */
+    onboarding_status: string | null;
+    /**
+     * Interrupted Count
+     */
+    interrupted_count: number;
+    /**
+     * Pending Verification Count
+     */
+    pending_verification_count: number;
+    /**
+     * Waiting Resume Count
+     */
+    waiting_resume_count: number;
+};
+
+/**
+ * ProjectSetGoal
+ */
+export type ProjectSetGoal = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Goal
+     */
+    goal: string;
 };
 
 /**
@@ -2125,6 +2487,72 @@ export type QueryCapability = {
      * Changed By
      */
     changed_by: Array<string>;
+    /**
+     * Replayable
+     */
+    replayable?: boolean;
+};
+
+/**
+ * RecoveryLimits
+ */
+export type RecoveryLimits = {
+    /**
+     * Activations
+     */
+    activations: number;
+    /**
+     * Model Steps
+     */
+    model_steps: number;
+    /**
+     * Retries
+     */
+    retries: number;
+    /**
+     * Cycle Count
+     */
+    cycle_count: number;
+};
+
+/**
+ * RecoveryOwner
+ */
+export type RecoveryOwner = {
+    /**
+     * Epoch
+     */
+    epoch: number;
+    /**
+     * Since
+     */
+    since: string;
+    /**
+     * Holds Slot
+     */
+    holds_slot: boolean;
+};
+
+/**
+ * RecoveryStatus
+ */
+export type RecoveryStatus = {
+    /**
+     * Auto Resumed
+     */
+    auto_resumed: number;
+    /**
+     * Pending Verification
+     */
+    pending_verification: number;
+    /**
+     * Waiting Resume
+     */
+    waiting_resume: number;
+    /**
+     * Unknown Actions
+     */
+    unknown_actions: number;
 };
 
 /**
@@ -2138,7 +2566,7 @@ export type Rejected = {
     /**
      * Reason
      */
-    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused';
+    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid';
     /**
      * Message
      */
@@ -2165,6 +2593,66 @@ export type ReplayCheckResult = {
      * Differences
      */
     differences: Array<string>;
+};
+
+/**
+ * ReportFact
+ */
+export type ReportFact = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Type
+     */
+    type: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+};
+
+/**
+ * ReportItem
+ */
+export type ReportItem = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Value
+     */
+    value: number;
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * Refs
+     */
+    refs: Array<number>;
+    /**
+     * Detail
+     */
+    detail?: string | null;
 };
 
 /**
@@ -2296,6 +2784,71 @@ export type RunExportResult = {
 };
 
 /**
+ * RunRecoveryResult
+ */
+export type RunRecoveryResult = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * State
+     */
+    state: 'running' | 'interrupted' | 'pending_verification' | 'waiting_resume' | 'terminated';
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Executable
+     */
+    executable: boolean;
+    /**
+     * Last Confirmed Position
+     */
+    last_confirmed_position: number;
+    /**
+     * Last Confirmed Event Id
+     */
+    last_confirmed_event_id: string | null;
+    /**
+     * Unfinished Actions
+     */
+    unfinished_actions: Array<UnfinishedAction>;
+    /**
+     * Verifications
+     */
+    verifications: Array<VerificationRecord>;
+    /**
+     * Next Legal Action
+     */
+    next_legal_action: string | null;
+    /**
+     * Can Continue
+     */
+    can_continue: boolean;
+    /**
+     * Cannot Continue Reason
+     */
+    cannot_continue_reason: string | null;
+    unusable: UnusableTarget | null;
+    limits: RecoveryLimits;
+    owner: RecoveryOwner | null;
+    /**
+     * Late Results
+     */
+    late_results: Array<LateResult>;
+    /**
+     * Has Unknown Actions
+     */
+    has_unknown_actions: boolean;
+};
+
+/**
  * RuntimeForceUpgrade
  */
 export type RuntimeForceUpgrade = {
@@ -2321,6 +2874,17 @@ export type RuntimeStartDrain = {
      * Base Version
      */
     base_version?: number | null;
+};
+
+/**
+ * Snapshot[AwayReport]
+ */
+export type SnapshotAwayReport = {
+    /**
+     * Position
+     */
+    position: number;
+    data: AwayReport;
 };
 
 /**
@@ -2511,6 +3075,17 @@ export type SnapshotRunExportResult = {
 };
 
 /**
+ * Snapshot[RunRecoveryResult]
+ */
+export type SnapshotRunRecoveryResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RunRecoveryResult;
+};
+
+/**
  * Snapshot[SystemStatus]
  */
 export type SnapshotSystemStatus = {
@@ -2628,9 +3203,139 @@ export type SystemStatus = {
      * Started At
      */
     started_at: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Running Runs
+     */
+    running_runs: number;
     provider: ProviderReadiness;
     catalog: CatalogState;
     drain: DrainStatus;
+    recovery: RecoveryStatus;
+    home: HomeStatus;
+};
+
+/**
+ * UnfinishedAction
+ */
+export type UnfinishedAction = {
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Status
+     */
+    status: 'not_sent' | 'unknown';
+    /**
+     * Activation Id
+     */
+    activation_id: string | null;
+    /**
+     * Step Id
+     */
+    step_id: number | null;
+    /**
+     * Input Version
+     */
+    input_version: number | null;
+    /**
+     * Purpose
+     */
+    purpose: string | null;
+    /**
+     * Repeatable
+     */
+    repeatable: boolean;
+    /**
+     * Before Snapshot Ref
+     */
+    before_snapshot_ref: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Started Event Id
+     */
+    started_event_id: string;
+};
+
+/**
+ * UnknownActionRequested
+ */
+export type UnknownActionRequested = {
+    /**
+     * Kind
+     */
+    kind: 'unknown_action';
+    /**
+     * Blocks
+     */
+    blocks: 'action';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Action Kind
+     */
+    action_kind: string;
+    /**
+     * Repeatable
+     */
+    repeatable: boolean;
+};
+
+/**
+ * UnusableTarget
+ */
+export type UnusableTarget = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Model
+     */
+    model: string | null;
+    /**
+     * Problem
+     */
+    problem: string;
 };
 
 /**
@@ -2769,6 +3474,48 @@ export type ValidationError = {
 };
 
 /**
+ * VerificationRecord
+ */
+export type VerificationRecord = {
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Basis
+     */
+    basis: string;
+    /**
+     * Result
+     */
+    result: string;
+    /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Decision Id
+     */
+    decision_id: string | null;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Event Id
+     */
+    event_id: string;
+};
+
+/**
  * VersionEntry
  */
 export type VersionEntry = {
@@ -2850,6 +3597,10 @@ export type WorkItemCard = {
      * Work Item Id
      */
     work_item_id: string;
+    /**
+     * Kind
+     */
+    kind: string;
     /**
      * Title
      */
@@ -2969,6 +3720,10 @@ export type WorkItemLoop = {
      */
     work_item_id: string;
     /**
+     * Kind
+     */
+    kind: string;
+    /**
      * Sign
      */
     sign: string;
@@ -3016,6 +3771,10 @@ export type WorkItemLoop = {
      * Adoption Id
      */
     adoption_id: string | null;
+    /**
+     * Recovery State
+     */
+    recovery_state: string | null;
     /**
      * Version
      */
@@ -3106,6 +3865,244 @@ export type WorkItemStats = {
      * Not Started
      */
     not_started: number;
+};
+
+/**
+ * ActionVerifiedEvent
+ */
+export type ActionVerifiedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'action_verified';
+    payload: ActionVerifiedPayload;
+};
+
+/**
+ * ActionVerifiedPayload
+ */
+export type ActionVerifiedPayload = {
+    /**
+     * Provider Config Id
+     */
+    provider_config_id: string | null;
+    /**
+     * Model Id
+     */
+    model_id: string | null;
+    /**
+     * Provider Name
+     */
+    provider_name: string;
+    /**
+     * Protocol
+     */
+    protocol: string;
+    /**
+     * Base Url
+     */
+    base_url: string | null;
+    /**
+     * Requested Provider
+     */
+    requested_provider: string;
+    /**
+     * Requested Protocol
+     */
+    requested_protocol: string;
+    /**
+     * Requested Model
+     */
+    requested_model: string;
+    /**
+     * Credential Ref
+     */
+    credential_ref: string | null;
+    /**
+     * Credential Version
+     */
+    credential_version: string | null;
+    /**
+     * Context Window
+     */
+    context_window: number | null;
+    /**
+     * Configured Max Output Tokens
+     */
+    configured_max_output_tokens: number | null;
+    /**
+     * Accepts Required Tool Call
+     */
+    accepts_required_tool_call: boolean | null;
+    /**
+     * Selection Source
+     */
+    selection_source: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier: string | null;
+    /**
+     * Sent Tier
+     */
+    sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number;
+    /**
+     * Prompt Version
+     */
+    prompt_version: number;
+    /**
+     * Prompt Hash
+     */
+    prompt_hash: string | null;
+    /**
+     * Guidance Ids
+     */
+    guidance_ids: Array<string>;
+    /**
+     * Guidance Only
+     */
+    guidance_only: boolean;
+    /**
+     * Effective Contract Hash
+     */
+    effective_contract_hash: string | null;
+    /**
+     * Engineering Plan Hash
+     */
+    engineering_plan_hash: string | null;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    /**
+     * Logical Call Id
+     */
+    logical_call_id: string;
+    /**
+     * Collaboration Request Id
+     */
+    collaboration_request_id: string | null;
+    /**
+     * Context Event Id
+     */
+    context_event_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Step Id
+     */
+    step_id: number;
+    input_item: FunctionCallOutput;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Purpose
+     */
+    purpose: 'work' | 'compaction';
+    /**
+     * Ok
+     */
+    ok: boolean;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Resolution
+     */
+    resolution: 'continue';
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Decision Id
+     */
+    decision_id?: string | null;
 };
 
 /**
@@ -3357,6 +4354,190 @@ export type Baseline = {
      * Code Tree Digest
      */
     code_tree_digest: string;
+};
+
+/**
+ * BaselineConclusion
+ */
+export type BaselineConclusion = {
+    /**
+     * Requirement
+     */
+    requirement: string;
+    /**
+     * Status
+     */
+    status: 'verified' | 'read_only' | 'existing_defect' | 'unsupported';
+    /**
+     * Evidence
+     */
+    evidence: string;
+};
+
+/**
+ * BaselineOmission
+ */
+export type BaselineOmission = {
+    /**
+     * Capability
+     */
+    capability: string;
+    /**
+     * Location
+     */
+    location: string;
+};
+
+/**
+ * BaselineOtherFailure
+ */
+export type BaselineOtherFailure = {
+    /**
+     * Check
+     */
+    check: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * BaselineReviewAcceptedEvent
+ */
+export type BaselineReviewAcceptedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'baseline_review_accepted';
+    payload: BaselineReviewAcceptedPayload;
+};
+
+/**
+ * BaselineReviewAcceptedPayload
+ */
+export type BaselineReviewAcceptedPayload = {
+    /**
+     * Verdict
+     */
+    verdict: 'consistent' | 'rework_product';
+    /**
+     * Conclusions
+     */
+    conclusions: Array<BaselineConclusion>;
+    /**
+     * Omissions
+     */
+    omissions: Array<BaselineOmission>;
+    /**
+     * Checks
+     */
+    checks: Array<CheckReceipt>;
+    /**
+     * Other Failures
+     */
+    other_failures: Array<BaselineOtherFailure>;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Structure Hash
+     */
+    structure_hash: string;
+    /**
+     * Code Snapshot Hash
+     */
+    code_snapshot_hash: string;
+    /**
+     * Kind
+     */
+    kind: 'baseline_review';
+    /**
+     * Issuer
+     */
+    issuer: 'quality';
+    /**
+     * Parent Hash
+     */
+    parent_hash: string | null;
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Status
+     */
+    status: 'active';
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    git_version: GitVersion;
 };
 
 /**
@@ -3753,6 +4934,12 @@ export type CodeSnapshot = {
      */
     directories: Array<string>;
     tree_ref: ArtifactRef;
+    /**
+     * Provenance
+     */
+    provenance?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -4394,6 +5581,18 @@ export type CompactionRecordedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -4647,6 +5846,18 @@ export type ContextAssembledPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Effective Contract Hash
      */
@@ -5190,7 +6401,10 @@ export type DecisionRequestedEvent = {
      * Type
      */
     type: 'decision_requested';
-    payload: ModelUnavailableRequested;
+    /**
+     * Payload
+     */
+    payload: ModelUnavailableRequested | UnknownActionRequested;
 };
 
 /**
@@ -5271,7 +6485,7 @@ export type DecisionWithdrawnPayload = {
     /**
      * Reason
      */
-    reason: 'released' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
+    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
 };
 
 /**
@@ -6145,13 +7359,13 @@ export type DepartmentPromptConfiguredEvent = {
      * Type
      */
     type: 'department_prompt_configured';
-    payload: DepartmentPromptConfiguredPayload;
+    payload: DepartmentSettingsConfiguredPayload;
 };
 
 /**
- * DepartmentPromptConfiguredPayload
+ * DepartmentSettingsConfiguredPayload
  */
-export type DepartmentPromptConfiguredPayload = {
+export type DepartmentSettingsConfiguredPayload = {
     /**
      * Department
      */
@@ -6160,101 +7374,27 @@ export type DepartmentPromptConfiguredPayload = {
      * Version
      */
     version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
     /**
      * Base Version
      */
     base_version: number;
-};
-
-/**
- * DepartmentPromptUpdatedEvent
- */
-export type DepartmentPromptUpdatedEvent = {
     /**
-     * Position
+     * Provider Id
      */
-    position: number;
+    provider_id?: string | null;
     /**
-     * Previous
+     * Model Id
      */
-    previous: number;
+    model_id?: string | null;
     /**
-     * Event Id
+     * Requested Tier
      */
-    event_id: string;
+    requested_tier?: string | null;
     /**
-     * At
+     * Department Prompt
      */
-    at: string;
-    /**
-     * Stream
-     */
-    stream: string;
-    /**
-     * Stream Version
-     */
-    stream_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string | null;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string | null;
-    /**
-     * Run Id
-     */
-    run_id: string | null;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality' | null;
-    /**
-     * Role
-     */
-    role: string | null;
-    /**
-     * Actor
-     */
-    actor: string;
-    /**
-     * Command Id
-     */
-    command_id: string | null;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Type
-     */
-    type: 'department_prompt_updated';
-    payload: DepartmentPromptUpdatedPayload;
-};
-
-/**
- * DepartmentPromptUpdatedPayload
- */
-export type DepartmentPromptUpdatedPayload = {
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality';
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
+    department_prompt?: string | null;
+    department_prompt_ref?: ArtifactRef | null;
 };
 
 /**
@@ -6341,6 +7481,83 @@ export type GitVersion = {
      * Tree
      */
     tree: string;
+};
+
+/**
+ * HomeSeenEvent
+ */
+export type HomeSeenEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'home_seen';
+    payload: HomeSeenPayload;
+};
+
+/**
+ * HomeSeenPayload
+ */
+export type HomeSeenPayload = {
+    /**
+     * Position
+     */
+    position: number;
 };
 
 /**
@@ -6749,6 +7966,18 @@ export type ModelAttemptFailedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -7021,6 +8250,18 @@ export type ModelAttemptFinishedPayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -7271,6 +8512,18 @@ export type ModelMessagePayload = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -7484,6 +8737,18 @@ export type ModelRequestSerializedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -7702,6 +8967,18 @@ export type ModelRequestedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -7939,6 +9216,18 @@ export type ModelRetryScheduledPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -8619,6 +9908,84 @@ export type ProjectArchivedPayload = {
 };
 
 /**
+ * ProjectGoalChangedEvent
+ */
+export type ProjectGoalChangedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_goal_changed';
+    payload: ProjectGoalChangedPayload;
+};
+
+/**
+ * ProjectGoalChangedPayload
+ */
+export type ProjectGoalChangedPayload = {
+    /**
+     * Goal
+     */
+    goal: string;
+    goal_ref: ArtifactRef;
+};
+
+/**
  * ProjectPinnedEvent
  */
 export type ProjectPinnedEvent = {
@@ -8778,7 +10145,7 @@ export type ProjectRegisteredPayload = {
     /**
      * Source
      */
-    source: 'idea';
+    source: 'idea' | 'existing';
 };
 
 /**
@@ -8930,25 +10297,6 @@ export type ProjectRestoredEvent = {
  */
 export type ProjectRestoredPayload = {
     [key: string]: never;
-};
-
-/**
- * PromptRecord
- */
-export type PromptRecord = {
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality';
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Text
-     */
-    text: string;
-    prompt_ref: ArtifactRef;
 };
 
 /**
@@ -9370,13 +10718,11 @@ export type RunCreatedPayload = {
      * Task
      */
     task: string;
-    initial_input: InputRecord;
     /**
-     * Department Prompts
+     * Kind
      */
-    department_prompts: {
-        [key: string]: PromptRecord;
-    };
+    kind?: string;
+    initial_input: InputRecord;
     intend_ref: ArtifactRef;
     git_version: GitVersion;
     /**
@@ -9419,6 +10765,7 @@ export type RunCreatedPayload = {
     work_item_id: string | null;
     baseline: Baseline | null;
     snapshot: CodeSnapshot | null;
+    overview_ref?: ArtifactRef | null;
     /**
      * Workspace Digest
      */
@@ -9526,7 +10873,7 @@ export type RunDonePayload = {
     /**
      * Stop Reason
      */
-    stop_reason: 'released';
+    stop_reason: 'released' | 'baseline_verified';
 };
 
 /**
@@ -10287,6 +11634,210 @@ export type SpecSupersededPayload = {
 };
 
 /**
+ * StructureAcceptedEvent
+ */
+export type StructureAcceptedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'structure_accepted';
+    payload: StructureAcceptedPayload;
+};
+
+/**
+ * StructureAcceptedPayload
+ */
+export type StructureAcceptedPayload = {
+    /**
+     * Overall
+     */
+    overall: string;
+    /**
+     * Modules
+     */
+    modules: Array<StructureModule>;
+    /**
+     * Entry Points
+     */
+    entry_points: Array<StructureEntryPoint>;
+    /**
+     * Build And Test
+     */
+    build_and_test: Array<StructureBuildItem>;
+    /**
+     * Requirement Locations
+     */
+    requirement_locations: Array<StructureRequirementLocation>;
+    /**
+     * Conventions
+     */
+    conventions: Array<string>;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Code Tree Digest
+     */
+    code_tree_digest: string;
+    /**
+     * Kind
+     */
+    kind: 'structure';
+    /**
+     * Issuer
+     */
+    issuer: 'engineering';
+    /**
+     * Parent Hash
+     */
+    parent_hash: string | null;
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Status
+     */
+    status: 'active';
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Id
+     */
+    id: string;
+    structure_ref: ArtifactRef;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    git_version: GitVersion;
+};
+
+/**
+ * StructureBuildItem
+ */
+export type StructureBuildItem = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Argv
+     */
+    argv: Array<string>;
+    /**
+     * Purpose
+     */
+    purpose: string;
+    receipt: CheckReceipt;
+};
+
+/**
+ * StructureEntryPoint
+ */
+export type StructureEntryPoint = {
+    /**
+     * Kind
+     */
+    kind: 'program' | 'command_line' | 'service';
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * How To Run
+     */
+    how_to_run: string;
+};
+
+/**
+ * StructureModule
+ */
+export type StructureModule = {
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Responsibility
+     */
+    responsibility: string;
+};
+
+/**
+ * StructureRequirementLocation
+ */
+export type StructureRequirementLocation = {
+    /**
+     * Requirement
+     */
+    requirement: string;
+    /**
+     * Locations
+     */
+    locations: Array<string>;
+};
+
+/**
  * ToolCallRequiredEvent
  */
 export type ToolCallRequiredEvent = {
@@ -10489,6 +12040,18 @@ export type ToolCallResult = {
      */
     sent_tier: string | null;
     /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
      * Input Version
      */
     input_version: number;
@@ -10572,6 +12135,7 @@ export type ToolCallResult = {
      */
     error: string | null;
     output_ref?: ArtifactRef | null;
+    after_snapshot_ref?: ArtifactRef | null;
 };
 
 /**
@@ -10779,6 +12343,18 @@ export type ToolSkippedPayload = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -11015,6 +12591,7 @@ export type ToolStartedPayload = {
      * Snapshot Hash
      */
     snapshot_hash?: string | null;
+    before_snapshot_ref?: ArtifactRef | null;
 };
 
 /**
@@ -11221,6 +12798,18 @@ export type UsageCharge = {
      * Sent Tier
      */
     sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
     /**
      * Input Version
      */
@@ -11542,6 +13131,10 @@ export type WorkItemCreatedPayload = {
      * Priority
      */
     priority?: string;
+    /**
+     * Kind
+     */
+    kind?: string;
 };
 
 /**
@@ -11658,8 +13251,6 @@ export type EventObject = ({
 } & UserInputReceivedEvent) | ({
     type: 'product_input_assigned';
 } & ProductInputAssignedEvent) | ({
-    type: 'department_prompt_updated';
-} & DepartmentPromptUpdatedEvent) | ({
     type: 'department_guidance_received';
 } & DepartmentGuidanceReceivedEvent) | ({
     type: 'department_guidance_applied';
@@ -11698,6 +13289,8 @@ export type EventObject = ({
 } & ToolStartedEvent) | ({
     type: 'tool_skipped';
 } & ToolSkippedEvent) | ({
+    type: 'action_verified';
+} & ActionVerifiedEvent) | ({
     type: 'proposal_submitted';
 } & ProposalSubmittedEvent) | ({
     type: 'proposal_rejected';
@@ -11722,6 +13315,10 @@ export type EventObject = ({
 } & DeliveryAcceptedEvent) | ({
     type: 'qa_submitted';
 } & QaSubmittedEvent) | ({
+    type: 'structure_accepted';
+} & StructureAcceptedEvent) | ({
+    type: 'baseline_review_accepted';
+} & BaselineReviewAcceptedEvent) | ({
     type: 'lesson_candidate_recorded';
 } & LessonCandidateRecordedEvent) | ({
     type: 'transition';
@@ -11744,6 +13341,8 @@ export type EventObject = ({
 } & ProjectRegisteredEvent) | ({
     type: 'project_renamed';
 } & ProjectRenamedEvent) | ({
+    type: 'project_goal_changed';
+} & ProjectGoalChangedEvent) | ({
     type: 'project_pinned';
 } & ProjectPinnedEvent) | ({
     type: 'project_archived';
@@ -11777,7 +13376,9 @@ export type EventObject = ({
     type: 'runtime_drain_started';
 } & RuntimeDrainStartedEvent) | ({
     type: 'runtime_force_upgrade_requested';
-} & RuntimeForceUpgradeRequestedEvent);
+} & RuntimeForceUpgradeRequestedEvent) | ({
+    type: 'home_seen';
+} & HomeSeenEvent);
 
 /**
  * OutputDelta
@@ -11854,6 +13455,64 @@ export type CommandProjectCreateResponses = {
 
 export type CommandProjectCreateResponse = CommandProjectCreateResponses[keyof CommandProjectCreateResponses];
 
+export type CommandProjectOnboardData = {
+    body: ProjectOnboard;
+    path?: never;
+    query?: never;
+    url: '/api/commands/project.onboard';
+};
+
+export type CommandProjectOnboardErrors = {
+    /**
+     * 命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandProjectOnboardError = CommandProjectOnboardErrors[keyof CommandProjectOnboardErrors];
+
+export type CommandProjectOnboardResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedOnboardRefs;
+};
+
+export type CommandProjectOnboardResponse = CommandProjectOnboardResponses[keyof CommandProjectOnboardResponses];
+
+export type CommandOnboardingRestartData = {
+    body: OnboardingRestart;
+    path?: never;
+    query?: never;
+    url: '/api/commands/onboarding.restart';
+};
+
+export type CommandOnboardingRestartErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, project_archived, not_allowed, source_invalid, busy, provider_unavailable, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandOnboardingRestartError = CommandOnboardingRestartErrors[keyof CommandOnboardingRestartErrors];
+
+export type CommandOnboardingRestartResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedOnboardRefs;
+};
+
+export type CommandOnboardingRestartResponse = CommandOnboardingRestartResponses[keyof CommandOnboardingRestartResponses];
+
 export type CommandProjectRenameData = {
     body: ProjectRename;
     path?: never;
@@ -11882,6 +13541,35 @@ export type CommandProjectRenameResponses = {
 };
 
 export type CommandProjectRenameResponse = CommandProjectRenameResponses[keyof CommandProjectRenameResponses];
+
+export type CommandProjectSetGoalData = {
+    body: ProjectSetGoal;
+    path?: never;
+    query?: never;
+    url: '/api/commands/project.set_goal';
+};
+
+export type CommandProjectSetGoalErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, stale_base, project_archived, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandProjectSetGoalError = CommandProjectSetGoalErrors[keyof CommandProjectSetGoalErrors];
+
+export type CommandProjectSetGoalResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandProjectSetGoalResponse = CommandProjectSetGoalResponses[keyof CommandProjectSetGoalResponses];
 
 export type CommandProjectPinData = {
     body: ProjectPin;
@@ -12008,7 +13696,7 @@ export type CommandWorkItemCreateData = {
 
 export type CommandWorkItemCreateErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, work_item_in_progress, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -12608,12 +14296,55 @@ export type CommandRuntimeForceUpgradeResponses = {
 
 export type CommandRuntimeForceUpgradeResponse = CommandRuntimeForceUpgradeResponses[keyof CommandRuntimeForceUpgradeResponses];
 
+export type CommandHomeMarkSeenData = {
+    body: MarkSeen;
+    path?: never;
+    query?: never;
+    url: '/api/commands/home.mark_seen';
+};
+
+export type CommandHomeMarkSeenErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_allowed, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandHomeMarkSeenError = CommandHomeMarkSeenErrors[keyof CommandHomeMarkSeenErrors];
+
+export type CommandHomeMarkSeenResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandHomeMarkSeenResponse = CommandHomeMarkSeenResponses[keyof CommandHomeMarkSeenResponses];
+
 export type QuerySystemStatusData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * At
+         */
+        at?: number | null;
+    };
     url: '/api/queries/system.status';
 };
+
+export type QuerySystemStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QuerySystemStatusError = QuerySystemStatusErrors[keyof QuerySystemStatusErrors];
 
 export type QuerySystemStatusResponses = {
     /**
@@ -12659,6 +14390,10 @@ export type QueryDecisionsListData = {
     path?: never;
     query?: {
         /**
+         * At
+         */
+        at?: number | null;
+        /**
          * Project Id
          */
         project_id?: string | null;
@@ -12700,6 +14435,10 @@ export type QueryProjectsListData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * At
+         */
+        at?: number | null;
         /**
          * Include Archived
          */
@@ -12764,6 +14503,10 @@ export type QueryProjectLoopData = {
     body?: never;
     path?: never;
     query: {
+        /**
+         * At
+         */
+        at?: number | null;
         /**
          * Project Id
          */
@@ -13280,6 +15023,36 @@ export type QueryReplayCheckResponses = {
 
 export type QueryReplayCheckResponse = QueryReplayCheckResponses[keyof QueryReplayCheckResponses];
 
+export type QueryRunRecoveryData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/run.recovery';
+};
+
+export type QueryRunRecoveryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRunRecoveryError = QueryRunRecoveryErrors[keyof QueryRunRecoveryErrors];
+
+export type QueryRunRecoveryResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRunRecoveryResult;
+};
+
+export type QueryRunRecoveryResponse = QueryRunRecoveryResponses[keyof QueryRunRecoveryResponses];
+
 export type QueryCatalogData = {
     body?: never;
     path?: never;
@@ -13312,6 +15085,40 @@ export type QueryCatalogDocumentResponses = {
 
 export type QueryCatalogDocumentResponse = QueryCatalogDocumentResponses[keyof QueryCatalogDocumentResponses];
 
+export type QueryHomeAwayReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Range
+         */
+        range?: 'since_seen' | '24h' | '7d';
+        /**
+         * Project
+         */
+        project?: string | null;
+    };
+    url: '/api/queries/home.away_report';
+};
+
+export type QueryHomeAwayReportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryHomeAwayReportError = QueryHomeAwayReportErrors[keyof QueryHomeAwayReportErrors];
+
+export type QueryHomeAwayReportResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotAwayReport;
+};
+
+export type QueryHomeAwayReportResponse = QueryHomeAwayReportResponses[keyof QueryHomeAwayReportResponses];
+
 export type CapabilitiesData = {
     body?: never;
     path?: never;
@@ -13327,6 +15134,62 @@ export type CapabilitiesResponses = {
 };
 
 export type CapabilitiesResponse = CapabilitiesResponses[keyof CapabilitiesResponses];
+
+export type SystemStopData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/system/stop';
+};
+
+export type SystemStopResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ClientUpdateManifestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/client-update/latest.yml';
+};
+
+export type ClientUpdateManifestResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ClientUpdateFileData = {
+    body?: never;
+    path: {
+        /**
+         * Filename
+         */
+        filename: string;
+    };
+    query?: never;
+    url: '/client-update/{filename}';
+};
+
+export type ClientUpdateFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ClientUpdateFileError = ClientUpdateFileErrors[keyof ClientUpdateFileErrors];
+
+export type ClientUpdateFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type EventsData = {
     body?: never;

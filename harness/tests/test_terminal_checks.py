@@ -72,22 +72,6 @@ def test_guidance_written_before_the_failure_commits_keeps_the_run_going(tmp_pat
     assert [item.status for item in stopped.department_guidance] == ["received"]
 
 
-def test_a_prompt_update_does_not_change_the_failure(tmp_path, monkeypatch):
-    system, _adapter, run_id = _retries_exhausted(tmp_path)
-    done = _write_during_terminal(monkeypatch, system,
-                                  lambda: system.update_prompt(run_id, "product", "A revised product prompt"))
-
-    failed = system.activate_once(run_id)
-
-    [writer] = done
-    assert not writer.errors
-    # 提示词不改变激活的依据：重新判断以后仍然以重试用完的原因失败，提示词的修改在失败之前
-    assert failed.phase == "FAILED" and failed.stop_reason == "provider_error"
-    types = _types(system, run_id)
-    assert types.index(EventType.DEPARTMENT_PROMPT_UPDATED) < types.index(EventType.RUN_FAILED)
-    assert types.count(EventType.RUN_FAILED) == 1
-
-
 def test_a_stop_command_written_before_the_failure_commits_leaves_only_the_cancellation(tmp_path, monkeypatch):
     system, _adapter, run_id = _retries_exhausted(tmp_path)
     done = _write_during_terminal(monkeypatch, system, lambda: system.add_input(run_id, "/stop"))

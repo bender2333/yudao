@@ -876,6 +876,7 @@ function parseProviderHtml(html) {
       if (select) {
         if (select._firstOptionValue === undefined) select._firstOptionValue = attrs.value ?? "";
         if ("selected" in attrs) select.value = attrs.value ?? "";
+        (select._options ||= []).push(node);
       }
       continue;
     }
@@ -926,6 +927,7 @@ class ProviderFormData {
     }
   }
   entries() { return this._entries[Symbol.iterator](); }
+  getAll(name) { return this._entries.filter(([key]) => key === name).map(([, value]) => value); }
 }
 
 function loadProviderConfig(fetchImpl) {
@@ -1300,6 +1302,108 @@ test("binding options mark unadmitted models unavailable with the reason visible
   const putCall = calls.find(([url, options]) => url === "/api/department-bindings" && options.method === "PUT");
   assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1" } });
   assert.match(root.innerHTML, /新任务将使用此配置，已有任务保持原配置/);
+});
+
+test("model form declares reasoning levels, default level and mode, and submits them", async () => {
+  const models = [catalogModel("m1", "luna")];
+  const admissions = [catalogAdmission("m1")];
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
+    "/api/catalog/model-test": { ok: true, model_id: "m1", admitted: true },
+    "/api/catalog/connection-save": { revision: 6 },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const modelForm = root.querySelector("[data-pc-form='model']");
+  // 支持档位是全集的多选，声明三项一起编辑；响应式连接只提供 effort
+  const levelFields = modelForm._fields.filter(field => field.name === "reasoning_levels");
+  assert.deepEqual(levelFields.map(field => field.node.attrs.value),
+                   ["minimal", "low", "medium", "high", "xhigh", "max"]);
+  const modeSelect = modelForm._fields.find(field => field.name === "reasoning_mode").node;
+  const modeByValue = Object.fromEntries(modeSelect._options.map(option => [option.attrs.value, option.attrs]));
+  assert.ok(modeByValue.effort, "effort 方式对 Responses 连接可用");
+  assert.ok(!("disabled" in modeByValue.effort));
+  assert.ok("disabled" in modeByValue.adaptive, "adaptive 方式只对 Messages 连接可用");
+  assert.ok("disabled" in modeByValue.budget);
+  // 默认档位的选项来自已勾选的支持档位
+  const defaults = modelForm._fields.find(field => field.name === "default_reasoning_level").node;
+  assert.deepEqual(defaults._options.slice(1).map(option => option.attrs.value), []);
+  levelFields.find(field => field.node.attrs.value === "low").node.checked = true;
+  levelFields.find(field => field.node.attrs.value === "medium").node.checked = true;
+  // 勾选以后重新渲染，默认档位与参数方式的选项随之出现
+  await levelFields.find(field => field.node.attrs.value === "low").node.dispatch("change");
+  const refreshed = root.querySelector("[data-pc-form='model']");
+  const refreshedDefaults = refreshed._fields.find(field => field.name === "default_reasoning_level").node;
+  assert.deepEqual(refreshedDefaults._options.slice(1).map(option => option.attrs.value), ["low", "medium"]);
+  refreshedDefaults.value = "low";
+  refreshed._fields.find(field => field.name === "reasoning_mode").node.value = "effort";
+  await root.querySelector("[data-pc-form='model']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => url === "/api/providers/p1" && options.method === "PUT");
+  const saved = JSON.parse(putCall[1].body).models.find(item => item.id === "m1");
+  assert.deepEqual(saved.reasoning_levels, ["low", "medium"]);
+  assert.equal(saved.default_reasoning_level, "low");
+  assert.equal(saved.reasoning_mode, "effort");
+});
+
+test("binding exposes the request tier from the model declaration and saves it", async () => {
+  const models = [catalogModel("m1", "luna", { reasoning_levels: ["low", "medium"], default_reasoning_level: "low", reasoning_mode: "effort" })];
+  const admissions = [catalogAdmission("m1")];
+  const bindings = { product: { provider_id: "p1", model_id: "m1", requested_tier: "low" } };
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings }),
+    "/api/department-bindings": () => ({ bindings }),
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const tierSelect = root.querySelector("[data-pc-binding-tier='product']");
+  assert.deepEqual(tierSelect._options.map(option => option.attrs.value), ["", "low", "medium"]);
+  assert.ok("selected" in tierSelect._options[1].attrs);
+  await root.querySelector("[data-pc-form='bindings']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => url === "/api/department-bindings" && options.method === "PUT");
+  assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1", requested_tier: "low" } });
+});
+
+test("binding keeps a saved tier that the current model does not declare", async () => {
+  // 保存时只核对请求档位属于档位全集（#87）：部门默认换成支持档位不含原请求档位的模型以后，
+  // 下拉保留这一项并写明按模型限制，保存时原档位照旧提交
+  const models = [catalogModel("m1", "luna", { reasoning_levels: ["low"], default_reasoning_level: "low", reasoning_mode: "effort" })];
+  const admissions = [catalogAdmission("m1")];
+  const bindings = { product: { provider_id: "p1", model_id: "m1", requested_tier: "high" } };
+  const { calls, fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings }),
+    "/api/department-bindings": () => ({ bindings }),
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const tierSelect = root.querySelector("[data-pc-binding-tier='product']");
+  assert.deepEqual(tierSelect._options.map(option => option.attrs.value), ["", "low", "high"]);
+  assert.ok("selected" in tierSelect._options[2].attrs);
+  assert.match(root.innerHTML, /超出当前模型支持档位，按模型限制/);
+  await root.querySelector("[data-pc-form='bindings']").dispatch("submit");
+  const putCall = calls.find(([url, options]) => url === "/api/department-bindings" && options.method === "PUT");
+  assert.deepEqual(JSON.parse(putCall[1].body), { product: { provider_id: "p1", model_id: "m1", requested_tier: "high" } });
+});
+
+test("binding tier select is disabled when the model declares no reasoning levels", async () => {
+  const models = [catalogModel("m1", "luna")];
+  const admissions = [catalogAdmission("m1")];
+  const { fetchImpl } = providerFetch({
+    "/api/provider-presets": { revision: "v1", presets: [] },
+    "/api/providers": () => catalogView({ revision: 5, models, admissions, bindings: { product: { provider_id: "p1", model_id: "m1" } } }),
+    "/api/department-bindings": { bindings: { product: { provider_id: "p1", model_id: "m1" } } },
+  });
+  const config = loadProviderConfig(fetchImpl);
+  const root = providerRoot();
+  await config.mount(root);
+  const tierSelect = root.querySelector("[data-pc-binding-tier='product']");
+  assert.ok("disabled" in tierSelect.attrs);
+  assert.match(root.innerHTML, /该模型未声明推理档位，请求不带推理参数/);
 });
 
 test("readiness gap chip jumps to the missing credential field", async () => {

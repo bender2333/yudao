@@ -3,6 +3,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, ProjectEventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 
@@ -25,7 +26,8 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects.rename(project_id, "载荷核对")
     projects.set_goal(project_id, "核对修改以后的长期目标")
     projects.pin(project_id, True)
-    projects.configure_prompt(project_id, "engineering", "先写计划再写代码。", 0)
+    projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)
     projects.configure_command(project_id, "unit-tests", ["python", "-m", "unittest"], args=["-v"])
     projects.record_material(project_id, "一段原文", department="product")
     projects.record_material(project_id, "不属于部门的原文")

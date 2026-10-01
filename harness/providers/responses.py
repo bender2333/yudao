@@ -33,6 +33,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
+from .reasoning import responses_reasoning
 from .resolve import FrozenTarget
 from .tls import certificate_verification_failed, service_address, ssl_context
 
@@ -449,6 +450,8 @@ class _ResponsesInvoker:
     ) -> InvokeResult:
         provider_input = invocation.provider_input
         output_limit = {} if provider_input.max_output_tokens is None else {"max_output_tokens": provider_input.max_output_tokens}
+        # 推理参数（#87）：effort 方式发送 reasoning.effort，档位是冻结目标里的实际发送档位
+        reasoning = responses_reasoning(invocation.frozen_target)
         try:
             stream = await _created_stream(client.responses.create(
                 model=invocation.config.model,
@@ -459,6 +462,7 @@ class _ResponsesInvoker:
                 store=False,
                 stream=True,
                 **output_limit,
+                **({} if reasoning is None else {"reasoning": reasoning}),
             ), trace)
         except Exception:
             if observation_errors:

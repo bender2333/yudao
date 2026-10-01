@@ -154,13 +154,13 @@ def test_command_registration_save_and_department_settings_save(data_dir):
         # department_settings.save：基准版本是部门设置的版本，初次为 0
         prompt_stale = client.post("/api/commands/department_settings.save", json={
             "command_id": str(uuid.uuid4()), "base_version": 99, "project_id": project_id,
-            "department": "product", "text": "产品原则"})
+            "department": "product", "department_prompt": "产品原则"})
         assert prompt_stale.status_code == 409 and prompt_stale.json()["reason"] == "stale_base"
         assert prompt_stale.json()["current_version"] == 0
 
         prompt_ok = client.post("/api/commands/department_settings.save", json={
             "command_id": str(uuid.uuid4()), "base_version": 0, "project_id": project_id,
-            "department": "product", "text": "产品原则"})
+            "department": "product", "department_prompt": "产品原则"})
         assert prompt_ok.status_code == 200
 
         # command_registration.save：基准版本是该登记命令的版本，初次为 0
