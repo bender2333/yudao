@@ -10,7 +10,8 @@
     },
     {
       "id": "quality",
-      "roles": ["quality"]
+      "roles": ["quality"],
+      "suggested_capabilities": ["image"]
     }
   ],
   "rules": {

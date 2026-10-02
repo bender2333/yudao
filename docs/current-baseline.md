@@ -95,7 +95,7 @@
 | 项目流跨版本保存与升级排空 | 3.1 的版本规则（[ADR-0019](adr/0019-project-stream-across-versions.md)） | 3.1 按 run 事件版本核对 |
 | Go 所需三协议与统一 Provider | 2.7，已于 2026-09-20 关闭（[执行报告](archive/stage-2-7-provider-report.md)） | 不阻塞；2026-09-26 核对后 #2 至 #5 关闭（预置表的 Go 请求基址已改正，`import harness.providers` 不再加载内核模块）；#7 已关闭，Anthropic Messages 的真实工具往返由 Stage 3 D24 工作包的真实 Provider 验收（#96）检验，#96 覆盖三种协议；推理设置属于 Stage 3 的 D24 工作包（#83） |
 | 执行环境服务（远程执行代理） | Stage 3 后续独立包（3.2C，[ADR-0018](adr/0018-single-control-host-remote-execution.md)、[ADR-0022](adr/0022-run-directly-without-containers.md)） | 不阻塞 3.1；依赖 3.1 的动作核实与 #110，3.2B、3.2D 只依赖它的合同（#128） |
-| 网络/MCP | Stage 3 后续独立包（3.2B） | 按对应能力依赖推进 |
+| 网络/MCP | Stage 3 后续独立包（3.2B，设计 2026-10-01 已确认，[设计说明](design/network-and-mcp.md)） | 按对应能力依赖推进 |
 | 运维、长时间运行 | Stage 4 运维部门与长时间运行 | 不阻塞通用工具与单机恢复 |
 | 技能、部门内多角色 | Stage 5 | 不阻塞通用工具与单机恢复 |
 | 学习与系统演化 | 持续改进工作线、Stage 6 | 不阻塞通用工具与单机恢复 |

@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from . import capabilities
 from .presets import USER_AGENT, preset_models_url
 from .store import ProviderDefinition
 from .tls import certificate_verification_failed, service_address, ssl_context
@@ -42,7 +43,7 @@ def refresh_candidates(
     except ValueError:
         return _unknown(provider, source_url, fetched_at, "模型列表不是合法 JSON")
     try:
-        candidates = _parse_candidates(payload)
+        candidates = _parse_candidates(payload, provider.preset_id)
     except ValueError as exc:
         return _unknown(provider, source_url, fetched_at, str(exc))
     if not candidates:
@@ -106,7 +107,11 @@ def _effective_models_url(provider: ProviderDefinition, override: str | None = N
     return preset_models_url(provider.preset_id)
 
 
-def _parse_candidates(payload: Any) -> list[dict[str, Any]]:
+def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
+    # 候选带预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表（来源 models_url），
+    # 其次取模型能力表（来源 capability_table），两处都没有时留空；输入方式取能力表，
+    # 包含 image 时预填文本与图像，不包含 image、能力表没有记录或服务方案为自定义时只有文本。
+    # 不按模型名称推测
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         raise ValueError("模型列表缺少 data 数组")
@@ -120,7 +125,7 @@ def _parse_candidates(payload: Any) -> list[dict[str, Any]]:
         if model_id in seen:
             continue
         seen.add(model_id)
-        # 候选默认只有上游模型 ID；上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项
+        # 上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项，来源是上游模型列表
         candidate: dict[str, Any] = {"id": model_id}
         limits = item.get("limit") if isinstance(item, dict) else None
         if isinstance(limits, Mapping):
@@ -128,8 +133,20 @@ def _parse_candidates(payload: Any) -> list[dict[str, Any]]:
             output = limits.get("output")
             if isinstance(window, int) and not isinstance(window, bool) and window > 0:
                 candidate["context_window"] = window
+                candidate["context_window_source"] = "models_url"
             if isinstance(output, int) and not isinstance(output, bool) and output > 0:
                 candidate["max_output_tokens"] = output
+                candidate["max_output_tokens_source"] = "models_url"
+        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+        for field in ("context_window", "max_output_tokens"):
+            if field not in candidate and entry is not None and getattr(entry, field) is not None:
+                candidate[field] = getattr(entry, field)
+                candidate[f"{field}_source"] = "capability_table"
+        modalities = ["text"]
+        if entry is not None and "image" in entry.input_modalities:
+            modalities = ["text", "image"]
+        candidate["input_modalities"] = modalities
+        candidate["input_modalities_source"] = "capability_table" if entry is not None else "default"
         candidates.append(candidate)
     candidates.sort(key=lambda entry: entry["id"])
     return candidates

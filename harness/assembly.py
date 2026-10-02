@@ -63,6 +63,8 @@ class PinnedStep:
     guidance: list[DepartmentGuidance]
     events: list[Event]
     snapshot_hash: str
+    # 调用目标的输入方式（设计说明第 5.6 节）：装配请求的工具定义时按它决定提供哪些工具
+    input_modalities: tuple[str, ...]
     context: AssembledContext
 
     @property
@@ -140,7 +142,8 @@ class ContextAssembly:
         return records
 
     def pin(self, projection: RunProjection, frame: StepFrame, limits: ModelLimits, *, step_id: int,
-            events: list[Event], snapshot_hash: str) -> PinnedStep:
+            events: list[Event], snapshot_hash: str,
+            input_modalities: tuple[str, ...] = ("text",)) -> PinnedStep:
         # 装配这一步的固定部分。待处理指导的原文只在激活第一步交给部门；
         # guidance_results 按给定的事件与工作区快照计算
         guidance = pending_guidance(projection, frame.department) if step_id == 1 else []
@@ -149,8 +152,10 @@ class ContextAssembly:
             activation_id=frame.activation_id, step_id=step_id, prompt=frame.prompt,
             context_window=limits.context_window, max_output_tokens=limits.output_limit,
             guidance=guidance, guidance_only=frame.guidance_only, events=events, snapshot_hash=snapshot_hash,
+            input_modalities=input_modalities,
         )
-        return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash, context)
+        return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash,
+                          input_modalities, context)
 
     def request(self, pinned: PinnedStep, history: list[dict[str, Any]]) -> StepRequest:
         # 在固定部分之后接上部门历史：按激活采用的版本取最近一次压缩的检查点，
@@ -172,6 +177,7 @@ class ContextAssembly:
                 context_window=limits.context_window, max_output_tokens=limits.output_limit,
                 guidance=pinned.guidance, guidance_only=frame.guidance_only,
                 events=pinned.events, snapshot_hash=pinned.snapshot_hash,
+                input_modalities=pinned.input_modalities,
             )
         payload: dict[str, Any] = {"input": context.input_items, "tools": context.tools}
         if context.manifest.max_output_tokens is not None:

@@ -89,6 +89,15 @@ def usable_when_guidance_only(name: str) -> bool:
     return tool is not None and tool.guidance_only
 
 
+def offers_with_input(tool_names: list[str], input_modalities: tuple[str, ...]) -> list[str]:
+    # 这次请求提供的工具：按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具
+    # （设计说明第 5.6 节「请求时」；浏览器设计第 6.1 节的屏幕工具与 browser_take_screenshot 属于这一类）
+    if "image" in input_modalities:
+        return list(tool_names)
+    return [name for name in tool_names
+            if not (name in DEFINITIONS.tools and DEFINITIONS.tools[name].requires_image_input)]
+
+
 def tool_definitions(tool_names: list[str]) -> list[dict[str, Any]]:
     # 请求中提供给模型的工具：名称、描述与参数（参数是普通的 JSON 结构，按定义中的键顺序）
     return [{"name": name, "description": DEFINITIONS.tools[name].description,

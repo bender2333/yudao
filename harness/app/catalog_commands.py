@@ -12,7 +12,7 @@ from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
 from ..models import CatalogEventType
-from ..providers import CatalogValidationError, ProviderError, SUPPORTED_PROTOCOLS
+from ..providers import CatalogValidationError, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
@@ -48,6 +48,9 @@ class ModelInput(Contract):
     capability_source: str = ""
     capacity_confirmed: bool = False
     accepts_required_tool_call: bool = True
+    # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
+    # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
+    input_modalities: list[Literal["text", "image"]] = ["text"]
     # 推理档位声明（#87）：三项一起声明，缺任一项或整体缺省时请求不带推理参数
     reasoning_levels: list[str] = []
     default_reasoning_level: str | None = None
@@ -81,6 +84,10 @@ class CatalogConnectionSave(CommandRequest):
 
 class CatalogConnectionSaveRefs(Contract):
     provider_id: str
+
+class CatalogDepartmentDefaultsSaveRefs(Contract):
+    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）
+    reminders: list[str] = []
 
 
 class CatalogConnectionDelete(CommandRequest):
@@ -147,8 +154,10 @@ def _register(application: Application, command: Command) -> None:
 
 
 def _revised(application: Application, command: Command, operation: str, before: int, after: int,
-             *, provider_id: str | None) -> None:
-    payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id}
+             *, provider_id: str | None, reminders: list[str] | None = None) -> None:
+    # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件一起保存，接受结果重新计算时能得到同样的值
+    payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id,
+               "reminders": list(reminders or ())}
     application.system.writes.transact(catalog_stream(), lambda transaction: transaction.append(
         NewCatalogEvent(CatalogEventType.CATALOG_REVISED, payload)), command=command)
 
@@ -173,6 +182,20 @@ def _check_not_registered(application: Application, command: Command) -> None:
     # 已经登记过的命令身份不再执行（内容相同 → DuplicateCommand，不同 → CommandIdReused）：
     # 修改 Provider 目录或凭据之前先核对，重复提交不会把目录、目录文件与 .env 再改一遍
     application.system.store.check_command(command)
+
+def _binding_reminders(application: Application) -> list[str]:
+    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
+    # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
+    facade = application.system.facade
+    view = facade.providers_view()
+    models = {item["id"]: item for item in view["models"]}
+    notes: list[str] = []
+    for department, binding in view["bindings"].items():
+        model = models.get(binding.get("model_id") or "")
+        if model is None:
+            continue
+        notes.extend(suggested.reminders(department, model))
+    return notes
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +284,8 @@ async def _save_department_defaults(application: Application, command: Command,
     if after == before:
         _register(application, command)
         return
-    _revised(application, command, "department_defaults", before, after, provider_id=None)
+    _revised(application, command, "department_defaults", before, after, provider_id=None,
+             reminders=_binding_reminders(application))
 
 
 async def _reload(application: Application, command: Command, request: CatalogReload) -> None:
@@ -470,8 +494,10 @@ CATALOG_MODEL_TEST = CommandDefinition(
     derive_refs=lambda _events: NoRefs(), reasons=("not_found",),
 )
 CATALOG_DEPARTMENT_DEFAULTS_SAVE = CommandDefinition(
-    name="catalog.department_defaults.save", request=CatalogDepartmentDefaultsSave, refs=NoRefs,
-    handle=_save_department_defaults, derive_refs=lambda _events: NoRefs(),
+    name="catalog.department_defaults.save", request=CatalogDepartmentDefaultsSave,
+    refs=CatalogDepartmentDefaultsSaveRefs, handle=_save_department_defaults,
+    derive_refs=lambda events: CatalogDepartmentDefaultsSaveRefs(
+        reminders=list(events[-1].payload.get("reminders") or ())),
     reasons=("stale_base", "catalog_invalid"),
 )
 CREDENTIAL_SET = CommandDefinition(

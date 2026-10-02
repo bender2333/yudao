@@ -53,6 +53,8 @@ class FrozenTarget:
     capability_source: str = ""
     # 模型访问定义声明的是否接受要求调用工具（#102）
     accepts_required_tool_call: bool = True
+    # 模型访问定义声明的输入方式（设计说明第 4.3 节）：步骤驱动按它决定这次请求提供的工具（第 5.6 节）
+    input_modalities: tuple[str, ...] = ("text",)
     # 推理档位声明（ADR-0006）与本次请求实际发送的档位；未声明档位时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
     default_reasoning_level: str | None = None
@@ -80,6 +82,7 @@ class FrozenTarget:
             "credential_ref": self.credential_ref,
             "capability_source": self.capability_source,
             "accepts_required_tool_call": self.accepts_required_tool_call,
+            "input_modalities": list(self.input_modalities),
             "reasoning_levels": list(self.reasoning_levels),
             "default_reasoning_level": self.default_reasoning_level,
             "reasoning_mode": self.reasoning_mode,
@@ -169,6 +172,7 @@ def resolve_snapshot(
             credential_ref=provider.credential_ref or None,
             capability_source=model.capability_source,
             accepts_required_tool_call=model.accepts_required_tool_call,
+            input_modalities=model.input_modalities,
             reasoning_levels=model.reasoning_levels,
             default_reasoning_level=model.default_reasoning_level,
             reasoning_mode=model.reasoning_mode,
@@ -246,6 +250,7 @@ def call_target_public(
         "context_window": None if model is None else model.context_window,
         "configured_max_output_tokens": None if model is None else model.max_output_tokens,
         "accepts_required_tool_call": None if model is None else model.accepts_required_tool_call,
+        "input_modalities": [] if model is None else list(model.input_modalities),
         "reasoning_levels": [] if model is None else list(model.reasoning_levels),
         "default_reasoning_level": None if model is None else model.default_reasoning_level,
         "reasoning_mode": None if model is None else (model.reasoning_mode or None),
@@ -340,6 +345,7 @@ def resolve_call_target(
         credential_ref=provider.credential_ref or None,
         capability_source=model.capability_source,
         accepts_required_tool_call=model.accepts_required_tool_call,
+        input_modalities=model.input_modalities,
         reasoning_levels=model.reasoning_levels,
         default_reasoning_level=model.default_reasoning_level,
         reasoning_mode=model.reasoning_mode,

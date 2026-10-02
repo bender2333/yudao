@@ -39,6 +39,7 @@ from .resolve import (
 )
 from .responses import ProviderConnections
 from .selection import ModelSelection, merge_selection
+from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
@@ -608,6 +609,42 @@ class ProviderFacade:
                 if not admission_is_current(record, model, provider):
                     raise CatalogValidationError((ValidationIssue(
                         f"departments.{department}.model_id", "该模型访问定义的准入已作废，请重新执行模型测试"),))
+
+    def project_department_reminders(
+            self, departments: Mapping[str, Mapping[str, Any] | None]) -> dict[str, list[str]]:
+        # 项目各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）。
+        # 生效模型按第 5.3 节的顺序解析：项目部门设置写入了模型时用它，否则用部门默认
+        notes: dict[str, list[str]] = {}
+        for department, project_setting in departments.items():
+            model_id = (project_setting or {}).get("model_id")
+            if not model_id:
+                with self._lock:
+                    model_id = (self._bindings.get(str(department)) or {}).get("model_id")
+            notes[department] = self.model_reminders(str(model_id) if model_id else None, department)
+        return notes
+
+    def model_reminders(self, model_id: str | None, department: str) -> list[str]:
+        # 一个模型访问定义在指定部门下的建议能力提醒（设计说明第 5.6 节）。
+        # 模型管理页与项目部门设置按各自的生效模型引用调用；没有绑定模型或模型不存在时没有提醒
+        if not model_id:
+            return []
+        with self._lock:
+            model = self._store.models.get(model_id)
+            return [] if model is None else _suggested_reminders(department, model)
+
+    def department_setting_reminders(self, department: str,
+                                     project: ModelSelection | Mapping[str, Any] | None,
+                                     ) -> list[str]:
+        # 项目部门设置写入的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
+        # 没有写入模型的设置不检查；提醒只按模型访问定义中的输入方式判断
+        selection = _as_selection(project)
+        if selection is None or not selection.writes_model():
+            return []
+        with self._lock:
+            model = self._store.models.get(selection.model_id or "")
+            if model is None:
+                return []
+            return _suggested_reminders(department, model)
 
     def bind_call_key(self, handle_id: str, call_key: str) -> None:
         # 把已解析的目标改挂到这次逻辑调用的身份上；重试沿用同一身份，凭据材料仍留在 Provider 模块
