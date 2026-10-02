@@ -100,6 +100,13 @@ class CatalogDocumentSave(CommandRequest):
     document: CatalogDocumentInput
 
 
+class CatalogModelRemove(CommandRequest):
+    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方（设计说明第 4.5 节）
+    base_version: int
+    provider_id: Text
+    model_id: Text
+
+
 class CatalogReload(CommandRequest):
     base_version: int
 
@@ -183,6 +190,31 @@ def _check_not_registered(application: Application, command: Command) -> None:
     # 修改 Provider 目录或凭据之前先核对，重复提交不会把目录、目录文件与 .env 再改一遍
     application.system.store.check_command(command)
 
+
+def _project_model_referrers(application: Application, model_id: str) -> list[str]:
+    # 各项目的项目部门设置中引用这条模型访问定义的引用方（设计说明第 4.5 节：与部门默认同样拒绝）。
+    # 项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
+    referrers: list[str] = []
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            if project.department_settings[department].model_id == model_id:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
+
+def _project_provider_referrers(application: Application, provider_id: str) -> list[str]:
+    # 各项目的项目部门设置中引用这份 Provider 配置的引用方：直接指向它，或指向它下面的定义。
+    # 与 _project_model_referrers 同理，项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
+    definition_ids = {item["model_id"] for item in
+                      application.system.facade.deletable_definitions(provider_id)}
+    referrers: list[str] = []
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            setting = project.department_settings[department]
+            if setting.provider_id == provider_id or setting.model_id in definition_ids:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
 def _binding_reminders(application: Application) -> list[str]:
     # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
     # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
@@ -228,7 +260,8 @@ async def _delete_connection(application: Application, command: Command, request
     before = facade.catalog_revision()
     previous = facade.to_document()
     try:
-        facade.delete_provider(request.provider_id)
+        facade.delete_provider(request.provider_id,
+                               _project_provider_referrers(application, request.provider_id))
     except CatalogValidationError as exc:
         if any("不存在" in issue.message for issue in exc.issues):
             raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
@@ -239,6 +272,29 @@ async def _delete_connection(application: Application, command: Command, request
     if problem is not None:
         raise Rejection("catalog_invalid", problem)
     _revised(application, command, "delete_connection", before, after, provider_id=request.provider_id)
+
+
+async def _remove_model(application: Application, command: Command, request: CatalogModelRemove) -> None:
+    facade = application.system.facade
+    _check_not_registered(application, command)
+    _stale_base(facade, request.base_version)
+    before = facade.catalog_revision()
+    previous = facade.to_document()
+    try:
+        facade.remove_model(request.provider_id, request.model_id,
+                            _project_model_referrers(application, request.model_id))
+    except CatalogValidationError as exc:
+        if any("不存在" in issue.message for issue in exc.issues):
+            raise Rejection("not_found", f"模型访问定义不存在：{request.model_id}")
+        if any("仍被引用" in issue.message for issue in exc.issues):
+            referrers = [issue.location for issue in exc.issues]
+            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(referrers))
+        raise Rejection("catalog_invalid", str(exc))
+    after = facade.catalog_revision()
+    problem = facade.persist_catalog(previous)
+    if problem is not None:
+        raise Rejection("catalog_invalid", problem)
+    _revised(application, command, "remove_model", before, after, provider_id=request.provider_id)
 
 
 async def _save_document(application: Application, command: Command, request: CatalogDocumentSave) -> None:
@@ -258,6 +314,9 @@ async def _save_document(application: Application, command: Command, request: Ca
     try:
         facade.replace_catalog_document(document)
     except CatalogValidationError as exc:
+        if any("仍被引用" in issue.message for issue in exc.issues):
+            referrers = [issue.location for issue in exc.issues]
+            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(referrers))
         raise Rejection("catalog_invalid", str(exc))
     after = facade.catalog_revision()
     problem = facade.persist_catalog(previous)
@@ -473,9 +532,14 @@ CATALOG_CONNECTION_DELETE = CommandDefinition(
     handle=_delete_connection, derive_refs=lambda _events: NoRefs(),
     reasons=("stale_base", "not_found", "in_use"),
 )
+CATALOG_MODEL_REMOVE = CommandDefinition(
+    name="catalog.model.remove", request=CatalogModelRemove, refs=NoRefs, handle=_remove_model,
+    derive_refs=lambda _events: NoRefs(),
+    reasons=("stale_base", "not_found", "in_use", "catalog_invalid"),
+)
 CATALOG_DOCUMENT_SAVE = CommandDefinition(
     name="catalog.document.save", request=CatalogDocumentSave, refs=NoRefs, handle=_save_document,
-    derive_refs=lambda _events: NoRefs(), reasons=("stale_base", "catalog_invalid"),
+    derive_refs=lambda _events: NoRefs(), reasons=("stale_base", "catalog_invalid", "in_use"),
 )
 CATALOG_RELOAD = CommandDefinition(
     name="catalog.reload", request=CatalogReload, refs=NoRefs, handle=_reload,
