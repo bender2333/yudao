@@ -134,7 +134,7 @@ Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](
    - Stage 3 末手动检查（#173）的方法随之确定。
    - 已知的工具事实见[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)第 1.4 节。
 4. **3.2B 网络与 MCP**：2026-10-01 已确定，见[决策记录](../decision.md)同日「网络取回与 MCP 工具」一条、[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)、[D36](network-and-mcp.md)与[设计说明](../design/network-and-mcp.md)。
-5. **M1 试用时桌面客户端的打包与安装**：2026-10-01 已确定，见[决策记录](../decision.md)同日「桌面客户端的打包、安装与发布」一条、[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)与[设计说明](../design/client-packaging-and-release.md)。遗留一项：局域网访问方式怎样启用（给开发板提供安装包要求 Yudao 服务以局域网访问方式运行，而客户端自动启动的服务默认是本机访问方式），M3 试用之前确定。
+5. **M1 试用时桌面客户端的打包与安装**：2026-10-01 已确定，见[决策记录](../decision.md)同日「桌面客户端的打包、安装与发布」一条、[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)与[设计说明](../design/client-packaging-and-release.md)。局域网访问方式的开启 2026-10-02 确定：客户端「本机」一项的开关「允许局域网访问」决定启动参数，见决策记录同日「局域网访问方式的开启」一条与设计说明第 4.3 节。
 6. **声明可以重复的动作，结果未知时是否自动重新执行**：2026-10-02 已确定，见[决策记录](../decision.md)同日「结果未知的动作自动核实与自动重新执行」一条与[恢复契约](../design/recovery-contract-and-fault-matrix.md)第 4 节：可以重复的动作自动重新执行一次，文件工具按动作前的快照自动核实，仍然未知时交给用户；登记的命令增加「可以重新执行」（#242）。
 
 以后阶段的讨论：
