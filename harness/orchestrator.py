@@ -1037,6 +1037,7 @@ class Orchestrator:
             "configured_max_output_tokens": None,
             "selection_source": None,
             "accepts_required_tool_call": None,
+            "input_modalities": [],
             "reasoning_levels": [],
             "default_reasoning_level": None,
             "reasoning_mode": None,

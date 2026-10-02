@@ -24,6 +24,25 @@ export type AcceptedCatalogConnectionSaveRefs = {
 };
 
 /**
+ * Accepted[CatalogDepartmentDefaultsSaveRefs]
+ */
+export type AcceptedCatalogDepartmentDefaultsSaveRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: CatalogDepartmentDefaultsSaveRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
  * Accepted[DecisionRefs]
  */
 export type AcceptedDecisionRefs = {
@@ -36,6 +55,25 @@ export type AcceptedDecisionRefs = {
      */
     position: number;
     refs: DecisionRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
+ * Accepted[DepartmentSettingsSaveRefs]
+ */
+export type AcceptedDepartmentSettingsSaveRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: DepartmentSettingsSaveRefs;
     /**
      * Duplicate
      */
@@ -478,6 +516,10 @@ export type CallTarget = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -548,6 +590,7 @@ export type Catalog = {
      */
     reload_error: string | null;
     presets: CatalogPresets;
+    capability_table: CatalogCapabilityTable;
     /**
      * Providers
      */
@@ -565,6 +608,12 @@ export type Catalog = {
      */
     bindings: {
         [key: string]: CatalogBinding;
+    };
+    /**
+     * Department Reminders
+     */
+    department_reminders: {
+        [key: string]: Array<string>;
     };
 };
 
@@ -652,6 +701,32 @@ export type CatalogCandidatesCollect = {
      * Models Url
      */
     models_url?: string | null;
+};
+
+/**
+ * CatalogCapabilityTable
+ */
+export type CatalogCapabilityTable = {
+    /**
+     * Revision
+     */
+    revision: string;
+    /**
+     * Snapshot Date
+     */
+    snapshot_date: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Presets
+     */
+    presets: {
+        [key: string]: Array<{
+            [key: string]: unknown;
+        }>;
+    };
 };
 
 /**
@@ -770,6 +845,16 @@ export type CatalogDepartmentDefaultsSave = {
 };
 
 /**
+ * CatalogDepartmentDefaultsSaveRefs
+ */
+export type CatalogDepartmentDefaultsSaveRefs = {
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
+};
+
+/**
  * CatalogDocument
  */
 export type CatalogDocument = {
@@ -866,6 +951,10 @@ export type CatalogModel = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Reasoning Levels
      */
@@ -1420,6 +1509,16 @@ export type DepartmentSettingsSave = {
 };
 
 /**
+ * DepartmentSettingsSaveRefs
+ */
+export type DepartmentSettingsSaveRefs = {
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
+};
+
+/**
  * DepartmentWorkspaceResult
  */
 export type DepartmentWorkspaceResult = {
@@ -1545,6 +1644,10 @@ export type DocumentModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Input Modalities
+     */
+    input_modalities?: Array<'text' | 'image'>;
     /**
      * Reasoning Levels
      */
@@ -1913,6 +2016,10 @@ export type ModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Input Modalities
+     */
+    input_modalities?: Array<'text' | 'image'>;
     /**
      * Reasoning Levels
      */
@@ -2416,6 +2523,12 @@ export type ProjectSettingsResult = {
      */
     source_directories: {
         [key: string]: SourceDirectorySetting;
+    };
+    /**
+     * Department Reminders
+     */
+    department_reminders: {
+        [key: string]: Array<string>;
     };
 };
 
@@ -3991,6 +4104,10 @@ export type ActionVerifiedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -4734,6 +4851,10 @@ export type CatalogRevisedPayload = {
      * Provider Id
      */
     provider_id: string | null;
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
 };
 
 /**
@@ -5569,6 +5690,10 @@ export type CompactionRecordedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -5834,6 +5959,10 @@ export type ContextAssembledPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -7395,6 +7524,10 @@ export type DepartmentSettingsConfiguredPayload = {
      */
     department_prompt?: string | null;
     department_prompt_ref?: ArtifactRef | null;
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
 };
 
 /**
@@ -7954,6 +8087,10 @@ export type ModelAttemptFailedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8238,6 +8375,10 @@ export type ModelAttemptFinishedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8500,6 +8641,10 @@ export type ModelMessagePayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8725,6 +8870,10 @@ export type ModelRequestSerializedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -8955,6 +9104,10 @@ export type ModelRequestedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -9204,6 +9357,10 @@ export type ModelRetryScheduledPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -12028,6 +12185,10 @@ export type ToolCallResult = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -12331,6 +12492,10 @@ export type ToolSkippedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -12786,6 +12951,10 @@ export type UsageCharge = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -13827,7 +13996,7 @@ export type CommandDepartmentSettingsSaveResponses = {
     /**
      * Successful Response
      */
-    200: AcceptedNoRefs;
+    200: AcceptedDepartmentSettingsSaveRefs;
 };
 
 export type CommandDepartmentSettingsSaveResponse = CommandDepartmentSettingsSaveResponses[keyof CommandDepartmentSettingsSaveResponses];
@@ -14146,7 +14315,7 @@ export type CommandCatalogDepartmentDefaultsSaveResponses = {
     /**
      * Successful Response
      */
-    200: AcceptedNoRefs;
+    200: AcceptedCatalogDepartmentDefaultsSaveRefs;
 };
 
 export type CommandCatalogDepartmentDefaultsSaveResponse = CommandCatalogDepartmentDefaultsSaveResponses[keyof CommandCatalogDepartmentDefaultsSaveResponses];

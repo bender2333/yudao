@@ -98,6 +98,9 @@ class Department(_Definition):
     id: Identifier
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
+    # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
+    # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
+    suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
 
 
 class OrganizationRules(_Definition):
@@ -133,6 +136,9 @@ class Tool(_Definition):
     repeatable: bool = False
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
+    # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时
+    # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
+    requires_image_input: bool = False
     # 许可规则：因待处理指导被提前安排、只能回应指导的激活可以使用
     guidance_only: bool
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -303,6 +309,13 @@ class Definitions(_Definition):
     def role(self, department: str) -> Role:
         # 部门的角色（现在每个部门一个角色，编号与部门相同）
         return self.roles[department]
+
+    def suggested_capabilities(self, department: str) -> tuple[str, ...]:
+        # 部门的建议能力（设计说明第 5.6 节）：部门内的角色继承部门的建议能力
+        for item in self.organization.departments:
+            if item.id == department:
+                return item.suggested_capabilities
+        raise ValueError(f"unknown department {department!r}")
 
     def work_item(self, kind: str) -> WorkItemKind:
         # 事项种类的定义；普通事项没有部门说明与阶段迁移，沿用 roles.json
