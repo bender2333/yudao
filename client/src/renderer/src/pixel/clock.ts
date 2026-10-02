@@ -26,6 +26,11 @@ export interface Clock {
   reset(): void;
   /** 停止推进并释放资源。 */
   destroy(): void;
+  /**
+   * 让本次推进中新建的补间立刻落到当前时间上。
+   * 回调里建立的补间（走动、包裹移动）需要它：位置要与「推进到第几毫秒」一致，不能等下一帧。
+   */
+  reapply(): void;
 }
 
 type Listener = (elapsedMs: number, deltaMs: number) => void;
@@ -90,6 +95,9 @@ export function createManualClock(): Clock & { advance(toMs: number): void } {
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
+    reapply() {
+      seek(now / 1000);
+    },
     tween(target, vars) {
       if (destroyed) throw new Error("时钟已释放");
       return ctx.add ? (ctx.add(() => gsap.to(target, vars)) as unknown as GsapTween) : (gsap.to(target, vars) as unknown as GsapTween);
@@ -102,6 +110,8 @@ export function createManualClock(): Clock & { advance(toMs: number): void } {
       // 根时间是「推进到的毫秒数」，补间位置只由它决定
       seek(now / 1000);
       for (const fn of [...listeners]) fn(now, delta);
+      // 回调里新建的补间要立刻落到「推进到的毫秒数」上，位置才与经过时间对得上
+      seek(now / 1000);
     },
     reset() {
       rewind();
@@ -153,6 +163,10 @@ export function createRafClock(raf: (cb: (t: number) => void) => number, now: ()
     },
     tween(target, vars) {
       return gsap.to(target, vars) as unknown as GsapTween;
+    },
+    reapply() {
+      gsap.ticker.time = nowMs / 1000;
+      (gsap.updateRoot as (t: number, force?: boolean) => void)(nowMs / 1000, true);
     },
     reset() {
       start = null;

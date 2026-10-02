@@ -7,6 +7,8 @@ export type Route = {
   workItemId: string | null;
   department: string | null;
   systemPage: string | null;
+  attemptId: string | null;
+  runId: string | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -21,13 +23,19 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
   }
   if (segments[0] === "connect") {
     route.name = "connect";
+    return route;
+  }
+  // 客户端自己的设置页：连接设置、本机服务与登录时启动（设计说明第 4.3、4.5 节）。
+  // 名字与项目设置页（#/p/<项目>/settings）分开，两个页面不互相顶替
+  if (segments[0] === "settings") {
+    route.name = "client-settings";
     return route;
   }
   // 动作图鉴：只在开发时使用，不进入正式的页面入口（页签、侧栏与 paths 里都没有它）
@@ -54,7 +62,10 @@ export function parseRoute(hash: string): Route {
       return route;
     }
     if (segments[2] === "observe" && segments[3]) {
+      // 观测详情：#/p/{项目}/observe/{请求标识}；run 标识写在参数 r 中，刷新与后退以后仍能直接读取
       route.name = "observe-detail";
+      route.attemptId = segments[3];
+      route.runId = query.get("r");
       return route;
     }
     route.name = segments[2] ?? "overview";
@@ -73,6 +84,20 @@ export const paths = {
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
   materials: (projectId: string) => `#/p/${projectId}/materials`,
   observe: (projectId: string) => `#/p/${projectId}/observe`,
+  // 请求详情：事项范围（w）与 run 标识（r）都写在参数里，刷新、后退与直接输入路径都能读回
+  observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    if (options.runId) {
+      query.set("r", options.runId);
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
+  },
   settings: (projectId: string) => `#/p/${projectId}/settings`,
   sys: (page: string) => `#/sys/${page}`,
+  // 客户端自己的设置页（与项目设置不同：连接设置、本机服务与登录时启动）
+  clientSettings: () => "#/settings",
 };
