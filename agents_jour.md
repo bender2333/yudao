@@ -1179,3 +1179,19 @@ claude-opus-4-5 / 2026-10-03 01:50 / 审查者：#266 第 1 轮审查。规范�
 复测（单进程）：test_issue_266.py 4 passed；test_layers.py + test_openapi_snapshot.py 3 passed；test_issue_91.py、test_catalog_api.py、test_provider_catalog.py、test_startup_reload.py、test_smoke.py、test_issue_266.py 合计 124 passed；前端 test_web_ui.js tests 47 / pass 47 / fail 0。`-m "unit or module"` 为 1706 deselected（#158 登记表尚未合并，按 AGENTS.md「登记表建立以前」的规则执行）。
 
 审查通过：标签 needs-review 改为 review-passed；推送 issue-266，创建 PR #267（https://github.com/bender2333/yudao/pull/267，正文 Closes #266，main ← issue-266）；在工单评论 REVIEW: PASS；worktree 已删除（git 注册移除，残留空目录被会话工作目录占用，会话结束即消失）。
+
+claude-opus-4-6 / 2026-10-03 03:35 / 执行者：#208 客户端安装包与更新页。准备：worktree `C:/project/yudao-worktrees/issue-208`、分支 `issue-208`、标签 ready-for-agent 改为 in-progress；工单正文在 GitHub 上被截断，用 `gh api` 取到完整正文；阻塞项 #79、#206 均 review-passed 已关闭。
+
+阅读：设计说明第 3.3、5.2、5.3、7 节与 ADR-0023；#207 已合并的客户端外壳（主进程 `client/src/main/`、渲染进程 `client/src/renderer/src/`）与端到端装置（`client/tests/e2e/fixtures.ts`、`backend.py`）；#206 的更新源（`harness/app/client_update.py` 的 ReleaseAssets、`create_app(release_assets=...)`、`/client-update/` 路由）。
+
+实现：一、打包——`client/package.json` 加入 electron-updater 6.8.10 与 `build:installer`；`client/electron-builder.config.mjs` 用 JS 配置（NSIS、x64、oneClick、perMachine:false、开始菜单快捷方式、不写 publisherName），appId/产品名/安装包名按环境变量改写；`client/scripts/build-installer.mjs` 构建安装包、blockmap 与 latest.yml，支持 `YUDAO_VERSION` 与 `YUDAO_API_VERSION`（测试构建改写客户端记录的接口版本，构建后还原）。`make-tray-icons.mjs` 增加 256×256 的 `app-icon.png`（electron-builder 要求图标至少 256）。配置文件必须是 JS 或环境变量不能写进 NSIS 字符串——`${env.*}` 在 electron-builder 26 里不被展开，实测报 warning 6000 并把 `PRODUCT_NAME=${env.YUDAO_PRODUCT_NAME}` 原样传给 makensis。
+
+二、更新流程——`client/src/main/update.ts`：`updateFeedUrl`（地址加 `/client-update/`，去掉末尾斜杠）、`describeUpdateError`（404 与 `ERR_UPDATER_CHANNEL_FILE_NOT_FOUND` 归为「控制主机没有提供客户端安装包」）、`configureUpdater`（generic 提供方、autoDownload 关、allowDowngrade 开、allowPrerelease 关、forceDevUpdateConfig）、`runUpdate`（检查、`downloadUpdate` 显式下载——autoDownload 关时 downloadPromise 为 null——、quitAndInstall(true,true) 静默安装并重启）。差分下载失败改完整下载与 SHA-512 校验由 electron-updater 内部完成（AppUpdater.js 第 660 至 730 行），实现在设计说明允许的范围内，未自行重写。IPC 走 `yudao:update:start` 与 `yudao:update:progress`，另有 `yudao:client-version`。
+
+三、更新页——渲染进程 `views/update.tsx` 显示客户端与服务两边的发布版本号与接口版本，按钮「更新客户端」，失败显示原因与「重试」；连接契约 `outdated` 状态增加 serverRelease（来自能力清单 `deployment.version`）。
+
+测试：单元 `client/tests/unit/update.test.js` 7 passed。端到端 `client/tests/e2e/update.spec.ts` 5 passed（真实构建两个测试版本、真实安装 `/S /D=`、真实更新源、真实 electron-updater）：接口版本不同→更新页→更新到版本 2→重新连接不再显示更新页；降级；篡改安装程序→sha512 校验失败→重试、旧版本保持；404→「控制主机没有提供客户端安装包」；更新期间与以后服务保持运行。另外核对 electron-updater 下载的安装程序只有 `:$DATA` 数据流、没有 `Zone.Identifier`，即无 SmartScreen 标记（设计说明第 7 节）。测试构建的安装包缓存在 git 忽略的 `client/tests/e2e/.update-build/`，第二次运行复用。前端 `harness/tests/test_web_ui.js` 47 passed；客户端单元（`node --test tests/unit/*`）108 passed；`test_layers.py` 与 `test_openapi_snapshot.py` 3 passed（先在 `harness/tests/openapi` 与 `client` 各 npm install；本次未改接口合同，快照与生成类型不变）；`-m "unit or module"` 因 #158 登记表未合并而选中 0 项，按 AGENTS.md 的「登记表建立之前」规则运行与改动相关的测试文件。
+
+隔离修正：第一轮运行时发现安装程序的 `--force-run` 启动的那一份客户端用默认用户数据目录，与用户已经安装的那一份共用 `%APPDATA%\yudao-client`（工单验收第 7 项）。原因是 Electron 默认按产品名取 UserData，而打包内的 package.json 只有 `name`。修正：`build-installer.mjs` 用 `extraMetadata.productName` 把产品名写进打包内的 package.json，主进程用 `app.setPath("userData", appData + app.getName())`，测试构建的产品名是 `Yudao-e2e`，因此它的全部实例（含 --force-run）只写 `%APPDATA%\Yudao-e2e`，用户那一份 `Yudao` 不受影响；测试结束按可执行文件路径结束这些实例并删除临时目录。
+
+架构说明：本次没有遇到与现有设计冲突或规范遗漏，未登记 architecture-issues。

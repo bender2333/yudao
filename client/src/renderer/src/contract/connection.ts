@@ -10,7 +10,7 @@ import { effectiveAddress } from "./settings";
 
 export type Connection =
   | { state: "connected"; address: string; capabilities: Capabilities }
-  | { state: "outdated"; address: string; clientVersion: number; serverVersion: number }
+  | { state: "outdated"; address: string; clientVersion: number; serverVersion: number; serverRelease: string }
   | { state: "failed"; address: string; message: string };
 
 // 一次连接建立的接口访问对象：所有查询与命令都经它发出请求，baseUrl 由地址决定
@@ -38,7 +38,8 @@ export async function connect(settings: ConnectionSettings): Promise<Connection>
   }
   const serverVersion = capabilities.deployment.api_version;
   if (serverVersion !== CLIENT_API_VERSION) {
-    return { state: "outdated", address, clientVersion: CLIENT_API_VERSION, serverVersion };
+    return { state: "outdated", address, clientVersion: CLIENT_API_VERSION, serverVersion,
+             serverRelease: capabilities.deployment.version };
   }
   return { state: "connected", address, capabilities };
 }

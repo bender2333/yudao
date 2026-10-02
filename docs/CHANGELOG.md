@@ -462,3 +462,4 @@ claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登�
 claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
 claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 00:36 / docs/architecture-issues.md 为 #88 登记的问题（重启以后读不到准入文件）写处理结论，替换执行者写的「待架构师裁定」行 / 采纳第一种，由 #266 实施，#96 依赖 #266
+claude-opus-4-6 / 2026-10-03 03:35 / client/README.md 的目录、常用命令与新增「安装包与更新」一节按 #208 的交付更新（build:installer、appId/产品名/版本可改写、更新页与更新源、不签名无 SmartScreen） / 文档与实现保持一致，README 原写「客户端安装包与更新由 #208 实现」已过时

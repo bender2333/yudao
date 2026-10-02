@@ -76,4 +76,8 @@ writeFileSync(join(outDir, "tray.png"), encodePng(size, size, drawBase(size)));
 for (let count = 1; count <= 9; count += 1) {
   writeFileSync(join(outDir, `tray-${count}.png`), encodePng(size, size, drawBadge(size, count)));
 }
+// 应用图标：Windows 的安装程序、快捷方式与窗口用它。electron-builder 要求至少 256×256，
+// 与托盘图标同一个图形（同一个 drawBase），放在根目录供 electron-builder 自动取用
+const appSize = 256;
+writeFileSync(join(outDir, "app-icon.png"), encodePng(appSize, appSize, drawBase(appSize)));
 console.log("托盘图标已生成到 resources/");
