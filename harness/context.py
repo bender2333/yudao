@@ -60,7 +60,8 @@ class ContextAssembler:
                  guidance: list[DepartmentGuidance] | None = None,
                  guidance_only: bool = False,
                  events: list[Any] | None = None,
-                 snapshot_hash: str | None = None) -> AssembledContext:
+                 snapshot_hash: str | None = None,
+                 input_modalities: tuple[str, ...] = ("text",)) -> AssembledContext:
         effective_window = projection.context_window if context_window is None else context_window
         if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
                 or effective_window < 1):
@@ -76,7 +77,8 @@ class ContextAssembler:
         guidance_items = list(guidance or [])
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
-        tool_names = offered_tools(projection, department, guidance_only=guidance_only)
+        tool_names = offered_tools(projection, department, guidance_only=guidance_only,
+                                   input_modalities=input_modalities)
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility

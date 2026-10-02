@@ -192,17 +192,25 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
         assert bound.payload["revision"] == after_defaults["revision"] > current
         assert set(after_defaults["bindings"]) == set(DEPARTMENTS)
 
-        # 导入整份文档：整体替换，事件与查询返回同一修订号
-        imported = _command(client, "catalog.document.save", base_version=after_defaults["revision"],
+        # 导入整份文档：整体替换，事件与查询返回同一修订号。
+        # 先清空部门默认：导入移除仍被默认引用的定义会整份拒绝（工单 #90），
+        # 清空以后导入就可以把目录整体换成另一份
+        cleared = _command(client, "catalog.department_defaults.save",
+                           base_version=after_defaults["revision"], bindings={})
+        assert cleared.status_code == 200, cleared.text
+        current = _catalog(client)["revision"]
+        imported = _command(client, "catalog.document.save", base_version=current,
                             document={"providers": [_provider("p3")], "models": [_document_model("p3", "m3")],
-                                      "bindings": {}})
+                                      "bindings": {department: {"provider_id": "p3", "model_id": "m3"}
+                                                   for department in DEPARTMENTS}})
         assert imported.status_code == 200, imported.text
         [event] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "save_document",
                             timeout=5.0, description="save_document catalog_revised")
         after = _catalog(client)
-        assert event.payload["revision"] == after["revision"] > after_defaults["revision"]
+        assert event.payload["revision"] == after["revision"] > current
         assert [item["id"] for item in after["providers"]] == ["p3"]
-        assert after["bindings"] == {}
+        assert set(after["bindings"]) == set(DEPARTMENTS)
+        assert {binding["model_id"] for binding in after["bindings"].values()} == {"m3"}
         document = client.get("/api/queries/catalog.document").json()["data"]
         assert [item["id"] for item in document["providers"]] == ["p3"]
         assert document["revision"] == after["revision"]

@@ -98,6 +98,9 @@ class Department(_Definition):
     id: Identifier
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
+    # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
+    # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
+    suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
 
 
 class OrganizationRules(_Definition):
@@ -133,6 +136,9 @@ class Tool(_Definition):
     repeatable: bool = False
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
+    # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时
+    # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
+    requires_image_input: bool = False
     # 许可规则：因待处理指导被提前安排、只能回应指导的激活可以使用
     guidance_only: bool
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -181,6 +187,9 @@ class ServicePreset(_Definition):
     header_profile: str
     source: str
     notes: str
+    # 这个服务方案在 models.dev 中对应的 provider ID，模型能力表的提取脚本据此取材；
+    # 「自定义」不使用预置表，在能力表中没有条目，不填这一项
+    models_dev_id: str = ""
 
     freeze_base_urls = _frozen("base_urls")
 
@@ -190,6 +199,30 @@ class ServicePresets(_Definition):
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
+
+
+class ModelCapability(_Definition):
+    # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
+    # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
+    model: str = Field(min_length=1)
+    input_modalities: tuple[str, ...] = ()
+    output_modalities: tuple[str, ...] = ()
+    context_window: int | None = None
+    max_output_tokens: int | None = None
+    tool_call: bool = False
+    reasoning: bool = False
+
+
+class ModelCapabilities(_Definition):
+    # 模型能力表（ADR-0003）：只收录预置表中服务方案的模型，整张表带 revision、快照日期与来源；
+    # 运行时不从远端刷新，只用于新建模型访问定义时的预填（设计说明第 4.1 节）。
+    # 键是预置表中的服务方案 ID（取值与 ServicePreset.id 一致，可以含连字符）
+    presets: Mapping[str, tuple[ModelCapability, ...]]
+    revision: str = Field(min_length=1)
+    snapshot_date: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+
+    freeze_presets = _frozen("presets")
 
 
 class StopReason(_Definition):
@@ -262,6 +295,8 @@ class Definitions(_Definition):
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
+    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填（设计说明第 4.1 节）
+    model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
 
@@ -274,6 +309,13 @@ class Definitions(_Definition):
     def role(self, department: str) -> Role:
         # 部门的角色（现在每个部门一个角色，编号与部门相同）
         return self.roles[department]
+
+    def suggested_capabilities(self, department: str) -> tuple[str, ...]:
+        # 部门的建议能力（设计说明第 5.6 节）：部门内的角色继承部门的建议能力
+        for item in self.organization.departments:
+            if item.id == department:
+                return item.suggested_capabilities
+        raise ValueError(f"unknown department {department!r}")
 
     def work_item(self, kind: str) -> WorkItemKind:
         # 事项种类的定义；普通事项没有部门说明与阶段迁移，沿用 roles.json
@@ -327,6 +369,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "limits.json": ("limits", TypeAdapter(Limits)),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
     "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
+    "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
 }
 
@@ -392,7 +435,8 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
     # 类型以外的核对：部门与角色一一对应，角色与事项种类的工具都有定义且不重复，一种提案只由一个工具提交，
-    # 提案合同与各事项种类可以使用的主机工具相符，事项种类的停止原因在清单中，服务方案的编号不重复
+    # 提案合同与各事项种类可以使用的主机工具相符，事项种类的停止原因在清单中，服务方案的编号不重复，
+    # 模型能力表与服务方案预置表互相对得上
     issues: list[tuple[str, str, str]] = []
     organization: Organization = parts["organization"]
     roles: dict[str, Role] = parts["roles"]
@@ -431,6 +475,22 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
     for index, identity in enumerate(identities):
         if identities.index(identity) != index:
             issues.append(("service_presets.json", f"presets[{index}].id", f"重复的服务方案 {identity}"))
+    capabilities: ModelCapabilities = parts["model_capabilities"]
+    preset_ids = {preset.id for preset in presets.presets}
+    for preset_id in sorted(set(capabilities.presets) - preset_ids):
+        issues.append(("model_capabilities.json", f"presets.{preset_id}", "能力表中有预置表没有的服务方案"))
+    for index, preset_id in enumerate(capabilities.presets):
+        if preset_id not in preset_ids:
+            continue
+        models = [capability.model for capability in capabilities.presets[preset_id]]
+        for position, model in enumerate(models):
+            if models.index(model) != position:
+                issues.append(("model_capabilities.json", f"presets.{preset_id}[{position}].model",
+                               f"同一个服务方案中模型 {model} 重复"))
+    for index, preset in enumerate(presets.presets):
+        if preset.models_dev_id and preset.id not in capabilities.presets:
+            issues.append(("model_capabilities.json", f"presets.{preset.id}",
+                           f"预置表第 {index + 1} 项（{preset.id}）记录了 models_dev_id，能力表却缺少这个服务方案"))
     return issues
 
 

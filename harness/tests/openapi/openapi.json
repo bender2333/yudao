@@ -691,7 +691,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                  "$ref": "#/components/schemas/Accepted_DepartmentSettingsSaveRefs_"
                 }
               }
             }
@@ -974,6 +974,57 @@
         }
       }
     },
+    "/api/commands/catalog.model.remove": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.model.remove",
+        "operationId": "command_catalog_model_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogModelRemove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.document.save": {
       "post": {
         "tags": [
@@ -1003,7 +1054,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：stale_base, catalog_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：stale_base, catalog_invalid, in_use, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -1252,7 +1303,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                  "$ref": "#/components/schemas/Accepted_CatalogDepartmentDefaultsSaveRefs_"
                 }
               }
             }
@@ -2992,6 +3043,85 @@
         }
       }
     },
+    "/api/queries/catalog.change_impact": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "catalog.change_impact",
+        "operationId": "query_catalog_change_impact",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "connection",
+                "provider",
+                "document"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "provider_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Id"
+            }
+          },
+          {
+            "name": "document",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ChangeImpact_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/home.away_report": {
       "get": {
         "tags": [
@@ -3399,6 +3529,35 @@
         ],
         "title": "Accepted[CatalogConnectionSaveRefs]"
       },
+      "Accepted_CatalogDepartmentDefaultsSaveRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/CatalogDepartmentDefaultsSaveRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[CatalogDepartmentDefaultsSaveRefs]"
+      },
       "Accepted_DecisionRefs_": {
         "properties": {
           "command_id": {
@@ -3427,6 +3586,35 @@
           "duplicate"
         ],
         "title": "Accepted[DecisionRefs]"
+      },
+      "Accepted_DepartmentSettingsSaveRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/DepartmentSettingsSaveRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[DepartmentSettingsSaveRefs]"
       },
       "Accepted_NoRefs_": {
         "properties": {
@@ -4268,6 +4456,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -4347,6 +4542,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -4437,6 +4633,9 @@
           "presets": {
             "$ref": "#/components/schemas/CatalogPresets"
           },
+          "capability_table": {
+            "$ref": "#/components/schemas/CatalogCapabilityTable"
+          },
           "providers": {
             "items": {
               "$ref": "#/components/schemas/CatalogProvider"
@@ -4464,6 +4663,16 @@
             },
             "type": "object",
             "title": "Bindings"
+          },
+          "department_reminders": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Department Reminders"
           }
         },
         "additionalProperties": false,
@@ -4473,10 +4682,12 @@
           "config_state",
           "reload_error",
           "presets",
+          "capability_table",
           "providers",
           "models",
           "admissions",
-          "bindings"
+          "bindings",
+          "department_reminders"
         ],
         "title": "Catalog"
       },
@@ -4647,6 +4858,42 @@
           "provider_id"
         ],
         "title": "CatalogCandidatesCollect"
+      },
+      "CatalogCapabilityTable": {
+        "properties": {
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "snapshot_date": {
+            "type": "string",
+            "title": "Snapshot Date"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "presets": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Presets"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "snapshot_date",
+          "source",
+          "presets"
+        ],
+        "title": "CatalogCapabilityTable"
       },
       "CatalogConnectionDelete": {
         "properties": {
@@ -4820,6 +5067,21 @@
         ],
         "title": "CatalogDepartmentDefaultsSave"
       },
+      "CatalogDepartmentDefaultsSaveRefs": {
+        "properties": {
+          "reminders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reminders",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CatalogDepartmentDefaultsSaveRefs"
+      },
       "CatalogDocument": {
         "properties": {
           "revision": {
@@ -4955,6 +5217,13 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
           "reasoning_levels": {
             "items": {
               "type": "string"
@@ -4988,11 +5257,44 @@
           "max_output_tokens",
           "capability_source",
           "accepts_required_tool_call",
+          "input_modalities",
           "reasoning_levels",
           "default_reasoning_level",
           "reasoning_mode"
         ],
         "title": "CatalogModel"
+      },
+      "CatalogModelRemove": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "provider_id",
+          "model_id"
+        ],
+        "title": "CatalogModelRemove"
       },
       "CatalogModelTest": {
         "properties": {
@@ -5165,6 +5467,60 @@
           "reload_error"
         ],
         "title": "CatalogState"
+      },
+      "ChangeImpact": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "impacted": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDefinition"
+            },
+            "type": "array",
+            "title": "Impacted",
+            "default": []
+          },
+          "deletions": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDefinition"
+            },
+            "type": "array",
+            "title": "Deletions",
+            "default": []
+          },
+          "department_defaults": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDepartmentDefault"
+            },
+            "type": "array",
+            "title": "Department Defaults",
+            "default": []
+          },
+          "project_settings": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactProjectSetting"
+            },
+            "type": "array",
+            "title": "Project Settings",
+            "default": []
+          },
+          "work_items": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactWorkItem"
+            },
+            "type": "array",
+            "title": "Work Items",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "title": "ChangeImpact"
       },
       "CommandCapability": {
         "properties": {
@@ -5653,6 +6009,9 @@
               },
               {
                 "$ref": "#/components/schemas/UnknownActionRequested"
+              },
+              {
+                "$ref": "#/components/schemas/PauseRequested"
               }
             ],
             "title": "Request"
@@ -5929,6 +6288,21 @@
         ],
         "title": "DepartmentSettingsSave"
       },
+      "DepartmentSettingsSaveRefs": {
+        "properties": {
+          "reminders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reminders",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DepartmentSettingsSaveRefs"
+      },
       "DepartmentWorkspaceResult": {
         "properties": {
           "project_id": {
@@ -6140,6 +6514,20 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image"
+              ]
+            },
+            "type": "array",
+            "title": "Input Modalities",
+            "default": [
+              "text"
+            ]
           },
           "reasoning_levels": {
             "items": {
@@ -6484,6 +6872,117 @@
         ],
         "title": "HomeStatus"
       },
+      "ImpactDefinition": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactDefinition"
+      },
+      "ImpactDepartmentDefault": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactDepartmentDefault"
+      },
+      "ImpactProjectSetting": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "department",
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactProjectSetting"
+      },
+      "ImpactWorkItem": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "work_item_id",
+          "title",
+          "department"
+        ],
+        "title": "ImpactWorkItem"
+      },
       "InputView": {
         "properties": {
           "input_id": {
@@ -6741,6 +7240,20 @@
             "title": "Accepts Required Tool Call",
             "default": true
           },
+          "input_modalities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image"
+              ]
+            },
+            "type": "array",
+            "title": "Input Modalities",
+            "default": [
+              "text"
+            ]
+          },
           "reasoning_levels": {
             "items": {
               "type": "string"
@@ -6929,6 +7442,87 @@
           "queries"
         ],
         "title": "OverlayCapability"
+      },
+      "PauseRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "stop_reason": {
+            "type": "string",
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Stop Reason"
+          },
+          "resumed_at_phase": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PRODUCT_SPEC",
+              "ENGINEERING",
+              "DELIVERY",
+              "QUALITY",
+              "REWORK_PRODUCT",
+              "REWORK_ENGINEERING",
+              "DONE",
+              "PAUSED",
+              "FAILED"
+            ],
+            "title": "Resumed At Phase"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "stop_reason",
+          "resumed_at_phase"
+        ],
+        "title": "PauseRequested"
       },
       "ProjectArchive": {
         "properties": {
@@ -7507,6 +8101,16 @@
             },
             "type": "object",
             "title": "Source Directories"
+          },
+          "department_reminders": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Department Reminders"
           }
         },
         "additionalProperties": false,
@@ -7520,7 +8124,8 @@
           "archived",
           "departments",
           "commands",
-          "source_directories"
+          "source_directories",
+          "department_reminders"
         ],
         "title": "ProjectSettingsResult"
       },
@@ -8330,6 +8935,24 @@
           "data"
         ],
         "title": "Snapshot[Catalog]"
+      },
+      "Snapshot_ChangeImpact_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChangeImpact"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ChangeImpact]"
       },
       "Snapshot_DecisionList_": {
         "properties": {
@@ -10257,6 +10880,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -10492,6 +11122,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -11689,6 +12320,7 @@
             "enum": [
               "save_connection",
               "delete_connection",
+              "remove_model",
               "save_document",
               "department_defaults",
               "reload",
@@ -11707,6 +12339,14 @@
               }
             ],
             "title": "Provider Id"
+          },
+          "reminders": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reminders",
+            "type": "array"
           }
         },
         "required": [
@@ -13375,6 +14015,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -13576,6 +14223,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -13914,6 +14562,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -14218,6 +14873,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -15022,6 +15678,9 @@
               },
               {
                 "$ref": "#/components/schemas/UnknownActionRequested"
+              },
+              {
+                "$ref": "#/components/schemas/PauseRequested"
               }
             ],
             "title": "Payload"
@@ -17019,6 +17678,14 @@
               }
             ],
             "default": null
+          },
+          "reminders": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reminders",
+            "type": "array"
           }
         },
         "required": [
@@ -18110,6 +18777,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -18444,6 +19118,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -18739,6 +19414,13 @@
               }
             ],
             "title": "Accepts Required Tool Call"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
           },
           "selection_source": {
             "anyOf": [
@@ -19047,6 +19729,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -19338,6 +20021,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -19550,6 +20240,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -19829,6 +20520,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -20039,6 +20737,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -20319,6 +21018,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -20556,6 +21262,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -20840,6 +21547,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -21062,6 +21776,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -23653,6 +24368,184 @@
           "defects"
         ],
         "title": "ReviewObservation",
+        "type": "object"
+      },
+      "RunContinuedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "run_continued",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RunContinuedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "RunContinuedEvent",
+        "type": "object"
+      },
+      "RunContinuedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "stop_reason": {
+            "enum": [
+              "no_tool_call",
+              "workspace_unrepresentable"
+            ],
+            "title": "Stop Reason",
+            "type": "string"
+          },
+          "resumed_at_phase": {
+            "enum": [
+              "CREATED",
+              "PRODUCT_SPEC",
+              "ENGINEERING",
+              "DELIVERY",
+              "QUALITY",
+              "REWORK_PRODUCT",
+              "REWORK_ENGINEERING",
+              "DONE",
+              "PAUSED",
+              "FAILED"
+            ],
+            "title": "Resumed At Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision_id",
+          "stop_reason",
+          "resumed_at_phase"
+        ],
+        "title": "RunContinuedPayload",
         "type": "object"
       },
       "RunCreatedEvent": {
@@ -26395,6 +27288,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -26627,6 +27527,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -27053,6 +27954,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -27252,6 +28160,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -28015,6 +28924,13 @@
             ],
             "title": "Accepts Required Tool Call"
           },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
           "selection_source": {
             "anyOf": [
               {
@@ -28216,6 +29132,7 @@
           "context_window",
           "configured_max_output_tokens",
           "accepts_required_tool_call",
+          "input_modalities",
           "selection_source",
           "requested_tier",
           "sent_tier",
@@ -28976,6 +29893,7 @@
             "proposal_rejected": "#/components/schemas/ProposalRejectedEvent",
             "proposal_submitted": "#/components/schemas/ProposalSubmittedEvent",
             "qa_submitted": "#/components/schemas/QaSubmittedEvent",
+            "run_continued": "#/components/schemas/RunContinuedEvent",
             "run_created": "#/components/schemas/RunCreatedEvent",
             "run_done": "#/components/schemas/RunDoneEvent",
             "run_failed": "#/components/schemas/RunFailedEvent",
@@ -29127,6 +30045,9 @@
           },
           {
             "$ref": "#/components/schemas/RunResumedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RunContinuedEvent"
           },
           {
             "$ref": "#/components/schemas/DecisionRequestedEvent"

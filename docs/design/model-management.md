@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-日期：2026-09-24；2026-09-26 按 ADR-0017 在第 5 节增加角色一层。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](../adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)、[ADR-0017 角色设置优先于部门设置](../adr/0017-role-settings-override-department.md)。界面原型：[v7 原型](../prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。
+日期：2026-09-24；2026-09-26 按 ADR-0017 在第 5 节增加角色一层；2026-10-02 第 5.3 节增加事项种类的工作说明（工单 #248）。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0004 连接与协议](../adr/0004-one-protocol-per-connection.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)、[ADR-0017 角色设置优先于部门设置](../adr/0017-role-settings-override-department.md)。界面原型：[v7 原型](../prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。
 
 本说明是模型目录、部门与角色的模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
@@ -216,7 +216,8 @@ Provider 模块监视模型目录文件。合法的外部修改按第 4.4 节的
 1. 模型访问定义：按项目角色设置、角色默认、项目部门设置、部门默认的顺序，取第一个写入了的；都没有时解析失败。
 2. 请求档位：按与模型访问定义相同的顺序，取第一个写入了的；都为空时使用所选模型的默认档位。
 3. 角色 Prompt：项目角色设置中有这一项时使用它，否则使用内置角色 Prompt。
-4. 部门 Prompt：项目部门设置中有这一项时使用它，否则使用内置默认 Prompt。部门 Prompt 是全部门的规则，放入本部门每个角色的请求。
+4. 部门 Prompt：项目部门设置中有这一项时使用它，否则使用内置默认 Prompt。部门 Prompt 是部门的身份与全部门的规则，放入本部门每个角色的请求；内置默认只写这两类内容，不写某一种事项的做法。
+5. 事项种类的工作说明：定义中每个事项种类为每个部门写一份工作说明（普通事项怎样提交计划、交付与检查，建档事项的读取顺序与产出），按 run 的事项种类放在部门 Prompt 之后，每次请求都放入，不受项目部门设置影响。请求事件记录部门 Prompt 的版本；工作说明随定义的版本确定，按事件重新装配请求时两部分都能复原。
 
 模型与请求档位分别继承，与第 5.2 节「只写入覆盖的项」一致。某一层只修改了模型、没有写入请求档位时，按顺序取得的请求档位按新模型的支持范围限制（第 7.3 节）。选择来源是提供模型访问定义的那一层。
 

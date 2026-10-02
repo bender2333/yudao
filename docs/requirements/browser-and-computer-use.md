@@ -1,6 +1,6 @@
 # D34 浏览器与 computer use
 
-确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行，computer use 的屏幕从哪里来待专题 2。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单 #147 至 #155。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
+确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单 #147 至 #155。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
 
 ## 用户原话
 
@@ -29,7 +29,7 @@
 ## 已确认
 
 - 浏览器工具使用 Playwright MCP，经 3.2B 的 MCP 接入：每个动作一个工具；每一步把页面的可访问性结构文本交给模型，模型能看图时同时附上截图；截图另外保存为证据。
-- computer use 用来操作桌面程序：部门通过截图、点击与输入操作被测的桌面程序，屏幕从哪里来待专题 2（[阶段需求概览](stage-requirements-overview.md)第 6 节第 2 项）。网页应用使用浏览器工具，桌面程序使用 computer use。
+- computer use 用来操作桌面程序：部门通过截图、点击与输入操作被测的桌面程序，桌面程序在控制主机上、用户已经登录的交互桌面上用真实输入操作，开始前经用户同意，整台控制主机同一时刻只有一个桌面会话（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)）。网页应用使用浏览器工具，桌面程序使用 computer use。
 - 两个工具在执行环境中运行，被测的交付软件在同一个执行环境中启动。安全暂放低优先级，按 Playwright MCP 等普通浏览器 MCP 的默认做法运行，不另加限制。
 - 质检两个工具都可以使用；工程可以使用浏览器做研发自测，模型能看图时也可以使用 computer use；运维是否使用在 Stage 4 设计运维部门时决定。
 - 质检部门的模型应当有视觉能力，设置时只提醒，不强制。部门定义写明建议能力，质检的建议能力是图像输入；保存项目部门设置或部门默认时，所选模型不支持图像，照常保存并提醒用户缺少的能力与影响；请求时按模型实际具备的能力提供工具，不支持图像时不提供 computer use，浏览器只给可访问性结构（[模型管理设计说明](../design/model-management.md)第 5.6 节）。质检没有核验的条目按已有规则如实报告，不能放行。
@@ -38,7 +38,7 @@
 
 ## 设计确定的内容
 
-设计写在[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)：试用的位置与执行位置上的程序（第 3.1、3.2 节）；Playwright MCP 的运行方式与启用的能力（第 4 节）；截图尺寸 1280×800 与 8 个屏幕工具，屏幕从哪里来待专题 2（第 5 节）；截图作为证据的保存与显示（第 7 节）；质检从 PRD 生成试用用例、逐条结论与放行，试用记录绑定交付快照（第 8 节）。
+设计写在[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)：试用的位置与执行位置上的程序（第 3.1、3.2 节）；Playwright MCP 的运行方式与启用的能力（第 4 节）；控制主机交互桌面上的 8 个屏幕工具、截图与坐标、用户同意与独占（第 5 节）；截图作为证据的保存与显示（第 7 节）；质检从 PRD 生成试用用例、逐条结论与放行，试用记录绑定交付快照（第 8 节）。
 
 2026-09-29 架构师就设计中的六项提出推荐，用户回答：
 
@@ -55,4 +55,4 @@
 
 ## 实现状态
 
-未实施。前置依赖：执行环境的合同（#128）、3.2B 的 MCP 接入（#69）、D24 的输入方式与建议能力（#146）。computer use 的部分（#150 与 #155 中的对应场景）待专题 2。工单：#147 至 #155，挂在 #123 下。
+未实施。前置依赖：执行环境的合同（#128）、3.2B 的 MCP 接入（#69）、D24 的输入方式与建议能力（#146）。工单：#147 至 #155、#246、#247，挂在 #123 下。

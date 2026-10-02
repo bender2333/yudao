@@ -57,6 +57,7 @@ RUN_EVENT_TYPES = frozenset({
     "baseline_review_accepted",
     "transition",
     "run_resumed",
+    "run_continued",
     "run_done",
     "run_paused",
     "run_failed",

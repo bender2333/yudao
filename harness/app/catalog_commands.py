@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
 from ..models import CatalogEventType
-from ..providers import CatalogValidationError, ProviderError, SUPPORTED_PROTOCOLS
+from ..providers import CatalogValidationError, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
@@ -48,6 +49,9 @@ class ModelInput(Contract):
     capability_source: str = ""
     capacity_confirmed: bool = False
     accepts_required_tool_call: bool = True
+    # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
+    # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
+    input_modalities: list[Literal["text", "image"]] = ["text"]
     # 推理档位声明（#87）：三项一起声明，缺任一项或整体缺省时请求不带推理参数
     reasoning_levels: list[str] = []
     default_reasoning_level: str | None = None
@@ -82,6 +86,10 @@ class CatalogConnectionSave(CommandRequest):
 class CatalogConnectionSaveRefs(Contract):
     provider_id: str
 
+class CatalogDepartmentDefaultsSaveRefs(Contract):
+    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）
+    reminders: list[str] = []
+
 
 class CatalogConnectionDelete(CommandRequest):
     base_version: int
@@ -91,6 +99,13 @@ class CatalogConnectionDelete(CommandRequest):
 class CatalogDocumentSave(CommandRequest):
     base_version: int
     document: CatalogDocumentInput
+
+
+class CatalogModelRemove(CommandRequest):
+    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方（设计说明第 4.5 节）
+    base_version: int
+    provider_id: Text
+    model_id: Text
 
 
 class CatalogReload(CommandRequest):
@@ -147,8 +162,10 @@ def _register(application: Application, command: Command) -> None:
 
 
 def _revised(application: Application, command: Command, operation: str, before: int, after: int,
-             *, provider_id: str | None) -> None:
-    payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id}
+             *, provider_id: str | None, reminders: list[str] | None = None) -> None:
+    # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件一起保存，接受结果重新计算时能得到同样的值
+    payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id,
+               "reminders": list(reminders or ())}
     application.system.writes.transact(catalog_stream(), lambda transaction: transaction.append(
         NewCatalogEvent(CatalogEventType.CATALOG_REVISED, payload)), command=command)
 
@@ -173,6 +190,76 @@ def _check_not_registered(application: Application, command: Command) -> None:
     # 已经登记过的命令身份不再执行（内容相同 → DuplicateCommand，不同 → CommandIdReused）：
     # 修改 Provider 目录或凭据之前先核对，重复提交不会把目录、目录文件与 .env 再改一遍
     application.system.store.check_command(command)
+
+
+def _project_model_referrers(application: Application, model_id: str) -> list[str]:
+    # 各项目的项目部门设置中引用这条模型访问定义的引用方（设计说明第 4.5 节：与部门默认同样拒绝）。
+    # 项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
+    referrers: list[str] = []
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            if project.department_settings[department].model_id == model_id:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
+
+def _project_provider_referrers(application: Application, provider_id: str) -> list[str]:
+    # 各项目的项目部门设置中引用这份 Provider 配置的引用方：直接指向它，或指向它下面的定义。
+    # 与 _project_model_referrers 同理，项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
+    definition_ids = {item["model_id"] for item in
+                      application.system.facade.deletable_definitions(provider_id)}
+    referrers: list[str] = []
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            setting = project.department_settings[department]
+            if setting.provider_id == provider_id or setting.model_id in definition_ids:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
+def _document_removed_referrers(application: Application, document: Mapping[str, Any]) -> list[str]:
+    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方（设计说明第 4.6 节）。
+    # 与移除单条定义同一套规则：部门默认与项目部门设置都算引用方，按移除单条定义的同一个顺序列出，
+    # 比对用文档里的原始身份，文档自身的结构与准入校验由 Provider 模块完成
+    if not isinstance(document, Mapping):
+        return []
+    raw_providers = document.get("providers")
+    raw_models = document.get("models")
+    if not isinstance(raw_providers, list) or not isinstance(raw_models, list):
+        return []
+    provider_ids = {str(item.get("id")) for item in raw_providers if isinstance(item, Mapping)}
+    model_ids = {str(item.get("id")) for item in raw_models if isinstance(item, Mapping)}
+    referrers: list[str] = []
+    bindings = application.system.facade.get_bindings()
+    for department in sorted(bindings):
+        binding = bindings[department]
+        model_id = str(binding.get("model_id") or "")
+        if not model_id:
+            continue
+        if model_id not in model_ids or str(binding.get("provider_id") or "") not in provider_ids:
+            referrers.append(f"bindings.{department}")
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            setting = project.department_settings[department]
+            model_id = str(setting.model_id or "")
+            if not model_id:
+                continue
+            if model_id not in model_ids or str(setting.provider_id or "") not in provider_ids:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
+def _binding_reminders(application: Application) -> list[str]:
+    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
+    # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
+    facade = application.system.facade
+    view = facade.providers_view()
+    models = {item["id"]: item for item in view["models"]}
+    notes: list[str] = []
+    for department, binding in view["bindings"].items():
+        model = models.get(binding.get("model_id") or "")
+        if model is None:
+            continue
+        notes.extend(suggested.reminders(department, model))
+    return notes
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +292,8 @@ async def _delete_connection(application: Application, command: Command, request
     before = facade.catalog_revision()
     previous = facade.to_document()
     try:
-        facade.delete_provider(request.provider_id)
+        facade.delete_provider(request.provider_id,
+                               _project_provider_referrers(application, request.provider_id))
     except CatalogValidationError as exc:
         if any("不存在" in issue.message for issue in exc.issues):
             raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
@@ -216,6 +304,29 @@ async def _delete_connection(application: Application, command: Command, request
     if problem is not None:
         raise Rejection("catalog_invalid", problem)
     _revised(application, command, "delete_connection", before, after, provider_id=request.provider_id)
+
+
+async def _remove_model(application: Application, command: Command, request: CatalogModelRemove) -> None:
+    facade = application.system.facade
+    _check_not_registered(application, command)
+    _stale_base(facade, request.base_version)
+    before = facade.catalog_revision()
+    previous = facade.to_document()
+    try:
+        facade.remove_model(request.provider_id, request.model_id,
+                            _project_model_referrers(application, request.model_id))
+    except CatalogValidationError as exc:
+        if any("不存在" in issue.message for issue in exc.issues):
+            raise Rejection("not_found", f"模型访问定义不存在：{request.model_id}")
+        if any("仍被引用" in issue.message for issue in exc.issues):
+            referrers = [issue.location for issue in exc.issues]
+            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(referrers))
+        raise Rejection("catalog_invalid", str(exc))
+    after = facade.catalog_revision()
+    problem = facade.persist_catalog(previous)
+    if problem is not None:
+        raise Rejection("catalog_invalid", problem)
+    _revised(application, command, "remove_model", before, after, provider_id=request.provider_id)
 
 
 async def _save_document(application: Application, command: Command, request: CatalogDocumentSave) -> None:
@@ -233,6 +344,9 @@ async def _save_document(application: Application, command: Command, request: Ca
         "bindings": {key: item.model_dump() for key, item in request.document.bindings.items()},
     }
     try:
+        referrers = _document_removed_referrers(application, document)
+        if referrers:
+            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(sorted(set(referrers))))
         facade.replace_catalog_document(document)
     except CatalogValidationError as exc:
         raise Rejection("catalog_invalid", str(exc))
@@ -261,7 +375,8 @@ async def _save_department_defaults(application: Application, command: Command,
     if after == before:
         _register(application, command)
         return
-    _revised(application, command, "department_defaults", before, after, provider_id=None)
+    _revised(application, command, "department_defaults", before, after, provider_id=None,
+             reminders=_binding_reminders(application))
 
 
 async def _reload(application: Application, command: Command, request: CatalogReload) -> None:
@@ -449,9 +564,14 @@ CATALOG_CONNECTION_DELETE = CommandDefinition(
     handle=_delete_connection, derive_refs=lambda _events: NoRefs(),
     reasons=("stale_base", "not_found", "in_use"),
 )
+CATALOG_MODEL_REMOVE = CommandDefinition(
+    name="catalog.model.remove", request=CatalogModelRemove, refs=NoRefs, handle=_remove_model,
+    derive_refs=lambda _events: NoRefs(),
+    reasons=("stale_base", "not_found", "in_use", "catalog_invalid"),
+)
 CATALOG_DOCUMENT_SAVE = CommandDefinition(
     name="catalog.document.save", request=CatalogDocumentSave, refs=NoRefs, handle=_save_document,
-    derive_refs=lambda _events: NoRefs(), reasons=("stale_base", "catalog_invalid"),
+    derive_refs=lambda _events: NoRefs(), reasons=("stale_base", "catalog_invalid", "in_use"),
 )
 CATALOG_RELOAD = CommandDefinition(
     name="catalog.reload", request=CatalogReload, refs=NoRefs, handle=_reload,
@@ -470,8 +590,10 @@ CATALOG_MODEL_TEST = CommandDefinition(
     derive_refs=lambda _events: NoRefs(), reasons=("not_found",),
 )
 CATALOG_DEPARTMENT_DEFAULTS_SAVE = CommandDefinition(
-    name="catalog.department_defaults.save", request=CatalogDepartmentDefaultsSave, refs=NoRefs,
-    handle=_save_department_defaults, derive_refs=lambda _events: NoRefs(),
+    name="catalog.department_defaults.save", request=CatalogDepartmentDefaultsSave,
+    refs=CatalogDepartmentDefaultsSaveRefs, handle=_save_department_defaults,
+    derive_refs=lambda events: CatalogDepartmentDefaultsSaveRefs(
+        reminders=list(events[-1].payload.get("reminders") or ())),
     reasons=("stale_base", "catalog_invalid"),
 )
 CREDENTIAL_SET = CommandDefinition(

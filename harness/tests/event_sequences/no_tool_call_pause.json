@@ -292,6 +292,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3026,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
@@ -362,6 +365,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
@@ -420,6 +426,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "message_index": 1,
@@ -477,6 +486,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -548,6 +560,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "fake-model",
@@ -761,6 +776,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3096,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:work",
@@ -831,6 +849,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:work",
     "max_attempts": 3,
@@ -889,6 +910,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:work",
     "message_index": 2,
@@ -956,6 +980,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:work",
     "model_id": "fake-model",
@@ -1169,6 +1196,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3166,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-3:work",
@@ -1239,6 +1269,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-3:work",
     "max_attempts": 3,
@@ -1297,6 +1330,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-3:work",
     "message_index": 3,
@@ -1364,6 +1400,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-3:work",
     "model_id": "fake-model",
@@ -1577,6 +1616,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3236,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-4:work",
@@ -1647,6 +1689,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-4:work",
     "max_attempts": 3,
@@ -1705,6 +1750,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-4:work",
     "message_index": 4,
@@ -1772,6 +1820,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-4:work",
     "model_id": "fake-model",
@@ -1832,6 +1883,41 @@
   },
   {
    "event": "<evt#26>",
+   "type": "decision_requested",
+   "actor": "system",
+   "department": "product",
+   "state_before": "PAUSED",
+   "state_after": "PAUSED",
+   "parent_event_id": null,
+   "session_id": null,
+   "provider": null,
+   "model": null,
+   "context_digest": null,
+   "stop_reason": null,
+   "error": null,
+   "artifact_hashes": [],
+   "payload": {
+    "blocks": "run",
+    "department": "product",
+    "description": "运行暂停，停止原因为 no_tool_call。部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。 停止说明：department replied 4 times in a row without calling a tool",
+    "facts": [],
+    "kind": "no_tool_call",
+    "options": [
+     {
+      "id": "continue",
+      "label": "处理以后继续执行"
+     },
+     {
+      "id": "stop",
+      "label": "停止事项"
+     }
+    ],
+    "resumed_at_phase": "PRODUCT_SPEC",
+    "stop_reason": "no_tool_call"
+   }
+  },
+  {
+   "event": "<evt#27>",
    "type": "activation_finished",
    "actor": "system",
    "department": "product",
@@ -1882,6 +1968,9 @@
     "credential_ref": null,
     "credential_version": null,
     "default_reasoning_level": null,
+    "input_modalities": [
+     "text"
+    ],
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
@@ -2496,6 +2585,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#6>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -2550,6 +2642,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#12>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-2:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -2604,6 +2699,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#17>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-3:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -2658,6 +2756,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#22>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-4:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -2737,7 +2838,7 @@
   },
   "snapshot": null,
   "stop_reason": "no_tool_call",
-  "stream_version": 26,
+  "stream_version": 27,
   "structure": null,
   "structures": [],
   "task": "build an echo CLI",

@@ -24,6 +24,25 @@ export type AcceptedCatalogConnectionSaveRefs = {
 };
 
 /**
+ * Accepted[CatalogDepartmentDefaultsSaveRefs]
+ */
+export type AcceptedCatalogDepartmentDefaultsSaveRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: CatalogDepartmentDefaultsSaveRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
  * Accepted[DecisionRefs]
  */
 export type AcceptedDecisionRefs = {
@@ -36,6 +55,25 @@ export type AcceptedDecisionRefs = {
      */
     position: number;
     refs: DecisionRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
+ * Accepted[DepartmentSettingsSaveRefs]
+ */
+export type AcceptedDepartmentSettingsSaveRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: DepartmentSettingsSaveRefs;
     /**
      * Duplicate
      */
@@ -478,6 +516,10 @@ export type CallTarget = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -548,6 +590,7 @@ export type Catalog = {
      */
     reload_error: string | null;
     presets: CatalogPresets;
+    capability_table: CatalogCapabilityTable;
     /**
      * Providers
      */
@@ -565,6 +608,12 @@ export type Catalog = {
      */
     bindings: {
         [key: string]: CatalogBinding;
+    };
+    /**
+     * Department Reminders
+     */
+    department_reminders: {
+        [key: string]: Array<string>;
     };
 };
 
@@ -652,6 +701,32 @@ export type CatalogCandidatesCollect = {
      * Models Url
      */
     models_url?: string | null;
+};
+
+/**
+ * CatalogCapabilityTable
+ */
+export type CatalogCapabilityTable = {
+    /**
+     * Revision
+     */
+    revision: string;
+    /**
+     * Snapshot Date
+     */
+    snapshot_date: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Presets
+     */
+    presets: {
+        [key: string]: Array<{
+            [key: string]: unknown;
+        }>;
+    };
 };
 
 /**
@@ -770,6 +845,16 @@ export type CatalogDepartmentDefaultsSave = {
 };
 
 /**
+ * CatalogDepartmentDefaultsSaveRefs
+ */
+export type CatalogDepartmentDefaultsSaveRefs = {
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
+};
+
+/**
  * CatalogDocument
  */
 export type CatalogDocument = {
@@ -867,6 +952,10 @@ export type CatalogModel = {
      */
     accepts_required_tool_call: boolean;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Reasoning Levels
      */
     reasoning_levels: Array<string>;
@@ -878,6 +967,28 @@ export type CatalogModel = {
      * Reasoning Mode
      */
     reasoning_mode: string;
+};
+
+/**
+ * CatalogModelRemove
+ */
+export type CatalogModelRemove = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
 };
 
 /**
@@ -995,6 +1106,36 @@ export type CatalogState = {
      * Reload Error
      */
     reload_error: string | null;
+};
+
+/**
+ * ChangeImpact
+ */
+export type ChangeImpact = {
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Impacted
+     */
+    impacted?: Array<ImpactDefinition>;
+    /**
+     * Deletions
+     */
+    deletions?: Array<ImpactDefinition>;
+    /**
+     * Department Defaults
+     */
+    department_defaults?: Array<ImpactDepartmentDefault>;
+    /**
+     * Project Settings
+     */
+    project_settings?: Array<ImpactProjectSetting>;
+    /**
+     * Work Items
+     */
+    work_items?: Array<ImpactWorkItem>;
 };
 
 /**
@@ -1283,7 +1424,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested;
+    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -1420,6 +1561,16 @@ export type DepartmentSettingsSave = {
 };
 
 /**
+ * DepartmentSettingsSaveRefs
+ */
+export type DepartmentSettingsSaveRefs = {
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
+};
+
+/**
  * DepartmentWorkspaceResult
  */
 export type DepartmentWorkspaceResult = {
@@ -1545,6 +1696,10 @@ export type DocumentModelInput = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
+    /**
+     * Input Modalities
+     */
+    input_modalities?: Array<'text' | 'image'>;
     /**
      * Reasoning Levels
      */
@@ -1746,6 +1901,90 @@ export type HomeStatus = {
 };
 
 /**
+ * ImpactDefinition
+ */
+export type ImpactDefinition = {
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactDepartmentDefault
+ */
+export type ImpactDepartmentDefault = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactProjectSetting
+ */
+export type ImpactProjectSetting = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactWorkItem
+ */
+export type ImpactWorkItem = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Department
+     */
+    department: string;
+};
+
+/**
  * InputView
  */
 export type InputView = {
@@ -1914,6 +2153,10 @@ export type ModelInput = {
      */
     accepts_required_tool_call?: boolean;
     /**
+     * Input Modalities
+     */
+    input_modalities?: Array<'text' | 'image'>;
+    /**
      * Reasoning Levels
      */
     reasoning_levels?: Array<string>;
@@ -2025,6 +2268,44 @@ export type OverlayCapability = {
      * Queries
      */
     queries: Array<string>;
+};
+
+/**
+ * PauseRequested
+ */
+export type PauseRequested = {
+    /**
+     * Kind
+     */
+    kind: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Blocks
+     */
+    blocks: 'run';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Stop Reason
+     */
+    stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Resumed At Phase
+     */
+    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
 };
 
 /**
@@ -2416,6 +2697,12 @@ export type ProjectSettingsResult = {
      */
     source_directories: {
         [key: string]: SourceDirectorySetting;
+    };
+    /**
+     * Department Reminders
+     */
+    department_reminders: {
+        [key: string]: Array<string>;
     };
 };
 
@@ -2907,6 +3194,17 @@ export type SnapshotCatalog = {
      */
     position: number;
     data: Catalog;
+};
+
+/**
+ * Snapshot[ChangeImpact]
+ */
+export type SnapshotChangeImpact = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ChangeImpact;
 };
 
 /**
@@ -3991,6 +4289,10 @@ export type ActionVerifiedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -4729,11 +5031,15 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'delete_connection' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */
     provider_id: string | null;
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
 };
 
 /**
@@ -5569,6 +5875,10 @@ export type CompactionRecordedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -5834,6 +6144,10 @@ export type ContextAssembledPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -6404,7 +6718,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | UnknownActionRequested;
+    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
 };
 
 /**
@@ -7395,6 +7709,10 @@ export type DepartmentSettingsConfiguredPayload = {
      */
     department_prompt?: string | null;
     department_prompt_ref?: ArtifactRef | null;
+    /**
+     * Reminders
+     */
+    reminders?: Array<string>;
 };
 
 /**
@@ -7954,6 +8272,10 @@ export type ModelAttemptFailedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8238,6 +8560,10 @@ export type ModelAttemptFinishedPayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8500,6 +8826,10 @@ export type ModelMessagePayload = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -8725,6 +9055,10 @@ export type ModelRequestSerializedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -8955,6 +9289,10 @@ export type ModelRequestedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -9204,6 +9542,10 @@ export type ModelRetryScheduledPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -10644,6 +10986,91 @@ export type ReviewObservation = {
 };
 
 /**
+ * RunContinuedEvent
+ */
+export type RunContinuedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'run_continued';
+    payload: RunContinuedPayload;
+};
+
+/**
+ * RunContinuedPayload
+ */
+export type RunContinuedPayload = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Stop Reason
+     */
+    stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Resumed At Phase
+     */
+    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
+};
+
+/**
  * RunCreatedEvent
  */
 export type RunCreatedEvent = {
@@ -12028,6 +12455,10 @@ export type ToolCallResult = {
      */
     accepts_required_tool_call: boolean | null;
     /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
      * Selection Source
      */
     selection_source: string | null;
@@ -12331,6 +12762,10 @@ export type ToolSkippedPayload = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -12786,6 +13221,10 @@ export type UsageCharge = {
      * Accepts Required Tool Call
      */
     accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
     /**
      * Selection Source
      */
@@ -13331,6 +13770,8 @@ export type EventObject = ({
 } & RunFailedEvent) | ({
     type: 'run_resumed';
 } & RunResumedEvent) | ({
+    type: 'run_continued';
+} & RunContinuedEvent) | ({
     type: 'decision_requested';
 } & DecisionRequestedEvent) | ({
     type: 'decision_answered';
@@ -13827,7 +14268,7 @@ export type CommandDepartmentSettingsSaveResponses = {
     /**
      * Successful Response
      */
-    200: AcceptedNoRefs;
+    200: AcceptedDepartmentSettingsSaveRefs;
 };
 
 export type CommandDepartmentSettingsSaveResponse = CommandDepartmentSettingsSaveResponses[keyof CommandDepartmentSettingsSaveResponses];
@@ -13977,6 +14418,35 @@ export type CommandCatalogConnectionDeleteResponses = {
 
 export type CommandCatalogConnectionDeleteResponse = CommandCatalogConnectionDeleteResponses[keyof CommandCatalogConnectionDeleteResponses];
 
+export type CommandCatalogModelRemoveData = {
+    body: CatalogModelRemove;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.model.remove';
+};
+
+export type CommandCatalogModelRemoveErrors = {
+    /**
+     * 命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogModelRemoveError = CommandCatalogModelRemoveErrors[keyof CommandCatalogModelRemoveErrors];
+
+export type CommandCatalogModelRemoveResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogModelRemoveResponse = CommandCatalogModelRemoveResponses[keyof CommandCatalogModelRemoveResponses];
+
 export type CommandCatalogDocumentSaveData = {
     body: CatalogDocumentSave;
     path?: never;
@@ -13986,7 +14456,7 @@ export type CommandCatalogDocumentSaveData = {
 
 export type CommandCatalogDocumentSaveErrors = {
     /**
-     * 命令被拒绝，可能的原因：stale_base, catalog_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：stale_base, catalog_invalid, in_use, command_id_reused
      */
     409: Rejected;
     /**
@@ -14146,7 +14616,7 @@ export type CommandCatalogDepartmentDefaultsSaveResponses = {
     /**
      * Successful Response
      */
-    200: AcceptedNoRefs;
+    200: AcceptedCatalogDepartmentDefaultsSaveRefs;
 };
 
 export type CommandCatalogDepartmentDefaultsSaveResponse = CommandCatalogDepartmentDefaultsSaveResponses[keyof CommandCatalogDepartmentDefaultsSaveResponses];
@@ -15084,6 +15554,44 @@ export type QueryCatalogDocumentResponses = {
 };
 
 export type QueryCatalogDocumentResponse = QueryCatalogDocumentResponses[keyof QueryCatalogDocumentResponses];
+
+export type QueryCatalogChangeImpactData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Kind
+         */
+        kind: 'connection' | 'provider' | 'document';
+        /**
+         * Provider Id
+         */
+        provider_id?: string | null;
+        /**
+         * Document
+         */
+        document?: string | null;
+    };
+    url: '/api/queries/catalog.change_impact';
+};
+
+export type QueryCatalogChangeImpactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryCatalogChangeImpactError = QueryCatalogChangeImpactErrors[keyof QueryCatalogChangeImpactErrors];
+
+export type QueryCatalogChangeImpactResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotChangeImpact;
+};
+
+export type QueryCatalogChangeImpactResponse = QueryCatalogChangeImpactResponses[keyof QueryCatalogChangeImpactResponses];
 
 export type QueryHomeAwayReportData = {
     body?: never;

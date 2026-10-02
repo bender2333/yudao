@@ -292,6 +292,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3026,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
@@ -362,6 +365,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
@@ -437,6 +443,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
@@ -580,6 +589,9 @@
     "credential_ref": null,
     "credential_version": null,
     "default_reasoning_level": null,
+    "input_modalities": [
+     "text"
+    ],
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
@@ -819,6 +831,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#6>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,

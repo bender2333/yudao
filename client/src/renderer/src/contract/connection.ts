@@ -26,11 +26,15 @@ export function interfaceFor(address: string): Interface {
 export async function connect(settings: ConnectionSettings): Promise<Connection> {
   const address = effectiveAddress(settings);
   const { client } = interfaceFor(address);
-  let capabilities: Capabilities;
+  let capabilities: Capabilities | undefined;
   try {
-    capabilities = (await fetchCapabilities({ client })).data as Capabilities;
+    capabilities = (await fetchCapabilities({ client })).data as Capabilities | undefined;
   } catch (error) {
     return { state: "failed", address, message: error instanceof Error ? error.message : String(error) };
+  }
+  if (capabilities === undefined) {
+    // 请求没有得到能力清单（地址不通、被跨源策略拦下等）：按连接失败报告，不把 undefined 当成能力清单用
+    return { state: "failed", address, message: "没有取到能力清单" };
   }
   const serverVersion = capabilities.deployment.api_version;
   if (serverVersion !== CLIENT_API_VERSION) {

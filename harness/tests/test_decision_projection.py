@@ -175,10 +175,19 @@ def test_decision_requests_are_rebuilt_from_events_and_the_replay_check_compares
     adapter = FakeAdapter(_plain_replies())
     restarted = LoopSystem.for_testing(data_dir, adapter)
     # 保存的投影被删除以后由重放补建：决定请求逐字相同。日志末尾位置在这一步只说明恢复写过事件
-    # （取得执行权、被继续的 run 的步骤），不参与这条断言
-    assert saved_decisions(restarted.store)[1] == before[1]
+    # （取得执行权、被继续的 run 的步骤），不参与这条断言。
+    # 启动自动继续会推进 run_a 与 run_b，它们因 no_tool_call 暂停并发出新的决定请求（#204）；
+    # 这里只比较重建之前就存在的那些请求
+    before_ids = {decision.decision_id for decision in before[1]}
+    rebuilt = [decision for decision in saved_decisions(restarted.store)[1]
+               if decision.decision_id in before_ids]
+    assert rebuilt == before[1]
     assert saved_decisions(restarted.store)[0] > before[0]
-    assert {run: restarted.store.projection(run_stream(ids[run])).decisions for run in saved} == saved
+    for run in saved:
+        rebuilt_run = {decision.decision_id: decision
+                       for decision in restarted.store.projection(run_stream(ids[run])).decisions}
+        for decision in saved[run]:
+            assert rebuilt_run[decision.decision_id] == decision
     restarted.replay(ids["run_a"])
     restarted.replay(ids["run_b"])
 
