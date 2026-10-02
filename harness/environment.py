@@ -515,11 +515,13 @@ class LocalEnvironment:
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,
                        stop: asyncio.Event) -> _Finished:
     # 进程在新的进程组（Windows）或新的会话（POSIX）中启动，超时或停止信号到达时结束整个进程树，
-    # 输出读到管道关闭为止：结束以后是截至结束时的输出
+    # 输出读到管道关闭为止：结束以后是截至结束时的输出。标准输入接空设备：登记命令与检查都不读输入，
+    # 若继承服务进程的标准输入（一根打开但无人写入的管道），解释器启动时对该句柄取状态会一直等待
     spawn: dict[str, Any] = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
                              else {"start_new_session": True})
     process = await asyncio.create_subprocess_exec(
-        *argv, cwd=str(cwd), env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, **spawn,
+        *argv, cwd=str(cwd), env=env, stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, **spawn,
     )
     communicate = asyncio.ensure_future(process.communicate())
     stopped = asyncio.ensure_future(stop.wait())
