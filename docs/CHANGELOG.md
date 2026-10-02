@@ -443,3 +443,5 @@ qwen3.8 / 2026-10-02 05:55 / docs/architecture-issues.md 为 #219 追加一条�
 claude-opus-5-5 / 2026-10-02 06:43 / docs/architecture-issues.md 为 #219 登记的三条写处理结论（等待界限沿用 #107；执行槽位占用改由 #231 修改） / 架构师处理执行者登记的架构问题
 claude-opus-5-5 / 2026-10-02 06:45 / docs/architecture-issues.md 为 #89 登记的三条写处理结论（接口版本 #232、等待时限 #233、对外名称 #234） / 架构师处理执行者登记的架构问题
 claude-opus-5-5 / 2026-10-02 07:28 / 新增 docs/adr/0024-git-in-process-with-pygit2.md（Yudao 自己的 Git 操作在进程内用 pygit2 完成）；新增 docs/agents/omp-print-runs.yml（执行者与审查者的 omp 关闭后台命令） / 用户同意：git 子进程的启动成本使收尾与测试变慢、并行时超时；命令转到后台后 omp -p 提前退出
+
+qwen3.8 / 2026-10-02 09:04 / docs/architecture-issues.md 为 #235 登记一条：忽略规则改用进程内 libgit2 以后，「外层以文件规则点名确切路径、内层用 ! 取回」的三类形状与 Git 命令行的结论相反（git 不排除、libgit2 排除），而 local-tools.md 第 18 行与 existing-project-onboarding.md 第 124 行仍写着判定由 Git 命令行完成 / ADR-0024 要求三处 Git 操作全部进程内完成，本次按 ADR 用 path_is_ignored、不加兼容分支；同一探测库同一隔离环境下逐条核对 8 个规则形状有 3 个分歧，登记待架构师裁定判定口径
