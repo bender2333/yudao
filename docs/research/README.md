@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-10-01 新资料：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务：事实调研](network-and-mcp-references.md)。支持[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)与 [ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)：OpenCode、OMP、Claude Code、Codex 的 MCP 客户端与网页取回做法；官方 MCP Python SDK 2.2.0 的传输、取消、Windows 进程与工具注解；国内可用的搜索类 MCP 服务器；控制主机的网络环境。只整理事实与来源。
+
 > 2026-10-01 新资料：[M1 试用时桌面客户端的打包与安装：事实调研](client-packaging-and-update.md)。支持[桌面客户端的安装、更新与发布设计说明](../design/client-packaging-and-release.md)与 [ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)：OpenCode 桌面版的打包、本机服务与更新做法；electron-builder 与 Electron Forge；electron-updater 的 generic 提供方、无签名与降级；Windows 上的代码签名与「来自网络」标记；Ollama、LM Studio、Docker Desktop 管理本机服务的做法；`uv tool install` 的行为；GitHub Actions 与 Release。只整理事实与来源。
 
 > 2026-09-30 新资料：[computer use 调研：屏幕来源、不打扰用户、家庭版、开发板与 UI Automation](computer-use-without-containers.md)。支持专题 2「computer use」的讨论（[阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节）：14 个项目的屏幕从哪里来、在同一台电脑上怎样不打扰用户、Windows 11 家庭版上哪些做法可行、开发板上直接运行 Xvfb 的软件包与占用，以及 Windows 的 UI Automation。只整理事实与来源。

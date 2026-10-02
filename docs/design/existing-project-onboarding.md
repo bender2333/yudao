@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-更新：2026-09-30。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
+更新：2026-10-02。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
 
 依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
@@ -42,7 +42,7 @@
 
 - 源目录路径按 `source_directory.save` 的规则处理（应用层设计说明第 10 节第 6 项）：命令中填写的路径同时成为这个项目的第一条源目录登记，以后在项目设置中查看与修改。
 - 快照在命令的事务之前采集（与 `start_work_item_from_snapshot` 相同），采集失败时命令被拒绝，不建立项目，不写入任何事件；已经保存的快照工件按内容摘要寻址，重复无害。
-- 拒绝原因：`source_invalid`（新增：源目录不存在或不可读、含有宿主私有路径、公开树中有无法表示的条目，`message` 列出工作区内的相对路径与处理方法，处理方法与 D09 的 `workspace_unrepresentable` 相同）、`busy`（3.4A 之前）、`provider_unavailable`；`onboarding.restart` 另有 `not_found`、`project_archived`、`not_allowed`（项目由想法新建、已有基线、已有进行中或等待确认的建档事项）。
+- 拒绝原因：`source_invalid`（新增：源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据从公开树中去掉，不算宿主私有路径）、公开树中有无法表示的条目，`message` 列出工作区内的相对路径与处理方法，处理方法与 D09 的 `workspace_unrepresentable` 相同）、`busy`（3.4A 之前）、`provider_unavailable`；`onboarding.restart` 另有 `not_found`、`project_archived`、`not_allowed`（项目由想法新建、已有基线、已有进行中或等待确认的建档事项）。
 - 取消建档使用已有的 `work_item.cancel`：建档 run 进行中时按原有规则取消 run；run 已结束、正在等待确认时撤销决定请求，项目流记下这个事项的放弃结果（#126 定义的事项结果事件，原因为用户取消）。
 - `project.archive` 在建档事项进行中或等待确认时按原有规则拒绝（`work_item_in_progress`），用户先取消建档事项。
 
@@ -332,7 +332,7 @@ flowchart LR
 6. **树摘要与源目录。** 建档全过程工作区的树摘要等于快照摘要，采纳成果的 `code_tree_digest` 等于快照摘要；源目录的内容与修改时间在建档前后相同。
 7. **部门隔离。** 建档与以后事项中，产品与质检的上下文清单没有 `existing_structure`，读取与搜索工具取不到 STRUCTURE.md；工程的上下文清单有它。
 8. **git 来源。** 源目录是 git 仓库时快照记录带提交、分支与是否有未提交的修改；不是 git 仓库时为空，建档照常进行。
-9. **源目录无效。** 源目录不存在、含有宿主私有路径或公开树中有无法表示的条目时，`project.onboard` 返回 `source_invalid` 与相对路径，没有建立项目。
+9. **源目录无效。** 源目录不存在、含有宿主私有路径或公开树中有无法表示的条目时，`project.onboard` 返回 `source_invalid` 与相对路径，没有建立项目；源目录中的 `.git` 不在公开树中，也不引起拒绝。
 10. **建档之前的事项。** 3.4A 之前在建档中的项目新建事项被拒绝（`work_item_in_progress`）；3.4A 之后进入队列显示「等待建档」，确认以后从基线开始。
 11. **失败与中断（第 6 节）。** 建档 run 在工具执行时被真实进程终止，重启后自动继续；在 run 结束与候选写入之间终止，重启后补做一次结算，只有一个决定请求；回答「提出修改」以后、新 run 创建之前终止，重启后建立缺少的 run；用 run 事件版本较早的数据目录启动，等待确认的决定请求照常显示并可以回答；运行时间用完以后 `onboarding.restart` 可用；`work_item.cancel` 撤销等待中的决定请求。
 12. **评测场景 2。** 场景 2 的 Yudao 一侧由评测工作线（#118）在里程碑 M2 运行，先建档，运行器回答确认（[评测场景设计](evaluation-scenarios.md)第 9、10 节）；版本回归在每个里程碑交给用户试用之前运行（Stage 3 计划第 7 节）。
