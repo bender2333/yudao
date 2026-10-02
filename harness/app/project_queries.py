@@ -16,9 +16,11 @@ from ..git_audit import git_version_detail
 from ..definitions import DEFINITIONS
 from ..event_store import run_stream
 from ..models import (
-    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, EventType, GIT_VERSION_EVENTS, ProjectEventType, hash_bytes,
+    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
+    ProjectEventType, hash_bytes,
 )
 from ..observability import ObservabilityQuery
+from ..providers.selection import ModelSelection
 from ..projection import (
     RunNotFoundError, project_run, replay_decisions, replay_project, replay_run, load_decisions, saved_project,
 )
@@ -99,6 +101,12 @@ class ProjectRow(Contract):
     version: int
     work_item_count: int
     in_progress_count: int
+    # 排队中的事项数：状态为未开始或排队中（设计说明第 4.3 节 projects.list 的项目列表字段）
+    waiting_count: int
+    # 待回答的决定数：本项目等待回答的决定请求数（首页与左侧栏按它显示数量）
+    decisions_waiting: int
+    # 最近活动时间：项目流与它各 run 的最后一条事件时间中最晚的一个
+    last_activity_at: str
     active_work_item_id: str | None
     current_adoption: str | None
     # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待建档为 awaiting_onboarding；其余为空
@@ -128,6 +136,9 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             pinned=state.pinned, archived=state.archived, created_at=state.created_at,
             updated_at=state.updated_at, version=state.stream_version, work_item_count=len(state.work_items),
             in_progress_count=sum(item.status == "in_progress" for item in state.work_items),
+            waiting_count=sum(item.status in {"not_started", "held"} for item in state.work_items),
+            decisions_waiting=sum(1 for item in store.decisions(projects=(project_id,), statuses=("open",))[1]),
+            last_activity_at=_last_activity(store, state, through=through),
             active_work_item_id=state.active_work_item_id,
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
             onboarding_status=_onboarding_status(state),
@@ -136,6 +147,16 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
         ))
     return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
+
+def _last_activity(store: Any, state: Any, *, through: int | None) -> str:
+    # 最近活动时间：项目流最后一条事件的时间，与这个项目各 run 最后一条事件的时间取最晚的一个。
+    # 项目流没有事件时回落到创建时间；比较用 ISO 字符串（带时区，字典序与时间序一致）
+    times = [state.updated_at or state.created_at]
+    for item in state.work_items:
+        bounds = store.run_time_bounds(item.run_id, through=through)
+        if bounds is not None:
+            times.append(bounds[1])
+    return max(times)
 
 def _onboarding_status(state: Any) -> str | None:
     # 建档中的项目还没有基线采纳：有进行中的建档事项时为 onboarding，否则为 awaiting_onboarding
@@ -600,6 +621,22 @@ class RoomView(Contract):
     tool_panel: dict[str, Any] | None
     self_test: dict[str, Any] | None
 
+class EffectiveModel(Contract):
+    # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的选择规则与当前目录计算，不发送请求。
+    # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
+    # 为 unset 时都没有设置。unusable 与 unset 时不返回其他连接或模型
+    state: Literal["effective", "unusable", "unset"]
+    provider_id: str | None = None
+    model_id: str | None = None
+    provider_name: str | None = None
+    protocol: str | None = None
+    model: str | None = None
+    selection_source: str | None = None
+    requested_tier: str | None = None
+    sent_tier: str | None = None
+    reason: str | None = None
+    message: str | None = None
+
 class DepartmentWorkspaceResult(Contract):
     project_id: str
     department: str
@@ -609,22 +646,44 @@ class DepartmentWorkspaceResult(Contract):
     active: bool
     prompt: DepartmentPromptState
     setting: DepartmentSetting
+    effective: EffectiveModel
     guidance: list[GuidanceRecord]
     messages: list[dict[str, Any]]
     context: dict[str, Any]
     last_call: dict[str, Any] | None
-    provider: dict[str, Any] | None
     reminders: list[str]
     room: RoomView
 
 
-def _effective_model_id(application: Application, state: Any, department: str) -> str | None:
-    # 本项目某部门的生效模型（设计说明第 5.3 节）：项目部门设置写入了模型时用它，否则用部门默认
-    project_model = state.department_settings[department].model_id
-    if project_model:
-        return project_model
-    binding = application.system.facade.providers_view()["bindings"].get(department) or {}
-    return binding.get("model_id")
+def _project_selection(setting: Any) -> ModelSelection | None:
+    # 项目部门设置中的模型选择：模型两项与请求档位分别写入，没有写入模型时为空（跟随部门默认）
+    if not setting.model_id:
+        return None
+    return ModelSelection(provider_id=setting.provider_id, model_id=setting.model_id,
+                          requested_tier=setting.requested_tier)
+
+def _effective_model(application: Application, setting: Any, department: str) -> EffectiveModel:
+    # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的顺序解析，不发送请求。
+    # 没有任何一层写入模型时为「未设置」，引用无法使用时为「无法使用」并带回原因；
+    # 这两种情况都不返回其他连接或模型
+    resolution = application.system.facade.resolve_effective_model(department, _project_selection(setting))
+    if resolution.resolution is None:
+        return EffectiveModel(state="unset")
+    target = resolution.resolution
+    if not target.available:
+        return EffectiveModel(state="unusable", reason=target.reason, message=target.message)
+    public = target.public
+    return EffectiveModel(
+        state="effective",
+        provider_id=public.get("provider_config_id"),
+        model_id=public.get("model_id"),
+        provider_name=public.get("provider_name"),
+        protocol=public.get("protocol"),
+        model=public.get("requested_model"),
+        selection_source=target.selection_source,
+        requested_tier=public.get("requested_tier"),
+        sent_tier=public.get("sent_tier"),
+    )
 
 # 房间状态显示的文字（原型 contract/handlers/department.js 的 STATUS_TEXT）
 ROOM_STATUS_TEXT = {
@@ -754,6 +813,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     run = None if item is None else _optional_run(application, item.run_id)
     configured = state.department_settings[request.department]
     used_version = _last_used_prompt_version(run, request.department)
+    effective = _effective_model(application, configured, request.department)
     guidance = [
         GuidanceRecord(
             guidance_id=value.id, version=value.version, text=value.text, status=value.status,
@@ -787,12 +847,11 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
                 source=configured.source, provider_id=configured.provider_id,
                 model_id=configured.model_id, requested_tier=configured.requested_tier,
                 prompt_configured=configured.configured_prompt),
+            effective=effective,
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
-            provider=None if run is None else run.provider_bindings.get(request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
-            reminders=application.system.facade.model_reminders(
-                _effective_model_id(application, state, request.department), request.department),
+            reminders=application.system.facade.model_reminders(effective.model_id, request.department),
             room=_room_view(application, state, item, run, request.department, guidance),
         ),
     )
@@ -1692,7 +1751,10 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.COLLABORATION_REQUESTED,
-                EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED),
+                EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED,
+                # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
+                # 目录修订（准入作废、连接修改）以后引用可用性随之更新
+                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED),
 )
 
 RUN_ACTIONS = QueryDefinition(
@@ -1736,7 +1798,9 @@ PROJECT_SETTINGS = QueryDefinition(
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
                 ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
-                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
+                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED,
+                # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
+                CatalogEventType.CATALOG_REVISED),
 )
 
 RUN_EXPORT = QueryDefinition(

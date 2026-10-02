@@ -11,7 +11,9 @@ import { buildCatalog } from "./../world/floor-decl.ts";
 import { createFloorDriver, createFloorState, type FloorDriver, type FloorState } from "./../world/floor.ts";
 import { createScene } from "./../world/scene.ts";
 import { FloorRenderer, H, W } from "./render.ts";
+import { createDecisionCard, type DecisionCard } from "./card.ts";
 import { ROOM_VISUALS } from "./render-decl.ts";
+import type { DecisionAnswer, DecisionResult } from "./card.ts";
 import type { FloorModel, PixelFloorEvent, SceneLike } from "../world/types.ts";
 import type { TimeText } from "../world/types.ts";
 
@@ -43,9 +45,11 @@ export interface FloorView {
   /** 画面逻辑尺寸，供宿主与测试读取。 */
   readonly size: { W: number; H: number };
   /** 世界的当前状态、驱动与场景（测试与回放读取）。 */
-  inspect(): { driver: FloorDriver; scene: SceneLike; state: FloorState; renderer: FloorRenderer };
+  inspect(): { driver: FloorDriver; scene: SceneLike; state: FloorState; renderer: FloorRenderer; card: DecisionCard };
   /** 大厅决定板在画面逻辑坐标里的矩形（点击与测试共用）。 */
   boardRect(): { x: number; y: number; w: number; h: number };
+  /** 打开着的决定卡片（测试与宿主读取）。 */
+  card(): DecisionCard;
 }
 
 /** 端到端测试的入口：按需要给出世界、角色、包裹、管道与信号的当前状态（含类型，测试不猜形状）。 */
@@ -59,6 +63,16 @@ export interface FloorTestHooks {
     reduced: boolean;
     canvasWidth: number;
   };
+  /** 决定板与决定卡片的状态（工单 #179 的端到端核对）。 */
+  decisions: () => {
+    board: { x: number; y: number; w: number; h: number };
+    faces: { id: string; kind: string; version: number; title: string }[];
+    card: { openId: string | null; submitted: string[]; message: string | null; stamp: { id: string; text: string } | null };
+  };
+  /** 打开指定决定的卡片（端到端测试直接打开，绕过点击坐标的缩放）。 */
+  openCard: (id: string) => void;
+  /** 点一个选项（端到端测试在真实画布上点章，这里给直接入口）。 */
+  answer: (option: string) => Promise<void>;
   resync: () => void;
 }
 
@@ -87,6 +101,17 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
         canvasWidth: 0,
       };
     },
+    decisions: () => {
+      const { driver, card } = view.inspect();
+      const info = card.inspect();
+      return {
+        board: view.boardRect(),
+        faces: driver.model.decisions.map((d) => ({ id: d.id, kind: d.kind, version: d.version, title: d.title })),
+        card: { openId: info.openId, submitted: info.submitted, message: info.message, stamp: info.stamp ? { id: info.stamp.id, text: info.stamp.text } : null },
+      };
+    },
+    openCard: (id) => view.card().open(id),
+    answer: (option) => view.card().answer(option),
     resync: () => onResync(),
   };
 }
@@ -96,7 +121,8 @@ export interface FloorViewOptions {
   clock: Clock;
   /** 决定卡的挂载容器（说明栏的输入框加在这里）。 */
   cardHost?: HTMLElement;
-  onDecide?: (payload: { decision_id: string; option: string; note: string; base_version: number }) => unknown;
+  /** 点选项时的回答：带上决定的版本与说明，返回命令的结果（被拒绝时给出原因）。 */
+  onDecide?: (payload: DecisionAnswer) => Promise<DecisionResult> | DecisionResult;
   onGo?: (target: string) => void;
 }
 
@@ -135,6 +161,18 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   };
   const driver = createFloorDriver({ model: emptyModel, scene, state: createFloorState(), catalog, W, H, time: FLOOR_TIME });
   const renderer = new FloorRenderer(driver, scene);
+  // 世界里的决定卡片：点大厅的板子打开，回答调用 onDecide（工单 #179）
+  const card = createDecisionCard(canvas, {
+    cardHost: opts.cardHost ?? null,
+    onDecide: (payload) => (opts.onDecide ? opts.onDecide(payload) : { accepted: false, message: "画面没有接上回答命令" }),
+    onGo: (target) => opts.onGo?.(target),
+    now: () => scene.realT,
+    after: (ms, fn) => scene.after(ms, fn),
+    W,
+    H,
+  });
+  renderer.card = card;
+  scene.cardStamped = (id, text) => card.stamp(id, text);
 
   let last = 0;
 
@@ -155,6 +193,31 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     // 画面自己渲染：PixiJS 的共享 ticker 被时钟停掉了（时间全部由共用时钟给出），这里主动画一帧
     app.renderer.render(app.stage);
   }
+
+  /** 画布上的坐标换成画面逻辑坐标（画面按整数倍缩放贴到舞台上）。 */
+  function worldXY(ev: MouseEvent): [number, number] {
+    const rect = canvas.getBoundingClientRect();
+    return [((ev.clientX - rect.left) / rect.width) * W, ((ev.clientY - rect.top) / rect.height) * H];
+  }
+
+  /** 决定板的命中范围：板子与它上方的「待你决定」牌子；没有等待回答的决定请求时不命中。 */
+  function overBoard(x: number, y: number): boolean {
+    if (driver.model.decisions.length === 0) return false;
+    const b = driver.boardRect();
+    return x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 10;
+  }
+
+  const onClick = (ev: MouseEvent): void => {
+    const [x, y] = worldXY(ev);
+    if (card.click(x, y)) return;
+    if (overBoard(x, y)) card.open();
+  };
+  const onMove = (ev: MouseEvent): void => {
+    const [x, y] = worldXY(ev);
+    canvas.style.cursor = card.cursor(x, y) ?? (!card.isOpen() && overBoard(x, y) ? "pointer" : "default");
+  };
+  canvas.addEventListener("click", onClick);
+  canvas.addEventListener("mousemove", onMove);
 
   applyLayout();
   draw();
@@ -179,6 +242,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     size: { W, H },
     setModel(model) {
       driver.setModel(model);
+      card.setDecisions(model.decisions);
       draw();
     },
     playEvent(event) {
@@ -200,12 +264,16 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     destroy() {
       offTick();
       window.removeEventListener("resize", onResize);
+      canvas.removeEventListener("click", onClick);
+      canvas.removeEventListener("mousemove", onMove);
+      card.destroy();
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
       texture.destroy(true);
       app.destroy(false, { children: true });
     },
-    inspect: () => ({ driver, scene, state: driver.state, renderer }),
+    inspect: () => ({ driver, scene, state: driver.state, renderer, card }),
     boardRect: () => driver.boardRect(),
+    card: () => card,
   };
 }
 

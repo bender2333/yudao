@@ -62,6 +62,8 @@ export const GUIDANCE_STATUS: Record<string, string> = {
 
 export const DECISION_KIND: Record<string, string> = {
   model_unavailable: "模型引用无法使用，等待恢复",
+  no_tool_call: "已暂停（模型没有调用工具），等待继续",
+  workspace_unrepresentable: "已暂停（工作区无法表示），等待继续",
   definitions_changed: "定义版本不同，等待选择",
   unknown_action: "动作结果未知，等待核实",
   initial_prd: "接入已有项目的初始 PRD 等待确认",

@@ -325,7 +325,8 @@ def test_sdk_sends_exact_host_context_and_preserves_stateless_tool_protocol(tmp_
         assert paths == ["/v1/responses", "/v1/responses"]
         assert all(auth)
         for body, request in zip(captures, [first, second]):
-            assert body == {"model": "local-model", "input": request.input_items, "tools": TOOLS, "store": False, "stream": True}
+            assert body == {"model": "local-model", "input": request.input_items, "tools": TOOLS, "store": False,
+                            "stream": True, "include": ["reasoning.encrypted_content"]}
             assert canary not in json.dumps(body)
         assert captures[1]["input"][-3:] == history
 
@@ -428,7 +429,8 @@ def test_completed_items_and_final_usage_are_observed_once():
     observations = []
     with _server([_stream([REASONING, CALL, TEXT], duplicate=True)]) as (config, *_):
         result = ResponsesAdapter(config).complete(_request(), observations.append)
-    assert [event.id for event in observations if event.kind == "message"] == ["rs-one", "fc-one", "msg-one"]
+    assert [event.id for event in observations if event.kind == "reasoning"] == ["rs-one"]
+    assert [event.id for event in observations if event.kind == "message"] == ["fc-one", "msg-one"]
     reports = [event for event in observations if event.kind == "usage"]
     assert len(reports) == 1 and reports[0].usage == result.usage
     assert reports[0].payload["usage"] == RAW_USAGE
@@ -765,7 +767,8 @@ def test_compaction_output_limit_is_sent_to_the_sdk_without_hidden_prompt_change
         request = _request().model_copy(update={"purpose": "compaction", "max_output_tokens": 320, "tools": []})
         ResponsesAdapter(config).complete(request)
         assert captures[0] == {"model": "local-model", "input": request.input_items, "tools": [],
-                               "store": False, "stream": True, "max_output_tokens": 320}
+                               "store": False, "stream": True, "max_output_tokens": 320,
+                               "include": ["reasoning.encrypted_content"]}
 
 
 def test_nullable_reasoning_content_is_preserved_through_sdk_and_next_request():
@@ -775,8 +778,8 @@ def test_nullable_reasoning_content_is_preserved_through_sdk_and_next_request():
         adapter = ResponsesAdapter(config)
         result = adapter.complete(_request(), observations.append)
         assert result.output == [reasoning, CALL]
-        message = next(event for event in observations if event.kind == "message")
-        assert message.payload == reasoning and message.text == ""
+        observation = next(event for event in observations if event.kind == "reasoning")
+        assert observation.payload == reasoning
         next_request = _request(history=[*result.output, {"type": "function_call_output", "call_id": CALL["call_id"], "output": "proof"}])
         adapter.complete(next_request)
         assert captures[1]["input"][-3] == reasoning

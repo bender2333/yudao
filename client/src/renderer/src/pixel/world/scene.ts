@@ -47,7 +47,7 @@ export function createScene(opts: SceneOptions): SceneLike {
         anim: o.anim ?? "idle",
         animStart: 0,
         clock: 0,
-        // 与原型 engine.js 的 addActor 一致：seed 由当前演员数量决定（待机眨眼与陈设噪点靠它）
+        // 小人的随机相位取声明序号的哈希（原型 engine.js 第 843 行）；不消耗场景的随机数序列
         seed: Math.floor(hash(scene.actors.length + 7) * 3000),
         hold: o.hold ?? null,
         face: null,

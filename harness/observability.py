@@ -27,6 +27,7 @@ from .models import (
     json_dumps,
 )
 from .projection import RunNotFoundError, project_run
+from .providers.resolve import CALL_TARGET_FIELDS
 from .views import compaction_coverage, event_card, run_payload
 
 
@@ -119,6 +120,7 @@ class ObservabilityQuery:
                 EventType.CONTEXT_ASSEMBLED,
                 EventType.MODEL_REQUESTED,
                 EventType.MODEL_REQUEST_SERIALIZED,
+                EventType.MODEL_REASONING,
                 EventType.MODEL_MESSAGE,
                 EventType.MODEL_ATTEMPT_FINISHED,
                 EventType.MODEL_ATTEMPT_FAILED,
@@ -342,10 +344,11 @@ class ObservabilityQuery:
             if event.type in {
                 EventType.USER_INPUT_RECEIVED,
                 EventType.DEPARTMENT_INPUT,
+                EventType.MODEL_REASONING,
                 EventType.MODEL_MESSAGE,
                 EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             }:
-                if event.type == EventType.MODEL_MESSAGE:
+                if event.type in {EventType.MODEL_MESSAGE, EventType.MODEL_REASONING}:
                     attempt = records.get(_attempt_id_for(payload, role))
                     if attempt is not None and attempt.get("status") in {"failed", "cancelled"}:
                         continue
@@ -657,6 +660,8 @@ class ObservabilityQuery:
         return result
 
     def _message_text(self, run_id: str, payload: dict[str, Any], event_type: str) -> str:
+        if event_type == EventType.MODEL_REASONING:
+            return self._reasoning_text(run_id, payload)
         key = "message_ref" if event_type == EventType.MODEL_MESSAGE else "input_ref"
         item = self._artifact_json(run_id, payload.get(key))
         if isinstance(item, dict):
@@ -677,11 +682,30 @@ class ObservabilityQuery:
                 name = item.get("name") or "unknown tool"
                 arguments = item.get("arguments")
                 return f"工具调用：{name} · 参数 {_short_text(arguments)}"
-            if item_type == "reasoning":
-                return "模型返回 reasoning item，SDK 未提供可显示文本"
             if event_type == EventType.MODEL_MESSAGE:
                 return f"模型返回 {item_type or '非文本 item'}，没有可显示文本"
         return str(payload.get("summary") or "")
+
+    def _reasoning_text(self, run_id: str, payload: dict[str, Any]) -> str:
+        # 推理内容按协议保存在推理条目里：可显示的文字按协议字段取，取不到时说明没有可显示文本
+        item = self._artifact_json(run_id, payload.get("reasoning_ref"))
+        if not isinstance(item, dict):
+            return ""
+        parts = [
+            str(part.get("text") or "")
+            for part in item.get("summary") or []
+            if isinstance(part, dict) and part.get("text")
+        ]
+        if not parts and isinstance(item.get("reasoning_content"), str):
+            parts = [item["reasoning_content"]]
+        if not parts:
+            parts = [
+                str(block.get("thinking") or "")
+                for block in item.get("blocks") or []
+                if isinstance(block, dict) and block.get("thinking")
+            ]
+        text = "\n".join(part for part in parts if part)
+        return text or "模型返回推理内容，没有可显示文本"
 
 
 def list_model_attempts(store: EventStore, artifacts: ArtifactStore, run_id: str, **filters: Any) -> dict[str, Any]:
@@ -970,6 +994,8 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
         "requested_model": record.get("requested_model"),
         "actual_provider": record.get("actual_provider"),
         "actual_model": record.get("actual_model"),
+        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位（设计说明第 6 节）
+        "call_target": record.get("call_target"),
         "status": _public_status(record),
         "stage": record.get("stage", record.get("status")),
         "partial_output": record.get("partial_output", False),
@@ -1043,6 +1069,7 @@ def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict
         "requested_model": payload.get("requested_model"),
         "actual_provider": None,
         "actual_model": None,
+        "call_target": None,
         "status": "prepared",
         "sent": False,
         "prepared_at": event.created_at if event.type == EventType.CONTEXT_ASSEMBLED else None,
@@ -1074,6 +1101,12 @@ def _merge_context(record: dict[str, Any], event: Event, payload: dict[str, Any]
     })
 
 
+# 调用目标的公开字段：请求、尝试与压缩事件把 call_target_public 的结果连同选择来源写入载荷（设计说明第 6 节）；
+# 字段清单由 Provider 模块给出，观察与分析按它取出
+def _call_target_public(payload: dict[str, Any]) -> dict[str, Any]:
+    # 从请求事件载荷取出调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位
+    return {key: payload.get(key) for key in (*CALL_TARGET_FIELDS, "selection_source")}
+
 def _merge_started(record: dict[str, Any], event: Event, payload: dict[str, Any]) -> None:
     record.update({
         "status": "requesting",
@@ -1085,6 +1118,9 @@ def _merge_started(record: dict[str, Any], event: Event, payload: dict[str, Any]
         "actual_provider": payload.get("actual_provider", record.get("actual_provider")),
         "actual_model": payload.get("actual_model", record.get("actual_model")),
         "started_event_id": event.event_id,
+        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位（设计说明第 6 节）；
+        # run.attempt 从它读取（工单 #92）
+        "call_target": _call_target_public(payload),
     })
 
 

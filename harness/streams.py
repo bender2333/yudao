@@ -29,6 +29,7 @@ RUN_EVENT_TYPES = frozenset({
     "activation_finished",
     "context_assembled",
     "model_request_serialized",
+    "model_reasoning",
     "model_message",
     "model_requested",
     "model_stream_progress",

@@ -1,0 +1,97 @@
+{
+  "project_id": "proj_ac579344f6074ccb",
+  "run_id": "run_41500e17e5704c13",
+  "after_product": {
+    "phase": "ENGINEERING"
+  },
+  "targets_after_product": [
+    {
+      "model_id": "claude-messages",
+      "protocol": "messages",
+      "selection_source": "department_default",
+      "requested_tier": "high",
+      "sent_tier": "high",
+      "requested_model": "ag/claude-opus-4-6-thinking",
+      "provider_name": "9router messages"
+    }
+  ],
+  "switch_engineering": {
+    "version": 0,
+    "result": {
+      "reminders": []
+    }
+  },
+  "after_switch": {
+    "phase": "ENGINEERING",
+    "stop_reason": null
+  },
+  "targets_after_switch": [
+    {
+      "model_id": "claude-messages",
+      "protocol": "messages",
+      "selection_source": "department_default",
+      "requested_tier": "high",
+      "sent_tier": "high",
+      "requested_model": "ag/claude-opus-4-6-thinking",
+      "provider_name": "9router messages"
+    },
+    {
+      "model_id": "claude-chat_completions",
+      "protocol": "chat_completions",
+      "selection_source": "project_department_setting",
+      "requested_tier": "low",
+      "sent_tier": "low",
+      "requested_model": "ag/claude-opus-4-6-thinking",
+      "provider_name": "9router chat_completions"
+    }
+  ],
+  "switch_engineering_deepseek": {
+    "version": 1,
+    "result": {
+      "reminders": []
+    }
+  },
+  "after_deepseek": {
+    "phase": "ENGINEERING",
+    "stop_reason": null
+  },
+  "targets_after_deepseek": [
+    {
+      "model_id": "claude-messages",
+      "protocol": "messages",
+      "selection_source": "department_default",
+      "requested_tier": "high",
+      "sent_tier": "high",
+      "requested_model": "ag/claude-opus-4-6-thinking",
+      "provider_name": "9router messages"
+    },
+    {
+      "model_id": "claude-chat_completions",
+      "protocol": "chat_completions",
+      "selection_source": "project_department_setting",
+      "requested_tier": "low",
+      "sent_tier": "low",
+      "requested_model": "ag/claude-opus-4-6-thinking",
+      "provider_name": "9router chat_completions"
+    },
+    {
+      "model_id": "deepseek-chat_completions",
+      "protocol": "chat_completions",
+      "selection_source": "project_department_setting",
+      "requested_tier": "medium",
+      "sent_tier": "medium",
+      "requested_model": "cbcn/deepseek-v4.1-flash",
+      "provider_name": "9router chat_completions"
+    },
+    {
+      "model_id": "deepseek-chat_completions",
+      "protocol": "chat_completions",
+      "selection_source": "project_department_setting",
+      "requested_tier": "medium",
+      "sent_tier": "medium",
+      "requested_model": "cbcn/deepseek-v4.1-flash",
+      "provider_name": "9router chat_completions"
+    }
+  ],
+  "final_phase": "ENGINEERING"
+}

@@ -6356,6 +6356,9 @@
           "setting": {
             "$ref": "#/components/schemas/DepartmentSetting"
           },
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveModel"
+          },
           "guidance": {
             "items": {
               "$ref": "#/components/schemas/GuidanceRecord"
@@ -6388,18 +6391,6 @@
             ],
             "title": "Last Call"
           },
-          "provider": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
-          },
           "reminders": {
             "items": {
               "type": "string"
@@ -6422,11 +6413,11 @@
           "active",
           "prompt",
           "setting",
+          "effective",
           "guidance",
           "messages",
           "context",
           "last_call",
-          "provider",
           "reminders",
           "room"
         ],
@@ -6606,6 +6597,135 @@
           "queued_work_items"
         ],
         "title": "DrainStatus"
+      },
+      "EffectiveModel": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "effective",
+              "unusable",
+              "unset"
+            ],
+            "title": "State"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Name"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "EffectiveModel"
       },
       "EventDetailResult": {
         "properties": {
@@ -7959,6 +8079,18 @@
             "type": "integer",
             "title": "In Progress Count"
           },
+          "waiting_count": {
+            "type": "integer",
+            "title": "Waiting Count"
+          },
+          "decisions_waiting": {
+            "type": "integer",
+            "title": "Decisions Waiting"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "title": "Last Activity At"
+          },
           "active_work_item_id": {
             "anyOf": [
               {
@@ -8019,6 +8151,9 @@
           "version",
           "work_item_count",
           "in_progress_count",
+          "waiting_count",
+          "decisions_waiting",
+          "last_activity_at",
           "active_work_item_id",
           "current_adoption",
           "onboarding_status",
@@ -20556,6 +20691,471 @@
         "title": "ModelMessagePayload",
         "type": "object"
       },
+      "ModelReasoningEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "model_reasoning",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ModelReasoningPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ModelReasoningEvent",
+        "type": "object"
+      },
+      "ModelReasoningPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "requested_provider": {
+            "title": "Requested Provider",
+            "type": "string"
+          },
+          "requested_protocol": {
+            "title": "Requested Protocol",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Version"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "configured_max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Max Output Tokens"
+          },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
+          "input_version": {
+            "title": "Input Version",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "integer"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash"
+          },
+          "guidance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guidance Ids",
+            "type": "array"
+          },
+          "guidance_only": {
+            "title": "Guidance Only",
+            "type": "boolean"
+          },
+          "effective_contract_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Contract Hash"
+          },
+          "engineering_plan_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineering Plan Hash"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "attempt_id": {
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "logical_call_id": {
+            "title": "Logical Call Id",
+            "type": "string"
+          },
+          "collaboration_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collaboration Request Id"
+          },
+          "context_event_id": {
+            "title": "Context Event Id",
+            "type": "string"
+          },
+          "reasoning_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "integer"
+          },
+          "purpose": {
+            "enum": [
+              "work",
+              "compaction"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_config_id",
+          "model_id",
+          "provider_name",
+          "protocol",
+          "base_url",
+          "requested_provider",
+          "requested_protocol",
+          "requested_model",
+          "credential_ref",
+          "credential_version",
+          "context_window",
+          "configured_max_output_tokens",
+          "accepts_required_tool_call",
+          "input_modalities",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
+          "input_version",
+          "prompt_version",
+          "prompt_hash",
+          "guidance_ids",
+          "guidance_only",
+          "effective_contract_hash",
+          "engineering_plan_hash",
+          "request_id",
+          "attempt_id",
+          "logical_call_id",
+          "collaboration_request_id",
+          "context_event_id",
+          "reasoning_ref",
+          "activation_id",
+          "step_id",
+          "purpose"
+        ],
+        "title": "ModelReasoningPayload",
+        "type": "object"
+      },
       "ModelRequestSerializedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -30162,6 +30762,7 @@
             "model_attempt_failed": "#/components/schemas/ModelAttemptFailedEvent",
             "model_attempt_finished": "#/components/schemas/ModelAttemptFinishedEvent",
             "model_message": "#/components/schemas/ModelMessageEvent",
+            "model_reasoning": "#/components/schemas/ModelReasoningEvent",
             "model_request_serialized": "#/components/schemas/ModelRequestSerializedEvent",
             "model_requested": "#/components/schemas/ModelRequestedEvent",
             "model_retry_scheduled": "#/components/schemas/ModelRetryScheduledEvent",
@@ -30240,6 +30841,9 @@
           },
           {
             "$ref": "#/components/schemas/ModelMessageEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ModelReasoningEvent"
           },
           {
             "$ref": "#/components/schemas/ModelRequestedEvent"

@@ -8,6 +8,7 @@ from typing import Any, Mapping, Sequence
 
 from .call import ModelCall
 from .errors import CancelledError, ProviderError, UnsupportedProtocolError
+from .reasoning import ReasoningOutput
 from .resolve import FrozenTarget
 from .store import SUPPORTED_PROTOCOLS
 
@@ -70,6 +71,9 @@ class InvokeResult:
     response_id: str | None = None
     protocol: str = ""
     actual_model: str | None = None
+    # 这次回答里上游返回的推理内容，带产生它的连接、协议与上游模型（设计说明第 7.6 节）；
+    # 与 output 分开保存，不进入协议无关的部门历史条目列表
+    reasoning: ReasoningOutput | None = None
     wire_evidence: dict[str, Any] = field(default_factory=dict)
 
 

@@ -1,0 +1,29 @@
+{
+  "secret_length": 35,
+  "run_ids": [
+    "run_f70147e623264494"
+  ],
+  "export_keys": [
+    "attempts",
+    "events",
+    "projection",
+    "run_id",
+    "usage"
+  ],
+  "event_count": 185,
+  "secret_hits_export": [],
+  "secret_hits_keys": [
+    "api_key"
+  ],
+  "replay": {
+    "target": "run",
+    "consistent": true,
+    "differences": []
+  },
+  "replay_without_credentials": {
+    "target": "run",
+    "consistent": true,
+    "differences": []
+  },
+  "secret_hits_files": []
+}

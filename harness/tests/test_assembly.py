@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
-from harness.assembly import ContextAssembly, ModelLimits, StepFrame, model_limits
+from harness.assembly import TARGET_KEYS, ContextAssembly, ModelLimits, StepFrame, model_limits
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjection, hash_bytes
 from harness.projection import apply_event
@@ -51,7 +51,8 @@ def _rebuild_recorded_steps(system, run_id):
             before = events[:index]
             limits = model_limits(payload["context_window"], payload["configured_max_output_tokens"])
             pinned = assembly.pin(projection, frames[payload["activation_id"]], limits,
-                                  step_id=payload["step_id"], events=before, snapshot_hash=payload["snapshot_hash"])
+                                  step_id=payload["step_id"], events=before, snapshot_hash=payload["snapshot_hash"],
+                                  call_target={key: payload.get(key) for key in TARGET_KEYS})
             step = assembly.request(pinned, assembly.department_history(before, event.department))
             assert step.payload == artifact(payload["request_ref"])
             assert step.parts == artifact(payload["parts_ref"])

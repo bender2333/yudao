@@ -348,21 +348,35 @@ class Orchestrator:
 
     def _install_test_call_target(self, context_window: int) -> None:
         # 测试系统的确定性适配器：用它的名称与模型名登记一个 fake 协议的模型访问定义。
-        # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致
+        # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致。
+        # 目录里已有内容时按合并处理：保留已有的连接、定义与部门默认，只补上缺的 fake 连接，
+        # 并且只给它补上还没有默认的部门——测试适配器不覆盖用户在目录与项目里写入的模型选择
         if self.facade is None:
             raise ValueError("a provider facade is required for runs")
         provider_id = self.test_provider
         model_id = f"{provider_id}-model"
-        self.facade.store_document({
-            "providers": [{"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""}],
-            "models": [{
+        view = self.facade.providers_view()
+        # providers_view 给界面用的字段比目录文档多（credential、credential_configured、models），
+        # 这里只取目录定义本身的字段，未知字段会被整份拒绝
+        providers = [
+            {key: item[key] for key in (
+                "id", "name", "protocol", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")}
+            for item in view["providers"]
+        ]
+        models = list(view["models"])
+        bindings = {key: dict(value) for key, value in view["bindings"].items()}
+        if not any(item["id"] == provider_id for item in providers):
+            providers.append({"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""})
+        if not any(item["id"] == model_id for item in models):
+            models.append({
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
                 "context_window": context_window,
                 "max_output_tokens": response_reserve(context_window, None),
-            }],
-            "bindings": {department: {"provider_id": provider_id, "model_id": model_id}
-                         for department in DEPARTMENTS},
-        })
+            })
+        for department in DEPARTMENTS:
+            bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
+        self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
+
     def _environment(self, run_id: str) -> LocalEnvironment:
         return LocalEnvironment.open(self.workspace_root / run_id)
 

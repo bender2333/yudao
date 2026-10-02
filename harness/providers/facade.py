@@ -31,6 +31,7 @@ from .invoke import (
 from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
 from .resolve import (
     CallTargetResolution,
+    EffectiveModelResolution,
     FrozenTarget,
     ResolveSnapshot,
     call_target_public,
@@ -38,7 +39,7 @@ from .resolve import (
     resolve_snapshot,
 )
 from .responses import ProviderConnections
-from .selection import ModelSelection, merge_selection
+from .selection import ModelSelection, SelectionResolution, merge_selection
 from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
@@ -616,33 +617,53 @@ class ProviderFacade:
             _, public = self._call_targets.pop(str(handle_id))
             return dict(public)
 
+    def _merge_department_selection(self, department: str,
+                                    project: ModelSelection | Mapping[str, Any] | None,
+                                    requested_tier: str | None,
+                                    ) -> tuple[SelectionResolution, tuple[CallTargetResolution, FrozenTarget | None]]:
+        # 读取该部门的部门默认，与项目部门设置一起合并，再解析调用目标。
+        # 模型访问定义与请求档位分别按「项目部门设置、部门默认」的顺序取得第一个写入了的项，
+        # 选择来源是提供模型访问定义的那一层（设计说明第 5.3 节）
+        default = _as_selection(self._bindings.get(str(department)))
+        project_selection = _as_selection(project) if project is not None else None
+        merged = merge_selection(project_selection, default)
+        if not merged.resolved:
+            return merged, (CallTargetResolution(
+                False, "provider_unavailable",
+                f"部门 {department} 未选择模型访问定义，请配置部门默认或本项目的部门设置",
+                call_target_public(None, requested_tier), selection_source=merged.selection_source,
+            ), None)
+        tier = requested_tier if requested_tier is not None else merged.requested_tier
+        resolution, target = _resolve_call_target(
+            self._store, self._credentials, merged.model_id, tier, self._admissions)
+        return merged, (replace(resolution, selection_source=merged.selection_source), target)
+
     def resolve_department_default(self, department: str, requested_tier: str | None = None, *,
                                    project: ModelSelection | Mapping[str, Any] | None = None,
                                    ) -> CallTargetResolution:
-        # 步骤驱动使用的内部入口：同一把锁内读取该部门的部门默认，与项目部门设置一起合并后解析。
-        # 模型访问定义与请求档位分别按「项目部门设置、部门默认」的顺序取得第一个写入了的项，
-        # 选择来源是提供模型访问定义的那一层（设计说明第 5.3 节）。调用方给出 requested_tier 时按它解析
-        # （整理请求使用最低支持档位），否则使用合并得到的请求档位；解析时按当前模型声明的支持档位限制（#87）
+        # 步骤驱动使用的内部入口：同一把锁内合并该部门的设置并解析调用目标，保留调用句柄。
+        # 调用方给出 requested_tier 时按它解析（整理请求使用最低支持档位），否则使用合并得到的请求档位；
+        # 解析时按当前模型声明的支持档位限制（#87）
         with self._lock:
-            default = _as_selection(self._bindings.get(str(department)))
-            project_selection = _as_selection(project) if project is not None else None
-            merged = merge_selection(project_selection, default)
-            if not merged.resolved:
-                return CallTargetResolution(
-                    False, "provider_unavailable",
-                    f"部门 {department} 未选择模型访问定义，请配置部门默认或本项目的部门设置",
-                    call_target_public(None, requested_tier), selection_source=merged.selection_source,
-                )
-            tier = requested_tier if requested_tier is not None else merged.requested_tier
-            resolution, target = _resolve_call_target(
-                self._store, self._credentials, merged.model_id, tier,
-                self._admissions,
-            )
+            _merged, (resolution, target) = self._merge_department_selection(
+                department, project, requested_tier)
             if target is None:
-                return replace(resolution, selection_source=merged.selection_source)
+                return resolution
             handle_id = f"target_{uuid4().hex[:16]}"
             self._call_targets[handle_id] = (target, dict(resolution.public))
-            return replace(resolution, handle_id=handle_id, selection_source=merged.selection_source)
+            return replace(resolution, handle_id=handle_id)
+
+    def resolve_effective_model(self, department: str,
+                                project: ModelSelection | Mapping[str, Any] | None = None,
+                                ) -> EffectiveModelResolution:
+        # 查询用入口：按第 5.3 节的选择规则合并项目部门设置与部门默认，并解析调用目标，
+        # 不发送请求、不保留调用句柄（部门工作间的生效模型）。没有任何一层写入模型时为「未设置」，
+        # 引用无法使用时为「无法使用」并带回原因；两种情况都不交回其他连接或模型
+        with self._lock:
+            merged, (resolution, _target) = self._merge_department_selection(department, project, None)
+            if not merged.resolved:
+                return EffectiveModelResolution("unset", None)
+            return EffectiveModelResolution("effective" if resolution.available else "unusable", resolution)
 
     def validate_department_setting(self, department: str,
                                     project: ModelSelection | Mapping[str, Any] | None,
@@ -873,14 +894,17 @@ class ProviderFacade:
             self._admission_seen = True
             return target
 
-    def _load_admissions_file(self) -> None:
-        # 读取独立准入文件：缺文件即空记录，坏内容报错并保留内存记录
+    def _load_admissions_file(self, *, keep_when_missing: bool = False) -> None:
+        # 读取独立准入文件：缺文件即空记录，坏内容报错并保留内存记录。
+        # 进程启动（load_document）缺文件就是空态；进行中的重新读取（_poll_config_file）缺文件时
+        # 保留内存记录：本进程写入的准入尚未落盘或文件被外部删除都不作废已通过的测试（工单 #266）
         if self._admission_path is None:
             return
         try:
             data = self._admission_path.read_bytes()
         except OSError:
-            self._admissions = {}
+            if not keep_when_missing:
+                self._admissions = {}
             self._admission_seen = True
             return
         raw = json.loads(data.decode("utf-8"))
@@ -1185,6 +1209,9 @@ class ProviderFacade:
             self._store = ProviderStore.empty()
             self._store.revision = previous_revision + 1
             self._bindings = {}
+            # 目录文件被删除时准入记录一并清空：定义已不存在，记录无从生效（工单 #266）
+            self._admissions = {}
+            self._admission_seen = True
             self._config_state = "deleted"
             self._reload_error = None
             self._disk_config_hash = None
@@ -1214,6 +1241,9 @@ class ProviderFacade:
             store.revision = previous_revision + 1
         self._store = store
         self._bindings = bindings
+        # 外部修改目录并成功发布以后一并读取准入文件，读取口径与 load_document 相同：
+        # 记录是否仍然有效按受影响字段逐项判断，作废的记录不恢复为已准入（工单 #266）
+        self._load_admissions_file(keep_when_missing=True)
         self._config_state = "loaded" if (store.providers or store.models or bindings) else "empty"
         self._reload_error = None
         self._disk_config_hash = digest
@@ -1299,11 +1329,16 @@ def _stream_event(event: Mapping[str, Any]) -> ModelStreamEvent | None:
     if kind == "message":
         text = event.get("text")
         return ModelStreamEvent(kind="message", text=str(text) if text is not None else "", **identity)
+    if kind == "reasoning":
+        return ModelStreamEvent(kind="reasoning", **identity)
     return None
 
 
 def _model_response(result: InvokeResult) -> ModelResponse:
     # 只记录服务实际返回的模型，未返回保持未知，不拿请求模型冒充
+    reasoning = None
+    if result.reasoning is not None and result.reasoning.items:
+        reasoning = {"items": result.reasoning.items}
     return ModelResponse(
         output=result.output,
         usage=_call_usage(result.usage),
@@ -1311,6 +1346,7 @@ def _model_response(result: InvokeResult) -> ModelResponse:
         model=result.actual_model or "",
         response_id=result.response_id,
         sdk_response=dict(result.wire_evidence),
+        reasoning=reasoning,
     )
 
 

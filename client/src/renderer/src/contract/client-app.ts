@@ -108,6 +108,12 @@ export class ClientApp {
     return this.runQuery<T>(this.iface.client, name, params);
   }
 
+  // 页面按需查询一次（设计说明第 5.7 节）：与视图同步走同一条查询通道，
+  // 结果不进入视图缓存。删除与保存前取回影响列表（工单 #94）使用这个入口
+  queryOne<T>(name: string, params: Record<string, unknown> | undefined): Promise<{ position: number; data: T }> {
+    return this.query<T>(name, params);
+  }
+
   // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）。
   // live=1：连接接收模型输出片段（delta 帧），部门房间的思考气泡据此逐字显示（工单 #177）
   private startStream(after: number): void {

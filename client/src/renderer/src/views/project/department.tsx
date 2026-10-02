@@ -14,6 +14,7 @@ import type {
 import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
+import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
 import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -66,10 +67,13 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   );
 }
 
-// 当前生效模型的来源：取自调用目标的 selection_source；后端目前只登记部门默认这一种
+// 当前生效模型的来源：取自生效模型的 selection_source
 function selectionSourceLabel(value: string | null): string {
   if (value === "department_default") {
     return "部门默认";
+  }
+  if (value === "project_department_setting") {
+    return "项目设置";
   }
   return show(value, "未上报");
 }
@@ -86,7 +90,7 @@ function departmentStatus(data: DepartmentWorkspaceResult): string {
 
 function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; onOpenSettings: () => void }) {
   const data = props.data;
-  const provider = data.provider === null ? null : dict(data.provider);
+  const effective = data.effective;
   const lastCall = data.last_call === null ? null : dict(data.last_call);
   const info = DEPARTMENTS[data.department];
 
@@ -95,19 +99,31 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
       <KeyValue
         items={[
           ["部门状态", departmentStatus(data)],
-          ["当前生效的模型及来源", provider === null
-            ? "还没有请求，未上报"
-            : `${show(optionalText(provider.requested_model))}（来源 ${selectionSourceLabel(optionalText(provider.selection_source))}）`],
-          ["最近一次请求实际使用的模型", lastCall === null ? "未上报" : show(optionalText(lastCall.actual_model))],
-          ["协议", lastCall === null && provider === null
+          ["当前生效的模型及来源", effective.state === "unset"
+            ? "未设置"
+            : effective.state === "unusable"
+              ? `无法使用：${show(effective.message)}`
+              : `${show(optionalText(effective.model))}（来源 ${selectionSourceLabel(optionalText(effective.selection_source))}）`],
+          // 最近一次请求实际使用的模型：取自请求事件的调用目标（解析出的模型就是这次请求使用的模型），
+          // 上游回报的实际模型只作为对照；这里显示调用目标的模型（设计说明第 9.3 节）
+          ["最近一次请求实际使用的模型", lastCall === null
             ? "未上报"
-            : show(optionalText(lastCall?.requested_protocol) ?? optionalText(provider?.protocol))],
-          ["发送的档位", provider === null
+            : show(optionalText(lastCall.requested_model) ?? optionalText(lastCall.actual_model))],
+          ["协议", lastCall === null ? "未上报" : show(optionalText(lastCall.requested_protocol))],
+          ["发送的档位", lastCall === null
             ? "未上报"
-            : `请求 ${show(optionalText(provider.requested_tier))}，实际发送 ${show(optionalText(provider.sent_tier))}`],
-          ["提醒", data.reminders.length === 0 ? "没有" : data.reminders.join("；")],
+            : `请求 ${show(optionalText(lastCall.requested_tier))}，实际发送 ${show(optionalText(lastCall.sent_tier))}`],
         ]}
       />
+      {/* 当前生效模型不具备本部门建议能力的角色，提醒显示在该角色的当前模型旁（第 5.6 节） */}
+      {data.reminders.length > 0 ? (
+        <p className="warn" role="status" data-testid={`workshop-reminder-${data.department}`}>
+          {data.reminders.join("；")}
+        </p>
+      ) : null}
+      <p className="note">
+        工位：{departmentName(data.department)} Agent
+      </p>
       <p className="note">
         {data.work_item_id === null
           ? "这个范围没有事项"
@@ -352,36 +368,47 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
   );
 }
 
-// 部门设置弹窗：部门 Prompt 文本；模型与推理档位由 #95 加入
+// 部门设置弹窗（第 9.2 节）：标题为「本项目 · 某部门设置」，写入本项目该部门的项目部门设置。
+// 模型、推理档位与部门 Prompt 三项一起保存；模型第一项为「跟随部门默认（当前：…）」，
+// 档位第一项为「跟随」；保存以后提示「从本部门下一次模型请求起生效」；
+// 版本冲突时服务端按 stale_base 拒绝，反馈提示重新读取（useCommand 的 rejection）。
 function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult; onClose: () => void }) {
-  const prompt = props.data.prompt;
-  const [textValue, setTextValue] = useDraft(`dept-settings/${props.data.project_id}/${props.data.department}`, prompt.configured_text);
-  const command = useCommand(props.app, pageKey([prompt.configured_version]));
+  const { data } = props;
+  const [draft, setDraft] = useDepartmentDraft(data.setting);
+  const command = useCommand(props.app, pageKey([data.setting.version, draft.model, draft.tier, draft.prompt]));
   const canSave = hasCommand(props.app, "department_settings.save");
+  // 保存结果带回的提醒（第 5.6 节「保存时」）：照常保存，提醒在设置旁显示
+  const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
+  const reminders = [...data.reminders, ...savedReminders];
 
   return (
-    <Modal title={`${departmentName(props.data.department)}设置`} onClose={props.onClose}>
-      <p className="note">
-        基准版本：第 {prompt.configured_version} 版。模型与推理档位属于部门默认与项目部门设置（#95），这里留出位置。
-      </p>
-      <TextArea label="部门 Prompt" value={textValue} rows={10} onInput={setTextValue} />
-      <div className="composer">
-        <SubmitButton
-          label="保存部门设置"
-          busy={command.busy}
-          disabled={!canSave || textValue === prompt.configured_text}
-          onClick={() => {
-            void command.submit("department_settings.save", {
-              project_id: props.data.project_id,
-              department: props.data.department,
-              base_version: prompt.configured_version,
-              department_prompt: textValue,
-            }).then((ok) => { if (ok) props.onClose(); });
-          }}
-        />
-        {!canSave ? <p className="note">能力清单没有登记 department_settings.save</p> : null}
-        <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+    <Modal title={`本项目 · ${departmentName(data.department)}设置`} onClose={props.onClose}>
+      <p className="note">基准版本：第 {data.setting.version} 版；写入本项目的项目部门设置，不修改部门默认。</p>
+      <DepartmentSettingsFields
+        app={props.app}
+        projectId={data.project_id}
+        department={data.department}
+        draft={draft}
+        onDraft={setDraft}
+        effective={data.effective}
+        reminders={reminders}
+      />
+      <div className="row-actions">
+        <button type="button" onClick={() => setDraft({ ...draft, prompt: data.setting.text })}>恢复默认</button>
       </div>
+      {canSave ? (
+        <DepartmentSettingsSave
+          projectId={data.project_id}
+          department={data.department}
+          setting={data.setting}
+          draft={draft}
+          command={command}
+          onSaved={props.onClose}
+        />
+      ) : (
+        <p className="note">能力清单没有登记 department_settings.save</p>
+      )}
+      <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
     </Modal>
   );
 }

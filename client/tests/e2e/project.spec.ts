@@ -322,13 +322,16 @@ test.describe("项目页面（1440×900）", () => {
       await expect(title).toContainText("fake");
       await expect(title).toContainText("当前生效的模型及来源");
       await expect(title).toContainText("（来源 部门默认）");
+      await expect(title).toContainText("工位：产品 Agent");
       await expect(title).toContainText("所选事项 wi_");
       await expect(title).toContainText("运行 run_");
-      // 部门设置弹窗：基准版本来自 project.overview 的部门 Prompt 版本
+      // 部门设置弹窗：标题为「本项目 · 某部门设置」，模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await title.getByRole("button", { name: "部门设置" }).click();
       const dialog = page.locator(".modal-backdrop");
-      await expect(dialog.locator(".modal-head h2")).toHaveText("产品设置");
+      await expect(dialog.locator(".modal-head h2")).toHaveText("本项目 · 产品设置");
       await expect(dialog).toContainText("基准版本：第 1 版");
+      await expect(dialog.getByLabel("模型")).toContainText("跟随部门默认（当前：fake-script）");
+      await expect(dialog.getByLabel("推理档位")).toContainText("跟随");
       await expect(dialog.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
       await dialog.getByRole("button", { name: "关闭" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
@@ -448,6 +451,14 @@ test.describe("项目页面（1440×900）", () => {
       await keyword.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
       await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
+      // Provider 配置筛选（第 7.4 节）：命中 0 条时写明没有请求记录，改回空条件以后恢复
+      const providerFilter = record.locator("label.field").filter({ hasText: "Provider 配置" }).locator("input");
+      await providerFilter.fill("no-such-provider");
+      await record.getByRole("button", { name: "按条件筛选" }).click();
+      await expect(record).toContainText("这个范围没有请求记录");
+      await providerFilter.fill("");
+      await record.getByRole("button", { name: "按条件筛选" }).click();
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
       // 请求详情：点第一行的「详情」，顶栏路径换成 observe-detail
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / observe-detail`);
@@ -457,6 +468,9 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail).toContainText("模型");
       await expect(detail).toContainText("请求 fake-script，实际 fake-script");
       await expect(detail).toContainText("调用目标");
+      // 调用目标与选择来源（第 7.4 节）：连接、协议、地址与来源层都写在这里
+      await expect(detail).toContainText("选择来源");
+      await expect(detail).toContainText("部门默认");
       await expect(detail).toContainText("是否可重试");
       await detail.getByRole("button", { name: "返回请求记录" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
@@ -499,8 +513,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(departments).toContainText("工程（engineering）");
       await expect(departments).toContainText("第 0 版；来源 default（使用内置默认 Prompt）");
       await expect(departments).toContainText("质检（quality）");
-      await departments.getByRole("button", { name: "修改部门 Prompt" }).first().click();
-      await expect(departments.getByLabel("产品的部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
+      // 修改部门设置：模型、推理档位与部门 Prompt 三项（第 9.2 节）
+      await departments.getByRole("button", { name: "修改部门设置" }).first().click();
+      await expect(departments.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
+      await expect(departments.getByLabel("模型")).toContainText("跟随部门默认（当前：fake-script）");
       await departments.getByRole("button", { name: "取消" }).first().click();
       const registry = await section(page, "登记命令");
       console.log("STEP settings");
@@ -596,7 +612,7 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await expect(page.locator(".connection")).toHaveText("已连接");
       const waiting = (await openDecisions(page)).length;
-      await expect(page.locator(".status-item").filter({ hasText: "待你决定" })).toHaveText(`待你决定：${waiting}`);
+      await expect(page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting}`);
       await expect(page.locator(".drawer-toggle")).toBeHidden();
       // 侧栏点项目条目 -> 概览
       await page.locator(".sidebar .project-entry").filter({ hasText: SAMPLE }).locator("button.nav-item").first().click();
@@ -620,7 +636,7 @@ test.describe("项目页面（1440×900）", () => {
       await page.evaluate((hash) => { window.location.hash = hash; }, `${navHash(id, "dept/product")}?w=${selected.work_items[0].work_item_id}`);
       await expect(await section(page, "产品工作间")).toContainText("（顶栏选中）");
       // 状态项点击 -> 首页（没有 #/decisions 这个页面）
-      await page.locator(".status-item").filter({ hasText: "待你决定" }).click();
+      await page.locator(".topbar .status-item").filter({ hasText: "待你决定：" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe("#/home");
       expect(errors).toEqual([]);
     } finally {

@@ -22,6 +22,7 @@ from pydantic import TypeAdapter
 from starlette.responses import FileResponse, Response
 
 from ..app.application import DEFAULT_REGISTRY, Application
+from ..app.catalog_queries import CatalogQueryInvalid
 from ..app.client_update import NO_INSTALLER, ReleaseAssetNotFound, ReleaseAssets
 from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
@@ -164,6 +165,9 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
             return JSONResponse(status_code=404, content={"error": str(exc)})
         except ReplayOutOfRange as exc:
             # at 大于日志末尾：按位置读取的合同拒绝（设计说明第 4.1 节）
+            return JSONResponse(status_code=422, content={"error": str(exc)})
+        except CatalogQueryInvalid as exc:
+            # 查询的拟议文档或选择结构非法：按输入问题返回 422，原因写出字段位置（工单 #261）
             return JSONResponse(status_code=422, content={"error": str(exc)})
 
     parameters = () if definition.request is None else (("params", Annotated[definition.request, Query()]),)

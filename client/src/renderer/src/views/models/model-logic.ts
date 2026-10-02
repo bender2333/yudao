@@ -3,6 +3,7 @@
 
 import type {
   CatalogAdmission,
+  CatalogBinding,
   CatalogCapabilityTable,
   CatalogCredential,
   CatalogModel,
@@ -112,13 +113,11 @@ export function admissionOf(providerId: string, modelId: string, admissions: Cat
   return admissions.find((item) => item.provider_id === providerId && item.model_id === modelId) ?? null;
 }
 
-// 准入列的显示（设计说明第 9.1 节）：测试时间与实际返回的模型；未准入显示「候选」，作废显示作废
+// 准入列的显示（设计说明第 9.1 节）：测试时间与实际返回的模型；未准入与作废都显示「候选」。
+// 视图里 admitted 与 stale 互斥：作废的准入 admitted 为假、stale 为真（#90）
 export function admissionLabel(admission: CatalogAdmission | null): string {
   if (!admission || !admission.admitted) {
-    return "候选";
-  }
-  if (admission.stale) {
-    return "候选（准入已作废）";
+    return admission?.stale ? "候选（准入已作废）" : "候选";
   }
   return `已准入：${admission.admitted_at ?? ""}${admission.admitted_model ? ` · ${admission.admitted_model}` : ""}`;
 }
@@ -134,6 +133,32 @@ export function rowCapacityValid(row: { context_window: number | null; max_outpu
 // 未「接受」或修改的行不能保存：这一行的容量必须已确认且有效
 export function canSaveRows(rows: { context_window: number | null; max_output_tokens: number | null; capacity_confirmed: boolean }[]): boolean {
   return rows.every((row) => row.capacity_confirmed && rowCapacityValid(row));
+}
+
+// 表单能否构成一份合法的目录文档（第 4.6 节的必填项与容量关系）：影响查询只对合法的拟议修改发问。
+// 窗口可以留空（只填输出上限），填了窗口时输出上限不大于窗口；输出上限必须有值且为正
+export function formDocumentValid(provider: { id: string; name: string; base_url: string }, rows: FormRow[]): boolean {
+  if (provider.id.trim() === "" || provider.name.trim() === "" || provider.base_url.trim() === "") {
+    return false;
+  }
+  return rows.every((row) => {
+    const window = intFromInput(row.context_window);
+    const output = intFromInput(row.max_output_tokens);
+    if (row.id.trim() === "" || row.model.trim() === "") {
+      return false;
+    }
+    if (output === null || output <= 0) {
+      return false;
+    }
+    // 推理档位声明的三项一起给出（第 7.1 节）：支持档位与默认档位不能在没有推理参数方式时单独出现
+    if (row.reasoning_mode === "" && (row.reasoning_levels.length > 0 || row.default_reasoning_level !== "")) {
+      return false;
+    }
+    if (window === null) {
+      return true;
+    }
+    return window > 0 && output <= window;
+  });
 }
 
 // 预填一条模型访问定义（设计说明第 4.3 节）：上游模型列表优先，其次模型能力表，都没有时留空；
@@ -218,44 +243,6 @@ export function reasoningModeOptions(protocol: string): string[] {
   return Object.keys(REASONING_MODE_PROTOCOLS).filter((mode) => REASONING_MODE_PROTOCOLS[mode].includes(protocol));
 }
 
-export type ProviderChange = Pick<CatalogProvider, "base_url" | "credential_ref" | "protocol">;
-
-export type ModelChange = Pick<CatalogModel, "id" | "model" | "reasoning_mode">;
-
-export type BindingEntry = { provider_id: string; model_id: string };
-
-// 保存会作废准入的修改之前，按第 4.4 节列出受影响的引用方（部门默认的哪个部门）。
-// 判断的字段：连接一侧的地址、凭据引用、协议；定义一侧的上游模型 ID、推理参数方式
-export function affectedReferences(
-  provider: CatalogProvider,
-  before: ProviderChange,
-  models: ModelChange[],
-  modelsBefore: ModelChange[],
-  bindings: Record<string, BindingEntry>,
-): string[] {
-  const providerAffected =
-    provider.base_url !== before.base_url ||
-    provider.credential_ref !== before.credential_ref ||
-    provider.protocol !== before.protocol;
-  const affectedModels: Record<string, boolean> = {};
-  for (const model of models) {
-    const previous = modelsBefore.find((item) => item.id === model.id);
-    if (previous && (previous.model !== model.model || previous.reasoning_mode !== model.reasoning_mode)) {
-      affectedModels[model.id] = true;
-    }
-  }
-  const affected: string[] = [];
-  for (const [department, binding] of Object.entries(bindings)) {
-    if (binding.provider_id !== provider.id) {
-      continue;
-    }
-    if (providerAffected || affectedModels[binding.model_id]) {
-      affected.push(department);
-    }
-  }
-  return affected;
-}
-
 // 数字输入：空文本交回 null（窗口与「未选择」的档位都留空），非数字也交回 null，由校验拒绝
 export function intFromInput(text: string): number | null {
   const trimmed = text.trim();
@@ -278,14 +265,85 @@ export function testKey(kind: "connection" | "model", providerId: string, modelI
   return kind === "connection" ? `connection:${providerId}` : `model:${modelId}`;
 }
 
-// 保存会作废准入时的提示文字（第 4.4 节）：列出受影响的部门默认；进行中的事项由事项页面显示
-export function impactNotice(departments: string[]): string {
-  if (departments.length === 0) {
+// 保存会作废准入的影响列表与删除的引用方（设计说明第 4.4、4.5 节，工单 #94）。
+// 数据来自应用层查询 catalog.change_impact（工单 #90），界面按它的结果弹确认框与列出引用方。
+// 后端按第 4.4、4.5 节的规则算出受影响与将被删除的定义，并汇总部门默认与各项目的项目部门设置两层引用方。
+export type ModelImpact = {
+  // 保存会作废准入的模型访问定义，与删除 Provider 配置时将一并删除的定义
+  impacted: string[];
+  deletions: string[];
+  // 引用方清单的显示文字：部门默认、各项目的项目部门设置与进行中事项（第 4.4、4.5 节）
+  references: string[];
+};
+
+// 后端各引用方清单的一项：位置串与它的显示文字
+type ImpactDepartmentDefault = { department: string; model_id: string };
+type ImpactProjectSetting = { project_id: string; project_name: string; department: string; model_id: string };
+type ImpactWorkItem = { project_id: string; project_name: string; work_item_id: string; title: string; department: string };
+
+// 把应用层返回的影响结果（ChangeImpact）读成界面形态：受影响与被删除的定义标识、引用方清单（按第 4.4、4.5 节）
+export function collectImpact(impact: {
+  impacted?: { model_id: string }[];
+  deletions?: { model_id: string }[];
+  department_defaults?: ImpactDepartmentDefault[];
+  project_settings?: ImpactProjectSetting[];
+  work_items?: ImpactWorkItem[];
+}): ModelImpact {
+  const references: string[] = [];
+  for (const item of impact.department_defaults ?? []) {
+    references.push(`部门默认：${DEPARTMENT_LABELS[item.department] ?? item.department}`);
+  }
+  for (const item of impact.project_settings ?? []) {
+    const department = DEPARTMENT_LABELS[item.department] ?? item.department;
+    references.push(`项目部门设置：${item.project_name}（${department}）`);
+  }
+  for (const item of impact.work_items ?? []) {
+    const department = DEPARTMENT_LABELS[item.department] ?? item.department;
+    references.push(`进行中事项：${item.project_name} · ${item.title}（${department}）`);
+  }
+  return {
+    impacted: (impact.impacted ?? []).map((item) => item.model_id),
+    deletions: (impact.deletions ?? []).map((item) => item.model_id),
+    references,
+  };
+}
+
+// 保存会作废准入时的确认文字（设计说明第 4.4 节最后一段）：列出受影响的定义、引用方与进行中事项；
+// 没有受影响字段或没有引用方时为空，界面据此决定是否弹确认框
+export function confirmImpactText(impact: ModelImpact | null): string {
+  if (impact === null || impact.references.length === 0
+    || (impact.impacted.length === 0 && impact.deletions.length === 0)) {
     return "";
   }
-  const names = departments.map((item) => DEPARTMENT_LABELS[item] ?? item).join("、");
-  return `保存以后这些部门默认引用的准入作废，回到候选：${names}。引用保留，相关角色的下一次模型请求不发送，事项进入待恢复。`;
+  const definitions = impact.impacted.length > 0 ? impact.impacted.join("、") : impact.deletions.join("、");
+  const references = impact.references.join("；");
+  return `这次保存会让这些模型访问定义的准入作废，回到候选：${definitions}。`
+    + `受影响的引用方：${references}。引用保留，相关角色的下一次模型请求不发送，事项进入待恢复。确认以后保存？`;
 }
+
+// 删除 Provider 配置的确认框文字（设计说明第 4.5 节）：被引用时列出引用方，拒绝删除；
+// 没有引用时列出将一并删除的定义，确认以后删除
+export function providerDeleteConfirmation(impact: ModelImpact | null): string {
+  if (impact === null) {
+    return "";
+  }
+  if (impact.references.length > 0) {
+    return `这份 Provider 配置仍被引用，不能删除：${impact.references.join("；")}。`;
+  }
+  const deletions = impact.deletions.length === 0 ? "没有模型访问定义" : impact.deletions.join("、");
+  return `删除这份 Provider 配置会一并删除它下面的模型访问定义：${deletions}。确认删除？`;
+}
+
+// 移除单条定义被引用时的文字（设计说明第 4.5 节）：列出引用方，拒绝移除
+export function modelRemoveReferrers(impact: ModelImpact | null): string {
+  if (impact === null || impact.references.length === 0) {
+    return "";
+  }
+  return `这条模型访问定义仍被引用，不能移除：${impact.references.join("；")}。`;
+}
+
+// 引用准入已作废的定义时下拉框里保留它的显示（设计说明第 4.4 节表格：保留，显示「无法使用：准入已作废」）
+export const STALE_ADMISSION_LABEL = "无法使用：准入已作废";
 
 export type ModelOption = { id: string; model: string; provider_id: string; provider_name: string };
 
@@ -522,3 +580,76 @@ export function admittedModels(
 ): ModelOption[] {
   return admittedOptions(models, providers, admissions);
 }
+
+// 选择的取值与显示（模型管理设计说明第 9.2 节）：
+// 模型下拉第一项为「跟随部门默认（当前：…）」，其后是按连接分组的已准入定义；
+// 选择第一项即清除项目的模型选择。这里把选项文本与「当前」说明集中在一处，
+// 部门设置弹窗与设置页的部门设置共用同一份计算。
+export type AdmissionGroup = { provider_id: string; provider_name: string; options: ModelOption[] };
+
+// 已准入定义按连接分组：组名取连接名称，组内按上游模型 ID 排序
+export function groupAdmittedModels(models: ModelOption[], providers: CatalogProvider[]): AdmissionGroup[] {
+  const groups: AdmissionGroup[] = [];
+  for (const provider of providers) {
+    const options = models
+      .filter((model) => model.provider_id === provider.id)
+      .sort((left, right) => left.model.localeCompare(right.model));
+    if (options.length > 0) {
+      groups.push({ provider_id: provider.id, provider_name: provider.name, options });
+    }
+  }
+  return groups;
+}
+
+// 跟随部门的选项文本：待保存的选择为空时写明当前生效的模型（来源与模型名）
+export function followDepartmentLabel(current: string): string {
+  return current === "" ? "跟随部门默认" : `跟随部门默认（当前：${current}）`;
+}
+
+// 当前生效模型的说明：取出生效状态与来源，供跟随选项展示。
+// 生效模型由 department.workspace 的 effective 给出，来源文案与选择来源一致
+export function currentEffectiveLabel(effective: { state: string; model?: string | null; message?: string | null;
+  selection_source?: string | null } | null): string {
+  if (effective === null) {
+    return "";
+  }
+  if (effective.state === "unset") {
+    return "未设置";
+  }
+  if (effective.state === "unusable") {
+    return `无法使用：${effective.message ?? ""}`;
+  }
+  return effective.model || "";
+}
+
+// 设置的模型取值（连接/定义）：写入项目的模型用它的引用，未写入时为空（跟随部门默认）
+export function selectionValue(providerId: string | null | undefined, modelId: string | null | undefined): string {
+  return providerId && modelId ? `${providerId}/${modelId}` : "";
+}
+
+// 把取值拆回连接与定义：空值表示「跟随部门默认」（清除项目的模型选择）
+export function selectionPair(value: string): { provider_id: string | null; model_id: string | null } {
+  if (value === "") {
+    return { provider_id: null, model_id: null };
+  }
+  const [provider_id, ...rest] = value.split("/");
+  return { provider_id, model_id: rest.join("/") };
+}
+
+// 一组设置按第 5.3 节取得的模型访问定义：项目设置写入了就用它，否则用部门默认（catalog 的 bindings）
+export function mergedModelId(projectModelId: string | null | undefined, department: string,
+  bindings: Record<string, CatalogBinding> | undefined): string {
+  if (projectModelId) {
+    return projectModelId;
+  }
+  return bindings?.[department]?.model_id ?? "";
+}
+
+// 从目录读出模型的上游名称与推理档位声明：供设置页的跟随说明与档位选项使用。
+// 模型不在目录里时返回空
+export function modelById(models: CatalogModel[], modelId: string): CatalogModel | null {
+  return models.find((item) => item.id === modelId) ?? null;
+}
+
+// 一次保存以后要提示的生效说明（设计说明第 9.2 节）
+export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";

@@ -1,0 +1,152 @@
+{
+  "proxy": "http://127.0.0.1:64865",
+  "protocols": {
+    "responses": {
+      "outcome": {
+        "model": "",
+        "finish": "completed"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses",
+        "headers": {
+          "host": "127.0.0.1:64865",
+          "accept-encoding": "gzip, deflate",
+          "connection": "keep-alive",
+          "authorization": "<42 chars>",
+          "accept": "application/json",
+          "content-type": "application/json",
+          "user-agent": "AsyncOpenAI/Python 2.54.0",
+          "x-stainless-lang": "python",
+          "x-stainless-package-version": "2.54.0",
+          "x-stainless-os": "Windows",
+          "x-stainless-arch": "other:amd64",
+          "x-stainless-runtime": "CPython",
+          "x-stainless-runtime-version": "3.14.7",
+          "x-stainless-async": "async:asyncio",
+          "x-stainless-retry-count": "0",
+          "x-stainless-read-timeout": "120.0",
+          "content-length": "245"
+        },
+        "body": {
+          "include": [
+            "reasoning.encrypted_content"
+          ],
+          "input": [
+            {
+              "role": "user",
+              "content": "Reply with the single word ok."
+            }
+          ],
+          "max_output_tokens": 256,
+          "model": "ag/claude-opus-4-6-thinking",
+          "reasoning": {
+            "effort": "medium"
+          },
+          "store": false,
+          "stream": true,
+          "tools": []
+        }
+      }
+    },
+    "chat_completions": {
+      "outcome": {
+        "model": "claude-opus-4-6-thinking",
+        "finish": "completed"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "headers": {
+          "host": "127.0.0.1:64865",
+          "accept-encoding": "gzip, deflate",
+          "connection": "keep-alive",
+          "authorization": "<42 chars>",
+          "accept": "application/json",
+          "content-type": "application/json",
+          "user-agent": "AsyncOpenAI/Python 2.54.0",
+          "x-stainless-lang": "python",
+          "x-stainless-package-version": "2.54.0",
+          "x-stainless-os": "Windows",
+          "x-stainless-arch": "other:amd64",
+          "x-stainless-runtime": "CPython",
+          "x-stainless-runtime-version": "3.14.7",
+          "x-stainless-async": "async:asyncio",
+          "x-stainless-retry-count": "0",
+          "x-stainless-read-timeout": "120.0",
+          "content-length": "210"
+        },
+        "body": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "Reply with the single word ok."
+            }
+          ],
+          "model": "ag/claude-opus-4-6-thinking",
+          "max_tokens": 256,
+          "reasoning_effort": "medium",
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        }
+      }
+    },
+    "messages": {
+      "outcome": {
+        "model": "claude-opus-4-6-thinking",
+        "finish": "completed"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "headers": {
+          "host": "127.0.0.1:64865",
+          "accept-encoding": "gzip, deflate, zstd",
+          "connection": "keep-alive",
+          "x-stainless-timeout": "NOT_GIVEN",
+          "x-stainless-retry-count": "0",
+          "x-stainless-read-timeout": "120.0",
+          "accept": "application/json",
+          "content-type": "application/json",
+          "user-agent": "AsyncAnthropic/Python 1.7.0",
+          "x-stainless-lang": "python",
+          "x-stainless-package-version": "1.7.0",
+          "x-stainless-os": "Windows",
+          "x-stainless-arch": "other:amd64",
+          "x-stainless-runtime": "CPython",
+          "x-stainless-runtime-version": "3.14.7",
+          "x-api-key": "<35 chars>",
+          "x-stainless-async": "async:asyncio",
+          "anthropic-version": "2023-06-01",
+          "content-length": "209"
+        },
+        "body": {
+          "max_tokens": 256,
+          "messages": [
+            {
+              "role": "user",
+              "content": "Reply with the single word ok."
+            }
+          ],
+          "model": "ag/claude-opus-4-6-thinking",
+          "output_config": {
+            "effort": "medium"
+          },
+          "stream": true,
+          "thinking": {
+            "type": "adaptive"
+          }
+        }
+      }
+    }
+  },
+  "messages_tool_headers": [
+    {
+      "content-type": "application/json",
+      "x-api-key": "<35 chars>",
+      "anthropic-version": "2023-06-01"
+    }
+  ]
+}

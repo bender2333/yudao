@@ -51,6 +51,32 @@ function trimOrNull(value: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+// 选择来源的显示（设计说明第 5.3、7.4 节）：提供模型访问定义的那一层。
+// 取值由 Provider 模块给出（department_default / project_department_setting），未知值原样显示
+function selectionSourceName(value: string | null): string {
+  if (value === "department_default") {
+    return "部门默认";
+  }
+  if (value === "project_department_setting") {
+    return "项目设置";
+  }
+  return show(value);
+}
+
+// 调用目标的显示（设计说明第 7.4 节）：连接、协议、地址、上游模型、容量、凭据引用与版本。
+// 字段取自请求事件的调用目标公开部分（不含 Key）；解析尚未确定的项写成「未上报」
+function callTargetText(target: Record<string, unknown>): string {
+  const parts = [
+    `连接 ${show(optionalText(target.provider_name))}`,
+    `协议 ${show(optionalText(target.protocol))}`,
+    `地址 ${show(optionalText(target.base_url))}`,
+    `上游模型 ${show(optionalText(target.requested_model))}`,
+    `窗口 ${formatNumberOr(numberValue(target.context_window), " token")}`,
+    `凭据引用 ${show(optionalText(target.credential_ref))}`,
+  ];
+  return parts.join("，");
+}
+
 export function ObservePage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
@@ -102,7 +128,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
             <input type="search" value={draft.q} placeholder="模型、调用目标、事项等" onChange={(event) => setDraft({ ...draft, q: event.target.value })} />
           </label>
           <label className="field">
-            <span>调用目标</span>
+            <span>Provider 配置</span>
             <input type="text" value={draft.provider} onChange={(event) => setDraft({ ...draft, provider: event.target.value })} />
           </label>
           <label className="field">
@@ -268,15 +294,19 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
   const events = list(props.data.events);
   const tools = list(props.data.tools);
   const refs = dict(props.data.artifact_refs);
+  // 调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位（设计说明第 6 节）
+  const callTarget = dict(attempt.call_target);
 
   return (
     <>
       <KeyValue
         items={[
           ["状态", `${label(ATTEMPT_STATUS, text(attempt.status))}${attempt.stage ? ` · 阶段 ${text(attempt.stage)}` : ""}`],
-          ["调用目标", `${show(optionalText(attempt.provider))}（请求 ${show(optionalText(attempt.requested_provider))}，实际 ${show(optionalText(attempt.actual_provider))}）`],
+          // 调用目标：连接、协议、地址、上游模型、容量、凭据引用与版本、选择来源（第 7.4 节）
+          ["调用目标", callTargetText(callTarget)],
+          ["选择来源", selectionSourceName(optionalText(callTarget.selection_source))],
           ["模型", `请求 ${show(optionalText(attempt.requested_model))}，实际 ${show(optionalText(attempt.actual_model))}`],
-          ["协议与档位", `请求 ${show(optionalText(attempt.requested_tier))}，实际发送 ${show(optionalText(attempt.sent_tier))}`],
+          ["协议与档位", `请求 ${show(optionalText(callTarget.requested_tier))}，实际发送 ${show(optionalText(callTarget.sent_tier))}`],
           ["部门 Prompt 版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
           ["第几步 / 第几次尝试", `${show(optionalText(attempt.step))} / ${show(optionalText(attempt.attempt))}`],
           ["开始与结束", `${formatTime(optionalText(attempt.started_at))} → ${formatTime(optionalText(attempt.finished_at))}（${formatNumberOr(numberValue(attempt.duration_ms), " 毫秒")}）`],

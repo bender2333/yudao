@@ -1600,6 +1600,7 @@ export type DepartmentWorkspaceResult = {
     active: boolean;
     prompt: DepartmentPromptState;
     setting: DepartmentSetting;
+    effective: EffectiveModel;
     /**
      * Guidance
      */
@@ -1620,12 +1621,6 @@ export type DepartmentWorkspaceResult = {
      * Last Call
      */
     last_call: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Provider
-     */
-    provider: {
         [key: string]: unknown;
     } | null;
     /**
@@ -1739,6 +1734,56 @@ export type DrainStatus = {
      * Queued Work Items
      */
     queued_work_items: number;
+};
+
+/**
+ * EffectiveModel
+ */
+export type EffectiveModel = {
+    /**
+     * State
+     */
+    state: 'effective' | 'unusable' | 'unset';
+    /**
+     * Provider Id
+     */
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Provider Name
+     */
+    provider_name?: string | null;
+    /**
+     * Protocol
+     */
+    protocol?: string | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Selection Source
+     */
+    selection_source?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Sent Tier
+     */
+    sent_tier?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Message
+     */
+    message?: string | null;
 };
 
 /**
@@ -2605,6 +2650,18 @@ export type ProjectRow = {
      * In Progress Count
      */
     in_progress_count: number;
+    /**
+     * Waiting Count
+     */
+    waiting_count: number;
+    /**
+     * Decisions Waiting
+     */
+    decisions_waiting: number;
+    /**
+     * Last Activity At
+     */
+    last_activity_at: string;
     /**
      * Active Work Item Id
      */
@@ -9096,6 +9153,220 @@ export type ModelMessagePayload = {
 };
 
 /**
+ * ModelReasoningEvent
+ */
+export type ModelReasoningEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'model_reasoning';
+    payload: ModelReasoningPayload;
+};
+
+/**
+ * ModelReasoningPayload
+ */
+export type ModelReasoningPayload = {
+    /**
+     * Provider Config Id
+     */
+    provider_config_id: string | null;
+    /**
+     * Model Id
+     */
+    model_id: string | null;
+    /**
+     * Provider Name
+     */
+    provider_name: string;
+    /**
+     * Protocol
+     */
+    protocol: string;
+    /**
+     * Base Url
+     */
+    base_url: string | null;
+    /**
+     * Requested Provider
+     */
+    requested_provider: string;
+    /**
+     * Requested Protocol
+     */
+    requested_protocol: string;
+    /**
+     * Requested Model
+     */
+    requested_model: string;
+    /**
+     * Credential Ref
+     */
+    credential_ref: string | null;
+    /**
+     * Credential Version
+     */
+    credential_version: string | null;
+    /**
+     * Context Window
+     */
+    context_window: number | null;
+    /**
+     * Configured Max Output Tokens
+     */
+    configured_max_output_tokens: number | null;
+    /**
+     * Accepts Required Tool Call
+     */
+    accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
+     * Selection Source
+     */
+    selection_source: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier: string | null;
+    /**
+     * Sent Tier
+     */
+    sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number;
+    /**
+     * Prompt Version
+     */
+    prompt_version: number;
+    /**
+     * Prompt Hash
+     */
+    prompt_hash: string | null;
+    /**
+     * Guidance Ids
+     */
+    guidance_ids: Array<string>;
+    /**
+     * Guidance Only
+     */
+    guidance_only: boolean;
+    /**
+     * Effective Contract Hash
+     */
+    effective_contract_hash: string | null;
+    /**
+     * Engineering Plan Hash
+     */
+    engineering_plan_hash: string | null;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    /**
+     * Logical Call Id
+     */
+    logical_call_id: string;
+    /**
+     * Collaboration Request Id
+     */
+    collaboration_request_id: string | null;
+    /**
+     * Context Event Id
+     */
+    context_event_id: string;
+    reasoning_ref: ArtifactRef;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Step Id
+     */
+    step_id: number;
+    /**
+     * Purpose
+     */
+    purpose: 'work' | 'compaction';
+};
+
+/**
  * ModelRequestSerializedEvent
  */
 export type ModelRequestSerializedEvent = {
@@ -13873,6 +14144,8 @@ export type EventObject = ({
 } & ModelRequestSerializedEvent) | ({
     type: 'model_message';
 } & ModelMessageEvent) | ({
+    type: 'model_reasoning';
+} & ModelReasoningEvent) | ({
     type: 'model_requested';
 } & ModelRequestedEvent) | ({
     type: 'model_stream_progress';

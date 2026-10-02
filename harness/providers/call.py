@@ -62,7 +62,7 @@ class ModelStreamEvent(BaseModel):
     # 与这段事件里的文字片段（deltas）；调用方不解析协议的事件形状
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    kind: Literal["request", "stream_event", "response", "usage", "message"]
+    kind: Literal["request", "stream_event", "response", "usage", "message", "reasoning"]
     id: str
     payload: dict[str, Any] = Field(default_factory=dict)
     text: str = ""
@@ -88,3 +88,5 @@ class ModelResponse(BaseModel):
     model: str = ""
     response_id: str | None = None
     sdk_response: dict[str, Any] | None = None
+    # 上游返回的推理内容，带产生它的连接、协议与上游模型；与 output 分开保存
+    reasoning: dict[str, Any] | None = None

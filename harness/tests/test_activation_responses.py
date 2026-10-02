@@ -68,7 +68,12 @@ def test_native_loop_executes_tool_and_persists_exact_inputs_before_each_request
             assert live_audits == [True]
             assert len(captures) == 2
             assert canary not in json.dumps(captures)
-            assert captures[1]["input"][-3:-1] == [REASONING, CALL]
+            replayed = [item for item in captures[1]["input"] if item.get("type") == "reasoning"]
+            assert len(replayed) == 1
+            assert replayed[0]["encrypted_content"] == REASONING["encrypted_content"]
+            last_two = captures[1]["input"][-3:-1]
+            assert last_two[0]["type"] == "reasoning" and last_two[1]["type"] == "function_call"
+            assert last_two[1]["call_id"] == CALL["call_id"]
             assert "host-read-evidence" in captures[1]["input"][-1]["output"]
             contexts = _assert_request_audit(system, run_id, captures)
             assert [event.payload["step_id"] for event in contexts] == [1, 2]
