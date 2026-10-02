@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-更新：2026-10-02。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
+更新：2026-10-02。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
 
 依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
@@ -131,7 +131,7 @@ flowchart TB
 
 每类列出的条目有定义中的上限，超出部分写明数量。概况只列路径与数量，不含文件内容。
 
-**读取顺序。** 建档事项的部门说明（定义中按事项种类给出）规定读取顺序，做法参照 OpenCode 的 `/init`（第 9 节）：先读价值最高的来源，可执行的来源（配置、脚本、测试）与文字说明冲突时以可执行的来源为准。
+**读取顺序。** 建档事项种类的工作说明（定义中按事项种类给出，每次请求放在部门 Prompt 之后，用户写入项目部门设置的部门 Prompt 以后仍然放入，[模型管理设计说明](model-management.md)第 5.3 节第 5 项）规定读取顺序，做法参照 OpenCode 的 `/init`（第 9 节）：先读价值最高的来源，可执行的来源（配置、脚本、测试）与文字说明冲突时以可执行的来源为准。
 
 | 部门 | 顺序 |
 | --- | --- |
@@ -268,7 +268,7 @@ flowchart LR
   Orch --> Step["步骤驱动"]
   Step --> P["上下文装配：仓库概况、结构说明的可见范围、修改轮的依据"]
   Step --> U["裁决规则：按事项种类的工具许可与提案合同、树摘要不变"]
-  Defs[("定义：事项种类、部门说明、提案合同、停止原因、文件名模式表")] --> P
+  Defs[("定义：事项种类与各部门的工作说明、提案合同、停止原因、文件名模式表")] --> P
   Defs --> U
   Defs --> Orch
   Step -->|"读取、搜索、检查"| Env["执行环境：工作区与检查副本"]

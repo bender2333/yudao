@@ -1,6 +1,6 @@
 # 桌面客户端的安装、更新与发布设计说明
 
-更新：2026-10-02，局域网访问方式的开启（第 4.3、4.4 节，第 10 节第 15 至 18 项）。状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 10 节），未实施。路线位置：[Stage 3 计划](../stage-3-plan.md)界面工作线，里程碑 M1。工单见第 12 节。
+更新：2026-10-02，局域网访问方式的开启（第 4.3、4.4 节，第 10 节第 15 至 18 项）；同日桌面会话的托盘菜单项与提示框（第 4.5 节）。状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 10 节），未实施。路线位置：[Stage 3 计划](../stage-3-plan.md)界面工作线，里程碑 M1。工单见第 12 节。
 
 依据：[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)（客户端与 Yudao 服务分开安装，一次发布是一个 wheel）；[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（客户端是 Electron 桌面程序）；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机）；[ADR-0019](../adr/0019-project-stream-across-versions.md)（升级与排空）；[ADR-0022](../adr/0022-run-directly-without-containers.md)；[应用层与接口层设计说明](app-and-interface.md)第 5.7、6、7.2、10 节；[执行环境服务设计说明](execution-environment.md)第 5.3 节。调研：[客户端打包与更新调研](../research/client-packaging-and-update.md)。用词以 `CONTEXT.md` 为准。
 
@@ -128,6 +128,7 @@ Stage 4 由操作系统的服务管理负责开机启动时，访问方式写在
 ### 4.5 托盘与登录时启动
 
 - 托盘菜单：「打开窗口」「停止 Yudao」（只在连接「本机」一项时出现，两种访问方式下都可用）「退出客户端」。关闭窗口只隐藏窗口，保留托盘与事件流连接（应用层与接口层设计说明第 5.7 节）。
+- 桌面会话（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节）：控制主机上有进行中的桌面会话时，托盘菜单增加「停止使用桌面」，选择后调用 `trial.stop_desktop`；客户端在主显示器边缘显示一圈置顶的提示框，写明「<部门>正在使用桌面」与项目名称，提示框不出现在截图中（`setContentProtection`，即 `WDA_EXCLUDEFROMCAPTURE`）、鼠标可以穿透、不获得焦点，会话结束时关闭。做法参照 UI-TARS-desktop 的 ScreenMarker。工单 #247。
 - 设置页有「登录时启动客户端」，默认关闭，使用 Electron 的 `app.setLoginItemSettings`，写入当前用户的注册表启动项，不需要管理员权限。
 - 客户端同一时刻只有一个进程。
 

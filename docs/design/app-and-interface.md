@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-更新：2026-10-02。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改，命令共 42 个。
+更新：2026-10-02。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改。2026-10-02 用户确认 computer use 在控制主机的交互桌面上进行：增加命令 `trial.stop_desktop`、决定种类「使用本机桌面」与两个待恢复原因（第 3.2、3.3、10 节），命令共 43 个。
 
 依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../prototypes/v9/design.md)与[构建约定](../prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../prototypes/v8/design.md)与[构建约定](../prototypes/v8/BUILD.md)），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
@@ -209,6 +209,7 @@ sequenceDiagram
 | `work_item.create` | 新建事项并开始执行，从项目的采纳成果开始 | 项目、事项原文、标题（可选） | `work_item_created`、`run_created`、`user_input_received` | 空 | 已有 `POST /api/projects/{id}/work-items`；删除 `max_cycles`、`run_time_limit_sec`、`context_window` 三个参数（D24 第 10 节，限额属于 ADR-0014 的定义）与代码快照来源 `source_dir`（已有代码经 `project.onboard` 进入，第 10 节第 6 项） |
 | `work_item.append_input` | 追加需求 | 事项、原文 | `user_input_received` | 事项的输入版本（记录依据） | 已有 `POST /api/runs/{id}/inputs`，作用对象改为事项 |
 | `work_item.cancel` | 取消事项 | 事项 | `run_failed`（停止原因 `cancelled`） | 事项版本（记录依据） | 已有 `POST /api/runs/{id}/cancel` |
+| `trial.stop_desktop` | 结束控制主机上进行中的桌面会话（客户端托盘菜单「停止使用桌面」） | 无 | `trial_session_ended`（结束方式「用户停止」） | 无 | 新增（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节） |
 | `work_item.reorder` | 调整同一项目排队中用户新要求的顺序；因升级重新开始的事项最前，其次是修复事项（Stage 4），这两类不参与调整 | 项目、排队中用户新要求的新顺序 | 由 #19 确定 | 该项目排队顺序的版本 | 新增（#19） |
 | `guidance.send` | 发送部门指导 | 事项、部门、原文 | `department_guidance_received` | 该部门的指导版本（记录依据） | 已有 `POST /api/runs/{id}/departments/{dept}/guidance` |
 
@@ -297,7 +298,7 @@ sequenceDiagram
 | `semantic.mark_invalid` | 把一条内容标记失效 | 内容、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 | `semantic.correct` | 写入更正 | 内容、更正文字、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 
-命令共 42 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 19 个。原型构建约定第 3.5 节的命令标识由本清单代替。
+命令共 43 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 20 个。原型构建约定第 3.5 节的命令标识由本清单代替。
 
 ### 3.3 用户决定的回答
 
@@ -310,6 +311,7 @@ sequenceDiagram
 | 继续旧事项时定义版本不同（`definitions_changed`） | 按新版本继续、停止事项 | run | 总体架构第 7.4 节，[ADR-0014](../adr/0014-versioned-definitions.md) | #16 |
 | 核实结果未知的动作 | 重新执行（只对契约声明可以重复的动作提供）、按当前实际状态继续、停止事项；只在自动核实与自动重新执行一次都没有得到结果时发出，连续两次结果未知时材料写明 | 动作 | 恢复契约第 4 节，原型第 4.3 节 | #17；自动核实与自动重新执行 #242 |
 | 质检无法核验 | 重新核验、停止事项 | run | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 8.4 节 | #151 |
+| 使用本机桌面（桌面种类的试用会话开始之前） | 开始（本次会话）、本事项内都允许、拒绝；拒绝时 `trial_start` 的结果写明用户没有交出桌面 | 动作 | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节 | #246 |
 | 一次性批准登记之外的网络取回与「使用前询问」的 MCP 工具（`tool_approval`） | 批准（本事项内有效）、拒绝；回答可以附说明，拒绝时的说明随工具结果交给模型 | 动作 | [网络取回与 MCP 工具设计说明](network-and-mcp.md)第 5 节，原型第 4.6 节 | #68、#236 |
 | 授权常设授权清单以外的外部动作 | 批准这一次、拒绝 | 动作 | D27、原型第 4.2 节 | Stage 4 |
 | 进入等待模型服务的通知 | 已阅；取消使用 `work_item.cancel` | 不阻塞 | D17、路线图第 5.1 节 | Stage 4 |
@@ -702,7 +704,7 @@ sequenceDiagram
 - #74：新增 `source_directory.save`；`work_item.create` 没有代码快照来源。
 - 3.8（#124）：新增 `project.onboard`、`onboarding.restart`、拒绝原因 `source_invalid`、项目流中的决定请求与 `initial_prd` 种类；删除 `work_item.create` 的代码快照来源（接入已有项目设计说明第 13 节）。
 - 3.2C（#120）：`machine.save`、`machine_authorization.save` 的事件，新增 `execution_placement.save`；`machines.list`、`system.status`、`project.settings`、`run.actions` 的执行位置与机器内容（执行环境服务设计说明第 7、12 节）。
-- 3.2D（#123）：新增查询 `run.trials`、`evidence.screenshot` 与决定种类「质检无法核验」；`work_item.materials`、`run.actions`、`department.workspace`、`tools.registry` 增加试用与截图的内容；命令不变（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 7.2、12 节，工单 #151、#152）。
+- 3.2D（#123）：新增查询 `run.trials`、`evidence.screenshot`，决定种类「质检无法核验」「使用本机桌面」，命令 `trial.stop_desktop`，run 的待恢复原因「等待桌面」「等待桌面解锁」（等待时间不计入运行时间上限）；`work_item.materials`、`run.actions`、`department.workspace`、`tools.registry` 增加试用与截图的内容（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1、7.2、12 节，工单 #151、#152、#246）。
 - #24：「按栏目读取上下文清单的查询接口」登记为应用层查询（`run.attempt` 的栏目部分）。
 - #37：`semantic.mark_invalid`、`semantic.correct` 登记为应用层命令。
 - 原型构建约定第 3.5 节的命令标识、第 6.1 节的事件对象由本设计代替；设计文档索引加入本文件；[部门定向指导](department-guidance.md)状态行「指导接口已在 `harness/web/server.py` 实现」在删除工单中修改；前端技术调研第 6 节的现状在删除工单以后更新；总体架构第 10 节加入本设计的工单。

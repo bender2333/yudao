@@ -1,6 +1,6 @@
 # 测试分层设计说明
 
-状态：2026-09-29 设计，用户已确认分层方式、各角色运行的层与集成层的批量运行（每 5 个 PR 一批、失败时暂停合并）；同日用户确认用登记表表示分层、测试文件原地不动，以减少与进行中工单的冲突，规则文件已按本文修改；同日随后暂缓。未实施，工单为父工单 #157（#158 至 #161）。本文规定 `harness/tests/` 的三层划分、每层的边界与检查方式、执行者、审查者与架构师各自在什么时候运行哪一层，以及测试输出的读取方式。
+状态：2026-09-29 设计，用户已确认分层方式、各角色运行的层与集成层的批量运行（每 5 个 PR 一批、失败时暂停合并）；同日用户确认用登记表表示分层、测试文件原地不动，以减少与进行中工单的冲突，规则文件已按本文修改；同日随后暂缓。2026-10-02 增加操作真实桌面的 `desktop` 标记（第 3、4 节），默认的全部运行排除它。未实施，工单为父工单 #157（#158 至 #161）。本文规定 `harness/tests/` 的三层划分、每层的边界与检查方式、执行者、审查者与架构师各自在什么时候运行哪一层，以及测试输出的读取方式。
 
 ## 1. 出发点
 
@@ -68,6 +68,7 @@
 - 新增测试文件时在登记表中加一行。登记表只追加与修改单行，不同分支同时新增文件时的合并冲突容易解决。
 - 测试文件之间不再互相导入。现在被其他文件导入的辅助函数移到已有的辅助文件中（`helpers.py`、`api_helpers.py`、`protocol_helpers.py`、`event_sequence.py` 等，按用途选择）：`test_web.py` 的 `running_server`、`request`、`get_json`、`wait_until`；`test_responses.py` 的 `_server`、`_stream`、`_submit_stream`、`_event`、`_response`、`_send`；`test_event_sequence.py` 的 `HTTP_REPLIES`、`HTTP_SCRIPT`、`product_spec_reply`、`BROKEN_STREAMS`、`PARTIAL_OUTPUT`；`test_compaction_engine._runner`。`test_provider_config_web.py` 自己定义的同名 `running_server` 与辅助文件中的合并为一个。一项单元层测试用标准库 `ast` 读取每个测试文件的导入语句，发现导入其他测试文件时失败。
 - 混合了不同层级的文件不拆分，按第 2 节登记为其中最高的一层。
+- 操作控制主机真实桌面的测试（3.2D 的桌面会话与屏幕工具，[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5 节）登记为 `desktop`。这些测试移动真实的鼠标、按下真实的按键、最小化用户的窗口，在用户使用电脑时运行会打断用户。`desktop` 标记同样在 `markers` 中声明；它不属于三层中的任何一层，`-m "unit or module"` 与 `-m integration` 都不选中它，第 4 节的默认运行全部排除它。客户端的 Playwright 测试中操作真实桌面的用例加 `@desktop` 标签，默认运行用 `--grep-invert @desktop` 排除。登记表建立之前，`desktop` 标记直接写在测试文件中，`pyproject.toml` 的默认参数排除它，明确写 `-m desktop` 时才运行（#150 先建立这个标记）。
 
 ## 4. 各角色运行哪一层
 
@@ -80,6 +81,8 @@
 
 本次改动或新增的集成层测试文件在 PR 中运行，保证合并进 main 的集成测试本身可以运行，例如重写了事件序列基准的 PR。
 
+`desktop` 测试只在明确选择时运行（`-m desktop`）：执行者与审查者处理 #150、#155 等改动桌面会话的工单时运行本工单涉及的 `desktop` 测试，架构师在里程碑交给用户试用之前运行全部 `desktop` 测试；这些工单派发之前与里程碑交付之前，架构师先在对话中问用户什么时间可以交出桌面，按用户给的时间运行。
+
 ### 4.1 常用命令
 
 ```bash
@@ -87,6 +90,7 @@ uv run python -m pytest -m "unit or module"
 uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
 node --test --test-reporter=dot harness/tests/test_web_ui.js
 uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
+uv run python -m pytest -m desktop   # 只在用户同意的时间运行
 ```
 
 最后一条只由架构师在集成层的批量运行中使用。
