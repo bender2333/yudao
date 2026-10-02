@@ -31,6 +31,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -38,12 +39,7 @@ import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CLIENT_ROOT = REPO_ROOT / "client"
-PYPROJECT = REPO_ROOT / "pyproject.toml"
-CLIENT_PACKAGE = CLIENT_ROOT / "package.json"
-# 发布资源目录：被 git 忽略，wheel 从这里取得客户端安装程序、blockmap、latest.yml 与执行代理的 wheel
-RELEASE_ASSETS = REPO_ROOT / "harness" / "release_assets"
-# 默认的 wheel 输出目录，同样被 git 忽略
+# 默认的 wheel 输出目录，被 git 忽略
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
 # Node 的最低版本（设计说明第 6.3 节）
 MIN_NODE = (22, 12)
@@ -59,16 +55,26 @@ def _run(command: list[str], cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 def _capture(command: list[str], cwd: Path | None = None) -> str:
-    # 运行外部命令并取回标准输出的文本，失败时就地抛出
-    result = subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True)
+    # 运行外部命令并取回标准输出的文本，失败时就地抛出。按 UTF-8 解码，非法字节替换，
+    # 避免 Windows 上 npm 等工具的设备编码导致解码失败
+    result = subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace")
     return result.stdout.strip()
+
+def _tool(name: str) -> str:
+    # 解析外部工具的路径。Windows 上 npm 是 npm.cmd 的包装，直接写 "npm" 时 subprocess 找不到它。
+    # 测试把假的 gh 放在 PATH 最前面时也经这里取到
+    path = shutil.which(name)
+    if path is None:
+        raise ReleaseError(f"找不到 {name}，请先安装并放进 PATH")
+    return path
 
 def _tool_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 def _pyproject_version(path: Path) -> str:
     # 从 pyproject.toml 读取 [project] 的 version。发布脚本只关心这一个字段，
-    # 用标准库 tomllib 读取，不引入额外的解析
+    # 用标准库 tomllib 读取
     import tomllib
 
     document = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -86,7 +92,7 @@ def _client_version(path: Path) -> str:
 
 def _check_node_version() -> str:
     # Node 不低于 22.12（设计说明第 6.3 节）。取 node --version 的 vX.Y.Z
-    raw = _capture(["node", "--version"]).lstrip("v")
+    raw = _capture([_tool("node"), "--version"]).lstrip("v")
     parts = raw.split(".")
     try:
         major, minor = int(parts[0]), int(parts[1])
@@ -96,35 +102,34 @@ def _check_node_version() -> str:
         raise ReleaseError(f"Node 版本 {raw} 低于要求的 {MIN_NODE[0]}.{MIN_NODE[1]}")
     return raw
 
-def _check_clean_worktree() -> None:
+def _check_clean_worktree(repo_root: Path) -> None:
     # 工作区干净：git status --porcelain 为空。构建产物与发布资源都在 .gitignore 中，不影响
-    dirty = _capture(["git", "status", "--porcelain"], cwd=REPO_ROOT)
+    dirty = _capture(["git", "status", "--porcelain"], cwd=repo_root)
     if dirty:
         raise ReleaseError("工作区不干净，请先提交或清理：\n" + dirty)
 
-def _check_on_publish_branch(branch: str) -> None:
+def _check_on_publish_branch(repo_root: Path, branch: str) -> None:
     # 当前提交在发布分支上
-    current = _capture(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT)
+    current = _capture(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
     if current != branch:
         raise ReleaseError(f"当前分支是 {current}，发布要求当前提交在 {branch} 上")
 
-def _check_pushed(branch: str, remote: str) -> None:
+def _check_pushed(repo_root: Path, branch: str, remote: str) -> None:
     # 当前提交已经推送到远端：HEAD 的提交号与远端分支相同
-    head = _capture(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT)
+    head = _capture(["git", "rev-parse", "HEAD"], cwd=repo_root)
     remote_ref = f"refs/remotes/{remote}/{branch}"
     try:
-        pushed = _capture(["git", "rev-parse", remote_ref], cwd=REPO_ROOT)
+        pushed = _capture(["git", "rev-parse", remote_ref], cwd=repo_root)
     except subprocess.CalledProcessError:
         pushed = ""
     if pushed != head:
         raise ReleaseError(f"当前提交 {head[:12]} 还没有推送到 {remote}/{branch}")
 
-def _check_versions(branch: str) -> str:
+def _check_versions(repo_root: Path) -> str:
     # 版本号三处相同：pyproject.toml 的 version、客户端 package.json 的 version 与标签 v<版本>。
-    # 标签按当前分支上最新的 v<版本> 标签取值；开发分支上没有发布标签时，
-    # 只要求前两处相同，标签在发布时由脚本建立
-    service = _pyproject_version(PYPROJECT)
-    client = _client_version(CLIENT_PACKAGE)
+    # 标签在发布时由脚本建立，核对时先要求前两处相同
+    service = _pyproject_version(repo_root / "pyproject.toml")
+    client = _client_version(repo_root / "client" / "package.json")
     if service != client:
         raise ReleaseError(
             f"版本号不一致：pyproject.toml 是 {service}，client/package.json 是 {client}")
@@ -135,12 +140,12 @@ def _check_environment() -> None:
         raise ReleaseError("uv 不可用，请先安装 uv")
     _check_node_version()
 
-def verify(*, branch: str, remote: str) -> str:
+def verify(repo_root: Path, *, branch: str, remote: str) -> str:
     # 第 1 步：核对。全部通过时返回发布版本号
-    _check_clean_worktree()
-    _check_on_publish_branch(branch)
-    _check_pushed(branch, remote)
-    version = _check_versions(branch)
+    _check_clean_worktree(repo_root)
+    _check_on_publish_branch(repo_root, branch)
+    _check_pushed(repo_root, branch, remote)
+    version = _check_versions(repo_root)
     _check_environment()
     return version
 
@@ -161,17 +166,19 @@ def sha256_hex(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-def build_client(*, app_id: str, product_name: str, setup_basename: str) -> dict[str, Path]:
+def build_client(repo_root: Path, *, app_id: str, product_name: str,
+                 setup_basename: str) -> dict[str, Path]:
     # 第 2 步：构建客户端。npm ci 安装依赖，electron-builder 生成安装程序、blockmap 与 latest.yml。
     # build-installer.mjs（#208）已经封装了这一步，并输出一行 JSON 写明三个文件的位置
-    _run(["npm", "ci"], cwd=CLIENT_ROOT)
-    output = _capture(
-        ["node", "scripts/build-installer.mjs"],
-        cwd=CLIENT_ROOT,
-    )
-    # build-installer.mjs 最后一行是 JSON；npm 的输出可能导致它前面有其他行，取最后一个 JSON 对象
-    last_line = output.splitlines()[-1]
-    parsed = json.loads(last_line)
+    client_root = repo_root / "client"
+    environment = {**os.environ, "YUDAO_APP_ID": app_id, "YUDAO_PRODUCT_NAME": product_name,
+                   "YUDAO_SETUP_BASENAME": setup_basename}
+    subprocess.run([_tool("npm"), "ci"], cwd=client_root, check=True, env=environment)
+    result = subprocess.run([_tool("node"), "scripts/build-installer.mjs"], cwd=client_root,
+                            check=True, capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", env=environment)
+    # build-installer.mjs 最后一行是 JSON；取最后一个 JSON 对象
+    parsed = json.loads(result.stdout.strip().splitlines()[-1])
     installer = Path(parsed["setup"])
     blockmap = Path(parsed["blockmap"])
     manifest = Path(parsed["manifest"])
@@ -182,7 +189,7 @@ def build_client(*, app_id: str, product_name: str, setup_basename: str) -> dict
 
 def verify_manifest_matches_installer(manifest: Path, installer: Path) -> None:
     # 核对 latest.yml 中的 SHA-512 与安装程序一致（设计说明第 6.3 节第 4 步）。
-    # latest.yml 是 YAML；只读取 fields 中 url 与安装程序同名的项，比较 sha512
+    # latest.yml 是 YAML；读取 files 中 url 与安装程序同名的项，比较 sha512
     import yaml
 
     document = yaml.safe_load(manifest.read_text(encoding="utf-8"))
@@ -199,23 +206,24 @@ def verify_manifest_matches_installer(manifest: Path, installer: Path) -> None:
         raise ReleaseError(
             f"{manifest} 中 {name} 的 SHA-512 是 {recorded}，安装程序的实际值是 {expected}")
 
-def assemble_assets(client: dict[str, Path]) -> dict[str, Path]:
+def assemble_assets(repo_root: Path, client: dict[str, Path]) -> dict[str, Path]:
     # 第 4 步前半：把客户端构建产物复制进发布资源目录（该目录被 git 忽略）。
     # 先清空目录，避免上一次发布留下的旧文件混进 wheel
-    if RELEASE_ASSETS.exists():
-        shutil.rmtree(RELEASE_ASSETS)
-    RELEASE_ASSETS.mkdir(parents=True)
+    assets_dir = repo_root / "harness" / "release_assets"
+    if assets_dir.exists():
+        shutil.rmtree(assets_dir)
+    assets_dir.mkdir(parents=True)
     copied: dict[str, Path] = {}
     for key in ("installer", "blockmap", "manifest"):
-        target = RELEASE_ASSETS / client[key].name
+        target = assets_dir / client[key].name
         shutil.copy2(client[key], target)
         copied[key] = target
     return copied
 
-def build_wheel(version: str, output_dir: Path) -> Path:
+def build_wheel(repo_root: Path, version: str, output_dir: Path) -> Path:
     # 第 4 步后半：uv build --wheel 生成 Yudao 服务的 wheel
     output_dir.mkdir(parents=True, exist_ok=True)
-    _run(["uv", "build", "--wheel", "--out-dir", str(output_dir)], cwd=REPO_ROOT)
+    _run(["uv", "build", "--wheel", "--out-dir", str(output_dir)], cwd=repo_root)
     expected = output_dir / f"yudao_harness-{version}-py3-none-any.whl"
     if not expected.is_file():
         raise ReleaseError(f"uv build 没有生成 {expected}")
@@ -231,31 +239,33 @@ def verify_wheel_contents(wheel: Path, assets: dict[str, Path]) -> None:
         if member not in names:
             raise ReleaseError(f"wheel {wheel.name} 中缺少 {member}（{key}）")
 
-def publish(version: str, wheel: Path, *, remote: str) -> None:
-    # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，gh release create 把 wheel 上传到私有仓库的 Release
+def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
+    # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，
+    # gh release create 把 wheel 上传到私有仓库的 Release
     tag = f"{TAG_PREFIX}{version}"
-    _run(["git", "tag", tag], cwd=REPO_ROOT)
-    _run(["git", "push", remote, tag], cwd=REPO_ROOT)
-    _run(["gh", "release", "create", tag, str(wheel), "--title", tag,
-          "--notes", f"Yudao {version}"], cwd=REPO_ROOT)
+    _run(["git", "tag", tag], cwd=repo_root)
+    _run(["git", "push", remote, tag], cwd=repo_root)
+    _run([_tool("gh"), "release", "create", tag, str(wheel), "--title", tag,
+          "--notes", f"Yudao {version}"], cwd=repo_root)
 
-def release(*, publish_flag: bool, app_id: str, product_name: str, setup_basename: str,
-            output_dir: Path, branch: str, remote: str) -> dict[str, object]:
+def release(repo_root: Path, *, publish_flag: bool, app_id: str, product_name: str,
+            setup_basename: str, output_dir: Path, branch: str, remote: str) -> dict[str, object]:
     # 依设计说明第 6.3 节的顺序执行，返回 wheel 的路径与核对值
-    version = verify(branch=branch, remote=remote)
-    client = build_client(app_id=app_id, product_name=product_name, setup_basename=setup_basename)
+    version = verify(repo_root, branch=branch, remote=remote)
+    client = build_client(repo_root, app_id=app_id, product_name=product_name,
+                          setup_basename=setup_basename)
     verify_manifest_matches_installer(client["manifest"], client["installer"])
-    assets = assemble_assets(client)
-    wheel = build_wheel(version, output_dir)
+    assets = assemble_assets(repo_root, client)
+    wheel = build_wheel(repo_root, version, output_dir)
     verify_wheel_contents(wheel, assets)
     if publish_flag:
-        publish(version, wheel, remote=remote)
+        publish(repo_root, version, wheel, remote=remote)
     return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel)}
 
 def main(argv: list[str] | None = None) -> int:
-    import os
-
     parser = argparse.ArgumentParser(description="构建并发布一个 Yudao 版本")
+    parser.add_argument("--repo-root", type=Path, default=REPO_ROOT,
+                        help="仓库的根目录，默认脚本所在的上级目录")
     parser.add_argument("--publish", action="store_true",
                         help="打标签、推送并把 wheel 上传到私有仓库的 Release")
     parser.add_argument("--branch", default=os.environ.get("YUDAO_RELEASE_BRANCH", "main"),
@@ -271,9 +281,9 @@ def main(argv: list[str] | None = None) -> int:
     product_name = os.environ.get("YUDAO_RELEASE_PRODUCT_NAME", "Yudao")
     setup_basename = os.environ.get("YUDAO_RELEASE_SETUP_BASENAME", "Yudao-Setup")
     try:
-        result = release(publish_flag=args.publish, app_id=app_id, product_name=product_name,
-                         setup_basename=setup_basename, output_dir=args.output_dir,
-                         branch=args.branch, remote=args.remote)
+        result = release(args.repo_root, publish_flag=args.publish, app_id=app_id,
+                         product_name=product_name, setup_basename=setup_basename,
+                         output_dir=args.output_dir, branch=args.branch, remote=args.remote)
     except ReleaseError as exc:
         print(exc, file=sys.stderr)
         return 1
