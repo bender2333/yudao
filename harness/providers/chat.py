@@ -22,7 +22,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
-from .reasoning import chat_reasoning_effort
+from .reasoning import chat_reasoning_effort, ReasoningOutput
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
@@ -163,6 +163,7 @@ class _ChatInvoker:
         call_params = dict(params)
         headers = call_params.pop("_request_headers", {})
         text_parts: list[str] = []
+        reasoning_parts: list[str] = []
         tool_calls: dict[str, dict[str, Any]] = {}
         usage_raw: dict[str, Any] | None = None
         response_id: str | None = None
@@ -200,6 +201,10 @@ class _ChatInvoker:
                 content = delta.get("content")
                 if isinstance(content, str) and content:
                     text_parts.append(content)
+                # 推理内容（设计说明第 7.6 节）：Chat Completions 的 reasoning_content，逐块累加
+                reasoning_content = delta.get("reasoning_content")
+                if isinstance(reasoning_content, str) and reasoning_content:
+                    reasoning_parts.append(reasoning_content)
                 for call in delta.get("tool_calls") or []:
                     index = str(call.get("index", len(tool_calls)))
                     entry = tool_calls.setdefault(index, {"id": "", "name": "", "arguments": ""})
@@ -222,6 +227,7 @@ class _ChatInvoker:
         text = "".join(text_parts)
         output = _chat_output(text, tool_calls)
         usage = _chat_usage(usage_raw, started)
+        reasoning = _chat_reasoning(reasoning_parts)
         await invocation.emit({
             "kind": "usage",
             "id": response_id or _observation_id(invocation),
@@ -236,11 +242,18 @@ class _ChatInvoker:
             output=output, text=text, usage=usage, finish_reason="completed",
             provider=invocation.frozen_target.provider_id, model=actual_model or invocation.frozen_target.model,
             response_id=response_id, protocol="chat_completions",
-            actual_model=actual_model,
+            actual_model=actual_model, reasoning=reasoning,
             wire_evidence={"request": {key: value for key, value in params.items() if not key.startswith("_")},
                            "response_id": response_id},
         )
 
+
+def _chat_reasoning(parts: list[str]) -> ReasoningOutput | None:
+    # Chat Completions 的推理内容是 assistant 消息上的 reasoning_content 字段，回放时原样发送
+    content = "".join(parts)
+    if not content:
+        return None
+    return ReasoningOutput(items=[{"type": "reasoning", "reasoning_content": content}])
 
 def _chunk_deltas(payload: dict[str, Any], offsets: dict[str, int]) -> list[ModelDelta]:
     # 这一块里的文字片段：回答文字进 output，工具调用的参数进 tool_arguments；
@@ -315,10 +328,15 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if isinstance(items, list) and items:
         pending_calls: list[dict[str, Any]] = []
+        pending_reasoning = ""
         for item in items:
             if not isinstance(item, dict):
                 continue
             item_type = item.get("type")
+            if item_type == "reasoning":
+                # 推理内容与消息、工具调用合并在 assistant 消息上，累积到下一次冲刷
+                pending_reasoning = _reasoning_content(item)
+                continue
             if item_type == "function_call":
                 pending_calls.append({
                     "id": str(item.get("call_id") or item.get("id") or ""),
@@ -329,8 +347,9 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
                     },
                 })
                 continue
-            _flush_tool_calls(messages, pending_calls)
+            _flush_tool_calls(messages, pending_calls, pending_reasoning)
             if item_type == "function_call_output":
+                pending_reasoning = ""
                 messages.append({
                     "role": "tool",
                     "tool_call_id": str(item.get("call_id") or ""),
@@ -339,8 +358,13 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
                 continue
             if item_type == "message" or item_type is None:
                 role = str(item.get("role") or "user")
-                messages.append({"role": role, "content": _message_text(item.get("content"))})
-        _flush_tool_calls(messages, pending_calls)
+                entry: dict[str, Any] = {"role": role, "content": _message_text(item.get("content"))}
+                # 推理内容挂在它伴随的 assistant 消息上；部门输入与用户消息消耗掉它
+                if role == "assistant" and pending_reasoning:
+                    entry["reasoning_content"] = pending_reasoning
+                pending_reasoning = ""
+                messages.append(entry)
+        _flush_tool_calls(messages, pending_calls, pending_reasoning)
         return messages
     # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
     for message in provider_input.messages:
@@ -357,11 +381,20 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
     return messages
 
 
-def _flush_tool_calls(messages: list[dict[str, Any]], pending: list[dict[str, Any]]) -> None:
+def _flush_tool_calls(messages: list[dict[str, Any]], pending: list[dict[str, Any]],
+                      reasoning_content: str = "") -> None:
     if not pending:
         return
-    messages.append({"role": "assistant", "content": None, "tool_calls": list(pending)})
+    entry: dict[str, Any] = {"role": "assistant", "content": None, "tool_calls": list(pending)}
+    if reasoning_content:
+        entry["reasoning_content"] = reasoning_content
+    messages.append(entry)
     pending.clear()
+
+def _reasoning_content(item: dict[str, Any]) -> str:
+    # 保存推理内容时原样留下上游字段名，回放时读回
+    value = item.get("reasoning_content")
+    return value if isinstance(value, str) else ""
 
 
 def _chat_tools(provider_input: ProviderInput) -> list[dict[str, Any]]:

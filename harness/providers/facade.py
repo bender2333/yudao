@@ -1320,11 +1320,16 @@ def _stream_event(event: Mapping[str, Any]) -> ModelStreamEvent | None:
     if kind == "message":
         text = event.get("text")
         return ModelStreamEvent(kind="message", text=str(text) if text is not None else "", **identity)
+    if kind == "reasoning":
+        return ModelStreamEvent(kind="reasoning", **identity)
     return None
 
 
 def _model_response(result: InvokeResult) -> ModelResponse:
     # 只记录服务实际返回的模型，未返回保持未知，不拿请求模型冒充
+    reasoning = None
+    if result.reasoning is not None and result.reasoning.items:
+        reasoning = {"items": result.reasoning.items}
     return ModelResponse(
         output=result.output,
         usage=_call_usage(result.usage),
@@ -1332,6 +1337,7 @@ def _model_response(result: InvokeResult) -> ModelResponse:
         model=result.actual_model or "",
         response_id=result.response_id,
         sdk_response=dict(result.wire_evidence),
+        reasoning=reasoning,
     )
 
 
