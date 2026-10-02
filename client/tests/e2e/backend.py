@@ -24,8 +24,14 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
+from harness.app.contracts import Accepted  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
-from harness.app.project_and_work_item_commands import WorkItemCreate  # noqa: E402
+from harness.app.project_and_work_item_commands import (  # noqa: E402
+    CommandRegistrationSave,
+    DepartmentSettingsSave,
+    MaterialRecord,
+    WorkItemCreate,
+)
 from harness.models import Usage  # noqa: E402
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
@@ -46,6 +52,13 @@ def script():
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
         # 回答「继续执行」以后再次遇到不可用：发出第二个决定请求，供「窗口关闭后有新的决定请求」的验收
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+        # 再次回答「继续执行」以后走完剩下的三部门：端到端测试核对一个事项的全过程随事件流完成
+        plan_turn(),
+        delivery_turn(),
+        review_turn("release", "checks passed on the current snapshot"),
+        # 第三个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
+        # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
+        product_spec(),
         plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
@@ -57,6 +70,17 @@ async def seed(application: Application, system: LoopSystem) -> None:
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"),
         actor="user:local")
     project_id = created.refs.project_id
+    # 项目设置页需要真实的行：登记一条命令、写入一个部门 Prompt、记录一条项目材料
+    await accept(application, "command_registration.save", CommandRegistrationSave(
+        command_id=str(uuid.uuid4()), project_id=project_id, name="smoke",
+        argv=["python", "-c", "raise SystemExit(0)"], args=["--verbose"],
+        timeout_sec=30, output_limit=4096, base_version=0))
+    await accept(application, "department_settings.save", DepartmentSettingsSave(
+        command_id=str(uuid.uuid4()), project_id=project_id, department="product",
+        department_prompt="产品部门先写目标与验收标准，范围以外的要求先问用户。", base_version=0))
+    await accept(application, "material.record", MaterialRecord(
+        command_id=str(uuid.uuid4()), project_id=project_id,
+        text="回声工具要能在终端里逐行回显输入。", department="product"))
     item = await application.command(
         "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="实现回声工具"),
         actor="user:local")
@@ -74,6 +98,18 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
+    # 第三个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
+    # 由事件流把第二个事项的全过程（产品 → 工程 → 质检 → 采纳）走完
+    await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
+        actor="user:local")
+
+
+async def accept(application: Application, name: str, request) -> None:
+    # 预置数据必须是真实被服务端接受的结果：被拒绝时立即失败，不在客户端一侧兜底
+    result = await application.command(name, request, actor="user:local")
+    if not isinstance(result, Accepted):
+        raise AssertionError(f"预置 {name} 被拒绝：{result.reason} {result.message}")
 
 
 class VersionedApplication(Application):
