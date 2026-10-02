@@ -19,6 +19,7 @@ import json
 import sys
 import threading
 import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import uvicorn
@@ -30,7 +31,8 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
-from harness.app.contracts import Accepted  # noqa: E402
+from harness.app.catalog_commands import CatalogConnectionSave, ModelInput, ProviderInput  # noqa: E402
+from harness.app.contracts import Accepted, Rejected  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
     CommandRegistrationSave,
@@ -43,6 +45,7 @@ from harness.data_directory import default_data_dir  # noqa: E402
 from harness.models import Usage  # noqa: E402
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
+from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
@@ -122,6 +125,54 @@ async def accept(application: Application, name: str, request) -> None:
         raise AssertionError(f"预置 {name} 被拒绝：{result.reason} {result.message}")
 
 
+class ModelsServer:
+    # 测试内启动的真实 HTTP 模型列表服务：GET /v1/models 返回 JSON，供候选采集与连接测试使用
+    def __init__(self, payload):
+        self.payload = payload
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                return
+
+            def do_GET(self):
+                body = json.dumps(server.payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}/v1/models"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+async def seed_catalog(application: Application, upstream_base: str, models_url: str) -> None:
+    # 界面上的候选、连接测试与模型测试都发真实请求，不使用测试替身
+    revision = application.system.facade.catalog_revision()
+    saved = await application.command("catalog.connection.save", CatalogConnectionSave(
+        command_id=str(uuid.uuid4()),
+        base_version=revision,
+        provider=ProviderInput(
+            id="opencode-go", name="OpenCode Go", protocol="responses",
+            base_url=f"{upstream_base}/v1", credential_ref="OPENCODE_GO_KEY",
+            timeout_sec=30, preset_id="opencode-go", models_url=models_url,
+        ),
+        models=[ModelInput(
+            id="glm-4.6", model="glm-4.6", context_window=200000, max_output_tokens=32000,
+            capability_source="能力表", capacity_confirmed=True,
+            accepts_required_tool_call=True, input_modalities=["text"],
+            reasoning_levels=["low", "high"], default_reasoning_level="low", reasoning_mode="effort",
+        )],
+    ), actor="user:local")
+    if isinstance(saved, Rejected):
+        raise RuntimeError(f"catalog seed rejected: {saved.reason} {saved.message}")
+
+
 class VersionedApplication(Application):
     # 让能力清单报告一个不同的接口版本：像一个接口版本不同的部署那样（不改动被测代码或接口层）
     reported_api_version: int | None = None
@@ -152,6 +203,16 @@ def main() -> int:
     parser.add_argument("mode", nargs="?", default="fixture", choices=("fixture", "api"))
     args = parser.parse_args()
 
+    import tempfile
+
+    # 测试内启动的真实 HTTP 上游：Responses 协议的最小推理服务与模型列表服务（工单 #93）。
+    # 「yudao api」模式不预置目录数据，但上游仍然要起：fixture 与 api 两种模式共用同一个
+    # 收尾清理，api 模式的上游只在没有用例连接时空转
+    upstream, _capture, upstream_base = serve(responses_responder)
+    models_server = ModelsServer({"data": [
+        {"id": "glm-4.6", "limit": {"context": 200000, "output": 32000}},
+        {"id": "vision-model", "limit": {"context": 128000, "output": 16000}},
+    ]})
     if args.mode == "api":
         # 作为 `yudao api` 运行：不带 --data-dir 时用命令行的默认数据目录（客户端只运行 yudao api，
         # 默认数据目录由 LOCALAPPDATA 算出，端到端测试把它指到自己的临时目录）
@@ -159,7 +220,6 @@ def main() -> int:
         # `yudao api` 的默认端口是 8765（客户端连接的本机地址），没有明确给端口时用它
         port = args.port if args.port else 8765
     else:
-        import tempfile
         data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
         port = args.port
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script()))
@@ -179,6 +239,10 @@ def main() -> int:
     while not server.started:
         if not thread.is_alive():
             raise RuntimeError("接口层在启动过程中结束")
+
+    # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）
+    asyncio.run(seed(application, system))
+    asyncio.run(seed_catalog(application, upstream_base, models_server.base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
     if args.mode == "api":
@@ -202,6 +266,9 @@ def main() -> int:
     finally:
         server.should_exit = True
         thread.join(10)
+        upstream.shutdown()
+        upstream.server_close()
+        models_server.close()
     return 0
 
 
