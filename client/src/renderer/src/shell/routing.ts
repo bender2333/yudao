@@ -32,6 +32,12 @@ export function parseRoute(hash: string): Route {
     route.name = "connect";
     return route;
   }
+  // 客户端自己的设置页：连接设置、本机服务与登录时启动（设计说明第 4.3、4.5 节）。
+  // 名字与项目设置页（#/p/<项目>/settings）分开，两个页面不互相顶替
+  if (segments[0] === "settings") {
+    route.name = "client-settings";
+    return route;
+  }
   // 动作图鉴：只在开发时使用，不进入正式的页面入口（页签、侧栏与 paths 里都没有它）
   if (segments[0] === "gallery") {
     route.name = "gallery";
@@ -92,4 +98,6 @@ export const paths = {
   },
   settings: (projectId: string) => `#/p/${projectId}/settings`,
   sys: (page: string) => `#/sys/${page}`,
+  // 客户端自己的设置页（与项目设置不同：连接设置、本机服务与登录时启动）
+  clientSettings: () => "#/settings",
 };

@@ -589,11 +589,17 @@ CATALOG_MODEL_TEST = CommandDefinition(
     name="catalog.model.test", request=CatalogModelTest, refs=NoRefs, handle=_test_model,
     derive_refs=lambda _events: NoRefs(), reasons=("not_found",),
 )
+
+def _department_defaults_refs(events) -> CatalogDepartmentDefaultsSaveRefs:
+    # 保存部门默认的引用：没有变化时不追加事件，提醒因此为空（工单 #91）
+    if not events:
+        return CatalogDepartmentDefaultsSaveRefs(reminders=[])
+    return CatalogDepartmentDefaultsSaveRefs(reminders=list(events[-1].payload.get("reminders") or ()))
+
 CATALOG_DEPARTMENT_DEFAULTS_SAVE = CommandDefinition(
     name="catalog.department_defaults.save", request=CatalogDepartmentDefaultsSave,
     refs=CatalogDepartmentDefaultsSaveRefs, handle=_save_department_defaults,
-    derive_refs=lambda events: CatalogDepartmentDefaultsSaveRefs(
-        reminders=list(events[-1].payload.get("reminders") or ())),
+    derive_refs=_department_defaults_refs,
     reasons=("stale_base", "catalog_invalid"),
 )
 CREDENTIAL_SET = CommandDefinition(
