@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import time
 import uuid
 from dataclasses import asdict
@@ -15,7 +16,7 @@ from harness.models import ArtifactRef, EventType, ProjectEventType, canonical_h
 from harness.public_tree import TreeError, capture_public_tree
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
-from harness.snapshot import ingest_snapshot, restore_snapshot
+from harness.snapshot import git_provenance, ingest_snapshot, restore_snapshot
 from harness.tests.api_helpers import running_api
 
 GOAL = "把一份可信代码快照接入后完成增量变更。"
@@ -262,3 +263,52 @@ def test_project_onboard_http_entry(data_dir, tmp_path):
             "command_id": str(uuid.uuid4()), "name": "快照2", "goal": GOAL,
             "source_name": "src", "source_path": str(source), "source_dir": str(source)})
         assert rejected.status_code == 422, rejected.text
+
+
+def _git_environment() -> dict[str, str]:
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+    })
+    return environment
+
+def _git(base: Path, *arguments: str) -> str:
+    completed = subprocess.run(["git", "--no-pager", "-C", str(base), *arguments],
+                               capture_output=True, check=True, env=_git_environment())
+    return completed.stdout.decode("utf-8").strip()
+
+def test_provenance_reads_a_repository_created_by_git_without_any_process(tmp_path, monkeypatch):
+    # 验收：来源核对改用进程内的 libgit2——提交、分支与未提交修改与 Git 命令行一致，且核对本身不启动进程
+    source = _make_source(tmp_path / "repo")
+    _git(source, "init", "-q")
+    _git(source, "add", "-A")
+    _git(source, "commit", "-q", "-m", "baseline")
+    expected = {"commit": _git(source, "rev-parse", "HEAD"),
+                "branch": _git(source, "rev-parse", "--abbrev-ref", "HEAD"), "dirty": False}
+    assert git_provenance(source) == expected
+    (source / "src" / "app.py").write_bytes(b"print('edited')\n")
+    (source / "extra.txt").write_bytes(b"untracked\n")
+    def forbidden(*args, **kwargs):
+        raise AssertionError(f"provenance must not start a process: {args}")
+    monkeypatch.setattr(subprocess, "run", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    provenance = git_provenance(source)
+    assert provenance["commit"] == expected["commit"]
+    assert provenance["branch"] == expected["branch"]
+    monkeypatch.undo()
+    assert provenance["dirty"] is (_git(source, "status", "--porcelain") != "")
+
+def test_provenance_is_empty_for_directories_that_are_not_work_trees(tmp_path):
+    # 普通目录没有来源；裸库没有工作树，与改造前 Git 命令行的 rev-parse --is-inside-work-tree 判定相同
+    plain = _make_source(tmp_path / "plain")
+    assert git_provenance(plain) == {}
+    bare = tmp_path / "bare"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True, env=_git_environment())
+    assert git_provenance(bare) == {}
+    # 尚无任何提交的工作树（HEAD 未出生）：与改造前一致，报错而不是静默留空
+    unborn = tmp_path / "unborn"
+    unborn.mkdir()
+    subprocess.run(["git", "init", "-q", str(unborn)], check=True, env=_git_environment())
+    with pytest.raises(TreeError):
+        git_provenance(unborn)

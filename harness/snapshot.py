@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+
+import pygit2
+from pygit2.enums import RepositoryOpenFlag
 
 from .artifacts import ArtifactStore
 from .models import ArtifactRef
@@ -38,40 +39,20 @@ def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, run_id: st
     return tree, record
 
 def git_provenance(source_dir: str | Path) -> dict[str, Any]:
-    # 用 Git 命令行读取基线对应的提交、分支与是否有未提交的修改；源目录不是 git 仓库时为空
+    # 在进程内用 libgit2 读取基线对应的提交、分支与是否有未提交的修改；源目录不是工作树时为空
     base = Path(source_dir).absolute()
-    executable = shutil.which("git")
-    if executable is None:
+    found = pygit2.discover_repository(str(base))
+    if found is None or not os.path.exists(found):
         return {}
-    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
-    environment.update({
-        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
-        "GIT_ATTR_NOSYSTEM": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0",
-    })
-    inside = _git(executable, base, "rev-parse", "--is-inside-work-tree", environment=environment, check=False)
-    if inside is None or inside.strip() != b"true":
+    repository = pygit2.Repository(found, flags=RepositoryOpenFlag.NO_SEARCH)
+    if repository.is_bare:
+        # 裸库没有工作树：与 Git 命令行的 rev-parse --is-inside-work-tree 相同，来源为空
         return {}
-    commit = _git(executable, base, "rev-parse", "HEAD", environment=environment)
-    branch = _git(executable, base, "rev-parse", "--abbrev-ref", "HEAD", environment=environment)
-    status = _git(executable, base, "status", "--porcelain", environment=environment)
-    return {
-        "commit": commit.decode("utf-8", errors="strict").strip(),
-        "branch": branch.decode("utf-8", errors="strict").strip(),
-        "dirty": bool(status.strip()),
-    }
-
-def _git(executable: str, base: Path, *arguments: str, environment: dict[str, str],
-         check: bool = True) -> bytes | None:
-    command = [executable, "--no-pager", "-C", str(base), "-c", "core.quotePath=false", *arguments]
-    completed = subprocess.run(command, capture_output=True, shell=False, env=environment, check=False, timeout=30)
-    if completed.returncode != 0:
-        if check:
-            raise TreeError(
-                f"git {' '.join(arguments)} 失败：退出状态 {completed.returncode}："
-                f"{completed.stderr.decode('utf-8', errors='replace').strip()}"
-            )
-        return None
-    return completed.stdout
+    try:
+        commit = str(repository.head.target)
+    except pygit2.GitError as error:
+        raise TreeError(f"git rev-parse HEAD 失败：{error}") from error
+    return {"commit": commit, "branch": repository.head.shorthand, "dirty": bool(repository.status())}
 
 def restore_snapshot(
     artifacts: ArtifactStore, run_id: str, snapshot: dict[str, Any], destination: str | Path
@@ -89,7 +70,7 @@ def restore_snapshot(
 def _reject_private_paths(source_dir: str | Path) -> None:
     # 采集会静默跳过宿主私有路径；快照接入必须明确拒绝并给出原因。
     # 仓库自身的 Git 元数据（.git）按设计第 4.2 节从公开树排除、不触发拒绝：任何 git 仓库的源目录都含它，
-    # git 来源由 Git 命令行读取；其余宿主私有路径（.checks）与无法表示的条目仍然拒绝
+    # git 来源由进程内的 libgit2 读取；其余宿主私有路径（.checks）与无法表示的条目仍然拒绝
     base = Path(source_dir).absolute()
     pending = [(base, "")]
     while pending:
