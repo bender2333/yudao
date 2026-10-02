@@ -75,24 +75,107 @@ async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void>
 
 // 启动 Electron 客户端：主进程读取测试环境变量（用户数据目录、后端地址与窗口尺寸），预置连接设置后启动
 export async function startClient(backend: Backend, size: { width: number; height: number }): Promise<ClientApp> {
-  const userData = mkdtempSync(join(tmpdir(), "yudao-client-"));
+  return launchClient({
+    address: backend.address,
+    userData: mkdtempSync(join(tmpdir(), "yudao-client-")),
+    size,
+  });
+}
+
+// 本机模式的客户端：连接设置是「本机」（地址 http://127.0.0.1:8765），服务没有运行，
+// 客户端按设计说明第 4.3 节在 PATH 中找到 yudao 命令并启动 `yudao api`。
+// commandBin 给出 yudao 命令所在目录（测试放一个把参数原样交给 backend.py 的替身命令，
+// backend.py 的 api 模式与 `yudao api` 同样的方式监听本机默认端口；
+// 客户端的找命令、启动后台进程、探测与写日志全部按生产方式运行）。
+// serviceRoot 作为 LOCALAPPDATA 传给客户端：它启动的服务的默认数据目录由它算出
+// （harness/data_directory.py 的 user_data_root），因此服务的数据目录落在测试目录内
+export type LocalLaunch = {
+  userData: string;
+  serviceRoot: string;
+  commandBin: string;
+  size: { width: number; height: number };
+};
+
+export async function startLocalClient(launch: LocalLaunch): Promise<ClientApp> {
+  return launchClient({
+    address: null,
+    userData: launch.userData,
+    size: launch.size,
+    env: {
+      LOCALAPPDATA: launch.serviceRoot,
+      YUDAO_E2E_COMMAND_BIN: launch.commandBin,
+    },
+  });
+}
+
+async function launchClient(options: {
+  address: string | null;
+  userData: string;
+  size: { width: number; height: number };
+  env?: Record<string, string>;
+}): Promise<ClientApp> {
+  const local = options.address === null;
   const app = await electron.launch({
     args: [join(repoRoot, "client", "out", "main", "index.js")],
     cwd: repoRoot,
     env: {
       ...process.env,
-      YUDAO_E2E_USER_DATA: userData,
-      YUDAO_E2E_BACKEND: backend.address,
-      YUDAO_E2E_WIDTH: String(size.width),
-      YUDAO_E2E_HEIGHT: String(size.height),
+      YUDAO_E2E_USER_DATA: options.userData,
+      YUDAO_E2E_WIDTH: String(options.size.width),
+      YUDAO_E2E_HEIGHT: String(options.size.height),
+      // 本机模式不设置 YUDAO_E2E_BACKEND：客户端按连接设置里的「本机」连接
+      ...(options.address === null ? {} : { YUDAO_E2E_BACKEND: options.address }),
+      ...options.env,
     },
+  });
+  const child = app.process();
+  const exited = new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+    } else {
+      child.on("exit", () => resolve());
+    }
   });
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
+  // 重复调用与进程已经退出时不再动作（用例的收尾写在 finally 里）
+  let closed = false;
   return {
     app,
     page,
-    close: () => app.close(),
+    // 本机模式的收尾走生产的退出入口：托盘「退出客户端」（设计说明第 4.5 节）。
+    // 退出以后客户端进程结束而服务仍在运行（ADR-0023），所以只能等进程退出事件：
+    // Playwright 的 app.close() 还要等它的启动管道关闭，而本机服务是客户端拉起的独立
+    // 后台进程，它继承了这条管道（Playwright 用 --remote-debugging-pipe 驱动 Electron），
+    // 服务不停止管道就不闭 —— 打包运行的客户端没有这条管道，这是测试驱动方式带来的
+    // 现象，因此测试按用户的方式退出客户端并等进程结束，随后宽容地关闭连接
+    close: async () => {
+      if (!local) {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        await app.close();
+        return;
+      }
+      if (closed) {
+        await exited;
+        return;
+      }
+      closed = true;
+      await app
+        .evaluate(() => {
+          const click = (globalThis as { yudaoTrayClick?: (label: string) => unknown }).yudaoTrayClick;
+          if (click === undefined || !click("退出客户端")) {
+            throw new Error("托盘里没有可点的「退出客户端」");
+          }
+        })
+        .catch(() => undefined);
+      await exited;
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, 5_000);
+      await Promise.race([app.close().catch(() => undefined), promise]);
+    },
   };
 }
 
