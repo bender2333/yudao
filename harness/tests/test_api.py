@@ -175,7 +175,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
                                                "command_id_reused"]},
         {"name": "catalog.connection.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.connection.delete", "reasons": ["stale_base", "not_found", "in_use", "command_id_reused"]},
-        {"name": "catalog.document.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.model.remove",
+         "reasons": ["stale_base", "not_found", "in_use", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.document.save",
+         "reasons": ["stale_base", "catalog_invalid", "in_use", "command_id_reused"]},
         {"name": "catalog.reload", "reasons": ["command_id_reused"]},
         {"name": "catalog.candidates.collect", "reasons": ["not_found", "command_id_reused"]},
         {"name": "catalog.connection.test", "reasons": ["not_found", "catalog_invalid", "command_id_reused"]},
@@ -192,9 +195,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
     assert [{"name": item["name"], "changed_by": item["changed_by"], "replayable": item["replayable"]}
-            for item in capabilities["queries"][-3:-1]] == [
+            for item in capabilities["queries"][-4:-1]] == [
         {"name": "catalog", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
+        {"name": "catalog.change_impact", "changed_by": catalog_changed_by, "replayable": False},
     ]
     assert capabilities["queries"][-1] == {
         "name": "home.away_report", "replayable": False,
@@ -210,7 +214,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
-        "home.away_report",
+        "catalog.change_impact", "home.away_report",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {

@@ -31,6 +31,8 @@ export function ConnectPage(props: ConnectPageProps) {
         kind,
         address: kind === "local" ? DEFAULT_LOCAL_ADDRESS : normalizeAddress(address),
         token,
+        // 连接页不改动「允许局域网访问」，沿用已保存的值
+        allowLan: props.settings.allowLan,
       };
       setLocalError(null);
       props.onChange(next);

@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import json
+from typing import TYPE_CHECKING, Any, Literal, Mapping
 
 from ..models import DEPARTMENTS, CatalogEventType
 from ..providers import capabilities
 from .contracts import Contract, Snapshot
+from .project_queries import NotFound
 from .registry import QueryDefinition
 
 if TYPE_CHECKING:
@@ -114,6 +116,51 @@ class CatalogDocument(Contract):
 def _model(item: dict[str, Any]) -> CatalogModel:
     return CatalogModel.model_validate(dict(item))
 
+class ChangeImpactRequest(Contract):
+    # 拟议的修改（get 查询参数）：kind 决定改动的形状，document 是 JSON 文本。
+    # connection：{"provider": {...}, "models": [...]}（catalog.connection.save 的两个字段，models 可省，省略时保留当前值）；
+    # provider：不使用 document，按 provider_id 算出删除该份配置之后的影响；
+    # document：与目录文件同形的整份目录文档（编辑 JSON 与导入，设计说明第 4.6 节）
+    kind: Literal["connection", "provider", "document"]
+    provider_id: str | None = None
+    document: str | None = None
+
+class ImpactDefinition(Contract):
+    # 受影响的模型访问定义（准入会作废），或将被一并删除的定义
+    model_id: str
+    provider_id: str
+
+class ImpactDepartmentDefault(Contract):
+    # 部门默认中的引用方
+    department: str
+    model_id: str
+    provider_id: str
+
+class ImpactProjectSetting(Contract):
+    # 某个项目的部门设置中的引用方
+    project_id: str
+    project_name: str
+    department: str
+    model_id: str
+    provider_id: str
+
+class ImpactWorkItem(Contract):
+    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）
+    project_id: str
+    project_name: str
+    work_item_id: str
+    title: str
+    department: str
+
+class ChangeImpact(Contract):
+    # catalog.change_impact 的结果：只读取，不写入任何内容（设计说明第 4.4、4.5 节）
+    revision: int
+    impacted: list[ImpactDefinition] = []
+    deletions: list[ImpactDefinition] = []
+    department_defaults: list[ImpactDepartmentDefault] = []
+    project_settings: list[ImpactProjectSetting] = []
+    work_items: list[ImpactWorkItem] = []
+
 
 def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
     system = application.system
@@ -172,7 +219,137 @@ def _catalog_document(application: Application, _request: None) -> Snapshot[Cata
 _CATALOG_EVENTS = (CatalogEventType.CATALOG_REVISED, CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
                    CatalogEventType.CATALOG_TEST_FINISHED, CatalogEventType.CREDENTIAL_CHANGED)
 
+
+def _definition_identity(item: Mapping[str, Any]) -> ImpactDefinition:
+    return ImpactDefinition(model_id=str(item.get("id") or ""),
+                            provider_id=str(item.get("provider_id") or ""))
+
+
+def _strand(value: Any) -> str:
+    # 查询参数里的标识：只有字符串才算给出，其余一律当作没给
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _json_object(raw: Any, location: str) -> Mapping[str, Any]:
+    # 查询参数里的 JSON 文本：不是对象时按查询目标不存在拒绝，与其它查询一致（接口层映射为 404）
+    if not isinstance(raw, str) or not raw.strip():
+        raise NotFound(location, "应为 JSON 文本")
+    try:
+        parsed = json.loads(raw)
+    except ValueError as exc:
+        raise NotFound(location, f"不是合法的 JSON：{exc}") from exc
+    if not isinstance(parsed, Mapping):
+        raise NotFound(location, "应为 JSON 对象")
+    return parsed
+
+
+def _removed_definitions(current: Mapping[str, Any], proposed: Mapping[str, Any]) -> list[ImpactDefinition]:
+    # 拟议目录里消失的定义：整条不在，或所属连接不在（随连接一起消失）
+    provider_ids = {str(item.get("id")) for item in proposed["providers"]}
+    model_ids = {str(item.get("id")) for item in proposed["models"]}
+    return [_definition_identity(item) for item in current["models"]
+            if str(item.get("id")) not in model_ids
+            or str(item.get("provider_id")) not in provider_ids]
+
+
+def _proposed_document(current: Mapping[str, Any], request: ChangeImpactRequest) -> dict[str, Any]:
+    # 按拟议的修改构造目录形状的拟议终态；结构由 Provider 模块在计算受影响定义时校验
+    if request.kind == "provider":
+        provider_id = _strand(request.provider_id)
+        if not provider_id:
+            raise NotFound("provider_id", "缺少要删除的 Provider 配置")
+        if not any(item.get("id") == provider_id for item in current["providers"]):
+            raise NotFound(provider_id, "Provider 配置不存在")
+        return {"providers": [item for item in current["providers"] if item.get("id") != provider_id],
+                "models": [item for item in current["models"] if item.get("provider_id") != provider_id]}
+    if request.kind == "connection":
+        proposed = _json_object(request.document, "document")
+        provider = proposed.get("provider")
+        if not isinstance(provider, Mapping):
+            raise NotFound("document", "document 缺少 provider 对象")
+        provider_id = _strand(provider.get("id"))
+        providers = [item for item in current["providers"] if item.get("id") != provider_id]
+        providers.append(dict(provider))
+        models = [item for item in current["models"] if item.get("provider_id") != provider_id]
+        nested = proposed.get("models")
+        if nested is None:
+            models = [item for item in current["models"]
+                      if item.get("provider_id") == provider_id] + models
+        elif isinstance(nested, list):
+            for item in nested:
+                if not isinstance(item, Mapping):
+                    raise NotFound("document", "models 里应为对象")
+                entry = dict(item)
+                entry["provider_id"] = provider_id
+                models.append(entry)
+        else:
+            raise NotFound("document", "models 应为数组")
+        return {"providers": providers, "models": models}
+    proposed = _json_object(request.document, "document")
+    providers = proposed.get("providers")
+    models = proposed.get("models")
+    if not isinstance(providers, list) or not isinstance(models, list):
+        raise NotFound("document", "document 应带 providers 与 models 数组")
+    return {"providers": [dict(item) for item in providers if isinstance(item, Mapping)],
+            "models": [dict(item) for item in models if isinstance(item, Mapping)]}
+
+
+def _change_impact(application: Application, request: ChangeImpactRequest) -> Snapshot[ChangeImpact]:
+    # 保存会作废准入的修改之前的影响列表（设计说明第 4.4 节最后一段）与删除时的一并删除清单（第 4.5 节）：
+    # 只读取，不写入任何内容。Provider 模块只返回受影响与将被删除的定义；
+    # 引用方与进行中事项由应用层汇总：目录中的部门默认、各项目的项目部门设置、运行状态投影中的进行中事项。
+    # 角色默认与项目角色设置（第 5.1、5.2 节）还没有实现，这两层引用方尚未汇总
+    system = application.system
+    facade = system.facade
+    position = system.store.end_position()
+    revision = facade.catalog_revision()
+    current = facade.to_document()
+    proposed = _proposed_document(current, request)
+    impacted = [ImpactDefinition(**item) for item in facade.impacted_definitions(proposed)]
+    deletions = _removed_definitions(current, proposed)
+    if request.kind == "provider":
+        deletions = [ImpactDefinition(**item)
+                     for item in facade.deletable_definitions(_strand(request.provider_id))]
+    affected = {item.model_id for item in impacted} | {item.model_id for item in deletions}
+
+    bindings = facade.get_bindings()
+    department_defaults = [ImpactDepartmentDefault(department=department,
+                                                   model_id=str(binding.get("model_id") or ""),
+                                                   provider_id=str(binding.get("provider_id") or ""))
+                           for department, binding in sorted(bindings.items())
+                           if str(binding.get("model_id") or "") in affected]
+    project_settings: list[ImpactProjectSetting] = []
+    work_items: list[ImpactWorkItem] = []
+    for project in system.projects.list_projects(include_archived=True):
+        settings = project.department_settings
+        for department in sorted(settings):
+            setting = settings[department] if isinstance(settings, Mapping) else None
+            if setting is not None and setting.model_id in affected:
+                project_settings.append(ImpactProjectSetting(
+                    project_id=project.project_id, project_name=project.name, department=department,
+                    model_id=str(setting.model_id or ""), provider_id=str(setting.provider_id or "")))
+        item = (None if project.active_work_item_id is None
+                else project.work_item(project.active_work_item_id))
+        if item is None or item.status != "in_progress" or not item.department:
+            continue
+        department = item.department
+        setting = settings.get(department) if isinstance(settings, Mapping) else None
+        selected = str((setting.model_id if setting is not None else None) or "") or \
+            str((bindings.get(department) or {}).get("model_id") or "")
+        if selected in affected:
+            work_items.append(ImpactWorkItem(
+                project_id=project.project_id, project_name=project.name,
+                work_item_id=item.work_item_id, title=item.title, department=department))
+    data = ChangeImpact(revision=revision, impacted=impacted, deletions=deletions,
+                        department_defaults=department_defaults, project_settings=project_settings,
+                        work_items=work_items)
+    return Snapshot[ChangeImpact](position=position, data=data)
+
+
 CATALOG_QUERY = QueryDefinition(name="catalog", request=None, result=Catalog, handle=_catalog,
                                 changed_by=_CATALOG_EVENTS)
 CATALOG_DOCUMENT_QUERY = QueryDefinition(name="catalog.document", request=None, result=CatalogDocument,
                                          handle=_catalog_document, changed_by=_CATALOG_EVENTS)
+CATALOG_CHANGE_IMPACT_QUERY = QueryDefinition(name="catalog.change_impact", request=ChangeImpactRequest,
+                                              result=ChangeImpact, handle=_change_impact,
+                                              changed_by=_CATALOG_EVENTS)

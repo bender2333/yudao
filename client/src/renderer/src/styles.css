@@ -228,6 +228,38 @@ button.primary:disabled {
   color: var(--danger);
 }
 
+fieldset.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 0 0 12px;
+}
+
+fieldset.field legend {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+label.choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+code.install {
+  display: block;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
 .drawer-toggle {
   display: none;
 }
@@ -659,3 +691,79 @@ button.link {
 .gallery-value { font-size: 11px; color: #9fd6ff; word-break: break-all; }
 .gallery-count { font-size: 11px; color: #9fffb0; }
 .gallery-entries { list-style: none; margin: 0; padding: 0; font-size: 10px; color: #a8a4bb; max-height: 130px; overflow: auto; }
+
+/* 模型管理页（工单 #93）：卡片、表单、候选、模型访问定义表、部门默认与编辑 JSON 弹窗。
+   宽度 390 时表格与网格改为单列，不出现横向滚动条。 */
+.mm-page { display: flex; flex-direction: column; gap: 12px; min-width: 0; max-width: 1000px; }
+.mm-head h1 { font-size: 18px; margin: 0 0 4px; }
+.mm-meta { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.mm-hint { color: var(--muted); font-size: 12px; margin: 4px 0; }
+.mm-warn { color: var(--warn); font-size: 12px; margin: 4px 0; }
+.mm-ok { color: var(--ok); font-size: 12px; }
+.mm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.mm-actions .spacer { flex: 1; }
+.mm-page button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); cursor: pointer; }
+.mm-page button:disabled { opacity: 0.55; cursor: not-allowed; }
+.mm-page button.primary { background: var(--accent); color: #fff; border: none; }
+.mm-page input, .mm-page select, .mm-page textarea { padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); color: var(--text); max-width: 100%; }
+
+.mm-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.mm-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mm-summary .mm-name { font-weight: 600; }
+.mm-count { margin-left: auto; color: var(--muted); font-size: 12px; }
+.mm-body { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+.mm-table { width: 100%; border-collapse: collapse; margin-top: 8px; display: block; overflow-x: auto; }
+.mm-table th, .mm-table td { border-bottom: 1px solid var(--border); padding: 6px 8px;
+  text-align: left; font-size: 12px; white-space: nowrap; }
+.mm-table th { color: var(--muted); font-weight: 500; }
+
+.mm-form { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.mm-form h3 { margin: 0; font-size: 15px; }
+.mm-form h4, .mm-models h4, .mm-candidates h4 { margin: 8px 0 4px; font-size: 13px; }
+.mm-field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mm-field .mm-label { width: 96px; color: var(--muted); font-size: 12px; flex: 0 0 96px; }
+.mm-field input, .mm-field select { flex: 1 1 200px; min-width: 0; }
+.mm-check { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.mm-src { color: var(--muted); font-size: 11px; }
+.mm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mm-chips .chip { font-size: 12px; }
+.mm-chips .chip.selected { background: var(--accent); color: #fff; border-color: transparent; }
+.mm-advanced summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.mm-advanced { display: flex; flex-direction: column; gap: 6px; }
+
+.mm-models { display: flex; flex-direction: column; gap: 8px; }
+.mm-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px; }
+.mm-row legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.mm-row-actions { margin: 2px 0; }
+
+.mm-candidates ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.mm-candidates li { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+
+.mm-defaults { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.mm-defaults h2 { font-size: 15px; margin: 0 0 4px; }
+.mm-defaults-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.mm-default { border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px; }
+.mm-default h3 { margin: 0; font-size: 13px; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 45%); display: flex;
+  align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px;
+  width: min(760px, 100%); max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.modal h2 { margin: 0; font-size: 16px; }
+.json-editor { width: 100%; min-height: 320px; font-family: Consolas, "Courier New", monospace;
+  font-size: 12px; resize: vertical; }
+
+@media (max-width: 700px) {
+  .mm-page { max-width: 100%; }
+  .mm-table { display: block; }
+  .mm-field .mm-label { flex: 0 0 100%; width: 100%; }
+  .mm-defaults-grid { grid-template-columns: 1fr; }
+}
+
