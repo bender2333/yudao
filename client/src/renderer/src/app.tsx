@@ -13,6 +13,7 @@ import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
+import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
 import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
@@ -209,7 +210,16 @@ export function App() {
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
-          <ProjectRouter app={app} route={route} systemStatus={systemStatus} />
+          {route.name === "sys-models" ? (
+            <ModelManagementPage
+              views={app.viewSync}
+              command={(name, body) => app.command(name, body)}
+              subscribeEvents={(listener) => app.subscribeEvents(listener)}
+              onBack={() => navigate(paths.home())}
+            />
+          ) : (
+            <ProjectRouter app={app} route={route} systemStatus={systemStatus} />
+          )}
         </main>
       </div>
     </div>
@@ -266,7 +276,8 @@ function pathLabel(route: Route, projects: ProjectRow[]): string {
     return "首页";
   }
   if (route.name.startsWith("sys-")) {
-    return route.systemPage ?? "系统";
+    // 模型管理页的路径只显示「模型管理」，不显示在项目名之后（设计说明第 9.1 节）
+    return route.name === "sys-models" ? "模型管理" : route.systemPage ?? "系统";
   }
   const project = projects.find((item) => item.project_id === route.projectId);
   const name = project?.name ?? route.projectId ?? "";
