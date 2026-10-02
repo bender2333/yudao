@@ -43,7 +43,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.data_directory import default_data_dir  # noqa: E402
 from harness.models import Usage  # noqa: E402
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
@@ -71,6 +71,59 @@ def script():
         # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
         product_spec(),
         plan_turn(),
+        delivery_turn(),
+        review_turn("release", "checks passed on the current snapshot"),
+    ]
+
+def room_script():
+    # 部门房间的端到端验收（工单 #177）：产品的模型请求分三段流式返回，每段之间停顿；
+    # 之后产品向工程发出一次询问（工程收到并回答），再走完交付与质检放行。端到端测试在请求
+    # 进行中打开产品房间核对思考气泡，在交接与询问发生时核对两端的小人各说一句。
+    from harness.providers.call import ModelDelta, ModelResponse, ModelStreamEvent
+    from harness.adapters.fake import pending_request_id
+    from harness.models import json_dumps
+
+    def answer_turn(request_id_from_call):
+        # 收到询问的一方：把回答作为 submit_response 交回
+        def turn(call):
+            request_id = request_id_from_call(call) if callable(request_id_from_call) else request_id_from_call
+            identity = f"call-{call.activation_id}-{call.step_id}-answer"
+            return ModelResponse(output=[{
+                "id": identity, "call_id": identity, "type": "function_call", "name": "submit_response",
+                "arguments": json_dumps({"request_id": request_id, "status": "answered",
+                                         "text": "按需求里的验收条件实现即可", "result_event_ids": []}),
+            }])
+        return turn
+
+    def product_stream(call):
+        # 一个轮次：分三段返回流式输出。每段是一条解码后的流事件（kind="stream_event"），带 output 通道
+        # 的片段（offset 为该段在通道中的起始字数），与真正的协议实现一致：attempt.live 的文字来自这些
+        # 片段，事件日志里不写入片段本身；调用进行中由步骤驱动写入 model_stream_progress。
+        # 片段之间的停顿由 FakeAdapter 的 stream_gap_sec 给出，让订阅方在请求进行中读到 attempt.live
+        from harness.providers.call import ModelDelta
+        offset = 0
+        for sequence, text in enumerate(("正在阅读需求", "正在整理验收条件", "正在写出 PRD 的要点")):
+            yield ModelStreamEvent(kind="stream_event", id=f"stream-{sequence}",
+                                   payload={"type": "response.output_text.delta", "delta": text,
+                                            "output_index": 0, "content_index": 0,
+                                            "sequence_number": sequence},
+                                   text=text, sequence=sequence, stage="output", source="provider_sdk",
+                                   deltas=(ModelDelta(channel="output", offset=offset, text=text),))
+            offset += len(text)
+        return product_spec()
+
+    return [
+        # 预置的已完成事项：走完一轮，给项目留下一个已完成的事项，部门工作间默认选中它时房间照常渲染
+        product_spec(),
+        plan_turn(),
+        delivery_turn(),
+        review_turn("release", "checks passed on the current snapshot"),
+        # 端到端测试开始的事项：产品分三段流式请求（思考气泡），工程写计划后向质检发出一次询问
+        # （传信的两端），质检回答，工程交付（交接的两端）、质检放行
+        product_stream,
+        plan_turn(),
+        collaboration_request("quality", "交付前需要确认哪一条验收条件"),
+        answer_turn(pending_request_id),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
@@ -117,6 +170,26 @@ async def seed(application: Application, system: LoopSystem) -> None:
     await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
         actor="user:local")
+
+async def seed_room(application: Application, system: LoopSystem) -> str:
+    # 部门房间的端到端验收（工单 #177）：建一个项目并跑完第一个事项（让部门工作间有默认选中的事项，
+    # 房间照常渲染）。端到端测试随后打开房间，再经命令开始第二个事项：命令在接口进程的事件循环里
+    # 启动这个 run，产品的模型请求因此在房间打开期间分三段流式返回。返回项目标识。
+    created = await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="房间项目", goal="观察部门房间"),
+        actor="user:local")
+    project_id = created.refs.project_id
+    # 项目设置页与交付检查需要真实的行：登记一条 `smoke` 命令（delivery_turn 的检查要用）
+    await accept(application, "command_registration.save", CommandRegistrationSave(
+        command_id=str(uuid.uuid4()), project_id=project_id, name="smoke",
+        argv=["python", "-c", "raise SystemExit(0)"], args=[], timeout_sec=30, output_limit=4096, base_version=0))
+    item = await application.command(
+        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="预置的已完成事项"),
+        actor="user:local")
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
+    return project_id
 
 async def accept(application: Application, name: str, request) -> None:
     # 预置数据必须是真实被服务端接受的结果：被拒绝时立即失败，不在客户端一侧兜底
@@ -201,6 +274,8 @@ def main() -> int:
     # 因此这里接到的子命令与真正的 yudao 命令一致；端口固定为客户端连接的本机端口，
     # 接受本机停止请求并在收到以后退出，与 harness.api.server 的行为一致
     parser.add_argument("mode", nargs="?", default="fixture", choices=("fixture", "api"))
+    # 部门房间的端到端验收（工单 #177）：用流式慢模型跑一个项目，供房间在请求进行中观察
+    parser.add_argument("--room", action="store_true")
     args = parser.parse_args()
 
     import tempfile
@@ -222,7 +297,8 @@ def main() -> int:
     else:
         data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
         port = args.port
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(room_script() if args.room else script(),
+                                                          stream_gap_sec=2.5 if args.room else 0.0))
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
@@ -244,12 +320,16 @@ def main() -> int:
     # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
     # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
     already_seeded = bool(application.query("projects.list", ProjectsList(include_archived=True)).data.projects)
+    room_project = None
     if not already_seeded:
-        asyncio.run(seed(application, system))
+        if args.room:
+            room_project = asyncio.run(seed_room(application, system))
+        else:
+            asyncio.run(seed(application, system))
     asyncio.run(seed_catalog(application, upstream_base, models_server.base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
-    print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)
+    print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project}), flush=True)
     if args.mode == "api":
         # 进程一直服务到收到本机停止请求（数据目录的进程锁随退出释放）
         thread.join()

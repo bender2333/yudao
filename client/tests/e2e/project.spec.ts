@@ -332,7 +332,11 @@ test.describe("项目页面（1440×900）", () => {
       await expect(dialog.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
       await dialog.getByRole("button", { name: "关闭" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
-      await expect(await section(page, "部门房间")).toContainText("部门房间的位置");
+      // 部门房间：画布画出内容（工单 #177）
+      const room = await section(page, "部门房间");
+      await expect(room.locator(".room-canvas canvas")).toHaveCount(1);
+      const roomWidth = await room.locator(".room-canvas canvas").evaluate((el) => (el as HTMLCanvasElement).width);
+      expect(roomWidth % 480).toBe(0);
       const inspect = page.locator('section.card:has([role="tablist"])').first();
       const tabs = inspect.locator('[role="tab"]');
       await expect(tabs).toHaveCount(3);

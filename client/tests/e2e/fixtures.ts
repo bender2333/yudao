@@ -13,6 +13,8 @@ export type Backend = {
   port: number;
   address: string;
   dataDir: string;
+  /** 部门房间的端到端验收预置的项目标识（--room 模式）；其他模式为空。 */
+  roomProject: string | null;
   stop: () => Promise<void>;
 };
 
@@ -26,10 +28,13 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 
 // 启动真实后端：脚本在 client/tests/e2e/backend.py 中，用仓库项目的 Python 环境运行。
 // apiVersion 让服务报告一个不同的接口版本，用于核对更新页
-export async function startBackend(options: { apiVersion?: number } = {}): Promise<Backend> {
+export async function startBackend(options: { apiVersion?: number; room?: boolean } = {}): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", "0"];
   if (options.apiVersion !== undefined) {
     script.push("--api-version", String(options.apiVersion));
+  }
+  if (options.room) {
+    script.push("--room");
   }
   const child = spawn("uv", ["run", "python", ...script], {
     cwd: repoRoot,
@@ -37,11 +42,12 @@ export async function startBackend(options: { apiVersion?: number } = {}): Promi
     shell: true,
   });
   const line = await readFirstLine(child);
-  const parsed = JSON.parse(line) as { port: number; data_dir: string };
+  const parsed = JSON.parse(line) as { port: number; data_dir: string; room_project?: string | null };
   return {
     port: parsed.port,
     address: `http://127.0.0.1:${parsed.port}`,
     dataDir: parsed.data_dir,
+    roomProject: parsed.room_project ?? null,
     stop: () => stopProcess(child),
   };
 }
