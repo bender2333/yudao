@@ -115,13 +115,12 @@ def _check_on_publish_branch(repo_root: Path, branch: str) -> None:
         raise ReleaseError(f"当前分支是 {current}，发布要求当前提交在 {branch} 上")
 
 def _check_pushed(repo_root: Path, branch: str, remote: str) -> None:
-    # 当前提交已经推送到远端：HEAD 的提交号与远端分支相同
+    # 当前提交已经推送到远端：用 git ls-remote 向真实远端查询分支的提交号，与 HEAD 比较。
+    # 只读本地跟踪引用时，远端被另一处推进或强制更新以后会得到过期的结论
     head = _capture(["git", "rev-parse", "HEAD"], cwd=repo_root)
-    remote_ref = f"refs/remotes/{remote}/{branch}"
-    try:
-        pushed = _capture(["git", "rev-parse", remote_ref], cwd=repo_root)
-    except subprocess.CalledProcessError:
-        pushed = ""
+    reference = f"refs/heads/{branch}"
+    output = _capture(["git", "ls-remote", remote, reference], cwd=repo_root)
+    pushed = output.split()[0] if output else ""
     if pushed != head:
         raise ReleaseError(f"当前提交 {head[:12]} 还没有推送到 {remote}/{branch}")
 
@@ -166,13 +165,14 @@ def sha256_hex(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-def build_client(repo_root: Path, *, app_id: str, product_name: str,
+def build_client(repo_root: Path, *, version: str, app_id: str, product_name: str,
                  setup_basename: str) -> dict[str, Path]:
     # 第 2 步：构建客户端。npm ci 安装依赖，electron-builder 生成安装程序、blockmap 与 latest.yml。
-    # build-installer.mjs（#208）已经封装了这一步，并输出一行 JSON 写明三个文件的位置
+    # build-installer.mjs（#208）已经封装了这一步，并输出一行 JSON 写明三个文件的位置。
+    # 版本显式写成已核对的发布版本，环境里残留的 YUDAO_VERSION 不会让安装程序用错版本
     client_root = repo_root / "client"
-    environment = {**os.environ, "YUDAO_APP_ID": app_id, "YUDAO_PRODUCT_NAME": product_name,
-                   "YUDAO_SETUP_BASENAME": setup_basename}
+    environment = {**os.environ, "YUDAO_VERSION": version, "YUDAO_APP_ID": app_id,
+                   "YUDAO_PRODUCT_NAME": product_name, "YUDAO_SETUP_BASENAME": setup_basename}
     subprocess.run([_tool("npm"), "ci"], cwd=client_root, check=True, env=environment)
     result = subprocess.run([_tool("node"), "scripts/build-installer.mjs"], cwd=client_root,
                             check=True, capture_output=True, text=True, encoding="utf-8",
@@ -252,7 +252,7 @@ def release(repo_root: Path, *, publish_flag: bool, app_id: str, product_name: s
             setup_basename: str, output_dir: Path, branch: str, remote: str) -> dict[str, object]:
     # 依设计说明第 6.3 节的顺序执行，返回 wheel 的路径与核对值
     version = verify(repo_root, branch=branch, remote=remote)
-    client = build_client(repo_root, app_id=app_id, product_name=product_name,
+    client = build_client(repo_root, version=version, app_id=app_id, product_name=product_name,
                           setup_basename=setup_basename)
     verify_manifest_matches_installer(client["manifest"], client["installer"])
     assets = assemble_assets(repo_root, client)

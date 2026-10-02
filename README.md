@@ -130,9 +130,15 @@ yudao replay <run_id>
 
 ### 控制主机上的 Yudao 服务
 
-前提：控制主机上有 [uv](https://docs.astral.sh/uv/)。
+前提：控制主机上有 [uv](https://docs.astral.sh/uv/)。安装 uv：
 
-安装：
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+uv 的可执行文件目录（Windows 为 `%USERPROFILE%\.local\bin`）要加入 `PATH`，重新打开终端以后生效。
+
+安装 Yudao 服务：
 
 ```bash
 uv tool install --python 3.12 <wheel 的路径>

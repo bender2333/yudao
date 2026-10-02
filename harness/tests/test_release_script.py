@@ -65,13 +65,16 @@ def _run_release(source: Path, output_dir: Path, *extra: str) -> subprocess.Comp
 
 @pytest.fixture(scope="module")
 def release_build(tmp_path_factory):
-    # 一次完整构建：复制仓库、建立 git 环境、运行发布脚本（不发布），返回现场
+    # 一次完整构建：复制仓库、建立 git 环境、记录本机安装状态、运行发布脚本（不发布）、返回现场
     workdir = tmp_path_factory.mktemp("release-build")
     source, remote = _prepare_checkout(workdir)
     output_dir = workdir / "dist"
+    before = _installed_tooling_state()
     result = _run_release(source, output_dir)
     assert result.returncode == 0, result.stdout + result.stderr
-    return {"source": source, "remote": remote, "output_dir": output_dir, "result": result}
+    after = _installed_tooling_state()
+    return {"source": source, "remote": remote, "output_dir": output_dir, "result": result,
+            "installed_before": before, "installed_after": after}
 
 def _load_release_module():
     # 直接加载 scripts/release.py 以便单独核对 publish 发出的命令
@@ -228,16 +231,20 @@ def _write_fake_gh(directory: Path, record: Path) -> Path:
         script.chmod(0o755)
     return directory
 
-def test_installed_tooling_is_unchanged(release_build):
-    # 验收第 5 项：运行脚本前后这台电脑上已经安装的 yudao 命令与桌面客户端不变。
-    # 脚本只构建与上传，不运行 uv tool install，也不运行安装程序；这里核对 uv tool list 中没有
-    # 新出现的 yudao，默认的客户端安装目录也不存在
+def _installed_tooling_state() -> dict[str, object]:
+    # 本机安装状态的快照：uv tool list 的输出，以及默认客户端安装目录是否存在及其中的文件清单。
+    # 发布脚本只构建与上传，不运行 uv tool install，也不运行安装程序，两次快照应当相同
     tools = subprocess.run(["uv", "tool", "list"], capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
-    installed = {line.split()[0] for line in tools.stdout.splitlines() if line.strip()}
-    assert "yudao" not in installed
     client_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Yudao"
-    assert not client_dir.exists()
+    listing = sorted(str(path.relative_to(client_dir)) for path in client_dir.rglob("*")) \
+        if client_dir.is_dir() else None
+    return {"tools": tools.stdout, "client_listing": listing}
+
+def test_installed_tooling_is_unchanged(release_build):
+    # 验收第 5 项：运行脚本前后这台电脑上已经安装的 yudao 命令与桌面客户端不变。
+    # 比较运行发布脚本前后两次本机安装状态的快照
+    assert release_build["installed_after"] == release_build["installed_before"]
 
 def _free_port() -> int:
     import socket
@@ -270,14 +277,23 @@ def _stop(process: subprocess.Popen) -> None:
         os.killpg(process.pid, signal.SIGKILL)
     process.wait(300)
 
-def test_wheel_installs_and_serves_the_client_update_source(release_build, tmp_path):
+def test_installed_wheel_passes_the_client_update_source_acceptance(release_build, tmp_path):
     # 验收第 4 项：脚本生成的 wheel 安装进临时虚拟环境后，#206 的各项验收通过。
-    # 建立临时虚拟环境、安装 wheel、用临时数据目录与端口启动 yudao api，
-    # 核对 yudao --version 与更新源返回 wheel 内的安装程序与更新清单
+    # 建立临时虚拟环境、安装 wheel、用临时数据目录与端口启动 yudao api，核对：
+    # yudao --version 输出发布版本号；更新源返回的 latest.yml 与安装程序与 wheel 内的字节相同，
+    # 安装程序的 Range 请求返回正确片段；同一数据目录第二次启动失败并写明原因；
+    # 数据目录内有默认的 Provider 目录文件与 .env；发布资源随 wheel 提供
+    import time
+
     import httpx
+    import yaml
 
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
+    with zipfile.ZipFile(wheel) as archive:
+        packaged_manifest = archive.read("harness/release_assets/latest.yml")
+        packaged_installer = archive.read(f"harness/release_assets/Yudao-Setup-{version}.exe")
+
     venv = tmp_path / "venv"
     subprocess.run(["uv", "venv", str(venv), "--python", "3.12"], check=True, capture_output=True)
     scripts = venv / ("Scripts" if os.name == "nt" else "bin")
@@ -291,23 +307,36 @@ def test_wheel_installs_and_serves_the_client_update_source(release_build, tmp_p
                               text=True, encoding="utf-8", errors="replace")
     assert released.stdout.strip() == version
 
+    data_dir = tmp_path / "data"
     port = _free_port()
     log = tmp_path / "api.log"
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
     with log.open("wb") as output:
-        api = subprocess.Popen([str(command), "api", "--data-dir", str(tmp_path / "data"),
+        api = subprocess.Popen([str(command), "api", "--data-dir", str(data_dir),
                                 "--port", str(port), "--provider-config", ""],
                                stdout=output, stderr=subprocess.STDOUT, **spawn)
     try:
         _wait_until_serving(api, f"http://127.0.0.1:{port}/api/queries/system.status", log)
         latest = httpx.get(f"http://127.0.0.1:{port}/client-update/latest.yml", timeout=10)
-        assert latest.status_code == 200
+        assert latest.status_code == 200 and latest.content == packaged_manifest
         installer = httpx.get(
-            f"http://127.0.0.1:{port}/client-update/Yudao-Setup-{version}.exe", timeout=30)
-        assert installer.status_code == 200 and len(installer.content) > 0
+            f"http://127.0.0.1:{port}/client-update/Yudao-Setup-{version}.exe", timeout=60)
+        assert installer.status_code == 200 and installer.content == packaged_installer
         partial = httpx.get(f"http://127.0.0.1:{port}/client-update/Yudao-Setup-{version}.exe",
                             headers={"Range": "bytes=4-7"}, timeout=30)
-        assert partial.status_code == 206 and partial.content == installer.content[4:8]
+        assert partial.status_code == 206 and partial.content == packaged_installer[4:8]
+
+        # 数据目录内有服务的日志（设计说明第 3.4、4.2 节）
+        assert (data_dir / "logs" / "yudao.log").is_file()
+
+        # 同一数据目录第二次启动失败并写明原因（服务进程锁）
+        second = subprocess.run(
+            [str(command), "api", "--data-dir", str(data_dir), "--port", str(_free_port()),
+             "--provider-config", ""],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        assert second.returncode != 0
+        assert "data directory is in use by another service process" in second.stderr
+        assert str(data_dir.resolve()) in second.stderr
     finally:
         _stop(api)
