@@ -970,6 +970,28 @@ export type CatalogModel = {
 };
 
 /**
+ * CatalogModelRemove
+ */
+export type CatalogModelRemove = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+};
+
+/**
  * CatalogModelTest
  */
 export type CatalogModelTest = {
@@ -1084,6 +1106,36 @@ export type CatalogState = {
      * Reload Error
      */
     reload_error: string | null;
+};
+
+/**
+ * ChangeImpact
+ */
+export type ChangeImpact = {
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Impacted
+     */
+    impacted?: Array<ImpactDefinition>;
+    /**
+     * Deletions
+     */
+    deletions?: Array<ImpactDefinition>;
+    /**
+     * Department Defaults
+     */
+    department_defaults?: Array<ImpactDepartmentDefault>;
+    /**
+     * Project Settings
+     */
+    project_settings?: Array<ImpactProjectSetting>;
+    /**
+     * Work Items
+     */
+    work_items?: Array<ImpactWorkItem>;
 };
 
 /**
@@ -1846,6 +1898,90 @@ export type HomeStatus = {
      * Disk Free Bytes
      */
     disk_free_bytes: number | null;
+};
+
+/**
+ * ImpactDefinition
+ */
+export type ImpactDefinition = {
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactDepartmentDefault
+ */
+export type ImpactDepartmentDefault = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactProjectSetting
+ */
+export type ImpactProjectSetting = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * ImpactWorkItem
+ */
+export type ImpactWorkItem = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Department
+     */
+    department: string;
 };
 
 /**
@@ -3058,6 +3194,17 @@ export type SnapshotCatalog = {
      */
     position: number;
     data: Catalog;
+};
+
+/**
+ * Snapshot[ChangeImpact]
+ */
+export type SnapshotChangeImpact = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ChangeImpact;
 };
 
 /**
@@ -4884,7 +5031,7 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'delete_connection' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */
@@ -14271,6 +14418,35 @@ export type CommandCatalogConnectionDeleteResponses = {
 
 export type CommandCatalogConnectionDeleteResponse = CommandCatalogConnectionDeleteResponses[keyof CommandCatalogConnectionDeleteResponses];
 
+export type CommandCatalogModelRemoveData = {
+    body: CatalogModelRemove;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.model.remove';
+};
+
+export type CommandCatalogModelRemoveErrors = {
+    /**
+     * 命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogModelRemoveError = CommandCatalogModelRemoveErrors[keyof CommandCatalogModelRemoveErrors];
+
+export type CommandCatalogModelRemoveResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogModelRemoveResponse = CommandCatalogModelRemoveResponses[keyof CommandCatalogModelRemoveResponses];
+
 export type CommandCatalogDocumentSaveData = {
     body: CatalogDocumentSave;
     path?: never;
@@ -14280,7 +14456,7 @@ export type CommandCatalogDocumentSaveData = {
 
 export type CommandCatalogDocumentSaveErrors = {
     /**
-     * 命令被拒绝，可能的原因：stale_base, catalog_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：stale_base, catalog_invalid, in_use, command_id_reused
      */
     409: Rejected;
     /**
@@ -15378,6 +15554,44 @@ export type QueryCatalogDocumentResponses = {
 };
 
 export type QueryCatalogDocumentResponse = QueryCatalogDocumentResponses[keyof QueryCatalogDocumentResponses];
+
+export type QueryCatalogChangeImpactData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Kind
+         */
+        kind: 'connection' | 'provider' | 'document';
+        /**
+         * Provider Id
+         */
+        provider_id?: string | null;
+        /**
+         * Document
+         */
+        document?: string | null;
+    };
+    url: '/api/queries/catalog.change_impact';
+};
+
+export type QueryCatalogChangeImpactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryCatalogChangeImpactError = QueryCatalogChangeImpactErrors[keyof QueryCatalogChangeImpactErrors];
+
+export type QueryCatalogChangeImpactResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotChangeImpact;
+};
+
+export type QueryCatalogChangeImpactResponse = QueryCatalogChangeImpactResponses[keyof QueryCatalogChangeImpactResponses];
 
 export type QueryHomeAwayReportData = {
     body?: never;

@@ -974,6 +974,57 @@
         }
       }
     },
+    "/api/commands/catalog.model.remove": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.model.remove",
+        "operationId": "command_catalog_model_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogModelRemove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.document.save": {
       "post": {
         "tags": [
@@ -1003,7 +1054,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：stale_base, catalog_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：stale_base, catalog_invalid, in_use, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -2985,6 +3036,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot_CatalogDocument_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queries/catalog.change_impact": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "catalog.change_impact",
+        "operationId": "query_catalog_change_impact",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "connection",
+                "provider",
+                "document"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "provider_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Id"
+            }
+          },
+          {
+            "name": "document",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ChangeImpact_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5134,6 +5264,38 @@
         ],
         "title": "CatalogModel"
       },
+      "CatalogModelRemove": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "provider_id",
+          "model_id"
+        ],
+        "title": "CatalogModelRemove"
+      },
       "CatalogModelTest": {
         "properties": {
           "command_id": {
@@ -5305,6 +5467,60 @@
           "reload_error"
         ],
         "title": "CatalogState"
+      },
+      "ChangeImpact": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "impacted": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDefinition"
+            },
+            "type": "array",
+            "title": "Impacted",
+            "default": []
+          },
+          "deletions": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDefinition"
+            },
+            "type": "array",
+            "title": "Deletions",
+            "default": []
+          },
+          "department_defaults": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactDepartmentDefault"
+            },
+            "type": "array",
+            "title": "Department Defaults",
+            "default": []
+          },
+          "project_settings": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactProjectSetting"
+            },
+            "type": "array",
+            "title": "Project Settings",
+            "default": []
+          },
+          "work_items": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactWorkItem"
+            },
+            "type": "array",
+            "title": "Work Items",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "title": "ChangeImpact"
       },
       "CommandCapability": {
         "properties": {
@@ -6655,6 +6871,117 @@
           "disk_free_bytes"
         ],
         "title": "HomeStatus"
+      },
+      "ImpactDefinition": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactDefinition"
+      },
+      "ImpactDepartmentDefault": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactDepartmentDefault"
+      },
+      "ImpactProjectSetting": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "department",
+          "model_id",
+          "provider_id"
+        ],
+        "title": "ImpactProjectSetting"
+      },
+      "ImpactWorkItem": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "work_item_id",
+          "title",
+          "department"
+        ],
+        "title": "ImpactWorkItem"
       },
       "InputView": {
         "properties": {
@@ -8608,6 +8935,24 @@
           "data"
         ],
         "title": "Snapshot[Catalog]"
+      },
+      "Snapshot_ChangeImpact_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChangeImpact"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ChangeImpact]"
       },
       "Snapshot_DecisionList_": {
         "properties": {
@@ -11975,6 +12320,7 @@
             "enum": [
               "save_connection",
               "delete_connection",
+              "remove_model",
               "save_document",
               "department_defaults",
               "reload",
