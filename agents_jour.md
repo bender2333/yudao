@@ -1178,4 +1178,4 @@ claude-opus-4-5 / 2026-10-03 01:50 / 审查者：#266 第 1 轮审查。规范�
 
 复测（单进程）：test_issue_266.py 4 passed；test_layers.py + test_openapi_snapshot.py 3 passed；test_issue_91.py、test_catalog_api.py、test_provider_catalog.py、test_startup_reload.py、test_smoke.py、test_issue_266.py 合计 124 passed；前端 test_web_ui.js tests 47 / pass 47 / fail 0。`-m "unit or module"` 为 1706 deselected（#158 登记表尚未合并，按 AGENTS.md「登记表建立以前」的规则执行）。
 
-审查通过：标签 needs-review 改为 review-passed；推送 issue-266，创建 PR #267（https://github.com/bender2333/yudao/pull/267，正文 Closes #266，main ← issue-266）；在工单评论 REVIEW: PASS；worktree 保留待删除。
+审查通过：标签 needs-review 改为 review-passed；推送 issue-266，创建 PR #267（https://github.com/bender2333/yudao/pull/267，正文 Closes #266，main ← issue-266）；在工单评论 REVIEW: PASS；worktree 已删除（git 注册移除，残留空目录被会话工作目录占用，会话结束即消失）。
