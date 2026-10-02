@@ -85,6 +85,14 @@ export function ProviderForm(props: ProviderFormProps) {
       patch.base_url = presetBaseUrlFor(preset, protocol);
     }
     props.onPatch(patch);
+    // 推理参数方式与协议不符时清空推理档位声明（第 7.1、7.4 节）：支持档位、默认档位与推理参数方式
+    // 三项一起声明，缺任一项时请求不带推理参数，所以清空方式时三项一起清空
+    const modes = reasoningModeOptions(protocol);
+    for (const row of state.rows) {
+      if (row.reasoning_mode !== "" && !modes.includes(row.reasoning_mode)) {
+        props.onPatchRow(row.key, { reasoning_mode: "", reasoning_levels: [], default_reasoning_level: "" });
+      }
+    }
   };
 
   const toggleLevel = (row: FormRow, level: string) => {

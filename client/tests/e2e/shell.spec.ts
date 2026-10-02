@@ -62,7 +62,9 @@ test("连接「本机」而服务已经在运行时，客户端直接连接并�
   const errors = watchErrors(client);
   try {
     await expect(client.page.locator(".connection")).toHaveText("已连接");
-    await expect(client.page.locator("dt", { hasText: "日志身份" })).toBeVisible();
+    // 首页已经由 #175 实现：外壳连上以后直接显示状态项与离开期间的报告，不再是占位页
+    await expect(client.page.locator(".status-row .status-item")).not.toHaveCount(0);
+    await expect(client.page.getByRole("heading", { name: "离开期间的报告", exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
     await client.close();
@@ -93,7 +95,7 @@ test("顶栏与托盘图标的待你决定数量与 decisions.list 中等待回�
       return body.data.decisions.length;
     }, backend.address);
     expect(waiting).toBeGreaterThan(0);
-    await expect(client.page.locator(".status-item")).toHaveText(`待你决定：${waiting}`);
+    await expect(client.page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting}`);
     // 托盘图标使用同一份数据：主进程记录的计数与等待数量一致
     const trayCount = await client.app.evaluate(() => (globalThis as { yudaoTrayCount?: () => number }).yudaoTrayCount?.() ?? null);
     expect(trayCount).toBe(waiting);

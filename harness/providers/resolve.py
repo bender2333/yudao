@@ -226,6 +226,15 @@ def _coerce_chain(credentials: CredentialChain | Mapping[str, Any] | None) -> Cr
     return CredentialChain()
 
 
+# 调用目标的公开字段名：进入请求事件与界面的公开部分由它们组成，不含密钥；
+# 观察与分析从事件载荷按下标取出这些字段（工单 #92）
+CALL_TARGET_FIELDS = (
+    "provider_config_id", "model_id", "provider_name", "protocol", "base_url",
+    "requested_provider", "requested_protocol", "requested_model", "credential_ref", "credential_version",
+    "context_window", "configured_max_output_tokens", "accepts_required_tool_call", "input_modalities",
+    "reasoning_levels", "default_reasoning_level", "reasoning_mode", "requested_tier", "sent_tier",
+)
+
 def call_target_public(
     model_id: Any,
     requested_tier: str | None = None,
@@ -288,6 +297,14 @@ class CallTargetResolution:
     public: Mapping[str, Any]
     handle_id: str | None = None
     selection_source: str | None = None
+
+@dataclass(frozen=True)
+class EffectiveModelResolution:
+    # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的选择规则与当前目录计算，
+    # 不发送请求、不保留调用句柄。state 取 effective、unusable、unset 三者之一；
+    # unusable 与 unset 时不返回其他连接或模型。resolution 是解析结果，unset 时为空。
+    state: str
+    resolution: CallTargetResolution | None
 
 
 def resolve_call_target(
