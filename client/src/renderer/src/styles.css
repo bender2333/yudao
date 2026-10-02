@@ -673,6 +673,13 @@ button.link {
 .floor-text-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
 .floor-text-list li { display: flex; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--line, #0002); }
 
+/* 首页的楼（像素画面五，工单 #178）：每层一个项目，画布按整数倍最近邻缩放，楼层多时纵向滚动 */
+.building-canvas { line-height: 0; }
+.building-canvas canvas { image-rendering: pixelated; display: block; width: 100%; cursor: default; }
+.building-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
+.building-list li { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--line, #0002); }
+.building-list li .count { color: #e0a13a; }
+
 .gallery-page { padding: 16px 20px 48px; color: #e8e6f0; overflow: auto; height: 100%; }
 .gallery-head h1 { font-size: 20px; margin: 0 0 6px; }
 .gallery-head p { margin: 0 0 10px; font-size: 12px; color: #b9b5c8; }
