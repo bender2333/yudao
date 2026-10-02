@@ -2,8 +2,8 @@
 
 The public tree holds every workspace entry except the host-private paths and the
 paths the project's ignore rules (its .gitignore files and Git exclude files)
-exclude. The ignore rules are decided by the Git command line; see
-`_ignored_paths`. Entries the public tree cannot represent (links, reparse
+exclude. The ignore rules are decided in process by libgit2; see
+`excluded_by_ignore_rules`. Entries the public tree cannot represent (links, reparse
 points, hard links, special files) raise `UnrepresentableWorkspace` naming only
 the workspace-relative path.
 """
@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import stat
-import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Sequence
+
+import pygit2
+from pygit2.enums import RepositoryInitFlag, RepositoryOpenFlag
 
 from .models import canonical_hash, hash_bytes
 
@@ -27,6 +29,7 @@ _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
 _GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
 
 class TreeError(ValueError):
     """A tree is incomplete, changed, or cannot be represented without ambiguity."""
@@ -147,15 +150,15 @@ def ignore_probe_directory(root: str | Path) -> Path:
     return probe
 
 def has_ignore_rules(root: str | Path, relative: str) -> bool:
-    """Whether any ignore file Git reads for this relative path can exclude it.
+    """Whether any ignore file libgit2 reads for this relative path can exclude it.
 
-    Git reads the ignore files inside the work tree plus the probe repository's own
+    libgit2 reads the ignore files inside the work tree plus the probe repository's own
     info/exclude. The probe repository is created with an empty template, so it has no
-    info/exclude, and its environment points core.excludesFile and core.attributesFile at
-    the null device. The only rules that can apply to a relative path therefore live in
-    the directories from the work tree root down to that path's own parent, and a .git
-    directory ends the search because Git stops there. A workspace holding no ignore file
-    at all excludes nothing, and no Git command line is started to learn that.
+    info/exclude, and its configuration points core.excludesFile at the null device. The
+    only rules that can apply to a relative path therefore live in the directories from
+    the work tree root down to that path's own parent, and a .git directory ends the
+    search because libgit2 stops there. A workspace holding no ignore file at all
+    excludes nothing, and no probe repository is opened to learn that.
     """
     base = _absolute_path(root)
     if os.path.exists(ignore_probe_directory(base) / "info" / "exclude"):
@@ -167,29 +170,44 @@ def has_ignore_rules(root: str | Path, relative: str) -> bool:
             return True
     return (base / ".gitignore").exists() or (base / ".git").exists()
 
+def _probe_repository(base: Path, probe: Path) -> pygit2.Repository:
+    """The workspace's probe repository, opened or created in process beside the work tree.
+
+    An empty template directory keeps the probe free of info/exclude and hook samples;
+    core.excludesFile points at the null device so the user's global ignore file cannot
+    leak into the decision. The work tree is attached explicitly, so only the
+    workspace's own rules apply.
+    """
+    if os.path.exists(probe / "HEAD"):
+        repository = pygit2.Repository(str(probe), flags=RepositoryOpenFlag.NO_SEARCH)
+    else:
+        with tempfile.TemporaryDirectory() as empty_template:
+            repository = pygit2.init_repository(
+                str(probe), bare=True, template_path=empty_template,
+                flags=(RepositoryInitFlag.BARE | RepositoryInitFlag.MKPATH
+                       | RepositoryInitFlag.EXTERNAL_TEMPLATE),
+            )
+    repository.config["core.excludesFile"] = os.devnull
+    repository.workdir = str(base) + os.sep
+    return repository
+
 def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> frozenset[str]:
-    """The relatives the project's ignore rules exclude, decided by the Git command line.
+    """The relatives the project's ignore rules exclude, decided in process by libgit2.
 
     The probe repository belongs to the workspace root and lives beside it, so the
     enclosing repository's rules (for example an outer .gitignore) do not leak in.
-    Returns the paths Git echoes back; exit code 1 with no output means nothing is
-    ignored. Relatives no ignore file can reach are not decided on the command line: with
-    no ignore file at all the answer is empty and the Git process is never started.
+    Relatives no ignore file can reach are not decided at all: with no ignore file the
+    answer is empty and the probe repository is never opened.
     """
-    candidates = [relative for relative in relatives if has_ignore_rules(root, relative)]
+    base = _absolute_path(root)
+    candidates = [relative for relative in relatives if has_ignore_rules(base, relative)]
     if not candidates:
         return frozenset()
-    base = _absolute_path(root)
-    probe = ignore_probe_directory(base)
-    if not os.path.exists(probe / "HEAD"):
-        probe.mkdir(parents=True, exist_ok=True)
-        _git_probe(probe, base, "init", "--quiet", "--template=")
-    environment = _git_environment()
-    output = _git_probe(
-        probe, base, "check-ignore", "--no-index", "--stdin", "-z",
-        data="\0".join(candidates).encode("utf-8") + b"\0", environment=environment,
-    )
-    return frozenset(item for item in output.decode("utf-8", errors="strict").split("\0") if item)
+    try:
+        repository = _probe_repository(base, ignore_probe_directory(base))
+    except pygit2.GitError as error:
+        raise TreeError(f"Git ignore rules cannot be decided: {error}") from error
+    return frozenset(relative for relative in candidates if repository.path_is_ignored(relative))
 
 def unrepresentable_reason(observed: os.stat_result, relative: str) -> str | None:
     """Why a workspace entry cannot enter the public tree, naming the relative path only."""
@@ -357,33 +375,6 @@ def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[in
     )
     return (*fields, observed.st_ctime_ns) if change_time else fields
 
-def _git_environment() -> dict[str, str]:
-    # 探测用的 Git 环境与 git_versions 相同的隔离：系统与全局配置不进入判定
-    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
-    environment.update({
-        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
-        "GIT_ATTR_NOSYSTEM": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0",
-        "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.excludesFile", "GIT_CONFIG_VALUE_0": os.devnull,
-    })
-    return environment
-
-def _git_probe(probe: Path, work_tree: Path, *arguments: str, data: bytes | None = None,
-               environment: dict[str, str] | None = None) -> bytes:
-    executable = shutil.which("git")
-    if executable is None:
-        raise TreeError("Git executable is unavailable; the project's ignore rules cannot be decided")
-    command = [
-        executable, "--no-pager", f"--git-dir={probe}", f"--work-tree={work_tree}",
-        "-c", "core.quotePath=false", *arguments,
-    ]
-    completed = subprocess.run(command, input=data, capture_output=True, shell=False,
-                               env=environment if environment is not None else _git_environment(), check=False)
-    if completed.returncode not in (0, 1):
-        raise TreeError(
-            "git check-ignore failed with exit code "
-            f"{completed.returncode}: {completed.stderr.decode('utf-8', errors='replace').strip()}"
-        )
-    return completed.stdout
 
 __all__ = [
     "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
