@@ -15,4 +15,5 @@ Yudao 的版本存储（`harness/git_versions.py`）、公开树的忽略规则�
 
 - 新增依赖 pygit2，写入 `pyproject.toml` 与锁文件。
 - 测试里等待一次激活收尾或完整循环的时间降到原来的几十分之一，按 #107 放宽的墙钟界限仍保留，只用来防止一直等待。
+- 忽略规则以 libgit2 的判断为准（2026-10-02 用户确认）。外层 `.gitignore` 点名一个具体路径、内层 `.gitignore` 再用 `!` 取回它的写法（例如外层 `sub/keep.txt`、内层 `sub/.gitignore` 写 `!keep.txt`），git 命令行判为不忽略，libgit2 判为忽略，这个文件不进入快照与公开树。这种写法少见，结果只会少收文件。
 - 执行代理（[ADR-0018](0018-single-control-host-remote-execution.md)）在远程机器上不使用版本存储，不受影响。
