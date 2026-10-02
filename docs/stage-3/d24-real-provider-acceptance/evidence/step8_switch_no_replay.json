@@ -1,0 +1,61 @@
+{
+  "proxy": "http://127.0.0.1:61829",
+  "run_id": "run_027677d75547458d",
+  "switch_engineering": {
+    "rejected": false,
+    "reason": null,
+    "message": null
+  },
+  "phase_after_switch": "ENGINEERING",
+  "stop_reason_after_switch": null,
+  "requests": [
+    {
+      "path": "/v1/responses",
+      "model": "ag/claude-opus-4-6-thinking",
+      "replayed": true
+    },
+    {
+      "path": "/v1/responses",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "replayed": false
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "ag/claude-opus-4-6-thinking",
+      "replayed": true
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "replayed": false
+    },
+    {
+      "path": "/v1/messages",
+      "model": "ag/claude-opus-4-6-thinking",
+      "replayed": true
+    },
+    {
+      "path": "/v1/messages",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "replayed": true
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "replayed": false
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "replayed": true
+    },
+    {
+      "path": "/v1/messages",
+      "model": "ag/claude-opus-4-6-thinking",
+      "replayed": true
+    }
+  ],
+  "messages_requests": 3,
+  "messages_thinking_in_second_turn": false,
+  "limit_before": 21381
+}

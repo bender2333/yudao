@@ -394,7 +394,10 @@ def _thinking_blocks(item: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return {call_id: kept} if kept else {}
 
 def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, Any]]]:
-    # 系统指令独立传参，不把用户材料提升为系统指令；工具配对保持 tool_use/tool_result
+    # 系统指令独立传参，不把用户材料提升为系统指令；工具配对保持 tool_use/tool_result。
+    # Anthropic Messages 要求消息 role 交替出现，且每个 tool_result 紧跟对应的 tool_use 所在消息。
+    # 历史里的推理条目、文本消息与工具调用按原顺序翻译，连续的同一 role 合并成一条，成为
+    # assistant 消息里的多个 tool_use 块与 user 消息里的多个 tool_result 块。
     raw = provider_input.raw_request or {}
     items = raw.get("input") if isinstance(raw, dict) else None
     system_parts: list[str] = []
@@ -411,24 +414,25 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
                 continue
             if item_type == "function_call":
                 call_id = str(item.get("call_id") or item.get("id") or "")
-                block: list[dict[str, Any]] = [*reasonings.pop(call_id, [])]
-                block.append({
+                thinking = [*reasonings.pop(call_id, [])]
+                tool_use = {
                     "type": "tool_use",
                     "id": call_id,
                     "name": str(item.get("name") or ""),
                     "input": _parse_arguments(item.get("arguments")),
-                })
-                messages.append({"role": "assistant", "content": block})
+                }
+                # Anthropic 的 assistant 回合里 thinking 块在文本与工具调用之前：先追加工具调用，
+                # 再把 thinking 块插到回合的最前面，保持与上游返回相同的顺序
+                _append_message(messages, "assistant", [tool_use])
+                if thinking:
+                    _prepend_blocks(messages[-1], thinking)
                 continue
             if item_type == "function_call_output":
-                messages.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": str(item.get("call_id") or ""),
-                        "content": str(item.get("output") or ""),
-                    }],
-                })
+                _append_message(messages, "user", [{
+                    "type": "tool_result",
+                    "tool_use_id": str(item.get("call_id") or ""),
+                    "content": str(item.get("output") or ""),
+                }])
                 continue
             if item_type == "message" or item_type is None:
                 role = str(item.get("role") or "user")
@@ -436,27 +440,46 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
                 if role in {"system", "developer"}:
                     system_parts.append(text)
                     continue
-                messages.append({"role": "assistant" if role == "assistant" else "user", "content": text})
+                _append_message(messages, "assistant" if role == "assistant" else "user", text)
         return "\n".join(part for part in system_parts if part), messages
     # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
     for message in provider_input.messages:
         if message.role in {"system", "developer"}:
             system_parts.append(message.content)
             continue
-        messages.append({
-            "role": "assistant" if message.role == "assistant" else "user",
-            "content": message.content,
-        })
+        _append_message(messages, "assistant" if message.role == "assistant" else "user", message.content)
     for result in provider_input.tool_results:
-        messages.append({
-            "role": "user",
-            "content": [{
-                "type": "tool_result",
-                "tool_use_id": result.call_id,
-                "content": result.output,
-            }],
-        })
+        _append_message(messages, "user", [{
+            "type": "tool_result",
+            "tool_use_id": result.call_id,
+            "content": result.output,
+        }])
     return "\n".join(part for part in system_parts if part), messages
+
+def _append_message(messages: list[dict[str, Any]], role: str, content: Any) -> None:
+    # 相邻的同一 role 合并成一条消息：合并时把两段内容拼成块列表，只有单个文本块的回合保持字符串，
+    # 与上游返回的形状一致。空字符串不产生块，避免出现 Anthropic 拒绝的空文本块（TextBlockParam.text 至少一个字符）
+    if isinstance(content, str) and not content:
+        return
+    if messages and messages[-1]["role"] == role:
+        previous = messages[-1]["content"]
+        messages[-1]["content"] = [*_message_blocks(previous), *_message_blocks(content)]
+        return
+    messages.append({"role": role, "content": content})
+
+def _message_blocks(content: Any) -> list[dict[str, Any]]:
+    # 一段内容翻译成消息的块列表：列表原样保留，字符串转成文本块
+    if isinstance(content, list):
+        return [block for block in content if isinstance(block, dict)]
+    if isinstance(content, str) and content:
+        return [{"type": "text", "text": content}]
+    return []
+
+def _prepend_blocks(message: dict[str, Any], blocks: list[dict[str, Any]]) -> None:
+    # 把块插到一条消息内容的最前面：thinking 块回到 assistant 回合的开头
+    if not blocks:
+        return
+    message["content"] = [*blocks, *_message_blocks(message["content"])]
 
 
 def _messages_tools(provider_input: ProviderInput) -> list[dict[str, Any]]:
