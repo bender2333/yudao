@@ -163,6 +163,7 @@ export function createScene(opts: SceneOptions): SceneLike {
     },
     hasTween: opts.tween !== undefined,
     tween: opts.tween ?? (() => ({ kill: () => {} })),
+    reapply: opts.reapply ?? (() => {}),
     makeCharacterMachine: opts.makeCharacterMachine ?? ((input) => characterMachine(input)),
     makePipeMachine: opts.makePipeMachine ?? ((input) => pipeMachine(input)),
   };
@@ -340,14 +341,9 @@ function startStep(scene: SceneLike, actor: Actor, st: Step): void {
       // 走动由 GSAP 的补间推进：补间的位置由共用的时钟推进到第几毫秒决定
       step.tween?.kill();
       if (scene.hasTween) {
-        // 补间由共用的时钟推进；它在下一帧的时钟位置里把小人移到目标
+        // GSAP 的补间负责把小人移到目标；步骤的完成仍按时间判定，补间只影响位置
         step.tween = scene.tween(actor as unknown as Record<string, unknown>, {
           x: st.x ?? actor.x, y: st.y ?? actor.y, duration: seconds, ease: "none",
-          onComplete: () => {
-            actor.x = st.x ?? actor.x;
-            actor.y = st.y ?? actor.y;
-            step.done = true;
-          },
         });
       }
       break;
@@ -436,12 +432,28 @@ function advanceActor(scene: SceneLike, actor: Actor, dt: number): void {
       actor.x = step.fromX + ((step.st.x ?? step.fromX) - step.fromX) * k;
       actor.y = step.fromY + ((step.st.y ?? step.fromY) - step.fromY) * k;
     }
-    // 接了补间时，走动的完成由补间自己报告；其余步骤按经过时间完成
-    const finished = step.st.t === "go" && scene.hasTween ? step.done === true : k >= 1;
-    if (finished) {
+    if (k >= 1) {
       step.tween?.kill();
+      // 走到目标位置时就地落到目标坐标（补间的终点与它一致）
+      if (step.st.t === "go" && scene.hasTween) {
+        actor.x = step.st.x ?? actor.x;
+        actor.y = step.st.y ?? actor.y;
+      }
       actor.step = null;
       actor.script.i++;
+      // 到达与下一个动作在同一帧里接上，中间不留空档
+      if (actor.script && !actor.step) {
+        const next = actor.script.steps[actor.script.i];
+        if (next) {
+          startStep(scene, actor, next);
+          if (next.t === "call" && next.fn) next.fn(actor);
+        } else {
+          const done = actor.script.onDone;
+          actor.script = null;
+          done?.();
+          return;
+        }
+      }
       continue;
     }
     return;

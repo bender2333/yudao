@@ -304,7 +304,8 @@ export function sendPackage(world: World, scene: SceneLike, id: string, linkKey:
   if (!pk) return;
   pk.atRest = null;
   const duration = (ms ?? Math.max(700, polyLength(pts) * 9)) / 1000;
-  pk.transit = { linkKey, pts, t0: null, k: 0, ms: duration * 1000, pos: pts[0], onDone: onDone ?? null };
+  // pos 留空：第一个位置在第一次推进时算出（与原型一致，发送的当帧还没有位置）
+  pk.transit = { linkKey, pts, t0: null, k: 0, ms: duration * 1000, onDone: onDone ?? null };
   // 包裹沿管道折线移动：由 GSAP 的补间推进一步，位置只由共用时钟决定
   const transit = pk.transit;
   if (scene?.hasTween) {

@@ -535,6 +535,8 @@ export interface SceneLike {
   tween: (target: Record<string, unknown>, vars: Record<string, unknown>) => { kill: () => void };
   /** 是否接了真实的补间实现（没有时为纯逻辑测试，按经过时间推进）。 */
   hasTween: boolean;
+  /** 让本次推进中新建的补间立刻落到当前时间上（由时钟提供）。 */
+  reapply: () => void;
   /** 飞行物：纸飞机、信件、决定单沿弧线飞行（原型 scene.fly）。 */
   fly: (o: { bmp: string; from: [number, number]; to: [number, number]; ms: number; arc?: number; onDone?: () => void }) => void;
   /** 粒子：灰尘、彩带、火花、烟雾（原型 scene.emit）。 */
@@ -624,6 +626,8 @@ export interface SceneOptions {
    * 起点钉在时钟零点上，位置只由「推进到第几毫秒」决定，测试与回放可重复。
    */
   tween?: (target: Record<string, unknown>, vars: Record<string, unknown>) => { kill: () => void };
+  /** 让本次推进中新建的补间立刻落到当前时间上（时钟的 reapply）。 */
+  reapply?: () => void;
   /** 建立角色与管道的状态机；测试与回放可以注入。 */
   makeCharacterMachine?: (input: CharacterMachineInput) => unknown;
   makePipeMachine?: (input: PipeMachineInput) => unknown;
