@@ -889,3 +889,27 @@ claude-opus-4-5 / 2026-10-02 14:30 / 执行者：#93 合并后复验（单进程
 
 
 opus-4.6 / 2026-10-02 19:50 / 执行者：#94 第 1 轮（自主推进模式）。工单正文：模型管理页的部门默认、修改前影响提示、删除与编辑 JSON（D24），并列三条验收标准加一条 Playwright 端到端测试。起点核对：worktree 与分支 issue-94 已在位，HEAD=837a9ce8，与 origin/main 一致，工作区干净，标签 ready-for-agent。阻塞项 #93、#90、#91、#146、#125 全部已关闭（review-passed 或已合并），前置齐备。先把标签改为 in-progress 并认领，再核实现有实现与工单要求的差距。
+
+opus-4.6 / 2026-10-02 20:10 / 执行者：#94 差距核对（读完设计说明第 4.4、4.5、4.6、5.1、5.6、9.1 节与现有实现）。逐条对照工单正文与三条验收标准：
+一、部门默认（页面底部）。现有 page.tsx 已有「部门默认」区、按连接分组的已准入下拉框与「未设置」、档位来自所选模型声明且未声明时禁用并显示说明文字。缺少两处：所选模型的已保存档位不在其支持档位内时，下拉框要「额外保留这一项并标明按模型限制」（第 9.1 节）——`tierOptions` 已实现这个逻辑，但页面只在 `saved.model_id === choice.modelId` 时把已保存档位传进去，切换到别的模型时已保存档位会丢失；准入作废的引用要显示「无法使用：准入已作废」——页面现在只在 `!option` 时显示「该模型不在已准入的定义中」，与设计说明第 4.4 节表格要求的文案不符。验收标准第 1 条因此不完整。
+二、保存会作废准入的修改之前显示影响列表。现有实现只在**编辑表单内**用 `affectedReferences` 计算部门默认的引用并以文字提示，没有「用户确认以后保存」，也没有列出进行中事项，更没有使用后端已提供的 `catalog.change_impact` 查询（#90 交付）。验收标准第 2 条要求「保存之前显示影响列表；取消以后目录不变」。
+三、删除被引用定义/连接的引用方展示与确认框。现有实现直接提交 `catalog.connection.delete`，被引用时把后端 409 的 `in_use` 消息显示出来（消息里含引用方），缺少「删除的确认框列出将一并删除的定义」；移除单条定义用 `catalog.connection.save` 提交，被引用时显示后端消息，缺少「显示引用方」的显式展示。验收标准第 3 条不完整。
+四、编辑 JSON 的字段位置。现有 JsonDialog 只做 JSON 解析，保存交给 `catalog.document.save`，后端返回的消息含字段位置（catalog_invalid/in_use），界面直接显示。需核对「带准入字段或引用候选时保存被拒绝，页面指出字段位置」。目录文档校验（#91）拒绝未知字段并指出 `bindings.<部门>.<字段>` 位置，需端到端验证。
+五、本工单的核心缺口：以上影响列表与引用方检查都要走 `catalog.change_impact` 查询（应用层 #90 已登记，客户端 SDK 已生成 `QueryCatalogChangeImpactData`）。页面需要在保存前与删除前用 `views.open("models.impact", { query: "catalog.change_impact", params })` 打开视图取回影响，并按结果弹确认框。
+
+opus-4.6 / 2026-10-02 20:45 / 执行者：#94 基线。client/out 不存在（上一轮 #93 结束后未重新构建），第一次跑 Playwright 全部在 `electron.launch` 超时；`npm run build` 后复跑 models.spec.ts 12 passed (5.3m)。安装 client 与 harness/tests/openapi 的依赖，跟踪文件未受影响。基线可供后续对照。
+
+opus-4.6 / 2026-10-02 20:50 / 执行者：#94 设计与改动计划（一次到位，覆盖工单四条验收标准）。核心：把保存会作废准入的影响列表与删除的引用检查接到后端已提供的 `catalog.change_impact` 查询（#90 交付，暂只汇总部门默认与项目部门设置两层引用方），界面用 `views.open` 打开 `models.impact` 视图取回结果。
+一、model-logic.ts：新增 `ModelImpact` 形状、`collectImpact` 的后端→界面映射、`confirmImpactText` 文案、`providerDeleteConfirmation` 与 `modelRemoveReferrers` 文案、`staleAdmissionLabel`（准入作废引用显示「无法使用：准入已作废」）。移除被后端取代的客户端 `affectedReferences` 与 `impactNotice`（保留 `BindingEntry`）。
+二、page.tsx：用 effect 订阅编辑表单的拟议修改，打开 `catalog.change_impact`（kind=connection）取回影响，替代原来的本地计算；保存前弹确认框，确认才提交，取消不改目录。删除 Provider 配置走 `kind=provider` 取回删除清单一并展示，被引用时显示引用方；移除单条定义走 `catalog.model.remove` 并在被引用时显示引用方。部门默认：切换模型时保留已保存档位（标为按模型限制）、准入作废的引用显示「无法使用：准入已作废」。
+三、json-dialog.tsx：保存被后端拒绝时显示含字段位置的错误；补充导出/导入的端到端可测控件（导入隐藏的 input 已有 aria-label）。
+四、index.html 或 app 层：确认 `views.open` 对 `catalog.change_impact` 通用可用（`callQuery` 按名称查找生成函数，`functionName` 已支持点号与下划线分词）。
+五、测试：model-logic.test.js 补单元用例；models.spec.ts 每条用例独立后端的基础上补工单验收的端到端用例（影响确认、取消不改、删除引用方、删除确认框、JSON 字段位置、部门默认档位与作废引用），两种窗口尺寸。
+
+opus-4.6 / 2026-10-02 22:05 / 执行者：#94 实现与自测。四块改动与四类真实缺陷。
+一、model-logic.ts 新增影响与引用方的取值与文案（collectImpact、confirmImpactText、providerDeleteConfirmation、modelRemoveReferrers、formDocumentValid、STALE_ADMISSION_LABEL），删除被后端取代的 affectedReferences 与 impactNotice；修正 admissionLabel 的死分支（视图里 admitted 与 stale 互斥）。
+二、page.tsx 用 views.open 打开 catalog.change_impact 取回编辑表单的影响，保存前弹确认框（取消不改目录）；删除连接走 kind=provider 取回引用方与一并删除清单；移除单条定义走 catalog.model.remove 并在被引用时显示引用方；部门默认保留已保存档位与显示「无法使用：准入已作废」；submit 在命令被接受后 await views.refresh 使下一条命令的基准版本不过期。ClientApp 增加 queryOne，页面按需查询一次。
+三、form.tsx 换协议时清空与协议不符的推理档位声明（三项一起清空）。
+四、e2e backend.py 增加 --admit-and-bind 预置（真实写准入并让三个部门默认绑定），fixtures 透传。
+真实缺陷：一、`catalog.change_impact` 对不合法的拟议文档抛 CatalogValidationError 成为 500，浏览器侧表现为 net::ERR_FAILED 与「Cannot read properties of undefined (reading 'position')」，已登记 docs/architecture-issues.md，界面侧改用目录文档形状（去掉 capacity_confirmed）并对不合法的编辑表单不发问影响查询。二、改协议以后推理参数方式与协议不符被后端拒绝（第 7.4 节），已在换协议时一并清空声明。三、清空部门默认以后立即删除连接提交了过期基准版本（stale_base），改为命令接受后刷新目录视图。四、admissionLabel 原判据 admitted && stale 与视图互斥，作废的定义显示成「候选」。
+自测：model-logic.test.js 17 passed；models.spec.ts 18 passed（1440×900 与 390×844 各 9 条，控制台错误为零），初次全量 12 passed 为基线。未推送、未开 PR。

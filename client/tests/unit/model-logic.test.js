@@ -1,4 +1,4 @@
-// 模型管理页的纯计算（工单 #93）：预填、档位选项、准入汇总与显示、受影响引用、凭据状态。
+// 模型管理页的纯计算（工单 #93、#94）：预填、档位选项、准入汇总与显示、影响列表与引用方、凭据状态。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,18 +7,23 @@ import {
   REASONING_LEVELS,
   UI_PROTOCOLS,
   CUSTOM_PRESET_ID,
+  STALE_ADMISSION_LABEL,
   admittedOptions,
+  collectImpact,
+  confirmImpactText,
   connectionTestable,
   defaultLevelOptions,
   emptyFormState,
+  formDocumentValid,
   formStateFromProvider,
-  impactNotice,
   intFromInput,
+  modelRemoveReferrers,
   patchRowCapacity,
   prefillModel,
   prefillSourceText,
   presetBaseUrlFor,
   presetById,
+  providerDeleteConfirmation,
   reasoningModeOptions,
   rowFromCandidate,
   rowFromManual,
@@ -33,7 +38,6 @@ import {
   admissionLabel,
   rowCapacityValid,
   canSaveRows,
-  affectedReferences,
 } from "../../src/renderer/src/views/models/model-logic.ts";
 
 const PRESETS = [
@@ -126,7 +130,9 @@ test("准入列显示测试时间与实际返回的模型；候选与作废各�
     admissionLabel({ admitted: true, stale: false, admitted_at: "2026-10-02T01:00:00Z", admitted_model: "glm-4.6" }),
     "已准入：2026-10-02T01:00:00Z · glm-4.6",
   );
-  assert.equal(admissionLabel({ admitted: true, stale: true }), "候选（准入已作废）");
+  // 视图里 admitted 与 stale 互斥：作废的准入 admitted 为假、stale 为真
+  assert.equal(admissionLabel({ admitted: false, stale: true }), "候选（准入已作废）");
+  assert.equal(admissionLabel({ admitted: false, stale: false }), "候选");
   const admissions = [{ model_id: "m1", provider_id: "p1", admitted: true, stale: false }];
   assert.equal(admissionFor({ id: "m1", provider_id: "p1" }, admissions)?.admitted, true);
   assert.equal(admissionFor({ id: "m2", provider_id: "p1" }, admissions), null);
@@ -196,36 +202,70 @@ test("默认档位只能从已选的支持档位中选择；推理参数方式�
   assert.deepEqual([...REASONING_LEVELS], ["minimal", "low", "medium", "high", "xhigh", "max"]);
 });
 
-test("受影响引用按第 4.4 节判断：地址、凭据引用、协议、上游模型 ID、推理参数方式", () => {
-  const provider = { id: "p1", base_url: "https://a/v1", credential_ref: "KEY", protocol: "responses" };
-  const before = { base_url: "https://a/v1", credential_ref: "KEY", protocol: "responses" };
-  const bindings = {
-    product: { provider_id: "p1", model_id: "m1" },
-    quality: { provider_id: "p1", model_id: "m2" },
-    engineering: { provider_id: "other", model_id: "m1" },
-  };
-  const modelsBefore = [
-    { id: "m1", model: "one", reasoning_mode: "" },
-    { id: "m2", model: "two", reasoning_mode: "" },
-  ];
+test("影响列表按第 4.4 节读回：受影响定义、引用方与进行中事项", () => {
+  const impact = collectImpact({
+    impacted: [{ model_id: "m1", provider_id: "p1" }],
+    deletions: [],
+    department_defaults: [{ department: "product", model_id: "m1", provider_id: "p1" }],
+    project_settings: [{ project_id: "pr1", project_name: "示例项目", department: "quality", model_id: "m1", provider_id: "p1" }],
+    work_items: [{ project_id: "pr1", project_name: "示例项目", work_item_id: "w1", title: "实现回声工具", department: "product" }],
+  });
+  assert.deepEqual(impact.impacted, ["m1"]);
+  assert.deepEqual(impact.deletions, []);
+  assert.equal(impact.references.length, 3);
+  assert.match(impact.references[0].text, /部门默认：产品/);
+  assert.match(impact.references[1].text, /项目部门设置：示例项目（质检）/);
+  assert.match(impact.references[2].text, /进行中事项：示例项目 · 实现回声工具（产品）/);
 
-  // 只改地址：该连接下全部引用受影响
-  assert.deepEqual(
-    affectedReferences({ ...provider, base_url: "https://b/v1" }, before, modelsBefore, modelsBefore, bindings).sort(),
-    ["product", "quality"],
-  );
-  // 改一个定义的上游模型 ID：只有引用它的部门受影响
-  assert.deepEqual(
-    affectedReferences(provider, before, [{ id: "m1", model: "renamed", reasoning_mode: "" }, modelsBefore[1]], modelsBefore, bindings),
-    ["product"],
-  );
-  // 改推理参数方式：同样作废该定义
-  assert.deepEqual(
-    affectedReferences(provider, before, [modelsBefore[0], { id: "m2", model: "two", reasoning_mode: "budget" }], modelsBefore, bindings),
-    ["quality"],
-  );
-  // 名称、超时一类不在这张表中：没有受影响字段时不提示
-  assert.deepEqual(affectedReferences(provider, before, modelsBefore, modelsBefore, bindings), []);
+  // 确认文字：没有引用方、没有受影响定义时为空（界面据此决定不弹确认框）
+  assert.equal(confirmImpactText(null), "");
+  assert.equal(confirmImpactText(collectImpact({ impacted: [{ model_id: "m1", provider_id: "p1" }] })), "");
+  const text = confirmImpactText(impact);
+  assert.match(text, /准入作废/);
+  assert.match(text, /m1/);
+  assert.match(text, /受影响的引用方/);
+  assert.match(text, /确认以后保存/);
+});
+
+test("删除 Provider 配置与移除定义的文字按第 4.5 节：被引用时列出引用方，无引用时列出将一并删除的定义", () => {
+  const referenced = collectImpact({
+    deletions: [{ model_id: "m1", provider_id: "p1" }],
+    department_defaults: [{ department: "quality", model_id: "m1", provider_id: "p1" }],
+  });
+  assert.match(providerDeleteConfirmation(referenced), /仍被引用，不能删除/);
+  assert.match(providerDeleteConfirmation(referenced), /部门默认：质检/);
+  assert.match(modelRemoveReferrers(referenced), /仍被引用，不能移除/);
+  assert.match(modelRemoveReferrers(referenced), /部门默认：质检/);
+
+  const unreferenced = collectImpact({ deletions: [{ model_id: "m1", provider_id: "p1" }, { model_id: "m2", provider_id: "p1" }] });
+  assert.match(providerDeleteConfirmation(unreferenced), /一并删除/);
+  assert.match(providerDeleteConfirmation(unreferenced), /m1、m2/);
+  assert.equal(modelRemoveReferrers(unreferenced), "");
+  assert.equal(providerDeleteConfirmation(null), "");
+
+  assert.equal(STALE_ADMISSION_LABEL, "无法使用：准入已作废");
+});
+
+test("表单能否构成合法目录文档：必填项与容量关系（第 4.6 节）", () => {
+  const provider = { id: "p1", name: "P", base_url: "https://x/v1" };
+  const row = {
+    ...rowFromManual(0),
+    id: "m1", model: "glm", context_window: "1000", max_output_tokens: "100", capacity_confirmed: true,
+  };
+  assert.equal(formDocumentValid(provider, [row]), true);
+  // 窗口可以留空，只填输出上限
+  assert.equal(formDocumentValid(provider, [{ ...row, context_window: "" }]), true);
+  // 输出上限必须有值且为正，且不大于窗口
+  assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "" }]), false);
+  assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "0" }]), false);
+  assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "2000" }]), false);
+  // 定义的上游模型 ID 不能为空
+  assert.equal(formDocumentValid(provider, [{ ...row, model: "" }]), false);
+  // 连接三项必填
+  assert.equal(formDocumentValid({ ...provider, name: "" }, [row]), false);
+  assert.equal(formDocumentValid({ ...provider, base_url: "" }, [row]), false);
+  // 没有容量的手动行：不构成合法文档
+  assert.equal(formDocumentValid(provider, [rowFromManual(0)]), false);
 });
 
 test("表单的取舍值：空文本与非法数字都交回 null", () => {
@@ -359,13 +399,6 @@ test("测试标识与连接测试可用性：连接按连接，模型按定义�
   assert.equal(connectionTestable({ models_url: "" }, PRESETS[0]), true);
   assert.equal(connectionTestable({ models_url: "https://x/models" }, null), true);
   assert.equal(connectionTestable({ models_url: "" }, null), false);
-});
-
-test("作废提示按第 4.4 节列出受影响的部门默认", () => {
-  assert.equal(impactNotice([]), "");
-  const text = impactNotice(["product", "quality"]);
-  assert.match(text, /产品、质检/);
-  assert.match(text, /下一次模型请求不发送/);
 });
 
 test("预填来源的文字标注", () => {
