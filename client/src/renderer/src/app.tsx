@@ -389,6 +389,7 @@ export function App() {
           ) : route.name === "sys-models" ? (
             <ModelManagementPage
               views={app.viewSync}
+              query={(name, params) => app.queryOne(name, params)}
               command={(name, body) => app.command(name, body)}
               subscribeEvents={(listener) => app.subscribeEvents(listener)}
               onBack={() => navigate(paths.home())}

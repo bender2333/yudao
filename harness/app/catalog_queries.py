@@ -8,12 +8,18 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping
 
 from ..models import DEPARTMENTS, CatalogEventType
 from ..providers import capabilities
+from ..providers.errors import CatalogValidationError
 from .contracts import Contract, Snapshot
 from .project_queries import NotFound
 from .registry import QueryDefinition
 
 if TYPE_CHECKING:
     from .application import Application
+
+class CatalogQueryInvalid(Exception):
+    # 拟议文档或选择结构非法：接口层映射为 422，原因写出字段位置（与命令被拒绝时 catalog_invalid 同一写法）。
+    # Provider 模块的 CatalogValidationError 在这一层转成它，接口层只认应用层的异常（工单 #261）
+    pass
 
 
 class CatalogCredential(Contract):
@@ -305,11 +311,15 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
     revision = facade.catalog_revision()
     current = facade.to_document()
     proposed = _proposed_document(current, request)
-    impacted = [ImpactDefinition(**item) for item in facade.impacted_definitions(proposed)]
-    deletions = _removed_definitions(current, proposed)
-    if request.kind == "provider":
-        deletions = [ImpactDefinition(**item)
-                     for item in facade.deletable_definitions(_strand(request.provider_id))]
+    try:
+        impacted = [ImpactDefinition(**item) for item in facade.impacted_definitions(proposed)]
+        deletions = _removed_definitions(current, proposed)
+        if request.kind == "provider":
+            deletions = [ImpactDefinition(**item)
+                         for item in facade.deletable_definitions(_strand(request.provider_id))]
+    except CatalogValidationError as exc:
+        # 拟议文档结构非法：接口层按输入问题映射为 422，原因保留字段位置（工单 #261）
+        raise CatalogQueryInvalid(str(exc)) from exc
     affected = {item.model_id for item in impacted} | {item.model_id for item in deletions}
 
     bindings = facade.get_bindings()
