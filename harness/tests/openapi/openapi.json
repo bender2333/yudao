@@ -8553,6 +8553,17 @@
             "type": "string",
             "title": "Type"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "label": {
             "type": "string",
             "title": "Label"
@@ -8586,6 +8597,7 @@
           "position",
           "at",
           "type",
+          "kind",
           "label",
           "project_id",
           "work_item_id"
