@@ -21,6 +21,26 @@ KEY = "issue146-key"
 # 质检缺少图像输入的影响（设计说明第 5.6 节）
 QUALITY_IMPACT = "不提供 computer use，浏览器只给可访问性结构，不给截图；依赖桌面程序或外观的验收条件无法核验"
 
+def _text_stream(model: str = "upstream") -> bytes:
+    # Responses 协议的一段完整回答（先 created 再 completed），模型测试据此判断连接与准入
+    from harness.tests.protocol_helpers import sse
+
+    def event(kind: str, **payload: Any) -> str:
+        return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
+
+    response = {
+        "id": "resp-1", "object": "response", "created_at": 1, "status": "completed", "model": model,
+        "output": [{"id": "msg-1", "type": "message", "role": "assistant", "status": "completed",
+                    "content": [{"type": "output_text", "text": "pong", "annotations": []}]}],
+        "error": None, "incomplete_details": None,
+        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2,
+                  "input_tokens_details": {"cached_tokens": 0},
+                  "output_tokens_details": {"reasoning_tokens": 0}},
+    }
+    return sse(event("response.created", sequence_number=0,
+                     response={**response, "status": "in_progress", "output": [], "usage": None}),
+               event("response.completed", sequence_number=1, response=response))
+
 class _Upstream:
     # 本机 HTTP 服务：GET 返回模型列表，POST 返回模型回答（Responses 协议的错误结构足够让调用成功）
     def __init__(self, models) -> None:
@@ -44,14 +64,8 @@ class _Upstream:
             def do_POST(self):
                 length = int(self.headers.get("Content-Length") or 0)
                 self.rfile.read(length)
-                body = json.dumps({
-                    "id": "resp-1", "object": "response", "created_at": 1, "status": "completed",
-                    "model": "upstream", "output": [], "error": None, "incomplete_details": None,
-                    "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2,
-                              "input_tokens_details": {"cached_tokens": 0},
-                              "output_tokens_details": {"reasoning_tokens": 0}},
-                }).encode("utf-8")
-                self._write(200, body)
+                # Responses 协议的流式回答：模型测试按它判断准入
+                self._write(200, _text_stream(), content_type="text/event-stream")
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         port = self.server.server_address[1]
@@ -226,6 +240,25 @@ def test_input_modalities_save_and_query_and_do_not_touch_admission(tmp_path):
             document = client.get("/api/queries/catalog.document").json()["data"]
             assert {item["id"]: item for item in document["models"]}["model-a"]["input_modalities"] == ["text", "image"]
 
+def test_model_test_keeps_input_modalities_and_admission(tmp_path):
+    # 模型测试不核实输入方式也不因它失败：测试前后定义中的输入方式不变，准入照常写入
+    with _Upstream({"data": []}) as upstream:
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
+                                    "models": [_document_model("model-a", input_modalities=["text", "image"])],
+                                    "bindings": {}})
+        with running_api(opened) as client:
+            current = _catalog(client)["revision"]
+            tested = _command(client, "catalog.model.test", base_version=current,
+                              provider_id="provider-a", model_id="model-a")
+            assert tested.status_code == 200, tested.text
+            _wait_for(opened.system.store,
+                      lambda item: item.type == CatalogEventType.CATALOG_TEST_FINISHED
+                      and item.payload.get("ok") and item.payload.get("kind") == "model",
+                      description="catalog_test_finished")
+            # 定义中的输入方式没有被测试改动
+            models = {item["id"]: item for item in _catalog(client)["models"]}
+            assert models["model-a"]["input_modalities"] == ["text", "image"]
+
 def test_unknown_input_modality_is_rejected_at_its_field(tmp_path):
     # 未知取值按字段位置拒绝：请求在接口层被拒绝，位置写明模型行的 input_modalities
     with _Upstream({"data": []}) as upstream:
@@ -367,6 +400,39 @@ def test_workspace_reminder_disappears_after_the_model_gains_the_capability(tmp_
             workspace = client.get("/api/queries/department.workspace",
                                    params={"project_id": project_id, "department": "quality"}).json()["data"]
             assert workspace["reminders"] == []
+
+def test_queries_do_not_append_events_and_carry_no_key(tmp_path):
+    # 调用查询前后事件日志末尾不变；查询结果中没有 API Key
+    with _Upstream({"data": []}) as upstream:
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
+                                    "models": [_document_model("text-model", input_modalities=["text"]),
+                                               _document_model("vision-model", input_modalities=["text", "image"])],
+                                    "bindings": {"quality": {"provider_id": "provider-a", "model_id": "text-model"}}})
+        with running_api(opened) as client:
+            opened.admit("text-model", "vision-model")
+            store = opened.system.store
+            created = _command(client, "project.create", name="P", goal="查询纯净")
+            project_id = created.json()["refs"]["project_id"]
+            before = store.end_position()
+            answers = [
+                client.get("/api/queries/catalog").json(),
+                client.get("/api/queries/catalog.document").json(),
+                client.get("/api/queries/project.settings", params={"project_id": project_id}).json(),
+                client.get("/api/queries/department.workspace",
+                           params={"project_id": project_id, "department": "quality"}).json(),
+            ]
+            assert store.end_position() == before
+            rendered = json.dumps(answers, ensure_ascii=False)
+            # 凭据不出现在查询结果里：模型访问定义与调用目标只有引用与版本，没有 Key
+            assert KEY not in rendered
+            catalog = answers[0]["data"]
+            for model in catalog["models"]:
+                assert "credential" not in model
+            for provider in catalog["providers"]:
+                assert provider["credential"]["source"] in {"none", "dotenv", "override"}
+                assert "secret" not in provider["credential"]
+            # 提醒确实出现在查询结果里，而不是被断言掩盖
+            assert "quality" in rendered
 
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）

@@ -170,3 +170,23 @@ def test_duplicate_model_in_one_preset_is_rejected(tmp_path):
         load_definitions(directory)
     assert any(issue[0] == "model_capabilities.json" and issue[1].startswith("presets.opencode-go[")
                for issue in raised.value.issues)
+
+def test_reading_the_capability_table_never_reaches_the_network():
+    # 运行的系统读取能力表时不发出网络请求：读取本模块顶层已经建好的索引，导入时也不连接远端
+    import socket
+
+    attempts: list[object] = []
+    original = socket.socket.connect
+
+    def guard(self, address, *args, **kwargs):
+        attempts.append(address)
+        raise AssertionError(f"能力表的读取不应连接网络：{address}")
+
+    socket.socket.connect = guard
+    try:
+        view = capabilities.table_public()
+        assert capabilities.capability("opencode-go", view["presets"]["opencode-go"][0]["model"]) is not None
+        assert capabilities.entries("opencode-go")
+    finally:
+        socket.socket.connect = original
+    assert attempts == []
