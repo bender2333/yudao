@@ -1,6 +1,6 @@
 // 系统首页（原型 v8 设计说明第 4 节，工单 #175）：从上到下依次是状态项、楼、待你决定、
 // 离开期间的报告、项目列表。数据来自 system.status、decisions.list、home.away_report 与 projects.list。
-// 楼由像素画面五（#179）画出，这里只留出它的位置。页面上的数据都来自查询与事件流。
+// 楼由像素画面五（#178）画出（views/home/building-section）。页面上的数据都来自查询与事件流。
 
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -17,6 +17,7 @@ import { useCommand, useSnapshot } from "../project/use-snapshot";
 import { DecisionCardList } from "../decisions/card";
 import { sortByRequested } from "../decisions/card-logic";
 import { statusItems, type StatusItem } from "./status-items";
+import { BuildingSection } from "./building-section";
 
 const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天" };
 
@@ -59,9 +60,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
       <Loading state={decisions} />
       <StatusRow items={items} onNavigate={props.onNavigate} />
 
-      <Section title="全部项目与机器" note="楼由像素画面五（#179 至 #180）画出，这里留出位置">
-        <p className="note">一栋楼，每个项目一层，地下室是机房（第 4.2 节）。</p>
-      </Section>
+      <BuildingSection app={props.app} projects={projects.data} onNavigate={props.onNavigate} />
 
       <Section title="待你决定" note="跨项目，按发出时间排列">
         <DecisionNames
