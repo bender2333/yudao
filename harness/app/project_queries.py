@@ -739,7 +739,7 @@ def _room_door(run: Any, status: str) -> str | None:
     return None
 
 def _room_view(application: Application, state: Any, item: Any, run: Any, department: str,
-               guidance: list[GuidanceRecord]) -> RoomView:
+               guidance: list[GuidanceRecord], effective: EffectiveModel) -> RoomView:
     # 部门房间的画面数据（v8 设计说明第 8 节）：状态、CRT、角色、门口状态、信箱与档案盒、管道状态。
     # Stage 4（运维）、3.2C（远程执行）与 3.2D（试用）的数据尚未进入 run 投影，这些字段保持为空或零。
     observation = None if run is None else _recovery_observation(application, run.run_id)
@@ -750,10 +750,7 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
         call_target = run.provider_bindings.get(department)
         if call_target:
             protocol = call_target.get("requested_protocol") or "—"
-    model_label = "—"
-    effective_model = _effective_model_id(application, state, department)
-    if effective_model:
-        model_label = effective_model
+    model_label = effective.model_id or "—"
     role_id = department + "-agent"
     role_kind = "ops" if department == "operations" else "agent"
     role_status = "working" if status == "working" else "idle"
@@ -852,7 +849,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             last_call=_last_call(run, request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
-            room=_room_view(application, state, item, run, request.department, guidance),
+            room=_room_view(application, state, item, run, request.department, guidance, effective),
         ),
     )
 
