@@ -915,3 +915,5 @@ opus-4.6 / 2026-10-02 22:05 / 执行者：#94 实现与自测。四块改动与�
 自测：model-logic.test.js 17 passed；models.spec.ts 18 passed（1440×900 与 390×844 各 9 条，控制台错误为零），初次全量 12 passed 为基线。未推送、未开 PR。
 
 opus-4.6 / 2026-10-02 23:00 / 执行者：#94 第 1 轮收尾核对。自测：单元 model-logic.test.js 17 passed；Playwright models.spec.ts 20 passed（1440×900 与 390×844 各 10 条）；前端 harness/tests/test_web_ui.js 47 passed、fail 0；client 单元 node --test tests/unit/*.test.js 54 passed、fail 0；test_layers.py 与 test_openapi_snapshot.py 3 passed；test_api.py、test_project_stream_fields.py 与目录相关 test_catalog_api.py、test_issue_90.py、test_issue_91.py、test_provider_catalog.py 合计 70 passed。`-m "unit or module"` 选中 0 项、1685 deselected：登记表 layers.toml 尚未建立（#158 未合并），按 AGENTS.md 回退规则执行。接口合同未改动（只改客户端页面与查询参数），openapi 快照与客户端生成类型无需重写。验收四条各有端到端用例；等审查者复核。未推送、未开 PR、未关闭工单。
+
+opus-4.6 / 2026-10-02 23:10 / 执行者：#94 第 1 轮交付。在工单下评论（首行 DELIVERY: 第 1 轮），标签由 in-progress 改为 needs-review，保留 worktree 与分支 issue-94 供审查者复核。本地提交 5 个（efd09e19 架构问题登记、e8cdcd08 实现、2332b739 文档记录、aa8c7976 自测记录，另 5a3d4f1c 起始记录），未推送、未开 PR、未关闭工单。
