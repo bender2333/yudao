@@ -1,0 +1,498 @@
+{
+  "protocols": {
+    "responses": {
+      "protocol": "responses",
+      "claude": {
+        "request": {
+          "include": [
+            "reasoning.encrypted_content"
+          ],
+          "input": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "max_output_tokens": 2048,
+          "model": "ag/claude-opus-4-6-thinking",
+          "reasoning": {
+            "effort": "medium"
+          },
+          "store": false,
+          "stream": true,
+          "tools": []
+        },
+        "reasoning_observations": [],
+        "response_reasoning": null,
+        "response_text": [
+          {
+            "id": "msg_resp_chatcmpl-req_vrtx_011CfdrSPM5YRY6weLrMpZRa_0",
+            "content": [
+              {
+                "annotations": [],
+                "text": "17 × 23\n\nBreaking it down: 17 × 20 = 340, and 17 × 3 = 51.\n\n340 + 51 = **391**",
+                "type": "output_text",
+                "logprobs": []
+              }
+            ],
+            "role": "assistant",
+            "type": "message"
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 19,
+          "output_tokens": 48,
+          "total_tokens": 67,
+          "cost": 0.0,
+          "latency_ms": 4724,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-responses",
+          "model_id": "claude-responses",
+          "provider_name": "9router responses",
+          "protocol": "responses",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-responses",
+          "requested_protocol": "responses",
+          "requested_model": "ag/claude-opus-4-6-thinking",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 200000,
+          "configured_max_output_tokens": 8192,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "effort",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      },
+      "deepseek": {
+        "request": {
+          "include": [
+            "reasoning.encrypted_content"
+          ],
+          "input": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "max_output_tokens": 2048,
+          "model": "cbcn/deepseek-v4.1-flash",
+          "reasoning": {
+            "effort": "medium"
+          },
+          "store": false,
+          "stream": true,
+          "tools": []
+        },
+        "reasoning_observations": [
+          {
+            "id": "rs_resp_cmb-cf353dcfbe8b11f1bb82aaf0b766cbcd_0",
+            "summary": [
+              {
+                "text": "We need answer 17*23. Need think briefly. 17*20=340, 17*3=51 total 391. Answer.",
+                "type": "summary_text"
+              }
+            ],
+            "type": "reasoning"
+          }
+        ],
+        "response_reasoning": null,
+        "response_text": [
+          {
+            "id": "msg_resp_cmb-cf353dcfbe8b11f1bb82aaf0b766cbcd_0",
+            "content": [
+              {
+                "annotations": [],
+                "text": "391",
+                "type": "output_text",
+                "logprobs": []
+              }
+            ],
+            "role": "assistant",
+            "type": "message"
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 42,
+          "output_tokens": 33,
+          "total_tokens": 75,
+          "cost": 0.0,
+          "latency_ms": 3513,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-responses",
+          "model_id": "deepseek-responses",
+          "provider_name": "9router responses",
+          "protocol": "responses",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-responses",
+          "requested_protocol": "responses",
+          "requested_model": "cbcn/deepseek-v4.1-flash",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 1000000,
+          "configured_max_output_tokens": 16384,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "effort",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      }
+    },
+    "chat_completions": {
+      "protocol": "chat_completions",
+      "claude": {
+        "request": {
+          "model": "ag/claude-opus-4-6-thinking",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          },
+          "max_tokens": 2048,
+          "reasoning_effort": "medium"
+        },
+        "reasoning_observations": [],
+        "response_reasoning": null,
+        "response_text": [
+          {
+            "id": "chat-message-0",
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "17 × 23 = 17 × 20 + 17 × 3 = 340 + 51 = **391**"
+              }
+            ]
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 2019,
+          "output_tokens": 38,
+          "total_tokens": 2057,
+          "cost": 0.0,
+          "latency_ms": 3843,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-chat_completions",
+          "model_id": "claude-chat_completions",
+          "provider_name": "9router chat_completions",
+          "protocol": "chat_completions",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-chat_completions",
+          "requested_protocol": "chat_completions",
+          "requested_model": "ag/claude-opus-4-6-thinking",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 200000,
+          "configured_max_output_tokens": 8192,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "effort",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      },
+      "deepseek": {
+        "request": {
+          "model": "cbcn/deepseek-v4.1-flash",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          },
+          "max_tokens": 2048,
+          "reasoning_effort": "medium"
+        },
+        "reasoning_observations": [],
+        "response_reasoning": {
+          "items": [
+            {
+              "type": "reasoning",
+              "reasoning_content": "We need answer. Need comply \"Think briefly then answer.\" We can compute 17*23 = 391. Need perhaps brief. Final only."
+            }
+          ]
+        },
+        "response_text": [
+          {
+            "id": "chat-message-0",
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "391"
+              }
+            ]
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 2042,
+          "output_tokens": 32,
+          "total_tokens": 2074,
+          "cost": 0.0,
+          "latency_ms": 2951,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-chat_completions",
+          "model_id": "deepseek-chat_completions",
+          "provider_name": "9router chat_completions",
+          "protocol": "chat_completions",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-chat_completions",
+          "requested_protocol": "chat_completions",
+          "requested_model": "cbcn/deepseek-v4.1-flash",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 1000000,
+          "configured_max_output_tokens": 16384,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "effort",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      }
+    },
+    "messages": {
+      "protocol": "messages",
+      "claude": {
+        "request": {
+          "model": "ag/claude-opus-4-6-thinking",
+          "max_tokens": 2048,
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "stream": true,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "output_config": {
+            "effort": "medium"
+          }
+        },
+        "reasoning_observations": [],
+        "response_reasoning": null,
+        "response_text": [
+          {
+            "id": "messages-text-0",
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "17 × 23 = 17 × 20 + 17 × 3 = 340 + 51 = **391**"
+              }
+            ]
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 2019,
+          "output_tokens": 38,
+          "total_tokens": 2057,
+          "cost": 0.0,
+          "latency_ms": 3696,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-messages",
+          "model_id": "claude-messages",
+          "provider_name": "9router messages",
+          "protocol": "messages",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-messages",
+          "requested_protocol": "messages",
+          "requested_model": "ag/claude-opus-4-6-thinking",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 200000,
+          "configured_max_output_tokens": 8192,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "adaptive",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      },
+      "deepseek": {
+        "request": {
+          "model": "cbcn/deepseek-v4.1-flash",
+          "max_tokens": 2048,
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is 17*23? Think briefly then answer."
+            }
+          ],
+          "stream": true,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "output_config": {
+            "effort": "medium"
+          }
+        },
+        "reasoning_observations": [],
+        "response_reasoning": {
+          "items": [
+            {
+              "type": "reasoning",
+              "call_id": "",
+              "blocks": [
+                {
+                  "type": "thinking",
+                  "thinking": "We need answer. Need think briefly. 17*23 = 391. Need final concise."
+                }
+              ]
+            }
+          ]
+        },
+        "response_text": [
+          {
+            "id": "messages-text-0",
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "391"
+              }
+            ]
+          }
+        ],
+        "actual_model": null,
+        "finish_reason": "completed",
+        "usage": {
+          "input_tokens": 2042,
+          "output_tokens": 22,
+          "total_tokens": 2064,
+          "cost": 0.0,
+          "latency_ms": 2732,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "reported": true,
+          "cost_reported": false
+        },
+        "resolved_public": {
+          "provider_config_id": "eval-messages",
+          "model_id": "deepseek-messages",
+          "provider_name": "9router messages",
+          "protocol": "messages",
+          "base_url": "https://9router.huiju.asia/v1",
+          "requested_provider": "eval-messages",
+          "requested_protocol": "messages",
+          "requested_model": "cbcn/deepseek-v4.1-flash",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "credential_version": "env",
+          "context_window": 1000000,
+          "configured_max_output_tokens": 16384,
+          "accepts_required_tool_call": true,
+          "input_modalities": [
+            "text"
+          ],
+          "reasoning_levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default_reasoning_level": "medium",
+          "reasoning_mode": "adaptive",
+          "requested_tier": null,
+          "sent_tier": "medium"
+        },
+        "selection_source": null
+      }
+    }
+  }
+}
