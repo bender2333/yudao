@@ -112,8 +112,8 @@ class _Opened:
         for model_id in model_ids:
             self.system.facade.record_admission("provider-a", model_id, admitted_model="upstream-a")
 
-def _command(client, name, **body):
-    return client.post(f"/api/commands/{name}", json={"command_id": str(uuid.uuid4()), **body})
+def _command(client, command, **body):
+    return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
 
 def _catalog(client):
     response = client.get("/api/queries/catalog")
@@ -305,6 +305,68 @@ def test_catalog_does_not_check_departments_without_a_written_model(tmp_path):
                                 bindings={"product": {"provider_id": "provider-a", "model_id": "text-model"}})
             assert accepted.status_code == 200, accepted.text
             assert accepted.json()["refs"]["reminders"] == []
+
+def test_project_settings_and_workspace_show_the_reminder(tmp_path):
+    # 项目部门设置写入只有文本的模型时接受结果带提醒；project.settings 与 department.workspace 一直返回它；
+    # 跟随部门默认（项目设置不写模型）时 project.settings 按部门默认同样返回提醒
+    with _Upstream({"data": []}) as upstream:
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
+                                    "models": [_document_model("text-model", input_modalities=["text"]),
+                                               _document_model("vision-model", input_modalities=["text", "image"])],
+                                    "bindings": {}})
+        with running_api(opened) as client:
+            opened.admit("text-model", "vision-model")
+            accepted = _save_quality_default(client, "text-model", base_version=_catalog(client)["revision"])
+            assert accepted.status_code == 200, accepted.text
+            catalog = _catalog(client)
+            assert catalog["department_reminders"]["quality"] == accepted.json()["refs"]["reminders"]
+
+            created = _command(client, "project.create", name="P", goal="建议能力提醒")
+            assert created.status_code == 200, created.text
+            project_id = created.json()["refs"]["project_id"]
+            # 项目设置跟随部门默认：按部门默认的模型返回提醒
+            settings = client.get("/api/queries/project.settings",
+                                  params={"project_id": project_id}).json()["data"]
+            assert settings["departments"]["quality"]["model_id"] is None
+            assert settings["department_reminders"]["quality"] == catalog["department_reminders"]["quality"]
+            assert settings["department_reminders"]["product"] == []
+            # 项目部门设置为质检另选只有文本的模型（与部门默认同值，来源不同）：仍然返回提醒
+            saved = _command(client, "department_settings.save", base_version=0, project_id=project_id,
+                             department="quality", provider_id="provider-a", model_id="text-model")
+            assert saved.status_code == 200, saved.text
+            assert saved.json()["refs"]["reminders"] == catalog["department_reminders"]["quality"]
+            settings = client.get("/api/queries/project.settings",
+                                  params={"project_id": project_id}).json()["data"]
+            assert settings["department_reminders"]["quality"] == catalog["department_reminders"]["quality"]
+            # 部门工作间按当前生效模型返回提醒
+            workspace = client.get("/api/queries/department.workspace",
+                                   params={"project_id": project_id, "department": "quality"}).json()["data"]
+            assert workspace["reminders"] == catalog["department_reminders"]["quality"]
+
+def test_workspace_reminder_disappears_after_the_model_gains_the_capability(tmp_path):
+    # 把部门默认换成含图像输入的模型以后，project.settings 与 department.workspace 的提醒消失
+    with _Upstream({"data": []}) as upstream:
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
+                                    "models": [_document_model("text-model", input_modalities=["text"]),
+                                               _document_model("vision-model", input_modalities=["text", "image"])],
+                                    "bindings": {}})
+        with running_api(opened) as client:
+            opened.admit("text-model", "vision-model")
+            accepted = _save_quality_default(client, "text-model", base_version=_catalog(client)["revision"])
+            assert accepted.status_code == 200, accepted.text
+            created = _command(client, "project.create", name="P", goal="建议能力提醒")
+            project_id = created.json()["refs"]["project_id"]
+            assert client.get("/api/queries/department.workspace",
+                              params={"project_id": project_id, "department": "quality"}
+                              ).json()["data"]["reminders"]
+            accepted = _save_quality_default(client, "vision-model", base_version=_catalog(client)["revision"])
+            assert accepted.status_code == 200, accepted.text
+            settings = client.get("/api/queries/project.settings",
+                                  params={"project_id": project_id}).json()["data"]
+            assert settings["department_reminders"]["quality"] == []
+            workspace = client.get("/api/queries/department.workspace",
+                                   params={"project_id": project_id, "department": "quality"}).json()["data"]
+            assert workspace["reminders"] == []
 
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）
