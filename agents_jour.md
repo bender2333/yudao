@@ -825,3 +825,23 @@ qwen3.8 / 2026-10-02 12:20 / 执行者：工单 #82「像素画面二：世界�
 qwen3.8 / 2026-10-02 12:35 / 执行者：#82 调查结论。按 ADR-0021：把原型 v9 设计说明第 3 至 6、10 节与 BUILD.md 第 3 节的结构用 TypeScript、XState、GSAP、PixiJS 实现，画出概览页的项目楼层。已读：v9 设计说明全文、v9 BUILD.md 第 1 至 4 节、v8 设计说明第 5.2 至 5.4、5.6、5.7、8.3 节、原型源码 js/pixel 下的 ecs.js、floor-decl.js、say.js、floor.js、engine.js（画布原语与场景）、checks/behaviors.js、record.js、replay.js、life.js、scenarios.js、env.js。客户端已具备：registry.ts（原型画法登记表）、char.ts（小人合成）、paint.ts/shapes.ts（陈设与画法，可在离屏 2D 画布绘制）、textures.ts（点阵→PixiJS 纹理）、clock.ts（GSAP 与 PixiJS 共用的确定时钟）、scale.ts、view.ts（PixiJS 挂载点，只有简化的小人）。原型 floor.js 约 1033 行，依赖 engine.js 的 createScene（actor 脚本、飞行动画、粒子、整数倍缩放）与 floor-decl.js 的声明数据。
 
 qwen3.8 / 2026-10-02 12:50 / 执行者：#82 实现方案。分层：一、声明数据由原型 floor-decl.js 与 say.js 在构建期经沙箱导出为 JSON（与 #176 的 registry.json 同一做法，原型不改），TS 一侧提供类型与规则函数。二、世界与系统写成不依赖渲染的 TS 模块 `client/src/renderer/src/pixel/world/`（entity/world/declare/dispatch/characters/packages/pipes/signals/say），直接对世界与状态机运行 behaviors 检查。三、XState 5 为每个角色与每根管道各建一个状态机，GSAP 负责走动与包裹移动，与 PixiJS 共用一个 Clock。四、渲染用既有 paint/shapes 原语在 PixiJS 的画布上绘制；场景需要 actor 脚本、飞行动画与粒子，这些在 view.ts 的简化版里没有，按原型 engine.js 第 4 至 6 节改写成 TS 的场景模块。五、录制脚本从原型页面录 19 个场景的调用序列与事件后固定时刻的状态，存进客户端测试目录；回放测试送进客户端画面比较。六、概览页 #80 留出的「循环画面」位置填入楼层画面，窄屏在下方给文字列表。
+
+qwen3.8 / 2026-10-02 15:10 / 执行者：#82 第 1 轮实现完成并分五次提交（世界与系统、画面与接入、GSAP 走动、录制与回放、视觉核对）。要点与结论：
+
+一、声明数据与规则照原型搬。`client/scripts/generate-floor-decl.mjs` 在构建期把原型 `floor-decl.js` 的房间与管道结构、任务目录、待机活动、说话目录登记的事件类型导出为 `generated/floor-decl.json`；`world/floor-decl.ts` 里持续状态表（`deptRest`、`roleRest`）与事件到任务的解析（`keyOf`）按原型逐行改写为 TypeScript；房间的陈设画法与条件（`props`、`lit`、`tint`）按原型写在 `pixel/floor/render-decl.ts`，声明只记录数据与规则。引擎与画面里没有具体的部门名。
+
+二、世界与系统不依赖渲染。房间与管道按图结构声明（`declareRooms`、`declareLinks`、`declareNodes`、`route`），事件按第 4.2 节的规则派发成任务或信号，角色队列、交接的两端、部门内角色、待机活动、包裹沿管道、管道的惯性流动、说话目录都在 `world/` 下。`pixel-floor.test.ts` 把原型 `behaviors.js` 里关于项目楼层的检查改写为对世界、系统与状态机的测试（31 项），确定时钟与手写数据，全部通过。
+
+三、XState 与 GSAP。每个角色与每根管道各一个状态机（`world/state.ts`）；小人的走动与包裹沿管道折线的移动用 GSAP 的补间推进，与 PixiJS 共用一个 Clock（`clock.ts` 增加了 `reapply`：回调里新建的补间立刻落到「推进到第几毫秒」上，位置与经过时间一致，回放可重复）。
+
+四、录制与回放。`client/scripts/record-floor-calls.mjs` 在原型页面上播放 19 个场景（原型自身有一个场景没有项目，跳过），录下 `setModel`、`playEvent`、`focus`、`setOverlay`、`destroy` 的调用序列，并在每个 `setModel`、`playEvent`、`focus` 之后固定时刻（5000 毫秒，动作收尾以后的静止状态）记录状态：每个角色的任务、队列、姿势、图标、头顶的话、坐标与是否坐着，每个包裹的去向与位置，每根管道的状态与光点，各个信号。录制存入 `client/tests/fixtures/floor/recordings.json`（955 KB），只经 `--write` 更新。`tests/unit/pixel-floor-replay.test.ts` 把调用送进客户端画面逐项比较：18 个场景全部一致，客户端零错误。
+
+五、画面对照。楼层画面在真实浏览器里与原型 v9 的画面对照过（`.tmp/floor-shot.png` 与 `.tmp/proto-floor.png`）：房间排布、管道走向、工位、小人、牌子、信息条、槽位灯一致。概览页的「循环画面」位置已填入楼层画面（`views/project/floor-screen.tsx`），覆盖层按钮按能力清单显示，窄屏在画面下方给文字列表。
+
+qwen3.8 / 2026-10-02 16:20 / 执行者：#82 验收与自测。过程联系表由 `client/scripts/build-floor-contact-sheet.mjs`（原型 checks/life.js 的做法）生成，取三个场景：多角色分派（`sc-todo-roles` 的 `x_role_task_assigned`）、交接（`sc-todo-loop` 的 `transition`）、询问与回答（`sc-metro-ask` 的 `collaboration_requested`），各 12 帧，存 `client/.tmp/floor-life/`，已交给用户查看画风与动作。
+
+发现并修好的一处渲染缺陷：PixiJS 的共享 ticker 被共用时钟停掉以后，画面靠手动时钟推进时不会自己重画；`floor/view.ts` 的 `draw()` 增加一次 `app.renderer.render(app.stage)`。
+
+端到端测试 `client/tests/e2e/floor.spec.ts` 五条用例：循环画面在概览页出现且画布是逻辑宽 640 的整数倍并有内容；画面的状态来自 `project.loop` 的查询、事项的每个状态对应事件日志里的真实事件；断线（离开概览页）再打开以后画面回到查询给出的状态；系统设置为减少动画时画面照常；1440×900 与 390×844 两种尺寸下都可用、控制台错误为零、窄屏无横向溢出。渲染进程用构建产物（服务的访问来源因此是允许的），观测读画布的像素签名与页面上的文字列表。
+
+自测计数：客户端类型检查无错误；客户端单元 `# tests 69 / pass 69 / fail 0`（新增 pixel-floor 31 项与 pixel-floor-replay 1 项）；客户端构建成功；`harness/tests/test_layers.py` 与 `test_openapi_snapshot.py` `3 passed in 12.89s`；前端 `test_web_ui.js` `# tests 47 / pass 47 / fail 0`；后端 `test_project_queries.py`、`test_api.py`、`test_decision_api.py` `37 passed in 56.21s`；Playwright 的 `floor.spec.ts`（5 条）与 `pixel.spec.ts`（4 条）共 `9 passed`，`project.spec.ts` `13 passed`。没有使用 mock、兼容层或者绕过逻辑；没有改动 Python 代码，接口合同与 OpenAPI 快照不变。
